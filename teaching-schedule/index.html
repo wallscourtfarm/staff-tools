@@ -1522,7 +1522,9 @@ function renderBody() {
           const overlay = n && row.id === firstSessionId ? `<div class="non-school-overlay"><span class="non-school-badge">${escHtml(n.label)}</span></div>` : '';
 
           // Get TP activities for this staff member and day
-          const tpActs = isStaffView ? getTPActivities(view, di + 1).filter(a => activityMatchesSession(a, row.id, row)) : [];
+          const staffMember = isStaffView ? STAFF.find(s => s.id === view) : null;
+          const staffName = staffMember ? staffMember.name : '';
+          const tpActs = isStaffView ? getTPActivities(staffName, di + 1).filter(a => activityMatchesSession(a, row.id, row)) : [];
           const tpActHtml = tpActs.map(a => renderTPActivityChip(a)).join('');
 
           // Build cell content
