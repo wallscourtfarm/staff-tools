@@ -109,7 +109,7 @@
 
 // ── CONFIG — edit these ───────────────────────────────────────────────────────
 
-const VIEWER_URL = 'https://imcl75.github.io/wfa/cover-plan/';
+const VIEWER_URL = 'https://wallscourtfarm.github.io/staff-tools/cover-plan/';
 
 // All staff who should receive the notification email.
 const NOTIFICATION_EMAILS = [
