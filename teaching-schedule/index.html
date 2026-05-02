@@ -1055,7 +1055,7 @@ function parseDayRange(dayStr) {
 function getTPActivities(staffName, dayIndex) {
   // dayIndex: 1=Mon, 2=Tue, ... 5=Fri
   if (!TP_ACTIVITIES.length) return [];
-  const matches = TP_ACTIVITIES.filter(row => {
+  return TP_ACTIVITIES.filter(row => {
     const name = (row.Staff || '').trim();
     if (name !== staffName) return false;
     const days = parseDayRange(row.Day);
@@ -1065,8 +1065,6 @@ function getTPActivities(staffName, dayIndex) {
     session: (row.Session || '').trim(),
     colour: (row.Colour || '#64748b').trim()
   }));
-  if (matches.length) console.log('TPActivities for', staffName, 'day', dayIndex, ':', matches);
-  return matches;
 }
 
 function activityMatchesSession(activity, rowId, rowData) {
@@ -1084,14 +1082,8 @@ function activityMatchesSession(activity, rowId, rowData) {
       const rowStart = parseInt(rowMatch[1]) * 60 + parseInt(rowMatch[2]);
       const rowEnd = parseInt(rowMatch[3]) * 60 + parseInt(rowMatch[4]);
       // Activity overlaps with session
-      const overlaps = actStart < rowEnd && actEnd > rowStart;
-      console.log('Time overlap check:', activity.name, 'act:', actStart + '-' + actEnd, 'row:', rowStart + '-' + rowEnd, 'overlaps:', overlaps);
-      return overlaps;
-    } else {
-      console.log('Time regex failed for row:', rowId, 'time:', rowData.time);
+      return actStart < rowEnd && actEnd > rowStart;
     }
-  } else {
-    console.log('No time match for', activity.name, '- activity:', activity.session, 'row.time:', rowData.time || '(empty)', 'row.id:', rowId);
   }
   return false;
 }
@@ -1493,10 +1485,27 @@ function renderBody() {
           const soTags = soList.filter(s => s.isFirst).map(s => `<div class="staff-out-tag" style="background:${s.colour}">${escHtml(s.label)}${s.cover ? `<span class="staff-out-cover"> · ${escHtml(s.cover)}</span>` : ''}</div>`).join('');
           const pad = soList.length ? `margin-left:${soList.length * 5 + 3}px;` : '';
           // TP activities for fixed rows (lunch, FAB, etc.)
-          const staffMember = (view !== 'master') ? STAFF.find(s => s.id === view) : null;
-          const staffName = staffMember ? staffMember.name : '';
-          const tpActs = (view !== 'master') ? getTPActivities(staffName, di + 1).filter(a => activityMatchesSession(a, row.id, row)) : [];
-          const tpActHtml = tpActs.map(a => renderTPActivityChip(a)).join('');
+          let tpActHtml = '';
+          if (view !== 'master') {
+            const staffMember = STAFF.find(s => s.id === view);
+            const staffName = staffMember ? staffMember.name : '';
+            const tpActs = getTPActivities(staffName, di + 1).filter(a => activityMatchesSession(a, row.id, row));
+            tpActHtml = tpActs.map(a => renderTPActivityChip(a)).join('');
+          } else {
+            // On master view, show TP activities for all staff in this year group
+            const staffInYG = STAFF.filter(s => {
+              const staffRow = ALL_SHEET_STAFF.find(r => (r.Name || '').trim() === s.name);
+              if (!staffRow) return false;
+              const yg = (staffRow.YearGroup || '').trim();
+              return yearGroupMatches(yg, YEAR_GROUP);
+            });
+            const allTpActs = [];
+            staffInYG.forEach(s => {
+              const acts = getTPActivities(s.name, di + 1).filter(a => activityMatchesSession(a, row.id, row));
+              allTpActs.push(...acts);
+            });
+            tpActHtml = allTpActs.map(a => renderTPActivityChip(a)).join('');
+          }
           return `<td class="view-cell">${strips}${soTags}${tpActHtml}<div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div></td>`;
         }).join('')}
       </tr>`;
@@ -1543,6 +1552,23 @@ function renderBody() {
           const tpActs = isStaffView ? getTPActivities(staffName, di + 1).filter(a => activityMatchesSession(a, row.id, row)) : [];
           const tpActHtml = tpActs.map(a => renderTPActivityChip(a)).join('');
 
+          // On master view, also show TP activities for staff in this year group
+          let masterTpHtml = '';
+          if (!isStaffView) {
+            const staffInYG = STAFF.filter(s => {
+              const staffRow = ALL_SHEET_STAFF.find(r => (r.Name || '').trim() === s.name);
+              if (!staffRow) return false;
+              const yg = (staffRow.YearGroup || '').trim();
+              return yearGroupMatches(yg, YEAR_GROUP);
+            });
+            const allTpActs = [];
+            staffInYG.forEach(s => {
+              const acts = getTPActivities(s.name, di + 1).filter(a => activityMatchesSession(a, row.id, row));
+              allTpActs.push(...acts);
+            });
+            masterTpHtml = allTpActs.map(a => renderTPActivityChip(a)).join('');
+          }
+
           // Build cell content
           let cellContent;
           if (isStaffView && !row.afterSchool) {
@@ -1550,8 +1576,8 @@ function renderBody() {
             if (ownItems.length === 0 && !afterEvents && !tpActs.length && !n) cellContent = '<div class="drop-hint">drop here</div>';
             else cellContent += renderStaffCell(ownItems, wk, view, day, row.id);
           } else {
-            cellContent = afterEvents;
-            if (items.length === 0 && !afterEvents && !n) cellContent = '<div class="drop-hint">drop here</div>';
+            cellContent = afterEvents + masterTpHtml;
+            if (items.length === 0 && !afterEvents && !masterTpHtml && !n) cellContent = '<div class="drop-hint">drop here</div>';
             cellContent += items.map((item, idx) => renderItem(item, wk, view, day, row.id, idx)).join('');
           }
 
@@ -2518,7 +2544,6 @@ async function init() {
     // NEW: TPActivities tab
     if (tpActivitiesText) {
       TP_ACTIVITIES = csvToObjects(tpActivitiesText);
-      console.log('TPActivities loaded:', TP_ACTIVITIES.length, 'rows');
     }
 
     migrateScheduleKeys();
