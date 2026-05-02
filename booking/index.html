@@ -22,24 +22,27 @@
     .app-header img { height: 40px; }
     .app-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 18px; color: var(--brand); line-height: 1.2; }
     .app-subtitle { font-size: 11px; color: #94a3b8; }
-    .header-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 
     /* ── Week bar ────────────────────────────────────────────────── */
     .top-bar {
       background: white; border-bottom: 1px solid #e2e8f0;
       padding: 6px 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      position: relative;
     }
-    .nav-btn { background: var(--brand-light); border: 1.5px solid var(--brand-border); border-radius: 5px; padding: 5px 11px; cursor: pointer; font-size: 16px; color: var(--brand); line-height: 1; }
+    .nav-btn { background: var(--brand-light); border: 1.5px solid var(--brand-border); border-radius: 5px; padding: 5px 11px; cursor: pointer; font-size: 16px; color: var(--brand); line-height: 1; min-width: 32px; }
     .nav-btn:hover { background: #dbeafe; }
     .nav-btn:disabled { opacity: .35; cursor: default; }
-    .week-label { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 14px; color: var(--brand); width: 280px; text-align: center; flex-shrink: 0; }
-    .sheet-status { font-size: 10px; color: #94a3b8; }
+    .nav-group { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .week-label { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 14px; color: var(--brand); min-width: 300px; text-align: center; }
+    .sheet-status { font-size: 10px; color: #94a3b8; margin-left: auto; }
     .sheet-status.ok { color: #22c55e; }
     .sheet-status.err { color: #f97316; }
 
     @media (max-width: 720px) {
-      .top-bar { padding: 8px 12px; }
-      .week-label { width: 100%; order: -1; text-align: left; }
+      .top-bar { padding: 8px 12px; flex-wrap: wrap; }
+      .nav-group { width: 100%; justify-content: center; }
+      .week-label { min-width: 0; flex: 1; text-align: center; }
+      .sheet-status { margin-left: 0; width: 100%; text-align: center; margin-top: 4px; }
     }
 
     /* ── Body ────────────────────────────────────────────────────── */
@@ -248,15 +251,15 @@
         <div class="app-title" id="appTitle">Resource Booking</div>
         <div class="app-subtitle">Wallscourt Farm Academy</div>
       </div>
-      <div class="header-actions">
-        <span id="sheetStatus" class="sheet-status">● Loading…</span>
-      </div>
     </div>
     <div class="top-bar">
-      <button class="nav-btn" id="btnPrev" onclick="changeWeek(-1)">‹</button>
-      <div class="week-label" id="weekLabel">Loading…</div>
-      <button class="nav-btn" id="btnNext" onclick="changeWeek(1)">›</button>
+      <div class="nav-group">
+        <button class="nav-btn" id="btnPrev" onclick="changeWeek(-1)">‹</button>
+        <div class="week-label" id="weekLabel">Loading…</div>
+        <button class="nav-btn" id="btnNext" onclick="changeWeek(1)">›</button>
+      </div>
       <button class="nav-btn" onclick="goToday()">Today</button>
+      <span id="sheetStatus" class="sheet-status">● Loading…</span>
     </div>
   </div>
 
