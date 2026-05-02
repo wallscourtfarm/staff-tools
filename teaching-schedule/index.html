@@ -1087,11 +1087,12 @@ function activityMatchesSession(activity, rowId, rowData) {
       const overlaps = actStart < rowEnd && actEnd > rowStart;
       if (overlaps) console.log('TPActivity matched:', activity.name, 'to session', rowId, 'time', rowData.time);
       return overlaps;
+    } else {
+      console.log('Time regex failed for row:', rowId, 'time:', rowData.time);
     }
-  }
-  // Debug: log why not matching
-  if (activity.session.includes(':')) {
-    console.log('No match for', activity.name, '- activity:', activity.session, 'row.time:', rowData.time, 'row.id:', rowId);
+  } else if (activity.session.includes(':')) {
+    // Debug: log why not matching
+    console.log('No match for', activity.name, '- activity:', activity.session, 'row.time:', rowData.time || '(empty)', 'row.id:', rowId);
   }
   return false;
 }
