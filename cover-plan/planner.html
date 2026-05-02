@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Release Schedule — Wallscourt Farm Academy</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f4f8; min-height: 100vh; font-size: 13px; }
+
+    .header-strip { background: #1798d3; height: 8px; }
+    header {
+      background: white; padding: 11px 18px;
+      display: flex; align-items: center; gap: 13px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    header img { height: 46px; }
+    .header-title { font-family:'Nunito',sans-serif; font-size:17px; font-weight:900; color:#1798d3; line-height:1.2; }
+    .header-sub { font-size:11px; color:#94a3b8; margin-top:1px; }
+    .demo-badge { font-size:9px; font-weight:bold; background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; padding:1px 6px; border-radius:10px; text-transform:uppercase; letter-spacing:.04em; margin-left:8px; vertical-align:middle; }
+
+    /* View tabs */
+    .view-tabs { margin-left:auto; display:flex; gap:4px; align-items:center; }
+    .view-tab { padding:6px 14px; border:none; border-radius:5px; cursor:pointer; font-family:Arial; font-size:13px; background:#f0f8fd; color:#475569; transition:all .15s; }
+    .view-tab:hover { background:#e0f0fa; }
+    .view-tab.active { background:#1798d3; color:white; font-weight:bold; }
+    .week-nav { display:flex; align-items:center; gap:6px; margin-left:12px; }
+    .week-nav button { padding:5px 11px; border:1px solid #e2e8f0; border-radius:4px; background:white; cursor:pointer; font-size:15px; color:#475569; line-height:1; }
+    .week-nav button:hover { background:#f0f8fd; border-color:#93c5fd; }
+    .week-nav button:disabled { opacity:.35; cursor:default; }
+    #weekLabel { font-family:'Nunito',sans-serif; font-weight:900; font-size:17px; color:#1798d3; text-align:center; min-width:150px; line-height:1.2; }
+    #weekLabel small { display:block; font-size:10px; color:#94a3b8; font-weight:normal; margin-top:1px; }
+
+    .stats-bar { background:white; border-bottom:1px solid #e8eef4; padding:6px 18px; display:flex; gap:18px; font-size:11.5px; color:#64748b; }
+    .stat { display:flex; align-items:center; gap:5px; }
+    .stat-dot { width:7px; height:7px; border-radius:50%; }
+    .stat strong { color:#1e3a8a; }
+
+    .app { display:grid; grid-template-columns:200px 1fr 185px; gap:10px; padding:10px; max-width:1680px; margin:0 auto; align-items:start; }
+
+    .panel { background:white; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:hidden; }
+    .panel-hd { padding:9px 12px 7px; border-bottom:1px solid #f1f5f9; font-family:'Nunito',sans-serif; font-weight:900; font-size:13px; color:#1e3a8a; }
+    .panel-hd small { display:block; font-size:10px; color:#94a3b8; font-weight:normal; font-family:Arial; margin-top:1px; }
+    .panel-body { padding:9px 10px; max-height:calc(100vh - 130px); overflow-y:auto; }
+    .section-label { font-size:9.5px; text-transform:uppercase; letter-spacing:.08em; color:#64748b; font-weight:bold; margin:10px 0 6px; }
+    .section-label:first-child { margin-top:0; }
+
+    /* Teacher chips — two-row (name always visible, ents below) */
+    .teacher-chip { display:flex; flex-direction:column; gap:3px; padding:6px 9px; border:1.5px solid #e2e8f0; border-radius:5px; margin-bottom:4px; cursor:grab; user-select:none; transition:all .12s; background:white; touch-action:none; }
+    .teacher-chip:hover { border-color:#1798d3; box-shadow:0 2px 6px rgba(23,152,211,.15); transform:translateY(-1px); }
+    .teacher-chip.dragging { opacity:.28; pointer-events:none; }
+    .chip-row1 { display:flex; align-items:center; gap:9px; }
+    .chip-row2 { display:flex; align-items:center; gap:7px; padding-left:19px; flex-wrap:wrap; }
+    .yg-pip { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+    .chip-name { font-size:12px; font-weight:bold; color:#111; flex:1; }
+    .chip-done { width:16px; height:16px; border-radius:50%; background:#22c55e; color:white; font-size:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-weight:bold; }
+    .chip-ent-item { display:flex; align-items:center; gap:2px; font-size:9px; color:#64748b; white-space:nowrap; }
+    .ent-mini { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+    .ent-mini.used  { background:#1798d3; }
+    .ent-mini.empty { background:#e2e8f0; border:1px solid #cbd5e1; }
+    .ent-mini.over  { background:#dc2626; }
+
+    /* Cover chips */
+    .cover-chip { display:flex; align-items:center; gap:7px; padding:5px 8px; border:1.5px solid #e2e8f0; border-radius:5px; margin-bottom:4px; cursor:grab; user-select:none; transition:all .12s; background:white; touch-action:none; }
+    .cover-chip:hover { border-color:#1798d3; box-shadow:0 2px 6px rgba(23,152,211,.15); transform:translateY(-1px); }
+    .cover-chip.dragging { opacity:.28; pointer-events:none; }
+    .cover-avatar { width:22px; height:22px; border-radius:50%; color:white; display:flex; align-items:center; justify-content:center; font-size:8.5px; font-weight:bold; flex-shrink:0; }
+    .cover-chip-name { font-size:12px; font-weight:bold; color:#111; }
+    .cover-chip-role { font-size:9.5px; color:#94a3b8; }
+
+    /* Grid */
+    .grid-wrap { background:white; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow-x:auto; }
+    .week-grid { width:100%; border-collapse:collapse; min-width:620px; table-layout:fixed; }
+    .week-grid th { padding:8px 6px; text-align:center; font-size:12px; font-weight:900; font-family:'Nunito',sans-serif; color:#1798d3; border-bottom:2px solid #d1d5db; border-right:1px solid #d1d5db; }
+    .week-grid th.is-today { background:#1798d3; color:white; }
+    .week-grid th:first-child { width:55px; color:#1798d3; border-right:2px solid #d1d5db; font-weight:900; font-family:'Nunito',sans-serif; }
+    .session-cell { font-size:9px; font-weight:900; font-family:'Nunito',sans-serif; color:#1798d3; text-transform:uppercase; letter-spacing:.05em; text-align:center; vertical-align:middle; padding:6px 4px; border-right:2px solid #d1d5db; border-bottom:1px solid #d1d5db; white-space:normal; line-height:1.3; }
+
+    /* Present / share mode — grid only, no side panels */
+    body.present-mode .app > .panel { display:none; }
+    body.present-mode .app { grid-template-columns:1fr; }
+    body.present-mode .header-sub { display:none; }
+    body.present-mode .stats-bar { font-size:12px; }
+    body.present-mode .week-grid th, body.present-mode .week-grid td { font-size:12px; }
+    body.present-mode .slot-item { font-size:12px; }
+    body.present-mode .slot-name { font-size:12.5px; }
+    .grid-cell { vertical-align:top; padding:5px; border-right:1px solid #d1d5db; border-bottom:1px solid #d1d5db; min-height:56px; min-width:115px; transition:background .1s; }
+    .grid-cell.teacher-ready { background:#f8faff; }
+    .grid-cell.teacher-over  { background:#dbeafe !important; outline:2px dashed #1798d3; outline-offset:-2px; }
+    .grid-cell.slot-over     { background:#eff6ff !important; outline:2px dashed #60a5fa; outline-offset:-2px; }
+    .grid-cell.cover-ready .slot-cover-zone { border-color:#93c5fd !important; background:#f0f8fd !important; color:#1798d3 !important; animation:pulse-zone 1.2s ease-in-out infinite; }
+    .grid-cell.cover-over   .slot-cover-zone { border-color:#1798d3 !important; background:#bfdbfe !important; animation:none; }
+    @keyframes pulse-zone { 0%,100%{border-color:#93c5fd} 50%{border-color:#1798d3} }
+    .empty-hint { display:flex; align-items:center; justify-content:center; min-height:40px; color:#e2e8f0; font-size:20px; border-radius:4px; border:1.5px dashed transparent; transition:all .1s; }
+    .grid-cell.teacher-over .empty-hint,.grid-cell.slot-over .empty-hint { color:#1798d3; border-color:#1798d3; }
+
+    /* Slot items */
+    .slot-item { border:1.5px solid #e2e8f0; border-radius:5px; margin-bottom:5px; overflow:hidden; font-size:11px; cursor:grab; touch-action:none; }
+    .slot-item:active { cursor:grabbing; }
+    .slot-item.slot-dragging { opacity:.3; }
+    .slot-hd { display:flex; align-items:center; gap:3px; padding:4px 5px; border-bottom:1px solid rgba(0,0,0,.07); }
+    .slot-pip { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+    .slot-name { font-weight:bold; flex:1; color:#111; font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .reason-sel { font-size:9.5px; font-weight:bold; border:none; border-radius:3px; padding:1px 2px; cursor:pointer; flex-shrink:0; max-width:72px; appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='currentColor' opacity='.5'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 3px center; padding-right:13px; }
+    .slot-del { background:none; border:none; cursor:pointer; color:#cbd5e1; font-size:14px; line-height:1; padding:0 2px; border-radius:2px; flex-shrink:0; }
+    .slot-del:hover { color:#dc2626; background:#fee2e2; }
+    .slot-cover-zone { margin:3px 4px 4px; padding:3px 6px; font-size:10px; color:#94a3b8; border:1.5px dashed #e2e8f0; border-radius:3px; transition:all .12s; cursor:default; }
+    .slot-cover-zone.over { border-color:#1798d3 !important; background:#bfdbfe !important; animation:none !important; }
+    .slot-cover-assigned { margin:3px 4px 4px; padding:3px 6px; font-size:10.5px; font-weight:bold; color:#166534; background:#f0fdf4; border:1.5px solid #86efac; border-radius:3px; display:flex; align-items:center; gap:5px; }
+    .slot-cover-assigned .cv-x { margin-left:auto; background:none; border:none; cursor:pointer; color:#94a3b8; font-size:12px; padding:0 1px; border-radius:2px; }
+    .slot-cover-assigned .cv-x:hover { color:#dc2626; }
+    .cv-mini-avatar { width:16px; height:16px; border-radius:50%; color:white; display:flex; align-items:center; justify-content:center; font-size:7px; font-weight:bold; flex-shrink:0; }
+    .nocover-slot { border-color:#cbd5e1 !important; }
+    .nocover-slot .slot-hd { background:#f8fafc !important; }
+    .nocover-slot .slot-name { color:#475569 !important; }
+
+    /* Cover load panel */
+    .cover-load-row { display:flex; align-items:center; gap:7px; padding:5px 0; border-bottom:1px solid #f8fafc; }
+    .cover-load-row:last-child { border-bottom:none; }
+    .cover-load-avatar { width:22px; height:22px; border-radius:50%; color:white; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:bold; flex-shrink:0; }
+    .cover-load-name { font-size:11.5px; font-weight:bold; color:#111; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cover-load-pips { display:flex; gap:3px; flex-wrap:wrap; }
+    .cover-load-pip { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+    .cover-chip-count { font-size:12px; font-weight:bold; color:#1798d3; background:#e0f2fe; border-radius:8px; padding:1px 7px; margin-left:auto; min-width:22px; text-align:center; }
+
+    /* YG header tints */
+    .syg-Reception .slot-hd{background:#dbeafe} .syg-Y1 .slot-hd{background:#ffedd5} .syg-Y2 .slot-hd{background:#d1fae5}
+    .syg-Y3 .slot-hd{background:#fce7f3} .syg-Y4 .slot-hd{background:#bfdbfe} .syg-Y5 .slot-hd{background:#fed7aa} .syg-Y6 .slot-hd{background:#bbf7d0}
+
+    /* Pips */
+    .pip-Reception,.dot-Reception{background:#93c5fd} .pip-Y1,.dot-Y1{background:#fb923c} .pip-Y2,.dot-Y2{background:#6ee7b7}
+    .pip-Y3,.dot-Y3{background:#f9a8d4} .pip-Y4,.dot-Y4{background:#60a5fa} .pip-Y5,.dot-Y5{background:#fdba74} .pip-Y6,.dot-Y6{background:#4ade80}
+    .pip-,.dot-{background:#cbd5e1}
+
+    /* Reason colours */
+    .rb-PPA{background:#dbeafe;color:#1e40af} .rb-Phase{background:#fce7f3;color:#9d174d} .rb-Leadership{background:#fef3c7;color:#92400e}
+    .rb-Training{background:#ede9fe;color:#5b21b6} .rb-ECT1{background:#fef9c3;color:#713f12} .rb-ECT2{background:#fefce8;color:#854d0e}
+    .rb-RA{background:#e0e7ff;color:#3730a3} .rb-SENCO{background:#f0f9ff;color:#0c4a6e} .rb-Illness{background:#fee2e2;color:#991b1b}
+    .rb-Sports{background:#ccfbf1;color:#0f766e} .rb-Other{background:#f3f4f6;color:#374151}
+
+    /* Cover load (within staff panel) */
+    .cover-load-section { margin-top:4px; border-top:1px solid #f1f5f9; padding-top:8px; }
+
+    /* My view */
+    .my-view-wrap { background:white; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; }
+    .my-name-row { display:flex; align-items:center; gap:10px; margin-bottom:20px; padding:11px 14px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0; }
+    .my-name-row label { font-size:13px; color:#475569; font-weight:bold; flex-shrink:0; }
+    .my-name-row select { padding:6px 10px; font-size:14px; border:1px solid #cbd5e1; border-radius:4px; color:#1e293b; background:white; flex:1; max-width:240px; }
+    .my-week-group { margin-bottom:22px; }
+    .my-week-label { font-size:13px; font-weight:bold; color:#1e3a8a; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+    .my-week-label .wk-badge { font-size:11px; background:#f0f4ff; color:#1e3a8a; padding:1px 8px; border-radius:4px; }
+    .my-entry { display:flex; gap:12px; padding:10px 13px; border-radius:5px; border-left:4px solid #e2e8f0; border:1px solid #e2e8f0; margin-bottom:7px; border-left-width:4px; }
+    .my-badge { font-size:10px; font-weight:bold; padding:2px 7px; border-radius:3px; letter-spacing:.02em; flex-shrink:0; align-self:flex-start; margin-top:1px; }
+    .my-badge.out { background:#ffedd5; color:#c2410c; }
+    .my-badge.covering { background:#dbeafe; color:#1d4ed8; }
+    .my-entry-detail { flex:1; }
+    .my-entry-when { font-size:13px; color:#111; margin-bottom:3px; }
+    .my-entry-info { font-size:12px; color:#555; }
+    .my-entry-cover { font-size:12px; color:#1a1a8c; margin-top:2px; }
+    .my-empty { text-align:center; padding:30px 0; color:#94a3b8; font-size:14px; }
+
+    footer { text-align:center; font-size:11px; color:#cbd5e1; padding:14px 0 22px; }
+
+    /* Event-blocked days */
+    .event-day-header { color:#dc2626; font-size:10px; font-weight:bold; margin-top:2px; letter-spacing:.01em; }
+    .event-day-header.inset { color:#b45309; }
+    .grid-cell.event-blocked {
+      background: repeating-linear-gradient(-45deg, #fef2f2 0, #fef2f2 4px, #fff8f8 4px, #fff8f8 9px) !important;
+      cursor:not-allowed;
+    }
+    .grid-cell.event-blocked.inset {
+      background: repeating-linear-gradient(-45deg, #fffbeb 0, #fffbeb 4px, #fffff5 4px, #fffff5 9px) !important;
+    }
+    .event-cell-label { text-align:center; padding:4px; font-size:9.5px; font-weight:bold; color:#fca5a5; letter-spacing:.03em; }
+    .event-cell-label.inset { color:#fcd34d; }
+
+    /* Day reset button */
+    .day-reset-btn { position:absolute; top:4px; right:4px; background:none; border:none; cursor:pointer; color:#cbd5e1; font-size:10px; padding:1px 3px; border-radius:2px; line-height:1; }
+    .day-reset-btn:hover { color:#dc2626; background:#fee2e2; }
+
+    /* Whole-school session banners */
+    .session-banner { display:flex; align-items:center; justify-content:center; gap:5px; padding:5px 7px; border-radius:4px; font-size:10.5px; font-weight:bold; margin-bottom:4px; text-align:center; }
+    .cell-note { display:flex; align-items:center; gap:5px; padding:4px 7px; background:#1e293b; border-radius:4px; font-size:10.5px; color:white; font-weight:bold; margin-bottom:4px; }
+    .cell-note .note-del { margin-left:auto; background:none; border:none; cursor:pointer; color:rgba(255,255,255,.4); font-size:12px; padding:0 1px; border-radius:2px; }
+    .cell-note .note-del:hover { color:white; background:rgba(255,255,255,.15); }
+    .add-note-btn { display:flex; align-items:center; justify-content:center; gap:4px; width:100%; padding:4px; font-size:10px; color:#cbd5e1; cursor:pointer; border:1.5px dashed transparent; border-radius:4px; background:none; transition:all .12s; }
+    .add-note-btn:hover { color:#94a3b8; border-color:#e2e8f0; }
+
+    /* Action buttons */
+    .action-btn { padding:3px 10px; border:1px solid #e2e8f0; border-radius:4px; background:white; cursor:pointer; font-size:11px; color:#475569; transition:all .12s; }
+    .action-btn:hover:not(:disabled) { border-color:#1798d3; color:#1798d3; }
+    .action-btn.danger:hover { border-color:#dc2626 !important; color:#dc2626 !important; }
+    .action-btn:disabled { opacity:.4; cursor:default; }
+
+    /* Whole-school events manager modal */
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:200; display:flex; align-items:center; justify-content:center; }
+    .modal-overlay.hidden { display:none; }
+    .modal { background:white; border-radius:10px; padding:22px 24px; width:460px; max-width:94vw; box-shadow:0 12px 40px rgba(0,0,0,.25); }
+    .modal-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    .modal-hd h2 { font-family:'Nunito',sans-serif; font-size:16px; font-weight:900; color:#1e3a8a; margin:0; }
+    .modal-hd button { background:none; border:none; cursor:pointer; font-size:20px; color:#94a3b8; line-height:1; padding:0; }
+    .modal-hd button:hover { color:#1e293b; }
+    .ws-list { margin-bottom:14px; }
+    .ws-row { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #f1f5f9; }
+    .ws-row:last-child { border-bottom:none; }
+    .ws-swatch { width:14px; height:14px; border-radius:3px; flex-shrink:0; }
+    .ws-info { flex:1; font-size:12px; }
+    .ws-info strong { display:block; color:#111; }
+    .ws-info span { color:#94a3b8; font-size:10.5px; }
+    .ws-del { background:none; border:none; cursor:pointer; color:#cbd5e1; font-size:14px; padding:2px 4px; border-radius:3px; }
+    .ws-del:hover { color:#dc2626; background:#fee2e2; }
+    .ws-add-form { background:#f8fafc; border-radius:6px; padding:12px; border:1px solid #e2e8f0; }
+    .ws-add-form h3 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#64748b; font-weight:bold; margin:0 0 10px; }
+    .ws-add-row { display:flex; gap:7px; align-items:flex-end; flex-wrap:wrap; }
+    .ws-add-row label { font-size:11px; color:#475569; }
+    .ws-add-row select, .ws-add-row input[type=text] { display:block; margin-top:3px; padding:5px 7px; border:1px solid #e2e8f0; border-radius:4px; font-size:12px; color:#111; background:white; }
+    .ws-add-row input[type=color] { width:32px; height:30px; border:1px solid #e2e8f0; border-radius:4px; padding:1px; cursor:pointer; }
+    .ws-save-btn { padding:5px 14px; background:#1798d3; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold; white-space:nowrap; }
+    .ws-save-btn:hover { background:#1282b8; }
+    .ws-open-btn { padding:3px 9px; border:1px solid #e2e8f0; border-radius:4px; background:white; cursor:pointer; font-size:11px; color:#475569; transition:all .12s; }
+    .ws-open-btn:hover { border-color:#1798d3; color:#1798d3; }
+
+    /* Edit mode toggle */
+    .edit-toggle-btn { padding:4px 11px; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold; transition:all .15s; border:1.5px solid #e2e8f0; background:white; color:#475569; }
+    .edit-toggle-btn:hover { border-color:#1798d3; }
+    .edit-toggle-btn.unlocked { background:#1798d3; color:white; border-color:#1798d3; }
+
+    /* Locked state — disable interactive elements */
+    body.edit-locked .teacher-chip { cursor:default; pointer-events:none; }
+    body.edit-locked .cover-chip   { cursor:default; pointer-events:none; }
+    body.edit-locked .slot-item    { cursor:default; }
+    body.edit-locked .slot-item { pointer-events:none; }
+    body.edit-locked .slot-del     { display:none; }
+    body.edit-locked .slot-cover-zone { pointer-events:none; }
+    body.edit-locked .slot-cover-assigned .cv-x { display:none; }
+    body.edit-locked .reason-sel   { pointer-events:none; }
+    body.edit-locked .reason-note  { pointer-events:none; }
+    body.edit-locked .add-note-btn { display:none; }
+    body.edit-locked .cell-note .note-del { display:none; }
+    body.edit-locked .action-btn   { display:none; }
+    body.edit-locked .ws-open-btn  { display:none; }
+    body.edit-locked .day-reset-btn { display:none; }
+
+    /* Other reason free-text input */
+    .reason-note { font-size:10px; border:1px solid #e2e8f0; border-radius:3px; padding:1px 4px; width:68px; color:#374151; background:#fff; margin-left:2px; vertical-align:middle; }
+    .reason-note:focus { outline:none; border-color:#1798d3; }
+  </style>
+</head>
+<body>
+
+<div class="header-strip"></div>
+<header>
+  <img src="logo.png" alt="Wallscourt Farm Academy">
+  <div>
+    <div class="header-title">Release Schedule</div>
+    <div class="header-sub">Drag teachers into sessions · Drag cover onto TBC slots · Drag slots to move</div>
+  </div>
+  <div class="view-tabs">
+    <button class="view-tab active" id="tab-week" onclick="setView('week')">Week</button>
+    <button class="view-tab" id="tab-mine" onclick="setView('mine')">My view</button>
+    <button class="view-tab" id="tab-present" onclick="setView('present')" title="Full-grid view for sharing on screen">⛶ Present</button>
+    <button class="ws-open-btn" onclick="openWsModal()" title="Manage whole-school events">📅 School events</button>
+    <button class="edit-toggle-btn" id="editToggleBtn" onclick="toggleEditMode()" title="Toggle edit mode"></button>
+  </div>
+  <div class="week-nav">
+    <button id="prevWeek" onclick="changeWeek(-1)">‹</button>
+    <div id="weekLabel"></div>
+    <button id="nextWeek" onclick="changeWeek(1)">›</button>
+  </div>
+</header>
+
+<div class="stats-bar" id="statsBar"></div>
+
+<div class="app" id="app">
+  <!-- Left: teachers -->
+  <div class="panel">
+    <div class="panel-hd">Teachers <small>Drag to mark as out</small></div>
+    <div class="panel-body" id="staffPanel"></div>
+  </div>
+  <!-- Center -->
+  <div id="centerPane"></div>
+  <!-- Right: cover staff -->
+  <div class="panel">
+    <div class="panel-hd">Cover staff <small>Drag onto TBC slots</small></div>
+    <div class="panel-body" id="coverPanel"></div>
+  </div>
+</div>
+
+<!-- Whole-school events manager modal -->
+<div class="modal-overlay hidden" id="wsModal" onclick="closeWsModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-hd">
+      <h2>Whole-school events</h2>
+      <button onclick="closeWsModal()">×</button>
+    </div>
+    <div class="ws-list" id="wsEventList"></div>
+    <div class="ws-add-form">
+      <h3>Add new</h3>
+      <div class="ws-add-row">
+        <label>Day<select id="ws-day">
+          <option value="0">Monday</option><option value="1">Tuesday</option>
+          <option value="2" selected>Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option>
+        </select></label>
+        <label>Session<select id="ws-session">
+          <option>Before School</option><option>AM</option><option>Lunch</option>
+          <option>PM</option><option selected>After School</option>
+        </select></label>
+        <label>Label<input type="text" id="ws-label" placeholder="e.g. Staff Meeting" style="width:130px"></label>
+        <label>Colour<input type="color" id="ws-bg" value="#1e3a8a"></label>
+        <button class="ws-save-btn" onclick="addWsEvent()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>Wallscourt Farm Academy · Release Schedule</footer>
+
+<script>
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const SESSIONS      = ['Before School','AM','Lunch','PM','After School'];
+const OFF_ALLOC     = new Set(['Before School','Lunch','After School']);
+const SESSION_SHORT = {'Before School':'Before School',AM:'AM',Lunch:'Lunch',PM:'PM','After School':'After School'};
+const DAYS          = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+const DAY_IDX       = {Monday:0,Tuesday:1,Wednesday:2,Thursday:3,Friday:4};
+const REASONS       = ['PPA','Phase Lead','Leadership','Training','ECT','ECT1','ECT2','RA','SENCO','Sports','Illness','Other'];
+const REASON_CLS    = {'PPA':'PPA','Phase Lead':'Phase','Leadership':'Leadership','Training':'Training',
+                       'ECT':'ECT1','ECT1':'ECT1','ECT2':'ECT2','RA':'RA','SENCO':'SENCO','Sports':'Sports','Illness':'Illness','Other':'Other'};
+const COUNTED_SESSIONS = new Set(['AM','PM']);
+const BLOCKING_TYPES   = new Set(['Half Term','Christmas','Easter','Summer Holiday','INSET','CLF Conference','Bank Holiday']);
+
+// ── Sheet config ──────────────────────────────────────────────────────────────
+const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
+const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbx6CThsZIBj9pxc0noGkgUMaCHTKgUBASm5-wQCIQ6JELoQ4abIctjlpEGPyE_jrlzR/exec';
+
+// ── Mutable data (populated by init) ─────────────────────────────────────────
+let WEEKS    = [];
+let TEACHERS = [];
+let COVER    = [];
+let EVENTS             = {};  // YYYY-MM-DD → {label,type:'bank-holiday'|'inset'}  — blocking
+let INFO_EVENTS        = {};  // YYYY-MM-DD → [{label,type}]                       — day header banners
+let SESSION_INFO_EVENTS= {};  // 'YYYY-MM-DD|Session' → [{label,type}]             — cell banners
+let RECURRING_SLOTS  = [];   // master copy of recurring, used to seed new weeks
+
+// ── Whole-school events (localStorage-backed; defaults loaded from sheet) ─────
+let WS_SHEET_DEFAULTS = [];
+function wsLoad() {
+  try { const s = localStorage.getItem('wfa_ws_events'); return s ? JSON.parse(s) : WS_SHEET_DEFAULTS; }
+  catch(e) { return WS_SHEET_DEFAULTS; }
+}
+function wsSave() { localStorage.setItem('wfa_ws_events', JSON.stringify(wsEvents)); }
+let wsEvents = [];
+
+// ── Edit mode ─────────────────────────────────────────────────────────────────
+let editMode = localStorage.getItem('wfa_edit_mode') === '1';
+function applyEditMode() {
+  document.body.classList.toggle('edit-locked', !editMode);
+  const btn = document.getElementById('editToggleBtn');
+  if (btn) {
+    btn.textContent = editMode ? '🔓 Editing' : '🔒 View only';
+    btn.classList.toggle('unlocked', editMode);
+  }
+}
+function toggleEditMode() {
+  editMode = !editMode;
+  localStorage.setItem('wfa_edit_mode', editMode ? '1' : '0');
+  applyEditMode();
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const state = {
+  weekIdx:   0,
+  weekSlots: {},
+  dragging:  null,
+  nextId:    200,
+  view:      'week',
+  myName:    '',
+  cellNotes: {},
+};
+
+// ── Colour helpers ────────────────────────────────────────────────────────────
+function contrastColor(hex) {
+  // Returns '#000000' or '#ffffff' — whichever is more readable on the given background.
+  // Uses WCAG relative luminance formula.
+  const c = hex.replace('#','');
+  const r = parseInt(c.slice(0,2),16)/255;
+  const g = parseInt(c.slice(2,4),16)/255;
+  const b = parseInt(c.slice(4,6),16)/255;
+  const toLinear = x => x<=0.04045 ? x/12.92 : Math.pow((x+0.055)/1.055,2.4);
+  const L = 0.2126*toLinear(r) + 0.7152*toLinear(g) + 0.0722*toLinear(b);
+  return L > 0.179 ? '#000000' : '#ffffff';
+}
+
+// ── CSV / Sheet helpers ───────────────────────────────────────────────────────
+function parseCSV(text) {
+  const rows = []; let inQ=false, cur='', cells=[];
+  for (let i=0; i<text.length; i++) {
+    const c=text[i];
+    if (c==='"') { inQ=!inQ; }
+    else if (c===',' && !inQ) { cells.push(cur.trim()); cur=''; }
+    else if ((c==='\n'||c==='\r') && !inQ) {
+      cells.push(cur.trim()); cur='';
+      if (cells.some(x=>x)) rows.push(cells);
+      cells=[];
+      if (c==='\r' && text[i+1]==='\n') i++;
+    } else cur+=c;
+  }
+  cells.push(cur.trim());
+  if (cells.some(x=>x)) rows.push(cells);
+  return rows;
+}
+function csvToObjects(text) {
+  text = text.replace(/^\ufeff/, ''); // strip UTF-8 BOM if present
+  const rows=parseCSV(text);
+  if (rows.length<2) return [];
+  const firstRow=rows[0];
+
+  // Detect gviz combined format: first row has cells like "ColumnName Value"
+  // or "ColumnName " (header + space + data value merged into one cell).
+  // Signature: every cell matches /^[A-Za-z]\w*( .*)?$/ AND at least one has a value.
+  // Detect gviz combined format: "ColumnName Value" in first row.
+  // Empty cells (blank trailing columns) are ignored in the check.
+  const gvizRe=/^([A-Za-z]\w*)( .*)?$/;
+  const nonEmpty = firstRow.filter(h=>h.length>0);
+  const isGviz = nonEmpty.every(h=>gvizRe.test(h))
+    && nonEmpty.some(h=>{ const m=h.match(gvizRe); return m&&m[2]&&m[2].trim(); });
+
+  let headers, dataRows;
+  if (isGviz) {
+    headers  = firstRow.map(h=>{ const m=h.match(gvizRe); return m?m[1]:h; });
+    const firstData = firstRow.map(h=>{ const m=h.match(gvizRe); return m&&m[2]?m[2].trim():''; });
+    dataRows = [firstData, ...rows.slice(1)];
+  } else {
+    headers  = firstRow;
+    dataRows = rows.slice(1);
+  }
+
+  return dataRows.map(r=>{
+    const obj={};
+    headers.forEach((h,i)=>{ if(h) obj[h]=(r[i]||'').trim(); });
+    return obj;
+  });
+}
+function parseDateStr(str) {
+  if (!str) return null;
+  const p=str.split('/');
+  if (p.length!==3) return null;
+  const [d,m,y]=p.map(Number);
+  return new Date(y<100?2000+y:y, m-1, d);
+}
+function dateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ── Data builders ─────────────────────────────────────────────────────────────
+function buildStaff(rows) {
+  const teachers=[], cover=[];
+  rows.forEach(r=>{
+    if (!r.Name) return;
+    const id=r.Name.toLowerCase().replace(/[^a-z0-9]+/g,'_');
+    const isLeader=['Principal','Vice Principal','Assistant Principal'].includes(r.Role);
+    const isInfoOnly=r.Role!=='Class' && ['Principal','Vice Principal','Assistant Principal',
+      'Phase','Phase Lead','SENCO'].includes(r.Role);
+    const ent=[];
+    for (let i=1;i<=4;i++) {
+      const nm=r[`Ent${i}`], n=parseInt(r[`Ent${i}Sessions`])||0;
+      const freq=(r[`Ent${i}Freq`]||'weekly').toLowerCase();
+      if (nm&&n>0) ent.push({r:nm,n,freq});
+    }
+    const workingDays=r.WorkingDays
+      ? r.WorkingDays.split(',').map(d=>parseInt(d.trim())-1).filter(d=>d>=0&&d<=4)
+      : null;
+    // Normalise YR → Reception so CSS pip/syg classes match
+    const yg = r.YearGroup === 'YR' ? 'Reception' : (r.YearGroup || null);
+    // Left panel: Class teachers + non-class staff who have scheduled time (Phase, SENCO, SLT)
+    const LEFT_ROLES = new Set(['Class','Phase','Phase Lead','SENCO','Principal','Vice Principal','Assistant Principal']);
+    if (LEFT_ROLES.has(r.Role)) {
+      const t={id,name:r.Name,yg,role:r.Role,ent,workingDays,isLeader,isInfoOnly};
+      if (isLeader) t.reasons=['Meeting','External Visit','Training','Conference'];
+      teachers.push(t);
+    }
+    if (r.CoverRole) {
+      cover.push({id:'c_'+id, name:r.Name, role:r.CoverRole,
+        init:r.Initials||r.Name.slice(0,2).toUpperCase(), col:r.Colour||'#94a3b8',
+        order: r.Order !== '' && r.Order !== undefined ? parseInt(r.Order) : Infinity});
+    }
+  });
+  cover.sort((a,b) => a.order - b.order);
+  const YG_ORDER  = ['Reception','Y1','Y2','Y3','Y4','Y5','Y6'];
+  const SLT_ROLES = new Set(['Principal','Vice Principal','Assistant Principal']);
+  teachers.sort((a,b) => {
+    // Class teachers first, then non-class based
+    if (a.isInfoOnly && !b.isInfoOnly) return 1;
+    if (!a.isInfoOnly && b.isInfoOnly) return -1;
+    if (a.isInfoOnly && b.isInfoOnly) {
+      // Within non-class based: Phase/SENCO (have entitlements) before SLT
+      const aIsSLT = SLT_ROLES.has(a.role)||a.isLeader, bIsSLT = SLT_ROLES.has(b.role)||b.isLeader;
+      if (aIsSLT && !bIsSLT) return 1;
+      if (!aIsSLT && bIsSLT) return -1;
+    }
+    return (YG_ORDER.indexOf(a.yg) === -1 ? 99 : YG_ORDER.indexOf(a.yg))
+         - (YG_ORDER.indexOf(b.yg) === -1 ? 99 : YG_ORDER.indexOf(b.yg));
+  });
+  return {teachers,cover};
+}
+function buildWeeks(rows) {
+  return rows.map(r=>{
+    const start=parseDateStr(r.StartDate);
+    if (!start||isNaN(start)) return null;
+    return {label:`Term ${r.Term}  Week ${r.Week}`, shortLabel:r.Label, term:+r.Term, week:+r.Week, start};
+  }).filter(Boolean);
+}
+function buildEvents(rows) {
+  const blocking={}, info={}, sessionInfo={};
+  rows.forEach(r=>{
+    if (!r.StartDate) return;
+    const start=parseDateStr(r.StartDate), end=parseDateStr(r.EndDate||r.StartDate);
+    if (!start||!end) return;
+    const isBlock=BLOCKING_TYPES.has(r.Type);
+    const btype=(r.Type==='INSET'||r.Type==='CLF Conference')?'inset':'bank-holiday';
+    const cur=new Date(start);
+    while (cur<=end) {
+      const k=dateKey(cur);
+      if (isBlock) {
+        blocking[k]={label:r.Label||r.Type, type:btype};
+      } else {
+        const lbl=r.Type+(r.Label&&r.Label!==r.Type?' · '+r.Label:'');
+        if (r.Session) {
+          const sk=`${k}|${r.Session}`;
+          if (!sessionInfo[sk]) sessionInfo[sk]=[];
+          sessionInfo[sk].push({label:r.Label||r.Type, type:r.Type, bg:r.Colour||'#1e3a8a'});
+        } else {
+          if (!info[k]) info[k]=[];
+          info[k].push({label:lbl, type:r.Type});
+        }
+      }
+      cur.setDate(cur.getDate()+1);
+    }
+  });
+  return {blocking,info,sessionInfo};
+}
+function buildSchoolEvents(rows) {
+  return rows.map(r=>({
+    day:DAY_IDX[r.Day]??0, session:r.Session, label:r.Label, bg:r.Colour||'#1e3a8a'
+  })).filter(e=>e.label);
+}
+function buildRecurring(rows) {
+  const YG_CODES = new Set(['Reception','YR','Y1','Y2','Y3','Y4','Y5','Y6']);
+  const result=[]; let id=1;
+  rows.forEach(r=>{
+    if (!r.Teacher||!r.Day||!r.Session) return;
+    const dayIdx=DAY_IDX[r.Day];
+    if (dayIdx===undefined) return;
+    const reason=r.Reason||'Other';
+    // Year group shorthand — expand to all class teachers in that group
+    if (YG_CODES.has(r.Teacher)) {
+      const yg = r.Teacher==='YR' ? 'Reception' : r.Teacher;
+      TEACHERS.filter(t=>t.yg===yg && t.role==='Class').forEach(t=>{
+        result.push({id:id++, day:dayIdx, session:r.Session, tid:t.id,
+          reason, reasonNote:'', cover:null, nocover:false});
+      });
+      return;
+    }
+    // Individual teacher by name
+    const t=TEACHERS.find(t=>t.name===r.Teacher);
+    if (!t) return;
+    result.push({id:id++, day:dayIdx, session:r.Session, tid:t.id,
+      reason, reasonNote:'', cover:null, nocover:t.isInfoOnly||false});
+  });
+  return result;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+function currentWeekIdx() {
+  const today=new Date(); today.setHours(0,0,0,0);
+  for (let i=0;i<WEEKS.length;i++) {
+    const end=new Date(WEEKS[i].start); end.setDate(end.getDate()+4);
+    if (today<=end) return i;
+  }
+  return Math.max(0,WEEKS.length-1);
+}
+async function init() {
+  document.getElementById('centerPane').innerHTML=
+    '<div style="padding:60px;text-align:center;color:#94a3b8;font-size:14px">Loading from Google Sheets…</div>';
+  try {
+    const get=tab=>fetch(SHEET_BASE+encodeURIComponent(tab)).then(r=>{if(!r.ok)throw new Error(tab);return r.text();});
+    const [staffTxt,termsTxt,eventsTxt,wseTxt,recTxt]=await Promise.all([
+      get('Staff'),get('Terms'),get('Events'),get('SchoolEvents'),get('Recurring')
+    ]);
+    const {teachers,cover}=buildStaff(csvToObjects(staffTxt));
+    TEACHERS=teachers; COVER=cover;
+    WEEKS=buildWeeks(csvToObjects(termsTxt));
+    const {blocking,info,sessionInfo}=buildEvents(csvToObjects(eventsTxt));
+    EVENTS=blocking; INFO_EVENTS=info; SESSION_INFO_EVENTS=sessionInfo;
+    WS_SHEET_DEFAULTS=buildSchoolEvents(csvToObjects(wseTxt));
+    wsEvents=wsLoad();
+    RECURRING_SLOTS=buildRecurring(csvToObjects(recTxt));
+    // Restore saved planner state, falling back to recurring slots for current week
+    const saved=await stateLoad();
+    if (saved) {
+      state.weekSlots=saved.weekSlots||{};
+      state.cellNotes=saved.cellNotes||{};
+      state.nextId=saved.nextId||200;
+    }
+    state.weekIdx=currentWeekIdx();
+    if (!state.weekSlots[state.weekIdx] || state.weekSlots[state.weekIdx].length===0) state.weekSlots[state.weekIdx]=JSON.parse(JSON.stringify(RECURRING_SLOTS));
+    render();
+  } catch(err) {
+    document.getElementById('centerPane').innerHTML=
+      `<div style="padding:40px;text-align:center;color:#dc2626;font-size:14px">⚠ Could not load sheet data: ${err.message}<br><small style="color:#94a3b8">Check the sheet is published (File → Share → Publish to web)</small></div>`;
+    console.error(err);
+  }
+}
+
+// ── State persistence ─────────────────────────────────────────────────────────
+function stateSave() {
+  const json = JSON.stringify({ weekSlots: state.weekSlots, cellNotes: state.cellNotes, nextId: state.nextId });
+  try { localStorage.setItem('wfa_planner_state', json); } catch(e) {}
+  fetch(SYNC_URL, { method:'POST', body:json }).catch(()=>{});
+}
+async function stateLoad() {
+  try {
+    const res = await fetch(SYNC_URL);
+    const remote = await res.json();
+    if (remote) { localStorage.setItem('wfa_planner_state', JSON.stringify(remote)); return remote; }
+  } catch(e) {}
+  try { const s = localStorage.getItem('wfa_planner_state'); return s ? JSON.parse(s) : null; }
+  catch(e) { return null; }
+}
+
+function slots()        { return state.weekSlots[state.weekIdx] || []; }
+function setSlots(arr)  { state.weekSlots[state.weekIdx] = arr; stateSave(); }
+function teacher(tid)   { return TEACHERS.find(t => t.id === tid); }
+function rbCls(r)       { return 'rb-' + (REASON_CLS[r] || 'Other'); }
+function sygCls(yg)     { return yg ? 'syg-' + yg : ''; }
+function pipCls(yg)     { return 'pip-' + (yg || ''); }
+function dotCls(yg)     { return 'dot-' + (yg || ''); }
+const YG_COLOURS = {Reception:'#dbeafe',Y1:'#ffedd5',Y2:'#d1fae5',Y3:'#fce7f3',Y4:'#bfdbfe',Y5:'#fed7aa',Y6:'#bbf7d0'};
+function ygCol(yg)      { return YG_COLOURS[yg] || '#e2e8f0'; }
+
+function maxEnt(t) { return t.ent.reduce((s,e) => s + e.n, 0); }
+function teacherUsageCount(tid) { return slots().filter(s => s.tid === tid && COUNTED_SESSIONS.has(s.session)).length; }
+function coverByName(name) { return COVER.find(c => c.name.toLowerCase() === (name||'').toLowerCase()); }
+
+// Per-reason usage count for a teacher this week (fortnightly ents also check previous week)
+function teacherReasonUsed(tid) {
+  const used = {};
+  slots().filter(s => s.tid === tid && COUNTED_SESSIONS.has(s.session))
+    .forEach(s => { used[s.reason] = (used[s.reason]||0)+1; });
+  const t = teacher(tid);
+  if (t && state.weekIdx > 0) {
+    const prev = state.weekSlots[state.weekIdx-1] || [];
+    t.ent.filter(e => e.freq === 'fortnightly').forEach(e => {
+      const n = prev.filter(s => s.tid===tid && s.reason===e.r && COUNTED_SESSIONS.has(s.session)).length;
+      if (n > 0) used[e.r] = (used[e.r]||0) + n;
+    });
+  }
+  return used;
+}
+
+// First entitlement reason that still has capacity, or 'Other' if all used
+function firstAvailableReason(tid) {
+  const t = teacher(tid);
+  if (!t) return 'Other';
+  const used = teacherReasonUsed(tid);
+  const avail = t.ent.find(e => (used[e.r]||0) < e.n);
+  return avail?.r || 'Other';
+}
+
+function reasonOptions(tid, current) {
+  const t = teacher(tid);
+  if (!t) return `<option value="Other"${current==='Other'?' selected':''}>Other</option>`;
+  if (t.isLeader) {
+    const opts = [...(t.reasons || []), 'Other'];
+    return opts.map(r => `<option value="${r}"${r===current?' selected':''}>${r}</option>`).join('');
+  }
+  const used = teacherReasonUsed(tid);
+  const opts = [];
+  t.ent.forEach(e => {
+    const remaining = e.n - (used[e.r]||0);
+    if (remaining > 0 || e.r === current) {
+      const suffix = remaining <= 0 ? ' ✓' : e.n > 1 ? ` (${remaining} left)` : '';
+      opts.push(`<option value="${e.r}"${e.r===current?' selected':''}>${e.r}${suffix}</option>`);
+    }
+  });
+  opts.push(`<option value="Other"${current==='Other'?' selected':''}>Other</option>`);
+  return opts.join('');
+}
+
+function allNames() {
+  const names = new Set();
+  slots().forEach(s => {
+    const t = teacher(s.tid);
+    if (t) names.add(t.name);
+    if (s.cover) names.add(s.cover);
+  });
+  return [...names].sort();
+}
+
+function fmtDay(dayIdx, weekStart) {
+  const d = new Date(weekStart); d.setDate(d.getDate() + dayIdx);
+  return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'});
+}
+
+function getDayEvent(weekIdx, dayIdx) {
+  const w = WEEKS[weekIdx];
+  if (!w) return null;
+  const d = new Date(w.start); d.setDate(w.start.getDate() + dayIdx);
+  return EVENTS[dateKey(d)] || null;
+}
+function getDayInfoEvents(weekIdx, dayIdx) {
+  const w = WEEKS[weekIdx];
+  if (!w) return [];
+  const d = new Date(w.start); d.setDate(w.start.getDate() + dayIdx);
+  return INFO_EVENTS[dateKey(d)] || [];
+}
+function getSessionInfoEvents(weekIdx, dayIdx, session) {
+  const w = WEEKS[weekIdx];
+  if (!w) return [];
+  const d = new Date(w.start); d.setDate(w.start.getDate() + dayIdx);
+  return SESSION_INFO_EVENTS[`${dateKey(d)}|${session}`] || [];
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+
+function render() {
+  renderWeekLabel();
+  renderStats();
+  renderStaff();
+  renderCoverStaff();
+  if (state.view === 'mine') renderMyView(); else renderGrid();
+  document.getElementById('tab-week').classList.toggle('active', state.view === 'week');
+  document.getElementById('tab-mine').classList.toggle('active', state.view === 'mine');
+  document.getElementById('tab-present').classList.toggle('active', state.view === 'present');
+  applyEditMode();
+}
+
+function renderWeekLabel() {
+  const w = WEEKS[state.weekIdx];
+  if (!w) { document.getElementById('weekLabel').innerHTML = '—'; return; }
+  const end = new Date(w.start); end.setDate(w.start.getDate() + 4);
+  const fmt = d => d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  document.getElementById('weekLabel').innerHTML = `<div>${w.label}</div><small>${fmt(w.start)} – ${fmt(end)}</small>`;
+  document.getElementById('prevWeek').disabled = state.weekIdx === 0;
+  document.getElementById('nextWeek').disabled = state.weekIdx === WEEKS.length - 1;
+}
+
+function renderStats() {
+  const coverSlots = slots().filter(s => !s.nocover);
+  const total = coverSlots.length, covered = coverSlots.filter(s=>s.cover).length, tbc = total - covered;
+  const pct = total > 0 ? Math.round(covered/total*100) : 100;
+  const bar = `<div style="width:${Math.min(pct,100)}%;height:6px;background:${tbc===0?'#22c55e':'#1798d3'};border-radius:3px;transition:width .3s"></div>`;
+  const canCopy = state.weekIdx < WEEKS.length - 1;
+  document.getElementById('statsBar').innerHTML = `
+    <div class="stat"><div class="stat-dot" style="background:#e2e8f0"></div><span><strong>${total}</strong> sessions out</span></div>
+    <div class="stat"><div class="stat-dot" style="background:#22c55e"></div><span><strong>${covered}</strong> covered</span></div>
+    <div class="stat"><div class="stat-dot" style="background:#ef4444"></div><span><strong>${tbc}</strong> TBC</span></div>
+    <div class="stat" style="flex:1">
+      <div style="flex:1;max-width:180px;background:#e2e8f0;border-radius:3px;overflow:hidden">${bar}</div>
+      <span style="color:#1e3a8a;font-weight:bold;margin-left:6px">${pct}%</span>
+    </div>
+    <div class="stat" style="margin-left:auto;gap:6px">
+      <button class="action-btn" onclick="copyToNextWeek()" ${canCopy?'':'disabled'}>Copy → next week</button>
+      <button class="action-btn danger" onclick="resetWeek()">Reset week</button>
+    </div>`;
+}
+
+function renderStaff() {
+  const classTeachers = TEACHERS.filter(t => !t.isInfoOnly);
+  const leaders = TEACHERS.filter(t => t.isInfoOnly);
+
+  let html = `<div class="section-label">Teachers</div>`;
+
+  classTeachers.forEach(t => {
+    const usedMap = teacherReasonUsed(t.id);
+    const totalSlots = teacherUsageCount(t.id);
+    const namedTotal = maxEnt(t);
+    const allNamedDone = t.ent.length > 0 && t.ent.every(e => (usedMap[e.r]||0) >= e.n);
+    const dragging = state.dragging?.type === 'teacher' && state.dragging.id === t.id;
+
+    let entItems = '';
+    t.ent.forEach(e => {
+      const usedN = usedMap[e.r] || 0;
+      let pips = '';
+      for (let i = 0; i < e.n; i++)     pips += `<div class="ent-mini ${i < usedN ? 'used' : 'empty'}"></div>`;
+      for (let i = e.n; i < usedN; i++) pips += `<div class="ent-mini over"></div>`;
+      entItems += `<span class="chip-ent-item">${e.r} ${pips}</span>`;
+    });
+    const extraCount = Math.max(0, totalSlots - namedTotal);
+    if (extraCount > 0) {
+      let xp = '';
+      for (let i = 0; i < extraCount; i++) xp += `<div class="ent-mini over"></div>`;
+      entItems += `<span class="chip-ent-item">extra ${xp}</span>`;
+    }
+
+    html += `<div class="teacher-chip ${dragging?'dragging':''}"
+      onpointerdown="onTeacherPointerDown(event,'${t.id}')">
+      <div class="chip-row1">
+        <div class="yg-pip ${pipCls(t.yg)}"></div>
+        <span class="chip-name">${t.name}</span>
+        ${allNamedDone ? `<div class="chip-done" title="All named entitlements scheduled">✓</div>` : ''}
+      </div>
+      ${entItems ? `<div class="chip-row2">${entItems}</div>` : ''}
+    </div>`;
+  });
+
+  if (leaders.length) {
+    html += `<div class="section-label" style="margin-top:14px">Non-Class Based</div>`;
+    leaders.forEach(t => {
+      const dragging = state.dragging?.type === 'teacher' && state.dragging.id === t.id;
+      const usedMap = teacherReasonUsed(t.id);
+      const allNamedDone = t.ent.length > 0 && t.ent.every(e => (usedMap[e.r]||0) >= e.n);
+      let entItems = '';
+      t.ent.forEach(e => {
+        const usedN = usedMap[e.r]||0;
+        let pips = '';
+        for (let i=0;i<e.n;i++) pips+=`<div class="ent-mini ${i<usedN?'used':'empty'}"></div>`;
+        for (let i=e.n;i<usedN;i++) pips+=`<div class="ent-mini over"></div>`;
+        entItems += `<span class="chip-ent-item">${e.r} ${pips}</span>`;
+      });
+      html += `<div class="teacher-chip ${dragging?'dragging':''}"
+        onpointerdown="onTeacherPointerDown(event,'${t.id}')">
+        <div class="chip-row1">
+          <div class="yg-pip" style="background:#94a3b8"></div>
+          <span class="chip-name">${t.name}</span>
+          ${allNamedDone ? `<div class="chip-done" title="All named entitlements scheduled">✓</div>` : ''}
+        </div>
+        ${entItems ? `<div class="chip-row2">${entItems}</div>` : ''}
+      </div>`;
+    });
+  }
+
+  document.getElementById('staffPanel').innerHTML = html;
+}
+
+function renderCoverStaff() {
+  const coverCounts = {};
+  slots().forEach(s => { if (s.cover) coverCounts[s.cover] = (coverCounts[s.cover]||0)+1; });
+
+  let html = '';
+  COVER.forEach(c => {
+    const dragging = state.dragging?.type === 'cover' && state.dragging.id === c.id;
+    const n = coverCounts[c.name] || 0;
+    let pipRow = '';
+    for (let i = 0; i < n; i++) pipRow += `<div class="ent-mini used" style="background:${c.col}"></div>`;
+    html += `<div class="cover-chip ${dragging?'dragging':''}"
+      onpointerdown="onCoverPointerDown(event,'${c.id}','${c.name}')">
+      <div class="cover-avatar" style="background:${c.col};color:${contrastColor(c.col)}">${c.init}</div>
+      <div style="flex:1;min-width:0">
+        <div class="cover-chip-name">${c.name}</div>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
+          <span class="cover-chip-role">${c.role}</span>
+          ${n > 0 ? `<div style="display:flex;gap:2px">${pipRow}</div>` : ''}
+        </div>
+      </div>
+      ${n > 0 ? `<span class="cover-chip-count">${n}</span>` : ''}
+    </div>`;
+  });
+  document.getElementById('coverPanel').innerHTML = html;
+}
+
+function renderGrid() {
+  const w = WEEKS[state.weekIdx];
+  const isDragTeacher = state.dragging?.type === 'teacher';
+  const isDragSlot    = state.dragging?.type === 'slot';
+  const isDragCover   = state.dragging?.type === 'cover';
+
+  // Build slot lookup
+  const slotMap = {};
+  DAYS.forEach((_,i) => { slotMap[i] = {}; SESSIONS.forEach(s => { slotMap[i][s] = []; }); });
+  slots().forEach(s => slotMap[s.day][s.session].push(s));
+
+  let html = `<thead><tr>
+    <th></th>
+    ${DAYS.map((d,i) => {
+      const dt = new Date(w.start); dt.setDate(w.start.getDate()+i);
+      const ev = getDayEvent(state.weekIdx, i);
+      const infoEvs = getDayInfoEvents(state.weekIdx, i);
+      const evHtml = ev ? `<div class="event-day-header ${ev.type==='inset'?'inset':''}">${ev.type==='bank-holiday'?'🏦':'📋'} ${ev.label}</div>` : '';
+      const infoHtml = infoEvs.map(e=>`<div class="event-day-header" style="color:#7c3aed">📌 ${e.label}</div>`).join('');
+      const hasSlots = (state.weekSlots[state.weekIdx]||[]).some(s => s.day === i);
+      const resetBtn = hasSlots && !ev ? `<button class="day-reset-btn" onclick="resetDay(${i})" title="Clear ${d}">✕</button>` : '';
+      return `<th style="position:relative">${d.slice(0,3)}<br><span style="font-size:10px;font-weight:normal;opacity:.7">${dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span>${evHtml}${infoHtml}${resetBtn}</th>`;
+    }).join('')}
+  </tr></thead><tbody>`;
+
+  const SESSION_ROW_CLS = {'Before School':'srow-before','AM':'srow-am','Lunch':'srow-lunch','PM':'srow-pm','After School':'srow-after'};
+  SESSIONS.forEach(session => {
+    const isOffAlloc = OFF_ALLOC.has(session);
+    const rowCls = SESSION_ROW_CLS[session] || '';
+    html += `<tr class="${rowCls}"><td class="session-cell">${SESSION_SHORT[session]}</td>`;
+    DAYS.forEach((_,dayIdx) => {
+      const ev = getDayEvent(state.weekIdx, dayIdx);
+      if (ev) {
+        const isCls = ev.type === 'inset' ? 'inset' : '';
+        html += `<td class="grid-cell event-blocked ${isCls}"></td>`;
+        return;
+      }
+
+      const cellSlots = slotMap[dayIdx][session];
+      const hasTBC = cellSlots.some(s => !s.cover && !s.nocover);
+      let readyCls = '';
+      if (isDragTeacher || isDragSlot) readyCls = 'teacher-ready';
+      else if (isDragCover && hasTBC)  readyCls = 'cover-ready';
+
+      html += `<td class="grid-cell ${readyCls}"
+        data-day="${dayIdx}" data-session="${session}">`;
+
+      // Whole-school banner (e.g. Staff Meeting)
+      const wsEventMatches = wsEvents.filter(e => e.day === dayIdx && e.session === session);
+      wsEventMatches.forEach(wsEvent => {
+        html += `<div class="session-banner" style="background:${wsEvent.bg};color:${contrastColor(wsEvent.bg)}">${wsEvent.label}</div>`;
+      });
+
+      // Session-specific info events (e.g. FLC After School on a specific date)
+      getSessionInfoEvents(state.weekIdx, dayIdx, session).forEach(e => {
+        html += `<div class="session-banner" style="background:#7c3aed;color:${contrastColor('#7c3aed')}">${e.label}</div>`;
+      });
+
+      // Per-cell notes (user-added)
+      const noteKey = `${state.weekIdx}-${dayIdx}-${session}`;
+      const cellNote = state.cellNotes[noteKey];
+      if (cellNote) {
+        html += `<div class="cell-note">
+          <span style="flex:1">${cellNote}</span>
+          <button class="note-del" onclick="removeCellNote('${noteKey}')">×</button>
+        </div>`;
+      }
+
+      cellSlots.forEach(s => {
+        const t = teacher(s.tid);
+        const yg = t?.yg || null;
+        const draggingThis = state.dragging?.type === 'slot' && state.dragging.slotId === s.id;
+        const cv = coverByName(s.cover);
+        const coverHtml = s.nocover
+          ? '' // leadership/info entries need no cover
+          : s.cover
+            ? `<div class="slot-cover-assigned" style="background:${ygCol(yg)};color:${contrastColor(ygCol(yg))};border-color:${ygCol(yg)}">
+                 <div class="cv-mini-avatar" style="background:${cv?.col||'#94a3b8'};color:${contrastColor(cv?.col||'#94a3b8')}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</div>
+                 ${s.cover}<button class="cv-x" onclick="unassignCover(${s.id})">×</button>
+               </div>`
+            : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`;
+
+        const noteHtml = s.reason === 'Other'
+          ? `<input class="reason-note" type="text" placeholder="specify…" value="${(s.reasonNote||'').replace(/"/g,'&quot;')}"
+               onclick="event.stopPropagation()"
+               onchange="changeReasonNote(${s.id},this.value)">`
+          : '';
+
+        html += `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''} ${draggingThis?'slot-dragging':''}"
+          onpointerdown="onSlotPointerDown(event,${s.id})">
+          <div class="slot-hd">
+            <div class="slot-pip ${pipCls(yg)}"></div>
+            <span class="slot-name">${t ? t.name : s.tid}</span>
+            <select class="reason-sel ${rbCls(s.reason)}" onchange="changeReason(${s.id},this.value)" onclick="event.stopPropagation()">
+              ${reasonOptions(s.tid, s.reason)}
+            </select>
+            <button class="slot-del" onclick="removeSlot(${s.id})">×</button>
+          </div>
+          ${noteHtml ? `<div style="padding:2px 5px 4px">${noteHtml}</div>` : ''}
+          ${coverHtml}
+        </div>`;
+      });
+
+      if (cellSlots.length === 0 && wsEventMatches.length === 0 && !cellNote) {
+        html += isOffAlloc
+          ? `<button class="add-note-btn" onclick="addCellNote('${noteKey}')">＋ add note</button>`
+          : `<div class="empty-hint">＋</div>`;
+      } else if (isOffAlloc && !cellNote) {
+        html += `<button class="add-note-btn" onclick="addCellNote('${noteKey}')">＋ add note</button>`;
+      }
+      html += `</td>`;
+    });
+    html += `</tr>`;
+  });
+
+  html += `</tbody>`;
+  document.getElementById('centerPane').innerHTML = `<div class="grid-wrap"><table class="week-grid">${html}</table></div>`;
+}
+
+function renderMyView() {
+  const w = WEEKS[state.weekIdx];
+  const names = allNames();
+  const me = state.myName;
+
+  let html = `<div class="my-view-wrap">
+    <div class="my-name-row">
+      <label>Viewing schedule for:</label>
+      <select onchange="setMyName(this.value)">
+        <option value="">— select your name —</option>
+        ${names.map(n => `<option value="${n}" ${n===me?'selected':''}>${n}</option>`).join('')}
+      </select>
+    </div>`;
+
+  if (!me) {
+    html += `<div class="my-empty">Select your name above to see your schedule.</div>`;
+  } else {
+    // Entries where I'm OUT
+    const outEntries = slots().filter(s => {
+      const t = teacher(s.tid);
+      return t && t.name.toLowerCase() === me.toLowerCase();
+    });
+    // Entries where I'm covering someone
+    const coveringEntries = slots().filter(s =>
+      s.cover && s.cover.toLowerCase() === me.toLowerCase()
+    );
+
+    if (outEntries.length === 0 && coveringEntries.length === 0) {
+      html += `<div class="my-empty">No arrangements found for <strong>${me}</strong> this week.</div>`;
+    } else {
+      html += `<div class="my-week-group">
+        <div class="my-week-label"><span class="wk-badge">${WEEKS[state.weekIdx].label}</span></div>`;
+
+      outEntries.forEach(s => {
+        const yg = teacher(s.tid)?.yg;
+        const borderCol = {Reception:'#93c5fd',Y1:'#fb923c',Y2:'#6ee7b7',Y3:'#f9a8d4',Y4:'#60a5fa',Y5:'#fdba74',Y6:'#4ade80'}[yg] || '#e2e8f0';
+        html += `<div class="my-entry" style="border-left-color:${borderCol}">
+          <span class="my-badge out">OUT</span>
+          <div class="my-entry-detail">
+            <div class="my-entry-when">${DAYS[s.day]} · ${s.session}</div>
+            <div class="my-entry-info"><span class="reason-sel ${rbCls(s.reason)}" style="padding:1px 5px;border-radius:3px;font-size:11px">${s.reason}</span></div>
+            <div class="my-entry-cover">${s.cover ? `Covered by: <strong>${s.cover}</strong>` : s.nocover ? `` : `<span style="color:#c00;font-style:italic">Cover TBC</span>`}</div>
+          </div>
+        </div>`;
+      });
+
+      coveringEntries.forEach(s => {
+        const t = teacher(s.tid);
+        const yg = t?.yg;
+        const borderCol = {Reception:'#93c5fd',Y1:'#fb923c',Y2:'#6ee7b7',Y3:'#f9a8d4',Y4:'#60a5fa',Y5:'#fdba74',Y6:'#4ade80'}[yg] || '#e2e8f0';
+        html += `<div class="my-entry" style="border-left-color:${borderCol}">
+          <span class="my-badge covering">COVERING</span>
+          <div class="my-entry-detail">
+            <div class="my-entry-when">${DAYS[s.day]} · ${s.session}</div>
+            <div class="my-entry-info">Covering: <strong>${t ? t.name : s.tid}</strong>
+              <span class="reason-sel ${rbCls(s.reason)}" style="padding:1px 5px;border-radius:3px;font-size:11px;margin-left:6px">${s.reason}</span>
+            </div>
+          </div>
+        </div>`;
+      });
+
+      html += `</div>`;
+    }
+  }
+
+  html += `</div>`;
+  document.getElementById('centerPane').innerHTML = html;
+}
+
+
+// ── Pointer drag ──────────────────────────────────────────────────────────────
+let ptrDrag = null;
+
+function ptrGhostCreate(sourceEl) {
+  ptrGhostRemove();
+  const el = sourceEl.cloneNode(true);
+  el.id = 'drag-ghost';
+  el.style.cssText = `position:fixed;z-index:9999;pointer-events:none;opacity:.85;box-shadow:0 6px 20px rgba(0,0,0,.25);width:${sourceEl.offsetWidth}px;margin:0;top:0;left:0;will-change:transform;`;
+  document.body.appendChild(el);
+  return el;
+}
+function ptrGhostMove(x, y) {
+  const el = document.getElementById('drag-ghost');
+  if (el) el.style.transform = `translate(${x+14}px,${y-18}px)`;
+}
+function ptrGhostRemove() { document.getElementById('drag-ghost')?.remove(); }
+
+function ptrCellAt(x, y) {
+  for (const el of document.elementsFromPoint(x, y)) {
+    if (el.dataset.day !== undefined && el.dataset.session !== undefined)
+      return { dayIdx: +el.dataset.day, session: el.dataset.session, el };
+  }
+  return null;
+}
+function ptrSlotZoneAt(x, y) {
+  for (const el of document.elementsFromPoint(x, y)) {
+    if (el.classList?.contains('slot-cover-zone')) return { slotId: +el.dataset.slot, el };
+  }
+  return null;
+}
+
+let ptrLastHL = null;
+function ptrHL(el, cls) {
+  if (ptrLastHL) { ptrLastHL.el.classList.remove(ptrLastHL.cls); ptrLastHL = null; }
+  if (el) { el.classList.add(cls); ptrLastHL = { el, cls }; }
+}
+
+document.addEventListener('pointermove', e => {
+  if (!ptrDrag) return;
+  if (!ptrDrag.active) {
+    const dx = e.clientX - ptrDrag.startX, dy = e.clientY - ptrDrag.startY;
+    if (Math.hypot(dx, dy) < 8) return;
+    ptrDrag.active = true;
+    ptrGhostCreate(ptrDrag.sourceEl);
+    state.dragging = ptrDrag.info;
+    render();
+  }
+  ptrGhostMove(e.clientX, e.clientY);
+  const d = ptrDrag.info;
+  if (d.type === 'cover') {
+    const zone = ptrSlotZoneAt(e.clientX, e.clientY);
+    ptrHL(zone?.el || null, 'over');
+  } else {
+    const cell = ptrCellAt(e.clientX, e.clientY);
+    ptrHL(cell?.el || null, d.type === 'slot' ? 'slot-over' : 'teacher-over');
+  }
+});
+
+function ptrCommitDrop(x, y) {
+  if (!ptrDrag?.active) return;
+  const d = ptrDrag.info;
+  if (d.type === 'cover') {
+    const zone = ptrSlotZoneAt(x, y);
+    if (zone) {
+      const s = slots().find(x => x.id === zone.slotId);
+      if (s && !s.cover) { s.cover = d.name; stateSave(); }
+    }
+  } else {
+    const cell = ptrCellAt(x, y);
+    if (cell) {
+      const { dayIdx, session } = cell;
+      if (d.type === 'teacher') {
+        if (!getDayEvent(state.weekIdx, dayIdx) &&
+            !slots().find(s => s.tid === d.id && s.day === dayIdx && s.session === session)) {
+          const t = teacher(d.id);
+          if (!t?.workingDays || t.workingDays.includes(dayIdx)) {
+            const isLeader = t?.isLeader || false;
+            const defaultReason = isLeader ? (t.reasons?.[0] || 'Meeting') : firstAvailableReason(d.id);
+            setSlots([...slots(), { id: state.nextId++, day: dayIdx, session, tid: d.id, reason: defaultReason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false }]);
+          }
+        }
+      } else if (d.type === 'slot') {
+        if (!getDayEvent(state.weekIdx, dayIdx)) {
+          const s = slots().find(x => x.id === d.slotId);
+          if (s) { s.day = dayIdx; s.session = session; stateSave(); }
+        }
+      }
+    }
+  }
+}
+
+document.addEventListener('pointerup', e => {
+  if (!ptrDrag) return;
+  ptrCommitDrop(e.clientX, e.clientY);
+  ptrGhostRemove();
+  ptrHL(null);
+  ptrDrag = null;
+  state.dragging = null;
+  render();
+});
+
+document.addEventListener('pointercancel', () => {
+  ptrGhostRemove();
+  ptrHL(null);
+  ptrDrag = null;
+  state.dragging = null;
+  render();
+});
+
+function startPtrDrag(e, info) {
+  if (document.body.classList.contains('edit-locked')) return;
+  if (e.target.closest('button, select, input')) return;
+  e.preventDefault();
+  ptrDrag = { info, sourceEl: e.currentTarget, startX: e.clientX, startY: e.clientY, active: false };
+}
+
+function onTeacherPointerDown(e, tid) {
+  startPtrDrag(e, { type: 'teacher', id: tid });
+}
+function onCoverPointerDown(e, cid, name) {
+  startPtrDrag(e, { type: 'cover', id: cid, name });
+}
+function onSlotPointerDown(e, slotId) {
+  e.stopPropagation();
+  startPtrDrag(e, { type: 'slot', slotId });
+}
+
+// ── Mutations ─────────────────────────────────────────────────────────────────
+
+function removeSlot(slotId)    { setSlots(slots().filter(s => s.id !== slotId)); render(); }
+function unassignCover(slotId) { const s = slots().find(x => x.id === slotId); if (s) { s.cover = null; stateSave(); render(); } }
+function changeReason(slotId, reason) { const s = slots().find(x => x.id === slotId); if (s) { s.reason = reason; if (reason !== 'Other') s.reasonNote = ''; stateSave(); render(); } }
+function changeReasonNote(slotId, note) { const s = slots().find(x => x.id === slotId); if (s) { s.reasonNote = note; stateSave(); } }
+function changeWeek(dir) {
+  state.weekIdx = Math.max(0, Math.min(WEEKS.length-1, state.weekIdx+dir));
+  if (!state.weekSlots[state.weekIdx] || state.weekSlots[state.weekIdx].length===0)
+    state.weekSlots[state.weekIdx] = JSON.parse(JSON.stringify(RECURRING_SLOTS));
+  render();
+}
+function setView(v)            { state.view = v; document.body.classList.toggle('present-mode', v==='present'); render(); }
+function setMyName(n)          { state.myName = n; render(); }
+
+function addCellNote(key) {
+  const existing = state.cellNotes[key] || '';
+  const text = prompt('Add a note for this session:', existing);
+  if (text === null) return; // cancelled
+  if (text.trim()) state.cellNotes[key] = text.trim();
+  else delete state.cellNotes[key];
+  stateSave();
+  render();
+}
+function removeCellNote(key) {
+  delete state.cellNotes[key];
+  stateSave();
+  render();
+}
+
+function resetDay(dayIdx) {
+  if (!confirm(`Clear all slots for ${DAYS[dayIdx]}? This cannot be undone.`)) return;
+  setSlots(slots().filter(s => s.day !== dayIdx));
+  render();
+}
+function resetWeek() {
+  if (!confirm(`Reset ${WEEKS[state.weekIdx].label} to recurring slots only? This cannot be undone.`)) return;
+  setSlots(JSON.parse(JSON.stringify(RECURRING_SLOTS)));
+  render();
+}
+function copyToNextWeek() {
+  const nextIdx = state.weekIdx + 1;
+  if (nextIdx >= WEEKS.length) return;
+  if ((state.weekSlots[nextIdx]||[]).length > 0) {
+    if (!confirm('Next week already has entries — replace with a copy of this week?')) return;
+  }
+  state.weekSlots[nextIdx] = slots().map(s => ({...s, id:state.nextId++}));
+  state.weekIdx = nextIdx;
+  render();
+}
+
+// ── Whole-school events modal ─────────────────────────────────────────────────
+
+function openWsModal() {
+  renderWsModal();
+  document.getElementById('wsModal').classList.remove('hidden');
+}
+function closeWsModal(e) {
+  if (e && e.target !== document.getElementById('wsModal')) return;
+  document.getElementById('wsModal').classList.add('hidden');
+}
+function renderWsModal() {
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  let html = '';
+  if (!wsEvents.length) {
+    html = '<p style="color:#94a3b8;font-size:12px;padding:4px 0 10px">No events yet.</p>';
+  } else {
+    wsEvents.forEach((ev, i) => {
+      html += `<div class="ws-row">
+        <div class="ws-swatch" style="background:${ev.bg}"></div>
+        <div class="ws-info">
+          <strong>${ev.label}</strong>
+          <span>${days[ev.day]} · ${ev.session}</span>
+        </div>
+        <button class="ws-del" onclick="removeWsEvent(${i})">×</button>
+      </div>`;
+    });
+  }
+  document.getElementById('wsEventList').innerHTML = html;
+}
+function addWsEvent() {
+  const label = document.getElementById('ws-label').value.trim();
+  if (!label) { alert('Please enter a label.'); return; }
+  wsEvents.push({
+    day:     parseInt(document.getElementById('ws-day').value),
+    session: document.getElementById('ws-session').value,
+    label,
+    bg:      document.getElementById('ws-bg').value,
+  });
+  wsSave();
+  document.getElementById('ws-label').value = '';
+  renderWsModal();
+  render();
+}
+function removeWsEvent(i) {
+  wsEvents.splice(i, 1);
+  wsSave();
+  renderWsModal();
+  render();
+}
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

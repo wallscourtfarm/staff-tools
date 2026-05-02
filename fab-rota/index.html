@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Fresh Air Break Rota · WFA</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f1f5f9; min-height: 100vh; }
+
+    .app-header { background: white; border-bottom: 2px solid #1798d3; padding: 10px 16px; display: flex; align-items: center; gap: 12px; }
+    .app-header img { height: 40px; }
+    .app-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 18px; color: #1798d3; line-height: 1.2; }
+    .app-subtitle { font-size: 11px; color: #94a3b8; }
+
+    .week-bar { background: white; border-bottom: 1px solid #e2e8f0; padding: 8px 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .nav-btn { background: #f0f8fd; border: 1.5px solid #bae0f5; border-radius: 5px; padding: 5px 11px; cursor: pointer; font-size: 16px; color: #1798d3; line-height: 1; }
+    .nav-btn:hover { background: #dbeafe; }
+    .nav-btn:disabled { opacity: .35; cursor: default; }
+    .week-label { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 15px; color: #1798d3; min-width: 220px; text-align: center; }
+    .action-btn { background: white; border: 1.5px solid #cbd5e1; border-radius: 5px; padding: 5px 11px; font-size: 12px; cursor: pointer; color: #475569; }
+    .action-btn:hover { background: #f8fafc; border-color: #94a3b8; }
+    .action-btn.danger { color: #dc2626; border-color: #fca5a5; }
+    .action-btn.danger:hover { background: #fef2f2; }
+    .sheet-status { font-size: 10px; color: #94a3b8; margin-left: auto; }
+    .sheet-status.ok { color: #22c55e; }
+    .sheet-status.err { color: #f97316; }
+
+    .app-body { display: flex; gap: 10px; padding: 10px; max-width: 1500px; margin: 0 auto; align-items: flex-start; }
+
+    /* Staff panel */
+    .staff-panel { width: 155px; flex-shrink: 0; }
+    .panel-box { background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.07); padding: 10px; }
+    .panel-hd { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 13px; color: #1798d3; margin-bottom: 8px; }
+    .staff-chip { display: flex; align-items: center; gap: 6px; padding: 5px 7px; border: 1.5px solid #e2e8f0; border-radius: 5px; margin-bottom: 4px; cursor: grab; user-select: none; touch-action: none; background: white; transition: border-color .1s; }
+    .staff-chip:hover { border-color: #93c5fd; }
+    .staff-chip.dragging { opacity: .25; }
+    .s-avatar { width: 24px; height: 24px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; flex-shrink: 0; }
+    .s-name { font-size: 11px; font-weight: bold; color: #1e293b; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .s-count { font-size: 10px; font-weight: bold; color: #94a3b8; flex-shrink: 0; }
+    .edit-staff-btn { width: 100%; padding: 5px; border: 1.5px dashed #cbd5e1; border-radius: 5px; background: none; cursor: pointer; font-size: 11px; color: #94a3b8; margin-top: 6px; }
+    .edit-staff-btn:hover { border-color: #1798d3; color: #1798d3; }
+
+    /* Grid */
+    .grid-area { flex: 1; min-width: 0; }
+    .group-block { background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.07); margin-bottom: 10px; overflow: hidden; }
+    .group-hd { background: #1798d3; color: white; padding: 9px 14px; display: flex; align-items: center; gap: 10px; }
+    .group-hd-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 14px; }
+    .group-hd-time { font-size: 11px; opacity: .85; }
+
+    .rota-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .rota-table th { padding: 7px 6px; text-align: center; font-size: 12px; font-weight: 900; font-family: 'Nunito', sans-serif; color: #1798d3; border-bottom: 2px solid #d1d5db; border-right: 1px solid #e2e8f0; background: #f8fafc; }
+    .rota-table th.today { background: #1798d3; color: white; }
+    .rota-table th.zone-hd { width: 115px; text-align: left; padding-left: 12px; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; color: #64748b; border-right: 2px solid #d1d5db; }
+    .rota-table td { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 5px; vertical-align: top; min-height: 52px; }
+    .rota-table td.zone-label { font-weight: bold; font-size: 11px; color: #1e293b; padding: 10px 12px; border-right: 2px solid #d1d5db; background: #f8fafc; vertical-align: middle; }
+    .rota-table td.drop-ready { background: #f0f8fd; }
+    .rota-table td.drop-over { background: #dbeafe !important; outline: 2px dashed #1798d3; outline-offset: -2px; }
+
+    /* Chips in cells */
+    .cell-chips { display: flex; flex-direction: column; gap: 3px; }
+    .assign-chip { display: flex; align-items: center; gap: 4px; padding: 3px 5px; border-radius: 4px; }
+    .a-avatar { width: 16px; height: 16px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 6.5px; font-weight: bold; flex-shrink: 0; }
+    .a-name { font-size: 10.5px; font-weight: bold; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .a-del { background: none; border: none; cursor: pointer; font-size: 12px; color: rgba(0,0,0,.25); padding: 0 1px; line-height: 1; flex-shrink: 0; }
+    .a-del:hover { color: #dc2626; }
+    .drop-hint { font-size: 11px; color: #cbd5e1; padding: 4px 2px; }
+
+    /* Ghost */
+    #drag-ghost { position: fixed; z-index: 9999; pointer-events: none; opacity: .85; box-shadow: 0 6px 20px rgba(0,0,0,.25); top: 0; left: 0; will-change: transform; border-radius: 5px; background: white; }
+
+    /* Modal */
+    .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-bg.open { display: flex; }
+    .modal { background: white; border-radius: 10px; padding: 24px; width: 90%; max-width: 460px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+    .modal h3 { font-family: 'Nunito', sans-serif; font-weight: 900; color: #1798d3; font-size: 16px; margin-bottom: 4px; }
+    .modal-hint { font-size: 11px; color: #94a3b8; margin-bottom: 14px; }
+    .modal-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
+    .modal-row input { border: 1px solid #e2e8f0; border-radius: 4px; padding: 5px 8px; font-size: 13px; }
+    .modal-row input.nm { flex: 1; }
+    .modal-row input.init { width: 42px; text-align: center; font-weight: bold; text-transform: uppercase; }
+    .colour-dot { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; flex-shrink: 0; border: 2px solid transparent; }
+    .colour-dot:hover { border-color: #1e293b; }
+    .del-btn { background: none; border: none; cursor: pointer; color: #cbd5e1; font-size: 16px; line-height: 1; }
+    .del-btn:hover { color: #dc2626; }
+    .modal-add { display: flex; gap: 8px; margin-top: 14px; }
+    .modal-add input { flex: 1; border: 1px solid #e2e8f0; border-radius: 4px; padding: 7px 10px; font-size: 13px; }
+    .modal-add button { background: #1798d3; color: white; border: none; border-radius: 5px; padding: 7px 16px; font-size: 13px; font-weight: bold; cursor: pointer; }
+    .modal-done { width: 100%; margin-top: 14px; background: #f1f5f9; color: #64748b; border: none; border-radius: 5px; padding: 9px; font-size: 13px; font-weight: bold; cursor: pointer; }
+    .modal-done:hover { background: #e2e8f0; }
+  </style>
+</head>
+<body>
+
+<div class="app-header">
+  <img src="logo.png" alt="Wallscourt Farm Academy">
+  <div>
+    <div class="app-title">Fresh Air Break Rota</div>
+    <div class="app-subtitle">Wallscourt Farm Academy</div>
+  </div>
+</div>
+
+<div class="week-bar">
+  <button class="nav-btn" id="btnPrev" onclick="changeWeek(-1)">‹</button>
+  <div class="week-label" id="weekLabel">–</div>
+  <button class="nav-btn" id="btnNext" onclick="changeWeek(1)">›</button>
+  <button class="action-btn" onclick="goToday()">This week</button>
+  <button class="action-btn" onclick="copyToNext()">Copy → next week</button>
+  <button class="action-btn" onclick="setAsTerm()" style="border-color:#a3e635;color:#4d7c0f">Set as term rota</button>
+  <button class="action-btn danger" onclick="resetToTerm()">Reset to term rota</button>
+  <span class="sheet-status" id="sheetStatus">Loading…</span>
+</div>
+
+<div class="app-body">
+  <div class="staff-panel">
+    <div class="panel-box">
+      <div class="panel-hd">Staff</div>
+      <div id="staffList"></div>
+      <button class="edit-staff-btn" onclick="openModal()">＋ Edit staff list</button>
+    </div>
+  </div>
+  <div class="grid-area" id="gridArea"></div>
+</div>
+
+<div class="modal-bg" id="staffModal">
+  <div class="modal">
+    <h3>Staff List</h3>
+    <p class="modal-hint" id="modalHint">Click a colour dot to cycle colours. Staff loads from the school Google Sheet — add temporary staff below if needed.</p>
+    <div id="modalRows"></div>
+    <div class="modal-add">
+      <input id="newName" placeholder="Name" oninput="autoInitials()" onkeydown="if(event.key==='Enter')addStaff()">
+      <input id="newInit" placeholder="Initials" maxlength="3" style="width:64px;flex:none;text-align:center;font-weight:bold;text-transform:uppercase;border:1px solid #e2e8f0;border-radius:4px;padding:7px 8px;font-size:13px">
+      <button onclick="addStaff()">Add</button>
+    </div>
+    <button class="modal-done" onclick="closeModal()">Done</button>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+
+const GROUPS = [
+  { id:'lower', label:'Y1, Y2, Y3', time:'10:30 – 10:45', zones: null },
+  { id:'upper', label:'Y4, Y5, Y6', time:'10:45 – 11:00', zones: ['MUGA','Garden Room (+Bell)','Hard Standing','Trim Trail'] },
+];
+
+const PALETTE = ['#1798d3','#f97316','#22c55e','#e879f9','#64748b'];
+
+const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
+const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let STAFF        = [];
+let WEEKS        = []; // [{ start:Date, term:'T1', week:'W1', label:'T1W1' }, ...]
+let termTemplate = null;
+let state        = { weekIdx: 0, slots: {} };
+let isDragging   = false;
+
+// ── CSV / Sheet helpers ───────────────────────────────────────────────────────
+function parseCSV(text) {
+  const rows = []; let inQ=false, cur='', cells=[];
+  for (let i=0; i<text.length; i++) {
+    const c=text[i];
+    if (c==='"') { inQ=!inQ; }
+    else if (c===',' && !inQ) { cells.push(cur.trim()); cur=''; }
+    else if ((c==='\n'||c==='\r') && !inQ) {
+      cells.push(cur.trim()); cur='';
+      if (cells.some(x=>x)) rows.push(cells);
+      cells=[];
+      if (c==='\r' && text[i+1]==='\n') i++;
+    } else cur+=c;
+  }
+  cells.push(cur.trim());
+  if (cells.some(x=>x)) rows.push(cells);
+  return rows;
+}
+
+function csvToObjects(text) {
+  text = text.replace(/^\ufeff/, '');
+  const rows = parseCSV(text);
+  if (rows.length < 2) return [];
+  const firstRow = rows[0];
+  const gvizRe = /^([A-Za-z]\w*)( .*)?$/;
+  const nonEmpty = firstRow.filter(h => h.length > 0);
+  const isGviz = nonEmpty.every(h => gvizRe.test(h))
+    && nonEmpty.some(h => { const m=h.match(gvizRe); return m&&m[2]&&m[2].trim(); });
+  let headers, dataRows;
+  if (isGviz) {
+    headers  = firstRow.map(h => { const m=h.match(gvizRe); return m?m[1]:h; });
+    const firstData = firstRow.map(h => { const m=h.match(gvizRe); return m&&m[2]?m[2].trim():''; });
+    dataRows = [firstData, ...rows.slice(1)];
+  } else {
+    headers  = firstRow;
+    dataRows = rows.slice(1);
+  }
+  return dataRows.map(r => {
+    const obj = {};
+    headers.forEach((h,i) => { if (h) obj[h]=(r[i]||'').trim(); });
+    return obj;
+  });
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  const p = s.split('/');
+  if (p.length !== 3) return null;
+  const [d,m,y] = p.map(Number);
+  return new Date(y < 100 ? 2000+y : y, m-1, d);
+}
+
+function buildStaff(rows) {
+  const colourById = {};
+  STAFF.forEach(s => { colourById[s.id] = s.col; });
+
+  return rows
+    .filter(r => r.Name && r.Name.trim())
+    .map((r, i) => {
+      const name = r.Name.trim();
+      const init = (r.Initials || '').trim() || mkInitials(name);
+      const id   = name.toLowerCase().replace(/[^a-z0-9]+/g,'_');
+      let col    = colourById[id] || PALETTE[i % PALETTE.length];
+      return { id, name, init, col };
+    });
+}
+
+function buildWeeks(rows) {
+  return rows
+    .filter(r => r.StartDate && r.Term && r.Week)
+    .map(r => {
+      const start = parseDate(r.StartDate.trim());
+      if (!start || isNaN(start)) return null;
+      const term  = String(r.Term).trim();
+      const week  = String(r.Week).trim();
+      return { start, term, week, label: `T${term}W${week}` };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.start - b.start);
+}
+
+// ── Week helpers ──────────────────────────────────────────────────────────────
+function currentWeekIdx() {
+  if (!WEEKS.length) return 0;
+  const today = new Date(); today.setHours(0,0,0,0);
+  for (let i = 0; i < WEEKS.length; i++) {
+    const end = new Date(WEEKS[i].start); end.setDate(end.getDate() + 6);
+    if (today >= WEEKS[i].start && today <= end) return i;
+  }
+  // Return nearest future week, or last if all past
+  for (let i = 0; i < WEEKS.length; i++) {
+    if (WEEKS[i].start > today) return i;
+  }
+  return WEEKS.length - 1;
+}
+
+function currentMonday() {
+  const d = new Date(); d.setHours(0,0,0,0);
+  const day = d.getDay();
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  return d;
+}
+
+function weekMonday() {
+  if (WEEKS.length && WEEKS[state.weekIdx]) return new Date(WEEKS[state.weekIdx].start);
+  const d = currentMonday(); d.setDate(d.getDate() + state.weekIdx * 7); return d;
+}
+
+function weekLabel() {
+  if (WEEKS.length && WEEKS[state.weekIdx]) {
+    const w = WEEKS[state.weekIdx];
+    const end = new Date(w.start); end.setDate(w.start.getDate() + 4);
+    const fmt = x => x.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+    return `${w.label} · ${fmt(w.start)} – ${fmt(end)}`;
+  }
+  const d = weekMonday(), end = new Date(d); end.setDate(d.getDate() + 4);
+  const fmt = x => x.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+  return `${fmt(d)} – ${fmt(end)}`;
+}
+
+function dayDate(di) {
+  const d = weekMonday(); d.setDate(d.getDate() + di);
+  return d.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+}
+
+function isToday(di) {
+  const d = weekMonday(); d.setDate(d.getDate() + di);
+  const t = new Date(); t.setHours(0,0,0,0);
+  return d.getTime() === t.getTime();
+}
+
+// ── Slot helpers ──────────────────────────────────────────────────────────────
+function numZones(g) { return g.zones ? g.zones.length : 1; }
+
+function emptyWeek() {
+  const w = {};
+  GROUPS.forEach(g => {
+    w[g.id] = Array.from({length: numZones(g)}, () => Array.from({length: 5}, () => []));
+  });
+  return w;
+}
+
+function deepCopyWeek(src) {
+  const w = {};
+  GROUPS.forEach(g => {
+    w[g.id] = Array.from({length: numZones(g)}, (_,zi) =>
+      Array.from({length: 5}, (_,di) => [...((src[g.id]?.[zi]?.[di]) || [])])
+    );
+  });
+  return w;
+}
+
+function getWeek() {
+  const key = state.weekIdx;
+  if (!state.slots[key]) {
+    state.slots[key] = termTemplate ? deepCopyWeek(termTemplate) : emptyWeek();
+  }
+  const w = state.slots[key];
+  GROUPS.forEach(g => {
+    if (!w[g.id]) w[g.id] = Array.from({length: numZones(g)}, () => Array.from({length: 5}, () => []));
+    for (let zi = 0; zi < numZones(g); zi++) {
+      if (!w[g.id][zi]) w[g.id][zi] = Array.from({length: 5}, () => []);
+      for (let di = 0; di < 5; di++) {
+        if (!Array.isArray(w[g.id][zi][di])) w[g.id][zi][di] = [];
+      }
+    }
+  });
+  return w;
+}
+
+function getSlot(gid, zi, di)        { return getWeek()[gid][zi][di]; }
+function addToSlot(gid, zi, di, sid) {
+  const arr = getSlot(gid, zi, di);
+  if (!arr.includes(sid)) { arr.push(sid); save(); }
+}
+function removeFromSlot(gid, zi, di, sid) {
+  getWeek()[gid][zi][di] = getSlot(gid, zi, di).filter(s => s !== sid);
+  save(); render();
+}
+
+// ── Persistence ───────────────────────────────────────────────────────────────
+function save() {
+  localStorage.setItem('wfa_fab_state', JSON.stringify(state));
+  localStorage.setItem('wfa_fab_staff', JSON.stringify(STAFF));
+  localStorage.setItem('wfa_fab_term',  JSON.stringify(termTemplate));
+  const staffColours = {};
+  STAFF.forEach(s => { staffColours[s.id] = s.col; });
+  fetch(SYNC_URL, { method:'POST', body: JSON.stringify({ state, termTemplate, staffColours }) }).catch(() => {});
+}
+
+function loadAll() {
+  try {
+    const s = localStorage.getItem('wfa_fab_state');
+    if (s) {
+      const p = JSON.parse(s);
+      state.slots   = p.slots || {};
+      // Migrate from old weekOffset key if present
+      state.weekIdx = p.weekIdx !== undefined ? p.weekIdx : (p.weekOffset || 0);
+    }
+  } catch(e) {}
+  try { const s = localStorage.getItem('wfa_fab_staff'); if (s) STAFF = JSON.parse(s); } catch(e) {}
+  try { const s = localStorage.getItem('wfa_fab_term');  if (s) termTemplate = JSON.parse(s); } catch(e) {}
+}
+
+// ── Staff helpers ─────────────────────────────────────────────────────────────
+function staffById(id) { return STAFF.find(s => s.id === id); }
+
+function mkInitials(name) {
+  const p = name.trim().split(/\s+/);
+  return p.length === 1 ? name.slice(0,2).toUpperCase() : (p[0][0]+p[p.length-1][0]).toUpperCase();
+}
+
+function contrastColor(hex) {
+  if (!hex || hex.length < 7) return '#fff';
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return (0.299*r+0.587*g+0.114*b)/255 > 0.55 ? '#1a1a1a' : '#ffffff';
+}
+
+function staffAssignCount(sid) {
+  const w = getWeek(); let n = 0;
+  GROUPS.forEach(g => {
+    for (let zi=0; zi<numZones(g); zi++)
+      for (let di=0; di<5; di++)
+        if ((w[g.id]?.[zi]?.[di]||[]).includes(sid)) n++;
+  });
+  return n;
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function changeWeek(dir) {
+  if (WEEKS.length) {
+    state.weekIdx = Math.max(0, Math.min(WEEKS.length - 1, state.weekIdx + dir));
+  } else {
+    state.weekIdx += dir;
+  }
+  save(); render();
+}
+
+function goToday() {
+  state.weekIdx = WEEKS.length ? currentWeekIdx() : 0;
+  save(); render();
+}
+
+function copyToNext() {
+  const next = state.weekIdx + 1;
+  if (WEEKS.length && next >= WEEKS.length) { alert('No further weeks in this term.'); return; }
+  const nxt = state.slots[next];
+  const hasData = nxt && GROUPS.some(g => {
+    for (let zi=0; zi<numZones(g); zi++)
+      for (let di=0; di<5; di++)
+        if ((nxt[g.id]?.[zi]?.[di]||[]).length) return true;
+    return false;
+  });
+  if (hasData && !confirm('Next week already has assignments — replace with a copy of this week?')) return;
+  const cur = getWeek();
+  const copy = {};
+  GROUPS.forEach(g => {
+    copy[g.id] = Array.from({length:numZones(g)}, (_,zi) =>
+      Array.from({length:5}, (_,di) => [...(cur[g.id]?.[zi]?.[di]||[])])
+    );
+  });
+  state.slots[next] = copy;
+  state.weekIdx = next;
+  save(); render();
+}
+
+function setAsTerm() {
+  if (!confirm('Save this week\'s rota as the term default? New weeks will auto-fill from it.')) return;
+  termTemplate = deepCopyWeek(getWeek());
+  save();
+  alert('Term rota saved. New weeks will now start with this layout.');
+}
+
+function resetToTerm() {
+  const msg = termTemplate
+    ? 'Reset this week to the term rota? Any changes this week will be lost.'
+    : 'No term rota set yet. Clear all assignments for this week?';
+  if (!confirm(msg)) return;
+  state.slots[state.weekIdx] = termTemplate ? deepCopyWeek(termTemplate) : emptyWeek();
+  save(); render();
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render() {
+  document.getElementById('weekLabel').textContent = weekLabel();
+  if (WEEKS.length) {
+    document.getElementById('btnPrev').disabled = state.weekIdx <= 0;
+    document.getElementById('btnNext').disabled = state.weekIdx >= WEEKS.length - 1;
+  } else {
+    document.getElementById('btnPrev').disabled = false;
+    document.getElementById('btnNext').disabled = false;
+  }
+  renderStaff();
+  renderGrid();
+}
+
+function renderStaff() {
+  const el = document.getElementById('staffList');
+  if (!STAFF.length) {
+    el.innerHTML = '<div style="font-size:11px;color:#94a3b8;padding:4px 0">No staff — loading from sheet…</div>';
+    return;
+  }
+  el.innerHTML = STAFF.map(s => {
+    const n = staffAssignCount(s.id);
+    const dragging = ptrDrag?.info?.staffId === s.id;
+    return `<div class="staff-chip${dragging?' dragging':''}" onpointerdown="onStaffDown(event,'${s.id}')">
+      <div class="s-avatar" style="background:${s.col};color:${contrastColor(s.col)}">${s.init}</div>
+      <span class="s-name">${s.name}</span>
+      ${n ? `<span class="s-count">${n}×</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function chipHtml(gid, zi, di, sid) {
+  const s = staffById(sid);
+  if (!s) return '';
+  return `<div class="assign-chip" style="background:${s.col}22;border:1.5px solid ${s.col}55">
+    <div class="a-avatar" style="background:${s.col};color:${contrastColor(s.col)}">${s.init}</div>
+    <span class="a-name" style="color:#1e293b">${s.name}</span>
+    <button class="a-del" onclick="removeFromSlot('${gid}',${zi},${di},'${sid}')">×</button>
+  </div>`;
+}
+
+function renderGroup(g) {
+  const hasZones = !!g.zones;
+  const dayHeaders = DAYS.map((d,i) => `<th class="${isToday(i)?'today':''}">${d.slice(0,3)}<br><span style="font-size:9px;font-weight:normal;opacity:.7">${dayDate(i)}</span></th>`).join('');
+  const readyCls = isDragging ? 'drop-ready' : '';
+
+  let tbody = '';
+  if (hasZones) {
+    g.zones.forEach((zone, zi) => {
+      tbody += `<tr><td class="zone-label">${zone}</td>`;
+      for (let di=0; di<5; di++) {
+        const ids = getSlot(g.id, zi, di);
+        tbody += `<td class="${readyCls}" data-gid="${g.id}" data-zi="${zi}" data-di="${di}">
+          <div class="cell-chips">
+            ${ids.map(sid => chipHtml(g.id, zi, di, sid)).join('')}
+            <div class="drop-hint">＋</div>
+          </div>
+        </td>`;
+      }
+      tbody += `</tr>`;
+    });
+  } else {
+    tbody += `<tr>`;
+    for (let di=0; di<5; di++) {
+      const ids = getSlot(g.id, 0, di);
+      tbody += `<td class="${readyCls}" data-gid="${g.id}" data-zi="0" data-di="${di}">
+        <div class="cell-chips">
+          ${ids.map(sid => chipHtml(g.id, 0, di, sid)).join('')}
+          <div class="drop-hint">＋</div>
+        </div>
+      </td>`;
+    }
+    tbody += `</tr>`;
+  }
+
+  return `<div class="group-block">
+    <div class="group-hd">
+      <span class="group-hd-title">${g.label}</span>
+      <span class="group-hd-time">${g.time}</span>
+    </div>
+    <table class="rota-table">
+      <thead><tr>
+        ${hasZones ? '<th class="zone-hd"></th>' : ''}
+        ${dayHeaders}
+      </tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>
+  </div>`;
+}
+
+function renderGrid() {
+  document.getElementById('gridArea').innerHTML = GROUPS.map(renderGroup).join('');
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function openModal()  { renderModal(); document.getElementById('staffModal').classList.add('open'); }
+function closeModal() { document.getElementById('staffModal').classList.remove('open'); save(); render(); }
+
+function renderModal() {
+  document.getElementById('modalRows').innerHTML = STAFF.length
+    ? STAFF.map((s,i) => `
+      <div class="modal-row">
+        <div style="width:28px;height:28px;border-radius:50%;background:${s.col};color:${contrastColor(s.col)};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;flex-shrink:0">${s.init}</div>
+        <input class="nm" value="${s.name}" onchange="STAFF[${i}].name=this.value;STAFF[${i}].init=mkInitials(this.value);renderModal()">
+        <input class="init" value="${s.init}" maxlength="3" onchange="STAFF[${i}].init=this.value.toUpperCase();renderModal()">
+        <div class="colour-dot" style="background:${s.col}" title="Click to change colour" onclick="cycleCol(${i})"></div>
+        <button class="del-btn" onclick="STAFF.splice(${i},1);renderModal()">×</button>
+      </div>`).join('')
+    : '<div style="font-size:12px;color:#94a3b8;padding:6px 0">No staff loaded yet.</div>';
+}
+
+function cycleCol(i) {
+  STAFF[i].col = PALETTE[(PALETTE.indexOf(STAFF[i].col)+1) % PALETTE.length];
+  renderModal();
+}
+
+function autoInitials() {
+  const name = document.getElementById('newName').value.trim();
+  document.getElementById('newInit').value = mkInitials(name);
+}
+
+function addStaff() {
+  const name = document.getElementById('newName').value.trim();
+  if (!name) return;
+  const init = (document.getElementById('newInit').value.trim() || mkInitials(name)).toUpperCase().slice(0,3);
+  STAFF.push({ id: name.toLowerCase().replace(/[^a-z0-9]+/g,'_')+'_'+Date.now(), name, init, col: PALETTE[STAFF.length % PALETTE.length] });
+  document.getElementById('newName').value = '';
+  document.getElementById('newInit').value = '';
+  renderModal();
+}
+
+// ── Pointer drag ──────────────────────────────────────────────────────────────
+let ptrDrag = null;
+
+function ptrCellAt(x, y) {
+  for (const el of document.elementsFromPoint(x, y)) {
+    if (el.dataset.gid !== undefined && el.dataset.zi !== undefined && el.dataset.di !== undefined)
+      return { gid: el.dataset.gid, zi: +el.dataset.zi, di: +el.dataset.di, el };
+  }
+  return null;
+}
+
+let ptrLastHL = null;
+function ptrHL(el) {
+  if (ptrLastHL) { ptrLastHL.classList.remove('drop-over'); ptrLastHL = null; }
+  if (el) { el.classList.add('drop-over'); ptrLastHL = el; }
+}
+
+function ptrGhostCreate(src) {
+  document.getElementById('drag-ghost')?.remove();
+  const el = src.cloneNode(true);
+  el.id = 'drag-ghost';
+  el.style.cssText = `position:fixed;z-index:9999;pointer-events:none;opacity:.85;box-shadow:0 6px 20px rgba(0,0,0,.25);width:${src.offsetWidth}px;margin:0;top:0;left:0;will-change:transform;border-radius:5px;`;
+  document.body.appendChild(el);
+}
+function ptrGhostMove(x, y) {
+  const el = document.getElementById('drag-ghost');
+  if (el) el.style.transform = `translate(${x+14}px,${y-18}px)`;
+}
+function ptrGhostRemove() { document.getElementById('drag-ghost')?.remove(); }
+
+document.addEventListener('pointermove', e => {
+  if (!ptrDrag) return;
+  if (!ptrDrag.active) {
+    if (Math.hypot(e.clientX-ptrDrag.startX, e.clientY-ptrDrag.startY) < 8) return;
+    ptrDrag.active = true;
+    isDragging = true;
+    ptrGhostCreate(ptrDrag.sourceEl);
+    render();
+  }
+  ptrGhostMove(e.clientX, e.clientY);
+  ptrHL(ptrCellAt(e.clientX, e.clientY)?.el || null);
+});
+
+document.addEventListener('pointerup', e => {
+  if (!ptrDrag) return;
+  if (ptrDrag.active) {
+    const cell = ptrCellAt(e.clientX, e.clientY);
+    if (cell) { addToSlot(cell.gid, cell.zi, cell.di, ptrDrag.info.staffId); }
+  }
+  ptrGhostRemove(); ptrHL(null);
+  ptrDrag = null; isDragging = false;
+  render();
+});
+
+document.addEventListener('pointercancel', () => {
+  ptrGhostRemove(); ptrHL(null);
+  ptrDrag = null; isDragging = false;
+  render();
+});
+
+function onStaffDown(e, staffId) {
+  if (e.target.closest('button')) return;
+  e.preventDefault();
+  ptrDrag = { info:{staffId}, sourceEl:e.currentTarget, startX:e.clientX, startY:e.clientY, active:false };
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  loadAll();
+  render();
+
+  const status = document.getElementById('sheetStatus');
+  try {
+    const [staffCsv, termsCsv, remoteRaw] = await Promise.all([
+      fetch(SHEET_BASE + 'Staff').then(r => { if (!r.ok) throw new Error('Staff'); return r.text(); }),
+      fetch(SHEET_BASE + 'Terms').then(r => { if (!r.ok) throw new Error('Terms'); return r.text(); }),
+      fetch(SYNC_URL).then(r => r.text()).catch(() => null),
+    ]);
+
+    const sheetStaff = buildStaff(csvToObjects(staffCsv));
+    const sheetWeeks = buildWeeks(csvToObjects(termsCsv));
+
+    if (sheetStaff.length) STAFF = sheetStaff;
+    if (sheetWeeks.length) {
+      WEEKS = sheetWeeks;
+      if (state.weekIdx === 0) state.weekIdx = currentWeekIdx();
+      state.weekIdx = Math.max(0, Math.min(WEEKS.length - 1, state.weekIdx));
+    }
+
+    // Apply remote state (overrides localStorage)
+    if (remoteRaw && remoteRaw !== '{}') {
+      try {
+        const remote = JSON.parse(remoteRaw);
+        if (remote.state) {
+          state.slots   = remote.state.slots   ?? state.slots;
+          state.weekIdx = remote.state.weekIdx  ?? state.weekIdx;
+        }
+        if (remote.termTemplate !== undefined) termTemplate = remote.termTemplate;
+        if (remote.staffColours) {
+          STAFF = STAFF.map(s => ({ ...s, col: remote.staffColours[s.id] || s.col }));
+        }
+      } catch(e) {}
+    }
+
+    localStorage.setItem('wfa_fab_state', JSON.stringify(state));
+    localStorage.setItem('wfa_fab_staff', JSON.stringify(STAFF));
+    localStorage.setItem('wfa_fab_term',  JSON.stringify(termTemplate));
+    status.textContent = `Sheet loaded · ${STAFF.length} staff · ${WEEKS.length} weeks`;
+    status.className = 'sheet-status ok';
+  } catch(e) {
+    console.warn('Sheet load failed, using cached data', e);
+    status.textContent = STAFF.length ? 'Using cached data (offline)' : 'Sheet unavailable — add staff manually';
+    status.className = 'sheet-status err';
+  }
+  render();
+}
+
+init();
+</script>
+</body>
+</html>

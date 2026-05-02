@@ -1,0 +1,2387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Learning Schedule · WFA</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --brand: #1798d3; --brand-light: #f0f8fd; --brand-border: #bae0f5; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f1f5f9; min-height: 100vh; }
+
+    /* ── Sticky top wrapper ──────────────────────────────────────── */
+    .sticky-top { position: sticky; top: 0; z-index: 200; background: white; will-change: transform; }
+
+    /* ── Header ──────────────────────────────────────────────────── */
+    .app-header {
+      background: white; border-bottom: 2px solid var(--brand);
+      padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+    }
+    .app-header img { height: 40px; }
+    .app-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 18px; color: var(--brand); line-height: 1.2; }
+    .app-subtitle { font-size: 11px; color: #94a3b8; }
+    .header-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+    .icon-btn { background: none; border: 1.5px solid #e2e8f0; border-radius: 5px; cursor: pointer; font-size: 16px; color: #64748b; padding: 5px 9px; line-height: 1; }
+    .icon-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
+    .yg-select {
+      font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 13px;
+      color: var(--brand); background: var(--brand-light); border: 1.5px solid var(--brand-border);
+      border-radius: 5px; padding: 5px 9px; cursor: pointer; line-height: 1;
+    }
+    .yg-select:hover { background: #dbeafe; }
+    @media (max-width: 720px) {
+      .app-header { padding: 10px 12px; gap: 10px; }
+      .app-header img { height: 34px; }
+      .app-title { font-size: 16px; }
+      .app-subtitle { font-size: 10px; }
+    }
+
+    /* ── Week / day bar ──────────────────────────────────────────── */
+    .top-bar {
+      background: white; border-bottom: 1px solid #e2e8f0;
+      padding: 6px 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .nav-btn { background: var(--brand-light); border: 1.5px solid var(--brand-border); border-radius: 5px; padding: 5px 11px; cursor: pointer; font-size: 16px; color: var(--brand); line-height: 1; }
+    .nav-btn:hover { background: #dbeafe; }
+    .nav-btn:disabled { opacity: .35; cursor: default; }
+    .week-label { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 14px; color: var(--brand); min-width: 200px; text-align: center; }
+    .action-btn { background: white; border: 1.5px solid #cbd5e1; border-radius: 5px; padding: 5px 11px; font-size: 12px; cursor: pointer; color: #475569; }
+    .action-btn:hover { background: #f8fafc; border-color: #94a3b8; }
+    .action-btn.danger { color: #dc2626; border-color: #fca5a5; }
+    .action-btn.danger:hover { background: #fef2f2; }
+    .sheet-status { font-size: 10px; color: #94a3b8; }
+    .sheet-status.ok { color: #22c55e; }
+    .sheet-status.err { color: #f97316; }
+    .sep { color: #e2e8f0; }
+    @media (max-width: 720px) {
+      .top-bar { padding: 8px 12px; }
+      .week-label { min-width: 100%; order: -1; text-align: left; }
+      .action-btn { padding: 5px 9px; }
+      .sheet-status { width: 100%; }
+    }
+
+    /* ── Day tabs ────────────────────────────────────────────────── */
+    .view-tabs {
+      background: white; border-bottom: 2px solid #e2e8f0;
+      padding: 0 16px; display: flex; gap: 2px; flex-wrap: wrap;
+    }
+    .view-tab {
+      padding: 9px 16px 8px; cursor: pointer;
+      font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 13px;
+      color: #94a3b8; border-bottom: 3px solid transparent; margin-bottom: -2px;
+      transition: color .12s, background .12s; white-space: nowrap; flex-shrink: 0;
+    }
+    .view-tab:hover { color: var(--brand); background: #f8fafc; }
+    .view-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
+    .view-tab-name { font-size: 9px; font-weight: 600; color: #94a3b8; display: block; line-height: 1.2; }
+    .view-tab.active .view-tab-name { color: var(--brand); }
+    @media (max-width: 720px) {
+      .view-tabs { padding: 0 12px; }
+      .view-tab { padding: 8px 12px 7px; font-size: 12px; }
+    }
+
+    /* ── Body ────────────────────────────────────────────────────── */
+    .app-body { display: flex; min-height: calc(100vh - 160px); align-items: stretch; }
+
+    .view-cell {
+      vertical-align: top; padding: 8px; border-right: 1px solid #e2e8f0;
+      border-bottom: 2px solid #d1d5db; min-height: 78px; background: white;
+      position: relative;
+    }
+    .view-cell:last-child { border-right: none; }
+    .day-hd { width: 140px; }
+    .day-hd-name { font-size: 13px; color: #1e293b; }
+    .day-hd-date { font-size: 10px; font-weight: 600; color: #94a3b8; }
+    .day-hd.today .day-hd-name { color: var(--brand); }
+    .day-hd.today .day-hd-date { color: var(--brand); }
+    .time-col { width: 90px; }
+    .slot-label { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 11px; color: var(--brand); display: block; }
+    .slot-time { font-size: 9px; color: #94a3b8; font-weight: 600; }
+    .view-bar {
+      height: 18px; border-radius: 4px; margin-bottom: 6px; padding: 0 6px;
+      display: flex; align-items: center; font-size: 10px; font-weight: 700; color: #1e293b;
+      border: 1px solid rgba(0,0,0,.08);
+    }
+    .split-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .split-half { border-radius: 4px; padding: 5px 6px; font-size: 13px; font-weight: 700; min-height: 38px; }
+    .split-half.drop-over-half { outline: 2px dashed var(--brand); outline-offset: -2px; background: #dbeafe !important; }
+
+    /* ── Staff cell split (TP/LP views) ─────────────────────────── */
+    .staff-own-col { display: flex; flex-direction: column; padding: 2px; gap: 2px; flex: 1; }
+    .staff-own-col .cell-chip { border-radius: 5px; margin-bottom: 0; }
+    .staff-own-col .chip-top { padding: 2px 4px; gap: 3px; }
+    .staff-own-col .chip-name { font-size: 11px; font-weight: 700; }
+    .staff-own-col .chip-colour { width: 6px; height: 6px; }
+    .staff-own-col .chip-handle { font-size: 8px; padding: 0 1px; }
+    .staff-own-col .chip-del { font-size: 11px; }
+    .staff-own-col .chip-split { display: none; }
+    .staff-own-col .chip-note-toggle { font-size: 9px; padding: 0 2px; }
+    @media (max-width: 960px) {
+      .app-body { flex-direction: column; }
+      .subjects-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #e2e8f0; max-height: 180px; }
+    }
+
+    /* ── Subjects sidebar ────────────────────────────────────────── */
+    .subjects-sidebar {
+      width: 130px; flex-shrink: 0; background: white;
+      border-right: 1px solid #e2e8f0; padding: 10px 7px;
+      overflow-y: auto; overflow-x: hidden;
+    }
+    .sidebar-hd {
+      font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 11px;
+      color: #94a3b8; text-transform: uppercase; letter-spacing: .05em;
+      padding: 0 4px 8px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .subj-group { margin-bottom: 6px; }
+    .subj-group.group-empty-label { margin-top: 12px; }
+    .subj-group-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #cbd5e1; padding: 0 5px 2px; }
+    .subj-chip {
+      display: flex; align-items: center; gap: 5px; padding: 5px 6px;
+      border-radius: 5px; margin-bottom: 2px; cursor: grab;
+      user-select: none; touch-action: none; border: 1px solid rgba(0,0,0,.07);
+      transition: filter .1s, transform .1s, box-shadow .1s;
+    }
+    .subj-chip:hover { filter: brightness(.95); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(15,23,42,.06); }
+    .subj-chip.dragging { opacity: .2; }
+    .subj-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .subj-name { font-size: 11px; font-weight: 700; color: #1e293b; line-height: 1.25; }
+
+    /* ── Grid area ───────────────────────────────────────────────── */
+    .grid-area { flex: 1; min-width: 0; padding: 12px; overflow-x: auto; }
+
+    .sched-table { width: 100%; border-collapse: collapse; min-width: 560px; background: white; table-layout: fixed; }
+
+    /* Header row */
+    .sched-table th {
+      padding: 8px 10px; text-align: center; background: #f8fafc;
+      border-bottom: 2px solid #e2e8f0; border-right: 1px solid #e2e8f0;
+      font-family: 'Nunito', sans-serif; font-weight: 900;
+    }
+    .sched-table th:last-child { border-right: none; }
+    .sched-table th.time-hd { width: 90px; border-right: 2px solid #d1d5db; }
+    .staff-hd-name { font-size: 13px; color: #1e293b; }
+    .staff-hd-role { font-size: 10px; font-weight: 600; color: #94a3b8; }
+    .staff-hd-colour { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+
+    /* Fixed rows */
+    .sched-table .fixed-row td {
+      background: var(--brand-light); padding: 7px 14px;
+      border-bottom: 1px solid var(--brand-border);
+    }
+    .sched-table .fixed-row td.time-cell {
+      font-size: 9.5px; color: var(--brand); font-weight: 700;
+      border-right: 2px solid var(--brand-border); white-space: nowrap;
+      padding: 7px 6px;
+    }
+    .sched-table .fixed-row td.span-cell {
+      border-right: none;
+    }
+    .fixed-label { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 12px; color: var(--brand); position: relative; z-index: 1; }
+    .fixed-sub { font-size: 9.5px; color: var(--brand); opacity: 0.6; }
+
+    /* FAB row highlight — slightly stronger tint */
+    .sched-table .fixed-row.fab-row td { background: var(--brand-light); }
+    .sched-table .fixed-row.fab-row .fixed-label { color: var(--brand); }
+    .sched-table .fixed-row.story-row td { background: #fef2f2; }
+    .sched-table .fixed-row.story-row .fixed-label { color: #e34234; }
+
+    /* Session rows */
+    .sched-table .session-row td.time-cell {
+      font-size: 9.5px; color: #64748b; font-weight: 700;
+      border-right: 2px solid #d1d5db; padding: 10px 6px;
+      background: #f8fafc; vertical-align: top; white-space: nowrap;
+      border-bottom: 2px solid #d1d5db;
+    }
+    .session-label { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 11px; color: var(--brand); display: block; }
+    .session-time { font-size: 9px; color: #94a3b8; font-weight: 600; }
+
+    .sched-table .session-row td.view-cell {
+      vertical-align: top; padding: 5px; border-right: 1px solid #e2e8f0;
+      border-bottom: 2px solid #d1d5db; min-height: 90px;
+      transition: background .1s;
+    }
+    .sched-table .session-row td.view-cell:last-child { border-right: none; }
+    .sched-table .session-row td.view-cell.drop-over {
+      background: #dbeafe !important; outline: 2px dashed var(--brand); outline-offset: -3px;
+    }
+    .drop-hint { font-size: 10px; color: #d1d5db; padding: 6px 4px; text-align: center; position: relative; z-index: 1; }
+
+    /* ── Cell chips ──────────────────────────────────────────────── */
+    .cell-chip {
+      border-radius: 7px; margin-bottom: 3px; overflow: hidden;
+      border: 1px solid rgba(0,0,0,.1); box-shadow: 0 1px 2px rgba(15,23,42,.04);
+      display: flex; flex-direction: column; position: relative; z-index: 1;
+    }
+    .chip-top { display: flex; align-items: center; gap: 4px; padding: 4px 6px; }
+    .chip-colour { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .chip-colour.colourable { cursor: pointer; width: 10px; height: 10px; border: 1.5px solid #fff; box-shadow: 0 0 0 1px #94a3b8; }
+    .hz-colour-pop { position: absolute; top: 18px; left: 4px; background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; display: flex; gap: 3px; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+    .hz-colour-pop span { width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+    .hz-colour-pop span:hover { border-color: #1e293b; }
+    .chip-name { font-size: 13px; font-weight: 800; flex: 1; line-height: 1.25; color: #1e293b; font-family: 'Nunito', sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip-handle {
+      cursor: grab; font-size: 10px; color: rgba(0,0,0,.18); padding: 0 2px;
+      line-height: 1; flex-shrink: 0; user-select: none; touch-action: none;
+    }
+    .chip-handle:hover { color: rgba(0,0,0,.45); }
+    .cell-chip.dragging { opacity: .3; }
+    .chip-del {
+      background: none; border: none; cursor: pointer;
+      font-size: 13px; color: rgba(0,0,0,.25); padding: 0 1px; line-height: 1; flex-shrink: 0;
+    }
+    .chip-del:hover { color: #dc2626; }
+    .chip-split {
+      background: none; border: none; cursor: pointer;
+      font-size: 11px; color: rgba(0,0,0,.15); padding: 0 2px; line-height: 1; flex-shrink: 0;
+    }
+    .chip-split:hover { color: var(--brand); }
+    .chip-note-wrap {
+      padding: 3px 7px 4px; border-top: 1px solid rgba(0,0,0,.06);
+      background: rgba(255,255,255,.55);
+    }
+    .chip-note-toggle {
+      display: block; background: none; border: none; cursor: pointer;
+      font-size: 13px; font-weight: 800; color: rgba(0,0,0,.2); line-height: 1;
+      padding: 0; font-family: 'Nunito', sans-serif;
+    }
+    .chip-note-toggle:hover { color: var(--brand); }
+    .chip-note-toggle.has-note { display: none; }
+    .chip-note {
+      width: 100%; border: none; outline: none; background: transparent;
+      font-size: 11px; color: #334155; font-family: 'Nunito', sans-serif; font-weight: 600;
+      padding: 0; resize: none; line-height: 1.35; min-height: 15px;
+    }
+    .chip-note::placeholder { color: #cbd5e1; font-style: italic; }
+    .chip-note.hidden { display: none; }
+    .cell-chip:hover { box-shadow: 0 3px 8px rgba(15,23,42,.08); }
+
+    /* ── Non-school day ────────────────────────────────────────────── */
+    .non-school-day { background: #f1f5f9 !important; position: relative; }
+    .non-school-day .session-label,
+    .non-school-day .session-time { color: #94a3b8; }
+    .non-school-day .view-cell { background: #f1f5f9 !important; min-height: 0 !important; }
+    .non-school-day .view-cell .drop-hint { display: none; }
+    .non-school-day .cell-chip { opacity: .3; pointer-events: none; }
+    .non-school-overlay {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      pointer-events: none; z-index: 5;
+    }
+    .non-school-badge {
+      background: #e2e8f0; color: #64748b; padding: 4px 10px; border-radius: 5px;
+      font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 12px;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    th.non-school-day { background: #f1f5f9 !important; }
+    th.non-school-day .day-hd-name,
+    th.non-school-day .day-hd-date { color: #94a3b8 !important; }
+    .sched-table .fixed-row td.non-school-day { background: #f1f5f9 !important; }
+
+    /* ── Staff-out spans (PPA, Leadership, etc.) ──────────────── */
+    .staff-out-strip {
+      position: absolute; top: 0; bottom: -3px; width: 3px;
+      pointer-events: none; z-index: 2;
+    }
+    .staff-out-strip.strip-first { border-radius: 3px 3px 0 0; top: 0; }
+    .staff-out-strip.strip-last  { border-radius: 0 0 3px 3px; bottom: 0; }
+    .staff-out-strip.strip-only  { border-radius: 3px; top: 0; bottom: 0; }
+    .staff-out-strip.strip-mid   { border-radius: 0; }
+    .staff-out-tag {
+      position: relative; z-index: 1;
+      display: inline-flex; align-items: center; gap: 4px;
+      color: white;
+      font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 11px;
+      padding: 2px 8px; border-radius: 4px;
+      margin-bottom: 4px; margin-left: 6px; white-space: nowrap;
+    }
+    .staff-out-cover {
+      font-weight: 600; font-size: 10px;
+      color: rgba(255,255,255,.85);
+    }
+    .day-hd-add {
+      display: inline-block; font-size: 13px; font-weight: 800;
+      color: var(--brand); cursor: pointer; margin-left: 4px; line-height: 1;
+      vertical-align: middle; border-radius: 3px;
+    }
+    .day-hd-add:hover { background: #dbeafe; }
+    .day-event-tag {
+      display: inline-block; font-size: 8.5px; font-weight: 700;
+      padding: 1px 5px; border-radius: 3px; margin-top: 2px;
+      color: #475569; background: #e2e8f0; white-space: nowrap;
+      max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+    }
+    .chip-resize {
+      height: 4px; cursor: ns-resize; margin: 0 4px;
+      border-radius: 0 0 4px 4px; opacity: .15; transition: opacity .1s;
+    }
+    .cell-chip:hover .chip-resize { opacity: .35; }
+    .chip-resize:hover { opacity: .6 !important; }
+
+    /* ── Drag ghost ──────────────────────────────────────────────── */
+    #drag-ghost {
+      position: fixed; z-index: 9999; pointer-events: none;
+      top: 0; left: 0; will-change: transform;
+      background: white; border-radius: 5px; padding: 5px 9px;
+      box-shadow: 0 6px 20px rgba(0,0,0,.28); opacity: .92;
+      font-size: 11px; font-weight: 700; display: flex; align-items: center;
+      gap: 5px; white-space: nowrap; border: 1px solid rgba(0,0,0,.1);
+    }
+
+    /* ── Modals ──────────────────────────────────────────────────── */
+    .modal-bg {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.45); z-index: 1000;
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-bg.open { display: flex; }
+    .modal {
+      background: white; border-radius: 10px; padding: 24px;
+      width: 100%; max-width: 600px; max-height: 85vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    }
+    .modal h3 { font-family: 'Nunito', sans-serif; font-weight: 900; color: var(--brand); font-size: 17px; margin-bottom: 4px; }
+    .modal-hint { font-size: 11px; color: #94a3b8; margin-bottom: 16px; }
+    .staff-modal-row { padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+    .staff-modal-row:last-of-type { border-bottom: none; }
+    .smr-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .smr-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: white; flex-shrink: 0; font-family: 'Nunito', sans-serif; }
+    .smr-role { font-size: 11px; color: #64748b; font-weight: 700; }
+    .smr-fields { display: flex; gap: 8px; align-items: center; }
+    .smr-fields input { flex: 1; border: 1px solid #e2e8f0; border-radius: 5px; padding: 6px 10px; font-size: 13px; font-family: Arial, sans-serif; }
+    .smr-fields input:focus { outline: none; border-color: var(--brand); }
+    .colour-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+    .colour-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2.5px solid transparent; transition: transform .1s; }
+    .colour-swatch:hover { transform: scale(1.15); }
+    .colour-swatch.selected { border-color: #1e293b; }
+    .modal-footer { display: flex; gap: 8px; margin-top: 18px; }
+    .modal-save { flex: 1; background: var(--brand); color: white; border: none; border-radius: 6px; padding: 11px; font-size: 14px; font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; }
+    .modal-save:hover { background: #1480b8; }
+    .modal-cancel { background: #f1f5f9; color: #64748b; border: none; border-radius: 6px; padding: 11px 18px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Nunito', sans-serif; }
+    .modal-cancel:hover { background: #e2e8f0; }
+    @media (max-width: 720px) {
+      .modal { padding: 18px; }
+      .smr-fields { flex-direction: column; align-items: stretch; }
+      .modal-footer { flex-direction: column; }
+      .modal-cancel { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="sticky-top">
+<div class="app-header">
+  <img src="logo.png" alt="Wallscourt Farm Academy">
+  <div>
+    <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
+    <div class="app-subtitle">Wallscourt Farm Academy</div>
+  </div>
+  <div class="header-actions">
+    <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
+      <option value="Y4">Y4</option>
+    </select>
+    <button class="icon-btn" onclick="openStaffModal()" title="Edit staff names">⚙</button>
+  </div>
+</div>
+
+<div class="top-bar">
+  <button class="nav-btn" id="btnPrev" onclick="changeWeek(-1)">‹</button>
+  <div class="week-label" id="weekLabel">–</div>
+  <button class="nav-btn" id="btnNext" onclick="changeWeek(1)">›</button>
+  <button class="action-btn" onclick="goToday()">This week</button>
+  <span class="sep">|</span>
+  <button class="action-btn" onclick="copyWeekToNext()">Copy week → next week</button>
+  <button class="action-btn" onclick="openSubjectModal()">Subject settings</button>
+  <button class="action-btn danger" onclick="clearActiveView()">Clear view</button>
+  <span class="sheet-status" id="sheetStatus">Loading…</span>
+  <span class="sheet-status" id="syncStatus"></span>
+</div>
+<div class="view-tabs" id="viewTabs"></div>
+</div>
+
+<div class="app-body">
+  <div class="subjects-sidebar" id="subjectsSidebar">
+    <div class="sidebar-hd">Subjects</div>
+    <div id="subjectList"></div>
+  </div>
+  <div class="grid-area">
+    <table class="sched-table" id="schedTable">
+      <thead id="schedHead"></thead>
+      <tbody id="schedBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-bg" id="subjectModal">
+  <div class="modal">
+    <h3>Edit Subjects</h3>
+    <p class="modal-hint">Adjust subject names and colours used in the schedule.</p>
+    <div id="subjectModalRows"></div>
+    <div class="modal-footer">
+      <button class="modal-cancel" onclick="closeSubjectModal()">Cancel</button>
+      <button class="modal-save" onclick="saveSubjectModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Staff settings modal -->
+<div class="modal-bg" id="staffModal">
+  <div class="modal">
+    <h3>Edit Staff Names</h3>
+    <p class="modal-hint" id="staffModalHint">Set the names for your team. These are saved locally on this device.</p>
+    <div id="staffModalRows"></div>
+    <div class="modal-footer">
+      <button class="modal-cancel" onclick="closeStaffModal()">Cancel</button>
+      <button class="modal-save" onclick="saveStaffModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Drag ghost -->
+<div id="drag-ghost" style="display:none"></div>
+
+<!-- Staff-out modal -->
+<div class="modal-bg" id="staffOutModal">
+  <div class="modal">
+    <h3>Add Staff Out</h3>
+    <p class="modal-hint">Mark when this person is out of class (PPA, leadership, course, etc.)</p>
+    <div id="staffOutFields"></div>
+    <div class="modal-footer">
+      <button class="modal-cancel" onclick="closeStaffOutModal()">Cancel</button>
+      <button class="modal-save" onclick="saveStaffOut()">Add</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
+const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbwlNv08Z0cFSgKq_1zcrQw9I2I9ewg8Stj6kcQjSZaBm_uscbIC0V225ez6mVvg75sVfQ/exec';
+
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+const DAY_SHORT = ['Mon','Tue','Wed','Thu','Fri'];
+let VIEWS = ['master','tp','lp'];
+
+// ── Day structure (ROWS) — dynamic per year group ────────────────────────────────
+const DEFAULT_ROWS = [
+  { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
+  { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:45', order:3 },
+  { type:'fixed',   id:'fab',    label:'Fresh Air Break',        time:'10:45-11:00', cls:'fab-row', order:4 },
+  { type:'session', id:'s2',     label:'Session 2',              time:'11:00-12:00', order:5 },
+  { type:'fixed',   id:'wash',   label:'Wash Hands', hideTime:true,             time:'12:00-12:05', order:6 },
+  { type:'fixed',   id:'lunch',  label:'Lunchtime',              time:'12:00-13:10', cls:'fab-row', order:7 },
+  { type:'fixed',   id:'reg-pm', label:'PM Registration', hideTime:true,        time:'13:10-13:15', order:8 },
+  { type:'session', id:'s3',     label:'Session 3',              time:'13:15-15:00', order:9 },
+  { type:'fixed',   id:'story',  label:'Story Time',             time:'15:00-15:15', cls:'story-row', order:10 },
+  { type:'fixed',   id:'home',   label:'Home Time',              time:'15:00', order:11 },
+  { type:'fixed',   id:'after',  label:'After School',           time:'15:15-17:00', afterSchool:true, order:12 },
+];
+
+const FALLBACK_DAY_STRUCTURES = {
+  Reception: [
+    { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
+    { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:15', order:2 },
+    { type:'fixed',   id:'lrsnack',label:'Learning Review Snack', time:'10:15-10:30', cls:'fab-row', order:3 },
+    { type:'session', id:'s2',     label:'Session 2',              time:'10:45-11:30', order:4 },
+    { type:'fixed',   id:'wash',   label:'Wash Hands', hideTime:true,             time:'11:30-11:40', order:5 },
+    { type:'fixed',   id:'lunch',  label:'Lunchtime',              time:'11:40-12:45', cls:'fab-row', order:6 },
+    { type:'fixed',   id:'reg-pm', label:'PM Registration', hideTime:true,        time:'12:45-12:50', order:7 },
+    { type:'session', id:'s3',     label:'Session 3',              time:'12:50-15:00', order:8 },
+    { type:'fixed',   id:'story',  label:'Story Time',             time:'15:00-15:15', cls:'story-row', order:9 },
+    { type:'fixed',   id:'home',   label:'Home Time',              time:'15:00', order:10 },
+    { type:'fixed',   id:'after',  label:'After School',           time:'15:15-17:00', afterSchool:true, order:11 },
+  ],
+  Y1: [
+    { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
+    { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:30', order:2 },
+    { type:'fixed',   id:'fab',    label:'Fresh Air Break',        time:'10:30-10:45', cls:'fab-row', order:3 },
+    { type:'session', id:'s2',     label:'Session 2',              time:'10:45-11:45', order:4 },
+    { type:'fixed',   id:'wash',   label:'Wash Hands', hideTime:true,             time:'11:45-11:50', order:5 },
+    { type:'fixed',   id:'lunch',  label:'Lunchtime',              time:'11:50-12:50', cls:'fab-row', order:6 },
+    { type:'fixed',   id:'reg-pm', label:'PM Registration', hideTime:true,        time:'12:50-12:55', order:7 },
+    { type:'session', id:'s3',     label:'Session 3',              time:'12:55-15:00', order:8 },
+    { type:'fixed',   id:'story',  label:'Story Time',             time:'15:00-15:15', cls:'story-row', order:9 },
+    { type:'fixed',   id:'home',   label:'Home Time',              time:'15:00', order:10 },
+    { type:'fixed',   id:'after',  label:'After School',           time:'15:15-17:00', afterSchool:true, order:11 },
+  ],
+  Y2: [
+    { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
+    { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:30', order:2 },
+    { type:'fixed',   id:'fab',    label:'Fresh Air Break',        time:'10:30-10:45', cls:'fab-row', order:3 },
+    { type:'session', id:'s2',     label:'Session 2',              time:'10:45-11:45', order:4 },
+    { type:'fixed',   id:'wash',   label:'Wash Hands', hideTime:true,             time:'11:45-11:50', order:5 },
+    { type:'fixed',   id:'lunch',  label:'Lunchtime',              time:'11:50-12:50', cls:'fab-row', order:6 },
+    { type:'fixed',   id:'reg-pm', label:'PM Registration', hideTime:true,        time:'12:50-12:55', order:7 },
+    { type:'session', id:'s3',     label:'Session 3',              time:'12:55-15:00', order:8 },
+    { type:'fixed',   id:'story',  label:'Story Time',             time:'15:00-15:15', cls:'story-row', order:9 },
+    { type:'fixed',   id:'home',   label:'Home Time',              time:'15:00', order:10 },
+    { type:'fixed',   id:'after',  label:'After School',           time:'15:15-17:00', afterSchool:true, order:11 },
+  ],
+  Y3: [
+    { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
+    { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:30', order:2 },
+    { type:'fixed',   id:'fab',    label:'Fresh Air Break',        time:'10:30-10:45', cls:'fab-row', order:3 },
+    { type:'session', id:'s2',     label:'Session 2',              time:'11:00-12:00', order:4 },
+    { type:'fixed',   id:'wash',   label:'Wash Hands', hideTime:true,             time:'12:00-12:05', order:5 },
+    { type:'fixed',   id:'lunch',  label:'Lunchtime',              time:'12:00-13:05', cls:'fab-row', order:6 },
+    { type:'fixed',   id:'reg-pm', label:'PM Registration', hideTime:true,        time:'13:05-13:10', order:7 },
+    { type:'session', id:'s3',     label:'Session 3',              time:'13:10-15:00', order:8 },
+    { type:'fixed',   id:'story',  label:'Story Time',             time:'15:00-15:15', cls:'story-row', order:9 },
+    { type:'fixed',   id:'home',   label:'Home Time',              time:'15:00', order:10 },
+    { type:'fixed',   id:'after',  label:'After School',           time:'15:15-17:00', afterSchool:true, order:11 },
+  ],
+  Y4: DEFAULT_ROWS.map(r => ({...r})),
+  Y5: [
+    { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
+    { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:45', order:2 },
+    { type:'fixed',   id:'fab',    label:'Fresh Air Break',        time:'10:45-11:00', cls:'fab-row', order:3 },
+    { type:'session', id:'s2',     label:'Session 2',              time:'11:00-12:15', order:4 },
+    { type:'fixed',   id:'wash',   label:'Wash Hands', hideTime:true,             time:'12:15-12:20', order:5 },
+    { type:'fixed',   id:'lunch',  label:'Lunchtime',              time:'12:15-13:20', cls:'fab-row', order:6 },
+    { type:'fixed',   id:'reg-pm', label:'PM Registration', hideTime:true,        time:'13:20-13:25', order:7 },
+    { type:'session', id:'s3',     label:'Session 3',              time:'13:25-15:00', order:8 },
+    { type:'fixed',   id:'story',  label:'Story Time',             time:'15:00-15:15', cls:'story-row', order:9 },
+    { type:'fixed',   id:'home',   label:'Home Time',              time:'15:00', order:10 },
+    { type:'fixed',   id:'after',  label:'After School',           time:'15:15-17:00', afterSchool:true, order:11 },
+  ],
+  Y6: [
+    { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
+    { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:45', order:2 },
+    { type:'fixed',   id:'fab',    label:'Fresh Air Break',        time:'10:45-11:00', cls:'fab-row', order:3 },
+    { type:'session', id:'s2',     label:'Session 2',              time:'11:00-12:15', order:4 },
+    { type:'fixed',   id:'wash',   label:'Wash Hands', hideTime:true,             time:'12:15-12:20', order:5 },
+    { type:'fixed',   id:'lunch',  label:'Lunchtime',              time:'12:15-13:20', cls:'fab-row', order:6 },
+    { type:'fixed',   id:'reg-pm', label:'PM Registration', hideTime:true,        time:'13:20-13:25', order:7 },
+    { type:'session', id:'s3',     label:'Session 3',              time:'13:25-15:00', order:8 },
+    { type:'fixed',   id:'story',  label:'Story Time',             time:'15:00-15:15', cls:'story-row', order:9 },
+    { type:'fixed',   id:'home',   label:'Home Time',              time:'15:00', order:10 },
+    { type:'fixed',   id:'after',  label:'After School',           time:'15:15-17:00', afterSchool:true, order:11 },
+  ],
+};
+
+function fallbackDayStructure(yg) {
+  return (FALLBACK_DAY_STRUCTURES[yg] || FALLBACK_DAY_STRUCTURES['Y4']).map(r => ({...r}));
+}
+
+let ROWS = DEFAULT_ROWS.map(r => ({...r})); // reinitialised after YEAR_GROUP loads
+
+const SUBJECT_GROUPS = [
+  { label: 'Enquiry', subjects: [
+    { name:'Writer',             col:'#0055ff' },
+    { name:'Historian',          col:'#2979ff' },
+    { name:'Geographer',         col:'#2979ff' },
+    { name:'Scientist',          col:'#2979ff' },
+    { name:'Computer Scientist',  col:'#2979ff' },
+  ]},
+  { label: 'Maths', subjects: [
+    { name:'Mathematician',      col:'#f7d000' },
+    { name:'Arithmetic',         col:'#ffe44d' },
+    { name:'Timestables',        col:'#ffe44d' },
+    { name:'Timestables Check',  col:'#ffe44d' },
+  ]},
+  { label: 'Reading', subjects: [
+    { name:'Reader',           col:'#e34234' },
+    { name:'📚 DALOR',  col:'#e34234' },
+  ]},
+  { label: 'Writing Skills', subjects: [
+    { name:'Speller',      col:'#93c5fd' },
+    { name:'ETIW',         col:'#93c5fd' },
+    { name:'Handwriting',  col:'#93c5fd' },
+  ]},
+  { label: 'Gatherings', subjects: [
+    { name:'Gathering',             col:'#1798d3' },
+    { name:'Celebration Gathering', col:'#1798d3' },
+    { name:'Home Zone Gathering',   col:'#1798d3' },
+    { name:'Singing Gathering',     col:'#1798d3' },
+    { name:'KS2 Gathering',        col:'#1798d3' },
+    { name:'Citizen',               col:'#1798d3' },
+  ]},
+  { label: 'Uncategorised', subjects: [
+    { name:'Artist',   col:'#7c3aed' },
+    { name:'Musician', col:'#c4b5fd' },
+    { name:'Designer', col:'#7c3aed' },
+    { name:'Linguist', col:'#fb923c' },
+    { name:'Athlete',  col:'#16a34a' },
+    { name:'Other',    col:'#64748b' },
+  ]},
+];
+
+// Fallback subject groups per year group (used when sheet is unavailable)
+const FALLBACK_SUBJECT_GROUPS = {
+  Y4: SUBJECT_GROUPS.map(g => ({ label: g.label, subjects: g.subjects.map(s => ({...s})) })),
+};
+
+// Sheet data caches (populated after fetch, used for year group switching)
+let ALL_SHEET_STAFF = [];
+let SHEET_SUBJECT_GROUPS = [];
+let SHEET_INTERVENTIONS = [];
+let SHEET_DAY_STRUCTURES = [];
+
+// Flat lookup: name → col
+const SUBJECT_COL = {};
+SUBJECT_GROUPS.forEach(g => g.subjects.forEach(s => { SUBJECT_COL[s.name] = s.col; }));
+
+const STAFF_COLOURS = ['#1798d3','#f97316','#22c55e','#8b5cf6'];
+const COLOUR_PALETTE = ['#1798d3','#f97316','#22c55e','#8b5cf6','#ec4899','#0f766e','#dc2626','#92400e','#64748b'];
+const FALLBACK_STAFF = {
+  Y4: [
+    { id:'t1', name:'Teacher 1', role:'Class Teacher',    col:'#1798d3' },
+    { id:'t2', name:'Teacher 2', role:'Class Teacher',    col:'#f97316' },
+    { id:'tp', name:'Emma J',   role:'Teaching Partner', col:'#22c55e' },
+    { id:'lp', name:'Emma C',   role:'Learning Partner', col:'#8b5cf6' },
+  ],
+};
+
+const FALLBACK_INTERVENTIONS_DATA = [
+  { label: 'Reader', subjects: [
+    { name: '1 to 1 reading', col:'#e34234' },
+    { name: '3 in 3 reading', col:'#ef6c5a' },
+    { name: '3 in 3 bookclub', col:'#f09c8e' },
+    { name: 'Phonics', col:'#fb923c' },
+  ]},
+  { label: 'Mathematician', subjects: [
+    { name: 'Arithmetic', col:'#ffe44d' },
+    { name: 'Maths', col:'#f7d000' },
+    { name: 'Times Tables', col:'#ffd54f' },
+    { name: 'Typing', col:'#e8b800' },
+  ]},
+  { label: 'Writer', subjects: [
+    { name: 'Writing skills', col:'#4b8bff' },
+    { name: 'Spelling Skills', col:'#93c5fd' },
+    { name: 'Handwriting', col:'#60a5fa' },
+    { name: 'Hamish & Milo', col:'#7c3aed' },
+  ]},
+  { label: 'Well-Being', subjects: [
+    { name: 'movement break', col:'#22c55e' },
+    { name: 'Sensory circuit', col:'#16a34a' },
+    { name: 'Speech & Language', col:'#0d9488' },
+  ]},
+  { label: 'HomeZone', subjects: [
+    { name: 'HomeZone', col:'#94a3b8', colourable: true },
+  ]},
+];
+
+const FALLBACK_INTERVENTIONS = {
+  Y4: FALLBACK_INTERVENTIONS_DATA.map(g => ({ label: g.label, subjects: g.subjects.map(s => ({...s})) })),
+};
+
+// ── Year group state ──────────────────────────────────────────────────────────
+let YEAR_GROUP = 'Y4';
+
+function loadYearGroup() {
+  migrateLocalStorage();
+  return localStorage.getItem('wfa_ts_yeargroup') || 'Y4';
+}
+
+function saveYearGroup(yg) {
+  YEAR_GROUP = yg;
+  localStorage.setItem('wfa_ts_yeargroup', yg);
+}
+
+function migrateLocalStorage() {
+  const mappings = [
+    ['wfa_ts_schedule',  'wfa_ts_schedule_Y4'],
+    ['wfa_ts_staff',    'wfa_ts_staff_Y4'],
+    ['wfa_ts_subjects', 'wfa_ts_subjects_Y4'],
+  ];
+  mappings.forEach(([oldKey, newKey]) => {
+    if (localStorage.getItem(oldKey) && !localStorage.getItem(newKey)) {
+      localStorage.setItem(newKey, localStorage.getItem(oldKey));
+      localStorage.removeItem(oldKey);
+    }
+  });
+  if (!localStorage.getItem('wfa_ts_yeargroup')) {
+    localStorage.setItem('wfa_ts_yeargroup', 'Y4');
+  }
+}
+
+function staffKey()      { return `wfa_ts_staff_${YEAR_GROUP}`; }
+function subjectsKey()   { return `wfa_ts_subjects_${YEAR_GROUP}`; }
+function scheduleKeyLS() { return `wfa_ts_schedule_${YEAR_GROUP}`; }
+function interventionsKey() { return `wfa_ts_interventions_${YEAR_GROUP}`; }
+
+function fallbackStaff() {
+  return (FALLBACK_STAFF[YEAR_GROUP] || FALLBACK_STAFF['Y4']).map(s => ({...s}));
+}
+
+function fallbackSubjects() {
+  return (FALLBACK_SUBJECT_GROUPS[YEAR_GROUP] || FALLBACK_SUBJECT_GROUPS['Y4']).map(g => ({ label: g.label, subjects: g.subjects.map(s => ({...s})) }));
+}
+
+// ── State ───────────────────────────────────────────────────────────────────
+YEAR_GROUP = loadYearGroup();
+ROWS = fallbackDayStructure(YEAR_GROUP);
+let STAFF  = loadStaff();
+let SUBJECTS = loadSubjects();
+let INTERVENTIONS = loadInterventions();
+let WEEKS  = [];
+
+// ── Subject name migration ────────────────────────────────────────────────
+// Strips stray emojis from chip subject names so they match SUBJECT_COL
+function stripEmoji(s) { return s.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').replace(/\s+/g, ' ').trim(); }
+function migrateSubjectNames() {
+  // Fix subject definitions in SUBJECTS
+  let subjChanged = false;
+  SUBJECTS.forEach(g => {
+    g.subjects.forEach(s => {
+      const cleaned = stripEmoji(s.name);
+      if (cleaned !== s.name && cleaned) {
+        s.name = cleaned;
+        subjChanged = true;
+      }
+    });
+  });
+  if (subjChanged) saveSubjectsLocal();
+  // Rebuild SUBJECT_COL
+  for (const key of Object.keys(SUBJECT_COL)) delete SUBJECT_COL[key];
+  SUBJECTS.forEach(g => g.subjects.forEach(s => { SUBJECT_COL[s.name] = s.col; }));
+  // Also keep emoji versions mapped so existing chips still match
+  SUBJECT_GROUPS.forEach(g => g.subjects.forEach(s => { if (!SUBJECT_COL[s.name]) SUBJECT_COL[s.name] = s.col; }));
+  // Fix chips in schedule data
+  let schedChanged = false;
+  Object.values(state.schedule).forEach(week => {
+    Object.values(week || {}).forEach(view => {
+      if (!view || typeof view !== 'object') return;
+      Object.values(view).forEach(day => {
+        if (!day || typeof day !== 'object') return;
+        Object.values(day).forEach(slot => {
+          if (!Array.isArray(slot)) return;
+          slot.forEach(item => {
+            ['subject','subjectLeft','subjectRight'].forEach(key => {
+              if (item[key]) {
+                const cleaned = stripEmoji(item[key]);
+                if (cleaned !== item[key] && SUBJECT_COL[cleaned]) {
+                  item[key] = cleaned;
+                  schedChanged = true;
+                }
+              }
+            });
+          });
+        });
+      });
+    });
+  });
+  if (schedChanged) persistLocal();
+}
+
+function migrateShadowsOut() {
+  let changed = false;
+  Object.values(state.schedule).forEach(weekData => {
+    VIEWS.filter(v => v !== 'master').forEach(view => {
+      if (!weekData[view] || typeof weekData[view] !== 'object') return;
+      Object.values(weekData[view]).forEach(dayObj => {
+        if (!dayObj || typeof dayObj !== 'object') return;
+        Object.keys(dayObj).forEach(sessionKey => {
+          if (!Array.isArray(dayObj[sessionKey])) return;
+          const before = dayObj[sessionKey].length;
+          dayObj[sessionKey] = dayObj[sessionKey].filter(item => !item.shadow);
+          if (dayObj[sessionKey].length !== before) changed = true;
+          dayObj[sessionKey].forEach(item => { if (item.inClass) { delete item.inClass; changed = true; } });
+        });
+      });
+    });
+  });
+  if (changed) persistLocal();
+}
+
+function migrateSubjects() {
+  const oldLabels = ['Interventions', 'Support', 'Cover'];
+  const before = SUBJECTS.length;
+  SUBJECTS = SUBJECTS.filter(g => !oldLabels.includes(g.label));
+  if (SUBJECTS.length !== before) saveSubjectsLocal();
+}
+
+let state = {
+  weekIdx:   0,
+  activeView: 'master',
+  schedule:  {}, // weekKey → view → day → sessionId → [{ subject, note, split }]
+  afterSchoolEvents: {}, // 'YYYY-MM-DD' → [{ label, type, bg }]
+  nonSchoolDays: {}, // 'YYYY-MM-DD' → { label, type }
+  schoolEvents: {},  // 'YYYY-MM-DD' → [{ label, type }]
+};
+
+// ── Persistence ─────────────────────────────────────────────────────────────
+function loadStaff() {
+  try { return JSON.parse(localStorage.getItem(staffKey())) || fallbackStaff(); }
+  catch { return fallbackStaff(); }
+}
+
+function loadSubjects() {
+  try { return JSON.parse(localStorage.getItem(subjectsKey())) || fallbackSubjects(); }
+  catch { return fallbackSubjects(); }
+}
+
+function loadInterventions() {
+  try { return JSON.parse(localStorage.getItem(interventionsKey())) || fallbackInterventions(); }
+  catch { return fallbackInterventions(); }
+}
+
+function saveStaffLocal() {
+  localStorage.setItem(staffKey(), JSON.stringify(STAFF));
+}
+
+function saveSubjectsLocal() {
+  localStorage.setItem(subjectsKey(), JSON.stringify(SUBJECTS));
+}
+
+function saveInterventionsLocal() {
+  localStorage.setItem(interventionsKey(), JSON.stringify(INTERVENTIONS));
+}
+
+function schedKey() {
+  if (WEEKS.length && WEEKS[state.weekIdx]) return WEEKS[state.weekIdx].key;
+  const d = weekMonday();
+  return dateKey(d);
+}
+
+function ensureWeek(weekKey) {
+  if (!state.schedule[weekKey]) state.schedule[weekKey] = {};
+  VIEWS.forEach(v => {
+    if (!state.schedule[weekKey][v]) state.schedule[weekKey][v] = {};
+  });
+  return state.schedule[weekKey];
+}
+
+function ensureDay(weekKey, view, day) {
+  const wk = ensureWeek(weekKey);
+  if (!wk[view][day]) {
+    const dayObj = {};
+    ROWS.filter(r => r.type === 'session').forEach(r => { dayObj[r.id] = []; });
+    wk[view][day] = dayObj;
+  }
+  return wk[view][day];
+}
+
+// ── Compute views from staff ──────────────────────────────────────────────────
+function computeViews(staff) {
+  const views = ['master'];
+  staff.forEach(s => {
+    const role = (s.role || '').toLowerCase();
+    if (role.includes('teaching partner') || role.includes('learning partner')) {
+      views.push(s.id);
+    }
+  });
+  return views;
+}
+
+// ── Build staff from sheet ────────────────────────────────────────────────────
+function buildTeachingStaff(rows, yearGroup) {
+  // For staff, blank YearGroup means unassigned — NOT universal
+  const filtered = rows.filter(r => {
+    const yg = (r.YearGroup || '').trim();
+    if (!yg) return false;
+    return yearGroupMatches(yg, yearGroup);
+  });
+  const colours = ['#1798d3','#f97316','#22c55e','#8b5cf6','#ec4899','#0f766e'];
+  let colourIdx = 0;
+  return filtered.map(r => {
+    const id = r.Name.toLowerCase().replace(/[^a-z0-9]+/g,'_');
+    const col = (r.Colour && r.Colour.trim()) || colours[colourIdx++ % colours.length];
+    return { id, name: r.Name.trim(), role: (r.Role || '').trim(), col };
+  });
+}
+
+function normaliseYG(yg) {
+  if (yg === 'YR' || yg === 'R') return 'Reception';
+  if (/^\d+$/.test(yg)) return 'Y' + yg;
+  return yg;
+}
+function expandYearGroups(raw) {
+  // "3,4,5,6" → ["Y3","Y4","Y5","Y6"], "R" → ["Reception"], "" → []
+  return raw.split(',').map(s => s.trim()).filter(Boolean).map(normaliseYG);
+}
+function yearGroupMatches(raw, yearGroup) {
+  // Blank = universal; otherwise check if yearGroup is in the expanded list
+  if (!raw) return true;
+  return expandYearGroups(raw).includes(yearGroup);
+}
+
+// ── Build subjects from sheet ─────────────────────────────────────────────────
+function buildSubjectGroups(rows, yearGroup) {
+  // Blank YearGroup = universal defaults; specific YearGroup = additions
+  // Deduplicate: universal rows first, then year-group-specific rows (skipping universal ones)
+  const matched = rows.filter(r => {
+    const raw = (r.YearGroup || '').trim();
+    return !raw || yearGroupMatches(raw, yearGroup);
+  });
+  const seen = new Set();
+  const groupMap = {};
+  const groupOrder = [];
+  matched.forEach(r => {
+    const key = (r.Group || '').trim() + '||' + r.Subject;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const g = (r.Group || '').trim() || '';
+    if (!groupMap[g]) { groupMap[g] = { label: g, subjects: [] }; groupOrder.push(g); }
+    groupMap[g].subjects.push({ name: r.Subject, col: r.Colour || '#64748b', _order: parseInt(r.Order) || 99 });
+  });
+  // Sort subjects within each group by Order
+  Object.values(groupMap).forEach(g => {
+    g.subjects.sort((a, b) => a._order - b._order);
+    g.subjects.forEach(s => delete s._order);
+  });
+  return groupOrder.map(g => groupMap[g]);
+}
+
+// ── Build interventions from sheet ─────────────────────────────────────────────
+function buildInterventions(rows, yearGroup) {
+  // Blank YearGroup = universal defaults; specific YearGroup = additions
+  // Deduplicate: universal rows first, then year-group-specific rows (skipping universal ones)
+  const matched = rows.filter(r => {
+    const raw = (r.YearGroup || '').trim();
+    return !raw || yearGroupMatches(raw, yearGroup);
+  });
+  const seen = new Set();
+  const groupMap = {};
+  const groupOrder = [];
+  matched.forEach(r => {
+    const key = (r.Group || '').trim() + '||' + r.Activity;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const g = (r.Group || '').trim() || '';
+    if (!groupMap[g]) { groupMap[g] = { label: g, subjects: [] }; groupOrder.push(g); }
+    groupMap[g].subjects.push({
+      name: r.Activity,
+      col: r.Colour || '#64748b',
+      colourable: r.Colourable === 'true' || r.Colourable === 'TRUE',
+      _order: parseInt(r.Order) || 99
+    });
+  });
+  // Sort subjects within each group by Order
+  Object.values(groupMap).forEach(g => {
+    g.subjects.sort((a, b) => a._order - b._order);
+    g.subjects.forEach(s => delete s._order);
+  });
+  return groupOrder.map(g => groupMap[g]);
+}
+
+// ── Build day structure from sheet ──────────────────────────────────────────────
+function buildDayStructure(rows, yearGroup) {
+  // Blank YearGroup = universal rows; specific YearGroup = overrides
+  // Deduplicate by ID (case-insensitive): specific rows override universal rows with the same ID
+  const matched = rows.filter(r => {
+    const raw = (r.YearGroup || '').trim();
+    return !raw || yearGroupMatches(raw, yearGroup);
+  });
+  const seen = new Set();
+  const result = [];
+  const toRow = r => ({
+    type: (r.Type || 'session').trim().toLowerCase(),
+    id: (r.ID || '').trim().toLowerCase(),
+    label: (r.Label || '').trim(),
+    time: (r.Time || '').trim(),
+    cls: (r.Class || '').trim() || undefined,
+    afterSchool: (r.ID || '').trim().toLowerCase() === 'after',
+    hideTime: (r.HideTime || '').trim().toLowerCase() === 'true',
+    order: parseInt(r.Order) || 99,
+  });
+  // Process universal (blank YearGroup) first, then specific
+  const universal = matched.filter(r => !(r.YearGroup || '').trim());
+  const specific = matched.filter(r => !!(r.YearGroup || '').trim());
+  universal.forEach(r => {
+    const id = (r.ID || '').trim().toLowerCase();
+    if (seen.has(id)) return;
+    seen.add(id);
+    result.push(toRow(r));
+  });
+  specific.forEach(r => {
+    const id = (r.ID || '').trim().toLowerCase();
+    if (seen.has(id)) {
+      const idx = result.findIndex(e => e.id === id);
+      if (idx >= 0) result[idx] = toRow(r);
+    } else {
+      seen.add(id);
+      result.push(toRow(r));
+    }
+  });
+  result.sort((a, b) => a.order - b.order);
+  result.forEach(r => delete r.order);
+  return result;
+}
+
+// ── Rebuild SUBJECT_COL from current data ─────────────────────────────────────
+function rebuildSubjectCol() {
+  for (const key of Object.keys(SUBJECT_COL)) delete SUBJECT_COL[key];
+  SUBJECTS.forEach(g => g.subjects.forEach(s => { SUBJECT_COL[s.name] = s.col; }));
+  SUBJECT_GROUPS.forEach(g => g.subjects.forEach(s => { if (!SUBJECT_COL[s.name]) SUBJECT_COL[s.name] = s.col; }));
+  INTERVENTIONS.forEach(g => g.subjects.forEach(s => { if (!SUBJECT_COL[s.name]) SUBJECT_COL[s.name] = s.col; }));
+}
+
+// ── Update title and UI ────────────────────────────────────────────────────────
+const YG_COLOURS = {
+  Reception: '#1798d3', Y1: '#f97316', Y2: '#22c55e', Y3: '#FF00FF',
+  Y4: '#1798d3', Y5: '#f97316', Y6: '#22c55e',
+};
+const YG_COLOUR_LIGHTS = {
+  Reception: '#f0f8fd', Y1: '#fff7ed', Y2: '#f0fdf4', Y3: '#fff0ff',
+  Y4: '#f0f8fd', Y5: '#fff7ed', Y6: '#f0fdf4',
+};
+const YG_COLOUR_BORDERS = {
+  Reception: '#bae0f5', Y1: '#fed7aa', Y2: '#bbf7d0', Y3: '#f0b0f0',
+  Y4: '#bae0f5', Y5: '#fed7aa', Y6: '#bbf7d0',
+};
+
+function applyBrandColour() {
+  const brand = YG_COLOURS[YEAR_GROUP] || '#1798d3';
+  const light = YG_COLOUR_LIGHTS[YEAR_GROUP] || '#f0f8fd';
+  const border = YG_COLOUR_BORDERS[YEAR_GROUP] || '#bae0f5';
+  document.documentElement.style.setProperty('--brand', brand);
+  document.documentElement.style.setProperty('--brand-light', light);
+  document.documentElement.style.setProperty('--brand-border', border);
+}
+
+function updateTitle() {
+  document.getElementById('appTitle').textContent = `${YEAR_GROUP} Learning Schedule`;
+  document.title = `${YEAR_GROUP} Learning Schedule · WFA`;
+  applyBrandColour();
+}
+
+function populateYearGroupSelect(yearGroups) {
+  const sel = document.getElementById('yearGroupSelect');
+  sel.innerHTML = yearGroups.map(yg => `<option value="${yg}"${yg===YEAR_GROUP?' selected':''}>${yg}</option>`).join('');
+}
+
+function getSlot(weekKey, view, day, session) {
+  const dayObj = ensureDay(weekKey, view, day);
+  if (!dayObj[session]) dayObj[session] = [];
+  return dayObj[session];
+}
+
+function persistLocal() {
+  try { localStorage.setItem(scheduleKeyLS(), JSON.stringify(state.schedule)); } catch {}
+}
+
+function loadLocal() {
+  try {
+    const s = localStorage.getItem(scheduleKeyLS());
+    if (s) state.schedule = JSON.parse(s);
+  } catch {}
+}
+
+async function syncSave() {
+  if (!SYNC_URL) return;
+  const body = JSON.stringify({ action:'save', yearGroup: YEAR_GROUP, weekKey: schedKey(), data: state.schedule[schedKey()] || {} });
+  fetch(SYNC_URL, { method:'POST', body, headers:{'Content-Type':'text/plain'} })
+    .then(() => updateSyncStatus('ok'))
+    .catch(() => updateSyncStatus('err'));
+}
+
+async function syncLoad(weekKey) {
+  if (!SYNC_URL) return;
+  try {
+    const res = await fetch(`${SYNC_URL}?action=load&yearGroup=${encodeURIComponent(YEAR_GROUP)}&weekKey=${encodeURIComponent(weekKey)}`);
+    if (!res.ok) return;
+    const json = await res.json();
+    if (json && json.data) {
+      // Validate: only accept data if its view keys match current VIEWS
+      // (old sync script ignores yearGroup param and could return wrong year group's data)
+      const dataViews = Object.keys(json.data);
+      const validViews = dataViews.every(v => VIEWS.includes(v));
+      if (!validViews) return;
+      state.schedule[weekKey] = json.data;
+      renderGrid();
+      persistLocal();
+    }
+  } catch {}
+}
+
+async function syncPushAll() {
+  if (!SYNC_URL) return;
+  for (const weekKey of Object.keys(state.schedule)) {
+    const data = state.schedule[weekKey];
+    if (!data || !Object.keys(data).length) continue;
+    try {
+      await fetch(SYNC_URL, {
+        method:'POST',
+        body: JSON.stringify({ action:'save', yearGroup: YEAR_GROUP, weekKey, data }),
+        headers:{'Content-Type':'text/plain'}
+      });
+    } catch {}
+  }
+  updateSyncStatus('ok');
+}
+
+function updateSyncStatus(status) {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  if (status === 'ok') { el.textContent = '● Synced'; el.className = 'sheet-status ok'; }
+  else if (status === 'err') { el.textContent = '● Sync failed'; el.className = 'sheet-status err'; }
+  else { el.textContent = '● Syncing…'; el.className = 'sheet-status'; }
+}
+
+// ── Sheet loading ────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const rows = []; let inQ=false, cur='', cells=[];
+  for (let i=0; i<text.length; i++) {
+    const c=text[i];
+    if (c==='"') { inQ=!inQ; }
+    else if (c===',' && !inQ) { cells.push(cur.trim()); cur=''; }
+    else if ((c==='\n'||c==='\r') && !inQ) {
+      cells.push(cur.trim()); cur='';
+      if (cells.some(x=>x)) rows.push(cells);
+      cells=[];
+      if (c==='\r' && text[i+1]==='\n') i++;
+    } else cur+=c;
+  }
+  cells.push(cur.trim());
+  if (cells.some(x=>x)) rows.push(cells);
+  return rows;
+}
+
+function csvToObjects(text) {
+  text = text.replace(/^\ufeff/,'');
+  const rows = parseCSV(text);
+  if (rows.length < 2) return [];
+  const hdRow = rows[0];
+  const gvizRe = /^([A-Za-z]\w*)( .*)?$/;
+  const nonEmpty = hdRow.filter(h => h.length > 0);
+  const isGviz = nonEmpty.every(h => gvizRe.test(h)) && nonEmpty.some(h => { const m=h.match(gvizRe); return m&&m[2]&&m[2].trim(); });
+  let headers, dataRows;
+  if (isGviz) {
+    headers  = hdRow.map(h => { const m=h.match(gvizRe); return m?m[1]:h; });
+    const firstData = hdRow.map(h => { const m=h.match(gvizRe); return m&&m[2]?m[2].trim():''; });
+    dataRows = [firstData, ...rows.slice(1)];
+  } else {
+    headers = hdRow; dataRows = rows.slice(1);
+  }
+  return dataRows.map(r => {
+    const obj = {};
+    headers.forEach((h,i) => { if (h) obj[h]=(r[i]||'').trim(); });
+    return obj;
+  });
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  const p = s.split('/');
+  if (p.length !== 3) return null;
+  const [d,m,y] = p.map(Number);
+  return new Date(y < 100 ? 2000+y : y, m-1, d);
+}
+
+function dateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function buildWeeks(rows) {
+  return rows
+    .filter(r => r.StartDate && r.Term && r.Week)
+    .map(r => {
+      const start = parseDate(r.StartDate.trim());
+      if (!start || isNaN(start)) return null;
+      const term = String(r.Term).trim();
+      const week = String(r.Week).trim();
+      return { start, term, week, key:`T${term}W${week}`, label:`Term ${term} · Week ${week}` };
+    })
+    .filter(Boolean)
+    .sort((a,b) => a.start - b.start);
+}
+
+// ── Week helpers ─────────────────────────────────────────────────────────────
+function currentWeekIdx() {
+  if (!WEEKS.length) return 0;
+  const today = new Date(); today.setHours(0,0,0,0);
+  for (let i=0; i<WEEKS.length; i++) {
+    const end = new Date(WEEKS[i].start); end.setDate(end.getDate()+6);
+    if (today >= WEEKS[i].start && today <= end) return i;
+  }
+  for (let i=0; i<WEEKS.length; i++) { if (WEEKS[i].start > today) return i; }
+  return WEEKS.length - 1;
+}
+
+function weekMonday() {
+  if (WEEKS.length && WEEKS[state.weekIdx]) return new Date(WEEKS[state.weekIdx].start);
+  const d = new Date(); d.setHours(0,0,0,0);
+  const day = d.getDay();
+  d.setDate(d.getDate() + (day===0?-6:1-day) + state.weekIdx*7);
+  return d;
+}
+
+function weekLabel() {
+  const fmt = x => x.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  if (WEEKS.length && WEEKS[state.weekIdx]) {
+    const w = WEEKS[state.weekIdx];
+    const end = new Date(w.start); end.setDate(w.start.getDate()+4);
+    return `${w.label} · ${fmt(w.start)} – ${fmt(end)}`;
+  }
+  const d = weekMonday(), end = new Date(d); end.setDate(d.getDate()+4);
+  return `${fmt(d)} – ${fmt(end)}`;
+}
+
+function dayDate(di) {
+  const d = weekMonday(); d.setDate(d.getDate()+di);
+  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+}
+
+function isToday(di) {
+  const d = weekMonday(); d.setDate(d.getDate()+di);
+  const t = new Date(); t.setHours(0,0,0,0);
+  return d.getTime()===t.getTime();
+}
+
+function todayDayIdx() {
+  const t = new Date(); t.setHours(0,0,0,0);
+  const mon = weekMonday();
+  const diff = Math.round((t - mon) / 86400000);
+  return (diff >= 0 && diff <= 4) ? diff : -1;
+}
+
+// ── Navigation ───────────────────────────────────────────────────────────────
+function changeWeek(dir) {
+  state.weekIdx = Math.max(0, Math.min((WEEKS.length||52)-1, state.weekIdx + dir));
+  document.getElementById('btnPrev').disabled = state.weekIdx === 0;
+  document.getElementById('btnNext').disabled = WEEKS.length && state.weekIdx === WEEKS.length-1;
+  document.getElementById('weekLabel').textContent = weekLabel();
+  renderViewTabs();
+  renderGrid();
+  syncLoad(schedKey());
+}
+
+function goToday() {
+  if (WEEKS.length) state.weekIdx = currentWeekIdx();
+  document.getElementById('btnPrev').disabled = state.weekIdx === 0;
+  document.getElementById('btnNext').disabled = state.weekIdx === WEEKS.length-1;
+  document.getElementById('weekLabel').textContent = weekLabel();
+  renderViewTabs();
+  renderGrid();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function setDay(idx) {
+  state.activeDay = idx;
+  renderViewTabs();
+  renderGrid();
+}
+
+// ── Render: day tabs ─────────────────────────────────────────────────────────
+function renderViewTabs() {
+  const el = document.getElementById('viewTabs');
+  el.innerHTML = VIEWS.map(v => {
+    let label, name = '';
+    if (v === 'master') {
+      label = 'Learning Schedule';
+    } else {
+      const staffMember = STAFF.find(s => s.id === v);
+      label = staffMember ? staffMember.name : v.toUpperCase();
+    }
+    const cls = `view-tab${state.activeView === v ? ' active' : ''}`;
+    return `<div class="${cls}" onclick="setView('${v}')">${escHtml(label)}</div>`;
+  }).join('');
+}
+
+// ── Render: subjects sidebar ─────────────────────────────────────────────────
+function fallbackInterventions() {
+  return (FALLBACK_INTERVENTIONS[YEAR_GROUP] || FALLBACK_INTERVENTIONS['Y4']).map(g => ({ label: g.label, subjects: g.subjects.map(s => ({...s})) }));
+}
+function hzPalette() {
+  const picks = ['Writer / Enquiry','Mathematician','Reader','Artist','Musician','Athlete','Linguist','Designer','Other'];
+  return picks.map(name => {
+    const allSubjects = SUBJECTS.flatMap(g => g.subjects).concat(SUBJECT_GROUPS.flatMap(g => g.subjects));
+    const s = allSubjects.find(s => s.name === name) || allSubjects.find(s => name.startsWith(s.name));
+    return { name, col: s ? s.col : '#64748b' };
+  });
+}
+
+function renderSidebar() {
+  const el = document.getElementById('subjectList');
+  let groups = state.activeView === 'master' ? SUBJECTS : INTERVENTIONS;
+  el.innerHTML = groups.map(g => `
+    <div class="subj-group${!g.label ? ' group-empty-label' : ''}">
+      ${g.label ? `<div class="subj-group-label">${escHtml(g.label)}</div>` : ''}
+      ${g.subjects.map(s => `
+        <div class="subj-chip"
+          style="background:${s.col}50"
+          data-subject="${escHtml(s.name)}"
+          data-col="${s.col}"${s.colourable ? ' data-colourable="true"' : ''}>
+          <span class="subj-dot" style="background:${s.col}"></span>
+          <span class="subj-name">${escHtml(s.name)}</span>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+
+  el.querySelectorAll('.subj-chip').forEach(chip => {
+    chip.addEventListener('pointerdown', onSubjectPointerDown);
+  });
+}
+
+// ── Render: grid ─────────────────────────────────────────────────────────────
+function renderGrid() {
+  renderHead();
+  renderBody();
+}
+
+function renderHead() {
+  const mon = weekMonday();
+  const el = document.getElementById('schedHead');
+  el.innerHTML = `<tr>
+    <th class="time-hd"></th>
+    ${DAYS.map((d, i) => {
+      const cellDate = new Date(mon); cellDate.setDate(mon.getDate() + i);
+      const dk = dateKey(cellDate);
+      const nsd = state.nonSchoolDays[dk];
+      const evts = state.schoolEvents[dk] || [];
+      const cls = `day-hd${isToday(i) ? ' today' : ''}${nsd ? ' non-school-day' : ''}`;
+      const tags = evts.map(e => `<span class="day-event-tag">${escHtml(e.label)}</span>`).join(' ');
+      const addBtn = !nsd ? `<span class="day-hd-add" onclick="openStaffOutModal(${i})" title="Add staff out">＋</span>` : '';
+      return `<th class="${cls}"><span class="day-hd-name">${d}${addBtn}</span><br><span class="day-hd-date">${dayDate(i)}</span>${tags ? '<br>' + tags : ''}</th>`;
+    }).join('')}
+  </tr>`;
+}
+
+function renderBody() {
+  const el = document.getElementById('schedBody');
+  const wk  = schedKey();
+  const view = state.activeView;
+  const mon = weekMonday();
+
+  // Pre-compute non-school days for this week
+  const nsd = DAYS.map((_, di) => {
+    const cellDate = new Date(mon); cellDate.setDate(mon.getDate() + di);
+    return state.nonSchoolDays[dateKey(cellDate)] || null;
+  });
+
+  // Pre-compute staff-out spans per (dayIndex, rowIndex) — supports multiple overlapping spans
+  const staffOutMap = {};
+  {
+    DAYS.forEach((d, di) => {
+      const day = d.toLowerCase();
+      if (nsd[di]) return;
+      const spans = getStaffOut(wk, view, day);
+      if (!spans.length) return;
+      spans.forEach(sp => {
+        const startIdx = ROWS.findIndex(r => r.id === sp.start);
+        const endIdx = ROWS.findIndex(r => r.id === sp.end);
+        if (startIdx < 0 || endIdx < 0) return;
+        ROWS.forEach((row, ri) => {
+          if (ri >= startIdx && ri <= endIdx) {
+            const key = `${di}-${ri}`;
+            if (!staffOutMap[key]) staffOutMap[key] = [];
+            staffOutMap[key].push({
+              label: sp.label,
+              cover: sp.cover || '',
+              colour: sp.colour,
+              isFirst: ri === startIdx,
+              isLast: ri === endIdx,
+              isFixed: row.type === 'fixed',
+            });
+          }
+        });
+      });
+    });
+  }
+
+  let html = '';
+  const firstSessionId = (ROWS.find(r => r.type === 'session') || {}).id;
+
+  ROWS.forEach((row, ri) => {
+    if (row.type === 'fixed') {
+      html += `<tr class="fixed-row${row.cls?' '+row.cls:''}">
+        <td class="time-cell"><span class="fixed-label">${row.label}</span>${row.time && !row.hideTime ? `<br><span class="fixed-sub">${row.time}</span>` : ''}</td>
+        ${nsd.map((n, di) => {
+          if (n) return `<td class="view-cell non-school-day"><div class="fixed-label" style="color:#94a3b8">${escHtml(n.label)}</div></td>`;
+          const soList = staffOutMap[`${di}-${ri}`] || [];
+          const strips = soList.map((s, si) => {
+            let cls = 'staff-out-strip';
+            if (s.isFirst && s.isLast) cls += ' strip-only';
+            else if (s.isFirst) cls += ' strip-first';
+            else if (s.isLast) cls += ' strip-last';
+            else cls += ' strip-mid';
+            return `<div class="${cls}" style="left:${si * 5 - 1}px; background:${s.colour}"></div>`;
+          }).join('');
+          const soTags = soList.filter(s => s.isFirst).map(s => `<div class="staff-out-tag" style="background:${s.colour}">${escHtml(s.label)}${s.cover ? `<span class="staff-out-cover"> · ${escHtml(s.cover)}</span>` : ''}</div>`).join('');
+          const pad = soList.length ? `margin-left:${soList.length * 5 + 3}px;` : '';
+          return `<td class="view-cell">${strips}${soTags}<div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div></td>`;
+        }).join('')}
+      </tr>`;
+    } else {
+      html += `<tr class="session-row${nsd.some(Boolean) ? ' non-school-row' : ''}">
+        <td class="time-cell">
+          <span class="session-label">${row.label}</span>
+          ${row.time ? `<span class="session-time">${row.time}</span>` : ''}
+        </td>
+        ${DAYS.map((d, di) => {
+          const day = d.toLowerCase();
+          const n = nsd[di];
+          const isStaffView = (view !== 'master');
+          const items = getSlot(wk, view, day, row.id);
+          const ownItems = isStaffView ? items : [];
+          // After-school: show sheet events as read-only chips
+          let afterEvents = '';
+          if (row.afterSchool) {
+            const cellDate = new Date(mon); cellDate.setDate(mon.getDate() + di);
+            const dk = dateKey(cellDate);
+            const evts = state.afterSchoolEvents[dk] || [];
+            const recurring = recurringAfterSchool.filter(r => r.dayIdx === di);
+            const allEvts = [...recurring.map(r => ({ label: r.label, bg: r.bg })), ...evts.map(e => ({ label: e.label, bg: e.bg }))];
+            afterEvents = allEvts.map(ev => `<div class="cell-chip" style="background:${ev.bg}25"><div class="chip-top"><span class="chip-colour" style="background:${ev.bg}"></span><span class="chip-name" style="color:${ev.bg}">${escHtml(ev.label)}</span></div></div>`).join('');
+          }
+          // Staff-out colour strips + tag badges (supports overlapping spans)
+          const soList = staffOutMap[`${di}-${ri}`] || [];
+          const strips = soList.map((s, si) => {
+            let cls = 'staff-out-strip';
+            if (s.isFirst && s.isLast) cls += ' strip-only';
+            else if (s.isFirst) cls += ' strip-first';
+            else if (s.isLast) cls += ' strip-last';
+            else cls += ' strip-mid';
+            return `<div class="${cls}" style="left:${si * 5 - 1}px; background:${s.colour}"></div>`;
+          }).join('');
+          const soTags = soList.filter(s => s.isFirst).map(s => `<div class="staff-out-tag" style="background:${s.colour}">${escHtml(s.label)}${s.cover ? `<span class="staff-out-cover"> · ${escHtml(s.cover)}</span>` : ''}</div>`).join('');
+          const contentPad = soList.length ? `margin-left:${soList.length * 5 + 3}px;` : '';
+          const cellCls = `view-cell${n ? ' non-school-day' : ''}`;
+          const overlay = n && row.id === firstSessionId ? `<div class="non-school-overlay"><span class="non-school-badge">${escHtml(n.label)}</span></div>` : '';
+
+          // Build cell content
+          let cellContent;
+          if (isStaffView && !row.afterSchool) {
+            cellContent = afterEvents;
+            if (ownItems.length === 0 && !afterEvents && !n) cellContent = '<div class="drop-hint">drop here</div>';
+            else cellContent += renderStaffCell(ownItems, wk, view, day, row.id);
+          } else {
+            cellContent = afterEvents;
+            if (items.length === 0 && !afterEvents && !n) cellContent = '<div class="drop-hint">drop here</div>';
+            cellContent += items.map((item, idx) => renderItem(item, wk, view, day, row.id, idx)).join('');
+          }
+
+          return `<td class="${cellCls}" data-day="${day}" data-session="${row.id}" style="position:relative">
+            ${overlay}
+            ${strips}
+            ${soTags}
+            <div style="${contentPad}">
+            ${cellContent}
+            </div>
+          </td>`;
+        }).join('')}
+      </tr>`;
+    }
+  });
+
+  el.innerHTML = html;
+
+  el.querySelectorAll('.item-note').forEach(input => {
+    input.addEventListener('blur', onNoteBlur);
+    input.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); input.blur(); } });
+  });
+  el.querySelectorAll('.chip-handle').forEach(h => {
+    h.addEventListener('pointerdown', onChipPointerDown);
+  });
+  el.querySelectorAll('.chip-resize').forEach(h => {
+    h.addEventListener('pointerdown', onResizePointerDown);
+  });
+}
+
+function renderItem(item, wk, view, day, session, idx) {
+  const col = item.hzCol || SUBJECT_COL[item.subject] || SUBJECT_COL[item.subjectLeft] || '#64748b';
+  const light = col + '50';
+  const dur = item.duration || 1;
+  const minH = Math.max(32, dur * 32);
+  const isColourable = item.colourable || (item.subject && (item.subject === 'HomeZone' || item.subject.startsWith('HomeZone - ')));
+  const colCls = isColourable ? 'chip-colour colourable' : 'chip-colour';
+  const colClick = isColourable ? ` onclick="showHzPalette(event,this)"` : '';
+  if (item.split) {
+    const colL = SUBJECT_COL[item.subjectLeft] || '#64748b';
+    const colR = SUBJECT_COL[item.subjectRight] || '#64748b';
+    return `<div class="cell-chip" style="min-height:${minH}px" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">
+      <div class="split-wrap" style="flex:1">
+        <div class="split-half" style="background:${colL}50"><span class="chip-colour" style="background:${colL};display:inline-block;margin-right:3px"></span><span style="font-size:13px;font-weight:800;font-family:'Nunito',sans-serif">${escHtml(item.subjectLeft || '')}</span><textarea class="item-note chip-note" rows="1" data-side="left" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">${escHtml(item.noteLeft || '')}</textarea></div>
+        <div class="split-half" style="background:${colR}50"><span class="chip-colour" style="background:${colR};display:inline-block;margin-right:3px"></span><span style="font-size:13px;font-weight:800;font-family:'Nunito',sans-serif">${escHtml(item.subjectRight || '')}</span><textarea class="item-note chip-note" rows="1" data-side="right" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">${escHtml(item.noteRight || '')}</textarea></div>
+      </div>
+      <div style="display:flex;align-items:center;padding:0 5px 3px">
+        <button class="chip-split" title="Unsplit" onclick="unsplitItem(this)">↔</button>
+        <span style="flex:1"></span>
+        <button class="chip-del" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}" onclick="removeItem(this)">×</button>
+      </div>
+      <div class="chip-resize" style="background:${col}"></div>
+    </div>`;
+  }
+  return `<div class="cell-chip" style="background:${light};min-height:${minH}px" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">
+    <div class="chip-top">
+      <span class="chip-handle" title="Drag to reorder">≡</span>
+      <span class="${colCls}" style="background:${col}"${colClick}></span>
+      <span class="chip-name">${escHtml(item.subject)}</span>
+      <button class="chip-split" title="Split into two groups" onclick="splitItem(this)">⇔</button>
+      <button class="chip-del" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}" onclick="removeItem(this)">×</button>
+    </div>
+    <div class="chip-note-wrap">
+      <button class="chip-note-toggle${item.note ? ' has-note' : ''}" onclick="this.style.display='none';this.nextElementSibling.classList.remove('hidden');this.nextElementSibling.focus();return false">+</button>
+      <textarea class="item-note chip-note${item.note ? '' : ' hidden'}" rows="1" placeholder="Note…" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">${escHtml(item.note||'')}</textarea>
+    </div>
+    <div class="chip-resize" style="background:${col}"></div>
+  </div>`;
+}
+
+// ── Staff cell split (TP/LP views) ───────────────────────────────────────────
+function renderStaffCell(ownItems, wk, view, day, session) {
+  let html = '';
+  if (ownItems.length) {
+    html = ownItems.map((item, idx) => renderItem(item, wk, view, day, session, idx)).join('');
+  } else {
+    html = '<div class="drop-hint">drop here</div>';
+  }
+  return `<div class="staff-own-col">${html}</div>`;
+}
+
+// ── Chip actions ─────────────────────────────────────────────────────────────
+function showHzPalette(e, dotEl) {
+  e.stopPropagation();
+  const chip = dotEl.closest('.cell-chip');
+  const existing = chip.querySelector('.hz-colour-pop');
+  if (existing) { existing.remove(); return; }
+  const { wk, view, day, session, idx } = chip.dataset;
+  const slot = getSlot(wk, view, day, session);
+  const item = slot[Number(idx)];
+  const currentCol = item.hzCol || '#94a3b8';
+  const pal = hzPalette();
+  const pop = document.createElement('div');
+  pop.className = 'hz-colour-pop';
+  pop.innerHTML = pal.map(p => `<span style="background:${p.col}${p.col === currentCol ? ';border-color:#1e293b' : ''}" data-col="${p.col}" data-name="${p.name}" title="${p.name}"></span>`).join('');
+  pop.addEventListener('click', function(ev) {
+    const swatch = ev.target.closest('[data-col]');
+    if (!swatch) return;
+    item.hzCol = swatch.dataset.col;
+    item.subject = swatch.dataset.name === 'Other' ? 'HomeZone - Other' : `HomeZone - ${swatch.dataset.name}`;
+    persistLocal(); syncSave();
+    pop.remove();
+    renderGrid();
+  });
+  dotEl.parentElement.style.position = 'relative';
+  dotEl.parentElement.appendChild(pop);
+}
+
+document.addEventListener('click', function() {
+  document.querySelectorAll('.hz-colour-pop').forEach(p => p.remove());
+});
+
+function removeItem(btn) {
+  const { wk, view, day, session, idx } = btn.dataset;
+  const slot = getSlot(wk, view, day, session);
+  slot.splice(Number(idx), 1);
+  persistLocal(); syncSave();
+  renderGrid();
+}
+
+function splitItem(btn) {
+  const chip = btn.closest('.cell-chip');
+  const { wk, view, day, session, idx } = chip.dataset;
+  const slot = getSlot(wk, view, day, session);
+  const item = slot[Number(idx)];
+  if (!item || item.split) return;
+  item.split = true;
+  item.subjectLeft = item.subject;
+  item.subjectRight = '';
+  item.noteLeft = item.note || '';
+  item.noteRight = '';
+  delete item.subject;
+  delete item.note;
+  persistLocal(); syncSave();
+  renderGrid();
+}
+
+function unsplitItem(btn) {
+  const chip = btn.closest('.cell-chip');
+  const { wk, view, day, session, idx } = chip.dataset;
+  const slot = getSlot(wk, view, day, session);
+  const item = slot[Number(idx)];
+  if (!item || !item.split) return;
+  item.subject = item.subjectLeft || item.subjectRight || 'Other';
+  item.note = item.noteLeft || item.noteRight || '';
+  delete item.split;
+  delete item.subjectLeft;
+  delete item.subjectRight;
+  delete item.noteLeft;
+  delete item.noteRight;
+  persistLocal(); syncSave();
+  renderGrid();
+}
+
+function onNoteBlur(e) {
+  const { wk, view, day, session, idx, side } = e.target.dataset;
+  const slot = getSlot(wk, view, day, session);
+  if (slot[Number(idx)]) {
+    if (slot[Number(idx)].split && side) {
+      slot[Number(idx)][side === 'left' ? 'noteLeft' : 'noteRight'] = e.target.value;
+    } else {
+      slot[Number(idx)].note = e.target.value;
+    }
+    persistLocal(); syncSave();
+  }
+}
+
+// ── Resize chip height ──────────────────────────────────────────────────────
+let resize = null; // { chipEl, startY, startDur, item }
+
+function onResizePointerDown(e) {
+  if (e.button !== undefined && e.button !== 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const handle = e.currentTarget;
+  const chipEl = handle.closest('.cell-chip');
+  const { wk, view, day, session, idx } = chipEl.dataset;
+  const slot = getSlot(wk, view, day, session);
+  const item = slot[Number(idx)];
+  if (!item) return;
+  resize = { chipEl, startY: e.clientY, startDur: item.duration || 1, item };
+  handle.setPointerCapture(e.pointerId);
+  handle.addEventListener('pointermove', onResizePointerMove);
+  handle.addEventListener('pointerup', onResizePointerUp);
+  handle.addEventListener('pointercancel', onResizePointerUp);
+}
+
+function onResizePointerMove(e) {
+  if (!resize) return;
+  const dy = e.clientY - resize.startY;
+  const newDur = Math.max(1, Math.round((resize.startDur * 32 + dy) / 32));
+  resize.item.duration = newDur;
+  resize.chipEl.style.minHeight = Math.max(32, newDur * 32) + 'px';
+}
+
+function onResizePointerUp(e) {
+  if (!resize) return;
+  const handle = e.currentTarget;
+  handle.removeEventListener('pointermove', onResizePointerMove);
+  handle.removeEventListener('pointerup', onResizePointerUp);
+  handle.removeEventListener('pointercancel', onResizePointerUp);
+  persistLocal(); syncSave();
+  resize = null;
+}
+
+// ── Drag and drop ────────────────────────────────────────────────────────────
+let drag = null; // { subject, col, sourceType, sourceChip, sourceData }
+// sourceType: 'sidebar' (new from sidebar) or 'cell' (existing chip being reordered)
+
+const ghost = document.getElementById('drag-ghost');
+
+function onSubjectPointerDown(e) {
+  if (e.button !== undefined && e.button !== 0) return;
+  e.preventDefault();
+  const chip = e.currentTarget;
+  const subject = chip.dataset.subject;
+  const col = chip.dataset.col;
+
+  drag = { subject, col, colourable: chip.dataset.colourable === 'true', sourceType: 'sidebar', sourceChip: chip, sourceData: null };
+  chip.classList.add('dragging');
+  chip.setPointerCapture(e.pointerId);
+
+  ghost.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block"></span>${escHtml(subject)}`;
+  ghost.style.display = 'flex';
+  moveGhost(e.clientX, e.clientY);
+
+  chip.addEventListener('pointermove', onDragMove);
+  chip.addEventListener('pointerup', onDragEnd);
+  chip.addEventListener('pointercancel', onDragCancel);
+}
+
+function onChipPointerDown(e) {
+  if (e.button !== undefined && e.button !== 0) return;
+  const handle = e.target.closest('.chip-handle');
+  if (!handle) return;
+  e.preventDefault();
+  const chipEl = handle.closest('.cell-chip');
+  if (!chipEl) return;
+
+  const { wk, view, day, session, idx } = chipEl.dataset;
+  const slot = getSlot(wk, view, day, session);
+  const item = slot[Number(idx)];
+  if (!item) return;
+
+  const col = SUBJECT_COL[item.subject] || '#64748b';
+  drag = {
+    subject: item.subject, col, sourceType: 'cell', sourceChip: chipEl,
+    sourceData: { wk, view, day, session, idx: Number(idx), item: JSON.parse(JSON.stringify(item)) }
+  };
+  chipEl.classList.add('dragging');
+  handle.setPointerCapture(e.pointerId);
+
+  ghost.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block"></span>${escHtml(item.subject)}`;
+  ghost.style.display = 'flex';
+  moveGhost(e.clientX, e.clientY);
+
+  handle.addEventListener('pointermove', onDragMove);
+  handle.addEventListener('pointerup', onDragEnd);
+  handle.addEventListener('pointercancel', onDragCancel);
+}
+
+function onDragMove(e) {
+  if (!drag) return;
+  moveGhost(e.clientX, e.clientY);
+  highlightCellAt(e.clientX, e.clientY);
+}
+
+function onDragEnd(e) {
+  if (!drag) return;
+  const target = dropTargetAt(e.clientX, e.clientY);
+  if (target) {
+    const wk = schedKey();
+
+    // Dropping onto a split half
+    if (target.splitTarget) {
+      const slot = getSlot(wk, state.activeView, target.day, target.session);
+      const item = slot[target.splitTarget.idx];
+      if (item && item.split) {
+        if (drag.sourceType === 'cell') {
+          // If dragging from the other half of same split, clear that side first
+          const sd = drag.sourceData;
+          if (sd.day === target.day && sd.session === target.session && sd.idx === target.splitTarget.idx) {
+            // Moving within same split chip — just swap sides
+            const movingSubject = sd.item.subject || '';
+            const movingNote = sd.item.note || '';
+            if (target.splitTarget.side === 'right') {
+              item.subjectRight = movingSubject; item.noteRight = movingNote;
+            } else {
+              item.subjectLeft = movingSubject; item.noteLeft = movingNote;
+            }
+            persistLocal(); syncSave(); endDrag(); renderGrid(); return;
+          }
+          const srcSlot = getSlot(sd.wk, sd.view, sd.day, sd.session);
+          srcSlot.splice(sd.idx, 1);
+        }
+        if (target.splitTarget.side === 'right') {
+          item.subjectRight = drag.subject; item.noteRight = '';
+        } else {
+          item.subjectLeft = drag.subject; item.noteLeft = '';
+        }
+      }
+      persistLocal(); syncSave(); endDrag(); renderGrid(); return;
+    }
+
+    const { day, session, insertIdx } = target;
+    const slot = getSlot(wk, state.activeView, day, session);
+
+    if (drag.sourceType === 'cell') {
+      const sd = drag.sourceData;
+      const srcSlot = (sd.wk === wk && sd.view === state.activeView && sd.day === day && sd.session === session)
+        ? slot : getSlot(sd.wk, sd.view, sd.day, sd.session);
+      srcSlot.splice(sd.idx, 1);
+      let insertAt = insertIdx;
+      if (srcSlot === slot && sd.idx < insertAt) insertAt--;
+      if (insertAt < 0) insertAt = slot.length;
+      slot.splice(insertAt, 0, drag.sourceData.item);
+    } else {
+      const insertAt = insertIdx < 0 ? slot.length : Math.min(insertIdx, slot.length);
+      const newItem = { subject: drag.subject, note: '', duration: 1 };
+      if (drag.colourable) newItem.colourable = true;
+      slot.splice(insertAt, 0, newItem);
+    }
+    persistLocal(); syncSave();
+  }
+  endDrag();
+  renderGrid();
+}
+
+function onDragCancel() { endDrag(); }
+
+function endDrag() {
+  if (!drag) return;
+  drag.sourceChip.classList.remove('dragging');
+  const el = drag.sourceType === 'cell'
+    ? drag.sourceChip.querySelector('.chip-handle') || drag.sourceChip
+    : drag.sourceChip;
+  el.removeEventListener('pointermove', onDragMove);
+  el.removeEventListener('pointerup', onDragEnd);
+  el.removeEventListener('pointercancel', onDragCancel);
+  ghost.style.display = 'none';
+  clearDropHighlights();
+  drag = null;
+}
+
+function moveGhost(x, y) {
+  ghost.style.transform = `translate(${x+14}px,${y+10}px)`;
+}
+
+function dropTargetAt(x, y) {
+  ghost.style.display = 'none';
+  const el = document.elementFromPoint(x, y);
+  ghost.style.display = 'flex';
+  if (!el) return null;
+
+  // Check if dropping onto staff own column (TP/LP view)
+  const staffOwn = el.closest('.staff-own-col');
+  if (staffOwn) {
+    const cellEl = staffOwn.closest('.view-cell');
+    if (cellEl) {
+      const ownChips = [...staffOwn.querySelectorAll('.cell-chip:not(.dragging)')];
+      let insertIdx = ownChips.length;
+      for (let i = 0; i < ownChips.length; i++) {
+        const rect = ownChips[i].getBoundingClientRect();
+        if (y < rect.top + rect.height / 2) { insertIdx = i; break; }
+      }
+      return { day: cellEl.dataset.day, session: cellEl.dataset.session, insertIdx };
+    }
+  }
+
+  // Check if dropping onto a split half (master view class swaps)
+  const half = el.closest('.split-half');
+  if (half) {
+    const chip = half.closest('.cell-chip');
+    if (chip) {
+      const side = half.previousElementSibling ? 'right' : 'left';
+      return { day: chip.dataset.day, session: chip.dataset.session, insertIdx: -1, splitTarget: { idx: Number(chip.dataset.idx), side } };
+    }
+  }
+
+  const cell = el.closest('.view-cell');
+  if (!cell || !cell.dataset.day || cell.classList.contains('non-school-day')) return null;
+  const chips = [...cell.querySelectorAll('.cell-chip:not(.dragging)')];
+  let insertIdx = chips.length;
+  for (let i = 0; i < chips.length; i++) {
+    const rect = chips[i].getBoundingClientRect();
+    if (y < rect.top + rect.height / 2) { insertIdx = i; break; }
+  }
+  return { day: cell.dataset.day, session: cell.dataset.session, insertIdx };
+}
+
+function highlightCellAt(x, y) {
+  clearDropHighlights();
+  ghost.style.display = 'none';
+  const el = document.elementFromPoint(x, y);
+  ghost.style.display = 'flex';
+  if (!el) return;
+  const staffOwn = el.closest('.staff-own-col');
+  if (staffOwn) { staffOwn.closest('.view-cell')?.classList.add('drop-over'); return; }
+  const half = el.closest('.split-half');
+  if (half) { half.classList.add('drop-over-half'); return; }
+  const cell = el.closest('.view-cell');
+  if (cell && !cell.classList.contains('non-school-day')) cell.classList.add('drop-over');
+}
+
+function clearDropHighlights() {
+  document.querySelectorAll('.view-cell.drop-over').forEach(c => c.classList.remove('drop-over'));
+  document.querySelectorAll('.split-half.drop-over-half').forEach(c => c.classList.remove('drop-over-half'));
+}
+
+function onCellEnter(e) { /* handled in highlightCellAt */ }
+function onCellLeave(e) { e.currentTarget.classList.remove('drop-over'); }
+
+// ── Copy / clear helpers ─────────────────────────────────────────────────────
+function copyWeekToNext() {
+  const wk = schedKey();
+  const idx = state.weekIdx;
+  if (!WEEKS[idx + 1]) { alert('No next week available.'); return; }
+  state.schedule[WEEKS[idx + 1].key] = JSON.parse(JSON.stringify(state.schedule[wk] || {}));
+  persistLocal(); syncSave();
+  alert(`${wk} copied to next week.`);
+}
+
+function clearActiveView() {
+  if (!confirm(`Clear the ${state.activeView.toUpperCase()} view for this week?`)) return;
+  const wk = schedKey();
+  if (state.schedule[wk]) delete state.schedule[wk][state.activeView];
+  persistLocal(); syncSave();
+  renderGrid();
+}
+
+// ── Staff modal ──────────────────────────────────────────────────────────────
+function openSubjectModal() {
+  const el = document.getElementById('subjectModalRows');
+  el.innerHTML = SUBJECTS.map((g, gi) => `
+    <div class="staff-modal-row">
+      <div class="smr-top">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#1e293b">${g.label}</div>
+        </div>
+      </div>
+      ${g.subjects.map((s, si) => `
+        <div class="smr-fields" style="margin-bottom:8px">
+          <input id="subj-name-${gi}-${si}" value="${escHtml(s.name)}" placeholder="Subject name">
+          <input type="color" id="subj-col-${gi}-${si}" value="${s.col}" style="width:44px;padding:0;border:none;background:none">
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+  document.getElementById('subjectModal').classList.add('open');
+}
+
+function saveSubjectModal() {
+  SUBJECTS.forEach((g, gi) => {
+    g.subjects.forEach((s, si) => {
+      const nameEl = document.getElementById(`subj-name-${gi}-${si}`);
+      const colEl = document.getElementById(`subj-col-${gi}-${si}`);
+      if (nameEl) s.name = nameEl.value.trim() || s.name;
+      if (colEl) s.col = colEl.value;
+    });
+  });
+  for (const key of Object.keys(SUBJECT_COL)) delete SUBJECT_COL[key];
+  SUBJECTS.forEach(g => g.subjects.forEach(s => { SUBJECT_COL[s.name] = s.col; }));
+  saveSubjectsLocal();
+  closeSubjectModal();
+  renderSidebar();
+  renderGrid();
+}
+
+function closeSubjectModal() {
+  document.getElementById('subjectModal').classList.remove('open');
+}
+
+// ── Staff modal ────────────────────────────────────────────────────────────
+function openStaffModal() {
+  document.getElementById('staffModalHint').textContent = `Set the names for your ${YEAR_GROUP} team. These are saved locally on this device.`;
+  const el = document.getElementById('staffModalRows');
+  el.innerHTML = STAFF.map((s, i) => `
+    <div class="staff-modal-row">
+      <div class="smr-top">
+        <div class="smr-avatar" style="background:${s.col}">${s.name.charAt(0).toUpperCase()}</div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#1e293b">${escHtml(s.role)}</div>
+        </div>
+      </div>
+      <div class="smr-fields">
+        <input id="staff-name-${i}" value="${escHtml(s.name)}" placeholder="Name">
+        <div class="colour-picker">
+          ${COLOUR_PALETTE.map(c => `<div class="colour-swatch${c===s.col?' selected':''}" style="background:${c}" data-staff="${i}" data-col="${c}" onclick="selectStaffColour(${i},'${c}')"></div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('staffModal').classList.add('open');
+}
+
+let staffColourPicks = {};
+
+function selectStaffColour(idx, col) {
+  if (!staffColourPicks[idx]) staffColourPicks[idx] = STAFF[idx].col;
+  staffColourPicks[idx] = col;
+  const row = document.querySelectorAll('.staff-modal-row')[idx];
+  row.querySelectorAll('.colour-swatch').forEach(s => {
+    s.classList.toggle('selected', s.dataset.col === col);
+  });
+  row.querySelector('.smr-avatar').style.background = col;
+}
+
+function closeStaffModal() {
+  staffColourPicks = {};
+  document.getElementById('staffModal').classList.remove('open');
+}
+
+function saveStaffModal() {
+  STAFF.forEach((s, i) => {
+    const nameEl = document.getElementById(`staff-name-${i}`);
+    if (nameEl) s.name = nameEl.value.trim() || s.name;
+    if (staffColourPicks[i]) s.col = staffColourPicks[i];
+  });
+  saveStaffLocal();
+  staffColourPicks = {};
+  closeStaffModal();
+  renderGrid();
+}
+
+// ── Staff-out spans (PPA, Leadership, etc.) ────────────────────────────────
+function getSessionOptions() {
+  return ROWS.map(r => ({ id: r.id, label: r.label + (r.time ? ` (${r.time})` : '') }));
+}
+const STAFF_OUT_COLOURS = ['#475569','#7c3aed','#dc2626','#16a34a','#d97706'];
+
+function getStaffOut(wk, view, day) {
+  if (!state.schedule[wk] || !state.schedule[wk][view] || !state.schedule[wk][view][day]) return [];
+  const dayObj = state.schedule[wk][view][day];
+  return dayObj._out || [];
+}
+
+function setStaffOut(wk, view, day, spans) {
+  const dayObj = ensureDay(wk, view, day);
+  dayObj._out = spans;
+  persistLocal(); syncSave();
+  renderGrid();
+}
+
+let _staffOutDay = null;
+
+function openStaffOutModal(dayIdx) {
+  _staffOutDay = dayIdx;
+  const day = DAYS[dayIdx].toLowerCase();
+  const existing = getStaffOut(schedKey(), state.activeView, day);
+  const existingHtml = existing.length ? existing.map((sp, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9">
+      <span style="background:${sp.colour || '#475569'};color:white;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:700">${escHtml(sp.label)}</span>
+      <span style="font-size:12px;color:#64748b">${getSessionOptions().find(s=>s.id===sp.start)?.label||sp.start} → ${getSessionOptions().find(s=>s.id===sp.end)?.label||sp.end}</span>
+      ${sp.cover ? `<span style="font-size:12px;color:#94a3b8">Cover: ${escHtml(sp.cover)}</span>` : ''}
+      <button style="margin-left:auto;background:none;border:none;color:#dc2626;cursor:pointer;font-size:14px" onclick="removeStaffOut(${i})">×</button>
+    </div>
+  `).join('') : '<p style="font-size:12px;color:#94a3b8">No staff-out entries for this day.</p>';
+
+  document.getElementById('staffOutFields').innerHTML = `
+    <div style="margin-bottom:14px">${existingHtml}</div>
+    <div style="border-top:2px solid #e2e8f0;padding-top:12px">
+      <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px">Add new</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <input id="soLabel" placeholder="PPA, Leadership…" style="flex:1;border:1px solid #e2e8f0;border-radius:5px;padding:6px 10px;font-size:13px;font-family:Arial,sans-serif">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <select id="soStart" style="flex:1;border:1px solid #e2e8f0;border-radius:5px;padding:6px 8px;font-size:13px;font-family:Arial,sans-serif">
+          ${getSessionOptions().map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
+        </select>
+        <span style="font-size:16px;color:#94a3b8;font-weight:700">→</span>
+        <select id="soEnd" style="flex:1;border:1px solid #e2e8f0;border-radius:5px;padding:6px 8px;font-size:13px;font-family:Arial,sans-serif">
+          ${getSessionOptions().map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <input id="soCover" placeholder="Cover (optional)" style="flex:1;border:1px solid #e2e8f0;border-radius:5px;padding:6px 10px;font-size:13px;font-family:Arial,sans-serif">
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:12px;color:#64748b;font-weight:600">Colour:</span>
+        ${STAFF_OUT_COLOURS.map((c, i) => `<label style="cursor:pointer"><input type="radio" name="soColour" value="${c}" id="soColour${i}" ${i === 0 ? 'checked' : ''} style="display:none"><span style="display:inline-block;width:24px;height:24px;border-radius:5px;background:${c};border:2.5px solid ${i===0?'#1e293b':'transparent'};vertical-align:middle;transition:border .1s"></span></label>`).join('')}
+      </div>
+    </div>
+  `;
+  // Highlight selected colour on click
+  document.querySelectorAll('input[name="soColour"]').forEach(r => {
+    r.addEventListener('change', () => {
+      document.querySelectorAll('input[name="soColour"]').forEach(r2 => {
+        r2.parentElement.querySelector('span').style.borderColor = r2.checked ? '#1e293b' : 'transparent';
+      });
+    });
+  });
+  document.getElementById('staffOutModal').classList.add('open');
+}
+
+function removeStaffOut(idx) {
+  const day = DAYS[_staffOutDay].toLowerCase();
+  const spans = getStaffOut(schedKey(), state.activeView, day);
+  spans.splice(idx, 1);
+  setStaffOut(schedKey(), state.activeView, day, spans);
+  openStaffOutModal(_staffOutDay); // refresh modal
+}
+
+function saveStaffOut() {
+  const label = document.getElementById('soLabel').value.trim();
+  if (!label) { closeStaffOutModal(); return; }
+  const start = document.getElementById('soStart').value;
+  const end = document.getElementById('soEnd').value;
+  const cover = document.getElementById('soCover').value.trim();
+  const day = DAYS[_staffOutDay].toLowerCase();
+  const spans = getStaffOut(schedKey(), state.activeView, day);
+  // Ensure start <= end in ROWS order
+  const startIdx = ROWS.findIndex(r => r.id === start);
+  const endIdx = ROWS.findIndex(r => r.id === end);
+  if (startIdx < 0 || endIdx < 0 || startIdx > endIdx) { closeStaffOutModal(); return; }
+  const colour = document.querySelector('input[name="soColour"]:checked')?.value || STAFF_OUT_COLOURS[0];
+  spans.push({ start, end, label, cover, colour });
+  setStaffOut(schedKey(), state.activeView, day, spans);
+  closeStaffOutModal();
+}
+
+function closeStaffOutModal() {
+  document.getElementById('staffOutModal').classList.remove('open');
+}
+
+// ── Utility ──────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function setView(view) {
+  state.activeView = view;
+  // Ensure staff-specific subjects have colour entries
+  if (view !== 'master') {
+    INTERVENTIONS.forEach(g => g.subjects.forEach(s => {
+      if (!SUBJECT_COL[s.name]) SUBJECT_COL[s.name] = s.col;
+    }));
+  }
+  renderViewTabs();
+  renderSidebar();
+  renderGrid();
+}
+
+// ── After-school events from sheet ──────────────────────────────────────────
+const DAY_NAME_MAP = {'monday':0,'tuesday':1,'wednesday':2,'thursday':3,'friday':4,'saturday':5,'sunday':6};
+let recurringAfterSchool = []; // [{dayIdx, label, bg}]
+
+function buildAfterSchoolEvents(rows) {
+  const events = {};
+  rows.forEach(r => {
+    if (!r.StartDate || !r.Session) return;
+    const start = parseDate(r.StartDate.trim());
+    if (!start || isNaN(start)) return;
+    const session = String(r.Session).trim();
+    if (session !== 'After School') return;
+    const end = parseDate((r.EndDate || r.StartDate).trim()) || start;
+    const cur = new Date(start);
+    while (cur <= end) {
+      const k = dateKey(cur);
+      if (!events[k]) events[k] = [];
+      events[k].push({ label: r.Label || r.Type, type: r.Type, bg: r.Colour || '#1e3a8a' });
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+  return events;
+}
+
+function buildRecurringAfterSchool(rows) {
+  return rows
+    .filter(r => r.Session && String(r.Session).trim() === 'After School' && r.Day)
+    .map(r => ({
+      dayIdx: DAY_NAME_MAP[String(r.Day).trim().toLowerCase()],
+      label: r.Label,
+      bg: r.Colour || '#1e3a8a'
+    }))
+    .filter(r => r.dayIdx !== undefined && r.label);
+}
+
+const BLOCKING_TYPES = new Set([
+  'Half Term', 'Christmas', 'Easter', 'Summer Holiday',
+  'INSET 1', 'INSET 2', 'INSET 3', 'INSET 4', 'INSET 5',
+  'Bank Holiday', 'CLF Conference',
+]);
+
+function buildNonSchoolDays(rows) {
+  const days = {};
+  rows.forEach(r => {
+    if (!r.StartDate || (r.Session && String(r.Session).trim())) return;
+    const type = String(r.Type || '').trim();
+    if (!BLOCKING_TYPES.has(type)) return;
+    const start = parseDate(r.StartDate.trim());
+    if (!start || isNaN(start)) return;
+    const end = parseDate((r.EndDate || r.StartDate).trim()) || start;
+    const label = r.Label || type;
+    const cur = new Date(start);
+    while (cur <= end) {
+      if (cur.getDay() >= 1 && cur.getDay() <= 5) {
+        days[dateKey(cur)] = { label, type };
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+  return days;
+}
+
+function buildSchoolEvents(rows) {
+  const events = {};
+  rows.forEach(r => {
+    if (!r.StartDate) return;
+    if (r.Session && String(r.Session).trim()) return; // after-school events handled elsewhere
+    const type = String(r.Type || '').trim();
+    if (BLOCKING_TYPES.has(type)) return; // blocking events handled elsewhere
+    const start = parseDate(r.StartDate.trim());
+    if (!start || isNaN(start)) return;
+    const end = parseDate((r.EndDate || r.StartDate).trim()) || start;
+    const label = r.Label || type;
+    const cur = new Date(start);
+    while (cur <= end) {
+      if (cur.getDay() >= 1 && cur.getDay() <= 5) {
+        const k = dateKey(cur);
+        if (!events[k]) events[k] = [];
+        events[k].push({ label, type });
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+  return events;
+}
+
+// ── Data migration ──────────────────────────────────────────────────────────
+function migrateScheduleKeys() {
+  // Convert old date-based keys (e.g. "2026-04-12") to T1W2 format
+  // Old keys were created by toISOString() which uses UTC, so UK dates shift by ~1hr
+  const weekMap = {};
+  WEEKS.forEach(w => {
+    weekMap[dateKey(w.start)] = w.key;
+    // Also map UTC version (midnight BST = 11pm UTC previous day)
+    const utcKey = w.start.toISOString().slice(0, 10);
+    weekMap[utcKey] = w.key;
+  });
+  let migrated = false;
+  for (const oldKey of Object.keys(state.schedule)) {
+    const newKey = weekMap[oldKey];
+    if (newKey && newKey !== oldKey && !state.schedule[newKey]) {
+      state.schedule[newKey] = state.schedule[oldKey];
+      delete state.schedule[oldKey];
+      migrated = true;
+    }
+  }
+  if (migrated) persistLocal();
+}
+
+// ── Year group switching ──────────────────────────────────────────────────────
+function changeYearGroup(newYG) {
+  // Persist current schedule before switching
+  persistLocal();
+
+  YEAR_GROUP = newYG;
+  saveYearGroup(newYG);
+  updateTitle();
+
+  // Rebuild staff from sheet data
+  if (ALL_SHEET_STAFF.length) {
+    STAFF = buildTeachingStaff(ALL_SHEET_STAFF, YEAR_GROUP);
+  } else {
+    STAFF = fallbackStaff();
+  }
+  VIEWS = computeViews(STAFF);
+  saveStaffLocal();
+
+  // Rebuild subjects
+  if (SHEET_SUBJECT_GROUPS.length) {
+    SUBJECTS = buildSubjectGroups(SHEET_SUBJECT_GROUPS, YEAR_GROUP);
+  } else {
+    SUBJECTS = fallbackSubjects();
+  }
+  saveSubjectsLocal();
+
+  // Rebuild interventions
+  if (SHEET_INTERVENTIONS.length) {
+    INTERVENTIONS = buildInterventions(SHEET_INTERVENTIONS, YEAR_GROUP);
+  } else {
+    INTERVENTIONS = fallbackInterventions();
+  }
+  saveInterventionsLocal();
+
+  // Rebuild day structure
+  if (SHEET_DAY_STRUCTURES.length) {
+    ROWS = buildDayStructure(SHEET_DAY_STRUCTURES, YEAR_GROUP);
+  } else {
+    ROWS = fallbackDayStructure(YEAR_GROUP);
+  }
+
+  // Rebuild colour lookup
+  rebuildSubjectCol();
+
+  // Load schedule for this year group
+  state.schedule = {};
+  loadLocal();
+
+  // Reset view to master
+  state.activeView = 'master';
+
+  // Re-render everything
+  renderViewTabs();
+  renderSidebar();
+  renderGrid();
+
+  // Sync load for the new year group
+  syncLoad(schedKey());
+}
+
+// ── View ID migration ─────────────────────────────────────────────────────────
+function migrateViewIds(oldIds) {
+  // When staff IDs change (e.g. from hard-coded 'tp'/'lp' to name-derived IDs),
+  // remap schedule data so existing chips aren't lost
+  const newIds = STAFF.map(s => s.id);
+  const idMap = {};
+  oldIds.forEach((oldId, i) => {
+    const newId = newIds[i];
+    if (oldId !== newId && newId) {
+      idMap[oldId] = newId;
+    }
+  });
+  if (!Object.keys(idMap).length) return;
+
+  let migrated = false;
+  Object.keys(state.schedule).forEach(weekKey => {
+    const week = state.schedule[weekKey];
+    Object.keys(idMap).forEach(oldId => {
+      const newId = idMap[oldId];
+      if (week[oldId]) {
+        week[newId] = week[oldId];
+        delete week[oldId];
+        migrated = true;
+      }
+    });
+  });
+  if (migrated) persistLocal();
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  loadLocal();
+  VIEWS = computeViews(STAFF);
+  migrateSubjectNames();
+  migrateShadowsOut();
+  migrateSubjects();
+
+  updateTitle();
+  document.getElementById('weekLabel').textContent = '…';
+  renderSidebar();
+  renderViewTabs();
+  renderGrid();
+
+  try {
+    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText] = await Promise.all([
+      fetch(SHEET_BASE + encodeURIComponent('Terms')).then(r => { if (!r.ok) throw new Error('Terms tab not found'); return r.text(); }),
+      fetch(SHEET_BASE + encodeURIComponent('Events')).then(r => r.ok ? r.text() : '').catch(() => ''),
+      fetch(SHEET_BASE + encodeURIComponent('SchoolEvents')).then(r => r.ok ? r.text() : '').catch(() => ''),
+      fetch(SHEET_BASE + encodeURIComponent('Staff')).then(r => r.ok ? r.text() : '').catch(() => ''),
+      fetch(SHEET_BASE + encodeURIComponent('SubjectGroups')).then(r => r.ok ? r.text() : '').catch(() => ''),
+      fetch(SHEET_BASE + encodeURIComponent('Interventions')).then(r => r.ok ? r.text() : '').catch(() => ''),
+      fetch(SHEET_BASE + encodeURIComponent('DayStructure')).then(r => r.ok ? r.text() : '').catch(() => ''),
+    ]);
+    WEEKS = buildWeeks(csvToObjects(termsText));
+    if (eventsText) {
+      const evtRows = csvToObjects(eventsText);
+      state.afterSchoolEvents = buildAfterSchoolEvents(evtRows);
+      state.nonSchoolDays = buildNonSchoolDays(evtRows);
+      state.schoolEvents = buildSchoolEvents(evtRows);
+    }
+    if (schoolEventsText) recurringAfterSchool = buildRecurringAfterSchool(csvToObjects(schoolEventsText));
+
+    // NEW: Staff tab
+    if (staffText) {
+      const staffRows = csvToObjects(staffText);
+      ALL_SHEET_STAFF = staffRows;
+      const yearGroups = [...new Set(staffRows.flatMap(r => {
+        return expandYearGroups((r.YearGroup || '').trim());
+      }))];
+      yearGroups.sort((a, b) => {
+        const order = ['Reception','Y1','Y2','Y3','Y4','Y5','Y6'];
+        return order.indexOf(a) - order.indexOf(b);
+      });
+      populateYearGroupSelect(yearGroups.length ? yearGroups : [YEAR_GROUP]);
+      const oldIds = STAFF.map(s => s.id);
+      STAFF = buildTeachingStaff(staffRows, YEAR_GROUP);
+      VIEWS = computeViews(STAFF);
+      saveStaffLocal();
+      // Migrate view IDs if staff IDs changed
+      migrateViewIds(oldIds);
+    }
+
+    // NEW: SubjectGroups tab
+    if (subjectGroupsText) {
+      const sgRows = csvToObjects(subjectGroupsText);
+      SHEET_SUBJECT_GROUPS = sgRows;
+      if (!localStorage.getItem(subjectsKey())) {
+        SUBJECTS = buildSubjectGroups(sgRows, YEAR_GROUP);
+        saveSubjectsLocal();
+      }
+      rebuildSubjectCol();
+    }
+
+    // NEW: Interventions tab
+    if (interventionsText) {
+      const intRows = csvToObjects(interventionsText);
+      SHEET_INTERVENTIONS = intRows;
+      INTERVENTIONS = buildInterventions(intRows, YEAR_GROUP);
+      saveInterventionsLocal();
+      rebuildSubjectCol();
+    }
+
+    // NEW: DayStructure tab
+    if (dayStructureText) {
+      const dsRows = csvToObjects(dayStructureText);
+      SHEET_DAY_STRUCTURES = dsRows;
+      ROWS = buildDayStructure(dsRows, YEAR_GROUP);
+    }
+
+    migrateScheduleKeys();
+    state.weekIdx = currentWeekIdx();
+    document.getElementById('btnPrev').disabled = state.weekIdx === 0;
+    document.getElementById('btnNext').disabled = state.weekIdx === WEEKS.length-1;
+    document.getElementById('weekLabel').textContent = weekLabel();
+    const nsdCount = Object.keys(state.nonSchoolDays).length;
+    document.getElementById('sheetStatus').textContent = `● Sheet connected · ${nsdCount} non-school days`;
+    document.getElementById('sheetStatus').className = 'sheet-status ok';
+  } catch (err) {
+    document.getElementById('weekLabel').textContent = weekLabel();
+    document.getElementById('sheetStatus').textContent = '● Sheet offline – using local';
+    document.getElementById('sheetStatus').className = 'sheet-status err';
+  }
+
+  renderViewTabs();
+  renderSidebar();
+  renderGrid();
+  await syncLoad(schedKey());
+  syncPushAll(); // push all local weeks to cloud on first connection
+}
+
+init();
+</script>
+</body>
+</html>

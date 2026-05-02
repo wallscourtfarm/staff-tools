@@ -1,0 +1,1755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Resource Booking · WFA</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --brand: #1798d3; --brand-light: #f0f8fd; --brand-border: #bae0f5; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f1f5f9; min-height: 100vh; }
+
+    /* ── Sticky top wrapper ──────────────────────────────────────── */
+    .sticky-top { position: sticky; top: 0; z-index: 200; background: white; will-change: transform; }
+
+    /* ── Header ──────────────────────────────────────────────────── */
+    .app-header {
+      background: white; border-bottom: 2px solid var(--brand);
+      padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+    }
+    .app-header img { height: 40px; }
+    .app-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 18px; color: var(--brand); line-height: 1.2; }
+    .app-subtitle { font-size: 11px; color: #94a3b8; }
+    .header-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+
+    /* ── Week bar ────────────────────────────────────────────────── */
+    .top-bar {
+      background: white; border-bottom: 1px solid #e2e8f0;
+      padding: 6px 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .nav-btn { background: var(--brand-light); border: 1.5px solid var(--brand-border); border-radius: 5px; padding: 5px 11px; cursor: pointer; font-size: 16px; color: var(--brand); line-height: 1; }
+    .nav-btn:hover { background: #dbeafe; }
+    .nav-btn:disabled { opacity: .35; cursor: default; }
+    .week-label { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 14px; color: var(--brand); min-width: 200px; text-align: center; }
+    .sheet-status { font-size: 10px; color: #94a3b8; }
+    .sheet-status.ok { color: #22c55e; }
+    .sheet-status.err { color: #f97316; }
+
+    @media (max-width: 720px) {
+      .top-bar { padding: 8px 12px; }
+      .week-label { min-width: 100%; order: -1; text-align: left; }
+    }
+
+    /* ── Body ────────────────────────────────────────────────────── */
+    .app-body { display: flex; min-height: calc(100vh - 120px); align-items: stretch; }
+
+    /* ── Resources sidebar ────────────────────────────────────────── */
+    .resources-sidebar {
+      width: 140px; flex-shrink: 0; background: white;
+      border-right: 1px solid #e2e8f0; padding: 10px 7px;
+      overflow-y: auto; overflow-x: hidden;
+    }
+    .sidebar-hd {
+      font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 11px;
+      color: #94a3b8; text-transform: uppercase; letter-spacing: .05em;
+      padding: 0 4px 8px;
+    }
+    .sidebar-subhd {
+      font-size: 8.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; color: #cbd5e1; padding: 8px 5px 4px;
+    }
+    .resource-chip {
+      display: flex; align-items: center; gap: 5px; padding: 5px 6px;
+      border-radius: 5px; margin-bottom: 2px; cursor: pointer;
+      user-select: none; touch-action: none; border: 1px solid rgba(0,0,0,.07);
+      transition: filter .1s, transform .1s, box-shadow .1s;
+    }
+    .resource-chip:hover { filter: brightness(.95); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(15,23,42,.06); }
+    .resource-chip.selected { outline: 2px solid var(--brand); outline-offset: -2px; }
+    .resource-chip.dragging { opacity: 0.5; cursor: grabbing; }
+    .resource-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .resource-name { font-size: 11px; font-weight: 700; color: #1e293b; line-height: 1.25; flex: 1; }
+    .resource-avail { font-size: 9px; color: #64748b; font-weight: 600; }
+    .resource-avail.low { color: #dc2626; }
+    .resource-avail.full { color: #22c55e; }
+
+    /* Drop target highlighting */
+    .view-cell.drop-over { background: var(--brand-light) !important; outline: 2px dashed var(--brand); outline-offset: -2px; }
+    .drop-hint-drop { font-size: 10px; color: var(--brand); padding: 6px 4px; text-align: center; font-weight: 700; }
+
+    /* Drag ghost */
+    .drag-ghost { position: fixed; pointer-events: none; z-index: 1000; opacity: 0.9; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; color: white; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+
+    /* Drag placeholder on grid */
+    .drag-placeholder {
+      position: absolute;
+      border-radius: 3px;
+      background: var(--brand);
+      opacity: 0.3;
+      pointer-events: none;
+      z-index: 50;
+      border: 2px dashed var(--brand);
+    }
+    .drag-placeholder.invalid {
+      background: #dc2626;
+      border-color: #dc2626;
+    }
+
+    @media (max-width: 720px) {
+      .resources-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #e2e8f0; max-height: 150px; }
+      .app-body { flex-direction: column; }
+    }
+
+    /* ── Grid area ───────────────────────────────────────────────── */
+    .grid-area { flex: 1; min-width: 0; padding: 12px; overflow-x: auto; position: relative; }
+
+    .sched-table { width: 100%; border-collapse: collapse; min-width: 560px; background: white; table-layout: fixed; }
+    .bookings-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
+    .bookings-overlay > * { pointer-events: auto; }
+
+    .sched-table th {
+      padding: 8px 10px; text-align: center; background: #f8fafc;
+      border-bottom: 2px solid #e2e8f0; border-right: 1px solid #e2e8f0;
+      font-family: 'Nunito', sans-serif; font-weight: 900;
+    }
+    .sched-table th:last-child { border-right: none; }
+    .sched-table th.time-hd { width: 90px; border-right: 2px solid #d1d5db; }
+    .day-hd { width: 140px; }
+    .day-hd-name { font-size: 13px; color: #1e293b; }
+    .day-hd-date { font-size: 10px; font-weight: 600; color: #94a3b8; }
+    .day-hd.today .day-hd-name { color: var(--brand); }
+    .day-hd.today .day-hd-date { color: var(--brand); }
+
+    .sched-table .fixed-row td {
+      background: var(--brand-light); padding: 7px 14px;
+      border-bottom: 1px solid var(--brand-border);
+    }
+    .sched-table .fixed-row td.time-cell {
+      font-size: 9.5px; color: var(--brand); font-weight: 700;
+      border-right: 2px solid var(--brand-border); white-space: nowrap;
+      padding: 7px 6px;
+    }
+    .fixed-label { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 12px; color: var(--brand); }
+    .fixed-sub { font-size: 9.5px; color: var(--brand); opacity: 0.6; }
+
+    .sched-table .session-row td.time-cell {
+      font-size: 9.5px; color: #64748b; font-weight: 700;
+      border-right: 2px solid #d1d5db; padding: 10px 6px;
+      background: #f8fafc; vertical-align: top; white-space: nowrap;
+      border-bottom: 2px solid #d1d5db;
+    }
+    .session-label { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 11px; color: var(--brand); display: block; }
+    .session-time { font-size: 9px; color: #94a3b8; font-weight: 600; }
+
+    .sched-table .session-row td.view-cell {
+      vertical-align: top; padding: 0; border-right: 1px solid #e2e8f0;
+      border-bottom: 2px solid #d1d5db; height: 90px;
+      background: white; position: relative; overflow: visible;
+    }
+    .sched-table .session-row td.view-cell:last-child { border-right: none; }
+
+    .drop-hint { font-size: 10px; color: #d1d5db; padding: 6px 4px; text-align: center; cursor: pointer; }
+    .drop-hint:hover { color: var(--brand); background: var(--brand-light); border-radius: 4px; }
+
+    /* ── Booking chips ────────────────────────────────────────────── */
+    .booking-chip {
+      border-radius: 4px; overflow: hidden;
+      border: 1px solid rgba(0,0,0,.1);
+      background: white;
+      position: relative;
+    }
+    .booking-chip:hover { box-shadow: 0 2px 6px rgba(15,23,42,.15); }
+    .booking-chip-top { display: flex; align-items: center; gap: 4px; padding: 3px 5px; }
+    .booking-chip-name { font-size: 11px; font-weight: 800; color: #1e293b; font-family: 'Nunito', sans-serif; }
+    .booking-chip-time { font-size: 9px; color: #64748b; }
+    .booking-chip-teacher { font-size: 10px; color: #64748b; }
+    .booking-chip-purpose { font-size: 9px; color: #94a3b8; padding: 2px 5px 3px; background: #f8fafc; }
+    .booking-chip-del {
+      position: absolute; top: 2px; right: 2px;
+      background: rgba(0,0,0,.1); border: none; border-radius: 3px;
+      width: 16px; height: 16px; font-size: 11px; line-height: 1;
+      color: rgba(0,0,0,.4); cursor: pointer; display: none; z-index: 5;
+    }
+    .booking-chip:hover .booking-chip-del { display: block; }
+    .booking-chip-del:hover { background: #dc2626; color: white; }
+
+    /* Timeline-style booking bars (narrow, rotated text) */
+    .booking-bar {
+      position: absolute;
+      border-radius: 3px; overflow: hidden;
+      cursor: grab; transition: filter .1s;
+      min-height: 20px;
+      touch-action: none;
+      user-select: none;
+    }
+    .booking-bar:hover { filter: brightness(1.05); z-index: 20; }
+    .booking-bar.dragging { opacity: 0.3; cursor: grabbing; }
+    .booking-bar-inner {
+      writing-mode: vertical-rl; text-orientation: mixed;
+      font-size: 10px; font-weight: 700; color: white;
+      padding: 4px 2px; white-space: nowrap; overflow: hidden;
+      font-family: 'Nunito', sans-serif;
+    }
+    .booking-bar-time {
+      writing-mode: vertical-rl; text-orientation: mixed;
+      font-size: 8px; color: rgba(255,255,255,.7);
+      padding: 2px;
+    }
+    .booking-bar-del {
+      position: absolute; top: 2px; right: 2px;
+      background: rgba(255,255,255,.3); border: none; border-radius: 3px;
+      width: 14px; height: 14px; font-size: 10px; line-height: 1;
+      color: white; cursor: pointer; display: none; z-index: 5;
+    }
+    .booking-bar:hover .booking-bar-del { display: block; }
+    .booking-bar-del:hover { background: #dc2626; color: white; }
+
+    /* ── Non-school day ───────────────────────────────────────────── */
+    .non-school-day { background: #f1f5f9 !important; position: relative; }
+    .non-school-day .session-label,
+    .non-school-day .session-time { color: #94a3b8; }
+    .non-school-day .view-cell { background: #f1f5f9 !important; min-height: 0 !important; }
+    .non-school-day .view-cell .drop-hint { display: none; }
+    .non-school-overlay {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      pointer-events: none; z-index: 5;
+    }
+    .non-school-badge {
+      background: #e2e8f0; color: #64748b; padding: 4px 10px; border-radius: 5px;
+      font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 12px;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    th.non-school-day { background: #f1f5f9 !important; }
+    th.non-school-day .day-hd-name,
+    th.non-school-day .day-hd-date { color: #94a3b8 !important; }
+
+    /* ── Modal ────────────────────────────────────────────────────── */
+    .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 500; align-items: center; justify-content: center; }
+    .modal-bg.open { display: flex; }
+    .modal { background: white; border-radius: 10px; padding: 16px 20px; box-shadow: 0 10px 40px rgba(0,0,0,.2); max-width: 90vw; max-height: 90vh; overflow-y: auto; }
+    .modal h3 { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 16px; color: #1e293b; margin-bottom: 4px; }
+    .modal-hint { font-size: 12px; color: #64748b; margin-bottom: 12px; }
+    .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+    .modal-cancel { background: #f1f5f9; border: 1px solid #d1d5db; border-radius: 5px; padding: 8px 16px; font-size: 13px; cursor: pointer; color: #64748b; }
+    #bookingYearGroup label:has(input:checked) { background: var(--brand); border-color: var(--brand); color: white; }
+    .modal-cancel:hover { background: #e2e8f0; }
+    .modal-save { background: var(--brand); border: none; border-radius: 5px; padding: 8px 16px; font-size: 13px; cursor: pointer; color: white; font-weight: 700; }
+    .modal-save:hover { filter: brightness(1.1); }
+  </style>
+</head>
+<body>
+  <div class="sticky-top">
+    <div class="app-header">
+      <img src="https://imcl75.github.io/wfa/logo.png" alt="Wallscourt Farm Academy" onerror="this.style.display='none'">
+      <div>
+        <div class="app-title" id="appTitle">Resource Booking</div>
+        <div class="app-subtitle">Wallscourt Farm Academy</div>
+      </div>
+      <div class="header-actions">
+        <span id="sheetStatus" class="sheet-status">● Loading…</span>
+      </div>
+    </div>
+    <div class="top-bar">
+      <button class="nav-btn" id="btnPrev" onclick="changeWeek(-1)">‹</button>
+      <div class="week-label" id="weekLabel">Loading…</div>
+      <button class="nav-btn" id="btnNext" onclick="changeWeek(1)">›</button>
+      <button class="nav-btn" onclick="goToday()">Today</button>
+    </div>
+  </div>
+
+  <div class="app-body">
+    <div class="resources-sidebar">
+      <div class="sidebar-hd">Resources</div>
+      <div id="resourceList"></div>
+    </div>
+    <div class="grid-area">
+      <table class="sched-table">
+        <thead id="schedHead"></thead>
+        <tbody id="schedBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Booking modal -->
+  <div class="modal-bg" id="bookingModal">
+    <div class="modal" style="min-width:420px;max-width:520px">
+      <h3>Book Resource</h3>
+      <p class="modal-hint" id="bookingHint">Select a resource to book.</p>
+      <div id="bookingFields">
+        <div style="margin-bottom:12px">
+          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">Resource</label>
+          <select id="bookingResource" style="width:100%;border:1px solid #e2e8f0;border-radius:5px;padding:8px;font-size:13px;font-family:Arial,sans-serif">
+            <optgroup label="Equipment" id="equipmentGroup"></optgroup>
+            <optgroup label="Learning Spaces" id="learningGroup"></optgroup>
+            <optgroup label="Outside" id="outsideGroup"></optgroup>
+            <optgroup label="Work Spaces" id="workGroup"></optgroup>
+          </select>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">Time</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <select id="bookingStart" style="flex:1;border:1px solid #e2e8f0;border-radius:5px;padding:8px;font-size:13px;font-family:Arial,sans-serif">
+              <option value="08:45">08:45</option>
+              <option value="09:00">09:00</option>
+              <option value="10:45">10:45</option>
+              <option value="11:00">11:00</option>
+              <option value="12:15">12:15</option>
+              <option value="13:20">13:20</option>
+              <option value="13:25">13:25</option>
+              <option value="15:00">15:00</option>
+              <option value="15:15">15:15</option>
+            </select>
+            <span style="color:#94a3b8;font-weight:700">→</span>
+            <select id="bookingEnd" style="flex:1;border:1px solid #e2e8f0;border-radius:5px;padding:8px;font-size:13px;font-family:Arial,sans-serif">
+              <option value="09:00">09:00</option>
+              <option value="10:45">10:45</option>
+              <option value="11:00">11:00</option>
+              <option value="12:15">12:15</option>
+              <option value="13:20">13:20</option>
+              <option value="13:25">13:25</option>
+              <option value="15:00">15:00</option>
+              <option value="15:15">15:15</option>
+              <option value="17:00">17:00</option>
+            </select>
+          </div>
+        </div>
+        <div id="bookingQtyRow" style="margin-bottom:12px;display:none">
+          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">Quantity</label>
+          <input type="number" id="bookingQty" min="1" max="30" value="1" style="width:80px;border:1px solid #e2e8f0;border-radius:5px;padding:8px;font-size:13px;font-family:Arial,sans-serif">
+          <span id="bookingQtyAvail" style="font-size:12px;color:#64748b;margin-left:8px"></span>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px">Year Group</label>
+          <div id="bookingYearGroup" style="display:flex;flex-wrap:wrap;gap:4px">
+            <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;font-size:12px"><input type="radio" name="yearGroup" value="Rec" style="margin:0">Rec</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;font-size:12px"><input type="radio" name="yearGroup" value="Y1" style="margin:0">Y1</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;font-size:12px"><input type="radio" name="yearGroup" value="Y2" style="margin:0">Y2</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;font-size:12px"><input type="radio" name="yearGroup" value="Y3" style="margin:0">Y3</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;font-size:12px"><input type="radio" name="yearGroup" value="Y4" style="margin:0">Y4</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;font-size:12px"><input type="radio" name="yearGroup" value="Y5" style="margin:0">Y5</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;font-size:12px"><input type="radio" name="yearGroup" value="Y6" style="margin:0">Y6</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;font-size:12px"><input type="radio" name="yearGroup" value="Whole School" style="margin:0">Whole</label>
+          </div>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">Purpose (optional)</label>
+          <input type="text" id="bookingPurpose" placeholder="e.g. Music lesson, PE" style="width:100%;border:1px solid #e2e8f0;border-radius:5px;padding:8px;font-size:13px;font-family:Arial,sans-serif">
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">Repeat</label>
+          <select id="bookingRecurring" style="width:100%;border:1px solid #e2e8f0;border-radius:5px;padding:8px;font-size:13px;font-family:Arial,sans-serif">
+            <option value="">One-time only</option>
+            <option value="weekly">Every week this term</option>
+            <option value="consecutive">Consecutive days</option>
+          </select>
+        </div>
+        <div id="bookingRecurringOpts" style="display:none;margin-bottom:12px">
+          <div id="bookingUntilRow">
+            <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">Until week</label>
+            <select id="bookingUntil" style="width:100%;border:1px solid #e2e8f0;border-radius:5px;padding:8px;font-size:13px;font-family:Arial,sans-serif"></select>
+          </div>
+          <div id="bookingDaysRow" style="display:none">
+            <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">Number of days</label>
+            <input type="number" id="bookingDays" min="2" max="5" value="2" style="width:80px;border:1px solid #e2e8f0;border-radius:5px;padding:8px;font-size:13px;font-family:Arial,sans-serif">
+          </div>
+        </div>
+      </div>
+      <div id="bookingConflict" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:5px;padding:8px;margin-bottom:12px;font-size:12px;color:#dc2626"></div>
+      <div class="modal-footer">
+        <button class="modal-cancel" onclick="closeBookingModal()">Cancel</button>
+        <button class="modal-save" onclick="saveBooking()">Book</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drag ghost -->
+  <div id="dragGhost" class="drag-ghost" style="display:none"></div>
+  <!-- Drag placeholder for moving bookings -->
+  <div id="dragPlaceholder" class="drag-placeholder" style="display:none"></div>
+
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
+const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbwzNtos0vdjnUhsFQ_igTtLNXyBd8k9c6rPkA0IZdkM3vJLAoIdSHonTbHAbyFNfH_BWQ/exec';
+
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+const DAY_SHORT = ['Mon','Tue','Wed','Thu','Fri'];
+
+// ── Resources (bookable spaces and equipment) ───────────────────────────────────
+// Default fallback; will be replaced by sheet data if available
+let RESOURCES = [
+  { id: 'muga', name: 'MUGA', type: 'space', quantity: 1, colour: '#22c55e', order: 1 },
+  { id: 'cafe', name: 'Cafe', type: 'space', quantity: 1, colour: '#f97316', order: 2 },
+  { id: 'hall', name: 'Hall', type: 'space', quantity: 1, colour: '#8b5cf6', order: 3 },
+  { id: 'library', name: 'Library', type: 'space', quantity: 1, colour: '#0d9488', order: 4 },
+  { id: 'super', name: 'Super Classroom', type: 'space', quantity: 1, colour: '#ec4899', order: 5 },
+  { id: 'music', name: 'Music Room', type: 'space', quantity: 1, colour: '#6366f1', order: 6 },
+  { id: 'art', name: 'Art Room', type: 'space', quantity: 1, colour: '#f59e0b', order: 7 },
+  { id: 'ipads', name: 'iPads', type: 'equipment', quantity: 30, colour: '#64748b', order: 10 },
+  { id: 'ipads_y1', name: 'Y1 iPads', type: 'equipment', quantity: 15, colour: '#94a3b8', order: 11 },
+  { id: 'laptops', name: 'Laptops', type: 'equipment', quantity: 20, colour: '#78716c', order: 12 },
+  { id: 'microphones', name: 'Microphones', type: 'equipment', quantity: 10, colour: '#a78bfa', order: 13 },
+];
+
+function buildResources(rows) {
+  // Expected columns: Id, Name, Type, Quantity, Colour, Order
+  return rows
+    .filter(r => r.Id && r.Name)
+    .map(r => ({
+      id: String(r.Id).trim().toLowerCase().replace(/\s+/g, '-'),
+      name: String(r.Name).trim(),
+      type: (r.Type || 'space').trim().toLowerCase(),
+      quantity: parseInt(r.Quantity) || 1,
+      colour: (r.Colour || '#64748b').trim(),
+      order: parseInt(r.Order) || 99,
+    }))
+    .sort((a, b) => a.order - b.order);
+}
+
+// ── Day structure ────────────────────────────────────────────────────────────
+const ROWS = [
+  { id:'reg-am', label:'Reg', time:'08:45-09:00', start:'08:45', end:'09:00' },
+  { id:'s1',     label:'Session 1', time:'09:00-10:45', start:'09:00', end:'10:45' },
+  { id:'fab',    label:'FAB', time:'10:45-11:00', start:'10:45', end:'11:00' },
+  { id:'s2',     label:'Session 2', time:'11:00-12:15', start:'11:00', end:'12:15' },
+  { id:'lunch',  label:'Lunch', time:'12:15-13:20', start:'12:15', end:'13:20' },
+  { id:'reg-pm', label:'Reg', time:'13:20-13:25', start:'13:20', end:'13:25' },
+  { id:'s3',     label:'Session 3', time:'13:25-15:00', start:'13:25', end:'15:00' },
+  { id:'story',  label:'Story', time:'15:00-15:15', start:'15:00', end:'15:15' },
+  { id:'home',   label:'Home', time:'15:15-17:00', start:'15:15', end:'17:00' },
+];
+
+// Convert time string (HH:MM) to minutes from midnight for comparison
+function timeToMins(t) {
+  if (!t) return 0;
+  const [h, m] = t.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+// Find which rows a time range spans
+function getRowsForTimeRange(startTime, endTime) {
+  const startMins = timeToMins(startTime);
+  const endMins = timeToMins(endTime);
+  return ROWS.filter(row => {
+    const rowStart = timeToMins(row.start);
+    const rowEnd = timeToMins(row.end);
+    return startMins < rowEnd && endMins > rowStart;
+  });
+}
+
+// ── State ───────────────────────────────────────────────────────────────────
+let state = {
+  weekIdx: 0,
+  bookings: {}, // weekKey → day → [{ booking with startTime, endTime }]
+  nonSchoolDays: {},
+  schoolEvents: {},
+};
+let WEEKS = [];
+let selectedResource = null;
+
+// ── Persistence ─────────────────────────────────────────────────────────────
+function bookingsKeyLS() { return 'wfa_bookings'; }
+
+function loadBookings() {
+  try { return JSON.parse(localStorage.getItem(bookingsKeyLS())) || {}; }
+  catch { return {}; }
+}
+
+function saveBookingsLocal() {
+  try { localStorage.setItem(bookingsKeyLS(), JSON.stringify(state.bookings)); } catch {}
+}
+
+function getBookings(weekKey, day) {
+  if (!state.bookings[weekKey]) state.bookings[weekKey] = {};
+  if (!state.bookings[weekKey][day]) state.bookings[weekKey][day] = [];
+  // Ensure it's always an array (sync might return object)
+  const bookings = state.bookings[weekKey][day];
+  return Array.isArray(bookings) ? bookings : [];
+}
+
+// ── Week helpers ─────────────────────────────────────────────────────────────
+function schedKey() {
+  if (WEEKS.length && WEEKS[state.weekIdx]) return WEEKS[state.weekIdx].key;
+  const d = weekMonday();
+  return dateKey(d);
+}
+
+function dateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  const p = s.split('/');
+  if (p.length !== 3) return null;
+  const [d,m,y] = p.map(Number);
+  return new Date(y < 100 ? 2000+y : y, m-1, d);
+}
+
+function buildWeeks(rows) {
+  return rows
+    .filter(r => r.StartDate && r.Term && r.Week)
+    .map(r => {
+      const start = parseDate(r.StartDate.trim());
+      if (!start || isNaN(start)) return null;
+      const term = String(r.Term).trim();
+      const week = String(r.Week).trim();
+      return { start, term, week, key:`T${term}W${week}`, label:`Term ${term} · Week ${week}` };
+    })
+    .filter(Boolean)
+    .sort((a,b) => a.start - b.start);
+}
+
+function currentWeekIdx() {
+  if (!WEEKS.length) return 0;
+  const today = new Date(); today.setHours(0,0,0,0);
+  for (let i=0; i<WEEKS.length; i++) {
+    const end = new Date(WEEKS[i].start); end.setDate(end.getDate()+6);
+    if (today >= WEEKS[i].start && today <= end) return i;
+  }
+  for (let i=0; i<WEEKS.length; i++) { if (WEEKS[i].start > today) return i; }
+  return WEEKS.length - 1;
+}
+
+function weekMonday() {
+  if (WEEKS.length && WEEKS[state.weekIdx]) return new Date(WEEKS[state.weekIdx].start);
+  const d = new Date(); d.setHours(0,0,0,0);
+  const day = d.getDay();
+  d.setDate(d.getDate() + (day===0?-6:1-day) + state.weekIdx*7);
+  return d;
+}
+
+function weekLabel() {
+  const fmt = x => x.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  if (WEEKS.length && WEEKS[state.weekIdx]) {
+    const w = WEEKS[state.weekIdx];
+    const end = new Date(w.start); end.setDate(w.start.getDate()+4);
+    return `${w.label} · ${fmt(w.start)} – ${fmt(end)}`;
+  }
+  const d = weekMonday(), end = new Date(d); end.setDate(d.getDate()+4);
+  return `${fmt(d)} – ${fmt(end)}`;
+}
+
+function dayDate(di) {
+  const d = weekMonday(); d.setDate(d.getDate()+di);
+  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+}
+
+function isToday(di) {
+  const d = weekMonday(); d.setDate(d.getDate()+di);
+  const t = new Date(); t.setHours(0,0,0,0);
+  return d.getTime()===t.getTime();
+}
+
+// ── Navigation ───────────────────────────────────────────────────────────────
+function changeWeek(dir) {
+  state.weekIdx = Math.max(0, Math.min((WEEKS.length||52)-1, state.weekIdx + dir));
+  document.getElementById('btnPrev').disabled = state.weekIdx === 0;
+  document.getElementById('btnNext').disabled = WEEKS.length && state.weekIdx === WEEKS.length-1;
+  document.getElementById('weekLabel').textContent = weekLabel();
+  renderGrid();
+  syncLoad(schedKey());
+}
+
+function goToday() {
+  if (WEEKS.length) state.weekIdx = currentWeekIdx();
+  document.getElementById('btnPrev').disabled = state.weekIdx === 0;
+  document.getElementById('btnNext').disabled = WEEKS.length && state.weekIdx === WEEKS.length-1;
+  document.getElementById('weekLabel').textContent = weekLabel();
+  renderGrid();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── CSV parsing ──────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const rows = []; let inQ=false, cur='', cells=[];
+  for (let i=0; i<text.length; i++) {
+    const c=text[i];
+    if (c==='"') { inQ=!inQ; }
+    else if (c===',' && !inQ) { cells.push(cur.trim()); cur=''; }
+    else if ((c==='\n'||c==='\r') && !inQ) {
+      cells.push(cur.trim()); cur='';
+      if (cells.some(x=>x)) rows.push(cells);
+      cells=[];
+      if (c==='\r' && text[i+1]==='\n') i++;
+    } else cur+=c;
+  }
+  cells.push(cur.trim());
+  if (cells.some(x=>x)) rows.push(cells);
+  return rows;
+}
+
+function csvToObjects(text) {
+  text = text.replace(/^\ufeff/,'');
+  const rows = parseCSV(text);
+  if (rows.length < 2) return [];
+  const hdRow = rows[0];
+  const gvizRe = /^([A-Za-z]\w*)( .*)?$/;
+  const nonEmpty = hdRow.filter(h => h.length > 0);
+  const isGviz = nonEmpty.every(h => gvizRe.test(h)) && nonEmpty.some(h => { const m=h.match(gvizRe); return m&&m[2]&&m[2].trim(); });
+  let headers, dataRows;
+  if (isGviz) {
+    headers  = hdRow.map(h => { const m=h.match(gvizRe); return m?m[1]:h; });
+    const firstData = hdRow.map(h => { const m=h.match(gvizRe); return m&&m[2]?m[2].trim():''; });
+    dataRows = [firstData, ...rows.slice(1)];
+  } else {
+    headers = hdRow; dataRows = rows.slice(1);
+  }
+  return dataRows.map(r => {
+    const obj = {};
+    headers.forEach((h,i) => { if (h) obj[h]=(r[i]||'').trim(); });
+    return obj;
+  });
+}
+
+function buildNonSchoolDays(rows) {
+  const BLOCKING_TYPES = new Set([
+    'Half Term', 'Christmas', 'Easter', 'Summer Holiday',
+    'INSET 1', 'INSET 2', 'INSET 3', 'INSET 4', 'INSET 5',
+    'Bank Holiday', 'CLF Conference',
+  ]);
+  const days = {};
+  rows.forEach(r => {
+    if (!r.StartDate || (r.Session && String(r.Session).trim())) return;
+    const type = String(r.Type || '').trim();
+    if (!BLOCKING_TYPES.has(type)) return;
+    const start = parseDate(r.StartDate.trim());
+    if (!start || isNaN(start)) return;
+    const end = parseDate((r.EndDate || r.StartDate).trim()) || start;
+    const label = r.Label || type;
+    const cur = new Date(start);
+    while (cur <= end) {
+      if (cur.getDay() >= 1 && cur.getDay() <= 5) {
+        days[dateKey(cur)] = { label, type };
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+  return days;
+}
+
+function buildSchoolEvents(rows) {
+  const events = {};
+  rows.forEach(r => {
+    if (!r.StartDate) return;
+    if (r.Session && String(r.Session).trim()) return;
+    const type = String(r.Type || '').trim();
+    const BLOCKING_TYPES = new Set([
+      'Half Term', 'Christmas', 'Easter', 'Summer Holiday',
+      'INSET 1', 'INSET 2', 'INSET 3', 'INSET 4', 'INSET 5',
+      'Bank Holiday', 'CLF Conference',
+    ]);
+    if (BLOCKING_TYPES.has(type)) return;
+    const start = parseDate(r.StartDate.trim());
+    if (!start || isNaN(start)) return;
+    const end = parseDate((r.EndDate || r.StartDate).trim()) || start;
+    const label = r.Label || type;
+    const cur = new Date(start);
+    while (cur <= end) {
+      if (cur.getDay() >= 1 && cur.getDay() <= 5) {
+        const k = dateKey(cur);
+        if (!events[k]) events[k] = [];
+        events[k].push({ label, type });
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+  return events;
+}
+
+// ── Sync ─────────────────────────────────────────────────────────────────────
+async function syncLoad(weekKey) {
+  if (!SYNC_URL) return;
+  try {
+    const res = await fetch(`${SYNC_URL}?action=loadBookings&weekKey=${encodeURIComponent(weekKey)}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.bookings) {
+        state.bookings[weekKey] = json.bookings;
+        renderSidebar();
+        renderGrid();
+      }
+    }
+  } catch {}
+}
+
+async function syncSave() {
+  if (!SYNC_URL) return;
+  try {
+    await fetch(SYNC_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'saveBookings', weekKey: schedKey(), bookings: state.bookings[schedKey()] || {} }),
+      headers: { 'Content-Type': 'text/plain' }
+    });
+    document.getElementById('sheetStatus').textContent = '● Synced';
+    document.getElementById('sheetStatus').className = 'sheet-status ok';
+  } catch {
+    document.getElementById('sheetStatus').textContent = '● Sync failed';
+    document.getElementById('sheetStatus').className = 'sheet-status err';
+  }
+}
+
+// ── Render: sidebar ─────────────────────────────────────────────────────────
+function renderSidebar() {
+  const el = document.getElementById('resourceList');
+
+  // Group resources by type category
+  const typeCategories = {
+    'outside': 'Outside',
+    'learning space': 'Learning Spaces',
+    'work space': 'Work Spaces',
+    'equipment': 'Equipment'
+  };
+
+  // Normalize types for grouping
+  const getTypeCategory = (type) => {
+    const t = type.toLowerCase();
+    if (t === 'equipment') return 'equipment';
+    if (t.includes('learning')) return 'learning space';
+    if (t.includes('work')) return 'work space';
+    if (t === 'outside') return 'outside';
+    return 'learning space'; // default
+  };
+
+  const grouped = {};
+  RESOURCES.forEach(r => {
+    const cat = getTypeCategory(r.type);
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(r);
+  });
+
+  // Sort within each group
+  Object.keys(grouped).forEach(cat => {
+    grouped[cat].sort((a, b) => a.order - b.order);
+  });
+
+  let html = '';
+  ['equipment', 'learning space', 'outside', 'work space'].forEach(cat => {
+    if (!grouped[cat] || grouped[cat].length === 0) return;
+    html += `<div class="sidebar-subhd">${typeCategories[cat] || cat}</div>`;
+    grouped[cat].forEach(r => {
+      const selected = selectedResource === r.id ? ' selected' : '';
+      html += `<div class="resource-chip${selected}" style="background:${r.colour}20" data-resource="${r.id}" data-resource-name="${escHtml(r.name)}" data-resource-colour="${r.colour}">
+        <span class="resource-dot" style="background:${r.colour}"></span>
+        <span class="resource-name">${escHtml(r.name)}</span>
+        ${r.quantity > 1 ? `<span class="resource-avail">${r.quantity}</span>` : ''}
+      </div>`;
+    });
+  });
+
+  el.innerHTML = html;
+
+  // Add pointer handlers to resource chips (iOS Safari compatible)
+  el.querySelectorAll('.resource-chip').forEach(chip => {
+    chip.addEventListener('pointerdown', onResourcePointerDown);
+  });
+}
+
+// ── Drag and drop (Pointer Events for iOS Safari support) ─────────────────────
+let drag = null;
+let placeholderEl = null;
+
+function onResourcePointerDown(e) {
+  if (e.button !== undefined && e.button !== 0) return;
+  e.preventDefault();
+  const chip = e.currentTarget;
+  const resourceId = chip.dataset.resource;
+  const resourceName = chip.dataset.resourceName;
+  const resourceColour = chip.dataset.resourceColour;
+
+  drag = { type: 'new', resourceId, resourceName, resourceColour, sourceChip: chip };
+  chip.classList.add('dragging');
+  chip.setPointerCapture(e.pointerId);
+
+  const ghost = document.getElementById('dragGhost');
+  ghost.textContent = resourceName;
+  ghost.style.background = resourceColour;
+  ghost.style.display = 'block';
+  moveGhost(e.clientX, e.clientY);
+
+  chip.addEventListener('pointermove', onDragMove);
+  chip.addEventListener('pointerup', onDragEnd);
+  chip.addEventListener('pointercancel', onDragEnd);
+}
+
+function onBookingBarPointerDown(e) {
+  if (e.button !== undefined && e.button !== 0) return;
+  // Don't initiate drag if clicking delete button
+  if (e.target.classList.contains('booking-bar-del')) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const bar = e.currentTarget;
+  const bookingId = bar.dataset.bookingId;
+  const day = bar.dataset.day;
+  const weekKey = schedKey();
+  const dayBookings = getBookings(weekKey, day);
+  const booking = dayBookings.find(b => b.id === bookingId || b.groupId === bookingId);
+
+  if (!booking) return;
+
+  const resource = RESOURCES.find(r => r.id === booking.resourceId);
+  const resourceName = resource ? resource.name : booking.resourceName;
+  const resourceColour = resource ? resource.colour : '#64748b';
+
+  // Calculate duration to preserve when moving
+  const durationMins = timeToMins(booking.endTime) - timeToMins(booking.startTime);
+
+  drag = {
+    type: 'move',
+    bookingId: booking.id,
+    groupId: booking.groupId,
+    resourceId: booking.resourceId,
+    resourceName,
+    resourceColour,
+    originalDay: day,
+    originalStartTime: booking.startTime,
+    originalEndTime: booking.endTime,
+    durationMins,
+    yearGroup: booking.yearGroup,
+    teacher: booking.teacher,
+    purpose: booking.purpose,
+    quantity: booking.quantity || 1,
+    sourceBar: bar,
+  };
+
+  bar.style.opacity = '0.3';
+  bar.setPointerCapture(e.pointerId);
+
+  const ghost = document.getElementById('dragGhost');
+  ghost.textContent = resourceName;
+  ghost.style.background = resourceColour;
+  ghost.style.display = 'block';
+  moveGhost(e.clientX, e.clientY);
+
+  bar.addEventListener('pointermove', onBookingDragMove);
+  bar.addEventListener('pointerup', onBookingDragEnd);
+  bar.addEventListener('pointercancel', onBookingDragEnd);
+
+  // Show placeholder immediately
+  placeholderEl = document.getElementById('dragPlaceholder');
+  placeholderEl.style.background = resourceColour;
+  updatePlaceholderPosition(e.clientX, e.clientY);
+}
+
+function onDragMove(e) {
+  if (!drag || drag.type !== 'new') return;
+  moveGhost(e.clientX, e.clientY);
+  highlightCellAt(e.clientX, e.clientY);
+}
+
+function onBookingDragMove(e) {
+  if (!drag || drag.type !== 'move') return;
+  moveGhost(e.clientX, e.clientY);
+  updatePlaceholderPosition(e.clientX, e.clientY);
+  highlightCellAt(e.clientX, e.clientY);
+}
+
+function onDragEnd(e) {
+  if (!drag || drag.type !== 'new') return;
+  const target = dropTargetAt(e.clientX, e.clientY);
+  if (target) {
+    selectedResource = drag.resourceId;
+    openBookingModal(target.day, target.session);
+  }
+  endDrag();
+}
+
+function onBookingDragEnd(e) {
+  if (!drag || drag.type !== 'move') return;
+  const target = dropTargetAt(e.clientX, e.clientY);
+  if (target) {
+    // Calculate new time based on vertical position
+    const newTime = calculateDropTime(e.clientX, e.clientY, target);
+    if (newTime) {
+      moveBookingTo(target.day, newTime.startTime, newTime.endTime);
+    }
+  }
+  endBookingDrag();
+}
+
+function endDrag() {
+  if (!drag || drag.type !== 'new') return;
+  drag.sourceChip.classList.remove('dragging');
+  drag.sourceChip.removeEventListener('pointermove', onDragMove);
+  drag.sourceChip.removeEventListener('pointerup', onDragEnd);
+  drag.sourceChip.removeEventListener('pointercancel', onDragEnd);
+  document.getElementById('dragGhost').style.display = 'none';
+  clearDropHighlights();
+  drag = null;
+}
+
+function endBookingDrag() {
+  if (!drag || drag.type !== 'move') return;
+  if (drag.sourceBar) {
+    drag.sourceBar.style.opacity = '';
+    drag.sourceBar.removeEventListener('pointermove', onBookingDragMove);
+    drag.sourceBar.removeEventListener('pointerup', onBookingDragEnd);
+    drag.sourceBar.removeEventListener('pointercancel', onBookingDragEnd);
+  }
+  document.getElementById('dragGhost').style.display = 'none';
+  document.getElementById('dragPlaceholder').style.display = 'none';
+  clearDropHighlights();
+  drag = null;
+}
+
+function calculateDropTime(x, y, target) {
+  const ghost = document.getElementById('dragGhost');
+  ghost.style.display = 'none';
+  const el = document.elementFromPoint(x, y);
+  ghost.style.display = 'block';
+  if (!el) return null;
+
+  const cell = el.closest('.view-cell');
+  if (!cell || cell.classList.contains('non-school-day')) return null;
+
+  const rowIdx = parseInt(cell.dataset.rowIdx);
+  const row = ROWS[rowIdx];
+  if (!row) return null;
+
+  // Find the closest time slot based on vertical position
+  const rect = cell.getBoundingClientRect();
+  const relY = y - rect.top;
+  const cellHeight = rect.height;
+  const progress = relY / cellHeight;
+
+  // Snap to row boundaries - find which row we're closest to
+  const sessionRows = document.querySelectorAll('.session-row');
+  let closestRowIdx = rowIdx;
+  let minDist = Infinity;
+
+  sessionRows.forEach((r, ri) => {
+    const rowCell = r.querySelector('.view-cell');
+    if (!rowCell) return;
+    const rowRect = rowCell.getBoundingClientRect();
+    const rowCenter = rowRect.top + rowRect.height / 2;
+    const dist = Math.abs(y - rowCenter);
+    if (dist < minDist) {
+      minDist = dist;
+      closestRowIdx = ri;
+    }
+  });
+
+  const newRow = ROWS[closestRowIdx];
+  if (!newRow) return null;
+
+  // Preserve duration
+  const startTime = newRow.start;
+  const startMins = timeToMins(startTime);
+  const endMins = startMins + drag.durationMins;
+
+  // Find matching end time from available slots
+  const endTime = findClosestEndTime(endMins);
+
+  return { day: target.day, startTime, endTime };
+}
+
+function findClosestEndTime(targetMins) {
+  const times = ['08:45','09:00','10:45','11:00','12:15','13:20','13:25','15:00','15:15','17:00'];
+  let closest = times[0];
+  let minDiff = Infinity;
+
+  times.forEach(t => {
+    const diff = Math.abs(timeToMins(t) - targetMins);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = t;
+    }
+  });
+
+  return closest;
+}
+
+function moveBookingTo(newDay, newStartTime, newEndTime) {
+  if (!drag || drag.type !== 'move') return;
+
+  const weekKey = schedKey();
+  const originalDayBookings = getBookings(weekKey, drag.originalDay);
+  const bookingIdx = originalDayBookings.findIndex(b => b.id === drag.bookingId);
+
+  if (bookingIdx === -1) return;
+
+  // Check for conflicts at new location (excluding the booking being moved)
+  if (newDay !== drag.originalDay || newStartTime !== drag.originalStartTime) {
+    const tempBooking = originalDayBookings.splice(bookingIdx, 1)[0];
+    const conflict = checkBookingConflict(drag.resourceId, weekKey, newDay, newStartTime, newEndTime, drag.quantity || 1);
+    originalDayBookings.splice(bookingIdx, 0, tempBooking); // Put it back for now
+
+    if (conflict) {
+      showConflictMessage(conflict.message);
+      return;
+    }
+  }
+
+  // Remove from original location
+  const booking = originalDayBookings.splice(bookingIdx, 1)[0];
+
+  // Update times and move to new day
+  booking.startTime = newStartTime;
+  booking.endTime = newEndTime;
+
+  // Add to new day
+  const newDayBookings = getBookings(weekKey, newDay);
+  newDayBookings.push(booking);
+
+  saveBookingsLocal();
+  syncSave();
+  renderGrid();
+}
+
+function showConflictMessage(message) {
+  const conflictEl = document.getElementById('bookingConflict');
+  if (conflictEl) {
+    conflictEl.textContent = message;
+    conflictEl.style.display = 'block';
+    conflictEl.style.position = 'fixed';
+    conflictEl.style.top = '20px';
+    conflictEl.style.left = '50%';
+    conflictEl.style.transform = 'translateX(-50%)';
+    conflictEl.style.zIndex = '1000';
+    setTimeout(() => {
+      conflictEl.style.display = 'none';
+      conflictEl.style.position = '';
+      conflictEl.style.top = '';
+      conflictEl.style.left = '';
+      conflictEl.style.transform = '';
+      conflictEl.style.zIndex = '';
+    }, 3000);
+  }
+}
+
+function updatePlaceholderPosition(x, y) {
+  if (!placeholderEl) return;
+
+  const ghost = document.getElementById('dragGhost');
+  ghost.style.display = 'none';
+  const el = document.elementFromPoint(x, y);
+  ghost.style.display = 'block';
+
+  if (!el) {
+    placeholderEl.style.display = 'none';
+    return;
+  }
+
+  const cell = el.closest('.view-cell');
+  if (!cell || cell.classList.contains('non-school-day')) {
+    placeholderEl.style.display = 'none';
+    return;
+  }
+
+  const day = cell.dataset.day;
+  const rowIdx = parseInt(cell.dataset.rowIdx);
+
+  // Check for conflicts at the target location (excluding the booking being moved)
+  let hasConflict = false;
+  if (drag && drag.type === 'move') {
+    const newRow = ROWS[rowIdx];
+    if (newRow) {
+      const endTime = findClosestEndTime(timeToMins(newRow.start) + drag.durationMins);
+      // Only show conflict if moving to a different time or day
+      if (day !== drag.originalDay || newRow.start !== drag.originalStartTime) {
+        // Temporarily exclude the booking being moved from conflict check
+        const weekKey = schedKey();
+        const originalDayBookings = getBookings(weekKey, drag.originalDay);
+        const bookingIdx = originalDayBookings.findIndex(b => b.id === drag.bookingId);
+        if (bookingIdx !== -1) {
+          const tempBooking = originalDayBookings.splice(bookingIdx, 1)[0];
+          const conflict = checkBookingConflict(drag.resourceId, weekKey, day, newRow.start, endTime, drag.quantity || 1);
+          originalDayBookings.splice(bookingIdx, 0, tempBooking);
+          hasConflict = !!conflict;
+        }
+      }
+    }
+  }
+
+  // Position placeholder over the target cell
+  const cellRect = cell.getBoundingClientRect();
+  const tableRect = document.querySelector('.sched-table').getBoundingClientRect();
+
+  // Calculate height based on duration
+  const sessionRows = document.querySelectorAll('.session-row');
+  let rowHeight = 90; // default
+  if (sessionRows[rowIdx]) {
+    const r = sessionRows[rowIdx].querySelector('.view-cell');
+    if (r) rowHeight = r.getBoundingClientRect().height;
+  }
+
+  // Height = number of rows spanned
+  const numRows = Math.ceil((drag.durationMins || 60) / 60); // rough approximation
+  const height = rowHeight * Math.max(1, numRows);
+
+  placeholderEl.style.display = 'block';
+  placeholderEl.style.left = (cellRect.left - tableRect.left) + 'px';
+  placeholderEl.style.top = (cellRect.top - tableRect.top) + 'px';
+  placeholderEl.style.width = cellRect.width + 'px';
+  placeholderEl.style.height = Math.min(height, cellRect.height) + 'px';
+  placeholderEl.style.background = drag.resourceColour;
+  placeholderEl.classList.toggle('invalid', hasConflict);
+}
+
+function moveGhost(x, y) {
+  const ghost = document.getElementById('dragGhost');
+  ghost.style.left = x + 14 + 'px';
+  ghost.style.top = y + 10 + 'px';
+}
+
+function dropTargetAt(x, y) {
+  const ghost = document.getElementById('dragGhost');
+  ghost.style.display = 'none';
+  const el = document.elementFromPoint(x, y);
+  ghost.style.display = 'block';
+  if (!el) return null;
+  const cell = el.closest('.view-cell');
+  if (!cell || cell.classList.contains('non-school-day')) return null;
+  const day = cell.dataset.day;
+  const rowIdx = parseInt(cell.dataset.rowIdx);
+  if (day === undefined || isNaN(rowIdx)) return null;
+  const row = ROWS[rowIdx];
+  if (!row) return null;
+  return { day, session: row.start };
+}
+
+function highlightCellAt(x, y) {
+  clearDropHighlights();
+  const ghost = document.getElementById('dragGhost');
+  ghost.style.display = 'none';
+  const el = document.elementFromPoint(x, y);
+  ghost.style.display = 'block';
+  if (!el) return;
+  const cell = el.closest('.view-cell');
+  if (cell && !cell.classList.contains('non-school-day')) {
+    cell.classList.add('drop-over');
+  }
+}
+
+function clearDropHighlights() {
+  document.querySelectorAll('.view-cell.drop-over').forEach(c => c.classList.remove('drop-over'));
+  const placeholder = document.getElementById('dragPlaceholder');
+  if (placeholder) placeholder.style.display = 'none';
+}
+
+// ── Render: grid ─────────────────────────────────────────────────────────────
+function renderGrid() {
+  renderHead();
+  renderBody();
+  renderBookingsOverlay();
+}
+
+function renderHead() {
+  const mon = weekMonday();
+  const el = document.getElementById('schedHead');
+  el.innerHTML = `<tr>
+    <th class="time-hd"></th>
+    ${DAYS.map((d, i) => {
+      const cellDate = new Date(mon); cellDate.setDate(mon.getDate() + i);
+      const dk = dateKey(cellDate);
+      const nsd = state.nonSchoolDays[dk];
+      const evts = state.schoolEvents[dk] || [];
+      const cls = `day-hd${isToday(i) ? ' today' : ''}${nsd ? ' non-school-day' : ''}`;
+      const tags = evts.map(e => `<span style="font-size:9px;background:${e.type==='Gathering'?'#1798d320':'#f1f5f9'};padding:1px 4px;border-radius:3px;margin-left:4px">${escHtml(e.label)}</span>`).join('');
+      return `<th class="${cls}"><span class="day-hd-name">${d}</span><br><span class="day-hd-date">${dayDate(i)}</span>${tags ? '<br>' + tags : ''}</th>`;
+    }).join('')}
+  </tr>`;
+}
+
+function renderBody() {
+  const el = document.getElementById('schedBody');
+  const wk = schedKey();
+  const mon = weekMonday();
+
+  const nsd = DAYS.map((_, di) => {
+    const cellDate = new Date(mon); cellDate.setDate(mon.getDate() + di);
+    return state.nonSchoolDays[dateKey(cellDate)] || null;
+  });
+
+  let html = '';
+
+  ROWS.forEach((row, ri) => {
+    html += `<tr class="session-row">
+      <td class="time-cell">
+        <span class="session-label">${row.label}</span>
+        <span class="session-time">${row.time}</span>
+      </td>
+      ${DAYS.map((d, di) => {
+        const day = d.toLowerCase();
+        const n = nsd[di];
+        const cellCls = `view-cell${n ? ' non-school-day' : ''}`;
+
+        if (n) {
+          return `<td class="${cellCls}"><div class="non-school-overlay"><span class="non-school-badge">${escHtml(n.label)}</span></div></td>`;
+        }
+
+        return `<td class="${cellCls}" data-day="${day}" data-row-idx="${ri}"><div class="drop-hint" onclick="openBookingModal('${day}','${row.start}')">+ book</div></td>`;
+      }).join('')}
+    </tr>`;
+  });
+
+  el.innerHTML = html;
+}
+
+function renderBookingsOverlay() {
+  const wk = schedKey();
+
+  // Get table dimensions for positioning
+  const table = document.querySelector('.sched-table');
+  if (!table) return;
+
+  const headerRow = table.querySelector('thead tr');
+  const gridBody = table.querySelector('tbody');
+  if (!gridBody) return;
+
+  const headerHeight = headerRow ? headerRow.offsetHeight : 36;
+
+  // Get or create overlay
+  let overlay = document.getElementById('bookingsOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'bookingsOverlay';
+    overlay.className = 'bookings-overlay';
+    table.parentElement.appendChild(overlay);
+  }
+  overlay.style.cssText = `position:absolute;top:${headerHeight}px;left:0;right:0;bottom:0;pointer-events:none;`;
+  overlay.innerHTML = '';
+
+  // Get actual day column widths from the first data row
+  const sessionRows = table.querySelectorAll('.session-row');
+  if (!sessionRows.length) return;
+
+  const firstDataRow = sessionRows[0];
+  const dayCells = firstDataRow.querySelectorAll('.view-cell');
+
+  // Get overlay's position for relative calculations
+  const overlayRect = overlay.getBoundingClientRect();
+
+  // Map time to pixel position by measuring actual row positions
+  // Build a lookup: for each row start/end time, what's the pixel offset?
+  const timeToPx = [];
+  sessionRows.forEach((row, ri) => {
+    const rowDef = ROWS[ri];
+    if (!rowDef) return;
+    const viewCell = row.querySelector('.view-cell');
+    if (!viewCell) return;
+
+    // Use getBoundingClientRect for reliable positioning
+    const cellRect = viewCell.getBoundingClientRect();
+    const rowTop = cellRect.top - overlayRect.top; // position relative to overlay
+    const rowHeight = cellRect.height;
+
+    timeToPx.push({
+      startMins: timeToMins(rowDef.start),
+      endMins: timeToMins(rowDef.end),
+      topPx: rowTop,
+      heightPx: rowHeight
+    });
+  });
+
+  // Helper: convert time to pixel position within overlay
+  const timeToPosition = (timeStr) => {
+    const mins = timeToMins(timeStr);
+    // Find the row this time falls within
+    for (const row of timeToPx) {
+      if (mins >= row.startMins && mins < row.endMins) {
+        // Interpolate within this row
+        const progress = (mins - row.startMins) / (row.endMins - row.startMins);
+        return row.topPx + progress * row.heightPx;
+      }
+    }
+    // If past last row, return bottom
+    if (timeToPx.length > 0) {
+      const lastRow = timeToPx[timeToPx.length - 1];
+      if (mins >= lastRow.endMins) return lastRow.topPx + lastRow.heightPx;
+    }
+    return 0;
+  };
+
+  // Pre-compute horizontal positions for each day's bookings
+  const bookingSlots = {};
+  DAYS.forEach((d, di) => {
+    const day = d.toLowerCase();
+    bookingSlots[day] = {};
+    const dayBookings = getBookings(wk, day);
+    const barWidthPct = Math.min(100 / Math.max(dayBookings.length, 1), 12);
+    dayBookings.forEach((b, bi) => {
+      bookingSlots[day][b.id] = { leftPct: bi * barWidthPct + 1, widthPct: barWidthPct - 2 };
+    });
+  });
+
+  // Render each booking as absolutely positioned bar
+  DAYS.forEach((d, di) => {
+    const day = d.toLowerCase();
+    const dayBookings = getBookings(wk, day);
+    if (!dayCells[di]) return;
+
+    // Use getBoundingClientRect for horizontal positioning too
+    const cellRect = dayCells[di].getBoundingClientRect();
+    const cellLeft = cellRect.left - overlayRect.left;
+    const cellWidth = cellRect.width;
+
+    dayBookings.forEach(b => {
+      const bStart = timeToMins(b.startTime);
+      const bEnd = timeToMins(b.endTime);
+      if (bEnd <= bStart) return;
+
+      const col = (RESOURCES.find(r => r.id === b.resourceId) || {}).colour || '#64748b';
+      const slot = bookingSlots[day][b.id] || { leftPct: 1, widthPct: 11 };
+
+      // Calculate position using actual row positions
+      const topPx = timeToPosition(b.startTime);
+      const bottomPx = timeToPosition(b.endTime);
+      const heightPx = Math.max(bottomPx - topPx, 20); // minimum 20px height
+
+      const leftPx = cellLeft + (slot.leftPct / 100) * cellWidth;
+      const widthPx = (slot.widthPct / 100) * cellWidth;
+
+      const bar = document.createElement('div');
+      bar.className = 'booking-bar';
+      bar.style.cssText = `position:absolute;left:${leftPx}px;width:${widthPx}px;top:${topPx}px;height:${heightPx}px;background:${col};pointer-events:auto;cursor:grab;`;
+      bar.dataset.bookingId = b.id;
+      bar.dataset.day = day;
+      const ygDisplay = b.yearGroup ? `${b.yearGroup} · ` : '';
+      bar.innerHTML = `
+        <div class="booking-bar-inner"><strong>${ygDisplay}</strong>${escHtml(b.resourceName || b.resourceId)}${b.quantity > 1 ? ' ×' + b.quantity : ''}</div>
+        <div class="booking-bar-time">${b.startTime}–${b.endTime}</div>
+        <button class="booking-bar-del" onclick="event.stopPropagation();deleteBookingGroup('${b.groupId || b.id}')" title="Remove">×</button>
+      `;
+      // Click to edit (but not if dragging)
+      bar.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditBookingModal(day, b.id);
+      });
+      bar.addEventListener('pointerdown', onBookingBarPointerDown);
+      overlay.appendChild(bar);
+    });
+  });
+}
+
+// ── Booking modal ─────────────────────────────────────────────────────────────
+let _bookingDay = null;
+let _editingBookingId = null; // Track if we're editing an existing booking
+
+function openBookingModal(day, startTime) {
+  _bookingDay = day;
+  _editingBookingId = null; // New booking
+
+  const dayLabel = DAYS[DAYS.findIndex(d => d.toLowerCase() === day)];
+  document.getElementById('bookingHint').textContent = `Booking for ${dayLabel}`;
+
+  // Set start time from clicked row
+  const startSelect = document.getElementById('bookingStart');
+  const endSelect = document.getElementById('bookingEnd');
+
+  startSelect.value = startTime || '09:00';
+
+  // Default end time to end of the session
+  const sessionRow = ROWS.find(r => r.start === startSelect.value);
+  const defaultEnd = sessionRow ? sessionRow.end : '10:45';
+  endSelect.value = defaultEnd;
+
+  // Populate resource dropdowns by type category
+  const getTypeCategory = (type) => {
+    const t = type.toLowerCase();
+    if (t === 'equipment') return 'equipment';
+    if (t.includes('learning')) return 'learning';
+    if (t.includes('work')) return 'work';
+    if (t === 'outside') return 'outside';
+    return 'learning';
+  };
+
+  const groups = {
+    outside: document.getElementById('outsideGroup'),
+    learning: document.getElementById('learningGroup'),
+    work: document.getElementById('workGroup'),
+    equipment: document.getElementById('equipmentGroup')
+  };
+
+  Object.keys(groups).forEach(g => { if (groups[g]) groups[g].innerHTML = ''; });
+
+  RESOURCES.forEach(r => {
+    const cat = getTypeCategory(r.type);
+    const group = groups[cat];
+    if (group) {
+      const label = r.quantity > 1 ? `${r.name} (${r.quantity} available)` : r.name;
+      group.innerHTML += `<option value="${r.id}">${label}</option>`;
+    }
+  });
+
+  if (selectedResource) {
+    document.getElementById('bookingResource').value = selectedResource;
+  } else {
+    document.getElementById('bookingResource').value = 'muga';
+  }
+
+  // Clear year group radio buttons
+  document.querySelectorAll('#bookingYearGroup input[type="radio"]').forEach(r => r.checked = false);
+  document.getElementById('bookingPurpose').value = '';
+  document.getElementById('bookingRecurring').value = '';
+  document.getElementById('bookingUntilRow').style.display = 'none';
+  document.getElementById('bookingDaysRow').style.display = 'none';
+  document.getElementById('bookingRecurringOpts').style.display = 'none';
+  document.getElementById('bookingConflict').style.display = 'none';
+
+  const untilSelect = document.getElementById('bookingUntil');
+  untilSelect.innerHTML = WEEKS.map((w, i) => `<option value="${w.key}"${i === state.weekIdx ? ' selected' : ''}>${w.label}</option>`).join('');
+
+  // Show/hide quantity field based on resource type
+  updateQuantityField();
+
+  document.getElementById('bookingModal').classList.add('open');
+}
+
+function openEditBookingModal(day, bookingId) {
+  _bookingDay = day;
+  _editingBookingId = bookingId;
+
+  // Find the booking
+  const weekKey = schedKey();
+  const dayBookings = getBookings(weekKey, day);
+  const booking = dayBookings.find(b => b.id === bookingId || b.groupId === bookingId);
+  if (!booking) return;
+
+  const dayLabel = DAYS[DAYS.findIndex(d => d.toLowerCase() === day)];
+  document.getElementById('bookingHint').textContent = `Edit booking for ${dayLabel}`;
+
+  // Set resource
+  document.getElementById('bookingResource').value = booking.resourceId;
+
+  // Set times
+  document.getElementById('bookingStart').value = booking.startTime;
+  document.getElementById('bookingEnd').value = booking.endTime;
+
+  // Set year group
+  const yearRadio = document.querySelector(`#bookingYearGroup input[value="${booking.yearGroup}"]`);
+  if (yearRadio) yearRadio.checked = true;
+
+  // Set purpose
+  document.getElementById('bookingPurpose').value = booking.purpose || '';
+
+  // Set quantity for equipment
+  if (booking.quantity && booking.quantity > 1) {
+    document.getElementById('bookingQty').value = booking.quantity;
+  }
+
+  // Hide recurring options when editing
+  document.getElementById('bookingRecurring').value = '';
+  document.getElementById('bookingRecurringOpts').style.display = 'none';
+  document.getElementById('bookingUntilRow').style.display = 'none';
+  document.getElementById('bookingDaysRow').style.display = 'none';
+
+  // Update quantity field visibility
+  updateQuantityField();
+
+  document.getElementById('bookingConflict').style.display = 'none';
+  document.getElementById('bookingModal').classList.add('open');
+}
+
+function updateQuantityField() {
+  const resourceId = document.getElementById('bookingResource').value;
+  const resource = RESOURCES.find(r => r.id === resourceId);
+  const qtyRow = document.getElementById('bookingQtyRow');
+  const qtyInput = document.getElementById('bookingQty');
+  const qtyAvail = document.getElementById('bookingQtyAvail');
+
+  if (resource && resource.type === 'equipment' && resource.quantity > 1) {
+    qtyRow.style.display = 'block';
+    qtyInput.max = resource.quantity;
+    qtyInput.value = 1;
+    // Calculate availability for the selected time
+    const startTime = document.getElementById('bookingStart').value;
+    const endTime = document.getElementById('bookingEnd').value;
+    const dayBookings = getBookings(schedKey(), _bookingDay);
+    const startMins = timeToMins(startTime);
+    const endMins = timeToMins(endTime);
+    const overlapping = dayBookings.filter(b => {
+      if (b.resourceId !== resourceId) return false;
+      const bStart = timeToMins(b.startTime);
+      const bEnd = timeToMins(b.endTime);
+      return bStart < endMins && bEnd > startMins;
+    });
+    const totalBooked = overlapping.reduce((sum, b) => sum + (b.quantity || 1), 0);
+    const available = resource.quantity - totalBooked;
+    qtyAvail.textContent = `of ${resource.quantity} (${available} available)`;
+  } else {
+    qtyRow.style.display = 'none';
+  }
+}
+
+// Update availability when time changes
+document.getElementById('bookingStart').addEventListener('change', updateQuantityField);
+document.getElementById('bookingEnd').addEventListener('change', updateQuantityField);
+document.getElementById('bookingResource').addEventListener('change', updateQuantityField);
+
+function closeBookingModal() {
+  document.getElementById('bookingModal').classList.remove('open');
+  selectedResource = null;
+  renderSidebar();
+}
+
+document.getElementById('bookingRecurring').addEventListener('change', function() {
+  const opts = document.getElementById('bookingRecurringOpts');
+  const untilRow = document.getElementById('bookingUntilRow');
+  const daysRow = document.getElementById('bookingDaysRow');
+  if (this.value === 'weekly') {
+    opts.style.display = 'block';
+    untilRow.style.display = 'block';
+    daysRow.style.display = 'none';
+  } else if (this.value === 'consecutive') {
+    opts.style.display = 'block';
+    untilRow.style.display = 'none';
+    daysRow.style.display = 'block';
+  } else {
+    opts.style.display = 'none';
+  }
+});
+
+function checkBookingConflict(resourceId, weekKey, day, startTime, endTime, quantity = 1) {
+  const resource = RESOURCES.find(r => r.id === resourceId);
+  if (!resource) return null;
+
+  const startMins = timeToMins(startTime);
+  const endMins = timeToMins(endTime);
+
+  const dayBookings = getBookings(weekKey, day);
+  const overlapping = dayBookings.filter(b => {
+    const bStart = timeToMins(b.startTime);
+    const bEnd = timeToMins(b.endTime);
+    return bStart < endMins && bEnd > startMins && b.resourceId === resourceId;
+  });
+
+  if (resource.type === 'space') {
+    if (overlapping.length > 0) {
+      const existing = overlapping[0];
+      return { conflict: true, message: `${existing.resourceName} already booked ${existing.startTime}–${existing.endTime} by ${existing.yearGroup || ''}${existing.teacher ? ' · ' + existing.teacher : ''}` };
+    }
+  } else {
+    const totalBooked = overlapping.reduce((sum, b) => sum + (b.quantity || 1), 0);
+    if (totalBooked + quantity > resource.quantity) {
+      const available = resource.quantity - totalBooked;
+      return { conflict: true, message: `Only ${available} available at this time (requested: ${quantity})` };
+    }
+  }
+  return null;
+}
+
+function saveBooking() {
+  const resourceId = document.getElementById('bookingResource').value;
+  const resource = RESOURCES.find(r => r.id === resourceId);
+  const qty = resource && resource.type === 'equipment' ? parseInt(document.getElementById('bookingQty').value) || 1 : 1;
+  const yearGroupRadio = document.querySelector('#bookingYearGroup input[type="radio"]:checked');
+  const yearGroup = yearGroupRadio ? yearGroupRadio.value : '';
+  const purpose = document.getElementById('bookingPurpose').value.trim();
+  const recurring = document.getElementById('bookingRecurring').value;
+  const untilWeek = document.getElementById('bookingUntil').value;
+  const days = parseInt(document.getElementById('bookingDays').value) || 2;
+  const startTime = document.getElementById('bookingStart').value;
+  const endTime = document.getElementById('bookingEnd').value;
+
+  // Validate year group is selected
+  if (!yearGroup) {
+    document.getElementById('bookingConflict').textContent = 'Please select a year group';
+    document.getElementById('bookingConflict').style.display = 'block';
+    return;
+  }
+
+  if (timeToMins(startTime) >= timeToMins(endTime)) {
+    document.getElementById('bookingConflict').textContent = 'End time must be after start time';
+    document.getElementById('bookingConflict').style.display = 'block';
+    return;
+  }
+
+  // Check for conflicts (exclude the booking being edited)
+  const weekKey = schedKey();
+  const dayBookings = getBookings(weekKey, _bookingDay);
+  const editIdx = _editingBookingId ? dayBookings.findIndex(b => b.id === _editingBookingId) : -1;
+  const tempBooking = editIdx !== -1 ? dayBookings.splice(editIdx, 1)[0] : null;
+
+  const conflict = checkBookingConflict(resourceId, weekKey, _bookingDay, startTime, endTime, qty);
+
+  // Restore the booking if there was a conflict
+  if (tempBooking) {
+    dayBookings.splice(editIdx, 0, tempBooking);
+  }
+
+  if (conflict) {
+    document.getElementById('bookingConflict').textContent = conflict.message;
+    document.getElementById('bookingConflict').style.display = 'block';
+    return;
+  }
+
+  // Editing existing booking
+  if (_editingBookingId) {
+    const booking = dayBookings.find(b => b.id === _editingBookingId);
+    if (booking) {
+      booking.resourceId = resourceId;
+      booking.resourceName = resource ? resource.name : resourceId;
+      booking.resourceType = resource ? resource.type : 'space';
+      booking.yearGroup = yearGroup;
+      booking.purpose = purpose;
+      booking.quantity = qty;
+      booking.startTime = startTime;
+      booking.endTime = endTime;
+    }
+    saveBookingsLocal();
+    syncSave();
+    closeBookingModal();
+    renderGrid();
+    return;
+  }
+
+  // Creating new booking
+  const groupId = 'bg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  const booking = {
+    id: 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+    groupId,
+    resourceId,
+    resourceName: resource ? resource.name : resourceId,
+    resourceType: resource ? resource.type : 'space',
+    yearGroup,
+    purpose,
+    quantity: qty,
+    startTime,
+    endTime,
+    created: new Date().toISOString(),
+  };
+
+  const bookings = getBookings(schedKey(), _bookingDay);
+  bookings.push(booking);
+  saveBookingsLocal();
+  syncSave();
+
+  if (recurring === 'weekly' && untilWeek) {
+    const startIdx = state.weekIdx;
+    const endIdx = WEEKS.findIndex(w => w.key === untilWeek);
+    if (endIdx > startIdx) {
+      for (let i = startIdx + 1; i <= endIdx; i++) {
+        const bs = getBookings(WEEKS[i].key, _bookingDay);
+        bs.push({ ...booking, id: 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8), groupId: 'bg_' + Date.now() + '_' + i });
+      }
+      saveBookingsLocal();
+      syncSave();
+    }
+  } else if (recurring === 'consecutive' && days > 1) {
+    // Handle consecutive school days, skipping weekends
+    const dayIdx = DAYS.findIndex(d => d.toLowerCase() === _bookingDay);
+    let currentWeekIdx = state.weekIdx;
+    let currentDayIdx = dayIdx;
+
+    for (let i = 1; i < days; i++) {
+      // Move to next school day
+      currentDayIdx++;
+      if (currentDayIdx >= 5) {
+        // Wrap to next week (Monday)
+        currentDayIdx = 0;
+        currentWeekIdx++;
+        if (currentWeekIdx >= WEEKS.length) break; // No more weeks
+      }
+
+      const weekKey = WEEKS[currentWeekIdx]?.key || schedKey();
+      const bs = getBookings(weekKey, DAYS[currentDayIdx].toLowerCase());
+      bs.push({ ...booking, id: 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8), groupId: 'bg_' + Date.now() + '_' + i });
+    }
+    saveBookingsLocal();
+    syncSave();
+  }
+
+  closeBookingModal();
+  renderGrid();
+}
+
+function deleteBookingGroup(groupId) {
+  const weekKey = schedKey();
+  if (!state.bookings[weekKey]) return;
+
+  for (const day of Object.keys(state.bookings[weekKey])) {
+    const bookings = state.bookings[weekKey][day];
+    for (let i = bookings.length - 1; i >= 0; i--) {
+      if (bookings[i].groupId === groupId || bookings[i].id === groupId) {
+        bookings.splice(i, 1);
+      }
+    }
+  }
+
+  saveBookingsLocal();
+  syncSave();
+  renderGrid();
+}
+
+// ── Utility ──────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  state.bookings = loadBookings();
+
+  document.getElementById('weekLabel').textContent = '…';
+  renderSidebar();
+  renderGrid();
+
+  try {
+    const [termsText, eventsText, resourcesText] = await Promise.all([
+      fetch(SHEET_BASE + encodeURIComponent('Terms')).then(r => { if (!r.ok) throw new Error('Terms tab not found'); return r.text(); }),
+      fetch(SHEET_BASE + encodeURIComponent('Events')).then(r => r.ok ? r.text() : '').catch(() => ''),
+      fetch(SHEET_BASE + encodeURIComponent('Resources')).then(r => r.ok ? r.text() : '').catch(() => ''),
+    ]);
+
+    // Load resources from sheet if available
+    if (resourcesText) {
+      const resourceRows = csvToObjects(resourcesText);
+      const sheetResources = buildResources(resourceRows);
+      if (sheetResources.length > 0) {
+        RESOURCES = sheetResources;
+        renderSidebar(); // Re-render with sheet resources
+        document.getElementById('sheetStatus').textContent = `● ${RESOURCES.length} resources`;
+      }
+    }
+
+    WEEKS = buildWeeks(csvToObjects(termsText));
+    if (eventsText) {
+      const evtRows = csvToObjects(eventsText);
+      state.nonSchoolDays = buildNonSchoolDays(evtRows);
+      state.schoolEvents = buildSchoolEvents(evtRows);
+    }
+
+    state.weekIdx = currentWeekIdx();
+    document.getElementById('btnPrev').disabled = state.weekIdx === 0;
+    document.getElementById('btnNext').disabled = WEEKS.length && state.weekIdx === WEEKS.length-1;
+    document.getElementById('weekLabel').textContent = weekLabel();
+    const nsdCount = Object.keys(state.nonSchoolDays).length;
+    document.getElementById('sheetStatus').textContent = `● ${nsdCount} holidays marked`;
+    document.getElementById('sheetStatus').className = 'sheet-status ok';
+  } catch (err) {
+    // Generate fallback weeks (current term based on today)
+    const today = new Date();
+    const termStart = new Date(today.getFullYear(), 0, 6); // Approx start of Term 1
+    const weekNum = Math.floor((today - termStart) / (7*24*60*60*1000));
+    const termNum = Math.floor(weekNum / 6) + 1;
+    const weekInTerm = (weekNum % 6) + 1;
+
+    // Generate 30 weeks starting from current week
+    const fallbackStart = new Date(today);
+    fallbackStart.setDate(fallbackStart.getDate() - ((today.getDay() + 6) % 7)); // Monday of current week
+    for (let i = 0; i < 30; i++) {
+      const w = new Date(fallbackStart);
+      w.setDate(w.getDate() + i * 7);
+      const t = Math.floor(i / 6) + 1;
+      const wt = (i % 6) + 1;
+      WEEKS.push({ start: new Date(w), term: t, week: wt, key: `T${t}W${wt}`, label: `Term ${t} · Week ${wt}` });
+    }
+
+    state.weekIdx = 0;
+    document.getElementById('weekLabel').textContent = weekLabel();
+    document.getElementById('sheetStatus').textContent = '● Using fallback weeks';
+    document.getElementById('sheetStatus').className = 'sheet-status err';
+  }
+
+  renderGrid();
+  await syncLoad(schedKey());
+}
+
+init();
+</script>
+</body>
+</html>

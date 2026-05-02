@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Release Schedule — Wallscourt Farm Academy</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; background: #f0f8fd; font-family: Arial, sans-serif; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+  const { useState, useEffect, useCallback } = React;
+
+  // ── Constants ────────────────────────────────────────────────────────────────
+
+  const DAYS    = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const DAY_ABR = { Monday:'Mon', Tuesday:'Tue', Wednesday:'Wed', Thursday:'Thu', Friday:'Fri' };
+  const SESSIONS     = ['Before School','AM','Lunch','PM','After School'];
+  const SESSION_ABR  = { 'Before School':'Before', AM:'AM', PM:'PM', Lunch:'Lunch', 'After School':'After' };
+
+  const REASON_COLOURS = {
+    'PPA':           { bg:'#dbeafe', border:'#93c5fd', label:'#1e40af' },
+    'Leadership':    { bg:'#fef3c7', border:'#fcd34d', label:'#92400e' },
+    'Phase Lead':    { bg:'#fce7f3', border:'#f9a8d4', label:'#9d174d' },
+    'Training':      { bg:'#ede9fe', border:'#c4b5fd', label:'#5b21b6' },
+    'ECT1':          { bg:'#fef9c3', border:'#fde047', label:'#713f12' },
+    'ECT2':          { bg:'#fefce8', border:'#facc15', label:'#854d0e' },
+    'RA':            { bg:'#e0e7ff', border:'#a5b4fc', label:'#3730a3' },
+    'Sports':        { bg:'#ccfbf1', border:'#5eead4', label:'#0f766e' },
+    'Trip':          { bg:'#d1fae5', border:'#6ee7b7', label:'#065f46' },
+    'Illness':       { bg:'#fee2e2', border:'#fca5a5', label:'#991b1b' },
+    'Staff Meeting': { bg:'#f0f9ff', border:'#7dd3fc', label:'#0c4a6e' },
+    'FLC':           { bg:'#fff1f2', border:'#fda4af', label:'#9f1239' },
+    'PAC':           { bg:'#f7fee7', border:'#a3e635', label:'#3f6212' },
+    'CLF Conference':{ bg:'#fff7ed', border:'#fdba74', label:'#9a3412' },
+    'Supervision':   { bg:'#f0fdf4', border:'#86efac', label:'#166534' },
+    'Other':         { bg:'#f3f4f6', border:'#d1d5db', label:'#374151' },
+  };
+  const DEFAULT_COLOUR = REASON_COLOURS['Other'];
+
+  // Week grid cards are coloured by year group (pale = EYFS/KS1, medium = KS2)
+  const YEAR_COLOURS = {
+    'Reception': { bg:'#dbeafe', border:'#93c5fd', label:'#1e40af' },  // pale blue
+    'Y1':        { bg:'#ffedd5', border:'#fb923c', label:'#c2410c' },  // pale orange
+    'Y2':        { bg:'#d1fae5', border:'#6ee7b7', label:'#065f46' },  // pale green
+    'Y3':        { bg:'#fce7f3', border:'#f9a8d4', label:'#9d174d' },  // pale pink
+    'Y4':        { bg:'#bfdbfe', border:'#60a5fa', label:'#1d4ed8' },  // medium blue
+    'Y5':        { bg:'#fed7aa', border:'#fdba74', label:'#9a3412' },  // medium orange
+    'Y6':        { bg:'#bbf7d0', border:'#4ade80', label:'#15803d' },  // medium green
+  };
+  const YEAR_ORDER = ['Reception','Y1','Y2','Y3','Y4','Y5','Y6'];
+  function yearGroupRank(entry, staffByName) {
+    const yg = yearGroup(entry, staffByName);
+    const idx = YEAR_ORDER.indexOf(yg);
+    return idx === -1 ? 99 : idx;
+  }
+  function canonicalYearGroup(str) {
+    if (!str) return null;
+    return Object.keys(YEAR_COLOURS).find(k => k.toLowerCase() === str.trim().toLowerCase()) || null;
+  }
+
+  function yearColour(entry, staffByName) {
+    // Explicit Class override first, then look up from staff, then reason fallback
+    const cls = (entry['Class'] || '').trim();
+    if (cls && YEAR_COLOURS[cls]) return YEAR_COLOURS[cls];
+    const out = (entry['Teacher Out'] || '').trim();
+    const outAsYG = canonicalYearGroup(out);
+    if (outAsYG) return YEAR_COLOURS[outAsYG];
+    if (staffByName) {
+      const yg = staffByName.get(out.toLowerCase());
+      if (yg && YEAR_COLOURS[yg]) return YEAR_COLOURS[yg];
+    }
+    return DEFAULT_COLOUR;
+  }
+
+  // ── Date helpers ──────────────────────────────────────────────────────────────
+
+  function weekMonday(date) {
+    const d = new Date(date); d.setHours(0,0,0,0);
+    const dow = d.getDay();
+    d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
+    return d;
+  }
+  function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+  function sameDay(a, b) {
+    return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+  }
+  function fmtShort(d)  { return d.toLocaleDateString('en-GB', { day:'numeric', month:'short' }); }
+  function fmtLong(d)   { return d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' }); }
+  function fmtTime(d)   { return d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }); }
+  function getTimeRange(e) {
+    const from = (e['Time From'] || '').trim();
+    const to   = (e['Time To']   || '').trim();
+    if (from && to) return `${from} – ${to}`;
+    if (from)       return `from ${from}`;
+    const legacy = (e['Time'] || '').trim();
+    return legacy || null;
+  }
+  function fmtWeekday(d){ return d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'short' }); }
+
+  function parseDate(str) {
+    if (!str) return null;
+    str = String(str).trim();
+    let m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+    m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+    return null;
+  }
+
+  // ── CSV parser ────────────────────────────────────────────────────────────────
+
+  function parseCSV(text) {
+    const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim().split('\n');
+    if (lines.length < 2) return [];
+
+    function splitLine(line) {
+      const fields = []; let cur = '', inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+          else { inQ = !inQ; }
+        } else if (ch === ',' && !inQ) { fields.push(cur.trim()); cur = ''; }
+        else { cur += ch; }
+      }
+      fields.push(cur.trim());
+      return fields;
+    }
+
+    const headers = splitLine(lines[0]).map(h => h.replace(/^"|"$/g,'').trim());
+    return lines.slice(1)
+      .map(line => {
+        const vals = splitLine(line);
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = (vals[i] || '').replace(/^"|"$/g,'').trim(); });
+        return obj;
+      })
+      .filter(row => Object.values(row).some(v => v));
+  }
+
+  // ── Fetch ─────────────────────────────────────────────────────────────────────
+
+  async function fetchSheet(sheetId, tabName) {
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const text = await resp.text();
+    if (text.includes('Sign in') || text.includes('<html')) return null;
+    return parseCSV(text);
+  }
+
+  async function fetchPlan(sheetId) {
+    const rows = await fetchSheet(sheetId, 'Plan');
+    if (!rows) throw new Error('Could not read sheet. Check the Sheet ID and that sharing is set to "Anyone with the link can view".');
+    return rows.filter(r => r['Date'] && r['Teacher Out'] && r['Teacher Out'].trim());
+  }
+
+  async function fetchEvents(sheetId) {
+    const rows = await fetchSheet(sheetId, 'Events');
+    return (rows || []).filter(r => r['Start Date']);
+  }
+
+  async function fetchStaff(sheetId) {
+    const rows = await fetchSheet(sheetId, 'Staff');
+    return (rows || []).filter(r => r['Name']);
+  }
+
+  async function fetchWeeks(sheetId) {
+    const rows = await fetchSheet(sheetId, 'Weeks');
+    return (rows || [])
+      .filter(r => r['Week Start'])
+      .map(r => ({ date: parseDate(r['Week Start']), term: r['Term'], week: r['Week'] }))
+      .filter(r => r.date);
+  }
+
+  function getWeekLabel(weekStart, weeks) {
+    const match = weeks.find(w => sameDay(w.date, weekStart));
+    if (!match) return null;
+    return {
+      short: `T${match.term}W${match.week}`,
+      long:  `Term ${match.term} · Week ${match.week}`,
+    };
+  }
+
+  // ── Shared sub-components ─────────────────────────────────────────────────────
+
+  function ReasonBadge({ reason }) {
+    const c = REASON_COLOURS[reason] || DEFAULT_COLOUR;
+    return (
+      <span style={{ background:c.border, color:c.label, fontSize:10.5, fontWeight:'bold',
+        padding:'1px 5px', borderRadius:3, letterSpacing:'0.02em', flexShrink:0 }}>
+        {reason || 'Other'}
+      </span>
+    );
+  }
+
+  function isAllStaff(entry) {
+    return (entry['Teacher Out'] || '').trim().toLowerCase() === 'all staff';
+  }
+  function isLesson(entry) {
+    return (entry['Type'] || '').trim() !== '';
+  }
+  function lessonLabel(entry) {
+    return (entry['Type'] || '').trim();
+  }
+  function isSports(entry) {
+    return (entry['Type'] || '').trim().toLowerCase() === 'sports';
+  }
+  function yearGroup(entry, staffByName) {
+    const cls = (entry['Class'] || '').trim();
+    if (cls && YEAR_COLOURS[cls]) return cls;
+    const out = (entry['Teacher Out'] || '').trim();
+    const outAsYG = canonicalYearGroup(out);
+    if (outAsYG) return outAsYG;
+    if (staffByName) {
+      const yg = staffByName.get(out.toLowerCase());
+      if (yg && YEAR_COLOURS[yg]) return yg;
+    }
+    return null;
+  }
+
+  function AllStaffCard({ entry }) {
+    const c = REASON_COLOURS[entry['Reason']] || DEFAULT_COLOUR;
+    const time  = getTimeRange(entry);
+    const notes = entry['Notes'] && entry['Notes'].trim();
+    return (
+      <div style={{ background:c.bg, border:`1.5px solid ${c.border}`, borderRadius:4,
+        padding:'7px 10px', marginBottom:5, fontSize:12.5, lineHeight:1.4 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+          <span style={{ fontWeight:'bold', color:'#111' }}>All Staff</span>
+          <ReasonBadge reason={entry['Reason']}/>
+          {time && <span style={{ fontSize:12, fontWeight:'bold', color:c.label,
+            background:'white', border:`1px solid ${c.border}`, padding:'0 5px', borderRadius:3 }}>
+            {time}
+          </span>}
+        </div>
+        {notes && <div style={{ color:'#555', fontSize:11.5, marginTop:3 }}>{notes}</div>}
+      </div>
+    );
+  }
+
+  function LessonCard({ entry, staffByName }) {
+    const c = yearColour(entry, staffByName);
+    const time = getTimeRange(entry);
+    const hasNotes = entry['Notes'] && entry['Notes'].trim();
+    const sports = isSports(entry);
+    const primaryLabel = sports
+      ? (yearGroup(entry, staffByName) || entry['Teacher Out'] || '?')
+      : (entry['Teacher Out'] || '?');
+    return (
+      <div style={{ background:c.bg, border:`1px dashed ${c.border}`, borderRadius:4,
+        padding:'6px 9px', marginBottom:5, fontSize:12.5, fontFamily:'Arial', lineHeight:1.35, wordBreak:'break-word' }}>
+        <div style={{ fontWeight:'bold', color:'#111' }}>
+          {primaryLabel}
+          {!sports && entry['Class'] && <span style={{ fontWeight:'normal', color:'#555', marginLeft:4 }}>({entry['Class']})</span>}
+          {time && <span style={{ fontWeight:'normal', color:c.label, marginLeft:6,
+            fontSize:11, background:'white', border:`1px solid ${c.border}`,
+            padding:'0 4px', borderRadius:3 }}>{time}</span>}
+        </div>
+        <div style={{ marginTop:2, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+          <span style={{ fontSize:10.5, fontWeight:'bold', background:'#dcfce7',
+            color:'#166534', padding:'1px 5px', borderRadius:3, letterSpacing:'0.02em' }}>
+            {lessonLabel(entry)}
+          </span>
+          <ReasonBadge reason={entry['Reason']}/>
+          {hasNotes && <span style={{ color:'#666', fontSize:11 }}>{entry['Notes']}</span>}
+        </div>
+      </div>
+    );
+  }
+
+  function SlotCard({ entry, staffByName }) {
+    if (isAllStaff(entry)) return <AllStaffCard entry={entry}/>;
+    if (isLesson(entry))   return <LessonCard entry={entry} staffByName={staffByName}/>;
+    const c = yearColour(entry, staffByName);
+    const time     = getTimeRange(entry);
+    const hasNotes = entry['Notes'] && entry['Notes'].trim();
+    return (
+      <div style={{ background:c.bg, border:`1px solid ${c.border}`, borderRadius:4,
+        padding:'6px 9px', marginBottom:5, fontSize:12.5, fontFamily:'Arial', lineHeight:1.35, wordBreak:'break-word' }}>
+        <div style={{ fontWeight:'bold', color:'#111' }}>
+          {entry['Teacher Out'] || '?'}
+          {entry['Class'] && <span style={{ fontWeight:'normal', color:'#555', marginLeft:4 }}>({entry['Class']})</span>}
+          {time && <span style={{ fontWeight:'normal', color:c.label, marginLeft:6,
+            fontSize:11, background:'white', border:`1px solid ${c.border}`,
+            padding:'0 4px', borderRadius:3 }}>{time}</span>}
+        </div>
+        <div style={{ color:'#1a1a8c', marginTop:1 }}>
+          → {entry['Cover Staff'] || <span style={{ color:'#c00', fontStyle:'italic' }}>Cover TBC</span>}
+        </div>
+        <div style={{ marginTop:2, display:'flex', alignItems:'center', gap:6 }}>
+          <ReasonBadge reason={entry['Reason']}/>
+          {hasNotes && <span style={{ color:'#666', fontSize:11 }}>{entry['Notes']}</span>}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Settings panel ────────────────────────────────────────────────────────────
+
+  function SettingsPanel({ sheetId, onSave }) {
+    const [draft, setDraft] = useState('');
+    const [open, setOpen]   = useState(!sheetId);
+
+    function extractId(input) {
+      const m = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+      return m ? m[1] : input.trim();
+    }
+    function save() {
+      const id = extractId(draft);
+      if (!id) return;
+      localStorage.setItem('wfa_cover_sheet_id', id);
+      onSave(id); setOpen(false);
+    }
+
+    if (!open) return (
+      <div style={{ textAlign:'right', marginBottom:6 }}>
+        <button onClick={()=>setOpen(true)} style={{ fontSize:12, color:'rgba(255,255,255,0.55)',
+          background:'transparent', border:'none', cursor:'pointer', fontFamily:'Arial' }}>
+          ⚙ {sheetId ? 'Sheet connected ✓ — change' : 'Connect Google Sheet'}
+        </button>
+      </div>
+    );
+
+    return (
+      <div style={{ background:'rgba(0,0,0,0.22)', borderRadius:4, padding:'14px 16px', marginBottom:12 }}>
+        <p style={{ margin:'0 0 8px', fontSize:13, color:'rgba(255,255,255,0.9)' }}>
+          Paste your Google Sheet URL or ID. Must be shared as "Anyone with the link can view".
+        </p>
+        <div style={{ display:'flex', gap:8 }}>
+          <input value={draft} onChange={e=>setDraft(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&save()}
+            placeholder="Paste Google Sheet URL or ID…"
+            style={{ flex:1, padding:'7px 10px', fontSize:13, border:'none', borderRadius:4 }}
+          />
+          <button onClick={save} style={{ padding:'7px 16px', fontSize:13, fontWeight:'bold',
+            background:'#e8a000', color:'white', border:'none', borderRadius:4, cursor:'pointer' }}>
+            Save
+          </button>
+          {sheetId && <button onClick={()=>setOpen(false)} style={{ padding:'7px 12px', fontSize:13,
+            background:'transparent', color:'rgba(255,255,255,0.7)',
+            border:'1px solid rgba(255,255,255,0.3)', borderRadius:4, cursor:'pointer' }}>
+            Cancel
+          </button>}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Illness banner ────────────────────────────────────────────────────────────
+
+  function IllnessBanner({ staff }) {
+    const ill = staff.filter(s => (s['Status'] || '').trim().toLowerCase() === 'illness');
+    if (ill.length === 0) return null;
+    return (
+      <div style={{ marginBottom:12, background:'#fff7ed', border:'1px solid #fb923c',
+        borderLeft:'4px solid #ea580c', borderRadius:4, padding:'10px 14px' }}>
+        <div style={{ fontSize:12, fontWeight:'bold', color:'#9a3412', letterSpacing:'0.04em',
+          textTransform:'uppercase', marginBottom:6 }}>Currently absent — Illness</div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+          {ill.map((s, i) => (
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:6, background:'white',
+              border:'1px solid #fed7aa', borderRadius:4, padding:'4px 10px', fontSize:13 }}>
+              <span style={{ fontWeight:'bold', color:'#111' }}>{s['Name']}</span>
+              {(s['Role'] || s['Year Group']) && (
+                <span style={{ color:'#64748b', fontSize:12 }}>
+                  {[s['Role'], s['Year Group']].filter(Boolean).join(' · ')}
+                </span>
+              )}
+              {s['Notes'] && s['Notes'].trim() && (
+                <span style={{ color:'#9a3412', fontSize:12 }}>— {s['Notes']}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Event banners ─────────────────────────────────────────────────────────────
+
+  function EventBanners({ events, weekStart }) {
+    if (!events || events.length === 0) return null;
+    const weekEnd = addDays(weekStart, 5);
+
+    const visible = events.filter(e => {
+      const start = parseDate(e['Start Date']);
+      const end   = parseDate(e['End Date'] || e['Start Date']);
+      if (!start) return false;
+      return start < weekEnd && end >= weekStart;
+    });
+
+    if (visible.length === 0) return null;
+
+    const EVENT_STYLES = [
+      { bg:'#fff7ed', border:'#fb923c', text:'#9a3412' },
+      { bg:'#f0fdf4', border:'#4ade80', text:'#166534' },
+      { bg:'#fdf4ff', border:'#e879f9', text:'#86198f' },
+      { bg:'#fffbeb', border:'#fbbf24', text:'#92400e' },
+    ];
+
+    return (
+      <div style={{ marginBottom:14, display:'flex', flexDirection:'column', gap:6 }}>
+        {visible.map((e, i) => {
+          const start = parseDate(e['Start Date']);
+          const end   = parseDate(e['End Date'] || e['Start Date']);
+          const s     = EVENT_STYLES[i % EVENT_STYLES.length];
+          const sameDate = sameDay(start, end);
+          const dateRange = sameDate
+            ? fmtShort(start)
+            : `${fmtShort(start)} – ${fmtShort(end)}`;
+          return (
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 14px',
+              background:s.bg, border:`1px solid ${s.border}`, borderLeft:`4px solid ${s.border}`,
+              borderRadius:4, fontSize:13 }}>
+              <span style={{ fontSize:16 }}>📅</span>
+              <span style={{ fontWeight:'bold', color:s.text }}>{e['Event'] || '—'}</span>
+              <span style={{ color:'#64748b', fontSize:12 }}>{dateRange}</span>
+              {e['Notes'] && <span style={{ color:'#64748b', fontSize:12 }}>· {e['Notes']}</span>}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── Week grid view ────────────────────────────────────────────────────────────
+
+  function WeekGrid({ entries, weekStart, staff }) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    // Build case-insensitive map: full name and first name both resolve to year group
+    const staffByName = new Map();
+    (staff || []).forEach(s => {
+      const name = (s['Name'] || '').trim();
+      const yg   = (s['Year Group'] || '').trim();
+      if (!name) return;
+      staffByName.set(name.toLowerCase(), yg);
+      const firstName = name.split(' ')[0];
+      if (firstName.toLowerCase() !== name.toLowerCase())
+        staffByName.set(firstName.toLowerCase(), yg);
+    });
+    const grid = {};
+    DAYS.forEach(d => { grid[d] = {}; SESSIONS.forEach(s => { grid[d][s] = []; }); });
+
+    entries.forEach(e => {
+      const dt = parseDate(e['Date']);
+      if (!dt) return;
+      const dayIdx = dt.getDay() - 1;
+      if (dayIdx < 0 || dayIdx > 4) return;
+      const day = DAYS[dayIdx];
+      const session = e['Session'] && e['Session'].trim();
+      if (session && SESSIONS.includes(session)) {
+        grid[day][session].push(e);
+      } else {
+        // Blank session = all day: show in AM and PM
+        grid[day]['AM'].push(e);
+        grid[day]['PM'].push(e);
+      }
+    });
+
+    // Deduplicate Sports entries by year group within each cell
+    DAYS.forEach(d => {
+      SESSIONS.forEach(s => {
+        const seen = new Set();
+        grid[d][s] = grid[d][s].filter(e => {
+          if (!isSports(e)) return true;
+          const key = yearGroup(e, staffByName) || (e['Teacher Out'] || '').trim().toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      });
+    });
+
+    const dayDates = DAYS.map((_, i) => addDays(weekStart, i));
+
+    return (
+      <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
+        <table style={{ width:'100%', borderCollapse:'collapse', minWidth:620, tableLayout:'fixed' }}>
+          <thead>
+            <tr>
+              <th style={{ width:60, border:'1px solid #e2e8f0', padding:'8px 6px',
+                background:'#f8fafc', fontSize:12, color:'#94a3b8' }}></th>
+              {DAYS.map((day, i) => {
+                const d = dayDates[i];
+                const isToday = sameDay(d, today);
+                return (
+                  <th key={day} style={{ width:'calc((100% - 60px) / 5)', border:'1px solid #e2e8f0', padding:'10px 8px',
+                    background: isToday ? '#1a1a8c' : '#f0f4ff',
+                    color: isToday ? 'white' : '#1e3a8a', textAlign:'center', fontSize:13, fontWeight:'bold' }}>
+                    <div>{DAY_ABR[day]}</div>
+                    <div style={{ fontSize:11, fontWeight:'normal', opacity:0.8 }}>{fmtShort(d)}</div>
+                    {isToday && <div style={{ fontSize:10, fontWeight:'normal', opacity:0.7, marginTop:1 }}>TODAY</div>}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {SESSIONS.map(session => (
+              <tr key={session}>
+                <td style={{ border:'1px solid #e2e8f0', padding:'8px 6px', background:'#f8fafc',
+                  fontWeight:'bold', fontSize:11, color:'#64748b', textAlign:'center', verticalAlign:'top',
+                  whiteSpace:'nowrap' }}>
+                  {SESSION_ABR[session] || session}
+                </td>
+                {DAYS.map((day, i) => {
+                  const isToday = sameDay(dayDates[i], today);
+                  const slots = grid[day][session];
+                  return (
+                    <td key={day} style={{ border:'1px solid #e2e8f0', padding:'8px 7px',
+                      background: isToday ? '#f0f4ff' : 'white', verticalAlign:'top', minWidth:130 }}>
+                      {slots.length === 0
+                        ? <span style={{ color:'#d1d5db', fontSize:12 }}>—</span>
+                        : [...slots].sort((a,b) => yearGroupRank(a,staffByName) - yearGroupRank(b,staffByName))
+                            .map((e, idx) => <SlotCard key={idx} entry={e} staffByName={staffByName}/>)
+                      }
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // ── Today view ────────────────────────────────────────────────────────────────
+
+  function TodayPanel({ entries }) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const todayRows = entries.filter(e => {
+      const d = parseDate(e['Date']);
+      return d && sameDay(d, today);
+    });
+
+    if (todayRows.length === 0) return (
+      <div style={{ padding:'30px 0', textAlign:'center', color:'#94a3b8', fontSize:14 }}>
+        No cover arrangements recorded for today.
+      </div>
+    );
+
+    const bySession = { 'All Day': [] };
+    SESSIONS.forEach(s => { bySession[s] = []; });
+    todayRows.forEach(e => {
+      const s = e['Session'] && e['Session'].trim();
+      bySession[s && SESSIONS.includes(s) ? s : 'All Day'].push(e);
+    });
+
+    const todayDisplaySessions = ['All Day', ...SESSIONS];
+
+    return (
+      <div>
+        {todayDisplaySessions.map(session => bySession[session].length === 0 ? null : (
+          <div key={session} style={{ marginBottom:20 }}>
+            <div style={{ fontSize:12, fontWeight:'bold', color:'#64748b', letterSpacing:'0.08em',
+              textTransform:'uppercase', marginBottom:8 }}>{session}</div>
+            {bySession[session].map((e, i) => {
+              const c    = REASON_COLOURS[e['Reason']] || DEFAULT_COLOUR;
+              const time = getTimeRange(e);
+              if (isAllStaff(e)) return (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 14px',
+                  background:c.bg, border:`1px solid ${c.border}`, borderLeft:`4px solid ${c.border}`,
+                  borderRadius:4, marginBottom:6, flexWrap:'wrap' }}>
+                  <span style={{ fontWeight:'bold', fontSize:14 }}>All Staff</span>
+                  <ReasonBadge reason={e['Reason']}/>
+                  {time && <span style={{ fontSize:13, fontWeight:'bold', color:c.label,
+                    background:'white', border:`1px solid ${c.border}`, padding:'1px 7px', borderRadius:3 }}>
+                    {time}
+                  </span>}
+                  {e['Notes'] && e['Notes'].trim() &&
+                    <div style={{ width:'100%', fontSize:12, color:'#64748b', paddingTop:2 }}>{e['Notes']}</div>}
+                </div>
+              );
+              if (isLesson(e)) return (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px',
+                  background:'white', border:`1px dashed ${c.border}`, borderLeft:`4px solid ${c.border}`,
+                  borderRadius:4, marginBottom:6, flexWrap:'wrap' }}>
+                  <div style={{ flex:1, minWidth:160 }}>
+                    <span style={{ fontWeight:'bold', fontSize:14 }}>{e['Teacher Out'] || '?'}</span>
+                    {e['Class'] && <span style={{ color:'#666', fontSize:13 }}> · {e['Class']}</span>}
+                    {time && <span style={{ fontSize:12, color:c.label, marginLeft:8,
+                      background:c.bg, border:`1px solid ${c.border}`, padding:'0 5px', borderRadius:3 }}>
+                      {time}
+                    </span>}
+                  </div>
+                  <span style={{ fontSize:11, fontWeight:'bold', background:'#dcfce7',
+                    color:'#166534', padding:'2px 7px', borderRadius:3 }}>
+                    {lessonLabel(e)}
+                  </span>
+                  <ReasonBadge reason={e['Reason']}/>
+                  {e['Notes'] && e['Notes'].trim() &&
+                    <div style={{ width:'100%', fontSize:12, color:'#64748b', paddingTop:4 }}>{e['Notes']}</div>}
+                </div>
+              );
+              return (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px',
+                  background:'white', border:`1px solid ${c.border}`, borderLeft:`4px solid ${c.border}`,
+                  borderRadius:4, marginBottom:6, flexWrap:'wrap' }}>
+                  <div style={{ flex:1, minWidth:160 }}>
+                    <span style={{ fontWeight:'bold', fontSize:14 }}>{e['Teacher Out'] || '?'}</span>
+                    {e['Class'] && <span style={{ color:'#666', fontSize:13 }}> · {e['Class']}</span>}
+                    {time && <span style={{ fontSize:12, color:c.label, marginLeft:8,
+                      background:c.bg, border:`1px solid ${c.border}`, padding:'0 5px', borderRadius:3 }}>
+                      {time}
+                    </span>}
+                  </div>
+                  <div style={{ color:'#1a1a8c', fontWeight:'bold', fontSize:14, flexShrink:0 }}>
+                    → {e['Cover Staff'] || <span style={{ color:'#c00', fontStyle:'italic', fontWeight:'normal' }}>TBC</span>}
+                  </div>
+                  <ReasonBadge reason={e['Reason']}/>
+                  {e['Notes'] && e['Notes'].trim() &&
+                    <div style={{ width:'100%', fontSize:12, color:'#64748b', paddingTop:4 }}>{e['Notes']}</div>}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // ── My view ───────────────────────────────────────────────────────────────────
+
+  function MyView({ entries, myName, onNameChange, allNames, termWeeks, staff }) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const staffByName = new Map();
+    (staff || []).forEach(s => {
+      const name = (s['Name'] || '').trim();
+      const yg   = (s['Year Group'] || '').trim();
+      if (!name) return;
+      staffByName.set(name.toLowerCase(), yg);
+      const firstName = name.split(' ')[0];
+      if (firstName.toLowerCase() !== name.toLowerCase())
+        staffByName.set(firstName.toLowerCase(), yg);
+    });
+
+    // Entries involving this person
+    const mine = entries
+      .filter(e => {
+        const out   = (e['Teacher Out'] || '').trim().toLowerCase();
+        const cover = (e['Cover Staff'] || '').trim().toLowerCase();
+        const me    = myName.trim().toLowerCase();
+        return out === 'all staff' || out === me || cover === me;
+      })
+      .map(e => ({ ...e, _date: parseDate(e['Date']) }))
+      .filter(e => e._date)
+      .sort((a, b) => a._date - b._date);
+
+    // Group by week
+    const weekMap = new Map();
+    mine.forEach(e => {
+      const key = weekMonday(e._date).toISOString();
+      if (!weekMap.has(key)) weekMap.set(key, { start: weekMonday(e._date), entries: [] });
+      weekMap.get(key).entries.push(e);
+    });
+
+    const weekGroups = [...weekMap.values()].sort((a, b) => a.start - b.start);
+    const upcoming = weekGroups.filter(w => addDays(w.start, 5) >= today);
+    const past     = weekGroups.filter(w => addDays(w.start, 5) < today);
+
+    const [showPast, setShowPast] = useState(false);
+
+    function renderWeek(week) {
+      const isCurrent = sameDay(week.start, weekMonday(today));
+      const lbl = getWeekLabel(week.start, termWeeks || []);
+      return (
+        <div key={week.start.toISOString()} style={{ marginBottom:20 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+            {lbl && <span style={{ fontSize:12, fontWeight:'bold', background:'#f0f4ff',
+              color:'#1e3a8a', padding:'1px 8px', borderRadius:4 }}>{lbl.short}</span>}
+            <div style={{ fontSize:13, fontWeight:'bold', color:'#1e3a8a' }}>
+              {fmtShort(week.start)} – {fmtShort(addDays(week.start, 4))}
+            </div>
+            {isCurrent && (
+              <span style={{ fontSize:11, background:'#1a1a8c', color:'white',
+                padding:'1px 7px', borderRadius:10 }}>This week</span>
+            )}
+          </div>
+          {week.entries.map((e, i) => renderEntry(e, i))}
+        </div>
+      );
+    }
+
+    function renderEntry(e, i) {
+      const me     = myName.trim().toLowerCase();
+      const isOut  = (e['Teacher Out'] || '').trim().toLowerCase() === me;
+      const isToday = sameDay(e._date, today);
+      const c      = REASON_COLOURS[e['Reason']] || DEFAULT_COLOUR;
+      const yc     = yearColour(e, staffByName);
+      const time   = getTimeRange(e);
+
+      const sessionLabel = e['Session'] && e['Session'].trim() || 'All Day';
+      const sessionBadge = (
+        <span style={{ fontSize:11, fontWeight:'bold', background:'#f1f5f9',
+          color:'#475569', padding:'1px 6px', borderRadius:3 }}>
+          {sessionLabel}
+        </span>
+      );
+      const timeBadge = time && (
+        <span style={{ fontSize:11, fontWeight:'bold', background:'#e0e7ff',
+          color:'#3730a3', padding:'1px 6px', borderRadius:3 }}>
+          {time}
+        </span>
+      );
+
+      if (isLesson(e)) {
+        return (
+          <div key={i} style={{ display:'flex', gap:12, padding:'11px 14px', marginBottom:7,
+            background: isToday ? '#f0fdf4' : '#fff',
+            border:`1px dashed ${yc.border}`, borderLeft:`4px solid ${yc.border}`,
+            borderRadius:4, flexWrap:'wrap', alignItems:'flex-start' }}>
+            <div style={{ flexShrink:0, paddingTop:1 }}>
+              <span style={{ fontSize:11, fontWeight:'bold', background:'#dcfce7',
+                color:'#166534', padding:'2px 7px', borderRadius:3, letterSpacing:'0.02em' }}>
+                {lessonLabel(e)}
+              </span>
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:13.5, color:'#111', marginBottom:3, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                {fmtWeekday(e._date)} · {sessionBadge} {timeBadge}
+                {isToday && <span style={{ fontSize:11, color:'#166534', fontWeight:'bold' }}>TODAY</span>}
+              </div>
+              <div style={{ fontSize:13, color:'#555' }}>
+                {e['Class'] && <span style={{ marginRight:6 }}>{e['Class']} · </span>}
+                <ReasonBadge reason={e['Reason']}/>
+                {e['Notes'] && <span style={{ color:'#64748b', fontSize:12, marginLeft:6 }}>{e['Notes']}</span>}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      if (isOut) {
+        // I am OUT — show who's covering me
+        return (
+          <div key={i} style={{ display:'flex', gap:12, padding:'11px 14px', marginBottom:7,
+            background: isToday ? '#fff7ed' : '#fff',
+            border:`1px solid ${yc.border}`, borderLeft:`4px solid ${yc.border}`,
+            borderRadius:4, flexWrap:'wrap', alignItems:'flex-start' }}>
+            <div style={{ flexShrink:0, paddingTop:1 }}>
+              <span style={{ fontSize:11, fontWeight:'bold', background:'#ffedd5',
+                color:'#c2410c', padding:'2px 7px', borderRadius:3, letterSpacing:'0.02em' }}>
+                OUT
+              </span>
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:13.5, color:'#111', marginBottom:3, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                {fmtWeekday(e._date)} · {sessionBadge} {timeBadge}
+                {isToday && <span style={{ fontSize:11, color:'#c2410c', fontWeight:'bold' }}>TODAY</span>}
+              </div>
+              <div style={{ fontSize:13, color:'#555' }}>
+                {e['Class'] && <span style={{ marginRight:6 }}>{e['Class']} · </span>}
+                <ReasonBadge reason={e['Reason']}/>
+                {e['Notes'] && <span style={{ color:'#64748b', fontSize:12, marginLeft:6 }}>{e['Notes']}</span>}
+              </div>
+              <div style={{ fontSize:13, color:'#1a1a8c', marginTop:4 }}>
+                Covered by: <strong>{e['Cover Staff'] || <span style={{ color:'#c00', fontStyle:'italic' }}>TBC</span>}</strong>
+              </div>
+            </div>
+          </div>
+        );
+      } else {
+        // I am COVERING someone else
+        return (
+          <div key={i} style={{ display:'flex', gap:12, padding:'11px 14px', marginBottom:7,
+            background: isToday ? '#eff6ff' : '#fff',
+            border:`1px solid ${yc.border}`, borderLeft:`4px solid ${yc.border}`,
+            borderRadius:4, flexWrap:'wrap', alignItems:'flex-start' }}>
+            <div style={{ flexShrink:0, paddingTop:1 }}>
+              <span style={{ fontSize:11, fontWeight:'bold', background:'#dbeafe',
+                color:'#1d4ed8', padding:'2px 7px', borderRadius:3, letterSpacing:'0.02em' }}>
+                COVERING
+              </span>
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:13.5, color:'#111', marginBottom:3, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                {fmtWeekday(e._date)} · {sessionBadge} {timeBadge}
+                {isToday && <span style={{ fontSize:11, color:'#1d4ed8', fontWeight:'bold' }}>TODAY</span>}
+              </div>
+              <div style={{ fontSize:13, color:'#555' }}>
+                Covering: <strong>{e['Teacher Out'] || '?'}</strong>
+                {e['Class'] && <span style={{ color:'#888' }}> ({e['Class']})</span>}
+                <span style={{ marginLeft:8 }}><ReasonBadge reason={e['Reason']}/></span>
+                {e['Notes'] && <span style={{ color:'#64748b', fontSize:12, marginLeft:6 }}>{e['Notes']}</span>}
+              </div>
+            </div>
+          </div>
+        );
+      }
+    }
+
+    return (
+      <div>
+        {/* Name picker */}
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20,
+          padding:'12px 14px', background:'#f8fafc', borderRadius:6, border:'1px solid #e2e8f0' }}>
+          <label style={{ fontSize:13, color:'#475569', fontWeight:'bold', flexShrink:0 }}>
+            Viewing schedule for:
+          </label>
+          <select value={myName} onChange={e => onNameChange(e.target.value)}
+            style={{ padding:'6px 10px', fontSize:14, border:'1px solid #cbd5e1',
+              borderRadius:4, color:'#1e293b', background:'white', flex:1, maxWidth:260 }}>
+            <option value="">— select your name —</option>
+            {allNames.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+
+        {!myName ? (
+          <div style={{ textAlign:'center', padding:'30px 0', color:'#94a3b8', fontSize:14 }}>
+            Select your name above to see your personal schedule.
+          </div>
+        ) : mine.length === 0 ? (
+          <div style={{ textAlign:'center', padding:'30px 0', color:'#94a3b8', fontSize:14 }}>
+            No arrangements found for <strong>{myName}</strong> in the current plan.
+          </div>
+        ) : (
+          <>
+            {upcoming.length === 0
+              ? <div style={{ color:'#94a3b8', fontSize:13, marginBottom:16 }}>No upcoming arrangements.</div>
+              : upcoming.map(w => renderWeek(w))
+            }
+
+            {past.length > 0 && (
+              <div style={{ marginTop:8 }}>
+                <button onClick={() => setShowPast(p => !p)}
+                  style={{ fontSize:12, color:'#94a3b8', background:'none', border:'none',
+                    cursor:'pointer', padding:0, fontFamily:'Arial' }}>
+                  {showPast ? '▲ Hide' : '▼ Show'} past arrangements ({past.reduce((n,w)=>n+w.entries.length,0)})
+                </button>
+                {showPast && (
+                  <div style={{ marginTop:12, opacity:0.7 }}>
+                    {past.map(w => renderWeek(w))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ── Legend ────────────────────────────────────────────────────────────────────
+
+  function Legend() {
+    return (
+      <div style={{ display:'flex', gap:10, flexWrap:'wrap', padding:'12px 0 4px' }}>
+        {Object.entries(REASON_COLOURS).map(([label, c]) => (
+          <div key={label} style={{ display:'flex', alignItems:'center', gap:5, fontSize:12 }}>
+            <div style={{ width:13, height:13, background:c.bg, border:`1px solid ${c.border}`, borderRadius:2 }}/>
+            <span style={{ color:'#64748b' }}>{label}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // ── Main App ──────────────────────────────────────────────────────────────────
+
+  function App() {
+    const [sheetId,     setSheetId]     = useState(() => localStorage.getItem('wfa_cover_sheet_id') || '');
+    const [entries,     setEntries]     = useState([]);
+    const [events,      setEvents]      = useState([]);
+    const [weeks,       setWeeks]       = useState([]);
+    const [staff,       setStaff]       = useState([]);
+    const [loading,     setLoading]     = useState(false);
+    const [error,       setError]       = useState('');
+    const [lastFetched, setLastFetched] = useState(null);
+    const [weekStart,   setWeekStart]   = useState(() => weekMonday(new Date()));
+    const [view,        setView]        = useState('week');
+    const [myName,      setMyName]      = useState(() => localStorage.getItem('wfa_my_name') || '');
+
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    const load = useCallback(async (id) => {
+      if (!id) return;
+      setLoading(true); setError('');
+      try {
+        const [rows, evts, wks, stf] = await Promise.all([fetchPlan(id), fetchEvents(id), fetchWeeks(id), fetchStaff(id)]);
+        setEntries(rows);
+        setEvents(evts);
+        setWeeks(wks);
+        setStaff(stf);
+        setLastFetched(new Date());
+      } catch(e) { setError(e.message); }
+      setLoading(false);
+    }, []);
+
+    useEffect(() => {
+      if (sheetId) load(sheetId);
+      const t = setInterval(() => { if (sheetId) load(sheetId); }, 3 * 60 * 1000);
+      return () => clearInterval(t);
+    }, [sheetId, load]);
+
+    function handleNameChange(name) {
+      setMyName(name);
+      localStorage.setItem('wfa_my_name', name);
+    }
+
+    // Build sorted unique name list from both Teacher Out and Cover Staff columns
+    const allNames = [...new Set(
+      entries.flatMap(e => [e['Teacher Out'], e['Cover Staff']])
+        .map(n => (n || '').trim())
+        .filter(n => n && !canonicalYearGroup(n))
+    )].sort();
+
+    const weekEnd      = addDays(weekStart, 5);
+    const weekEntries  = entries.filter(e => { const d = parseDate(e['Date']); return d && d >= weekStart && d < weekEnd; });
+    const isThisWeek   = sameDay(weekStart, weekMonday(today));
+    const todayCount   = entries.filter(e => { const d = parseDate(e['Date']); return d && sameDay(d, today); }).length;
+    const myCount      = myName ? entries.filter(e => {
+      const d = parseDate(e['Date']); if (!d || d < today) return false;
+      const me  = myName.toLowerCase();
+      const out = (e['Teacher Out']||'').toLowerCase();
+      return out === 'all staff' || out === me || (e['Cover Staff']||'').toLowerCase() === me;
+    }).length : 0;
+
+    const TABS = [
+      { id:'week',  label:'Week view' },
+      { id:'today', label:`Today${todayCount > 0 ? ` (${todayCount})` : ''}` },
+      { id:'mine',  label:`My view${myCount > 0 ? ` (${myCount})` : ''}` },
+    ];
+
+    return (
+      <div style={{ fontFamily:'Arial', background:'#f0f4f8', minHeight:'100vh', padding:'16px' }}>
+
+        {/* Header */}
+        <div style={{ maxWidth:1040, margin:'0 auto 14px', borderRadius:8,
+          overflow:'hidden', boxShadow:'0 1px 6px rgba(0,0,0,0.1)' }}>
+
+          {/* Blue top strip */}
+          <div style={{ background:'#1798d3', height:8 }}/>
+
+          {/* White header body */}
+          <div style={{ background:'white', padding:'14px 22px' }}>
+            <SettingsPanel sheetId={sheetId} onSave={id => { setSheetId(id); load(id); }}/>
+
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+              flexWrap:'wrap', gap:12 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:16 }}>
+                <img src="logo.png" alt="Wallscourt Farm Academy" style={{ height:64, display:'block' }}/>
+                <div style={{ borderLeft:'2px solid #e2e8f0', paddingLeft:16 }}>
+                  <div style={{ fontSize:17, fontWeight:900, fontFamily:'Nunito, Arial, sans-serif',
+                    color:'#1798d3', letterSpacing:'0.01em' }}>Release Schedule</div>
+                  <div style={{ fontSize:12, color:'#94a3b8', marginTop:3 }}>
+                    {lastFetched
+                      ? <>Last refreshed {fmtTime(lastFetched)} · <button onClick={()=>load(sheetId)}
+                          style={{ background:'none', border:'none', color:'#1798d3',
+                            cursor:'pointer', fontSize:12, padding:0, fontFamily:'Arial' }}>
+                          refresh now
+                        </button></>
+                      : 'Not yet loaded'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div style={{ display:'flex', gap:2, alignItems:'center' }}>
+                {TABS.map(tab => (
+                  <button key={tab.id} onClick={() => {
+                    setView(tab.id);
+                    if (tab.id === 'today') setWeekStart(weekMonday(today));
+                  }}
+                    style={{ padding:'7px 16px', fontSize:13, border:'none', borderRadius:5,
+                      cursor:'pointer', fontFamily:'Arial', fontWeight: view===tab.id ? 'bold' : 'normal',
+                      background: view===tab.id ? '#1798d3' : '#f0f8fd',
+                      color: view===tab.id ? 'white' : '#475569' }}>
+                    {tab.label}
+                  </button>
+                ))}
+                {view === 'week' && !isThisWeek && (
+                  <button onClick={() => setWeekStart(weekMonday(today))}
+                    style={{ padding:'7px 14px', fontSize:13, border:'1.5px solid #1798d3',
+                      borderRadius:5, cursor:'pointer', fontFamily:'Arial', fontWeight:'normal',
+                      background:'white', color:'#1798d3', marginLeft:6 }}>
+                    ↩ This week
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main card */}
+        <div style={{ maxWidth:1040, margin:'0 auto', background:'white', borderRadius:8,
+          padding:'20px 22px', boxShadow:'0 1px 6px rgba(0,0,0,0.08)' }}>
+
+          {!sheetId ? (
+            <div style={{ textAlign:'center', padding:'50px 0', color:'#94a3b8' }}>
+              <div style={{ fontSize:32, marginBottom:10 }}>📋</div>
+              <div style={{ fontSize:15, marginBottom:6 }}>No Google Sheet connected yet.</div>
+              <div style={{ fontSize:13 }}>Click "Connect Google Sheet" above to get started.</div>
+            </div>
+          ) : loading && entries.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'50px 0', color:'#94a3b8', fontSize:14 }}>
+              Loading release schedule…
+            </div>
+          ) : error ? (
+            <div style={{ background:'#fee2e2', border:'1px solid #fca5a5', borderRadius:4,
+              padding:'16px 18px', color:'#991b1b', fontSize:14 }}>
+              <strong>Could not load plan</strong><br/>{error}
+            </div>
+          ) : view === 'today' ? (
+            <>
+              <div style={{ marginBottom:16 }}>
+                <h2 style={{ fontSize:16, color:'#1e3a8a', margin:'0 0 2px' }}>Today's cover</h2>
+                <div style={{ fontSize:13, color:'#64748b' }}>{fmtLong(today)}</div>
+              </div>
+              <IllnessBanner staff={staff}/>
+              <EventBanners events={events} weekStart={today} />
+              <TodayPanel entries={entries}/>
+            </>
+          ) : view === 'mine' ? (
+            <>
+              <h2 style={{ fontSize:16, color:'#1e3a8a', margin:'0 0 16px' }}>My schedule</h2>
+              <IllnessBanner staff={staff.filter(s => s['Name']===myName && (s['Status']||'').toLowerCase()==='illness')}/>
+              <MyView entries={entries} myName={myName} onNameChange={handleNameChange} allNames={allNames} termWeeks={weeks} staff={staff}/>
+            </>
+          ) : (
+            <>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+                <button onClick={() => setWeekStart(d => addDays(d, -7))}
+                  style={{ padding:'5px 14px', fontSize:15, border:'1px solid #e2e8f0',
+                    borderRadius:4, cursor:'pointer', background:'white', color:'#334155' }}>‹</button>
+                <div style={{ flex:1, textAlign:'center' }}>
+                  {(() => {
+                    const lbl = getWeekLabel(weekStart, weeks);
+                    return lbl ? (
+                      <>
+                        <div style={{ fontWeight:'bold', fontSize:15, color:'#1e3a8a' }}>
+                          {lbl.long}
+                          {isThisWeek && <span style={{ fontSize:11, fontWeight:'normal', color:'#64748b',
+                            marginLeft:8, background:'#f0f4ff', padding:'1px 7px', borderRadius:10 }}>
+                            This week
+                          </span>}
+                        </div>
+                        <div style={{ fontSize:12, color:'#64748b', marginTop:2 }}>
+                          {fmtShort(weekStart)} – {fmtShort(addDays(weekStart, 4))}
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ fontWeight:'bold', fontSize:15, color:'#1e3a8a' }}>
+                        {fmtShort(weekStart)} – {fmtShort(addDays(weekStart, 4))}
+                        {isThisWeek && <span style={{ fontSize:11, fontWeight:'normal', color:'#64748b',
+                          marginLeft:8, background:'#f0f4ff', padding:'1px 7px', borderRadius:10 }}>
+                          This week
+                        </span>}
+                      </div>
+                    );
+                  })()}
+                </div>
+                <button onClick={() => setWeekStart(d => addDays(d, 7))}
+                  style={{ padding:'5px 14px', fontSize:15, border:'1px solid #e2e8f0',
+                    borderRadius:4, cursor:'pointer', background:'white', color:'#334155' }}>›</button>
+              </div>
+              <IllnessBanner staff={staff}/>
+              <EventBanners events={events} weekStart={weekStart} />
+              {weekEntries.length === 0
+                ? <div style={{ textAlign:'center', padding:'30px 0', color:'#94a3b8', fontSize:14 }}>No cover recorded for this week.</div>
+                : <WeekGrid entries={weekEntries} weekStart={weekStart} staff={staff}/>
+              }
+            </>
+          )}
+        </div>
+
+        {entries.length > 0 && view !== 'mine' && (
+          <div style={{ maxWidth:1040, margin:'10px auto 0', paddingLeft:4 }}>
+            <Legend/>
+          </div>
+        )}
+
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

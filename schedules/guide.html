@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WFA Scheduling Tools — User Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 13pt;
+    color: #222;
+    background: #f8fafc;
+    padding: 32px 16px;
+  }
+
+  .page { max-width: 800px; margin: 0 auto; }
+
+  .header-strip { background: #1798d3; height: 10px; border-radius: 6px 6px 0 0; }
+  header {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    padding: 20px 28px 24px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  header img { height: 64px; }
+  .header-text h1 {
+    font-family: 'Nunito', Arial, sans-serif;
+    font-size: 18pt;
+    font-weight: 900;
+    color: #1798d3;
+    margin-bottom: 4px;
+  }
+  .header-text p { font-size: 11pt; color: #64748b; }
+
+  h2 {
+    font-family: 'Nunito', Arial, sans-serif;
+    font-size: 15pt;
+    font-weight: 900;
+    color: white;
+    background: #1798d3;
+    padding: 8px 16px;
+    border-radius: 5px;
+    margin: 36px 0 18px 0;
+  }
+  h3 {
+    font-size: 12pt;
+    font-weight: bold;
+    color: #1798d3;
+    margin: 24px 0 8px 0;
+    border-bottom: 1.5px solid #e0f0fa;
+    padding-bottom: 4px;
+  }
+
+  p { line-height: 1.65; margin-bottom: 10px; }
+  ul, ol { margin: 6px 0 12px 22px; line-height: 2; }
+
+  .step {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 16px;
+  }
+  .step-num {
+    background: #1798d3;
+    color: white;
+    font-weight: bold;
+    font-size: 13pt;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-body { flex: 1; }
+  .step-body strong { display: block; font-size: 12pt; margin-bottom: 3px; }
+  .step-body p { margin: 0; font-size: 11.5pt; color: #334155; }
+
+  .url-box {
+    background: #f0f8fd;
+    border: 1.5px solid #93c5fd;
+    border-radius: 4px;
+    padding: 10px 16px;
+    font-size: 12pt;
+    font-weight: bold;
+    color: #1798d3;
+    margin: 8px 0 12px 0;
+    word-break: break-all;
+  }
+
+  .note {
+    background: #fff8e6;
+    border-left: 4px solid #f59e0b;
+    padding: 11px 15px;
+    border-radius: 0 4px 4px 0;
+    margin: 14px 0;
+    font-size: 11.5pt;
+    line-height: 1.6;
+  }
+  .note strong { color: #92400e; }
+  .tip {
+    background: #f0f8fd;
+    border-left: 4px solid #1798d3;
+    padding: 11px 15px;
+    border-radius: 0 4px 4px 0;
+    margin: 14px 0;
+    font-size: 11.5pt;
+    line-height: 1.6;
+  }
+
+  .colour-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 16px;
+  }
+  .swatch {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11pt;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 5px 10px;
+  }
+  .swatch-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 18px;
+    font-size: 11.5pt;
+    background: white;
+  }
+  th {
+    background: #f0f8fd;
+    border: 1.5px solid #bae0f5;
+    padding: 8px 12px;
+    text-align: left;
+    color: #1798d3;
+    font-weight: bold;
+  }
+  td {
+    border: 1.5px solid #e2e8f0;
+    padding: 7px 12px;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #fafafa; }
+
+  .panel-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 14px 0;
+  }
+  .panel-card {
+    border: 1.5px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 14px 16px;
+    background: white;
+  }
+  .panel-card h4 {
+    font-size: 11.5pt;
+    font-weight: bold;
+    color: #1798d3;
+    margin-bottom: 6px;
+  }
+  .panel-card p { margin: 0; font-size: 11pt; color: #334155; line-height: 1.5; }
+
+  .part-divider {
+    text-align: center;
+    margin: 48px 0 8px;
+    position: relative;
+  }
+  .part-divider::before {
+    content: '';
+    display: block;
+    height: 2px;
+    background: #e2e8f0;
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+  }
+  .part-divider span {
+    position: relative;
+    background: #f8fafc;
+    padding: 0 16px;
+    font-size: 10pt;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 14px;
+    border-top: 1px solid #e2e8f0;
+    font-size: 10pt;
+    color: #94a3b8;
+    text-align: center;
+  }
+
+  .tool-link {
+    display: inline-block;
+    background: #1798d3;
+    color: white;
+    font-weight: bold;
+    padding: 8px 16px;
+    border-radius: 5px;
+    text-decoration: none;
+    margin: 4px 4px 4px 0;
+    font-size: 11.5pt;
+  }
+  .tool-link:hover { background: #0c7cc4; }
+
+  .toc { margin: 16px 0 24px; }
+  .toc a { color: #1798d3; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc ul { list-style: none; padding-left: 0; }
+  .toc ul ul { padding-left: 20px; }
+  .toc li { margin: 4px 0; font-size: 11.5pt; }
+
+  @media print {
+    body { background: white; padding: 20px; }
+    h2 { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .header-strip { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .swatch-dot { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  @media (max-width: 600px) {
+    .panel-row { grid-template-columns: 1fr; }
+    header { flex-direction: column; text-align: center; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header-strip"></div>
+  <header>
+    <img src="../teaching-schedule/logo.png" alt="Wallscourt Farm Academy">
+    <div class="header-text">
+      <h1>WFA Scheduling Tools — User Guide</h1>
+      <p>Wallscourt Farm Academy &nbsp;·&nbsp; How to use the Learning Schedule, Release Schedule, and FAB Rota</p>
+    </div>
+  </header>
+
+  <!-- ── OVERVIEW ── -->
+
+  <h2>Overview</h2>
+
+  <p>Wallscourt Farm Academy uses three web-based scheduling tools, all connected to a shared Google Sheet. They work on any device — laptop, iPad, or phone — and sync automatically so changes on one device are visible on all others after a refresh.</p>
+
+  <table>
+    <tr><th>Tool</th><th>What it does</th><th>Who uses it</th></tr>
+    <tr><td><strong>Learning Schedule</strong></td><td>Plan what each year group is learning each week — drag subjects into sessions, split lessons, add notes</td><td>Class teachers, TPs, LPs</td></tr>
+    <tr><td><strong>Release Schedule</strong></td><td>Record who is out of class each week and who is covering them</td><td>Office staff, cover manager</td></tr>
+    <tr><td><strong>FAB Rota</strong></td><td>Assign staff to Fresh Air Break duty zones each week</td><td>Office staff, rota manager</td></tr>
+  </table>
+
+  <div class="url-box">https://imcl75.github.io/wfa/schedules/</div>
+
+  <p>From this page you can access all three tools and this user guide.</p>
+
+  <div class="tip">Bookmark the schedules page on every device you use so you can get to any tool quickly.</div>
+
+  <!-- ── PART 1: LEARNING SCHEDULE ── -->
+
+  <h2>Part 1 &nbsp;·&nbsp; Learning Schedule</h2>
+
+  <p>The Learning Schedule is a drag-and-drop timetable planner. Each year group has its own schedule with the correct session times, break times, and staff. You add subjects from the sidebar into session cells, reorder them, split lessons for class swaps, and add notes.</p>
+
+  <div class="url-box">https://imcl75.github.io/wfa/teaching-schedule/</div>
+
+  <h3>Year group selector</h3>
+
+  <p>Click the year group dropdown at the top right (e.g. <strong>Y4</strong>) to switch to a different year group. When you switch:</p>
+  <ul>
+    <li>The timetable rows update (FAB, lunch, and session times change per year group)</li>
+    <li>The staff list, subjects, and interventions update</li>
+    <li>The brand colour changes to match the year group</li>
+    <li>The schedule data switches to that year group's saved data</li>
+  </ul>
+
+  <p>Each year group has its own colour theme:</p>
+
+  <div class="colour-grid">
+    <div class="swatch"><div class="swatch-dot" style="background:#1798d3;"></div>Reception &amp; Y4</div>
+    <div class="swatch"><div class="swatch-dot" style="background:#f97316;"></div>Y1 &amp; Y5</div>
+    <div class="swatch"><div class="swatch-dot" style="background:#22c55e;"></div>Y2 &amp; Y6</div>
+    <div class="swatch"><div class="swatch-dot" style="background:#FF00FF;"></div>Y3</div>
+  </div>
+
+  <h3>Day structure per year group</h3>
+
+  <p>Each year group shows the correct timetable rows for that age group. The main differences are:</p>
+  <ul>
+    <li><strong>Reception</strong> has no FAB break — instead they have Learning Review Snack</li>
+    <li><strong>Y1–Y3</strong> have FAB at 10:30–10:45</li>
+    <li><strong>Y4–Y6</strong> have FAB at 10:45–11:00</li>
+    <li>Lunch times are staggered across all year groups</li>
+    <li>Wash Hands and PM Registration rows appear in sequence but without times displayed</li>
+  </ul>
+
+  <h3>Term and week navigation</h3>
+
+  <p>Use the <strong>&lt;</strong> and <strong>&gt;</strong> arrows to move between weeks. Click <strong>This week</strong> to jump back to the current week. The week label shows the term, week number, and date range (e.g. <em>Term 2 · Week 3 · 13 Jan – 17 Jan</em>).</p>
+
+  <h3>View tabs — Master and Staff views</h3>
+
+  <p>The row of tabs below the header switches between views:</p>
+  <ul>
+    <li><strong>Learning Schedule</strong> (master) — shows all activities for the class. The sidebar shows subjects.</li>
+    <li><strong>Staff name tabs</strong> — one per Teaching Partner or Learning Partner. Shows only that person's activities. The sidebar shows interventions instead of subjects.</li>
+  </ul>
+
+  <h3>Adding subjects to the schedule</h3>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Find the subject in the sidebar</strong>
+      <p>Subjects are grouped by category (Enquiry, Maths, Reading, etc.). Each chip shows a colour dot and the subject name.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Drag it into a session cell</strong>
+      <p>Hold and drag the chip from the sidebar into any Session 1, 2, or 3 cell. The target cell highlights with a dashed blue outline. Release to drop.</p>
+    </div>
+  </div>
+
+  <div class="tip">You can only drop into session rows (not fixed rows like FAB or Lunch).</div>
+
+  <h3>Reordering and moving chips</h3>
+
+  <ul>
+    <li><strong>Reorder within a cell</strong> — hold the <strong>≡</strong> drag handle on a chip and drag up or down</li>
+    <li><strong>Move to another cell</strong> — hold the <strong>≡</strong> handle and drag to a different day or session</li>
+  </ul>
+
+  <h3>Splitting a lesson (class swaps)</h3>
+
+  <p>Click the <strong>⇔</strong> button on a chip to split it into two side-by-side halves. This represents two groups doing different subjects at the same time (e.g. a class swap). The left half keeps the original subject; drag a subject onto the right half to fill it. Each half has its own notes.</p>
+
+  <p>To unsplit, click the <strong>↔</strong> button at the bottom of the split chip.</p>
+
+  <h3>Adding notes to a chip</h3>
+
+  <p>Click the <strong>+</strong> button at the bottom of a chip to expand a notes area. Type your note and press Enter or click away to save. If a note already exists, the textarea is visible by default.</p>
+
+  <h3>Resizing chips (duration)</h3>
+
+  <p>Drag the bottom edge of a chip up or down to change its height. This represents the duration of the activity. The minimum is one unit (roughly 15 minutes). Use this to show that a reading session is shorter than a writing session, for example.</p>
+
+  <h3>Colourable chips (HomeZone)</h3>
+
+  <p>Some intervention chips (like HomeZone) have a larger colour dot with a white border. Click this dot to pick from a palette of subject colours. The chip recolours and renames itself to match — for example, selecting the Writer colour changes it to "HomeZone - Writer".</p>
+
+  <h3>Copy week and clear view</h3>
+
+  <ul>
+    <li><strong>Copy week → next week</strong> — copies the entire current week's schedule into the following week</li>
+    <li><strong>Clear view</strong> — removes all chips from the current view (master or staff) for the current week. A confirmation dialog appears first.</li>
+  </ul>
+
+  <h3>Staff-out spans (PPA, Leadership, etc.)</h3>
+
+  <p>Click the <strong>＋</strong> button next to a day name in the column header to open the staff-out modal. Here you can mark periods when a staff member is out of class:</p>
+  <ul>
+    <li>Enter a label (e.g. PPA, Leadership, Course)</li>
+    <li>Select a start and end session from the dropdowns</li>
+    <li>Optionally add a cover name</li>
+    <li>Pick a colour</li>
+  </ul>
+
+  <p>Staff-out spans appear as coloured vertical strips along the left edge of the day column, with a label badge at the top of the span.</p>
+
+  <h3>Non-school days</h3>
+
+  <p>Days with blocking events (INSET, half term, bank holidays) are pulled from the Google Sheet. These columns are greyed out with a badge showing the event name (e.g. "HALF TERM"). You cannot drop chips into non-school day cells.</p>
+
+  <h3>After-school events</h3>
+
+  <p>The After School row shows events from the Google Sheet automatically. These appear as read-only chips — you cannot edit or remove them. They come from two sources:</p>
+  <ul>
+    <li><strong>One-off events</strong> from the Events tab (e.g. parents evening on a specific date)</li>
+    <li><strong>Recurring events</strong> from the SchoolEvents tab (e.g. club every Thursday)</li>
+  </ul>
+
+  <h3>Staff configuration (⚙ button)</h3>
+
+  <p>Click the <strong>⚙</strong> button in the header to edit staff names and colours for the current year group. Each staff member has a text input for their name and a row of colour swatches. Click Save when done.</p>
+
+  <h3>Subject settings</h3>
+
+  <p>Click <strong>Subject settings</strong> in the top bar to edit subject names and colours per group. Each subject has a text input and a colour picker.</p>
+
+  <h3>Syncing</h3>
+
+  <p>The Learning Schedule syncs with a Google Apps Script endpoint. Any change you make is saved automatically to the cloud. When you open the page or navigate to a new week, it pulls the latest data. If offline, changes are saved locally and sync when you reconnect.</p>
+
+  <div class="note"><strong>Single editor:</strong> Like the other tools, the Learning Schedule is designed for one person to edit at a time per year group. If two people edit simultaneously, the last save wins.</div>
+
+
+  <!-- ── PART 2: RELEASE SCHEDULE ── -->
+
+  <h2>Part 2 &nbsp;·&nbsp; Release Schedule</h2>
+
+  <p>The Release Schedule has two parts: a <strong>viewer</strong> that everyone can check, and a <strong>planner</strong> that the cover manager uses to build the weekly schedule.</p>
+
+  <h3>Release Schedule Viewer</h3>
+
+  <div class="url-box">https://imcl75.github.io/wfa/cover-plan/</div>
+
+  <p>The viewer is a read-only page that shows the current week's cover arrangements. It auto-refreshes every 3 minutes. It has three views:</p>
+
+  <ul>
+    <li><strong>Week view</strong> — a grid of 5 days × 5 sessions (Before School, AM, Lunch, PM, After School) showing cover arrangement cards</li>
+    <li><strong>Today view</strong> — shows only today's arrangements, grouped by session. The tab label shows how many arrangements there are today.</li>
+    <li><strong>My view</strong> — select your name from the dropdown to see a personalised view showing when you are out and when you are covering someone</li>
+  </ul>
+
+  <p>On first use, the viewer asks for the Google Sheet ID. Paste the sheet URL or ID and press Enter. This is saved so you don't need to enter it again.</p>
+
+  <h3>Illness and event banners</h3>
+
+  <p>The viewer automatically shows:</p>
+  <ul>
+    <li>An <strong>orange illness banner</strong> listing staff currently marked as ill (from the Staff tab where Status = "Illness")</li>
+    <li><strong>Coloured event banners</strong> for events in the current week (from the Events tab)</li>
+  </ul>
+
+  <h3>Cover & Release Planner</h3>
+
+  <div class="url-box">https://imcl75.github.io/wfa/cover-plan/planner.html</div>
+
+  <p>The planner is the interactive tool for managing the weekly release schedule. It has three panels:</p>
+
+  <div class="panel-row">
+    <div class="panel-card">
+      <h4>Left panel — Teachers</h4>
+      <p>Class teachers and non-class based staff (SENCO, SLT, Phase Leads). Drag someone from here into the grid to mark them as out.</p>
+    </div>
+    <div class="panel-card">
+      <h4>Centre — The week grid</h4>
+      <p>Five columns (Mon–Fri) and five rows (Before School, AM, Lunch, PM, After School). Each cell shows who is out and who is covering.</p>
+    </div>
+  </div>
+  <div class="panel-row">
+    <div class="panel-card">
+      <h4>Right panel — Cover Staff</h4>
+      <p>Everyone available to provide cover. Drag a cover person onto a TBC slot to assign them.</p>
+    </div>
+    <div class="panel-card">
+      <h4>Today's column</h4>
+      <p>Highlighted in blue so you can see at a glance what is happening today.</p>
+    </div>
+  </div>
+
+  <h3>Adding a release slot</h3>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Find the teacher in the left panel</strong>
+      <p>Class teachers are listed at the top, non-class based staff below the divider.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Drag them into the correct cell</strong>
+      <p>Hold and drag the teacher's card to the session and day. A highlight shows valid drop targets. Release to place the slot.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Check or change the reason</strong>
+      <p>Each slot has a dropdown with the reason (e.g. PPA, ECT1). The planner pre-selects the best reason based on entitlements. Change if needed.</p>
+    </div>
+  </div>
+
+  <div class="note"><strong>Part-time staff:</strong> You cannot drag a teacher into a day they do not work — those days are blocked automatically based on the WorkingDays column in the Staff tab.</div>
+
+  <h3>Assigning cover</h3>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Look for the + TBC box</strong>
+      <p>Any slot without cover shows a pale dashed box marked <em>+ TBC</em>.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Drag a cover person from the right panel onto the TBC box</strong>
+      <p>The box highlights when you hover. Drop to assign. The cover person's name and avatar appear in the slot.</p>
+    </div>
+  </div>
+
+  <h3>Removing a slot or cover</h3>
+
+  <ul>
+    <li>To remove a <strong>release slot entirely</strong> — click the <strong>×</strong> button on the right of the slot card</li>
+    <li>To <strong>unassign cover only</strong> (revert to TBC) — click the small <strong>×</strong> next to the cover person's name</li>
+  </ul>
+
+  <h3>Entitlement pips and the green tick</h3>
+
+  <p>Each teacher card shows small dots (pips) tracking their entitlement usage:</p>
+  <ul>
+    <li><strong>Filled blue pip</strong> — that session is scheduled</li>
+    <li><strong>Empty pip</strong> — still to be scheduled</li>
+    <li><strong>Red pip</strong> — over-allocated (more sessions than entitlement allows)</li>
+    <li><strong>Green ✓ tick</strong> — all entitlements fully scheduled</li>
+  </ul>
+
+  <h3>"Other" reason</h3>
+
+  <p>If you set a slot's reason to <strong>Other</strong>, a small text input appears for you to type what the reason is (e.g. "Dentist appointment"). This is cleared automatically if you change the reason away from Other.</p>
+
+  <h3>Cell notes</h3>
+
+  <p>In Before School, Lunch, and After School rows, empty cells show a <strong>"+ add note"</strong> link. Click it to add a free-text note (e.g. "Staff social"). Notes appear as coloured bars in the cell. Click the <strong>×</strong> to remove a note.</p>
+
+  <h3>Per-day reset</h3>
+
+  <p>Each day column header has a small <strong>×</strong> in the corner (visible when the day has slots). Click it to clear all slots for that day only. A confirmation dialog appears first.</p>
+
+  <h3>Locking the planner</h3>
+
+  <p>The <strong>padlock button</strong> (top right) switches the planner into read-only mode. When locked, slots cannot be moved, added, or removed, and reason dropdowns are disabled. Tap the padlock again to unlock.</p>
+
+  <h3>View tabs</h3>
+
+  <ul>
+    <li><strong>Week</strong> — normal three-panel editing view</li>
+    <li><strong>My view</strong> — filtered personal schedule showing when you are out and when you are covering</li>
+    <li><strong>Present</strong> — full-width grid (side panels hidden) for screen sharing</li>
+  </ul>
+
+  <h3>School event banners</h3>
+
+  <p>Coloured banners in cells come from the SchoolEvents tab and are informational only. They appear every week automatically.</p>
+
+  <h3>Navigating weeks</h3>
+
+  <p>Use <strong>← Previous</strong> and <strong>Next →</strong> to move between weeks. When you navigate to a week that hasn't been set up, it auto-fills from the Recurring tab.</p>
+
+  <h3>Copy to next week / Reset week</h3>
+
+  <ul>
+    <li><strong>Copy → next week</strong> — copies the entire current week (including cover assignments) into the following week</li>
+    <li><strong>Reset week</strong> — clears all manual changes and restores only the recurring slots</li>
+  </ul>
+
+  <div class="note"><strong>Reset is permanent</strong> — any cover assignments or one-off slots for that week will be lost. You cannot undo a reset.</div>
+
+  <h3>Google Apps Script menu</h3>
+
+  <p>The Google Sheet has a custom menu called <strong>Release Schedule</strong> with three options:</p>
+  <ul>
+    <li><strong>Generate Term Schedule</strong> — creates Plan rows for an entire term by combining the Recurring tab with the Weeks tab</li>
+    <li><strong>Regenerate from Week…</strong> — deletes auto-generated rows from a specified week onwards and re-generates them. Manually added rows are preserved.</li>
+    <li><strong>Publish & Notify Staff</strong> — sends an HTML email to staff with a summary of today's cover arrangements and a link to the viewer</li>
+  </ul>
+
+
+  <!-- ── PART 3: FAB ROTA ── -->
+
+  <h2>Part 3 &nbsp;·&nbsp; FAB Rota</h2>
+
+  <p>The FAB (Fresh Air Break) Rota assigns staff to break duty zones each week. It has two sections: <strong>Lower school</strong> (Y1–Y3, break at 10:30–10:45, no zone breakdown) and <strong>Upper school</strong> (Y4–Y6, break at 10:45–11:00, with four zones: MUGA, Garden Room, Hard Standing, Trim Trail).</p>
+
+  <div class="url-box">https://imcl75.github.io/wfa/fab-rota/</div>
+
+  <h3>Assigning staff to a zone</h3>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Find the staff member in the left panel</strong>
+      <p>Each person shows as a colour-coded chip with their initials, name, and a count badge showing how many slots they have this week.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Drag them into a zone/day cell</strong>
+      <p>Hold and drag the chip to the target cell. The cell highlights with a dashed blue outline. Release to assign. Duplicate assignments (same person, same cell) are prevented.</p>
+    </div>
+  </div>
+
+  <h3>Removing an assignment</h3>
+
+  <p>Click the <strong>×</strong> button on a staff chip within a grid cell to remove that person from that slot.</p>
+
+  <h3>Assignment count badge</h3>
+
+  <p>Each staff chip in the left panel shows a badge like "3×" indicating how many slots they are assigned to this week. If zero, no badge is shown.</p>
+
+  <h3>Week navigation</h3>
+
+  <p>Use the <strong>&lt;</strong> and <strong>&gt;</strong> arrows to move between weeks. Click <strong>This week</strong> to jump back to the current week.</p>
+
+  <h3>Copy to next week</h3>
+
+  <p>Click <strong>Copy → next week</strong> to copy the current week's assignments into the following week. If the next week already has assignments, a confirmation dialog appears.</p>
+
+  <h3>Term rota (set and reset)</h3>
+
+  <ul>
+    <li><strong>Set as term rota</strong> — saves the current week as the default template. Any week that has never been edited will auto-fill from this template.</li>
+    <li><strong>Reset to term rota</strong> — replaces the current week with a copy of the term template. If no template is set, it clears all assignments.</li>
+  </ul>
+
+  <div class="tip">Set the term rota once at the start of term, then you only need to tweak individual weeks when staff are absent.</div>
+
+  <h3>Editing the staff list</h3>
+
+  <p>Click <strong>"+ Edit staff list"</strong> at the bottom of the left panel to open the staff editor. Here you can:</p>
+  <ul>
+    <li>Edit names and initials</li>
+    <li>Click the colour dot to cycle through 5 colours</li>
+    <li>Remove staff with the <strong>×</strong> button</li>
+    <li>Add temporary staff by typing a name at the bottom</li>
+  </ul>
+
+  <p>Staff loaded from the Google Sheet appear first. Any temporary staff you add are saved alongside them.</p>
+
+  <h3>Syncing</h3>
+
+  <p>The FAB Rota syncs with a Google Apps Script endpoint. Changes are saved automatically. On page load, the latest data is pulled from the cloud. If offline, changes are saved locally and sync when you reconnect.</p>
+
+
+  <!-- ── PART 4: GOOGLE SHEET REFERENCE ── -->
+
+  <h2>Part 4 &nbsp;·&nbsp; Google Sheet Reference</h2>
+
+  <p>All three tools read from the same shared Google Sheet. Below is a complete reference of every tab and which tools use it.</p>
+
+  <h3>Which tabs each tool uses</h3>
+
+  <table>
+    <tr><th>Tab</th><th>Learning Schedule</th><th>Release Schedule</th><th>FAB Rota</th></tr>
+    <tr><td><strong>Staff</strong></td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+    <tr><td><strong>Terms</strong></td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+    <tr><td><strong>Events</strong></td><td>Yes</td><td>Yes</td><td>—</td></tr>
+    <tr><td><strong>SchoolEvents</strong></td><td>Yes</td><td>Yes</td><td>—</td></tr>
+    <tr><td><strong>SubjectGroups</strong></td><td>Yes</td><td>—</td><td>—</td></tr>
+    <tr><td><strong>Interventions</strong></td><td>Yes</td><td>—</td><td>—</td></tr>
+    <tr><td><strong>DayStructure</strong></td><td>Yes</td><td>—</td><td>—</td></tr>
+    <tr><td><strong>Recurring</strong></td><td>—</td><td>Yes</td><td>—</td></tr>
+    <tr><td><strong>Plan</strong></td><td>—</td><td>Yes</td><td>—</td></tr>
+    <tr><td><strong>Weeks</strong></td><td>—</td><td>Yes (viewer)</td><td>—</td></tr>
+  </table>
+
+  <h3>Staff tab — column reference</h3>
+
+  <table>
+    <tr><th>Column</th><th>Used by</th><th>Notes</th></tr>
+    <tr><td><strong>Name</strong></td><td>All</td><td>Full name. Must match exactly across all tabs.</td></tr>
+    <tr><td><strong>Role</strong></td><td>All</td><td>Controls which panel the person appears in (Release Schedule) and whether they get a staff view tab (Learning Schedule).</td></tr>
+    <tr><td><strong>YearGroup</strong></td><td>All</td><td>Comma-separated for shared staff (e.g. <code>1,2,3</code>). Leave blank for non-class staff. For the Learning Schedule, blank means unassigned (excluded from year groups).</td></tr>
+    <tr><td><strong>Order</strong></td><td>All</td><td>Display order. Lower numbers appear first.</td></tr>
+    <tr><td><strong>WorkingDays</strong></td><td>Release</td><td>Comma-separated day numbers: <code>1</code>=Mon through <code>5</code>=Fri. Blank = full time.</td></tr>
+    <tr><td><strong>Ent1–Ent4</strong></td><td>Release</td><td>Entitlement names (e.g. PPA, ECT1).</td></tr>
+    <tr><td><strong>Ent1Sessions–Ent4Sessions</strong></td><td>Release</td><td>Number of sessions per week (or per fortnight).</td></tr>
+    <tr><td><strong>Ent1Freq–Ent4Freq</strong></td><td>Release</td><td><code>weekly</code> or <code>fortnightly</code>. Blank = weekly.</td></tr>
+    <tr><td><strong>CoverRole</strong></td><td>Release</td><td>Role title for cover staff. If set, person appears in the right panel.</td></tr>
+    <tr><td><strong>Initials</strong></td><td>Release, FAB</td><td>2–3 letter initials for avatars.</td></tr>
+    <tr><td><strong>Colour</strong></td><td>Release, FAB</td><td>Hex colour code (e.g. <code>#e879f9</code>).</td></tr>
+    <tr><td><strong>Status</strong></td><td>Release (viewer)</td><td>Set to <code>Illness</code> to show the illness banner.</td></tr>
+  </table>
+
+  <h3>Terms tab — column reference</h3>
+
+  <table>
+    <tr><th>Column</th><th>Notes</th></tr>
+    <tr><td><strong>StartDate</strong></td><td>The Monday of each teaching week, as DD/MM/YYYY.</td></tr>
+    <tr><td><strong>Term</strong></td><td>Term number (1–6).</td></tr>
+    <tr><td><strong>Week</strong></td><td>Week number within that term.</td></tr>
+  </table>
+
+  <div class="tip">Populate the full year's teaching weeks at the start of the year. Half terms and holidays should be absent — do not add rows for non-teaching weeks.</div>
+
+  <h3>Events tab — column reference</h3>
+
+  <table>
+    <tr><th>Column</th><th>Used by</th><th>Notes</th></tr>
+    <tr><td><strong>StartDate</strong></td><td>Both</td><td>Start date as DD/MM/YYYY. For multi-day events, also set EndDate.</td></tr>
+    <tr><td><strong>EndDate</strong></td><td>Learning</td><td>End date for multi-day events.</td></tr>
+    <tr><td><strong>Session</strong></td><td>Both</td><td>For after-school events: <code>After School</code>. For session-specific banners in the planner.</td></tr>
+    <tr><td><strong>Type</strong></td><td>Both</td><td>Blocking types: <code>Half Term</code>, <code>INSET 1</code>–<code>INSET 5</code>, <code>Bank Holiday</code>, <code>Christmas</code>, <code>Easter</code>, <code>Summer Holiday</code>, <code>CLF Conference</code>. These grey out the day.</td></tr>
+    <tr><td><strong>Label</strong></td><td>Both</td><td>Text shown on the banner or badge.</td></tr>
+    <tr><td><strong>Colour</strong></td><td>Both</td><td>Hex colour for event banners.</td></tr>
+    <tr><td><strong>Day</strong></td><td>Learning</td><td>Day of the week for recurring after-school events.</td></tr>
+  </table>
+
+  <h3>SchoolEvents tab — column reference</h3>
+
+  <table>
+    <tr><th>Column</th><th>Notes</th></tr>
+    <tr><td><strong>Session</strong></td><td>Must be exactly one of: <code>After School</code> (for Learning Schedule) or <code>Before School</code>, <code>AM</code>, <code>Lunch</code>, <code>PM</code>, <code>After School</code> (for Release Schedule).</td></tr>
+    <tr><td><strong>Day</strong></td><td>Day of the week — <code>Monday</code> through <code>Friday</code>.</td></tr>
+    <tr><td><strong>Label</strong></td><td>The text shown in the banner.</td></tr>
+    <tr><td><strong>Colour</strong></td><td>Hex colour code. Leave blank for the default.</td></tr>
+  </table>
+
+  <h3>SubjectGroups tab — column reference</h3>
+
+  <table>
+    <tr><th>Column</th><th>Notes</th></tr>
+    <tr><td><strong>YearGroup</strong></td><td>Leave blank for universal (all year groups). Comma-separated for specific groups (e.g. <code>4,5,6</code>). Specific rows override universal rows with the same Group+Subject.</td></tr>
+    <tr><td><strong>Group</strong></td><td>Category name (e.g. Enquiry, Maths, Reading). Leave blank for no heading.</td></tr>
+    <tr><td><strong>Subject</strong></td><td>Subject name (e.g. Writer, Mathematician).</td></tr>
+    <tr><td><strong>Colour</strong></td><td>Hex colour code. Colours should be consistent across year groups.</td></tr>
+    <tr><td><strong>Order</strong></td><td>Sort order within the group.</td></tr>
+  </table>
+
+  <h3>Interventions tab — column reference</h3>
+
+  <table>
+    <tr><th>Column</th><th>Notes</th></tr>
+    <tr><td><strong>YearGroup</strong></td><td>Same pattern as SubjectGroups — blank = universal.</td></tr>
+    <tr><td><strong>Group</strong></td><td>Category name (e.g. Reader, Well-Being).</td></tr>
+    <tr><td><strong>Activity</strong></td><td>Activity name (e.g. "1 to 1 reading", "Phonics").</td></tr>
+    <tr><td><strong>Colour</strong></td><td>Hex colour code.</td></tr>
+    <tr><td><strong>Order</strong></td><td>Sort order within the group.</td></tr>
+    <tr><td><strong>Colourable</strong></td><td>Set to <code>true</code> to make this chip's colour dot clickable (e.g. HomeZone).</td></tr>
+  </table>
+
+  <h3>DayStructure tab — column reference</h3>
+
+  <table>
+    <tr><th>Column</th><th>Notes</th></tr>
+    <tr><td><strong>YearGroup</strong></td><td>Leave blank for universal rows (e.g. Morning Reg, Story Time). Comma-separated for specific groups. Specific rows override universal rows with the same ID.</td></tr>
+    <tr><td><strong>ID</strong></td><td>Short identifier used as a data key. Must be consistent across year groups: <code>reg-am</code>, <code>s1</code>, <code>fab</code>, <code>s2</code>, <code>wash</code>, <code>lunch</code>, <code>reg-pm</code>, <code>s3</code>, <code>story</code>, <code>home</code>, <code>after</code>.</td></tr>
+    <tr><td><strong>Type</strong></td><td>Either <code>fixed</code> (non-droppable, e.g. FAB, Lunch) or <code>session</code> (droppable, e.g. Session 1, 2, 3).</td></tr>
+    <tr><td><strong>Label</strong></td><td>Display text (e.g. "Session 1", "Fresh Air Break").</td></tr>
+    <tr><td><strong>Time</strong></td><td>Time range string (e.g. "09:00-10:45"). Leave blank for rows with no displayed time.</td></tr>
+    <tr><td><strong>Class</strong></td><td>CSS class for styling: <code>fab-row</code> for FAB and lunch, <code>story-row</code> for Story Time.</td></tr>
+    <tr><td><strong>Order</strong></td><td>Numeric sort order. Determines the row sequence.</td></tr>
+    <tr><td><strong>HideTime</strong></td><td>Set to <code>true</code> to suppress the time display (e.g. for Wash Hands, PM Registration).</td></tr>
+  </table>
+
+  <div class="note"><strong>Important:</strong> IDs must be short identifiers, not display labels. Use <code>s3</code> not "Session 3". The label column handles the display name.</div>
+
+  <h3>Recurring tab — column reference</h3>
+
+  <table>
+    <tr><th>Column</th><th>Notes</th></tr>
+    <tr><td><strong>Teacher</strong></td><td>Staff name (must match Staff tab) or year group code (<code>Y1</code>–<code>Y6</code>, <code>Reception</code>) to apply to all class teachers in that year group.</td></tr>
+    <tr><td><strong>Day</strong></td><td>Must be exactly <code>Monday</code> through <code>Friday</code>.</td></tr>
+    <tr><td><strong>Session</strong></td><td>Must be exactly one of: <code>Before School</code>, <code>AM</code>, <code>Lunch</code>, <code>PM</code>, <code>After School</code>.</td></tr>
+    <tr><td><strong>Reason</strong></td><td>Release reason (e.g. PPA, ECT1, RA).</td></tr>
+  </table>
+
+
+  <!-- ── PART 5: SYNCING ── -->
+
+  <div class="part-divider"><span>Cross-device</span></div>
+
+  <h2>Part 5 &nbsp;·&nbsp; Using on multiple devices</h2>
+
+  <p>All three tools sync via Google Apps Script endpoints. Changes are saved automatically within a second or two. Other devices do not update live — refresh the page to see the latest version. If offline, changes are saved locally and sync when you reconnect.</p>
+
+  <div class="tip">A good habit: if you've been making changes on a laptop, refresh the page on the iPad before handing it to someone else — that way they see your latest version.</div>
+
+  <div class="note"><strong>Single editor:</strong> All three tools are designed for one person to manage at a time. If two people make changes simultaneously, the last save wins. Agree who is managing each tool for the week.</div>
+
+
+  <!-- ── PART 6: COMMON TASKS ── -->
+
+  <div class="part-divider"><span>Common tasks</span></div>
+
+  <h2>Part 6 &nbsp;·&nbsp; Common tasks</h2>
+
+  <h3>Adding a new member of staff</h3>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Add a row in the Staff tab</strong>
+      <p>Fill in Name, Role, YearGroup, WorkingDays (if part-time), and any entitlements. If they provide cover, add CoverRole, Initials, and Colour.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Refresh each tool</strong>
+      <p>The new person will appear in the relevant panels across all tools.</p>
+    </div>
+  </div>
+
+  <h3>Adding a new year group to the Learning Schedule</h3>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Add staff rows with the new YearGroup</strong>
+      <p>Set YearGroup to the new year group code (e.g. <code>Y5</code>).</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Add SubjectGroups rows</strong>
+      <p>Leave YearGroup blank for universal subjects, or add year-group-specific rows.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Add DayStructure rows</strong>
+      <p>Add year-group-specific rows for FAB, lunch, sessions, and wash with the correct times. Add universal rows for Morning Reg, Story Time, etc. (leave YearGroup blank).</p>
+    </div>
+  </div>
+
+  <h3>Blocking out an INSET day or bank holiday</h3>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Add a row to the Events tab</strong>
+      <p>Enter the date, label (e.g. <em>INSET Day</em>), and type (<code>Half Term</code>, <code>Bank Holiday</code>, <code>INSET 1</code>, etc.).</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Refresh each tool</strong>
+      <p>The day will be greyed out in the Learning Schedule and the Release Schedule. No slots or chips can be added.</p>
+    </div>
+  </div>
+
+  <h3>Changing FAB or lunch times for a year group</h3>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Update the DayStructure tab</strong>
+      <p>Edit the Time column for the relevant YearGroup rows (e.g. change FAB from <code>10:30-10:45</code> to <code>10:45-11:00</code>).</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Refresh the Learning Schedule</strong>
+      <p>Switch to the affected year group and verify the updated times appear.</p>
+    </div>
+  </div>
+
+  <h3>Setting up the FAB rota for a new term</h3>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Build the first week's rota</strong>
+      <p>Drag staff into the correct zone/day cells for the first week.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Click "Set as term rota"</strong>
+      <p>This saves the layout as the default template. New weeks will auto-fill from this.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Use "Copy → next week" for subsequent weeks</strong>
+      <p>Copy the template forward and make adjustments for absences.</p>
+    </div>
+  </div>
+
+  <footer>
+    Wallscourt Farm Academy &nbsp;·&nbsp; Scheduling Tools User Guide &nbsp;·&nbsp; April 2026
+  </footer>
+
+</div>
+</body>
+</html>
