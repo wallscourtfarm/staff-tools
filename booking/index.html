@@ -343,7 +343,6 @@
           <select id="bookingRecurring" style="width:100%;border:1px solid #e2e8f0;border-radius:5px;padding:8px;font-size:13px;font-family:Arial,sans-serif">
             <option value="">One-time only</option>
             <option value="weekly">Every week this term</option>
-            <option value="consecutive">Consecutive days</option>
           </select>
         </div>
         <div id="bookingRecurringOpts" style="display:none;margin-bottom:12px">
@@ -351,11 +350,7 @@
             <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">Until week</label>
             <select id="bookingUntil" style="width:100%;border:1px solid #e2e8f0;border-radius:5px;padding:8px;font-size:13px;font-family:Arial,sans-serif"></select>
           </div>
-          <div id="bookingDaysRow" style="display:none">
-            <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">Number of days</label>
-            <input type="number" id="bookingDays" min="2" max="5" value="2" style="width:80px;border:1px solid #e2e8f0;border-radius:5px;padding:8px;font-size:13px;font-family:Arial,sans-serif">
-          </div>
-          <div id="bookingWeekdaysRow" style="display:none;margin-top:12px">
+          <div id="bookingWeekdaysRow" style="margin-top:12px">
             <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px">Also book on</label>
             <div id="bookingWeekdays" style="display:flex;flex-wrap:wrap;gap:4px">
               <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;font-size:12px"><input type="checkbox" name="weekdays" value="monday" style="margin:0">Mon</label>
@@ -1431,7 +1426,6 @@ function openBookingModal(day, startTime) {
   document.getElementById('bookingPurpose').value = '';
   document.getElementById('bookingRecurring').value = '';
   document.getElementById('bookingUntilRow').style.display = 'none';
-  document.getElementById('bookingDaysRow').style.display = 'none';
   document.getElementById('bookingWeekdaysRow').style.display = 'none';
   document.getElementById('bookingRecurringOpts').style.display = 'none';
   document.getElementById('bookingConflict').style.display = 'none';
@@ -1483,7 +1477,6 @@ function openEditBookingModal(day, bookingId) {
   document.getElementById('bookingRecurring').value = '';
   document.getElementById('bookingRecurringOpts').style.display = 'none';
   document.getElementById('bookingUntilRow').style.display = 'none';
-  document.getElementById('bookingDaysRow').style.display = 'none';
 
   // Update quantity field visibility
   updateQuantityField();
@@ -1537,21 +1530,14 @@ function closeBookingModal() {
 document.getElementById('bookingRecurring').addEventListener('change', function() {
   const opts = document.getElementById('bookingRecurringOpts');
   const untilRow = document.getElementById('bookingUntilRow');
-  const daysRow = document.getElementById('bookingDaysRow');
   const weekdaysRow = document.getElementById('bookingWeekdaysRow');
   if (this.value === 'weekly') {
     opts.style.display = 'block';
     untilRow.style.display = 'block';
-    daysRow.style.display = 'none';
     weekdaysRow.style.display = 'block';
     // Pre-check the current day
     const currentDayCheck = document.querySelector(`#bookingWeekdays input[value="${_bookingDay}"]`);
     if (currentDayCheck) currentDayCheck.checked = true;
-  } else if (this.value === 'consecutive') {
-    opts.style.display = 'block';
-    untilRow.style.display = 'none';
-    daysRow.style.display = 'block';
-    weekdaysRow.style.display = 'none';
   } else {
     opts.style.display = 'none';
     weekdaysRow.style.display = 'none';
@@ -1596,7 +1582,6 @@ function saveBooking() {
   const purpose = document.getElementById('bookingPurpose').value.trim();
   const recurring = document.getElementById('bookingRecurring').value;
   const untilWeek = document.getElementById('bookingUntil').value;
-  const days = parseInt(document.getElementById('bookingDays').value) || 2;
   const startTime = document.getElementById('bookingStart').value;
   const endTime = document.getElementById('bookingEnd').value;
 
@@ -1697,28 +1682,6 @@ function saveBooking() {
       saveBookingsLocal();
       syncSaveAll();
     }
-  } else if (recurring === 'consecutive' && days > 1) {
-    // Handle consecutive school days, skipping weekends
-    const dayIdx = DAYS.findIndex(d => d.toLowerCase() === _bookingDay);
-    let currentWeekIdx = state.weekIdx;
-    let currentDayIdx = dayIdx;
-
-    for (let i = 1; i < days; i++) {
-      // Move to next school day
-      currentDayIdx++;
-      if (currentDayIdx >= 5) {
-        // Wrap to next week (Monday)
-        currentDayIdx = 0;
-        currentWeekIdx++;
-        if (currentWeekIdx >= WEEKS.length) break; // No more weeks
-      }
-
-      const weekKey = WEEKS[currentWeekIdx]?.key || schedKey();
-      const bs = getBookings(weekKey, DAYS[currentDayIdx].toLowerCase());
-      bs.push({ ...booking, id: 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8), groupId: 'bg_' + Date.now() + '_' + i });
-    }
-    saveBookingsLocal();
-    syncSaveAll();
   }
 
   closeBookingModal();
