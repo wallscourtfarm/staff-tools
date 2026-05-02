@@ -1489,7 +1489,12 @@ function renderBody() {
           }).join('');
           const soTags = soList.filter(s => s.isFirst).map(s => `<div class="staff-out-tag" style="background:${s.colour}">${escHtml(s.label)}${s.cover ? `<span class="staff-out-cover"> · ${escHtml(s.cover)}</span>` : ''}</div>`).join('');
           const pad = soList.length ? `margin-left:${soList.length * 5 + 3}px;` : '';
-          return `<td class="view-cell">${strips}${soTags}<div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div></td>`;
+          // TP activities for fixed rows (lunch, FAB, etc.)
+          const staffMember = (view !== 'master') ? STAFF.find(s => s.id === view) : null;
+          const staffName = staffMember ? staffMember.name : '';
+          const tpActs = (view !== 'master') ? getTPActivities(staffName, di + 1).filter(a => activityMatchesSession(a, row.id, row)) : [];
+          const tpActHtml = tpActs.map(a => renderTPActivityChip(a)).join('');
+          return `<td class="view-cell">${strips}${soTags}${tpActHtml}<div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div></td>`;
         }).join('')}
       </tr>`;
     } else {
