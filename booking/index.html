@@ -380,6 +380,19 @@
   <!-- Drag placeholder for moving bookings -->
   <div id="dragPlaceholder" class="drag-placeholder" style="display:none"></div>
 
+  <!-- Delete options modal -->
+  <div class="modal-bg" id="deleteModal">
+    <div class="modal" style="min-width:280px;max-width:320px">
+      <h3>Delete Booking</h3>
+      <p class="modal-hint">Remove this booking from one day or the entire series?</p>
+      <div class="modal-footer" style="flex-direction:column;gap:8px;align-items:stretch">
+        <button class="modal-save" onclick="deleteSingleBooking()" style="width:100%">Delete this day only</button>
+        <button style="width:100%;background:#dc2626;border:none;border-radius:5px;padding:8px 16px;font-size:13px;cursor:pointer;color:white;font-weight:700" onclick="deleteEntireSeries()">Delete entire series</button>
+        <button class="modal-cancel" onclick="closeDeleteModal()" style="width:100%">Cancel</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 // ── Config ──────────────────────────────────────────────────────────────────
 const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
@@ -1324,7 +1337,7 @@ function renderBookingsOverlay() {
       bar.innerHTML = `
         <div class="booking-bar-inner"><strong>${ygDisplay}</strong>${escHtml(b.resourceName || b.resourceId)}${b.quantity > 1 ? ' ×' + b.quantity : ''}</div>
         <div class="booking-bar-time">${b.startTime}–${b.endTime}</div>
-        <button class="booking-bar-del" onclick="event.stopPropagation();deleteBookingGroup('${b.groupId || b.id}')" title="Remove">×</button>
+        <button class="booking-bar-del" onclick="event.stopPropagation();showDeleteOptions(event, '${b.id}', '${b.groupId || b.id}', '${day}')" title="Remove">×</button>
       `;
       // Click to edit (but not if dragging)
       bar.addEventListener('click', (e) => {
@@ -1712,6 +1725,46 @@ function deleteBookingGroup(groupId) {
   saveBookingsLocal();
   syncSave();
   renderGrid();
+}
+
+// Delete options modal state
+let _deleteBookingId = null;
+let _deleteGroupId = null;
+let _deleteDay = null;
+
+function showDeleteOptions(event, bookingId, groupId, day) {
+  event.stopPropagation();
+  _deleteBookingId = bookingId;
+  _deleteGroupId = groupId;
+  _deleteDay = day;
+  document.getElementById('deleteModal').classList.add('open');
+}
+
+function closeDeleteModal() {
+  document.getElementById('deleteModal').classList.remove('open');
+  _deleteBookingId = null;
+  _deleteGroupId = null;
+  _deleteDay = null;
+}
+
+function deleteSingleBooking() {
+  if (!_deleteBookingId || !_deleteDay) return;
+  const weekKey = schedKey();
+  const bookings = getBookings(weekKey, _deleteDay);
+  const idx = bookings.findIndex(b => b.id === _deleteBookingId);
+  if (idx !== -1) {
+    bookings.splice(idx, 1);
+    saveBookingsLocal();
+    syncSave();
+    renderGrid();
+  }
+  closeDeleteModal();
+}
+
+function deleteEntireSeries() {
+  if (!_deleteGroupId) return;
+  deleteBookingGroup(_deleteGroupId);
+  closeDeleteModal();
 }
 
 // ── Utility ──────────────────────────────────────────────────────────────────
