@@ -1641,26 +1641,27 @@ function saveBooking() {
   syncSave();
 
   if (recurring === 'weekly' && untilWeek) {
-    // Get selected weekdays
+    // Get selected weekdays, excluding the current day (already booked above)
     const selectedDays = Array.from(document.querySelectorAll('#bookingWeekdays input[type="checkbox"]:checked'))
-      .map(cb => cb.value);
+      .map(cb => cb.value)
+      .filter(day => day !== _bookingDay);
 
-    // If no additional days selected, just use the current day
-    const daysToBook = selectedDays.length > 0 ? selectedDays : [_bookingDay];
-
-    const startIdx = state.weekIdx;
-    const endIdx = WEEKS.findIndex(w => w.key === untilWeek);
-    if (endIdx >= startIdx) {
-      // Use a shared groupId prefix for all bookings in this series
-      const groupPrefix = 'bg_' + Date.now() + '_';
-      for (let i = startIdx; i <= endIdx; i++) {
-        for (const day of daysToBook) {
-          const bs = getBookings(WEEKS[i].key, day);
-          bs.push({ ...booking, id: 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8), groupId: groupPrefix + i + '_' + day });
+    // Only proceed if there are additional days to book
+    if (selectedDays.length > 0) {
+      const startIdx = state.weekIdx;
+      const endIdx = WEEKS.findIndex(w => w.key === untilWeek);
+      if (endIdx >= startIdx) {
+        // Use a shared groupId prefix for all bookings in this series (matching the original booking's groupId)
+        const groupPrefix = booking.groupId + '_';
+        for (let i = startIdx; i <= endIdx; i++) {
+          for (const day of selectedDays) {
+            const bs = getBookings(WEEKS[i].key, day);
+            bs.push({ ...booking, id: 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8), groupId: groupPrefix + i + '_' + day });
+          }
         }
+        saveBookingsLocal();
+        syncSave();
       }
-      saveBookingsLocal();
-      syncSave();
     }
   } else if (recurring === 'consecutive' && days > 1) {
     // Handle consecutive school days, skipping weekends
