@@ -301,6 +301,18 @@
       font-weight: 600; font-size: 10px;
       color: rgba(255,255,255,.85);
     }
+
+    /* ── TP Activities (fixed from sheet) ─────────────────────────── */
+    .tp-activity {
+      cursor: default;
+      opacity: 0.85;
+    }
+    .tp-activity .chip-handle,
+    .tp-activity .chip-split,
+    .tp-activity .chip-del,
+    .tp-activity .chip-note-toggle {
+      display: none;
+    }
     .day-hd-add {
       display: inline-block; font-size: 13px; font-weight: 800;
       color: var(--brand); cursor: pointer; margin-left: 4px; line-height: 1;
@@ -622,6 +634,7 @@ let ALL_SHEET_STAFF = [];
 let SHEET_SUBJECT_GROUPS = [];
 let SHEET_INTERVENTIONS = [];
 let SHEET_DAY_STRUCTURES = [];
+let TP_ACTIVITIES = [];
 
 // Flat lookup: name → col
 const SUBJECT_COL = {};
@@ -1011,6 +1024,77 @@ function rebuildSubjectCol() {
   SUBJECTS.forEach(g => g.subjects.forEach(s => { SUBJECT_COL[s.name] = s.col; }));
   SUBJECT_GROUPS.forEach(g => g.subjects.forEach(s => { if (!SUBJECT_COL[s.name]) SUBJECT_COL[s.name] = s.col; }));
   INTERVENTIONS.forEach(g => g.subjects.forEach(s => { if (!SUBJECT_COL[s.name]) SUBJECT_COL[s.name] = s.col; }));
+}
+
+// ── TPActivities helpers ───────────────────────────────────────────────────────
+const DAY_ABBREVS = { mon:1, m:1, tue:2, tues:2, tu:2, wed:3, w:3, thu:4, thur:4, th:4, fri:5, f:5 };
+
+function parseDayRange(dayStr) {
+  const str = (dayStr || '').trim().toLowerCase();
+  const days = new Set();
+  // Split by comma first
+  const parts = str.split(',');
+  for (const part of parts) {
+    const p = part.trim();
+    // Check for range (M-F, Mon-Fri)
+    const rangeMatch = p.match(/^([a-z]+)\s*[-–]\s*([a-z]+)$/);
+    if (rangeMatch) {
+      const start = DAY_ABBREVS[rangeMatch[1]];
+      const end = DAY_ABBREVS[rangeMatch[2]];
+      if (start && end) {
+        for (let d = Math.min(start, end); d <= Math.max(start, end); d++) days.add(d);
+      }
+    } else {
+      const d = DAY_ABBREVS[p];
+      if (d) days.add(d);
+    }
+  }
+  return [...days].sort((a, b) => a - b);
+}
+
+function getTPActivities(staffName, dayIndex) {
+  // dayIndex: 1=Mon, 2=Tue, ... 5=Fri
+  if (!TP_ACTIVITIES.length) return [];
+  return TP_ACTIVITIES.filter(row => {
+    const name = (row.Staff || '').trim();
+    if (name !== staffName) return false;
+    const days = parseDayRange(row.Day);
+    return days.includes(dayIndex);
+  }).map(row => ({
+    name: (row.Activity || '').trim(),
+    session: (row.Session || '').trim(),
+    colour: (row.Colour || '#64748b').trim()
+  }));
+}
+
+function activityMatchesSession(activity, rowId, rowData) {
+  // Match by session ID (lunch, after, s1, s2, s3)
+  const sessId = activity.session.toLowerCase();
+  if (sessId === rowId || sessId === rowData.id) return true;
+
+  // Match by time range
+  const timeMatch = sessId.match(/^(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})$/);
+  if (timeMatch && rowData.time) {
+    const actStart = parseInt(timeMatch[1]) * 60 + parseInt(timeMatch[2]);
+    const actEnd = parseInt(timeMatch[3]) * 60 + parseInt(timeMatch[4]);
+    const rowMatch = rowData.time.match(/^(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})$/);
+    if (rowMatch) {
+      const rowStart = parseInt(rowMatch[1]) * 60 + parseInt(rowMatch[2]);
+      const rowEnd = parseInt(rowMatch[3]) * 60 + parseInt(rowMatch[4]);
+      // Activity overlaps with session
+      return actStart < rowEnd && actEnd > rowStart;
+    }
+  }
+  return false;
+}
+
+function renderTPActivityChip(activity) {
+  return `<div class="cell-chip tp-activity" style="background:${activity.colour}20;border:1.5px dashed ${activity.colour}" data-tp-activity="true">
+    <div class="chip-top">
+      <span class="chip-colour" style="background:${activity.colour}"></span>
+      <span class="chip-name" style="color:${activity.colour}">${escHtml(activity.name)}</span>
+    </div>
+  </div>`;
 }
 
 // ── Update title and UI ────────────────────────────────────────────────────────
@@ -1437,11 +1521,15 @@ function renderBody() {
           const cellCls = `view-cell${n ? ' non-school-day' : ''}`;
           const overlay = n && row.id === firstSessionId ? `<div class="non-school-overlay"><span class="non-school-badge">${escHtml(n.label)}</span></div>` : '';
 
+          // Get TP activities for this staff member and day
+          const tpActs = isStaffView ? getTPActivities(view, di + 1).filter(a => activityMatchesSession(a, row.id, row)) : [];
+          const tpActHtml = tpActs.map(a => renderTPActivityChip(a)).join('');
+
           // Build cell content
           let cellContent;
           if (isStaffView && !row.afterSchool) {
-            cellContent = afterEvents;
-            if (ownItems.length === 0 && !afterEvents && !n) cellContent = '<div class="drop-hint">drop here</div>';
+            cellContent = afterEvents + tpActHtml;
+            if (ownItems.length === 0 && !afterEvents && !tpActs.length && !n) cellContent = '<div class="drop-hint">drop here</div>';
             else cellContent += renderStaffCell(ownItems, wk, view, day, row.id);
           } else {
             cellContent = afterEvents;
@@ -2346,7 +2434,7 @@ async function init() {
   renderGrid();
 
   try {
-    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText] = await Promise.all([
+    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText, tpActivitiesText] = await Promise.all([
       fetch(SHEET_BASE + encodeURIComponent('Terms')).then(r => { if (!r.ok) throw new Error('Terms tab not found'); return r.text(); }),
       fetch(SHEET_BASE + encodeURIComponent('Events')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('SchoolEvents')).then(r => r.ok ? r.text() : '').catch(() => ''),
@@ -2354,6 +2442,7 @@ async function init() {
       fetch(SHEET_BASE + encodeURIComponent('SubjectGroups')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('Interventions')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('DayStructure')).then(r => r.ok ? r.text() : '').catch(() => ''),
+      fetch(SHEET_BASE + encodeURIComponent('TPActivities')).then(r => r.ok ? r.text() : '').catch(() => ''),
     ]);
     WEEKS = buildWeeks(csvToObjects(termsText));
     if (eventsText) {
@@ -2406,6 +2495,11 @@ async function init() {
       const dsRows = csvToObjects(dayStructureText);
       SHEET_DAY_STRUCTURES = dsRows;
       ROWS = buildDayStructure(dsRows, YEAR_GROUP);
+    }
+
+    // NEW: TPActivities tab
+    if (tpActivitiesText) {
+      TP_ACTIVITIES = csvToObjects(tpActivitiesText);
     }
 
     migrateScheduleKeys();
