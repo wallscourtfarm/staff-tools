@@ -716,6 +716,26 @@ async function syncSave() {
   }
 }
 
+async function syncSaveAll() {
+  // Save all weeks that have bookings to the server
+  if (!SYNC_URL) return;
+  try {
+    const weekKeys = Object.keys(state.bookings).filter(k => state.bookings[k] && Object.keys(state.bookings[k]).length > 0);
+    for (const weekKey of weekKeys) {
+      await fetch(SYNC_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'saveBookings', weekKey: weekKey, bookings: state.bookings[weekKey] || {} }),
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    }
+    document.getElementById('sheetStatus').textContent = '● Synced';
+    document.getElementById('sheetStatus').className = 'sheet-status ok';
+  } catch {
+    document.getElementById('sheetStatus').textContent = '● Sync failed';
+    document.getElementById('sheetStatus').className = 'sheet-status err';
+  }
+}
+
 // ── Render: sidebar ─────────────────────────────────────────────────────────
 function renderSidebar() {
   const el = document.getElementById('resourceList');
@@ -1673,7 +1693,7 @@ function saveBooking() {
           }
         }
         saveBookingsLocal();
-        syncSave();
+        syncSaveAll();
       }
     }
   } else if (recurring === 'consecutive' && days > 1) {
@@ -1697,7 +1717,7 @@ function saveBooking() {
       bs.push({ ...booking, id: 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8), groupId: 'bg_' + Date.now() + '_' + i });
     }
     saveBookingsLocal();
-    syncSave();
+    syncSaveAll();
   }
 
   closeBookingModal();
@@ -1723,7 +1743,7 @@ function deleteBookingGroup(groupId) {
   }
 
   saveBookingsLocal();
-  syncSave();
+  syncSaveAll();
   renderGrid();
 }
 
