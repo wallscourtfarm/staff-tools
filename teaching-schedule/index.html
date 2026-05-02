@@ -1858,12 +1858,23 @@ function onCellEnter(e) { /* handled in highlightCellAt */ }
 function onCellLeave(e) { e.currentTarget.classList.remove('drop-over'); }
 
 // ── Copy / clear helpers ─────────────────────────────────────────────────────
-function copyWeekToNext() {
+async function copyWeekToNext() {
   const wk = schedKey();
   const idx = state.weekIdx;
   if (!WEEKS[idx + 1]) { alert('No next week available.'); return; }
-  state.schedule[WEEKS[idx + 1].key] = JSON.parse(JSON.stringify(state.schedule[wk] || {}));
-  persistLocal(); syncSave();
+  const nextKey = WEEKS[idx + 1].key;
+  state.schedule[nextKey] = JSON.parse(JSON.stringify(state.schedule[wk] || {}));
+  persistLocal();
+  // Sync next week to cloud (syncSave only syncs current week)
+  if (SYNC_URL) {
+    try {
+      await fetch(SYNC_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'save', yearGroup: YEAR_GROUP, weekKey: nextKey, data: state.schedule[nextKey] || {} }),
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    } catch {}
+  }
   alert(`${wk} copied to next week.`);
 }
 
