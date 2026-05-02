@@ -395,6 +395,7 @@
   <button class="action-btn" onclick="goToday()">This week</button>
   <span class="sep">|</span>
   <button class="action-btn" onclick="copyWeekToNext()">Copy week → next week</button>
+  <button class="action-btn" onclick="copyWeekToTerm()">Copy to term</button>
   <button class="action-btn" onclick="openSubjectModal()">Subject settings</button>
   <button class="action-btn danger" onclick="clearActiveView()">Clear view</button>
   <span class="sheet-status" id="sheetStatus">Loading…</span>
@@ -1876,6 +1877,40 @@ async function copyWeekToNext() {
     } catch {}
   }
   alert(`${wk} copied to next week.`);
+}
+
+async function copyWeekToTerm() {
+  const wk = schedKey();
+  const idx = state.weekIdx;
+  if (!WEEKS.length) { alert('No weeks available.'); return; }
+
+  const currentTerm = WEEKS[idx].term;
+  const currentData = JSON.parse(JSON.stringify(state.schedule[wk] || {}));
+
+  // Find all weeks in the same term that are after current week
+  const weeksToCopy = WEEKS.slice(idx + 1).filter(w => w.term === currentTerm);
+  if (!weeksToCopy.length) { alert('No more weeks in this term.'); return; }
+
+  if (!confirm(`Copy ${wk} to ${weeksToCopy.length} remaining week${weeksToCopy.length > 1 ? 's' : ''} in Term ${currentTerm}?`)) return;
+
+  for (const week of weeksToCopy) {
+    state.schedule[week.key] = JSON.parse(JSON.stringify(currentData));
+  }
+  persistLocal();
+
+  // Sync all copied weeks to cloud
+  if (SYNC_URL) {
+    for (const week of weeksToCopy) {
+      try {
+        await fetch(SYNC_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'save', yearGroup: YEAR_GROUP, weekKey: week.key, data: state.schedule[week.key] || {} }),
+          headers: { 'Content-Type': 'text/plain' }
+        });
+      } catch {}
+    }
+  }
+  alert(`${wk} copied to ${weeksToCopy.length} week${weeksToCopy.length > 1 ? 's' : ''} in Term ${currentTerm}.`);
 }
 
 function clearActiveView() {
