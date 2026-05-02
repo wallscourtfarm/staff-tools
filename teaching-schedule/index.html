@@ -1055,7 +1055,7 @@ function parseDayRange(dayStr) {
 function getTPActivities(staffName, dayIndex) {
   // dayIndex: 1=Mon, 2=Tue, ... 5=Fri
   if (!TP_ACTIVITIES.length) return [];
-  return TP_ACTIVITIES.filter(row => {
+  const matches = TP_ACTIVITIES.filter(row => {
     const name = (row.Staff || '').trim();
     if (name !== staffName) return false;
     const days = parseDayRange(row.Day);
@@ -1065,6 +1065,8 @@ function getTPActivities(staffName, dayIndex) {
     session: (row.Session || '').trim(),
     colour: (row.Colour || '#64748b').trim()
   }));
+  if (matches.length) console.log('TPActivities for', staffName, 'day', dayIndex, ':', matches);
+  return matches;
 }
 
 function activityMatchesSession(activity, rowId, rowData) {
@@ -1082,7 +1084,9 @@ function activityMatchesSession(activity, rowId, rowData) {
       const rowStart = parseInt(rowMatch[1]) * 60 + parseInt(rowMatch[2]);
       const rowEnd = parseInt(rowMatch[3]) * 60 + parseInt(rowMatch[4]);
       // Activity overlaps with session
-      return actStart < rowEnd && actEnd > rowStart;
+      const overlaps = actStart < rowEnd && actEnd > rowStart;
+      if (overlaps) console.log('TPActivity matched:', activity.name, 'to session', rowId, 'time', rowData.time);
+      return overlaps;
     }
   }
   return false;
@@ -2502,6 +2506,7 @@ async function init() {
     // NEW: TPActivities tab
     if (tpActivitiesText) {
       TP_ACTIVITIES = csvToObjects(tpActivitiesText);
+      console.log('TPActivities loaded:', TP_ACTIVITIES.length, 'rows');
     }
 
     migrateScheduleKeys();
