@@ -163,7 +163,7 @@ const LABEL_CONFIG = {
   drawer: {
     width: 120,
     height: 30,
-    border: 5,
+    border: 3, // narrower border
     perSheet: 12,
     cols: 2,
     rows: 6
@@ -171,7 +171,7 @@ const LABEL_CONFIG = {
   peg: {
     width: 42,
     height: 11,
-    border: 1.8,
+    border: 1, // narrower border
     perSheet: 102,
     cols: 6,
     rows: 17
@@ -309,9 +309,9 @@ function updatePreview() {
   const innerW = (config.width - config.border * 2) * scale;
   const innerH = (config.height - config.border * 2) * scale;
 
-  // Preview text size: scale to fit nicely (actual 54pt/19pt is too big for preview)
-  const fontSizePx = currentLabelType === 'drawer' ? 16 : 6;
-  const logoHmm = currentLabelType === 'drawer' ? 18 : 6;
+  // Preview sizes - scaled for visibility
+  const fontSizePx = currentLabelType === 'drawer' ? 24 : 8;
+  const logoHmm = currentLabelType === 'drawer' ? 20 : 7;
   const logoHpx = logoHmm * scale;
 
   labelPreview.style.width = previewW + 'px';
@@ -319,8 +319,8 @@ function updatePreview() {
 
   let html = `
     <div style="position:absolute;inset:0;background:${bgColour};">
-      <div style="position:absolute;top:${previewBorder}px;left:${previewBorder}px;width:${innerW}px;height:${innerH}px;background:white;display:flex;align-items:center;padding:0 ${4*scale}px;">
-        <img src="${logoData}" style="height:${logoHpx}px;width:${logoHpx}px;object-fit:contain;margin-right:${4*scale}px;flex-shrink:0;">
+      <div style="position:absolute;top:${previewBorder}px;left:${previewBorder}px;width:${innerW}px;height:${innerH}px;background:white;display:flex;align-items:center;justify-content:flex-start;padding:0 ${6*scale}px;">
+        <img src="${logoData}" style="height:${logoHpx}px;width:${logoHpx}px;object-fit:contain;margin-right:${6*scale}px;flex-shrink:0;">
         <span style="font-family:'Tw Cen MT',Arial,sans-serif;font-size:${fontSizePx}px;font-weight:bold;color:#1e2d3d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${previewName}</span>
       </div>
     </div>
@@ -385,8 +385,8 @@ async function generatePdf() {
 
     // Font sizes: 54pt for drawer, 19pt for peg
     const fontSize = currentLabelType === 'drawer' ? 54 : 19;
-    // Logo sizes: 18mm for drawer, 6mm for peg
-    const logoHmm = currentLabelType === 'drawer' ? 18 : 6;
+    // Logo sizes: 20mm for drawer, 7mm for peg
+    const logoHmm = currentLabelType === 'drawer' ? 20 : 7;
     const logoWmm = logoHmm;
 
     for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
@@ -412,24 +412,23 @@ async function generatePdf() {
           doc.rect(x + config.border, y + config.border, innerW, innerH, 'F');
 
           // Logo on left, vertically centred
-          const logoX = x + config.border + 2;
+          const logoX = x + config.border + 3;
           const logoY = y + config.border + (innerH - logoHmm) / 2;
           doc.addImage(logoData, 'JPEG', logoX, logoY, logoWmm, logoHmm);
 
-          // Name text - centred between logo and right edge
+          // Set font and colour
           doc.setFontSize(fontSize);
           doc.setFont(fontName, 'normal');
           doc.setTextColor(30, 45, 61);
 
-          // Text starts after logo, ends before right border
-          const textStartX = logoX + logoWmm + 3;
-          const textEndX = x + config.border + innerW - 3;
+          // Calculate text position - centred in space after logo
+          const textLeft = logoX + logoWmm + 5;
+          const textRight = x + config.border + innerW - 5;
           const textWidth = doc.getTextWidth(name);
-          const availableWidth = textEndX - textStartX;
-          const textX = textStartX + (availableWidth - textWidth) / 2;
+          const textX = (textLeft + textRight - textWidth) / 2;
 
-          // Vertically centre: baseline is at y, so adjust for font height
-          const textY = y + config.border + (innerH / 2) + (fontSize * 0.35);
+          // Vertical centre: y is baseline, so add ~35% of font size to centre
+          const textY = y + config.border + innerH / 2 + fontSize * 0.35;
           doc.text(name, textX, textY);
         }
       }
