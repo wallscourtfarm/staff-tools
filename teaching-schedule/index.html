@@ -1534,9 +1534,9 @@ function renderBody() {
             const allTpActs = [];
             staffInYG.forEach(s => {
               const acts = getTPActivities(s.name, di + 1, dk).filter(a => activityMatchesSession(a, row.id, row));
-              allTpActs.push(...acts);
+              acts.forEach(a => allTpActs.push({ ...a, staffName: s.name }));
             });
-            tpActHtml = allTpActs.map(a => renderTPActivityChip(a, '', dk)).join('');
+            tpActHtml = allTpActs.map(a => renderTPActivityChip(a, a.staffName, dk)).join('');
           }
           return `<td class="view-cell">${strips}${soTags}${tpActHtml}<div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div></td>`;
         }).join('')}
@@ -1597,9 +1597,9 @@ function renderBody() {
             const allTpActs = [];
             staffInYG.forEach(s => {
               const acts = getTPActivities(s.name, di + 1, dk).filter(a => activityMatchesSession(a, row.id, row));
-              allTpActs.push(...acts);
+              acts.forEach(a => allTpActs.push({ ...a, staffName: s.name }));
             });
-            masterTpHtml = allTpActs.map(a => renderTPActivityChip(a, '', dk)).join('');
+            masterTpHtml = allTpActs.map(a => renderTPActivityChip(a, a.staffName, dk)).join('');
           }
 
           // Build cell content
