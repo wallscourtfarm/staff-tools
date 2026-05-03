@@ -385,6 +385,8 @@ async function generatePdf() {
 
     // Font sizes: 54pt for drawer, 19pt for peg
     const fontSize = currentLabelType === 'drawer' ? 54 : 19;
+    // Convert pt to mm: 1pt ≈ 0.352778mm
+    const fontHmm = fontSize * 0.352778;
     // Logo sizes: 20mm for drawer, 7mm for peg
     const logoHmm = currentLabelType === 'drawer' ? 20 : 7;
     const logoWmm = logoHmm;
@@ -427,8 +429,9 @@ async function generatePdf() {
           const textWidth = doc.getTextWidth(name);
           const textX = (textLeft + textRight - textWidth) / 2;
 
-          // Vertical centre: y is baseline, so add ~35% of font size to centre
-          const textY = y + config.border + innerH / 2 + fontSize * 0.35;
+          // Vertical centre: baseline at y + border + (innerH - fontH)/2 + fontH*0.7
+          // The 0.7 factor accounts for the baseline being at bottom of text
+          const textY = y + config.border + (innerH - fontHmm) / 2 + fontHmm * 0.7;
           doc.text(name, textX, textY);
         }
       }
