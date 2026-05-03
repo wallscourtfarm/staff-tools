@@ -612,9 +612,18 @@ async function generatePdf() {
       }
     }
 
+    // Format label type name for filename
+    const labelTypeName = currentLabelType
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join('');
+
+    // Format year for filename
+    const yearStr = currentYear ? `Y${currentYear}` : 'NoYear';
+
     const filename = allLabelsMode
-      ? `WFA_Book_Labels_All6Types_${currentYear || 'NoYear'}.pdf`
-      : `WFA_Book_Labels_${currentLabelType.replace(/-/g, '_')}_${currentYear || 'Artist'}.pdf`;
+      ? `WFA_Book_Labels_All_${yearStr}.pdf`
+      : `WFA_Book_Labels_${labelTypeName}_${yearStr}.pdf`;
     doc.save(filename);
 
     statusEl.textContent = '✓ Downloaded';
