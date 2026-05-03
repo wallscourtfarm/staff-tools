@@ -488,7 +488,7 @@
 const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
 const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbwlNv08Z0cFSgKq_1zcrQw9I2I9ewg8Stj6kcQjSZaBm_uscbIC0V225ez6mVvg75sVfQ/exec';
-const EXCEPTIONS_URL = ''; // TODO: Deploy activity-exceptions.gs and paste URL here
+const EXCEPTIONS_URL = 'https://script.google.com/macros/s/AKfycbx6CThsZIBj9pxc0noGkgUMaCHTKgUBASm5-wQCIQ6JELoQ4abIctjlpEGPyE_jrlzR/exec';
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const DAY_SHORT = ['Mon','Tue','Wed','Thu','Fri'];
@@ -1740,7 +1740,7 @@ async function removeTPActivity(btn) {
   // Try to sync to sheet
   if (EXCEPTIONS_URL) {
     try {
-      await fetch(EXCEPTIONS_URL, {
+      await fetch(EXCEPTIONS_URL + '?action=addException', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date, staff, activity, session: session || '' })
@@ -2545,7 +2545,7 @@ async function init() {
       fetch(SHEET_BASE + encodeURIComponent('Interventions')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('DayTimings')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('DayActivities')).then(r => r.ok ? r.text() : '').catch(() => ''),
-	      EXCEPTIONS_URL ? fetch(EXCEPTIONS_URL).then(r => r.ok ? r.json() : {exceptions:[]}).then(d => d.exceptions || []).catch(() => []) : Promise.resolve([]),
+	      EXCEPTIONS_URL ? fetch(EXCEPTIONS_URL + '?action=exceptions').then(r => r.ok ? r.json() : {exceptions:[]}).then(d => d.exceptions || []).catch(() => []) : Promise.resolve([]),
     ]);
     WEEKS = buildWeeks(csvToObjects(termsText));
     if (eventsText) {
