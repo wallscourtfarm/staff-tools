@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drawer & Peg Labels — Wallscourt Farm Academy</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    @font-face {
+      font-family: 'Tw Cen MT';
+      src: url('Tw Cen MT.ttf') format('truetype');
+    }
+    :root {
+      --blue: #2a7fc1;
+      --blue-dk: #1a5c8e;
+      --blue-lt: #e8f2fb;
+      --gold: #e6a817;
+      --green: #3a9e5f;
+      --bg: #e8eef4;
+      --white: #ffffff;
+      --border: #d0dce8;
+      --text: #1e2d3d;
+      --muted: #7a8fa3;
+      --label: #4a6278;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); min-height: 100vh; display: flex; flex-direction: column; }
+    .top-bar { height: 5px; background: var(--blue); }
+    header { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    header img { height: 80px; width: auto; object-fit: contain; }
+    .header-divider { width: 1px; height: 64px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
+    .header-text h1 { color: var(--blue); font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+    .header-text p { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+    .school-name { color: var(--text); font-size: 1.1rem; font-weight: 600; line-height: 1.3; }
+    main { flex: 1; display: flex; justify-content: center; padding: 28px 16px 48px; }
+    .panel { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 12px; }
+    .card { background: var(--white); border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: hidden; }
+    .card-header { padding: 11px 18px; background: var(--blue-lt); border-bottom: 1px solid var(--border); }
+    .card-header h2 { font-size: 0.78rem; font-weight: 700; color: var(--blue-dk); text-transform: uppercase; letter-spacing: 0.06em; }
+    .card-body { padding: 16px 18px; }
+    .field { margin-bottom: 11px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--label); margin-bottom: 4px; }
+    .field select, .field input { width: 100%; font-family: inherit; font-size: 0.875rem; border: 1.5px solid var(--border); border-radius: 6px; padding: 8px 11px; background: var(--white); color: var(--text); }
+    .field select:focus, .field input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(42,127,193,0.12); }
+    textarea { width: 100%; font-family: inherit; font-size: 0.875rem; border: 1.5px solid var(--border); border-radius: 6px; padding: 8px 11px; background: var(--white); color: var(--text); resize: vertical; min-height: 100px; }
+    textarea:focus { outline: none; border-color: var(--blue); }
+    .hint { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+
+    .mode-tabs { display: flex; flex-wrap: wrap; gap: 0; border-radius: 8px; overflow: hidden; border: 1.5px solid var(--border); }
+    .mode-tab { flex: 1; min-width: 80px; padding: 10px 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer; background: var(--white); border: none; color: var(--muted); font-family: inherit; transition: background 0.15s, color 0.15s; text-transform: uppercase; letter-spacing: 0.03em; }
+    .mode-tab:hover:not(.active) { background: var(--blue-lt); color: var(--blue-dk); }
+    .mode-tab.active { background: var(--blue); color: var(--white); }
+
+    .year-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .year-btn { padding: 10px 4px; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: var(--white); border: 2px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit; transition: all 0.15s; }
+    .year-btn:hover { border-color: var(--blue); }
+    .year-btn.active { border-color: var(--blue); background: var(--blue); color: var(--white); }
+    .year-btn[data-colour="blue"].active { background: #3288ce; border-color: #3288ce; }
+    .year-btn[data-colour="orange"].active { background: #f57721; border-color: #f57721; }
+    .year-btn[data-colour="green"].active { background: #63b44a; border-color: #63b44a; }
+    .year-btn[data-colour="magenta"].active { background: #c1126d; border-color: #c1126d; }
+
+    .upload-area { border: 2px dashed var(--border); border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; margin-top: 8px; font-size: 0.85rem; color: var(--text); display: block; }
+    .upload-area:hover { border-color: var(--blue); background: var(--blue-lt); }
+    .upload-area input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .upload-area:focus-within { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+    .btn-dl { width: 100%; background: var(--gold); color: var(--white); border: none; border-radius: 7px; padding: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; box-shadow: 0 2px 6px rgba(230,168,23,0.3); transition: background 0.15s; }
+    .btn-dl:hover:not(:disabled) { background: #cb9210; }
+    .btn-dl:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; box-shadow: none; }
+    .status { text-align: center; font-size: 0.85rem; color: var(--green); margin-top: 8px; min-height: 16px; font-weight: 600; }
+    .status.error { color: #c0392b; }
+
+    .preview-box { background: #f5f5f5; border-radius: 8px; padding: 16px; display: flex; justify-content: center; align-items: center; min-height: 200px; }
+    .label-preview { position: relative; overflow: hidden; }
+    .drawer-preview { width: 240px; height: 60px; }
+    .peg-preview { width: 84px; height: 22px; }
+
+    footer { text-align: center; color: var(--muted); font-size: 0.7rem; padding: 14px; }
+
+    .size-info { background: var(--blue-lt); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 0.8rem; color: var(--blue-dk); }
+    .size-info strong { font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="top-bar"></div>
+<header>
+  <img src="logo.png" alt="WFA">
+  <div class="header-divider"></div>
+  <div>
+    <div class="school-name">Wallscourt Farm Academy</div>
+    <h1 class="header-text">Drawer & Peg Labels</h1>
+    <p>Print on A4 landscape, laminate & cut</p>
+  </div>
+</header>
+<main>
+  <div class="panel">
+    <div class="card">
+      <div class="card-header"><h2>Label Type</h2></div>
+      <div class="card-body">
+        <div class="mode-tabs" id="labelTypeTabs">
+          <button class="mode-tab active" data-type="drawer">Drawer Labels (120×30mm)</button>
+          <button class="mode-tab" data-type="peg">Peg Labels (42×11mm)</button>
+        </div>
+        <div class="size-info" id="sizeInfo">
+          <strong>Drawer:</strong> 12 per sheet — 120mm × 30mm with 5mm coloured border
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Year Group</h2></div>
+      <div class="card-body">
+        <div class="year-grid" id="yearGrid">
+          <button class="year-btn" data-year="R" data-colour="blue">R</button>
+          <button class="year-btn" data-year="1" data-colour="orange">Y1</button>
+          <button class="year-btn" data-year="2" data-colour="green">Y2</button>
+          <button class="year-btn" data-year="3" data-colour="magenta">Y3</button>
+          <button class="year-btn" data-year="4" data-colour="blue">Y4</button>
+          <button class="year-btn" data-year="5" data-colour="orange">Y5</button>
+          <button class="year-btn" data-year="6" data-colour="green">Y6</button>
+        </div>
+        <p class="hint">Select year group to set border colour</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Children's Names</h2></div>
+      <div class="card-body">
+        <textarea id="namesInput" placeholder="Enter names, one per line"></textarea>
+        <label class="upload-area">
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt">
+          <div>📄 Click to upload class list (Excel, CSV, or TXT)</div>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Preview</h2></div>
+      <div class="card-body">
+        <div class="preview-box">
+          <div class="label-preview drawer-preview" id="labelPreview"></div>
+        </div>
+        <div id="labelCount" style="text-align:center;font-size:0.75rem;color:var(--muted);margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <button class="btn-dl" id="dlBtn">↓ Download Labels (PDF)</button>
+    <div class="status" id="status"></div>
+  </div>
+</main>
+<footer>Wallscourt Farm Academy — Drawer & Peg Label Generator</footer>
+
+<script>
+// Year group colours
+const YEAR_COLOURS = {
+  'R': { hex: '#3288ce', zone: 'Oak' },
+  '1': { hex: '#f57721', zone: 'Beech' },
+  '2': { hex: '#63b44a', zone: 'Willow' },
+  '3': { hex: '#c1126d', zone: 'Acer' },
+  '4': { hex: '#3288ce', zone: 'Maple' },
+  '5': { hex: '#f57721', zone: 'Hazel' },
+  '6': { hex: '#63b44a', zone: 'Elm' }
+};
+
+// Label dimensions (mm)
+const LABEL_CONFIG = {
+  drawer: {
+    width: 120,
+    height: 30,
+    border: 5,
+    perSheet: 12,
+    cols: 2,
+    rows: 6
+  },
+  peg: {
+    width: 42,
+    height: 11,
+    border: 1.8, // proportionally scaled: 5mm * (42/120) ≈ 1.75mm, rounded to 1.8mm
+    perSheet: 102,
+    cols: 6,
+    rows: 17
+  }
+};
+
+// State
+let currentLabelType = 'drawer';
+let currentYear = null;
+let names = [];
+
+// DOM elements
+let labelTypeTabs, yearGrid, namesInput, fileInput;
+let dlBtn, statusEl, labelPreview, labelCount, sizeInfo;
+
+// Images
+let logoData = null;
+let fontBase64 = null;
+
+// Initialize
+document.addEventListener('DOMContentLoaded', init);
+
+async function init() {
+  labelTypeTabs = document.getElementById('labelTypeTabs');
+  yearGrid = document.getElementById('yearGrid');
+  namesInput = document.getElementById('namesInput');
+  fileInput = document.getElementById('fileInput');
+  dlBtn = document.getElementById('dlBtn');
+  statusEl = document.getElementById('status');
+  labelPreview = document.getElementById('labelPreview');
+  labelCount = document.getElementById('labelCount');
+  sizeInfo = document.getElementById('sizeInfo');
+
+  await Promise.all([loadImages(), loadFont()]);
+
+  labelTypeTabs.addEventListener('click', onLabelTypeClick);
+  yearGrid.addEventListener('click', onYearClick);
+  namesInput.addEventListener('input', onNamesInput);
+  fileInput.addEventListener('change', onFileUpload);
+  dlBtn.addEventListener('click', generatePdf);
+
+  updatePreview();
+}
+
+async function loadImages() {
+  try {
+    const response = await fetch('logo.png');
+    const blob = await response.blob();
+    logoData = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.warn('Could not load logo');
+  }
+}
+
+async function loadFont() {
+  try {
+    const response = await fetch('Tw Cen MT.ttf');
+    const blob = await response.blob();
+    fontBase64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.warn('Could not load font');
+  }
+}
+
+function onLabelTypeClick(e) {
+  if (!e.target.classList.contains('mode-tab')) return;
+
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+  e.target.classList.add('active');
+  currentLabelType = e.target.dataset.type;
+
+  // Update size info
+  const config = LABEL_CONFIG[currentLabelType];
+  if (currentLabelType === 'drawer') {
+    sizeInfo.innerHTML = `<strong>Drawer:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border`;
+  } else {
+    sizeInfo.innerHTML = `<strong>Peg:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border`;
+  }
+
+  // Update preview container size
+  labelPreview.className = `label-preview ${currentLabelType}-preview`;
+
+  updatePreview();
+}
+
+function onYearClick(e) {
+  if (!e.target.classList.contains('year-btn')) return;
+
+  document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  currentYear = e.target.dataset.year;
+  updatePreview();
+}
+
+function onNamesInput() {
+  const text = namesInput.value.trim();
+  names = text ? text.split('\n').map(n => n.trim()).filter(n => n) : [];
+  updatePreview();
+}
+
+async function onFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  try {
+    if (ext === 'xlsx' || ext === 'xls') {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      names = rows.flat().filter(cell => {
+        if (typeof cell !== 'string') return false;
+        const c = cell.trim().toLowerCase();
+        return c && !['first name', 'firstname', 'name', 'names'].includes(c);
+      });
+    } else {
+      const text = await file.text();
+      names = text.split(/[\n\r,]+/).map(n => n.trim()).filter(n => n);
+    }
+    namesInput.value = names.join('\n');
+    updatePreview();
+  } catch (err) {
+    statusEl.className = 'status error';
+    statusEl.textContent = 'Error reading file';
+    setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'status'; }, 3000);
+  }
+}
+
+function updatePreview() {
+  const config = LABEL_CONFIG[currentLabelType];
+  const yearData = currentYear ? YEAR_COLOURS[currentYear] : null;
+  const previewName = names.length > 0 ? names[0] : '[Name]';
+  const bgColour = yearData?.hex || '#ccc';
+
+  // Scale preview to fit
+  const scale = currentLabelType === 'drawer' ? 2 : 2;
+  const previewW = config.width * scale;
+  const previewH = config.height * scale;
+  const previewBorder = config.border * scale;
+
+  // Inner white area dimensions
+  const innerW = (config.width - config.border * 2) * scale;
+  const innerH = (config.height - config.border * 2) * scale;
+
+  labelPreview.style.width = previewW + 'px';
+  labelPreview.style.height = previewH + 'px';
+
+  let html = `
+    <div style="position:absolute;inset:0;background:${bgColour};">
+      <div style="position:absolute;top:${previewBorder}px;left:${previewBorder}px;width:${innerW}px;height:${innerH}px;background:white;display:flex;align-items:center;justify-content:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:${currentLabelType === 'drawer' ? 14 : 7}px;font-weight:bold;color:#1e2d3d;text-align:center;padding:4px;">
+        ${logoData ? `<img src="${logoData}" style="height:${currentLabelType === 'drawer' ? 20 : 8}px;margin-right:6px;object-fit:contain;">` : ''}
+        <span>${previewName}</span>
+      </div>
+    </div>
+  `;
+
+  labelPreview.innerHTML = html;
+
+  // Update button state
+  dlBtn.disabled = names.length === 0 || !currentYear;
+
+  // Update count
+  const sheets = Math.ceil(names.length / config.perSheet);
+  labelCount.textContent = names.length > 0 ? `${names.length} name${names.length > 1 ? 's' : ''} → ${sheets} sheet${sheets > 1 ? 's' : ''} (${config.perSheet} per sheet)` : '';
+}
+
+async function generatePdf() {
+  const { jsPDF } = window.jspdf;
+  const config = LABEL_CONFIG[currentLabelType];
+  const yearData = YEAR_COLOURS[currentYear];
+
+  statusEl.className = 'status';
+  statusEl.textContent = 'Building…';
+  dlBtn.disabled = true;
+
+  try {
+    // A4 landscape: 297mm x 210mm
+    const pageW = 297;
+    const pageH = 210;
+    const gap = 1; // 1mm between labels
+
+    // Calculate margins to centre the grid
+    const totalW = config.cols * config.width + (config.cols - 1) * gap;
+    const totalH = config.rows * config.height + (config.rows - 1) * gap;
+    const marginLeft = (pageW - totalW) / 2;
+    const marginTop = (pageH - totalH) / 2;
+
+    // Create PDF
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Add Tw Cen MT font
+    if (fontBase64) {
+      doc.addFileToVFS('TwCenMT.ttf', fontBase64);
+      doc.addFont('TwCenMT.ttf', 'TwCenMT', 'normal');
+    }
+    const fontName = fontBase64 ? 'TwCenMT' : 'helvetica';
+
+    // Convert hex to RGB
+    function hexToRgb(hex) {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return [r, g, b];
+    }
+
+    const [r, g, b] = hexToRgb(yearData.hex);
+
+    // Fill to complete sheets
+    const sheetsNeeded = Math.ceil(names.length / config.perSheet) || 1;
+    const paddedNames = [...names];
+    while (paddedNames.length < sheetsNeeded * config.perSheet) {
+      paddedNames.push(null);
+    }
+
+    // Inner white area
+    const innerW = config.width - config.border * 2;
+    const innerH = config.height - config.border * 2;
+
+    for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
+      if (sheetIdx > 0) doc.addPage();
+
+      const sheetNames = paddedNames.slice(sheetIdx * config.perSheet, (sheetIdx + 1) * config.perSheet);
+
+      for (let row = 0; row < config.rows; row++) {
+        for (let col = 0; col < config.cols; col++) {
+          const idx = row * config.cols + col;
+          const name = sheetNames[idx];
+          if (!name) continue;
+
+          const x = marginLeft + col * (config.width + gap);
+          const y = marginTop + row * (config.height + gap);
+
+          // Draw coloured border
+          doc.setFillColor(r, g, b);
+          doc.rect(x, y, config.width, config.height, 'F');
+
+          // Draw white inner
+          doc.setFillColor(255, 255, 255);
+          doc.rect(x + config.border, y + config.border, innerW, innerH, 'F');
+
+          // Add logo and name
+          if (logoData) {
+            const logoH = currentLabelType === 'drawer' ? 10 : 3.5;
+            const logoW = logoH; // Square
+            const logoX = x + config.border + 2;
+            const logoY = y + config.border + (innerH - logoH) / 2;
+
+            doc.addImage(logoData, 'PNG', logoX, logoY, logoW, logoH);
+
+            // Name text
+            const fontSize = currentLabelType === 'drawer' ? 14 : 6;
+            doc.setFontSize(fontSize);
+            doc.setFont(fontName, 'normal');
+            doc.setTextColor(30, 45, 61);
+
+            const textX = logoX + logoW + 2;
+            const textY = y + config.border + innerH / 2 + fontSize * 0.35;
+            doc.text(name, textX, textY);
+          } else {
+            // Just name, centred
+            const fontSize = currentLabelType === 'drawer' ? 14 : 6;
+            doc.setFontSize(fontSize);
+            doc.setFont(fontName, 'normal');
+            doc.setTextColor(30, 45, 61);
+
+            const textW = doc.getTextWidth(name);
+            const textX = x + config.border + (innerW - textW) / 2;
+            const textY = y + config.border + innerH / 2 + fontSize * 0.35;
+            doc.text(name, textX, textY);
+          }
+        }
+      }
+    }
+
+    // Download
+    const typeStr = currentLabelType === 'drawer' ? 'Drawer' : 'Peg';
+    const filename = `WFA_${typeStr}_Labels_Y${currentYear}.pdf`;
+    doc.save(filename);
+
+    statusEl.textContent = '✓ Downloaded';
+    setTimeout(() => { statusEl.textContent = ''; dlBtn.disabled = false; updatePreview(); }, 3000);
+
+  } catch (e) {
+    console.error(e);
+    statusEl.className = 'status error';
+    statusEl.textContent = 'Error: ' + e.message;
+    dlBtn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
