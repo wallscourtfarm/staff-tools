@@ -1742,14 +1742,17 @@ async function removeTPActivity(btn) {
   // Add to local exceptions immediately
   ACTIVITY_EXCEPTIONS.push({ date, staff, activity, session: session || '' });
 
-  // Try to sync to sheet
+  // Try to sync to sheet (use GET with URL params to avoid CORS preflight)
   if (EXCEPTIONS_URL) {
     try {
-      const response = await fetch(EXCEPTIONS_URL + '?action=addException', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, staff, activity, session: session || '' })
+      const params = new URLSearchParams({
+        action: 'addException',
+        date: date,
+        staff: staff,
+        activity: activity,
+        session: session || ''
       });
+      const response = await fetch(EXCEPTIONS_URL + '?' + params.toString());
       const result = await response.json();
       console.log('Exception sync result:', result);
     } catch (err) {
