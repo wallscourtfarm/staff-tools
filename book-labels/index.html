@@ -75,7 +75,7 @@
     .label-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
     .label-zone { font-size: 11px; font-weight: 600; }
     .label-zone-small { font-size: 9px; color: #666; }
-    .label-icons { position: absolute; bottom: 6px; left: 6px; display: flex; gap: 4px; }
+    .label-icons { position: absolute; bottom: 6px; left: 6px; display: flex; gap: 4px; align-items: flex-end; }
     .label-icons img { height: 18px; width: auto; }
 
     footer { text-align: center; color: var(--muted); font-size: 0.7rem; padding: 14px; }
@@ -103,6 +103,7 @@
           <button class="mode-tab" data-type="home-learning">Home Learning</button>
           <button class="mode-tab" data-type="writers-journal">Writer's Journal</button>
           <button class="mode-tab" data-type="maths-book">Maths Book</button>
+          <button class="mode-tab" data-type="maths-journal">Maths Journal</button>
           <button class="mode-tab" data-type="artist">Artist</button>
         </div>
       </div>
@@ -176,6 +177,7 @@ const LABEL_TYPES = {
   'home-learning': { title: "Home Learning", hasZone: true, iconType: 'stob' },
   'writers-journal': { title: "Writer's Journal", hasZone: true, iconType: 'stob' },
   'maths-book': { title: "Mathematician", hasZone: true, iconType: 'maths' },
+  'maths-journal': { title: "Maths Journal", hasZone: true, iconType: 'maths' },
   'artist': { title: "Artist", hasZone: false, iconType: 'artist', greyBorder: true }
 };
 
@@ -185,20 +187,20 @@ let currentYear = null;
 let names = [];
 let bookNumber = '';
 
-// DOM elements - wait for DOM to be ready
+// DOM elements
 let labelTypeTabs, yearGrid, yearGroupCard, namesInput, fileInput;
 let dlBtn, statusEl, bookNumberInput, labelPreview, labelCount;
 
-// Images
-let schoolLogoImg = null;
-let stobImg = null;
-let mathsImg = null;
-let artistImg = null;
+// Images (loaded as base64 for PDF)
+let schoolLogoData = null;
+let stobData = null;
+let mathsData = null;
+let artistData = null;
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', init);
 
-function init() {
+async function init() {
   // Get DOM elements
   labelTypeTabs = document.getElementById('labelTypeTabs');
   yearGrid = document.getElementById('yearGrid');
@@ -211,8 +213,8 @@ function init() {
   labelPreview = document.getElementById('labelPreview');
   labelCount = document.getElementById('labelCount');
 
-  // Load images
-  loadImages();
+  // Load images as base64
+  await loadImages();
 
   // Set up event listeners
   labelTypeTabs.addEventListener('click', onLabelTypeClick);
@@ -226,19 +228,28 @@ function init() {
   updatePreview();
 }
 
-function loadImages() {
+async function loadImages() {
   const imgs = [
-    ['schoollogo-book.png', 'schoolLogoImg'],
-    ['book-stob-lj.png', 'stobImg'],
-    ['maths-book.png', 'mathsImg'],
-    ['artist-book.png', 'artistImg']
+    ['schoollogo-book.png', 'schoolLogoData'],
+    ['book-stob-lj.png', 'stobData'],
+    ['maths-book.png', 'mathsData'],
+    ['artist-book.png', 'artistData']
   ];
 
-  imgs.forEach(([src, prop]) => {
-    const img = new Image();
-    img.onload = () => { window[prop] = img; };
-    img.src = src;
-  });
+  for (const [src, prop] of imgs) {
+    try {
+      const response = await fetch(src);
+      const blob = await response.blob();
+      const dataUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+      window[prop] = dataUrl;
+    } catch (e) {
+      console.warn(`Could not load ${src}`);
+    }
+  }
 }
 
 function onLabelTypeClick(e) {
@@ -248,7 +259,7 @@ function onLabelTypeClick(e) {
   e.target.classList.add('active');
   currentLabelType = e.target.dataset.type;
 
-  if (currentLabelType === 'artist') {
+  if (LABEL_TYPES[currentLabelType].greyBorder) {
     yearGroupCard.classList.add('hidden');
   } else {
     yearGroupCard.classList.remove('hidden');
@@ -313,9 +324,9 @@ function updatePreview() {
   const previewName = names.length > 0 ? names[0] : '[Name]';
   const bgColour = labelType.greyBorder ? '#808080' : (yearData?.hex || '#ccc');
 
-  // Preview dimensions (scaled down)
-  const pw = 280, ph = 200; // preview width/height
-  const margin = 12; // coloured border thickness
+  // Preview dimensions (scaled down from actual 139x99.1mm)
+  const pw = 280, ph = 200;
+  const margin = 10; // coloured border thickness in preview pixels
 
   let html = `
     <div style="position:absolute;inset:0;background:${bgColour};">
@@ -332,12 +343,12 @@ function updatePreview() {
   html += `<div class="label-icons">`;
 
   if (labelType.iconType === 'stob') {
-    if (schoolLogoImg) html += `<img src="${schoolLogoImg.src}">`;
-    if (stobImg) html += `<img src="${stobImg.src}">`;
-  } else if (labelType.iconType === 'maths' && mathsImg) {
-    html += `<img src="${mathsImg.src}" style="height:22px;">`;
-  } else if (labelType.iconType === 'artist' && artistImg) {
-    html += `<img src="${artistImg.src}" style="height:22px;">`;
+    if (schoolLogoData) html += `<img src="${schoolLogoData}">`;
+    if (stobData) html += `<img src="${stobData}" style="height:14px;width:auto;">`;
+  } else if (labelType.iconType === 'maths' && mathsData) {
+    html += `<img src="${mathsData}" style="height:22px;">`;
+  } else if (labelType.iconType === 'artist' && artistData) {
+    html += `<img src="${artistData}" style="height:24px;">`;
   }
 
   html += `</div></div></div>`;
@@ -364,24 +375,39 @@ async function generatePdf() {
   dlBtn.disabled = true;
 
   try {
-    // A4 dimensions in mm
-    const PAGE_W = 210, PAGE_H = 297;
+    // A4 LANDSCAPE dimensions in mm: 297mm wide x 210mm tall
+    // Avery L7169: 4 labels per sheet (2x2), each 139 x 99.1mm
+    const LABEL_W = 139;
+    const LABEL_H = 99.1;
 
-    // Avery L7169: 4 labels per sheet, 139 x 99.1mm
-    // Label positions on A4 (approximate Avery template positions)
-    const LABEL_W = 139, LABEL_H = 99.1;
-    const MARGIN_LEFT = 4.5;   // left margin
-    const MARGIN_TOP = 8.5;    // top margin
-    const GAP_X = 210 - 2 * MARGIN_LEFT - 2 * LABEL_W; // gap between columns
-    const GAP_Y = 297 - 2 * MARGIN_TOP - 2 * LABEL_H; // gap between rows
+    // Avery L7169 exact positions for landscape A4
+    // Left margin: 9.5mm, Top margin: 5.4mm
+    // Gap between columns: 0mm (labels touch horizontally)
+    // Gap between rows: 0mm (labels touch vertically)
+    const MARGIN_LEFT = 9.5;
+    const MARGIN_TOP = 5.4;
+    const GAP_X = 0;
+    const GAP_Y = 0;
+
+    // Calculate positions
+    const labelPositions = [
+      { x: MARGIN_LEFT, y: MARGIN_TOP },                    // top-left
+      { x: MARGIN_LEFT + LABEL_W + GAP_X, y: MARGIN_TOP }, // top-right
+      { x: MARGIN_LEFT, y: MARGIN_TOP + LABEL_H + GAP_Y }, // bottom-left
+      { x: MARGIN_LEFT + LABEL_W + GAP_X, y: MARGIN_TOP + LABEL_H + GAP_Y } // bottom-right
+    ];
 
     // Fill names to complete sheets
     const sheetsNeeded = Math.ceil(names.length / 4) || 1;
     const allNames = [...names];
     while (allNames.length < sheetsNeeded * 4) allNames.push('');
 
-    // Create PDF
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    // Create PDF in LANDSCAPE orientation
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
 
     // Convert hex to RGB
     function hexToRgb(hex) {
@@ -392,90 +418,96 @@ async function generatePdf() {
     }
 
     const [r, g, b] = hexToRgb(bgColour);
-    const BORDER = 3; // coloured border thickness in mm
+    const BORDER = 4; // coloured border thickness in mm (white inner area is inset by this)
 
     for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
       if (sheetIdx > 0) doc.addPage();
 
       const sheetNames = allNames.slice(sheetIdx * 4, (sheetIdx + 1) * 4);
 
-      for (let row = 0; row < 2; row++) {
-        for (let col = 0; col < 2; col++) {
-          const nameIdx = row * 2 + col;
-          const name = sheetNames[nameIdx];
-          if (!name) continue;
+      // Fill entire page with year group colour first (full bleed)
+      doc.setFillColor(r, g, b);
+      doc.rect(0, 0, 297, 210, 'F');
 
-          // Calculate label position
-          const x = MARGIN_LEFT + col * (LABEL_W + GAP_X);
-          const y = MARGIN_TOP + row * (LABEL_H + GAP_Y);
+      for (let i = 0; i < 4; i++) {
+        const name = sheetNames[i];
+        const pos = labelPositions[i];
 
-          // Fill entire label area with colour
-          doc.setFillColor(r, g, b);
-          doc.rect(x, y, LABEL_W, LABEL_H, 'F');
+        // Draw white inner rectangle
+        doc.setFillColor(255, 255, 255);
+        doc.rect(pos.x + BORDER, pos.y + BORDER, LABEL_W - BORDER * 2, LABEL_H - BORDER * 2, 'F');
 
-          // Draw white inner rectangle
-          doc.setFillColor(255, 255, 255);
-          doc.rect(x + BORDER, y + BORDER, LABEL_W - BORDER * 2, LABEL_H - BORDER * 2, 'F');
+        if (!name) continue;
 
-          // Add text content
-          let textY = y + BORDER + 8;
-          const textX = x + BORDER + 6;
-          const innerW = LABEL_W - BORDER * 2 - 12;
+        // Text positioning
+        const innerX = pos.x + BORDER;
+        const innerY = pos.y + BORDER;
+        const innerW = LABEL_W - BORDER * 2;
+        const innerH = LABEL_H - BORDER * 2;
 
-          // Name (underlined)
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(16);
-          doc.text(name, textX, textY);
-          const nameW = doc.getTextWidth(name);
-          doc.setDrawColor(0);
-          doc.setLineWidth(0.5);
-          doc.line(textX, textY + 1, textX + nameW, textY + 1);
+        let textY = innerY + 10;
+        const textX = innerX + 5;
 
-          // Title
+        // Name (underlined)
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18);
+        doc.setTextColor(0, 0, 0);
+        doc.text(name, textX, textY);
+        const nameW = doc.getTextWidth(name);
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.5);
+        doc.line(textX, textY + 1.5, textX + nameW, textY + 1.5);
+
+        // Title
+        textY += 12;
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(labelType.title, textX, textY);
+
+        // Learning Zone
+        if (labelType.hasZone && yearData) {
           textY += 10;
           doc.setFontSize(13);
-          doc.text(labelType.title, textX, textY);
+          doc.setFont('helvetica', 'bold');
+          doc.text(yearData.zone, textX, textY);
+          textY += 6;
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(100, 100, 100);
+          doc.text('Learning Zone', textX, textY);
+          doc.setTextColor(0, 0, 0);
+        }
 
-          // Learning Zone
-          if (labelType.hasZone && yearData) {
-            textY += 8;
-            doc.setFontSize(12);
-            doc.text(yearData.zone, textX, textY);
-            textY += 5;
-            doc.setFontSize(9);
-            doc.setTextColor(100, 100, 100);
-            doc.text('Learning Zone', textX, textY);
-            doc.setTextColor(0, 0, 0);
+        // Book number (top right of white area)
+        if (bookNumber) {
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(0, 0, 0);
+          const numW = doc.getTextWidth(bookNumber);
+          doc.text(bookNumber, innerX + innerW - 5 - numW, innerY + 10);
+        }
+
+        // Add images at bottom of label
+        const iconY = innerY + innerH - 22; // 22mm from bottom of white area
+        let iconX = innerX + 5;
+
+        if (labelType.iconType === 'stob') {
+          // School logo (left)
+          if (schoolLogoData) {
+            doc.addImage(schoolLogoData, 'PNG', iconX, iconY, 22, 10);
+            iconX += 24;
           }
-
-          // Book number (top right of white area)
-          if (bookNumber) {
-            doc.setFontSize(9);
-            doc.setFont('helvetica', 'bold');
-            const numW = doc.getTextWidth(bookNumber);
-            doc.text(bookNumber, x + LABEL_W - BORDER - 6 - numW, y + BORDER + 8);
+          // States of Being strip (wider)
+          if (stobData) {
+            doc.addImage(stobData, 'PNG', iconX, iconY + 1, 90, 8);
           }
-
-          // Add images
-          const iconY = y + LABEL_H - BORDER - 20;
-          let iconX = x + BORDER + 6;
-
-          if (labelType.iconType === 'stob') {
-            if (schoolLogoImg) {
-              doc.addImage(schoolLogoImg, 'PNG', iconX, iconY, 18, 18);
-              iconX += 20;
-            }
-            if (stobImg) {
-              // States of Being strip - wider
-              doc.addImage(stobImg, 'PNG', iconX, iconY + 2, 80, 14);
-            }
-          } else if (labelType.iconType === 'maths' && mathsImg) {
-            doc.addImage(mathsImg, 'PNG', iconX, iconY, 20, 20);
-          } else if (labelType.iconType === 'artist' && artistImg) {
-            // Centre the artist icon
-            const centerX = x + LABEL_W / 2 - 12;
-            doc.addImage(artistImg, 'PNG', centerX, iconY, 24, 24);
-          }
+        } else if (labelType.iconType === 'maths' && mathsData) {
+          // Maths icon
+          doc.addImage(mathsData, 'PNG', iconX, iconY - 2, 18, 14);
+        } else if (labelType.iconType === 'artist' && artistData) {
+          // Artist icon - centered at bottom
+          const centerX = innerX + innerW / 2 - 12;
+          doc.addImage(artistData, 'PNG', centerX, iconY - 4, 24, 20);
         }
       }
     }
@@ -484,7 +516,7 @@ async function generatePdf() {
     doc.save(filename);
 
     statusEl.textContent = '✓ Downloaded';
-    setTimeout(() => { statusEl.textContent = ''; dlBtn.disabled = false; }, 3000);
+    setTimeout(() => { statusEl.textContent = ''; dlBtn.disabled = false; updatePreview(); }, 3000);
 
   } catch (e) {
     console.error(e);
