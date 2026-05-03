@@ -87,7 +87,7 @@
 <body>
 <div class="top-bar"></div>
 <header>
-  <img src="logo.png" alt="WFA">
+  <img src="logo.jpg" alt="WFA">
   <div class="header-divider"></div>
   <div>
     <div class="school-name">Wallscourt Farm Academy</div>
@@ -323,8 +323,8 @@ function updatePreview() {
   const previewName = names.length > 0 ? names[0] : '[Name]';
   const bgColour = yearData?.hex || '#ccc';
 
-  // Scale preview to fit
-  const scale = currentLabelType === 'drawer' ? 2 : 2;
+  // Preview at 2x scale
+  const scale = 2;
   const previewW = config.width * scale;
   const previewH = config.height * scale;
   const previewBorder = config.border * scale;
@@ -333,13 +333,17 @@ function updatePreview() {
   const innerW = (config.width - config.border * 2) * scale;
   const innerH = (config.height - config.border * 2) * scale;
 
+  // Text sizes (preview at 2x scale)
+  const fontSize = currentLabelType === 'drawer' ? 36 : 12.6; // 54pt / 1.5 ≈ 36px, 19pt / 1.5 ≈ 12.6px
+  const logoH = currentLabelType === 'drawer' ? 14 : 4.5; // mm scaled to preview
+
   labelPreview.style.width = previewW + 'px';
   labelPreview.style.height = previewH + 'px';
 
   let html = `
     <div style="position:absolute;inset:0;background:${bgColour};">
-      <div style="position:absolute;top:${previewBorder}px;left:${previewBorder}px;width:${innerW}px;height:${innerH}px;background:white;display:flex;align-items:center;justify-content:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:${currentLabelType === 'drawer' ? 14 : 7}px;font-weight:bold;color:#1e2d3d;text-align:center;padding:4px;">
-        ${logoData ? `<img src="${logoData}" style="height:${currentLabelType === 'drawer' ? 20 : 8}px;margin-right:6px;object-fit:contain;">` : ''}
+      <div style="position:absolute;top:${previewBorder}px;left:${previewBorder}px;width:${innerW}px;height:${innerH}px;background:white;display:flex;align-items:center;justify-content:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:${fontSize}px;font-weight:bold;color:#1e2d3d;">
+        ${logoData ? `<img src="${logoData}" style="height:${logoH * scale}px;margin-right:4px;object-fit:contain;">` : ''}
         <span>${previewName}</span>
       </div>
     </div>
@@ -434,26 +438,28 @@ async function generatePdf() {
           doc.rect(x + config.border, y + config.border, innerW, innerH, 'F');
 
           // Add logo and name
+          // Text: 54pt for drawer, 19pt for peg (proportionally scaled)
+          const fontSize = currentLabelType === 'drawer' ? 54 : 19;
+          // Logo: 18mm for drawer, 6mm for peg
+          const logoH = currentLabelType === 'drawer' ? 18 : 6;
+          const logoW = logoH; // Square
+
           if (logoData) {
-            const logoH = currentLabelType === 'drawer' ? 10 : 3.5;
-            const logoW = logoH; // Square
-            const logoX = x + config.border + 2;
+            const logoX = x + config.border + 3;
             const logoY = y + config.border + (innerH - logoH) / 2;
 
-            doc.addImage(logoData, 'PNG', logoX, logoY, logoW, logoH);
+            doc.addImage(logoData, 'JPEG', logoX, logoY, logoW, logoH);
 
-            // Name text
-            const fontSize = currentLabelType === 'drawer' ? 14 : 6;
+            // Name text - to the right of logo
             doc.setFontSize(fontSize);
             doc.setFont(fontName, 'normal');
             doc.setTextColor(30, 45, 61);
 
-            const textX = logoX + logoW + 2;
+            const textX = logoX + logoW + 3;
             const textY = y + config.border + innerH / 2 + fontSize * 0.35;
             doc.text(name, textX, textY);
           } else {
             // Just name, centred
-            const fontSize = currentLabelType === 'drawer' ? 14 : 6;
             doc.setFontSize(fontSize);
             doc.setFont(fontName, 'normal');
             doc.setTextColor(30, 45, 61);
