@@ -177,7 +177,7 @@ const LABEL_TYPES = {
   'writers-journal': { title: "Writer's Journal", hasZone: true, iconType: 'stob', showLogo: true },
   'maths-book': { title: "Mathematician", hasZone: true, iconType: 'maths', showLogo: true },
   'maths-journal': { title: "Maths Journal", hasZone: true, iconType: 'maths', showLogo: true },
-  'artist': { title: "Artist", hasZone: false, iconType: 'artist', greyBorder: true }
+  'artist': { title: "Artist", hasZone: false, iconType: 'artist', greyBorder: true, showLogo: true }
 };
 
 // State
@@ -344,7 +344,12 @@ function updatePreview() {
 
   // Preview uses mm units to match PDF exactly
   // White box: 108mm x 73mm, centred in label (15.5mm from left, 13.05mm from top)
-  // Content positions: name 14mm, book 26mm, logo 34mm, zone 54mm, label 60mm
+  // Artist label has different positions (no zone, more space)
+
+  const isArtist = currentLabelType === 'artist';
+  const nameTop = isArtist ? '8mm' : '14mm';
+  const titleTop = isArtist ? '20mm' : '26mm';
+  const logoTop = isArtist ? '30mm' : '34mm';
 
   let html = `
     <div style="position:absolute;inset:0;background:${bgColour};">
@@ -360,15 +365,15 @@ function updatePreview() {
     html += `<div style="position:absolute;top:2mm;right:2mm;font-family:'Tw Cen MT',Arial,sans-serif;font-size:11pt;font-weight:bold;">${bookNumber}</div>`;
   }
 
-  // Name (centred, 14mm from top of white box) - 28pt font
-  html += `<div style="position:absolute;top:14mm;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:28pt;font-weight:bold;text-decoration:underline;">${previewName}</div>`;
+  // Name (centred) - 28pt font
+  html += `<div style="position:absolute;top:${nameTop};left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:28pt;font-weight:bold;text-decoration:underline;">${previewName}</div>`;
 
-  // Book name (centred, 26mm from top) - 22pt font
-  html += `<div style="position:absolute;top:26mm;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:22pt;font-weight:bold;">${labelType.title}</div>`;
+  // Book name (centred) - 22pt font
+  html += `<div style="position:absolute;top:${titleTop};left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:22pt;font-weight:bold;">${labelType.title}</div>`;
 
-  // School logo (centred, 34mm from top)
+  // School logo (centred)
   if (labelType.showLogo && schoolLogoData) {
-    html += `<img src="${schoolLogoData}" style="position:absolute;top:34mm;left:50%;transform:translateX(-50%);width:40mm;height:17.4mm;object-fit:contain;">`;
+    html += `<img src="${schoolLogoData}" style="position:absolute;top:${logoTop};left:50%;transform:translateX(-50%);width:40mm;height:17.4mm;object-fit:contain;">`;
   }
 
   // Maths icon (top left of white box)
@@ -498,33 +503,38 @@ async function generatePdf() {
           doc.text(bookNumber, innerX + WHITE_W - 4 - numW, innerY + 6);
         }
 
-        // Name (centred, 14mm from top of white box)
+        // Name (centred) - positions vary by label type
+        // Artist: 8mm, others: 14mm
         // PDF y is baseline, so add font height above baseline (≈75% of font size in mm)
         // 28pt ≈ 9.9mm, height above baseline ≈ 7.4mm
+        const nameTop = currentLabelType === 'artist' ? 8 : 14;
+        const titleTop = currentLabelType === 'artist' ? 20 : 26;
+        const logoTop = currentLabelType === 'artist' ? 30 : 34;
+
         doc.setFont(fontName, 'normal');
         doc.setFontSize(28);
         doc.setTextColor(0, 0, 0);
         const nameW = doc.getTextWidth(name);
-        const nameY = innerY + 14 + 7.4; // 14mm top + font height above baseline
+        const nameY = innerY + nameTop + 7.4; // top + font height above baseline
         doc.text(name, innerX + (WHITE_W - nameW) / 2, nameY);
         // Underline (1mm below baseline)
         doc.setDrawColor(0);
         doc.setLineWidth(0.5);
         doc.line(innerX + (WHITE_W - nameW) / 2, nameY + 1, innerX + (WHITE_W + nameW) / 2, nameY + 1);
 
-        // Book name (centred, 26mm from top of white box)
+        // Book name (centred)
         // 22pt ≈ 7.8mm, height above baseline ≈ 5.8mm
         doc.setFont(fontName, 'normal');
         doc.setFontSize(22);
         const titleW = doc.getTextWidth(labelType.title);
-        doc.text(labelType.title, innerX + (WHITE_W - titleW) / 2, innerY + 26 + 5.8);
+        doc.text(labelType.title, innerX + (WHITE_W - titleW) / 2, innerY + titleTop + 5.8);
 
-        // School logo (centred, 34mm from top of white box)
+        // School logo (centred)
         if (labelType.showLogo && schoolLogoData) {
           const logoW = 40;
           const logoH = 17.4;
           const logoL = innerX + (WHITE_W - logoW) / 2;
-          doc.addImage(schoolLogoData, 'PNG', logoL, innerY + 34, logoW, logoH);
+          doc.addImage(schoolLogoData, 'PNG', logoL, innerY + logoTop, logoW, logoH);
         }
 
         // Maths icon (top left of white box)
