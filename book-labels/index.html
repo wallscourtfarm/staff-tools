@@ -203,6 +203,7 @@
     <!-- Download -->
     <button class="btn-dl" id="dlBtn" onclick="generateDocx()" disabled>↓ Download Label Sheet (DOCX)</button>
     <div class="status" id="status"></div>
+    <div id="labelCount" style="text-align:center;font-size:0.75rem;color:var(--muted);margin-top:4px;"></div>
 
   </div>
 </main>
@@ -349,6 +350,13 @@ function updatePreview() {
   // For Artist labels, year is not required (grey border)
   const needsYear = !labelType.greyBorder;
   dlBtn.disabled = names.length === 0 || (needsYear && !currentYear);
+
+  // Show count
+  const countEl = document.getElementById('labelCount');
+  if (countEl) {
+    const sheets = Math.ceil(names.length / 4);
+    countEl.textContent = names.length > 0 ? `${names.length} names → ${sheets} sheet${sheets > 1 ? 's' : ''} (4 labels per sheet)` : '';
+  }
 }
 
 // Event handlers
@@ -451,10 +459,28 @@ async function generateDocx() {
       return bytes;
     };
 
-    // Avery L7169 dimensions in twips (1mm ≈ 567 twips)
-    const LABEL_W = Math.round(139.0 * 567);  // ~78783 twips
-    const LABEL_H = Math.round(99.1 * 567);   // ~56190 twips
-    const INNER_MARGIN = Math.round(3 * 567); // 3mm margin inside coloured border
+    // Avery L7169: 4 labels per sheet (2x2), 139 x 99.1mm
+    // A4 = 210 x 297mm
+    // In twips: 1mm ≈ 56.7 twips (not 567!)
+    // Actually: 1 inch = 1440 twips, 1 inch = 25.4mm
+    // So 1mm = 1440/25.4 ≈ 56.7 twips
+
+    const MM_TO_TWIPS = 56.7;
+    const LABEL_W_MM = 139;
+    const LABEL_H_MM = 99.1;
+    const LABEL_W = Math.round(LABEL_W_MM * MM_TO_TWIPS);  // ~7878 twips
+    const LABEL_H = Math.round(LABEL_H_MM * MM_TO_TWIPS);  // ~5619 twips
+    const MARGIN_MM = 3;
+    const MARGIN = Math.round(MARGIN_MM * MM_TO_TWIPS);
+
+    // A4 dimensions
+    const A4_W = Math.round(210 * MM_TO_TWIPS);  // ~11907 twips
+    const A4_H = Math.round(297 * MM_TO_TWIPS);   // ~16839 twips
+
+    // Page margins for Avery L7169
+    // Labels are centered with gaps
+    const SIDE_MARGIN = Math.round((210 - 2 * LABEL_W_MM) / 2 * MM_TO_TWIPS);
+    const TOP_MARGIN = Math.round((297 - 2 * LABEL_H_MM) / 2 * MM_TO_TWIPS);
 
     // Prepare images
     const schoolLogoBytes = schoolLogoData ? base64ToUint8(schoolLogoData) : null;
@@ -462,61 +488,123 @@ async function generateDocx() {
     const mathsIconBytes = mathsIconData ? base64ToUint8(mathsIconData) : null;
     const artistIconBytes = artistIconData ? base64ToUint8(artistIconData) : null;
 
-    // Fill names to complete sheets (8 per sheet)
-    const sheetsNeeded = Math.ceil(names.length / 8);
-    const totalLabels = Math.max(sheetsNeeded * 8, 8);
+    // Fill names to complete sheets (4 per sheet for L7169)
+    const sheetsNeeded = Math.ceil(names.length / 4) || 1;
     const allNames = [...names];
-    while (allNames.length < totalLabels) allNames.push('');
+    while (allNames.length < sheetsNeeded * 4) allNames.push('');
+
+    // No border style
+    const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+    const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
 
     // Create sections (one per sheet)
     const sections = [];
 
     for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
-      const sheetNames = allNames.slice(sheetIdx * 8, (sheetIdx + 1) * 8);
+      const sheetNames = allNames.slice(sheetIdx * 4, (sheetIdx + 1) * 4);
       const rows = [];
 
-      for (let rowIdx = 0; rowIdx < 4; rowIdx++) {
+      // 2 rows per sheet
+      for (let rowIdx = 0; rowIdx < 2; rowIdx++) {
         const cells = [];
 
+        // 2 columns per row
         for (let colIdx = 0; colIdx < 2; colIdx++) {
           const nameIdx = rowIdx * 2 + colIdx;
           const name = sheetNames[nameIdx] || '';
 
-          // Build cell content
-          const cellContent = [];
+          // Build inner content (white area)
+          const innerContent = [];
 
           if (name) {
-            // Name (underlined, bold, 14pt)
-            cellContent.push(new Paragraph({
-              children: [
-                new TextRun({ text: name, bold: true, size: 28, font: 'Calibri', underline: {} })
-              ],
-              spacing: { after: 80, before: 0, line: 280 }
+            // Name (underlined)
+            innerContent.push(new Paragraph({
+              children: [new TextRun({ text: name, bold: true, size: 32, font: 'Calibri', underline: {} })],
+              spacing: { after: 100, before: 0 }
             }));
 
-            // Title (bold, 12pt)
-            cellContent.push(new Paragraph({
-              children: [
-                new TextRun({ text: labelType.title, bold: true, size: 24, font: 'Calibri' })
-              ],
-              spacing: { after: 60, before: 0, line: 280 }
+            // Title
+            innerContent.push(new Paragraph({
+              children: [new TextRun({ text: labelType.title, bold: true, size: 26, font: 'Calibri' })],
+              spacing: { after: 80, before: 0 }
             }));
 
             // Learning Zone (if applicable)
             if (labelType.hasZone && yearData) {
-              cellContent.push(new Paragraph({
-                children: [
-                  new TextRun({ text: yearData.zone, bold: true, size: 22, font: 'Calibri' })
-                ],
-                spacing: { after: 0, before: 0, line: 280 }
+              innerContent.push(new Paragraph({
+                children: [new TextRun({ text: yearData.zone, bold: true, size: 24, font: 'Calibri' })],
+                spacing: { after: 0, before: 0 }
               }));
-              cellContent.push(new Paragraph({
-                children: [
-                  new TextRun({ text: 'Learning Zone', size: 18, font: 'Calibri', color: '666666' })
-                ],
-                spacing: { after: 60, before: 0, line: 280 }
+              innerContent.push(new Paragraph({
+                children: [new TextRun({ text: 'Learning Zone', size: 20, font: 'Calibri', color: '666666' })],
+                spacing: { after: 0, before: 0 }
               }));
             }
+          }
+
+          // Create inner cell (white background)
+          const innerCell = new TableCell({
+            width: { size: LABEL_W - MARGIN * 2, type: WidthType.DXA },
+            shading: { fill: 'FFFFFF' },
+            borders: noBorders,
+            margins: { top: 150, bottom: 150, left: 200, right: 200 },
+            children: innerContent.length > 0 ? innerContent : [new Paragraph({ children: [] })]
+          });
+
+          // Create outer cell (coloured background)
+          const outerCell = new TableCell({
+            width: { size: LABEL_W, type: WidthType.DXA },
+            height: { value: LABEL_H, rule: HeightRule.EXACT },
+            shading: { fill: bgColour },
+            borders: noBorders,
+            margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
+            children: [innerCell]
+          });
+
+          cells.push(outerCell);
+        }
+
+        rows.push(new TableRow({ children: cells }));
+      }
+
+      // Create table for this sheet
+      const table = new Table({
+        width: { size: A4_W, type: WidthType.DXA },
+        rows: rows
+      });
+
+      // Create section
+      sections.push({
+        properties: {
+          page: {
+            size: { width: A4_W, height: A4_H },
+            margins: { top: TOP_MARGIN, bottom: TOP_MARGIN, left: SIDE_MARGIN, right: SIDE_MARGIN }
+          }
+        },
+        children: [table]
+      });
+    }
+
+    const doc = new Document({ sections });
+
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `WFA_Book_Labels_${currentLabelType.replace(/-/g, '_')}_${currentYear || 'Artist'}.docx`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    status.textContent = '✓ Downloaded';
+    setTimeout(() => { status.textContent = ''; dlBtn.disabled = false; }, 3000);
+
+  } catch (e) {
+    console.error(e);
+    status.className = 'status error';
+    status.textContent = 'Error: ' + e.message;
+    dlBtn.disabled = false;
+  }
+}
 
             // Book number (top right position handled separately)
             // Icons are also handled in a separate section
