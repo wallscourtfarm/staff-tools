@@ -77,6 +77,9 @@
     .label-preview { width: 139mm; height: 99.1mm; position: relative; overflow: hidden; background: #3288ce; }
     .white-box { position: absolute; background: white; top: 13.05mm; left: 15.5mm; width: 108mm; height: 73mm; font-family: 'Tw Cen MT', Arial, sans-serif; }
 
+    .all-labels-checkbox { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 0.85rem; color: var(--text); cursor: pointer; }
+    .all-labels-checkbox input { width: 18px; height: 18px; cursor: pointer; accent-color: var(--blue); }
+
     footer { text-align: center; color: var(--muted); font-size: 0.7rem; padding: 14px; }
     .hidden { display: none !important; }
   </style>
@@ -99,12 +102,15 @@
       <div class="card-body">
         <div class="mode-tabs" id="labelTypeTabs">
           <button class="mode-tab active" data-type="learning-journey">Learning Journey</button>
-          <button class="mode-tab" data-type="home-learning">Home Learning</button>
-          <button class="mode-tab" data-type="writers-journal">Writer's Journal</button>
           <button class="mode-tab" data-type="maths-book">Maths Book</button>
-          <button class="mode-tab" data-type="maths-journal">Maths Journal</button>
+          <button class="mode-tab" data-type="home-learning">Home Learning</button>
           <button class="mode-tab" data-type="artist">Artist</button>
+          <button class="mode-tab" data-type="writers-journal">Writer's Journal</button>
+          <button class="mode-tab" data-type="maths-journal">Maths Journal</button>
         </div>
+        <label class="all-labels-checkbox">
+          <input type="checkbox" id="allLabels"> Generate all label types for each child
+        </label>
       </div>
     </div>
 
@@ -185,10 +191,11 @@ let currentLabelType = 'learning-journey';
 let currentYear = null;
 let names = [];
 let bookNumber = '';
+let allLabelsMode = false;
 
 // DOM elements
 let labelTypeTabs, yearGrid, yearGroupCard, namesInput, fileInput;
-let dlBtn, statusEl, bookNumberInput, labelPreview, labelCount;
+let dlBtn, statusEl, bookNumberInput, labelPreview, labelCount, allLabelsCheckbox;
 
 // Images (loaded as base64 for PDF)
 let schoolLogoData = null;
@@ -212,6 +219,7 @@ async function init() {
   bookNumberInput = document.getElementById('bookNumber');
   labelPreview = document.getElementById('labelPreview');
   labelCount = document.getElementById('labelCount');
+  allLabelsCheckbox = document.getElementById('allLabels');
 
   // Load images and font
   await Promise.all([loadImages(), loadFont()]);
@@ -223,8 +231,19 @@ async function init() {
   bookNumberInput.addEventListener('input', onBookNumberInput);
   fileInput.addEventListener('change', onFileUpload);
   dlBtn.addEventListener('click', generatePdf);
+  allLabelsCheckbox.addEventListener('change', onAllLabelsChange);
 
   // Initial preview
+  updatePreview();
+}
+
+function onAllLabelsChange() {
+  allLabelsMode = allLabelsCheckbox.checked;
+  // Disable tab clicks when in all-labels mode
+  labelTypeTabs.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.style.opacity = allLabelsMode ? '0.5' : '1';
+    tab.style.pointerEvents = allLabelsMode ? 'none' : 'auto';
+  });
   updatePreview();
 }
 
@@ -399,19 +418,33 @@ function updatePreview() {
   labelPreview.innerHTML = html;
 
   // Update button state
-  const needsYear = !labelType.greyBorder;
+  const needsYear = !labelType.greyBorder && !allLabelsMode;
   dlBtn.disabled = names.length === 0 || (needsYear && !currentYear);
 
   // Update count
-  const sheets = Math.ceil(names.length / 4);
-  labelCount.textContent = names.length > 0 ? `${names.length} names → ${sheets} sheet${sheets > 1 ? 's' : ''} (4 per sheet)` : '';
+  if (allLabelsMode) {
+    const totalLabels = names.length * 6; // 6 label types per child
+    const sheets = Math.ceil(totalLabels / 4);
+    labelCount.textContent = names.length > 0 ? `${names.length} child${names.length > 1 ? 'ren' : ''} × 6 labels → ${totalLabels} labels → ${sheets} sheet${sheets > 1 ? 's' : ''}` : '';
+  } else {
+    const sheets = Math.ceil(names.length / 4);
+    labelCount.textContent = names.length > 0 ? `${names.length} names → ${sheets} sheet${sheets > 1 ? 's' : ''} (4 per sheet)` : '';
+  }
 }
 
 async function generatePdf() {
   const { jsPDF } = window.jspdf;
-  const labelType = LABEL_TYPES[currentLabelType];
+
+  // Define label types order for "all labels" mode
+  const ALL_LABEL_TYPES = ['learning-journey', 'maths-book', 'home-learning', 'artist', 'writers-journal', 'maths-journal'];
+
+  // Get label types to generate
+  const typesToGenerate = allLabelsMode
+    ? ALL_LABEL_TYPES
+    : [currentLabelType];
+
+  // Get year data
   const yearData = currentYear ? YEAR_COLOURS[currentYear] : null;
-  const bgColour = labelType.greyBorder ? '#808080' : yearData.hex;
 
   statusEl.className = 'status';
   statusEl.textContent = 'Building…';
@@ -420,8 +453,6 @@ async function generatePdf() {
   try {
     // A4 LANDSCAPE: 297mm x 210mm
     // Avery L7169: 4 labels per sheet (2x2), each 139 x 99.1mm
-    const LABEL_W = 139;
-    const LABEL_H = 99.1;
     const WHITE_W = 108;
     const WHITE_H = 73;
     const BORDER_L = (139 - 108) / 2;  // 15.5mm
@@ -435,10 +466,21 @@ async function generatePdf() {
       { x: 9.5 + 139, y: 5.4 + 99.1 }             // bottom-right
     ];
 
-    // Fill names to complete sheets
-    const sheetsNeeded = Math.ceil(names.length / 4) || 1;
-    const allNames = [...names];
-    while (allNames.length < sheetsNeeded * 4) allNames.push('');
+    // Build list of labels to generate
+    // In all-labels mode: each child gets all 6 label types
+    // In single mode: each child gets the selected label type
+    const labelsToGenerate = [];
+    for (const name of names) {
+      for (const typeKey of typesToGenerate) {
+        labelsToGenerate.push({ name, typeKey });
+      }
+    }
+
+    // Fill to complete sheets
+    const sheetsNeeded = Math.ceil(labelsToGenerate.length / 4) || 1;
+    while (labelsToGenerate.length < sheetsNeeded * 4) {
+      labelsToGenerate.push(null);
+    }
 
     // Create PDF
     const doc = new jsPDF({
@@ -461,32 +503,37 @@ async function generatePdf() {
       return [r, g, b];
     }
 
-    const [r, g, b] = hexToRgb(bgColour);
     const fontName = fontBase64 ? 'TwCenMT' : 'helvetica';
 
     for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
       if (sheetIdx > 0) doc.addPage();
 
-      const sheetNames = allNames.slice(sheetIdx * 4, (sheetIdx + 1) * 4);
-
-      // Fill entire page with colour
-      doc.setFillColor(r, g, b);
-      doc.rect(0, 0, 297, 210, 'F');
+      const sheetLabels = labelsToGenerate.slice(sheetIdx * 4, (sheetIdx + 1) * 4);
 
       for (let i = 0; i < 4; i++) {
-        const name = sheetNames[i];
+        const labelData = sheetLabels[i];
         const pos = labelPositions[i];
+
+        if (!labelData) continue;
+
+        const { name, typeKey } = labelData;
+        const labelType = LABEL_TYPES[typeKey];
+        const labelYearData = labelType.hasZone ? yearData : null;
+        const bgColour = labelType.greyBorder ? '#808080' : (labelYearData?.hex || '#ccc');
+        const [r, g, b] = hexToRgb(bgColour);
+
+        // Fill label background
+        doc.setFillColor(r, g, b);
+        doc.rect(pos.x, pos.y, 139, 99.1, 'F');
 
         // Draw white box
         doc.setFillColor(255, 255, 255);
         doc.rect(pos.x + BORDER_L, pos.y + BORDER_T, WHITE_W, WHITE_H, 'F');
 
-        if (!name) continue;
-
         const innerX = pos.x + BORDER_L;
         const innerY = pos.y + BORDER_T;
 
-        // States of Being overlay (centred, near top)
+        // States of Being overlay
         if (labelType.iconType === 'stob' && stobData) {
           const stobW = 105;
           const stobH = 67;
@@ -503,33 +550,30 @@ async function generatePdf() {
           doc.text(bookNumber, innerX + WHITE_W - 4 - numW, innerY + 6);
         }
 
-        // Name (centred) - positions vary by label type
-        // Artist: 8mm, others: 14mm
-        // PDF y is baseline, so add font height above baseline (≈75% of font size in mm)
-        // 28pt ≈ 9.9mm, height above baseline ≈ 7.4mm
-        const nameTop = currentLabelType === 'artist' ? 8 : 14;
-        const titleTop = currentLabelType === 'artist' ? 20 : 26;
-        const logoTop = currentLabelType === 'artist' ? 30 : 34;
+        // Positions vary by label type
+        const isArtist = typeKey === 'artist';
+        const nameTop = isArtist ? 8 : 14;
+        const titleTop = isArtist ? 20 : 26;
+        const logoTop = isArtist ? 30 : 34;
 
+        // Name
         doc.setFont(fontName, 'normal');
         doc.setFontSize(28);
         doc.setTextColor(0, 0, 0);
         const nameW = doc.getTextWidth(name);
-        const nameY = innerY + nameTop + 7.4; // top + font height above baseline
+        const nameY = innerY + nameTop + 7.4;
         doc.text(name, innerX + (WHITE_W - nameW) / 2, nameY);
-        // Underline (1mm below baseline)
         doc.setDrawColor(0);
         doc.setLineWidth(0.5);
         doc.line(innerX + (WHITE_W - nameW) / 2, nameY + 1, innerX + (WHITE_W + nameW) / 2, nameY + 1);
 
-        // Book name (centred)
-        // 22pt ≈ 7.8mm, height above baseline ≈ 5.8mm
+        // Book name
         doc.setFont(fontName, 'normal');
         doc.setFontSize(22);
         const titleW = doc.getTextWidth(labelType.title);
         doc.text(labelType.title, innerX + (WHITE_W - titleW) / 2, innerY + titleTop + 5.8);
 
-        // School logo (centred)
+        // School logo
         if (labelType.showLogo && schoolLogoData) {
           const logoW = 40;
           const logoH = 17.4;
@@ -537,14 +581,14 @@ async function generatePdf() {
           doc.addImage(schoolLogoData, 'PNG', logoL, innerY + logoTop, logoW, logoH);
         }
 
-        // Maths icon (top left of white box)
+        // Maths icon
         if (labelType.iconType === 'maths' && mathsData) {
           const iconW = 16;
           const iconH = 12;
           doc.addImage(mathsData, 'PNG', innerX + 2, innerY + 2, iconW, iconH);
         }
 
-        // Artist icon (centred near bottom)
+        // Artist icon
         if (labelType.iconType === 'artist' && artistData) {
           const iconW = 20;
           const iconH = 16;
@@ -552,17 +596,13 @@ async function generatePdf() {
           doc.addImage(artistData, 'PNG', iconL, innerY + WHITE_H - 22, iconW, iconH);
         }
 
-        // Learning Zone (if applicable)
-        if (labelType.hasZone && yearData) {
-          // Zone name (centred, 54mm from top of white box)
-          // 18pt ≈ 6.4mm, height above baseline ≈ 4.8mm
+        // Learning Zone
+        if (labelType.hasZone && labelYearData) {
           doc.setFont(fontName, 'normal');
           doc.setFontSize(18);
-          const zoneW = doc.getTextWidth(yearData.zone);
-          doc.text(yearData.zone, innerX + (WHITE_W - zoneW) / 2, innerY + 54 + 4.8);
+          const zoneW = doc.getTextWidth(labelYearData.zone);
+          doc.text(labelYearData.zone, innerX + (WHITE_W - zoneW) / 2, innerY + 54 + 4.8);
 
-          // "Learning Zone" label (centred, 60mm from top of white box)
-          // 12pt ≈ 4.2mm, height above baseline ≈ 3.2mm
           doc.setFont(fontName, 'normal');
           doc.setFontSize(12);
           doc.setTextColor(102, 102, 102);
@@ -572,7 +612,9 @@ async function generatePdf() {
       }
     }
 
-    const filename = `WFA_Book_Labels_${currentLabelType.replace(/-/g, '_')}_${currentYear || 'Artist'}.pdf`;
+    const filename = allLabelsMode
+      ? `WFA_Book_Labels_All_${currentYear || 'NoYear'}.pdf`
+      : `WFA_Book_Labels_${currentLabelType.replace(/-/g, '_')}_${currentYear || 'Artist'}.pdf`;
     doc.save(filename);
 
     statusEl.textContent = '✓ Downloaded';
