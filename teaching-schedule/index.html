@@ -259,6 +259,19 @@
     .chip-note.hidden { display: none; }
     .cell-chip:hover { box-shadow: 0 3px 8px rgba(15,23,42,.08); }
 
+    /* ── TP Activity chips (with remove X) ───────────────────────────── */
+    .tp-activity { position: relative; }
+    .tp-activity .chip-top { padding-right: 4px; }
+    .tp-remove {
+      position: absolute; top: 2px; right: 2px;
+      background: rgba(255,255,255,0.9); border: none; border-radius: 50%;
+      width: 16px; height: 16px; font-size: 12px; line-height: 1;
+      color: #94a3b8; cursor: pointer; opacity: 0; transition: opacity .15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .tp-activity:hover .tp-remove { opacity: 1; }
+    .tp-remove:hover { color: #dc2626; background: #fee2e2; }
+
     /* ── Non-school day ────────────────────────────────────────────── */
     .non-school-day { background: #f1f5f9 !important; position: relative; }
     .non-school-day .session-label,
@@ -475,6 +488,7 @@
 const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
 const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbwlNv08Z0cFSgKq_1zcrQw9I2I9ewg8Stj6kcQjSZaBm_uscbIC0V225ez6mVvg75sVfQ/exec';
+const EXCEPTIONS_URL = ''; // TODO: Deploy activity-exceptions.gs and paste URL here
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const DAY_SHORT = ['Mon','Tue','Wed','Thu','Fri'];
@@ -635,6 +649,7 @@ let SHEET_SUBJECT_GROUPS = [];
 let SHEET_INTERVENTIONS = [];
 let SHEET_DAY_STRUCTURES = [];
 let TP_ACTIVITIES = [];
+let ACTIVITY_EXCEPTIONS = []; // { date, staff, activity, session }
 
 // Flat lookup: name → col
 const SUBJECT_COL = {};
@@ -1052,14 +1067,28 @@ function parseDayRange(dayStr) {
   return [...days].sort((a, b) => a - b);
 }
 
-function getTPActivities(staffName, dayIndex) {
+function getTPActivities(staffName, dayIndex, dateKey = null) {
   // dayIndex: 1=Mon, 2=Tue, ... 5=Fri
   if (!TP_ACTIVITIES.length) return [];
   return TP_ACTIVITIES.filter(row => {
     const name = (row.Staff || '').trim();
     if (name !== staffName) return false;
     const days = parseDayRange(row.Day);
-    return days.includes(dayIndex);
+    if (!days.includes(dayIndex)) return false;
+
+    // Check for exception (this specific date is excluded)
+    if (dateKey && ACTIVITY_EXCEPTIONS.length) {
+      const activityName = (row.Activity || '').trim();
+      const session = (row.Session || '').trim();
+      const isExcepted = ACTIVITY_EXCEPTIONS.some(exc =>
+        exc.date === dateKey &&
+        (exc.staff || '').trim() === staffName &&
+        (exc.activity || '').trim() === activityName
+      );
+      if (isExcepted) return false;
+    }
+
+    return true;
   }).map(row => ({
     name: (row.Activity || '').trim(),
     session: (row.Session || '').trim(),
@@ -1088,11 +1117,12 @@ function activityMatchesSession(activity, rowId, rowData) {
   return false;
 }
 
-function renderTPActivityChip(activity) {
+function renderTPActivityChip(activity, staffName = '', dateKey = '') {
   const displayName = activity.session.includes(':')
     ? `${activity.name} (${activity.session})`
     : activity.name;
   return `<div class="cell-chip tp-activity" style="background:${activity.colour}20;border:1.5px dashed ${activity.colour}" data-tp-activity="true">
+    <button class="tp-remove" title="Remove this instance" data-staff="${escAttr(staffName)}" data-date="${escAttr(dateKey)}" data-activity="${escAttr(activity.name)}" data-session="${escAttr(activity.session)}" onclick="removeTPActivity(this)">×</button>
     <div class="chip-top">
       <span class="chip-colour" style="background:${activity.colour}"></span>
       <span class="chip-name" style="color:${activity.colour}">${escHtml(displayName)}</span>
@@ -1484,13 +1514,15 @@ function renderBody() {
           }).join('');
           const soTags = soList.filter(s => s.isFirst).map(s => `<div class="staff-out-tag" style="background:${s.colour}">${escHtml(s.label)}${s.cover ? `<span class="staff-out-cover"> · ${escHtml(s.cover)}</span>` : ''}</div>`).join('');
           const pad = soList.length ? `margin-left:${soList.length * 5 + 3}px;` : '';
-          // TP activities for fixed rows (lunch, FAB, etc.)
+          const cellDate = new Date(mon); cellDate.setDate(mon.getDate() + di);
+          const dk = dateKey(cellDate);
+                    // TP activities for fixed rows (lunch, FAB, etc.)
           let tpActHtml = '';
           if (view !== 'master') {
             const staffMember = STAFF.find(s => s.id === view);
             const staffName = staffMember ? staffMember.name : '';
-            const tpActs = getTPActivities(staffName, di + 1).filter(a => activityMatchesSession(a, row.id, row));
-            tpActHtml = tpActs.map(a => renderTPActivityChip(a)).join('');
+            const tpActs = getTPActivities(staffName, di + 1, dk).filter(a => activityMatchesSession(a, row.id, row));
+            tpActHtml = tpActs.map(a => renderTPActivityChip(a, staffName, dk)).join('');
           } else {
             // On master view, show TP activities for all staff in this year group
             const staffInYG = STAFF.filter(s => {
@@ -1501,10 +1533,10 @@ function renderBody() {
             });
             const allTpActs = [];
             staffInYG.forEach(s => {
-              const acts = getTPActivities(s.name, di + 1).filter(a => activityMatchesSession(a, row.id, row));
+              const acts = getTPActivities(s.name, di + 1, dk).filter(a => activityMatchesSession(a, row.id, row));
               allTpActs.push(...acts);
             });
-            tpActHtml = allTpActs.map(a => renderTPActivityChip(a)).join('');
+            tpActHtml = allTpActs.map(a => renderTPActivityChip(a, '', dk)).join('');
           }
           return `<td class="view-cell">${strips}${soTags}${tpActHtml}<div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div></td>`;
         }).join('')}
@@ -1549,8 +1581,8 @@ function renderBody() {
           // Get TP activities for this staff member and day
           const staffMember = isStaffView ? STAFF.find(s => s.id === view) : null;
           const staffName = staffMember ? staffMember.name : '';
-          const tpActs = isStaffView ? getTPActivities(staffName, di + 1).filter(a => activityMatchesSession(a, row.id, row)) : [];
-          const tpActHtml = tpActs.map(a => renderTPActivityChip(a)).join('');
+          const tpActs = isStaffView ? getTPActivities(staffName, di + 1, dk).filter(a => activityMatchesSession(a, row.id, row)) : [];
+          const tpActHtml = tpActs.map(a => renderTPActivityChip(a, staffName, dk)).join('');
 
           // On master view, also show TP activities for staff in this year group
           let masterTpHtml = '';
@@ -1563,10 +1595,10 @@ function renderBody() {
             });
             const allTpActs = [];
             staffInYG.forEach(s => {
-              const acts = getTPActivities(s.name, di + 1).filter(a => activityMatchesSession(a, row.id, row));
+              const acts = getTPActivities(s.name, di + 1, dk).filter(a => activityMatchesSession(a, row.id, row));
               allTpActs.push(...acts);
             });
-            masterTpHtml = allTpActs.map(a => renderTPActivityChip(a)).join('');
+            masterTpHtml = allTpActs.map(a => renderTPActivityChip(a, '', dk)).join('');
           }
 
           // Build cell content
@@ -1695,6 +1727,29 @@ function removeItem(btn) {
   const slot = getSlot(wk, view, day, session);
   slot.splice(Number(idx), 1);
   persistLocal(); syncSave();
+  renderGrid();
+}
+
+async function removeTPActivity(btn) {
+  const { staff, date, activity, session } = btn.dataset;
+  if (!staff || !date || !activity) return;
+
+  // Add to local exceptions immediately
+  ACTIVITY_EXCEPTIONS.push({ date, staff, activity, session: session || '' });
+
+  // Try to sync to sheet
+  if (EXCEPTIONS_URL) {
+    try {
+      await fetch(EXCEPTIONS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, staff, activity, session: session || '' })
+      });
+    } catch (err) {
+      console.warn('Failed to sync exception to sheet:', err);
+    }
+  }
+
   renderGrid();
 }
 
@@ -2251,6 +2306,9 @@ function closeStaffOutModal() {
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+function escAttr(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
 function setView(view) {
   state.activeView = view;
@@ -2478,7 +2536,7 @@ async function init() {
   renderGrid();
 
   try {
-    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText, tpActivitiesText] = await Promise.all([
+    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText, tpActivitiesText, exceptionsData] = await Promise.all([
       fetch(SHEET_BASE + encodeURIComponent('TermDates')).then(r => { if (!r.ok) throw new Error('Terms tab not found'); return r.text(); }),
       fetch(SHEET_BASE + encodeURIComponent('Events')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('EventsMeetings')).then(r => r.ok ? r.text() : '').catch(() => ''),
@@ -2487,6 +2545,7 @@ async function init() {
       fetch(SHEET_BASE + encodeURIComponent('Interventions')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('DayTimings')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('DayActivities')).then(r => r.ok ? r.text() : '').catch(() => ''),
+	      EXCEPTIONS_URL ? fetch(EXCEPTIONS_URL).then(r => r.ok ? r.json() : {exceptions:[]}).then(d => d.exceptions || []).catch(() => []) : Promise.resolve([]),
     ]);
     WEEKS = buildWeeks(csvToObjects(termsText));
     if (eventsText) {
@@ -2544,6 +2603,11 @@ async function init() {
     // NEW: TPActivities tab
     if (tpActivitiesText) {
       TP_ACTIVITIES = csvToObjects(tpActivitiesText);
+    }
+
+    // Activity exceptions (from deployed Apps Script endpoint)
+    if (exceptionsData && Array.isArray(exceptionsData)) {
+      ACTIVITY_EXCEPTIONS = exceptionsData;
     }
 
     migrateScheduleKeys();
