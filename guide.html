@@ -403,9 +403,15 @@
 
   <p>The After School row shows events from the Google Sheet automatically. These appear as read-only chips — you cannot edit or remove them. They come from two sources:</p>
   <ul>
-    <li><strong>One-off events</strong> from the Events tab (e.g. parents evening on a specific date)</li>
-    <li><strong>Recurring events</strong> from the SchoolEvents tab (e.g. club every Thursday)</li>
+    <li><strong>One-off events</strong> from the CalendarEvents tab (e.g. parents evening on a specific date)</li>
+    <li><strong>Recurring events</strong> from the EventsMeetings tab (e.g. club every Thursday)</li>
   </ul>
+
+  <h3>Day Activities (TP/LP recurring activities)</h3>
+
+  <p>Staff who have regular daily activities (e.g. lunch duty, football club) can have these shown automatically on their schedule. These come from the <strong>DayActivities</strong> tab and appear as dashed-border chips with a colour.</p>
+
+  <p>Hover over a Day Activity chip to see the <strong>×</strong> remove button. Click it to remove that activity for that specific date only — useful if the person is absent or has a conflict. Removed activities are saved to the ActivityExceptions tab and persist across refreshes.</p>
 
   <h3>Staff configuration (⚙ button)</h3>
 
@@ -666,13 +672,15 @@
   <table>
     <tr><th>Tab</th><th>Learning Schedule</th><th>Release Schedule</th><th>FAB Rota</th></tr>
     <tr><td><strong>Staff</strong></td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
-    <tr><td><strong>Terms</strong></td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
-    <tr><td><strong>Events</strong></td><td>Yes</td><td>Yes</td><td>—</td></tr>
-    <tr><td><strong>SchoolEvents</strong></td><td>Yes</td><td>Yes</td><td>—</td></tr>
+    <tr><td><strong>TermDates</strong></td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+    <tr><td><strong>CalendarEvents</strong></td><td>Yes</td><td>Yes</td><td>—</td></tr>
+    <tr><td><strong>EventsMeetings</strong></td><td>Yes</td><td>Yes</td><td>—</td></tr>
     <tr><td><strong>SubjectGroups</strong></td><td>Yes</td><td>—</td><td>—</td></tr>
     <tr><td><strong>Interventions</strong></td><td>Yes</td><td>—</td><td>—</td></tr>
-    <tr><td><strong>DayStructure</strong></td><td>Yes</td><td>—</td><td>—</td></tr>
-    <tr><td><strong>Recurring</strong></td><td>—</td><td>Yes</td><td>—</td></tr>
+    <tr><td><strong>DayTimings</strong></td><td>Yes</td><td>—</td><td>—</td></tr>
+    <tr><td><strong>DayActivities</strong></td><td>Yes</td><td>—</td><td>—</td></tr>
+    <tr><td><strong>ActivityExceptions</strong></td><td>Yes</td><td>—</td><td>—</td></tr>
+    <tr><td><strong>RecurringCover</strong></td><td>—</td><td>Yes</td><td>—</td></tr>
     <tr><td><strong>Plan</strong></td><td>—</td><td>Yes</td><td>—</td></tr>
     <tr><td><strong>Weeks</strong></td><td>—</td><td>Yes (viewer)</td><td>—</td></tr>
   </table>
@@ -695,7 +703,7 @@
     <tr><td><strong>Status</strong></td><td>Release (viewer)</td><td>Set to <code>Illness</code> to show the illness banner.</td></tr>
   </table>
 
-  <h3>Terms tab — column reference</h3>
+  <h3>TermDates tab — column reference</h3>
 
   <table>
     <tr><th>Column</th><th>Notes</th></tr>
@@ -706,7 +714,7 @@
 
   <div class="tip">Populate the full year's teaching weeks at the start of the year. Half terms and holidays should be absent — do not add rows for non-teaching weeks.</div>
 
-  <h3>Events tab — column reference</h3>
+  <h3>CalendarEvents tab — column reference</h3>
 
   <table>
     <tr><th>Column</th><th>Used by</th><th>Notes</th></tr>
@@ -716,10 +724,9 @@
     <tr><td><strong>Type</strong></td><td>Both</td><td>Blocking types: <code>Half Term</code>, <code>INSET 1</code>–<code>INSET 5</code>, <code>Bank Holiday</code>, <code>Christmas</code>, <code>Easter</code>, <code>Summer Holiday</code>, <code>CLF Conference</code>. These grey out the day.</td></tr>
     <tr><td><strong>Label</strong></td><td>Both</td><td>Text shown on the banner or badge.</td></tr>
     <tr><td><strong>Colour</strong></td><td>Both</td><td>Hex colour for event banners.</td></tr>
-    <tr><td><strong>Day</strong></td><td>Learning</td><td>Day of the week for recurring after-school events.</td></tr>
   </table>
 
-  <h3>SchoolEvents tab — column reference</h3>
+  <h3>EventsMeetings tab — column reference</h3>
 
   <table>
     <tr><th>Column</th><th>Notes</th></tr>
@@ -752,7 +759,7 @@
     <tr><td><strong>Colourable</strong></td><td>Set to <code>true</code> to make this chip's colour dot clickable (e.g. HomeZone).</td></tr>
   </table>
 
-  <h3>DayStructure tab — column reference</h3>
+  <h3>DayTimings tab — column reference</h3>
 
   <table>
     <tr><th>Column</th><th>Notes</th></tr>
@@ -768,7 +775,30 @@
 
   <div class="note"><strong>Important:</strong> IDs must be short identifiers, not display labels. Use <code>s3</code> not "Session 3". The label column handles the display name.</div>
 
-  <h3>Recurring tab — column reference</h3>
+  <h3>DayActivities tab — column reference</h3>
+
+  <table>
+    <tr><th>Column</th><th>Notes</th></tr>
+    <tr><td><strong>Staff</strong></td><td>Staff name (must match Staff tab).</td></tr>
+    <tr><td><strong>Day</strong></td><td>Day or day range — <code>Monday</code>, <code>M-F</code> for Monday–Friday, <code>Mon,Wed,Fri</code> for specific days.</td></tr>
+    <tr><td><strong>Activity</strong></td><td>Activity name (e.g. "Football Club", "Lunch Duty").</td></tr>
+    <tr><td><strong>Session</strong></td><td>Time range (e.g. "12:15-13:10") or session ID (e.g. "lunch", "after").</td></tr>
+    <tr><td><strong>Colour</strong></td><td>Hex colour code for the chip.</td></tr>
+  </table>
+
+  <h3>ActivityExceptions tab — column reference</h3>
+
+  <table>
+    <tr><th>Column</th><th>Notes</th></tr>
+    <tr><td><strong>Date</strong></td><td>Date of the removed activity in DD/MM/YYYY format.</td></tr>
+    <tr><td><strong>Staff</strong></td><td>Staff name.</td></tr>
+    <tr><td><strong>Activity</strong></td><td>Activity name that was removed.</td></tr>
+    <tr><td><strong>Session</strong></td><td>Session/time range (optional).</td></tr>
+  </table>
+
+  <div class="tip">The ActivityExceptions tab is populated automatically when you click the <strong>×</strong> button on a Day Activity chip. You can manually delete rows to restore an activity.</div>
+
+  <h3>RecurringCover tab — column reference</h3>
 
   <table>
     <tr><th>Column</th><th>Notes</th></tr>
@@ -841,7 +871,7 @@
   <div class="step">
     <div class="step-num">1</div>
     <div class="step-body">
-      <strong>Add a row to the Events tab</strong>
+      <strong>Add a row to the CalendarEvents tab</strong>
       <p>Enter the date, label (e.g. <em>INSET Day</em>), and type (<code>Half Term</code>, <code>Bank Holiday</code>, <code>INSET 1</code>, etc.).</p>
     </div>
   </div>
@@ -857,7 +887,7 @@
   <div class="step">
     <div class="step-num">1</div>
     <div class="step-body">
-      <strong>Update the DayStructure tab</strong>
+      <strong>Update the DayTimings tab</strong>
       <p>Edit the Time column for the relevant YearGroup rows (e.g. change FAB from <code>10:30-10:45</code> to <code>10:45-11:00</code>).</p>
     </div>
   </div>
@@ -866,6 +896,22 @@
     <div class="step-body">
       <strong>Refresh the Learning Schedule</strong>
       <p>Switch to the affected year group and verify the updated times appear.</p>
+    </div>
+  </div>
+
+  <h3>Adding a recurring activity for a TP or LP</h3>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Add a row to the DayActivities tab</strong>
+      <p>Enter the staff name, day(s), activity name, time range, and colour. Use <code>M-F</code> for every weekday.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Refresh the Learning Schedule</strong>
+      <p>The activity will appear automatically on the relevant staff view and year group master view.</p>
     </div>
   </div>
 
