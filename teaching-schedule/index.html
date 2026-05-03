@@ -1553,11 +1553,12 @@ function renderBody() {
           const isStaffView = (view !== 'master');
           const items = getSlot(wk, view, day, row.id);
           const ownItems = isStaffView ? items : [];
+          // Cell date for checking events and TP activities
+          const cellDate = new Date(mon); cellDate.setDate(mon.getDate() + di);
+          const dk = dateKey(cellDate);
           // After-school: show sheet events as read-only chips
           let afterEvents = '';
           if (row.afterSchool) {
-            const cellDate = new Date(mon); cellDate.setDate(mon.getDate() + di);
-            const dk = dateKey(cellDate);
             const evts = state.afterSchoolEvents[dk] || [];
             const recurring = recurringAfterSchool.filter(r => r.dayIdx === di);
             const allEvts = [...recurring.map(r => ({ label: r.label, bg: r.bg })), ...evts.map(e => ({ label: e.label, bg: e.bg }))];
