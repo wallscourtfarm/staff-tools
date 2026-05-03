@@ -300,29 +300,32 @@ function updatePreview() {
   const bgColour = labelType.greyBorder ? '#808080' : (yearData?.hex || '#ccc');
   const greyBorder = labelType.greyBorder ? 'grey-border' : '';
 
-  // Scale: 139mm x 99.1mm label, preview at ~280px wide
-  // White content area: approximately 90% of label with margins
-  const margin = 8; // mm equivalent in preview pixels
+  // The label is 139mm wide x 99.1mm tall
+  // Preview at about 350px wide (scale factor ~2.5px per mm)
+  const scale = 2.5;
+  const labelW = 139 * scale;  // ~350px
+  const labelH = 99.1 * scale; // ~250px
+  const margin = 3 * scale;    // ~7.5px coloured border
 
   let html = `
-    <div class="label-preview" style="background:${bgColour};padding:${margin}px;border-radius:4px;">
-      <div style="background:white;position:relative;width:100%;min-height:180px;padding:8px 12px;border-radius:2px;">`;
+    <div style="width:${labelW}px;height:${labelH}px;background:${bgColour};padding:${margin}px;border-radius:4px;box-sizing:border-box;">
+      <div style="background:white;width:100%;height:100%;padding:10px 12px;box-sizing:border-box;position:relative;">`;
 
   // Book number (top right of white area)
   if (bookNumber) {
-    html += `<span style="position:absolute;top:6px;right:8px;font-size:0.6rem;font-weight:600;color:#333;">${bookNumber}</span>`;
+    html += `<span style="position:absolute;top:6px;right:8px;font-size:10px;font-weight:600;">${bookNumber}</span>`;
   }
 
   // Name (underlined)
-  html += `<div style="font-size:0.9rem;font-weight:700;text-decoration:underline;margin-bottom:4px;">${previewName}</div>`;
+  html += `<div style="font-size:16px;font-weight:700;text-decoration:underline;margin-bottom:4px;">${previewName}</div>`;
 
   // Title
-  html += `<div style="font-size:0.75rem;font-weight:600;margin-bottom:4px;">${labelType.title}</div>`;
+  html += `<div style="font-size:14px;font-weight:600;margin-bottom:4px;">${labelType.title}</div>`;
 
   // Learning Zone (if applicable)
   if (labelType.hasZone && yearData) {
-    html += `<div style="font-size:0.65rem;font-weight:600;">${yearData.zone}</div>`;
-    html += `<div style="font-size:0.55rem;color:#666;">Learning Zone</div>`;
+    html += `<div style="font-size:12px;font-weight:600;">${yearData.zone}</div>`;
+    html += `<div style="font-size:10px;color:#666;">Learning Zone</div>`;
   }
 
   // Icons at bottom
@@ -330,15 +333,15 @@ function updatePreview() {
 
   if (labelType.iconType === 'stob') {
     if (schoolLogoData) {
-      html += `<img src="${schoolLogoData}" style="height:20px;width:auto;">`;
+      html += `<img src="${schoolLogoData}" style="height:24px;width:auto;">`;
     }
     if (stobIconData) {
-      html += `<img src="${stobIconData}" style="height:20px;width:auto;">`;
+      html += `<img src="${stobIconData}" style="height:24px;width:auto;">`;
     }
   } else if (labelType.iconType === 'maths' && mathsIconData) {
-    html += `<img src="${mathsIconData}" style="height:24px;width:auto;">`;
+    html += `<img src="${mathsIconData}" style="height:28px;width:auto;">`;
   } else if (labelType.iconType === 'artist' && artistIconData) {
-    html += `<img src="${artistIconData}" style="height:24px;width:auto;">`;
+    html += `<img src="${artistIconData}" style="height:28px;width:auto;">`;
   }
 
   html += `</div></div></div>`;
@@ -347,7 +350,6 @@ function updatePreview() {
   previewContainer.className = `preview-label ${greyBorder}`;
 
   // Enable/disable download button
-  // For Artist labels, year is not required (grey border)
   const needsYear = !labelType.greyBorder;
   dlBtn.disabled = names.length === 0 || (needsYear && !currentYear);
 
@@ -460,27 +462,34 @@ async function generateDocx() {
     };
 
     // Avery L7169: 4 labels per sheet (2x2), 139 x 99.1mm
-    // A4 = 210 x 297mm
-    // In twips: 1mm ≈ 56.7 twips (not 567!)
-    // Actually: 1 inch = 1440 twips, 1 inch = 25.4mm
-    // So 1mm = 1440/25.4 ≈ 56.7 twips
+    // 1 inch = 1440 twips, 1 inch = 25.4mm
+    // 1mm = 1440/25.4 = 56.69 twips
 
-    const MM_TO_TWIPS = 56.7;
-    const LABEL_W_MM = 139;
-    const LABEL_H_MM = 99.1;
-    const LABEL_W = Math.round(LABEL_W_MM * MM_TO_TWIPS);  // ~7878 twips
-    const LABEL_H = Math.round(LABEL_H_MM * MM_TO_TWIPS);  // ~5619 twips
-    const MARGIN_MM = 3;
-    const MARGIN = Math.round(MARGIN_MM * MM_TO_TWIPS);
+    const MM_TO_TWIPS = 1440 / 25.4;
 
-    // A4 dimensions
-    const A4_W = Math.round(210 * MM_TO_TWIPS);  // ~11907 twips
-    const A4_H = Math.round(297 * MM_TO_TWIPS);   // ~16839 twips
+    // Label dimensions
+    const LABEL_W = Math.round(139 * MM_TO_TWIPS);   // ~7880 twips
+    const LABEL_H = Math.round(99.1 * MM_TO_TWIPS);  // ~5619 twips
 
-    // Page margins for Avery L7169
-    // Labels are centered with gaps
-    const SIDE_MARGIN = Math.round((210 - 2 * LABEL_W_MM) / 2 * MM_TO_TWIPS);
-    const TOP_MARGIN = Math.round((297 - 2 * LABEL_H_MM) / 2 * MM_TO_TWIPS);
+    // A4 page
+    const A4_W = Math.round(210 * MM_TO_TWIPS);  // ~11905 twips
+    const A4_H = Math.round(297 * MM_TO_TWIPS);  // ~16838 twips
+
+    // Margins - Avery L7169 has labels centered on A4
+    // 2 labels wide: (210 - 2*139) / 2 = -34mm total gap, split between sides
+    // Actually, Avery L7169 labels are positioned with specific margins
+    // Looking up Avery specs: left margin ~4.2mm, gap between labels ~6mm
+    const LEFT_MARGIN = Math.round(4.2 * MM_TO_TWIPS);   // ~238 twips
+    const TOP_MARGIN = Math.round(8.4 * MM_TO_TWIPS);    // ~476 twips
+    const LABEL_GAP = Math.round(6.6 * MM_TO_TWIPS);     // ~374 twips between labels
+
+    // Inner margin for coloured border
+    const BORDER_MM = 3;
+    const BORDER = Math.round(BORDER_MM * MM_TO_TWIPS); // ~170 twips
+
+    // No borders
+    const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+    const allNone = { top: none, bottom: none, left: none, right: none };
 
     // Prepare images
     const schoolLogoBytes = schoolLogoData ? base64ToUint8(schoolLogoData) : null;
@@ -493,83 +502,93 @@ async function generateDocx() {
     const allNames = [...names];
     while (allNames.length < sheetsNeeded * 4) allNames.push('');
 
-    // No border style
-    const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
-    const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
-
     // Create sections (one per sheet)
     const sections = [];
 
     for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
       const sheetNames = allNames.slice(sheetIdx * 4, (sheetIdx + 1) * 4);
-      const rows = [];
 
-      // 2 rows per sheet
-      for (let rowIdx = 0; rowIdx < 2; rowIdx++) {
-        const cells = [];
+      // Build function to create a label cell
+      function buildLabelCell(name) {
+        const children = [];
 
-        // 2 columns per row
-        for (let colIdx = 0; colIdx < 2; colIdx++) {
-          const nameIdx = rowIdx * 2 + colIdx;
-          const name = sheetNames[nameIdx] || '';
+        if (name) {
+          // Name (underlined, bold)
+          children.push(new Paragraph({
+            spacing: { after: 60, before: 0 },
+            children: [new TextRun({ text: name, bold: true, size: 28, font: 'Calibri', underline: {} })]
+          }));
 
-          // Build inner content (white area)
-          const innerContent = [];
+          // Title
+          children.push(new Paragraph({
+            spacing: { after: 40, before: 0 },
+            children: [new TextRun({ text: labelType.title, bold: true, size: 24, font: 'Calibri' })]
+          }));
 
-          if (name) {
-            // Name (underlined)
-            innerContent.push(new Paragraph({
-              children: [new TextRun({ text: name, bold: true, size: 32, font: 'Calibri', underline: {} })],
-              spacing: { after: 100, before: 0 }
+          // Learning Zone (if applicable)
+          if (labelType.hasZone && yearData) {
+            children.push(new Paragraph({
+              spacing: { after: 0, before: 0 },
+              children: [new TextRun({ text: yearData.zone, bold: true, size: 20, font: 'Calibri' })]
             }));
-
-            // Title
-            innerContent.push(new Paragraph({
-              children: [new TextRun({ text: labelType.title, bold: true, size: 26, font: 'Calibri' })],
-              spacing: { after: 80, before: 0 }
+            children.push(new Paragraph({
+              spacing: { after: 0, before: 0 },
+              children: [new TextRun({ text: 'Learning Zone', size: 16, font: 'Calibri', color: '666666' })]
             }));
-
-            // Learning Zone (if applicable)
-            if (labelType.hasZone && yearData) {
-              innerContent.push(new Paragraph({
-                children: [new TextRun({ text: yearData.zone, bold: true, size: 24, font: 'Calibri' })],
-                spacing: { after: 0, before: 0 }
-              }));
-              innerContent.push(new Paragraph({
-                children: [new TextRun({ text: 'Learning Zone', size: 20, font: 'Calibri', color: '666666' })],
-                spacing: { after: 0, before: 0 }
-              }));
-            }
           }
-
-          // Create inner cell (white background)
-          const innerCell = new TableCell({
-            width: { size: LABEL_W - MARGIN * 2, type: WidthType.DXA },
-            shading: { fill: 'FFFFFF' },
-            borders: noBorders,
-            margins: { top: 150, bottom: 150, left: 200, right: 200 },
-            children: innerContent.length > 0 ? innerContent : [new Paragraph({ children: [] })]
-          });
-
-          // Create outer cell (coloured background)
-          const outerCell = new TableCell({
-            width: { size: LABEL_W, type: WidthType.DXA },
-            height: { value: LABEL_H, rule: HeightRule.EXACT },
-            shading: { fill: bgColour },
-            borders: noBorders,
-            margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
-            children: [innerCell]
-          });
-
-          cells.push(outerCell);
         }
 
-        rows.push(new TableRow({ children: cells }));
+        // Inner white cell
+        const innerCell = new TableCell({
+          width: { size: LABEL_W - BORDER * 2, type: WidthType.DXA },
+          shading: { fill: 'FFFFFF' },
+          borders: allNone,
+          margins: { top: 100, bottom: 100, left: 150, right: 150 },
+          children: children.length > 0 ? children : [new Paragraph({ children: [] })]
+        });
+
+        // Outer coloured cell
+        return new TableCell({
+          width: { size: LABEL_W, type: WidthType.DXA },
+          shading: { fill: bgColour },
+          borders: allNone,
+          margins: { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER },
+          children: [innerCell]
+        });
       }
 
-      // Create table for this sheet
+      // Create gap cell
+      function buildGapCell() {
+        return new TableCell({
+          width: { size: LABEL_GAP, type: WidthType.DXA },
+          borders: allNone,
+          children: [new Paragraph({ children: [] })]
+        });
+      }
+
+      // Build rows (2 rows of 2 labels each)
+      const rows = [];
+
+      for (let rowIdx = 0; rowIdx < 2; rowIdx++) {
+        const name1 = sheetNames[rowIdx * 2] || '';
+        const name2 = sheetNames[rowIdx * 2 + 1] || '';
+
+        const rowChildren = [
+          buildLabelCell(name1),
+          buildGapCell(),
+          buildLabelCell(name2)
+        ];
+
+        rows.push(new TableRow({
+          height: { value: LABEL_H, rule: HeightRule.EXACT },
+          children: rowChildren
+        }));
+      }
+
+      // Create table
       const table = new Table({
-        width: { size: A4_W, type: WidthType.DXA },
+        width: { size: A4_W - LEFT_MARGIN * 2, type: WidthType.DXA },
+        columnWidths: [LABEL_W, LABEL_GAP, LABEL_W],
         rows: rows
       });
 
@@ -578,7 +597,12 @@ async function generateDocx() {
         properties: {
           page: {
             size: { width: A4_W, height: A4_H },
-            margins: { top: TOP_MARGIN, bottom: TOP_MARGIN, left: SIDE_MARGIN, right: SIDE_MARGIN }
+            margins: {
+              top: TOP_MARGIN,
+              bottom: TOP_MARGIN,
+              left: LEFT_MARGIN,
+              right: LEFT_MARGIN
+            }
           }
         },
         children: [table]
