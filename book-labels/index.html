@@ -62,7 +62,7 @@
     .year-btn[data-colour="green"].active { background: #63b44a; border-color: #63b44a; }
     .year-btn[data-colour="magenta"].active { background: #c1126d; border-color: #c1126d; }
 
-    .upload-area { border: 2px dashed var(--border); border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; margin-top: 8px; }
+    .upload-area { border: 2px dashed var(--border); border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; margin-top: 8px; font-size: 0.85rem; color: var(--text); }
     .upload-area:hover { border-color: var(--blue); background: var(--blue-lt); }
     .upload-area input { display: none; }
 
@@ -72,8 +72,9 @@
     .status { text-align: center; font-size: 0.85rem; color: var(--green); margin-top: 8px; min-height: 16px; font-weight: 600; }
     .status.error { color: #c0392b; }
 
-    .preview-box { background: #f5f5f5; border-radius: 8px; padding: 16px; display: flex; justify-content: center; align-items: center; min-height: 200px; }
-    .label-preview { width: 278px; height: 198px; position: relative; overflow: hidden; }
+    .preview-box { background: #f5f5f5; border-radius: 8px; padding: 16px; display: flex; justify-content: center; align-items: center; min-height: 220px; }
+    .label-preview { width: 278px; height: 198px; position: relative; overflow: hidden; background: #3288ce; }
+    .white-box { position: absolute; background: white; top: 26px; left: 31px; width: 216px; height: 146px; }
 
     footer { text-align: center; color: var(--muted); font-size: 0.7rem; padding: 14px; }
     .hidden { display: none !important; }
@@ -336,68 +337,51 @@ function updatePreview() {
   const previewName = names.length > 0 ? names[0] : '[Name]';
   const bgColour = labelType.greyBorder ? '#808080' : (yearData?.hex || '#ccc');
 
-  // Preview dimensions matching actual label proportions
-  // Label: 139mm x 99.1mm, White box: 108mm x 73mm
-  // Scale: 2 pixels per mm
-  const scale = 2;
-  const labelW = 139 * scale;
-  const labelH = 99.1 * scale;
-  const whiteW = 108 * scale;
-  const whiteH = 73 * scale;
-  const borderL = (139 - 108) / 2 * scale;
-  const borderT = (99.1 - 73) / 2 * scale;
+  // Preview container: 278px x 198px (scaled 2px per mm from 139mm x 99.1mm)
+  // White box: 216px x 146px (108mm x 73mm at 2px/mm)
+  // Positions match test file: name 15mm, book 28mm, logo 38mm, zone 56mm, label 62mm
 
   let html = `
     <div style="position:absolute;inset:0;background:${bgColour};">
-      <div style="position:absolute;background:white;top:${borderT}px;left:${borderL}px;width:${whiteW}px;height:${whiteH}px;">`;
+      <div class="white-box">`;
 
-  // States of Being overlay (centred, near top)
+  // States of Being overlay (centred horizontally, 2mm from top of white box)
   if (labelType.iconType === 'stob' && stobData) {
-    const stobW = 105 * scale;
-    const stobH = 67 * scale;
-    const stobL = (whiteW - stobW) / 2;
-    html += `<img src="${stobData}" style="position:absolute;top:4px;left:${stobL}px;width:${stobW}px;height:${stobH}px;object-fit:contain;">`;
+    html += `<img src="${stobData}" style="position:absolute;top:4px;left:50%;transform:translateX(-50%);width:210px;height:134px;object-fit:contain;">`;
   }
 
-  // Book number (top right)
+  // Book number (top right of white box)
   if (bookNumber) {
-    html += `<div style="position:absolute;top:4px;right:4px;font-family:'Tw Cen MT',Arial;font-size:11pt;font-weight:bold;">${bookNumber}</div>`;
+    html += `<div style="position:absolute;top:4px;right:4px;font-family:'Tw Cen MT',Arial,sans-serif;font-size:11pt;font-weight:bold;">${bookNumber}</div>`;
   }
 
-  // Name (centred, 15mm from top)
-  html += `<div style="position:absolute;top:30px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial;font-size:24pt;font-weight:bold;text-decoration:underline;">${previewName}</div>`;
+  // Name (centred, 15mm = 30px from top of white box)
+  html += `<div style="position:absolute;top:30px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:24pt;font-weight:bold;text-decoration:underline;">${previewName}</div>`;
 
-  // Book name (centred, 28mm from top)
-  html += `<div style="position:absolute;top:56px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial;font-size:18pt;font-weight:bold;">${labelType.title}</div>`;
+  // Book name (centred, 28mm = 56px from top)
+  html += `<div style="position:absolute;top:56px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:18pt;font-weight:bold;">${labelType.title}</div>`;
 
-  // School logo (centred, 38mm from top)
+  // School logo (centred, 38mm = 76px from top)
   if (labelType.iconType === 'stob' && schoolLogoData) {
-    const logoW = 40 * scale;
-    const logoH = 17.4 * scale;
-    const logoL = (whiteW - logoW) / 2;
-    html += `<img src="${schoolLogoData}" style="position:absolute;top:76px;left:${logoL}px;width:${logoW}px;height:${logoH}px;object-fit:contain;">`;
+    html += `<img src="${schoolLogoData}" style="position:absolute;top:76px;left:50%;transform:translateX(-50%);width:80px;height:35px;object-fit:contain;">`;
   }
 
   // Maths icon
   if (labelType.iconType === 'maths' && mathsData) {
-    const iconW = 16 * scale;
-    const iconH = 12 * scale;
-    const iconL = (whiteW - iconW) / 2;
-    html += `<img src="${mathsData}" style="position:absolute;top:76px;left:${iconL}px;width:${iconW}px;height:${iconH}px;object-fit:contain;">`;
+    html += `<img src="${mathsData}" style="position:absolute;top:76px;left:50%;transform:translateX(-50%);width:32px;height:24px;object-fit:contain;">`;
   }
 
   // Artist icon (centred near bottom)
   if (labelType.iconType === 'artist' && artistData) {
-    const iconW = 20 * scale;
-    const iconH = 16 * scale;
-    const iconL = (whiteW - iconW) / 2;
-    html += `<img src="${artistData}" style="position:absolute;bottom:10px;left:${iconL}px;width:${iconW}px;height:${iconH}px;object-fit:contain;">`;
+    html += `<img src="${artistData}" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:40px;height:32px;object-fit:contain;">`;
   }
 
   // Learning Zone (if applicable)
   if (labelType.hasZone && yearData) {
-    html += `<div style="position:absolute;top:112px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial;font-size:16pt;font-weight:bold;">${yearData.zone}</div>`;
-    html += `<div style="position:absolute;top:124px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial;font-size:11pt;color:#666;">Learning Zone</div>`;
+    // Zone name (centred, 56mm = 112px from top)
+    html += `<div style="position:absolute;top:112px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:16pt;font-weight:bold;">${yearData.zone}</div>`;
+    // "Learning Zone" label (centred, 62mm = 124px from top)
+    html += `<div style="position:absolute;top:124px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:11pt;color:#666;">Learning Zone</div>`;
   }
 
   html += `</div></div>`;
