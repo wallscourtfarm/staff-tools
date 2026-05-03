@@ -172,11 +172,11 @@ const YEAR_COLOURS = {
 
 // Label type config
 const LABEL_TYPES = {
-  'learning-journey': { title: "My Learning Journey", hasZone: true, iconType: 'stob' },
-  'home-learning': { title: "Home Learning", hasZone: true, iconType: 'stob' },
-  'writers-journal': { title: "Writer's Journal", hasZone: true, iconType: 'stob' },
-  'maths-book': { title: "Mathematician", hasZone: true, iconType: 'maths' },
-  'maths-journal': { title: "Maths Journal", hasZone: true, iconType: 'maths' },
+  'learning-journey': { title: "My Learning Journey", hasZone: true, iconType: 'stob', showLogo: true },
+  'home-learning': { title: "Home Learning", hasZone: true, iconType: 'stob', showLogo: true },
+  'writers-journal': { title: "Writer's Journal", hasZone: true, iconType: 'stob', showLogo: true },
+  'maths-book': { title: "Mathematician", hasZone: true, iconType: 'maths', showLogo: true },
+  'maths-journal': { title: "Maths Journal", hasZone: true, iconType: 'maths', showLogo: true },
   'artist': { title: "Artist", hasZone: false, iconType: 'artist', greyBorder: true }
 };
 
@@ -367,7 +367,7 @@ function updatePreview() {
   html += `<div style="position:absolute;top:26mm;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:22pt;font-weight:bold;">${labelType.title}</div>`;
 
   // School logo (centred, 34mm from top)
-  if (labelType.iconType === 'stob' && schoolLogoData) {
+  if (labelType.showLogo && schoolLogoData) {
     html += `<img src="${schoolLogoData}" style="position:absolute;top:34mm;left:50%;transform:translateX(-50%);width:40mm;height:17.4mm;object-fit:contain;">`;
   }
 
@@ -520,7 +520,7 @@ async function generatePdf() {
         doc.text(labelType.title, innerX + (WHITE_W - titleW) / 2, innerY + 26 + 5.8);
 
         // School logo (centred, 34mm from top of white box)
-        if (labelType.iconType === 'stob' && schoolLogoData) {
+        if (labelType.showLogo && schoolLogoData) {
           const logoW = 40;
           const logoH = 17.4;
           const logoL = innerX + (WHITE_W - logoW) / 2;
