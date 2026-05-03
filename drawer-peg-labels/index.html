@@ -309,10 +309,9 @@ function updatePreview() {
   const innerW = (config.width - config.border * 2) * scale;
   const innerH = (config.height - config.border * 2) * scale;
 
-  // Text sizes: 54pt for drawer, 19pt for peg
-  const fontSizePt = currentLabelType === 'drawer' ? 54 : 19;
-  const fontSizePx = fontSizePt * 1.33;
-  const logoHmm = currentLabelType === 'drawer' ? 15 : 5;
+  // Preview text size: scale to fit nicely (actual 54pt/19pt is too big for preview)
+  const fontSizePx = currentLabelType === 'drawer' ? 16 : 6;
+  const logoHmm = currentLabelType === 'drawer' ? 18 : 6;
   const logoHpx = logoHmm * scale;
 
   labelPreview.style.width = previewW + 'px';
@@ -386,8 +385,8 @@ async function generatePdf() {
 
     // Font sizes: 54pt for drawer, 19pt for peg
     const fontSize = currentLabelType === 'drawer' ? 54 : 19;
-    // Logo sizes: 15mm for drawer, 5mm for peg
-    const logoHmm = currentLabelType === 'drawer' ? 15 : 5;
+    // Logo sizes: 18mm for drawer, 6mm for peg
+    const logoHmm = currentLabelType === 'drawer' ? 18 : 6;
     const logoWmm = logoHmm;
 
     for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
@@ -412,24 +411,26 @@ async function generatePdf() {
           doc.setFillColor(255, 255, 255);
           doc.rect(x + config.border, y + config.border, innerW, innerH, 'F');
 
-          // Logo on left
+          // Logo on left, vertically centred
           const logoX = x + config.border + 2;
           const logoY = y + config.border + (innerH - logoHmm) / 2;
           doc.addImage(logoData, 'JPEG', logoX, logoY, logoWmm, logoHmm);
 
-          // Name text - centred in remaining space
+          // Name text - centred between logo and right edge
           doc.setFontSize(fontSize);
           doc.setFont(fontName, 'normal');
           doc.setTextColor(30, 45, 61);
 
-          const textX = logoX + logoWmm + 2;
-          const remainingWidth = innerW - logoWmm - 6;
-          const textW = doc.getTextWidth(name);
-          
-          // Centre text in remaining space
-          const textCentreX = textX + (remainingWidth - textW) / 2;
-          const textY = y + config.border + innerH / 2 + fontSize * 0.35;
-          doc.text(name, textCentreX, textY);
+          // Text starts after logo, ends before right border
+          const textStartX = logoX + logoWmm + 3;
+          const textEndX = x + config.border + innerW - 3;
+          const textWidth = doc.getTextWidth(name);
+          const availableWidth = textEndX - textStartX;
+          const textX = textStartX + (availableWidth - textWidth) / 2;
+
+          // Vertically centre: baseline is at y, so adjust for font height
+          const textY = y + config.border + (innerH / 2) + (fontSize * 0.35);
+          doc.text(name, textX, textY);
         }
       }
     }
