@@ -73,9 +73,9 @@
     .status { text-align: center; font-size: 0.85rem; color: var(--green); margin-top: 8px; min-height: 16px; font-weight: 600; }
     .status.error { color: #c0392b; }
 
-    .preview-box { background: #f5f5f5; border-radius: 8px; padding: 16px; display: flex; justify-content: center; align-items: center; min-height: 220px; }
-    .label-preview { width: 278px; height: 198px; position: relative; overflow: hidden; background: #3288ce; }
-    .white-box { position: absolute; background: white; top: 26px; left: 31px; width: 216px; height: 146px; }
+    .preview-box { background: #f5f5f5; border-radius: 8px; padding: 16px; display: flex; justify-content: center; align-items: center; min-height: 320px; }
+    .label-preview { width: 139mm; height: 99.1mm; position: relative; overflow: hidden; background: #3288ce; }
+    .white-box { position: absolute; background: white; top: 13.05mm; left: 15.5mm; width: 108mm; height: 73mm; font-family: 'Tw Cen MT', Arial, sans-serif; }
 
     footer { text-align: center; color: var(--muted); font-size: 0.7rem; padding: 14px; }
     .hidden { display: none !important; }
@@ -342,9 +342,9 @@ function updatePreview() {
   const previewName = names.length > 0 ? names[0] : '[Name]';
   const bgColour = labelType.greyBorder ? '#808080' : (yearData?.hex || '#ccc');
 
-  // Preview container: 278px x 198px (scaled 2px per mm from 139mm x 99.1mm)
-  // White box: 216px x 146px (108mm x 73mm at 2px/mm)
-  // Positions: name 14mm, book 26mm, logo 34mm, zone 54mm, label 60mm
+  // Preview uses mm units to match PDF exactly
+  // White box: 108mm x 73mm, centred in label (15.5mm from left, 13.05mm from top)
+  // Content positions: name 14mm, book 26mm, logo 34mm, zone 54mm, label 60mm
 
   let html = `
     <div style="position:absolute;inset:0;background:${bgColour};">
@@ -352,41 +352,41 @@ function updatePreview() {
 
   // States of Being overlay (centred horizontally, 2mm from top of white box)
   if (labelType.iconType === 'stob' && stobData) {
-    html += `<img src="${stobData}" style="position:absolute;top:4px;left:50%;transform:translateX(-50%);width:210px;height:134px;object-fit:contain;">`;
+    html += `<img src="${stobData}" style="position:absolute;top:2mm;left:50%;transform:translateX(-50%);width:105mm;height:67mm;object-fit:contain;">`;
   }
 
-  // Book number (top right of white box)
+  // Book number (top right of white box, 2mm from edges)
   if (bookNumber) {
-    html += `<div style="position:absolute;top:4px;right:4px;font-family:'Tw Cen MT',Arial,sans-serif;font-size:11pt;font-weight:bold;">${bookNumber}</div>`;
+    html += `<div style="position:absolute;top:2mm;right:2mm;font-family:'Tw Cen MT',Arial,sans-serif;font-size:11pt;font-weight:bold;">${bookNumber}</div>`;
   }
 
-  // Name (centred, 14mm = 28px from top of white box) - bigger font
-  html += `<div style="position:absolute;top:28px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:28pt;font-weight:bold;text-decoration:underline;">${previewName}</div>`;
+  // Name (centred, 14mm from top of white box) - 28pt font
+  html += `<div style="position:absolute;top:14mm;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:28pt;font-weight:bold;text-decoration:underline;">${previewName}</div>`;
 
-  // Book name (centred, 26mm = 52px from top) - bigger font
-  html += `<div style="position:absolute;top:52px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:22pt;font-weight:bold;">${labelType.title}</div>`;
+  // Book name (centred, 26mm from top) - 22pt font
+  html += `<div style="position:absolute;top:26mm;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:22pt;font-weight:bold;">${labelType.title}</div>`;
 
-  // School logo (centred, 34mm = 68px from top)
+  // School logo (centred, 34mm from top)
   if (labelType.iconType === 'stob' && schoolLogoData) {
-    html += `<img src="${schoolLogoData}" style="position:absolute;top:68px;left:50%;transform:translateX(-50%);width:80px;height:35px;object-fit:contain;">`;
+    html += `<img src="${schoolLogoData}" style="position:absolute;top:34mm;left:50%;transform:translateX(-50%);width:40mm;height:17.4mm;object-fit:contain;">`;
   }
 
   // Maths icon
   if (labelType.iconType === 'maths' && mathsData) {
-    html += `<img src="${mathsData}" style="position:absolute;top:68px;left:50%;transform:translateX(-50%);width:32px;height:24px;object-fit:contain;">`;
+    html += `<img src="${mathsData}" style="position:absolute;top:34mm;left:50%;transform:translateX(-50%);width:16mm;height:12mm;object-fit:contain;">`;
   }
 
   // Artist icon (centred near bottom)
   if (labelType.iconType === 'artist' && artistData) {
-    html += `<img src="${artistData}" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:40px;height:32px;object-fit:contain;">`;
+    html += `<img src="${artistData}" style="position:absolute;bottom:8mm;left:50%;transform:translateX(-50%);width:20mm;height:16mm;object-fit:contain;">`;
   }
 
   // Learning Zone (if applicable)
   if (labelType.hasZone && yearData) {
-    // Zone name (centred, 54mm = 108px from top)
-    html += `<div style="position:absolute;top:108px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:18pt;font-weight:bold;">${yearData.zone}</div>`;
-    // "Learning Zone" label (centred, 60mm = 120px from top)
-    html += `<div style="position:absolute;top:120px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:12pt;color:#666;">Learning Zone</div>`;
+    // Zone name (centred, 54mm from top) - 18pt font
+    html += `<div style="position:absolute;top:54mm;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:18pt;font-weight:bold;">${yearData.zone}</div>`;
+    // "Learning Zone" label (centred, 60mm from top) - 12pt font
+    html += `<div style="position:absolute;top:60mm;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial,sans-serif;font-size:12pt;color:#666;">Learning Zone</div>`;
   }
 
   html += `</div></div>`;
