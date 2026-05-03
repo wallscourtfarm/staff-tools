@@ -324,42 +324,59 @@ function updatePreview() {
   const previewName = names.length > 0 ? names[0] : '[Name]';
   const bgColour = labelType.greyBorder ? '#808080' : (yearData?.hex || '#ccc');
 
-  // Preview dimensions scaled from actual label proportions
-  // Actual: 139mm x 99.1mm, white area is 79% x 69.5%
-  // Preview: 280px x 200px (same aspect ratio)
-  const previewW = 280;
-  const previewH = 200;
+  // Preview scaled to show the white content area
+  // White area proportions: 109.8mm x 68.9mm
+  // Scale to fit in preview box
+  const scale = 2; // pixels per mm
+  const whiteW = 109.8 * scale; // ~220px
+  const whiteH = 68.9 * scale;  // ~138px
+  const borderL = 14.4 * scale; // ~29px
+  const borderT = 13.5 * scale; // ~27px
+  const borderR = 14.8 * scale;
+  const borderB = 16.7 * scale;
 
-  // Border proportions matching actual label (10.4% left/right, 13.6% top, 16.9% bottom)
-  const borderL = Math.round(previewW * 0.104);  // 29px
-  const borderR = Math.round(previewW * 0.106);  // 30px
-  const borderT = Math.round(previewH * 0.136);  // 27px
-  const borderB = Math.round(previewH * 0.169);  // 34px
+  // Position elements based on Excel row structure (each row ~4.7mm)
+  const rowH = 4.7 * scale; // ~9.4px per row
+  const previewW = (139 * scale);
+  const previewH = (99.1 * scale);
 
   let html = `
-    <div style="position:absolute;inset:0;background:${bgColour};">
-      <div class="label-inner" style="top:${borderT}px;left:${borderL}px;right:${borderR}px;bottom:${borderB}px;">
-        <div class="label-name">${previewName}</div>
-        <div class="label-title">${labelType.title}</div>`;
+    <div style="position:absolute;inset:0;background:${bgColour};width:${previewW}px;height:${previewH}px;">
+      <div style="position:absolute;background:white;top:${borderT}px;left:${borderL}px;right:${borderR}px;bottom:${borderB}px;padding:6px;font-family:sans-serif;">`;
 
-  if (labelType.hasZone && yearData) {
-    html += `
-        <div class="label-zone">${yearData.zone}</div>
-        <div class="label-zone-small">Learning Zone</div>`;
+  // School logo (top-left)
+  if (labelType.iconType === 'stob' && schoolLogoData) {
+    html += `<img src="${schoolLogoData}" style="height:${rowH*2}px;width:auto;position:absolute;top:2px;left:4px;">`;
   }
 
-  html += `<div class="label-icons">`;
+  // Book number (top-right)
+  if (bookNumber) {
+    html += `<div style="position:absolute;top:2px;right:4px;font-size:10px;font-weight:bold;">${bookNumber}</div>`;
+  }
 
-  if (labelType.iconType === 'stob') {
-    if (schoolLogoData) html += `<img src="${schoolLogoData}">`;
-    if (stobData) html += `<img src="${stobData}" style="height:14px;width:auto;">`;
+  // Name (row 6 - about 9mm from top)
+  html += `<div style="position:absolute;top:${rowH*2}px;left:4px;font-size:14px;font-weight:bold;text-decoration:underline;">${previewName}</div>`;
+
+  // Book title (row 9 - about 23mm from top)
+  html += `<div style="position:absolute;top:${rowH*5}px;left:4px;font-size:12px;font-weight:bold;">${labelType.title}</div>`;
+
+  // States of Being icons (row 11 - about 33mm from top)
+  if (labelType.iconType === 'stob' && stobData) {
+    html += `<img src="${stobData}" style="position:absolute;top:${rowH*7}px;left:4px;height:${rowH*1.5}px;width:auto;">`;
   } else if (labelType.iconType === 'maths' && mathsData) {
-    html += `<img src="${mathsData}" style="height:22px;">`;
+    html += `<img src="${mathsData}" style="position:absolute;top:${rowH*7}px;left:4px;height:${rowH*2}px;width:auto;">`;
   } else if (labelType.iconType === 'artist' && artistData) {
-    html += `<img src="${artistData}" style="height:24px;">`;
+    // Artist icon centered at bottom
+    html += `<img src="${artistData}" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);height:${rowH*2.5}px;width:auto;">`;
   }
 
-  html += `</div></div></div>`;
+  // Learning Zone (rows 15-17)
+  if (labelType.hasZone && yearData) {
+    html += `<div style="position:absolute;top:${rowH*11}px;left:4px;font-size:11px;font-weight:bold;">${yearData.zone}</div>`;
+    html += `<div style="position:absolute;top:${rowH*13}px;left:4px;font-size:9px;color:#666;">Learning Zone</div>`;
+  }
+
+  html += `</div></div>`;
 
   labelPreview.innerHTML = html;
 
@@ -456,76 +473,71 @@ async function generatePdf() {
 
         if (!name) continue;
 
-        // Text positioning
+        // Position elements based on Excel row structure
+        // White area: 109.8mm x 68.9mm
+        // Each row is ~4.7mm (99.1mm / 21 rows)
         const innerX = pos.x + BORDER_LEFT;
         const innerY = pos.y + BORDER_TOP;
         const innerW = WHITE_W;
         const innerH = WHITE_H;
+        const rowH = 4.7; // mm per row
 
-        let textY = innerY + 12;
-        const textX = innerX + 8;
-
-        // Name (underlined)
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(18);
         doc.setTextColor(0, 0, 0);
-        doc.text(name, textX, textY);
+
+        // School logo (top-left, row 4)
+        let iconX = innerX + 3;
+        if (labelType.iconType === 'stob' && schoolLogoData) {
+          doc.addImage(schoolLogoData, 'PNG', iconX, innerY + 2, 20, 10);
+        }
+
+        // Book number (top-right, row 4)
+        if (bookNumber) {
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          const numW = doc.getTextWidth(bookNumber);
+          doc.text(bookNumber, innerX + innerW - 3 - numW, innerY + 8);
+        }
+
+        // Name (row 6, ~9mm from top)
+        let textY = innerY + rowH * 2;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.text(name, innerX + 3, textY);
         const nameW = doc.getTextWidth(name);
         doc.setDrawColor(0);
-        doc.setLineWidth(0.5);
-        doc.line(textX, textY + 1.5, textX + nameW, textY + 1.5);
+        doc.setLineWidth(0.4);
+        doc.line(innerX + 3, textY + 1.2, innerX + 3 + nameW, textY + 1.2);
 
-        // Title
-        textY += 12;
-        doc.setFontSize(14);
+        // Book title (row 9, ~23mm from top)
+        textY = innerY + rowH * 5;
+        doc.setFontSize(13);
         doc.setFont('helvetica', 'bold');
-        doc.text(labelType.title, textX, textY);
+        doc.text(labelType.title, innerX + 3, textY);
 
-        // Learning Zone
-        if (labelType.hasZone && yearData) {
-          textY += 10;
-          doc.setFontSize(13);
-          doc.setFont('helvetica', 'bold');
-          doc.text(yearData.zone, textX, textY);
-          textY += 6;
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(100, 100, 100);
-          doc.text('Learning Zone', textX, textY);
-          doc.setTextColor(0, 0, 0);
-        }
-
-        // Book number (top right of white area)
-        if (bookNumber) {
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(0, 0, 0);
-          const numW = doc.getTextWidth(bookNumber);
-          doc.text(bookNumber, innerX + innerW - 5 - numW, innerY + 10);
-        }
-
-        // Add images at bottom of white area
-        // Icons should be near the bottom of the 68.9mm white area
-        const iconY = innerY + innerH - 18; // 18mm from bottom of white area
-        let iconX = innerX + 8;
-
-        if (labelType.iconType === 'stob') {
-          // School logo (left side)
-          if (schoolLogoData) {
-            doc.addImage(schoolLogoData, 'PNG', iconX, iconY, 25, 12);
-            iconX += 28;
-          }
-          // States of Being strip (wider, takes most of bottom)
-          if (stobData) {
-            doc.addImage(stobData, 'PNG', iconX, iconY + 1, 70, 10);
-          }
+        // States of Being icons (row 11, ~33mm from top)
+        if (labelType.iconType === 'stob' && stobData) {
+          doc.addImage(stobData, 'PNG', innerX + 3, innerY + rowH * 7, 70, 8);
         } else if (labelType.iconType === 'maths' && mathsData) {
-          // Maths icon at bottom left
-          doc.addImage(mathsData, 'PNG', iconX, iconY - 3, 18, 14);
+          doc.addImage(mathsData, 'PNG', innerX + 3, innerY + rowH * 7 - 2, 16, 12);
         } else if (labelType.iconType === 'artist' && artistData) {
-          // Artist icon - centered at bottom
-          const centerX = innerX + innerW / 2 - 12;
-          doc.addImage(artistData, 'PNG', centerX, iconY - 5, 24, 19);
+          // Artist icon centered near bottom
+          const centerX = innerX + innerW / 2 - 10;
+          doc.addImage(artistData, 'PNG', centerX, innerY + innerH - 25, 20, 16);
+        }
+
+        // Learning Zone name (row 15, ~52mm from top)
+        if (labelType.hasZone && yearData) {
+          textY = innerY + rowH * 11;
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text(yearData.zone, innerX + 3, textY);
+
+          // "Learning Zone" label (row 17, ~61mm from top)
+          textY = innerY + rowH * 13;
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(80, 80, 80);
+          doc.text('Learning Zone', innerX + 3, textY);
         }
       }
     }
