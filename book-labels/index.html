@@ -7,6 +7,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
+    @font-face {
+      font-family: 'Tw Cen MT';
+      src: url('Tw Cen MT.ttf') format('truetype');
+    }
     :root {
       --blue: #2a7fc1;
       --blue-dk: #1a5c8e;
@@ -69,14 +73,7 @@
     .status.error { color: #c0392b; }
 
     .preview-box { background: #f5f5f5; border-radius: 8px; padding: 16px; display: flex; justify-content: center; align-items: center; min-height: 200px; }
-    .label-preview { width: 280px; height: 200px; position: relative; border-radius: 4px; overflow: hidden; }
-    .label-inner { position: absolute; background: white; display: flex; flex-direction: column; padding: 8px 10px; }
-    .label-name { font-size: 14px; font-weight: 700; text-decoration: underline; margin-bottom: 2px; }
-    .label-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
-    .label-zone { font-size: 11px; font-weight: 600; }
-    .label-zone-small { font-size: 9px; color: #666; }
-    .label-icons { position: absolute; bottom: 6px; left: 6px; display: flex; gap: 4px; align-items: flex-end; }
-    .label-icons img { height: 18px; width: auto; }
+    .label-preview { width: 278px; height: 198px; position: relative; overflow: hidden; }
 
     footer { text-align: center; color: var(--muted); font-size: 0.7rem; padding: 14px; }
     .hidden { display: none !important; }
@@ -196,6 +193,7 @@ let schoolLogoData = null;
 let stobData = null;
 let mathsData = null;
 let artistData = null;
+let fontBase64 = null;
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', init);
@@ -213,8 +211,8 @@ async function init() {
   labelPreview = document.getElementById('labelPreview');
   labelCount = document.getElementById('labelCount');
 
-  // Load images as base64
-  await loadImages();
+  // Load images and font
+  await Promise.all([loadImages(), loadFont()]);
 
   // Set up event listeners
   labelTypeTabs.addEventListener('click', onLabelTypeClick);
@@ -249,6 +247,20 @@ async function loadImages() {
     } catch (e) {
       console.warn(`Could not load ${src}`);
     }
+  }
+}
+
+async function loadFont() {
+  try {
+    const response = await fetch('Tw Cen MT.ttf');
+    const blob = await response.blob();
+    fontBase64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.warn('Could not load font');
   }
 }
 
@@ -324,56 +336,68 @@ function updatePreview() {
   const previewName = names.length > 0 ? names[0] : '[Name]';
   const bgColour = labelType.greyBorder ? '#808080' : (yearData?.hex || '#ccc');
 
-  // Preview scaled to show the white content area
-  // White area proportions: 109.8mm x 68.9mm
-  // Scale to fit in preview box
-  const scale = 2; // pixels per mm
-  const whiteW = 109.8 * scale; // ~220px
-  const whiteH = 68.9 * scale;  // ~138px
-  const borderL = 14.4 * scale; // ~29px
-  const borderT = 13.5 * scale; // ~27px
-  const borderR = 14.8 * scale;
-  const borderB = 16.7 * scale;
-
-  // Position elements based on Excel row structure (each row ~4.7mm)
-  const rowH = 4.7 * scale; // ~9.4px per row
-  const previewW = (139 * scale);
-  const previewH = (99.1 * scale);
+  // Preview dimensions matching actual label proportions
+  // Label: 139mm x 99.1mm, White box: 108mm x 73mm
+  // Scale: 2 pixels per mm
+  const scale = 2;
+  const labelW = 139 * scale;
+  const labelH = 99.1 * scale;
+  const whiteW = 108 * scale;
+  const whiteH = 73 * scale;
+  const borderL = (139 - 108) / 2 * scale;
+  const borderT = (99.1 - 73) / 2 * scale;
 
   let html = `
-    <div style="position:absolute;inset:0;background:${bgColour};width:${previewW}px;height:${previewH}px;">
-      <div style="position:absolute;background:white;top:${borderT}px;left:${borderL}px;right:${borderR}px;bottom:${borderB}px;padding:6px;font-family:sans-serif;">`;
+    <div style="position:absolute;inset:0;background:${bgColour};">
+      <div style="position:absolute;background:white;top:${borderT}px;left:${borderL}px;width:${whiteW}px;height:${whiteH}px;">`;
 
-  // School logo (top-left)
-  if (labelType.iconType === 'stob' && schoolLogoData) {
-    html += `<img src="${schoolLogoData}" style="height:${rowH*2}px;width:auto;position:absolute;top:2px;left:4px;">`;
-  }
-
-  // Book number (top-right)
-  if (bookNumber) {
-    html += `<div style="position:absolute;top:2px;right:4px;font-size:10px;font-weight:bold;">${bookNumber}</div>`;
-  }
-
-  // Name (row 6 - about 9mm from top)
-  html += `<div style="position:absolute;top:${rowH*2}px;left:4px;font-size:14px;font-weight:bold;text-decoration:underline;">${previewName}</div>`;
-
-  // Book title (row 9 - about 23mm from top)
-  html += `<div style="position:absolute;top:${rowH*5}px;left:4px;font-size:12px;font-weight:bold;">${labelType.title}</div>`;
-
-  // States of Being icons (row 11 - about 33mm from top)
+  // States of Being overlay (centred, near top)
   if (labelType.iconType === 'stob' && stobData) {
-    html += `<img src="${stobData}" style="position:absolute;top:${rowH*7}px;left:4px;height:${rowH*1.5}px;width:auto;">`;
-  } else if (labelType.iconType === 'maths' && mathsData) {
-    html += `<img src="${mathsData}" style="position:absolute;top:${rowH*7}px;left:4px;height:${rowH*2}px;width:auto;">`;
-  } else if (labelType.iconType === 'artist' && artistData) {
-    // Artist icon centered at bottom
-    html += `<img src="${artistData}" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);height:${rowH*2.5}px;width:auto;">`;
+    const stobW = 105 * scale;
+    const stobH = 67 * scale;
+    const stobL = (whiteW - stobW) / 2;
+    html += `<img src="${stobData}" style="position:absolute;top:4px;left:${stobL}px;width:${stobW}px;height:${stobH}px;object-fit:contain;">`;
   }
 
-  // Learning Zone (rows 15-17)
+  // Book number (top right)
+  if (bookNumber) {
+    html += `<div style="position:absolute;top:4px;right:4px;font-family:'Tw Cen MT',Arial;font-size:11pt;font-weight:bold;">${bookNumber}</div>`;
+  }
+
+  // Name (centred, 15mm from top)
+  html += `<div style="position:absolute;top:30px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial;font-size:24pt;font-weight:bold;text-decoration:underline;">${previewName}</div>`;
+
+  // Book name (centred, 28mm from top)
+  html += `<div style="position:absolute;top:56px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial;font-size:18pt;font-weight:bold;">${labelType.title}</div>`;
+
+  // School logo (centred, 38mm from top)
+  if (labelType.iconType === 'stob' && schoolLogoData) {
+    const logoW = 40 * scale;
+    const logoH = 17.4 * scale;
+    const logoL = (whiteW - logoW) / 2;
+    html += `<img src="${schoolLogoData}" style="position:absolute;top:76px;left:${logoL}px;width:${logoW}px;height:${logoH}px;object-fit:contain;">`;
+  }
+
+  // Maths icon
+  if (labelType.iconType === 'maths' && mathsData) {
+    const iconW = 16 * scale;
+    const iconH = 12 * scale;
+    const iconL = (whiteW - iconW) / 2;
+    html += `<img src="${mathsData}" style="position:absolute;top:76px;left:${iconL}px;width:${iconW}px;height:${iconH}px;object-fit:contain;">`;
+  }
+
+  // Artist icon (centred near bottom)
+  if (labelType.iconType === 'artist' && artistData) {
+    const iconW = 20 * scale;
+    const iconH = 16 * scale;
+    const iconL = (whiteW - iconW) / 2;
+    html += `<img src="${artistData}" style="position:absolute;bottom:10px;left:${iconL}px;width:${iconW}px;height:${iconH}px;object-fit:contain;">`;
+  }
+
+  // Learning Zone (if applicable)
   if (labelType.hasZone && yearData) {
-    html += `<div style="position:absolute;top:${rowH*11}px;left:4px;font-size:11px;font-weight:bold;">${yearData.zone}</div>`;
-    html += `<div style="position:absolute;top:${rowH*13}px;left:4px;font-size:9px;color:#666;">Learning Zone</div>`;
+    html += `<div style="position:absolute;top:112px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial;font-size:16pt;font-weight:bold;">${yearData.zone}</div>`;
+    html += `<div style="position:absolute;top:124px;left:0;right:0;text-align:center;font-family:'Tw Cen MT',Arial;font-size:11pt;color:#666;">Learning Zone</div>`;
   }
 
   html += `</div></div>`;
@@ -400,26 +424,21 @@ async function generatePdf() {
   dlBtn.disabled = true;
 
   try {
-    // A4 LANDSCAPE dimensions in mm: 297mm wide x 210mm tall
+    // A4 LANDSCAPE: 297mm x 210mm
     // Avery L7169: 4 labels per sheet (2x2), each 139 x 99.1mm
     const LABEL_W = 139;
     const LABEL_H = 99.1;
+    const WHITE_W = 108;
+    const WHITE_H = 73;
+    const BORDER_L = (139 - 108) / 2;  // 15.5mm
+    const BORDER_T = (99.1 - 73) / 2;   // 13.05mm
 
-    // Avery L7169 exact positions for landscape A4
-    // Left margin: 9.5mm, Top margin: 5.4mm
-    // Gap between columns: 0mm (labels touch horizontally)
-    // Gap between rows: 0mm (labels touch vertically)
-    const MARGIN_LEFT = 9.5;
-    const MARGIN_TOP = 5.4;
-    const GAP_X = 0;
-    const GAP_Y = 0;
-
-    // Calculate positions
+    // Label positions
     const labelPositions = [
-      { x: MARGIN_LEFT, y: MARGIN_TOP },                    // top-left
-      { x: MARGIN_LEFT + LABEL_W + GAP_X, y: MARGIN_TOP }, // top-right
-      { x: MARGIN_LEFT, y: MARGIN_TOP + LABEL_H + GAP_Y }, // bottom-left
-      { x: MARGIN_LEFT + LABEL_W + GAP_X, y: MARGIN_TOP + LABEL_H + GAP_Y } // bottom-right
+      { x: 9.5, y: 5.4 },                         // top-left
+      { x: 9.5 + 139, y: 5.4 },                   // top-right
+      { x: 9.5, y: 5.4 + 99.1 },                  // bottom-left
+      { x: 9.5 + 139, y: 5.4 + 99.1 }             // bottom-right
     ];
 
     // Fill names to complete sheets
@@ -427,12 +446,18 @@ async function generatePdf() {
     const allNames = [...names];
     while (allNames.length < sheetsNeeded * 4) allNames.push('');
 
-    // Create PDF in LANDSCAPE orientation
+    // Create PDF
     const doc = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
     });
+
+    // Add Tw Cen MT font
+    if (fontBase64) {
+      doc.addFileToVFS('TwCenMT.ttf', fontBase64);
+      doc.addFont('TwCenMT.ttf', 'TwCenMT', 'normal');
+    }
 
     // Convert hex to RGB
     function hexToRgb(hex) {
@@ -443,23 +468,14 @@ async function generatePdf() {
     }
 
     const [r, g, b] = hexToRgb(bgColour);
-
-    // Border proportions from screenshot analysis:
-    // White area is 79% of width, 69.5% of height
-    // Border: ~14.5mm left/right, ~13.5mm top, ~16.7mm bottom
-    const BORDER_LEFT = 14.4;
-    const BORDER_RIGHT = 14.8;
-    const BORDER_TOP = 13.5;
-    const BORDER_BOTTOM = 16.7;
-    const WHITE_W = LABEL_W - BORDER_LEFT - BORDER_RIGHT;  // ~109.8mm
-    const WHITE_H = LABEL_H - BORDER_TOP - BORDER_BOTTOM;  // ~68.9mm
+    const fontName = fontBase64 ? 'TwCenMT' : 'helvetica';
 
     for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
       if (sheetIdx > 0) doc.addPage();
 
       const sheetNames = allNames.slice(sheetIdx * 4, (sheetIdx + 1) * 4);
 
-      // Fill entire page with year group colour first (full bleed)
+      // Fill entire page with colour
       doc.setFillColor(r, g, b);
       doc.rect(0, 0, 297, 210, 'F');
 
@@ -467,77 +483,86 @@ async function generatePdf() {
         const name = sheetNames[i];
         const pos = labelPositions[i];
 
-        // Draw white inner rectangle with correct proportions
+        // Draw white box
         doc.setFillColor(255, 255, 255);
-        doc.rect(pos.x + BORDER_LEFT, pos.y + BORDER_TOP, WHITE_W, WHITE_H, 'F');
+        doc.rect(pos.x + BORDER_L, pos.y + BORDER_T, WHITE_W, WHITE_H, 'F');
 
         if (!name) continue;
 
-        // Position elements based on Excel row structure
-        // White area: 109.8mm x 68.9mm
-        // Each row is ~4.7mm (99.1mm / 21 rows)
-        const innerX = pos.x + BORDER_LEFT;
-        const innerY = pos.y + BORDER_TOP;
-        const innerW = WHITE_W;
-        const innerH = WHITE_H;
-        const rowH = 4.7; // mm per row
+        const innerX = pos.x + BORDER_L;
+        const innerY = pos.y + BORDER_T;
 
-        doc.setTextColor(0, 0, 0);
-
-        // School logo (top-left, row 4)
-        let iconX = innerX + 3;
-        if (labelType.iconType === 'stob' && schoolLogoData) {
-          doc.addImage(schoolLogoData, 'PNG', iconX, innerY + 2, 20, 10);
-        }
-
-        // Book number (top-right, row 4)
-        if (bookNumber) {
-          doc.setFontSize(9);
-          doc.setFont('helvetica', 'bold');
-          const numW = doc.getTextWidth(bookNumber);
-          doc.text(bookNumber, innerX + innerW - 3 - numW, innerY + 8);
-        }
-
-        // Name (row 6, ~9mm from top)
-        let textY = innerY + rowH * 2;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(16);
-        doc.text(name, innerX + 3, textY);
-        const nameW = doc.getTextWidth(name);
-        doc.setDrawColor(0);
-        doc.setLineWidth(0.4);
-        doc.line(innerX + 3, textY + 1.2, innerX + 3 + nameW, textY + 1.2);
-
-        // Book title (row 9, ~23mm from top)
-        textY = innerY + rowH * 5;
-        doc.setFontSize(13);
-        doc.setFont('helvetica', 'bold');
-        doc.text(labelType.title, innerX + 3, textY);
-
-        // States of Being icons (row 11, ~33mm from top)
+        // States of Being overlay (centred, near top)
         if (labelType.iconType === 'stob' && stobData) {
-          doc.addImage(stobData, 'PNG', innerX + 3, innerY + rowH * 7, 70, 8);
-        } else if (labelType.iconType === 'maths' && mathsData) {
-          doc.addImage(mathsData, 'PNG', innerX + 3, innerY + rowH * 7 - 2, 16, 12);
-        } else if (labelType.iconType === 'artist' && artistData) {
-          // Artist icon centered near bottom
-          const centerX = innerX + innerW / 2 - 10;
-          doc.addImage(artistData, 'PNG', centerX, innerY + innerH - 25, 20, 16);
+          const stobW = 105;
+          const stobH = 67;
+          const stobL = innerX + (WHITE_W - stobW) / 2;
+          doc.addImage(stobData, 'PNG', stobL, innerY + 2, stobW, stobH);
         }
 
-        // Learning Zone name (row 15, ~52mm from top)
-        if (labelType.hasZone && yearData) {
-          textY = innerY + rowH * 11;
-          doc.setFontSize(12);
-          doc.setFont('helvetica', 'bold');
-          doc.text(yearData.zone, innerX + 3, textY);
+        // Book number (top right)
+        if (bookNumber) {
+          doc.setFont(fontName, 'normal');
+          doc.setFontSize(11);
+          doc.setTextColor(0, 0, 0);
+          const numW = doc.getTextWidth(bookNumber);
+          doc.text(bookNumber, innerX + WHITE_W - 4 - numW, innerY + 6);
+        }
 
-          // "Learning Zone" label (row 17, ~61mm from top)
-          textY = innerY + rowH * 13;
-          doc.setFontSize(9);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(80, 80, 80);
-          doc.text('Learning Zone', innerX + 3, textY);
+        // Name (centred, 15mm from top)
+        doc.setFont(fontName, 'bold');
+        doc.setFontSize(24);
+        doc.setTextColor(0, 0, 0);
+        const nameW = doc.getTextWidth(name);
+        doc.text(name, innerX + (WHITE_W - nameW) / 2, innerY + 15);
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.5);
+        doc.line(innerX + (WHITE_W - nameW) / 2, innerY + 16, innerX + (WHITE_W + nameW) / 2, innerY + 16);
+
+        // Book name (centred, 28mm from top)
+        doc.setFont(fontName, 'bold');
+        doc.setFontSize(18);
+        const titleW = doc.getTextWidth(labelType.title);
+        doc.text(labelType.title, innerX + (WHITE_W - titleW) / 2, innerY + 28);
+
+        // School logo (centred, 38mm from top)
+        if (labelType.iconType === 'stob' && schoolLogoData) {
+          const logoW = 40;
+          const logoH = 17.4;
+          const logoL = innerX + (WHITE_W - logoW) / 2;
+          doc.addImage(schoolLogoData, 'PNG', logoL, innerY + 38, logoW, logoH);
+        }
+
+        // Maths icon
+        if (labelType.iconType === 'maths' && mathsData) {
+          const iconW = 16;
+          const iconH = 12;
+          const iconL = innerX + (WHITE_W - iconW) / 2;
+          doc.addImage(mathsData, 'PNG', iconL, innerY + 38, iconW, iconH);
+        }
+
+        // Artist icon (centred near bottom)
+        if (labelType.iconType === 'artist' && artistData) {
+          const iconW = 20;
+          const iconH = 16;
+          const iconL = innerX + (WHITE_W - iconW) / 2;
+          doc.addImage(artistData, 'PNG', iconL, innerY + WHITE_H - 22, iconW, iconH);
+        }
+
+        // Learning Zone (if applicable)
+        if (labelType.hasZone && yearData) {
+          // Zone name (centred, 56mm from top)
+          doc.setFont(fontName, 'bold');
+          doc.setFontSize(16);
+          const zoneW = doc.getTextWidth(yearData.zone);
+          doc.text(yearData.zone, innerX + (WHITE_W - zoneW) / 2, innerY + 56);
+
+          // "Learning Zone" label (centred, 62mm from top)
+          doc.setFont(fontName, 'normal');
+          doc.setFontSize(11);
+          doc.setTextColor(102, 102, 102);
+          const lzW = doc.getTextWidth('Learning Zone');
+          doc.text('Learning Zone', innerX + (WHITE_W - lzW) / 2, innerY + 62);
         }
       }
     }
