@@ -324,13 +324,21 @@ function updatePreview() {
   const previewName = names.length > 0 ? names[0] : '[Name]';
   const bgColour = labelType.greyBorder ? '#808080' : (yearData?.hex || '#ccc');
 
-  // Preview dimensions (scaled down from actual 139x99.1mm)
-  const pw = 280, ph = 200;
-  const margin = 10; // coloured border thickness in preview pixels
+  // Preview dimensions scaled from actual label proportions
+  // Actual: 139mm x 99.1mm, white area is 79% x 69.5%
+  // Preview: 280px x 200px (same aspect ratio)
+  const previewW = 280;
+  const previewH = 200;
+
+  // Border proportions matching actual label (10.4% left/right, 13.6% top, 16.9% bottom)
+  const borderL = Math.round(previewW * 0.104);  // 29px
+  const borderR = Math.round(previewW * 0.106);  // 30px
+  const borderT = Math.round(previewH * 0.136);  // 27px
+  const borderB = Math.round(previewH * 0.169);  // 34px
 
   let html = `
     <div style="position:absolute;inset:0;background:${bgColour};">
-      <div class="label-inner" style="top:${margin}px;left:${margin}px;right:${margin}px;bottom:${margin}px;">
+      <div class="label-inner" style="top:${borderT}px;left:${borderL}px;right:${borderR}px;bottom:${borderB}px;">
         <div class="label-name">${previewName}</div>
         <div class="label-title">${labelType.title}</div>`;
 
@@ -418,7 +426,16 @@ async function generatePdf() {
     }
 
     const [r, g, b] = hexToRgb(bgColour);
-    const BORDER = 4; // coloured border thickness in mm (white inner area is inset by this)
+
+    // Border proportions from screenshot analysis:
+    // White area is 79% of width, 69.5% of height
+    // Border: ~14.5mm left/right, ~13.5mm top, ~16.7mm bottom
+    const BORDER_LEFT = 14.4;
+    const BORDER_RIGHT = 14.8;
+    const BORDER_TOP = 13.5;
+    const BORDER_BOTTOM = 16.7;
+    const WHITE_W = LABEL_W - BORDER_LEFT - BORDER_RIGHT;  // ~109.8mm
+    const WHITE_H = LABEL_H - BORDER_TOP - BORDER_BOTTOM;  // ~68.9mm
 
     for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
       if (sheetIdx > 0) doc.addPage();
@@ -433,20 +450,20 @@ async function generatePdf() {
         const name = sheetNames[i];
         const pos = labelPositions[i];
 
-        // Draw white inner rectangle
+        // Draw white inner rectangle with correct proportions
         doc.setFillColor(255, 255, 255);
-        doc.rect(pos.x + BORDER, pos.y + BORDER, LABEL_W - BORDER * 2, LABEL_H - BORDER * 2, 'F');
+        doc.rect(pos.x + BORDER_LEFT, pos.y + BORDER_TOP, WHITE_W, WHITE_H, 'F');
 
         if (!name) continue;
 
         // Text positioning
-        const innerX = pos.x + BORDER;
-        const innerY = pos.y + BORDER;
-        const innerW = LABEL_W - BORDER * 2;
-        const innerH = LABEL_H - BORDER * 2;
+        const innerX = pos.x + BORDER_LEFT;
+        const innerY = pos.y + BORDER_TOP;
+        const innerW = WHITE_W;
+        const innerH = WHITE_H;
 
-        let textY = innerY + 10;
-        const textX = innerX + 5;
+        let textY = innerY + 12;
+        const textX = innerX + 8;
 
         // Name (underlined)
         doc.setFont('helvetica', 'bold');
@@ -487,27 +504,28 @@ async function generatePdf() {
           doc.text(bookNumber, innerX + innerW - 5 - numW, innerY + 10);
         }
 
-        // Add images at bottom of label
-        const iconY = innerY + innerH - 22; // 22mm from bottom of white area
-        let iconX = innerX + 5;
+        // Add images at bottom of white area
+        // Icons should be near the bottom of the 68.9mm white area
+        const iconY = innerY + innerH - 18; // 18mm from bottom of white area
+        let iconX = innerX + 8;
 
         if (labelType.iconType === 'stob') {
-          // School logo (left)
+          // School logo (left side)
           if (schoolLogoData) {
-            doc.addImage(schoolLogoData, 'PNG', iconX, iconY, 22, 10);
-            iconX += 24;
+            doc.addImage(schoolLogoData, 'PNG', iconX, iconY, 25, 12);
+            iconX += 28;
           }
-          // States of Being strip (wider)
+          // States of Being strip (wider, takes most of bottom)
           if (stobData) {
-            doc.addImage(stobData, 'PNG', iconX, iconY + 1, 90, 8);
+            doc.addImage(stobData, 'PNG', iconX, iconY + 1, 70, 10);
           }
         } else if (labelType.iconType === 'maths' && mathsData) {
-          // Maths icon
-          doc.addImage(mathsData, 'PNG', iconX, iconY - 2, 18, 14);
+          // Maths icon at bottom left
+          doc.addImage(mathsData, 'PNG', iconX, iconY - 3, 18, 14);
         } else if (labelType.iconType === 'artist' && artistData) {
           // Artist icon - centered at bottom
           const centerX = innerX + innerW / 2 - 12;
-          doc.addImage(artistData, 'PNG', centerX, iconY - 4, 24, 20);
+          doc.addImage(artistData, 'PNG', centerX, iconY - 5, 24, 19);
         }
       }
     }
