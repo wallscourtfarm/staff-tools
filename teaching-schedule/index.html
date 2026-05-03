@@ -1733,7 +1733,11 @@ function removeItem(btn) {
 
 async function removeTPActivity(btn) {
   const { staff, date, activity, session } = btn.dataset;
-  if (!staff || !date || !activity) return;
+  console.log('Removing activity:', { staff, date, activity, session });
+  if (!staff || !date || !activity) {
+    console.warn('Missing required data:', { staff, date, activity });
+    return;
+  }
 
   // Add to local exceptions immediately
   ACTIVITY_EXCEPTIONS.push({ date, staff, activity, session: session || '' });
@@ -1741,11 +1745,13 @@ async function removeTPActivity(btn) {
   // Try to sync to sheet
   if (EXCEPTIONS_URL) {
     try {
-      await fetch(EXCEPTIONS_URL + '?action=addException', {
+      const response = await fetch(EXCEPTIONS_URL + '?action=addException', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date, staff, activity, session: session || '' })
       });
+      const result = await response.json();
+      console.log('Exception sync result:', result);
     } catch (err) {
       console.warn('Failed to sync exception to sheet:', err);
     }
