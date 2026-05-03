@@ -499,23 +499,27 @@ async function generatePdf() {
         }
 
         // Name (centred, 15mm from top of white box)
+        // PDF y is baseline, so add font height above baseline (≈75% of font size in mm)
+        // 24pt ≈ 8.5mm, height above baseline ≈ 6.4mm
         doc.setFont(fontName, 'normal');
         doc.setFontSize(24);
         doc.setTextColor(0, 0, 0);
         const nameW = doc.getTextWidth(name);
-        doc.text(name, innerX + (WHITE_W - nameW) / 2, innerY + 15);
-        // Underline
+        const nameY = innerY + 15 + 6.4; // 15mm top + font height above baseline
+        doc.text(name, innerX + (WHITE_W - nameW) / 2, nameY);
+        // Underline (1mm below baseline)
         doc.setDrawColor(0);
         doc.setLineWidth(0.5);
-        doc.line(innerX + (WHITE_W - nameW) / 2, innerY + 16, innerX + (WHITE_W + nameW) / 2, innerY + 16);
+        doc.line(innerX + (WHITE_W - nameW) / 2, nameY + 1, innerX + (WHITE_W + nameW) / 2, nameY + 1);
 
         // Book name (centred, 28mm from top of white box)
+        // 18pt ≈ 6.4mm, height above baseline ≈ 4.8mm
         doc.setFont(fontName, 'normal');
         doc.setFontSize(18);
         const titleW = doc.getTextWidth(labelType.title);
-        doc.text(labelType.title, innerX + (WHITE_W - titleW) / 2, innerY + 28);
+        doc.text(labelType.title, innerX + (WHITE_W - titleW) / 2, innerY + 28 + 4.8);
 
-        // School logo (centred, 38mm from top)
+        // School logo (centred, 38mm from top of white box)
         if (labelType.iconType === 'stob' && schoolLogoData) {
           const logoW = 40;
           const logoH = 17.4;
@@ -542,17 +546,19 @@ async function generatePdf() {
         // Learning Zone (if applicable)
         if (labelType.hasZone && yearData) {
           // Zone name (centred, 56mm from top of white box)
+          // 16pt ≈ 5.6mm, height above baseline ≈ 4.2mm
           doc.setFont(fontName, 'normal');
           doc.setFontSize(16);
           const zoneW = doc.getTextWidth(yearData.zone);
-          doc.text(yearData.zone, innerX + (WHITE_W - zoneW) / 2, innerY + 56);
+          doc.text(yearData.zone, innerX + (WHITE_W - zoneW) / 2, innerY + 56 + 4.2);
 
-          // "Learning Zone" label (centred, 62mm from top)
+          // "Learning Zone" label (centred, 62mm from top of white box)
+          // 11pt ≈ 3.9mm, height above baseline ≈ 2.9mm
           doc.setFont(fontName, 'normal');
           doc.setFontSize(11);
           doc.setTextColor(102, 102, 102);
           const lzW = doc.getTextWidth('Learning Zone');
-          doc.text('Learning Zone', innerX + (WHITE_W - lzW) / 2, innerY + 62);
+          doc.text('Learning Zone', innerX + (WHITE_W - lzW) / 2, innerY + 62 + 2.9);
         }
       }
     }
