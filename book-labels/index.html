@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Labels — Wallscourt Farm Academy</title>
+  <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --blue: #2a7fc1;
+      --blue-dk: #1a5c8e;
+      --blue-lt: #e8f2fb;
+      --gold: #e6a817;
+      --green: #3a9e5f;
+      --bg: #e8eef4;
+      --white: #ffffff;
+      --border: #d0dce8;
+      --text: #1e2d3d;
+      --muted: #7a8fa3;
+      --label: #4a6278;
+
+      /* Year group colours */
+      --year-blue: #3288ce;
+      --year-orange: #f57721;
+      --year-green: #63b44a;
+      --year-magenta: #c1126d;
+      --year-grey: #808080;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); min-height: 100vh; display: flex; flex-direction: column; }
+    .top-bar { height: 5px; background: var(--blue); }
+    header { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    header img { height: 80px; width: auto; object-fit: contain; }
+    .header-divider { width: 1px; height: 64px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
+    .header-text h1 { color: var(--blue); font-size: 1.7rem; font-weight: 700; line-height: 1.2; }
+    .header-text p { color: var(--muted); font-size: 1rem; margin-top: 4px; }
+    .school-name { color: var(--text); font-size: 1.1rem; font-weight: 600; line-height: 1.3; }
+    main { flex: 1; display: flex; justify-content: center; padding: 28px 16px 48px; }
+    .panel { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 12px; }
+    .card { background: var(--white); border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: hidden; }
+    .card-header { padding: 11px 18px; background: var(--blue-lt); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+    .card-header h2 { font-size: 0.78rem; font-weight: 700; color: var(--blue-dk); text-transform: uppercase; letter-spacing: 0.06em; }
+    .card-body { padding: 16px 18px; }
+    .field { margin-bottom: 11px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--label); margin-bottom: 4px; }
+    .field select, .field input.plain { width: 100%; font-family: inherit; font-size: 0.875rem; border: 1.5px solid var(--border); border-radius: 6px; padding: 8px 11px; background: var(--white); color: var(--text); transition: border-color 0.15s, box-shadow 0.15s; }
+    .field select:focus, .field input.plain:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(42,127,193,0.12); }
+    textarea.plain { width: 100%; font-family: inherit; font-size: 0.875rem; border: 1.5px solid var(--border); border-radius: 6px; padding: 8px 11px; background: var(--white); color: var(--text); resize: vertical; min-height: 80px; }
+    textarea.plain:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(42,127,193,0.12); }
+    .hint { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 11px; }
+
+    .mode-tabs { display: flex; gap: 0; border-radius: 8px; overflow: hidden; border: 1.5px solid var(--border); }
+    .mode-tab { flex: 1; padding: 9px 6px; font-size: 0.72rem; font-weight: 700; cursor: pointer; background: var(--white); border: none; color: var(--muted); font-family: inherit; transition: background 0.15s, color 0.15s; border-right: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.03em; }
+    .mode-tab:last-child { border-right: none; }
+    .mode-tab.active { background: var(--blue); color: var(--white); }
+    .mode-tab:hover:not(.active) { background: var(--blue-lt); color: var(--blue-dk); }
+
+    .year-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .year-btn { padding: 8px 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; background: var(--white); border: 2px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit; transition: all 0.15s; }
+    .year-btn:hover { border-color: var(--blue); }
+    .year-btn.active { border-color: var(--blue); background: var(--blue); color: var(--white); }
+    .year-btn[data-colour="blue"].active { background: var(--year-blue); border-color: var(--year-blue); }
+    .year-btn[data-colour="orange"].active { background: var(--year-orange); border-color: var(--year-orange); }
+    .year-btn[data-colour="green"].active { background: var(--year-green); border-color: var(--year-green); }
+    .year-btn[data-colour="magenta"].active { background: var(--year-magenta); border-color: var(--year-magenta); }
+
+    .upload-area { border: 2px dashed var(--border); border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+    .upload-area:hover { border-color: var(--blue); background: var(--blue-lt); }
+    .upload-area input { display: none; }
+    .upload-icon { font-size: 2rem; color: var(--muted); margin-bottom: 8px; }
+    .upload-text { font-size: 0.85rem; color: var(--text); }
+    .upload-hint { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+
+    .names-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; margin-top: 8px; }
+    .name-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+    .name-item:last-child { border-bottom: none; }
+    .name-remove { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; padding: 0; line-height: 1; }
+    .name-remove:hover { color: #c0392b; }
+
+    .preview-section { margin-top: 12px; }
+    .preview-label { border: 1.5px solid var(--border); border-radius: 8px; padding: 12px; background: var(--white); font-family: Calibri, 'Segoe UI', sans-serif; }
+    .preview-label.grey-border { border-color: var(--year-grey); border-width: 3px; }
+
+    .label-preview { position: relative; width: 100%; aspect-ratio: 139/99.1; border-radius: 4px; overflow: hidden; }
+    .label-bg { position: absolute; inset: 0; }
+    .label-content { position: absolute; background: white; border-radius: 2px; display: flex; flex-direction: column; padding: 4px 6px; }
+    .label-name { font-size: 0.7rem; font-weight: 700; text-decoration: underline; line-height: 1.1; }
+    .label-title { font-size: 0.6rem; font-weight: 600; line-height: 1.1; margin-top: 1px; }
+    .label-zone { font-size: 0.5rem; line-height: 1.1; margin-top: 1px; }
+    .label-zone-small { font-size: 0.4rem; color: var(--muted); }
+    .label-number { position: absolute; top: 2px; right: 4px; font-size: 0.5rem; font-weight: 600; }
+    .label-icons { display: flex; align-items: center; gap: 2px; margin-top: auto; }
+    .label-icons img { height: 14px; width: auto; }
+    .label-icon-single { position: absolute; height: 16px; width: auto; }
+
+    .btn-dl { width: 100%; background: var(--gold); color: var(--white); border: none; border-radius: 7px; padding: 13px; font-size: 0.95rem; font-weight: 700; cursor: pointer; font-family: inherit; letter-spacing: 0.01em; transition: background 0.15s, transform 0.1s; box-shadow: 0 2px 6px rgba(230,168,23,0.3); }
+    .btn-dl:hover:not(:disabled) { background: #cb9210; }
+    .btn-dl:active:not(:disabled) { transform: scale(0.99); }
+    .btn-dl:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; box-shadow: none; }
+    .status { text-align: center; font-size: 0.78rem; color: var(--green); margin-top: 8px; min-height: 16px; font-weight: 600; }
+    .status.error { color: #c0392b; }
+
+    footer { text-align: center; color: var(--muted); font-size: 0.68rem; padding: 14px; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="top-bar"></div>
+<header>
+  <img src="logo.png" alt="WFA">
+  <div class="header-divider"></div>
+  <div>
+    <div class="school-name">Wallscourt Farm Academy</div>
+    <h1 class="header-text" style="color:var(--blue);font-size:1.1rem;font-weight:700;">Book Labels</h1>
+    <p style="color:var(--muted);font-size:0.72rem;">Avery L7169 — 8 per sheet (139 × 99.1mm)</p>
+  </div>
+</header>
+<main>
+  <div class="panel">
+
+    <!-- Label Type -->
+    <div class="card">
+      <div class="card-header"><h2>Label Type</h2></div>
+      <div class="card-body">
+        <div class="field">
+          <div class="mode-tabs" id="labelTypeTabs">
+            <button class="mode-tab active" data-type="learning-journey">Learning Journey</button>
+            <button class="mode-tab" data-type="home-learning">Home Learning</button>
+            <button class="mode-tab" data-type="writers-journal">Writer's Journal</button>
+            <button class="mode-tab" data-type="maths-book">Maths Book</button>
+            <button class="mode-tab" data-type="maths-journal">Maths Journal</button>
+            <button class="mode-tab" data-type="artist">Artist</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Year Group -->
+    <div class="card" id="yearGroupCard">
+      <div class="card-header"><h2>Year Group</h2></div>
+      <div class="card-body">
+        <div class="year-grid" id="yearGrid">
+          <button class="year-btn" data-year="R" data-zone="Oak" data-colour="blue">R</button>
+          <button class="year-btn" data-year="1" data-zone="Beech" data-colour="orange">Y1</button>
+          <button class="year-btn" data-year="2" data-zone="Willow" data-colour="green">Y2</button>
+          <button class="year-btn" data-year="3" data-zone="Acer" data-colour="magenta">Y3</button>
+          <button class="year-btn" data-year="4" data-zone="Maple" data-colour="blue">Y4</button>
+          <button class="year-btn" data-year="5" data-zone="Hazel" data-colour="orange">Y5</button>
+          <button class="year-btn" data-year="6" data-zone="Elm" data-colour="green">Y6</button>
+        </div>
+        <p class="hint">Select year group to set Learning Zone and colour</p>
+      </div>
+    </div>
+
+    <!-- Book Number -->
+    <div class="card">
+      <div class="card-header"><h2>Book Number (Optional)</h2></div>
+      <div class="card-body">
+        <div class="field">
+          <input type="number" id="bookNumber" class="plain" placeholder="e.g. 1, 2, 3..." min="1" max="99">
+          <p class="hint">Leave blank for no number</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Names Input -->
+    <div class="card">
+      <div class="card-header"><h2>Children's Names</h2></div>
+      <div class="card-body">
+        <div class="field">
+          <textarea id="namesInput" class="plain" placeholder="Enter names, one per line&#10;e.g.&#10;Amir&#10;Arthur&#10;Asel"></textarea>
+          <p class="hint">Or upload a file below</p>
+        </div>
+        <div class="field">
+          <label class="upload-area" id="uploadArea">
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt">
+            <div class="upload-icon">📄</div>
+            <div class="upload-text">Click to upload class list</div>
+            <div class="upload-hint">Excel (.xlsx, .xls), CSV, or text file</div>
+          </label>
+        </div>
+        <div class="names-list hidden" id="namesList"></div>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div class="card">
+      <div class="card-header"><h2>Preview</h2></div>
+      <div class="card-body">
+        <div class="preview-label" id="previewContainer">
+          <div class="label-preview" id="labelPreview">
+            <!-- Preview will be rendered here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Download -->
+    <button class="btn-dl" id="dlBtn" onclick="generateDocx()" disabled>↓ Download Label Sheet (DOCX)</button>
+    <div class="status" id="status"></div>
+
+  </div>
+</main>
+<footer>Wallscourt Farm Academy — Book Label Generator</footer>
+
+<script>
+// Year group data
+const YEAR_COLOURS = {
+  'R': { colour: 'blue', hex: '#3288ce', zone: 'Oak' },
+  '1': { colour: 'orange', hex: '#f57721', zone: 'Beech' },
+  '2': { colour: 'green', hex: '#63b44a', zone: 'Willow' },
+  '3': { colour: 'magenta', hex: '#c1126d', zone: 'Acer' },
+  '4': { colour: 'blue', hex: '#3288ce', zone: 'Maple' },
+  '5': { colour: 'orange', hex: '#f57721', zone: 'Hazel' },
+  '6': { colour: 'green', hex: '#63b44a', zone: 'Elm' }
+};
+
+// Label type config
+const LABEL_TYPES = {
+  'learning-journey': { title: "My Learning Journey", hasZone: true, iconType: 'stob', iconPosition: 'bottom' },
+  'home-learning': { title: "Home Learning", hasZone: true, iconType: 'stob', iconPosition: 'bottom' },
+  'writers-journal': { title: "Writer's Journal", hasZone: true, iconType: 'stob', iconPosition: 'bottom' },
+  'maths-book': { title: "Mathematician", hasZone: true, iconType: 'maths', iconPosition: 'top-left' },
+  'maths-journal': { title: "Mathematician", hasZone: true, iconType: 'maths', iconPosition: 'top-left' },
+  'artist': { title: "Artist", hasZone: false, iconType: 'artist', iconPosition: 'bottom', greyBorder: true }
+};
+
+// State
+let currentLabelType = 'learning-journey';
+let currentYear = null;
+let names = [];
+let bookNumber = '';
+
+// DOM elements
+const labelTypeTabs = document.getElementById('labelTypeTabs');
+const yearGrid = document.getElementById('yearGrid');
+const yearGroupCard = document.getElementById('yearGroupCard');
+const namesInput = document.getElementById('namesInput');
+const fileInput = document.getElementById('fileInput');
+const namesList = document.getElementById('namesList');
+const previewContainer = document.getElementById('previewContainer');
+const labelPreview = document.getElementById('labelPreview');
+const dlBtn = document.getElementById('dlBtn');
+const status = document.getElementById('status');
+const bookNumberInput = document.getElementById('bookNumber');
+
+// Load images as base64
+let schoolLogoData = null;
+let stobIconData = null;
+let mathsIconData = null;
+let artistIconData = null;
+let imagesLoaded = false;
+
+async function loadImages() {
+  const toBase64 = async (path) => {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error(`Failed to load ${path}`);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  try {
+    schoolLogoData = await toBase64('schoollogo-book.png');
+    stobIconData = await toBase64('book-stob-lj.png');
+    mathsIconData = await toBase64('maths-book.png');
+    artistIconData = await toBase64('artist-book.png');
+    imagesLoaded = true;
+    console.log('Images loaded successfully');
+  } catch (e) {
+    console.error('Error loading images:', e);
+  }
+}
+
+// Helper functions
+function g(id) { return document.getElementById(id)?.value || ''; }
+
+function getNames() {
+  const text = namesInput.value.trim();
+  if (!text) return [];
+  return text.split('\n').map(n => n.trim()).filter(n => n);
+}
+
+function updatePreview() {
+  const labelType = LABEL_TYPES[currentLabelType];
+  const yearData = currentYear ? YEAR_COLOURS[currentYear] : null;
+  const previewNames = names.length > 0 ? names : ['[Name]'];
+  const previewName = previewNames[0];
+
+  // Build preview HTML
+  const bgColour = labelType.greyBorder ? '#808080' : (yearData?.hex || '#ccc');
+  const greyBorder = labelType.greyBorder ? 'grey-border' : '';
+
+  // Scale: 139mm x 99.1mm label, preview at ~280px wide
+  // White content area: approximately 90% of label with margins
+  const margin = 8; // mm equivalent in preview pixels
+
+  let html = `
+    <div class="label-preview" style="background:${bgColour};padding:${margin}px;border-radius:4px;">
+      <div style="background:white;position:relative;width:100%;min-height:180px;padding:8px 12px;border-radius:2px;">`;
+
+  // Book number (top right of white area)
+  if (bookNumber) {
+    html += `<span style="position:absolute;top:6px;right:8px;font-size:0.6rem;font-weight:600;color:#333;">${bookNumber}</span>`;
+  }
+
+  // Name (underlined)
+  html += `<div style="font-size:0.9rem;font-weight:700;text-decoration:underline;margin-bottom:4px;">${previewName}</div>`;
+
+  // Title
+  html += `<div style="font-size:0.75rem;font-weight:600;margin-bottom:4px;">${labelType.title}</div>`;
+
+  // Learning Zone (if applicable)
+  if (labelType.hasZone && yearData) {
+    html += `<div style="font-size:0.65rem;font-weight:600;">${yearData.zone}</div>`;
+    html += `<div style="font-size:0.55rem;color:#666;">Learning Zone</div>`;
+  }
+
+  // Icons at bottom
+  html += `<div style="position:absolute;bottom:6px;left:8px;display:flex;align-items:center;gap:4px;">`;
+
+  if (labelType.iconType === 'stob') {
+    if (schoolLogoData) {
+      html += `<img src="${schoolLogoData}" style="height:20px;width:auto;">`;
+    }
+    if (stobIconData) {
+      html += `<img src="${stobIconData}" style="height:20px;width:auto;">`;
+    }
+  } else if (labelType.iconType === 'maths' && mathsIconData) {
+    html += `<img src="${mathsIconData}" style="height:24px;width:auto;">`;
+  } else if (labelType.iconType === 'artist' && artistIconData) {
+    html += `<img src="${artistIconData}" style="height:24px;width:auto;">`;
+  }
+
+  html += `</div></div></div>`;
+
+  previewContainer.innerHTML = html;
+  previewContainer.className = `preview-label ${greyBorder}`;
+
+  // Enable/disable download button
+  // For Artist labels, year is not required (grey border)
+  const needsYear = !labelType.greyBorder;
+  dlBtn.disabled = names.length === 0 || (needsYear && !currentYear);
+}
+
+// Event handlers
+labelTypeTabs.addEventListener('click', (e) => {
+  if (e.target.classList.contains('mode-tab')) {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    e.target.classList.add('active');
+    currentLabelType = e.target.dataset.type;
+
+    // Show/hide year group for Artist (grey border, no zone)
+    if (currentLabelType === 'artist') {
+      yearGroupCard.classList.add('hidden');
+    } else {
+      yearGroupCard.classList.remove('hidden');
+    }
+
+    updatePreview();
+  }
+});
+
+yearGrid.addEventListener('click', (e) => {
+  if (e.target.classList.contains('year-btn')) {
+    document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    currentYear = e.target.dataset.year;
+    updatePreview();
+  }
+});
+
+namesInput.addEventListener('input', () => {
+  names = getNames();
+  updatePreview();
+});
+
+bookNumberInput.addEventListener('input', () => {
+  bookNumber = bookNumberInput.value.trim();
+  updatePreview();
+});
+
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  try {
+    if (ext === 'xlsx' || ext === 'xls') {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+      // Try to find names in first column, skipping header if present
+      const potentialNames = jsonData.flat().filter(cell => {
+        if (typeof cell !== 'string') return false;
+        const c = cell.trim().toLowerCase();
+        return c && !['first name', 'firstname', 'name', 'names', 'child'].includes(c);
+      });
+
+      names = potentialNames.map(n => n.trim()).filter(n => n);
+    } else if (ext === 'csv' || ext === 'txt') {
+      const text = await file.text();
+      names = text.split(/[\n\r,]+/).map(n => n.trim()).filter(n => n);
+    }
+
+    namesInput.value = names.join('\n');
+    updatePreview();
+  } catch (err) {
+    status.className = 'status error';
+    status.textContent = 'Error reading file: ' + err.message;
+    setTimeout(() => { status.textContent = ''; status.className = 'status'; }, 3000);
+  }
+});
+
+// DOCX Generation
+async function generateDocx() {
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+          WidthType, HeightRule, VerticalAlign, AlignmentType, BorderStyle,
+          ImageRun } = docx;
+
+  status.className = 'status';
+  status.textContent = 'Building…';
+  dlBtn.disabled = true;
+
+  try {
+    const labelType = LABEL_TYPES[currentLabelType];
+    const yearData = currentYear ? YEAR_COLOURS[currentYear] : null;
+    const bgColour = labelType.greyBorder ? '808080' : yearData.hex.replace('#', '');
+
+    // Ensure images are loaded
+    if (!imagesLoaded) {
+      await loadImages();
+    }
+
+    // Convert base64 to Uint8Array
+    const base64ToUint8 = (base64) => {
+      const bin = atob(base64.split(',')[1]);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return bytes;
+    };
+
+    // Avery L7169 dimensions in twips (1mm ≈ 567 twips)
+    const LABEL_W = Math.round(139.0 * 567);  // ~78783 twips
+    const LABEL_H = Math.round(99.1 * 567);   // ~56190 twips
+    const INNER_MARGIN = Math.round(3 * 567); // 3mm margin inside coloured border
+
+    // Prepare images
+    const schoolLogoBytes = schoolLogoData ? base64ToUint8(schoolLogoData) : null;
+    const stobIconBytes = stobIconData ? base64ToUint8(stobIconData) : null;
+    const mathsIconBytes = mathsIconData ? base64ToUint8(mathsIconData) : null;
+    const artistIconBytes = artistIconData ? base64ToUint8(artistIconData) : null;
+
+    // Fill names to complete sheets (8 per sheet)
+    const sheetsNeeded = Math.ceil(names.length / 8);
+    const totalLabels = Math.max(sheetsNeeded * 8, 8);
+    const allNames = [...names];
+    while (allNames.length < totalLabels) allNames.push('');
+
+    // Create sections (one per sheet)
+    const sections = [];
+
+    for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
+      const sheetNames = allNames.slice(sheetIdx * 8, (sheetIdx + 1) * 8);
+      const rows = [];
+
+      for (let rowIdx = 0; rowIdx < 4; rowIdx++) {
+        const cells = [];
+
+        for (let colIdx = 0; colIdx < 2; colIdx++) {
+          const nameIdx = rowIdx * 2 + colIdx;
+          const name = sheetNames[nameIdx] || '';
+
+          // Build cell content
+          const cellContent = [];
+
+          if (name) {
+            // Name (underlined, bold, 14pt)
+            cellContent.push(new Paragraph({
+              children: [
+                new TextRun({ text: name, bold: true, size: 28, font: 'Calibri', underline: {} })
+              ],
+              spacing: { after: 80, before: 0, line: 280 }
+            }));
+
+            // Title (bold, 12pt)
+            cellContent.push(new Paragraph({
+              children: [
+                new TextRun({ text: labelType.title, bold: true, size: 24, font: 'Calibri' })
+              ],
+              spacing: { after: 60, before: 0, line: 280 }
+            }));
+
+            // Learning Zone (if applicable)
+            if (labelType.hasZone && yearData) {
+              cellContent.push(new Paragraph({
+                children: [
+                  new TextRun({ text: yearData.zone, bold: true, size: 22, font: 'Calibri' })
+                ],
+                spacing: { after: 0, before: 0, line: 280 }
+              }));
+              cellContent.push(new Paragraph({
+                children: [
+                  new TextRun({ text: 'Learning Zone', size: 18, font: 'Calibri', color: '666666' })
+                ],
+                spacing: { after: 60, before: 0, line: 280 }
+              }));
+            }
+
+            // Book number (top right position handled separately)
+            // Icons are also handled in a separate section
+          }
+
+          // Create the inner white cell
+          const innerCell = new TableCell({
+            width: { size: LABEL_W - INNER_MARGIN * 2, type: WidthType.DXA },
+            shading: { fill: 'FFFFFF' },
+            margins: { top: 150, bottom: 150, left: 200, right: 200 },
+            children: cellContent.length > 0 ? cellContent : [new Paragraph({ children: [] })]
+          });
+
+          // Create outer cell with coloured background
+          const outerCell = new TableCell({
+            width: { size: LABEL_W, type: WidthType.DXA },
+            height: { value: LABEL_H, rule: HeightRule.EXACT },
+            shading: { fill: bgColour },
+            margins: { top: INNER_MARGIN, bottom: INNER_MARGIN, left: INNER_MARGIN, right: INNER_MARGIN },
+            children: [innerCell]
+          });
+
+          cells.push(outerCell);
+        }
+
+        rows.push(new TableRow({ children: cells }));
+      }
+
+      // Create the table for this sheet
+      const table = new Table({
+        width: { size: 11906 - 284 * 2, type: WidthType.DXA }, // A4 width minus margins
+        rows: rows
+      });
+
+      // Create section for this sheet
+      sections.push({
+        properties: {
+          page: {
+            size: { width: 11906, height: 16838 }, // A4 in twips
+            margins: { top: 0, bottom: 0, left: 284, right: 284 } // ~5mm margins
+          }
+        },
+        children: [table]
+      });
+    }
+
+    const doc = new Document({ sections });
+
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `WFA_Book_Labels_${currentLabelType.replace(/-/g, '_')}_${currentYear || 'Artist'}.docx`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    status.textContent = '✓ Downloaded';
+    setTimeout(() => { status.textContent = ''; dlBtn.disabled = false; }, 3000);
+
+  } catch (e) {
+    console.error(e);
+    status.className = 'status error';
+    status.textContent = 'Error: ' + e.message;
+    dlBtn.disabled = false;
+  }
+}
+
+// Initialize
+loadImages();
+</script>
+</body>
+</html>
