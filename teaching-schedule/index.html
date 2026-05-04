@@ -2894,7 +2894,14 @@ async function init() {
       }
     }
     // Separate FAB exceptions from activity exceptions
-    FAB_EXCEPTIONS = ACTIVITY_EXCEPTIONS.filter(e => e.type === 'FAB');
+    // Map fields: staff → staffId, session → zone
+    FAB_EXCEPTIONS = ACTIVITY_EXCEPTIONS
+      .filter(e => e.type === 'FAB')
+      .map(e => ({
+        date: e.date,
+        staffId: e.staff,
+        zone: e.session || ''
+      }));
     ACTIVITY_EXCEPTIONS = ACTIVITY_EXCEPTIONS.filter(e => !e.type || e.type === 'DayActivity');
 
     migrateScheduleKeys();
