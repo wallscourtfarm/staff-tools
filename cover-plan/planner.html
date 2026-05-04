@@ -108,12 +108,8 @@
     .slots-row { display:flex; gap:3px; align-items:stretch; }
     .slot-item { position:relative; min-width:24px; font-size:11px; }
     .slot-item.slot-dragging { opacity:.3; }
-    .slot-strip { position:absolute; left:0; top:0; bottom:0; width:3px; border-radius:3px; z-index:1; pointer-events:none; }
-    .slot-strip.strip-first { border-radius:3px 3px 0 0; }
-    .slot-strip.strip-last { border-radius:0 0 3px 3px; }
-    .slot-strip.strip-only { border-radius:3px; }
-    .slot-strip.strip-mid { border-radius:0; }
-    .slot-content { position:relative; z-index:2; margin-left:4px; border:1.5px solid #e2e8f0; border-radius:4px; overflow:visible; background:white; cursor:grab; touch-action:none; user-select:none; min-height:50px; display:flex; flex-direction:column; }
+    .slot-strip { display:none; } /* No longer used - color is now on content border-left */
+    .slot-content { position:relative; z-index:2; border:1.5px solid #e2e8f0; border-left-width:4px; border-left-style:solid; border-radius:4px; overflow:visible; background:white; cursor:grab; touch-action:none; user-select:none; min-height:50px; display:flex; flex-direction:column; }
     .slot-content:active { cursor:grabbing; }
     .slot-text { writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg); padding:6px 4px; flex:1; display:flex; flex-direction:column; gap:3px; align-items:flex-start; }
     .slot-name { font-weight:bold; color:#111; font-size:11px; white-space:nowrap; }
@@ -266,8 +262,8 @@
 </head>
 <body>
 
-<!-- Version marker: 🟢 green circle (row height fix) -->
-<div style="position:fixed;top:5px;right:5px;width:12px;height:12px;background:#22c55e;border-radius:50%;z-index:9999;" title="v1275958"></div>
+<!-- Version marker: 🔴 red triangle (border-left color) -->
+<div style="position:fixed;top:5px;right:5px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid:#ef4444;z-index:9999;" title="v389804e"></div>
 
 <div class="header-strip"></div>
 <header>
@@ -998,9 +994,8 @@ function renderGrid() {
                      </div>`
                   : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`;
 
-              html += `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''} ${draggingThis?'slot-dragging':''}>
-                <div class="slot-strip strip-only" style="background:${col}"></div>
-                <div class="slot-content" onpointerdown="onSlotPointerDown(event,${s.id})">
+              html += `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''} ${draggingThis?'slot-dragging':''}">
+                <div class="slot-content" style="border-left-color:${col}" onpointerdown="onSlotPointerDown(event,${s.id})">
                   <div class="slot-text">
                     <span class="slot-name">${t ? t.name : s.tid}</span>
                     <select class="slot-reason-sel" onclick="event.stopPropagation()" onchange="changeReason(${s.id},this.value)">${reasonOptionsHtml}</select>
@@ -1110,8 +1105,7 @@ function positionSpanStrips(spans) {
     const endIndicator = `<span class="slot-reason">→ ${s.endSession}</span>`;
 
     const slotHtml = `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''}" style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;">
-      <div class="slot-strip strip-first" style="background:${col}"></div>
-      <div class="slot-content" style="height:${height}px" onpointerdown="onSlotPointerDown(event,${s.id})">
+      <div class="slot-content" style="height:${height}px;border-left-color:${col}" onpointerdown="onSlotPointerDown(event,${s.id})">
         <div class="slot-text">
           <span class="slot-name">${t ? t.name : s.tid}</span>
           <select class="slot-reason-sel" onclick="event.stopPropagation()" onchange="changeReason(${s.id},this.value)">${reasonOptionsHtml}</select>
