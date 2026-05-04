@@ -1048,13 +1048,12 @@ function renderGrid() {
 }
 
 function positionSpanStrips(spans) {
-  console.log('positionSpanStrips called, spans:', spans.length);
   const container = document.getElementById('spanStrips');
-  if (!container) { console.log('ERROR: container not found'); return; }
+  if (!container) return;
   container.innerHTML = '';
 
   const rows = document.querySelectorAll('.week-grid tbody tr');
-  if (!rows.length) { console.log('ERROR: no rows found'); return; }
+  if (!rows.length) return;
 
   const rowTops = [], rowBottoms = [];
   rows.forEach(row => {
@@ -1064,11 +1063,7 @@ function positionSpanStrips(spans) {
     rowBottoms.push(rect.bottom - containerRect.top);
   });
 
-  console.log('rowTops:', rowTops);
-  console.log('rowBottoms:', rowBottoms);
-
   spans.forEach(({ slot: s, startIdx, endIdx }) => {
-    console.log('processing span:', s.id, 'startIdx:', startIdx, 'endIdx:', endIdx);
     const t = teacher(s.tid);
     const yg = t?.yg || null;
     const col = ygCol(yg);
@@ -1076,7 +1071,7 @@ function positionSpanStrips(spans) {
 
     // Find the slot-item in the first row to get its left position
     const firstCell = document.querySelector(`td[data-day="${s.day}"][data-session="${SESSIONS[startIdx]}"]`);
-    if (!firstCell) { console.log('ERROR: firstCell not found for day', s.day, 'session', SESSIONS[startIdx]); return; }
+    if (!firstCell) return;
 
     const slotItems = firstCell.querySelectorAll('.slot-item');
     const cellSlots = (state.weekSlots[state.weekIdx] || []).filter(sl => {
@@ -1088,7 +1083,7 @@ function positionSpanStrips(spans) {
     if (slotItemIdx < 0 || slotItemIdx >= slotItems.length) return;
 
     const slotItem = slotItems[slotItemIdx];
-    if (!slotItem) { console.log('ERROR: slotItem not found at index', slotItemIdx); return; }
+    if (!slotItem) return;
 
     const containerRect = container.getBoundingClientRect();
     const slotItemRect = slotItem.getBoundingClientRect();
