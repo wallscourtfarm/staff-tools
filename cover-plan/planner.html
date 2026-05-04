@@ -265,6 +265,9 @@
 </head>
 <body>
 
+<!-- Version marker: 🔵 blue circle (push 1) -->
+<div style="position:fixed;top:5px;right:5px;width:12px;height:12px;background:#3b82f6;border-radius:50%;z-index:9999;" title="v3270931"></div>
+
 <div class="header-strip"></div>
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
@@ -1044,12 +1047,13 @@ function renderGrid() {
 }
 
 function positionSpanStrips(spans) {
+  console.log('positionSpanStrips called, spans:', spans.length);
   const container = document.getElementById('spanStrips');
-  if (!container) return;
+  if (!container) { console.log('ERROR: container not found'); return; }
   container.innerHTML = '';
 
   const rows = document.querySelectorAll('.week-grid tbody tr');
-  if (!rows.length) return;
+  if (!rows.length) { console.log('ERROR: no rows found'); return; }
 
   const rowTops = [], rowBottoms = [];
   rows.forEach(row => {
@@ -1059,7 +1063,11 @@ function positionSpanStrips(spans) {
     rowBottoms.push(rect.bottom - containerRect.top);
   });
 
+  console.log('rowTops:', rowTops);
+  console.log('rowBottoms:', rowBottoms);
+
   spans.forEach(({ slot: s, startIdx, endIdx }) => {
+    console.log('processing span:', s.id, 'startIdx:', startIdx, 'endIdx:', endIdx);
     const t = teacher(s.tid);
     const yg = t?.yg || null;
     const col = ygCol(yg);
@@ -1067,7 +1075,7 @@ function positionSpanStrips(spans) {
 
     // Find the slot-item in the first row to get its left position
     const firstCell = document.querySelector(`td[data-day="${s.day}"][data-session="${SESSIONS[startIdx]}"]`);
-    if (!firstCell) return;
+    if (!firstCell) { console.log('ERROR: firstCell not found for day', s.day, 'session', SESSIONS[startIdx]); return; }
 
     const slotItems = firstCell.querySelectorAll('.slot-item');
     const cellSlots = (state.weekSlots[state.weekIdx] || []).filter(sl => {
@@ -1079,7 +1087,7 @@ function positionSpanStrips(spans) {
     if (slotItemIdx < 0 || slotItemIdx >= slotItems.length) return;
 
     const slotItem = slotItems[slotItemIdx];
-    if (!slotItem) return;
+    if (!slotItem) { console.log('ERROR: slotItem not found at index', slotItemIdx); return; }
 
     const containerRect = container.getBoundingClientRect();
     const slotItemRect = slotItem.getBoundingClientRect();
@@ -1089,6 +1097,8 @@ function positionSpanStrips(spans) {
     const bottom = rowBottoms[endIdx];
     const height = bottom - top;
     const width = slotItemRect.width;
+
+    console.log('Creating overlay slot at left:', left, 'top:', top, 'height:', height, 'width:', width);
 
     // Build the full slot content for the overlay
     const reasonOptionsHtml = reasonOptions(s.tid, s.reason);
