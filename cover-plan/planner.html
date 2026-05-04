@@ -115,6 +115,7 @@
     .slot-controls { display:flex; flex-direction:column; gap:2px; padding:3px 2px; border-top:1px solid rgba(0,0,0,.07); }
     .slot-del { background:none; border:none; cursor:pointer; color:#cbd5e1; font-size:12px; line-height:1; padding:1px; border-radius:2px; }
     .slot-del:hover { color:#dc2626; background:#fee2e2; }
+    .slot-reason-sel { font-size:9px; font-weight:bold; border:none; border-radius:3px; padding:1px 2px; cursor:pointer; max-width:80px; appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0l3 4 3-4z' fill='currentColor' opacity='.5'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 2px center; padding-right:10px; }
     .slot-cover-zone { padding:3px; font-size:8px; color:#94a3b8; border-top:1px dashed #e2e8f0; text-align:center; cursor:default; }
     .slot-cover-zone.over { border-color:#1798d3 !important; background:#bfdbfe !important; }
     .slot-cover-assigned { padding:3px; font-size:8px; font-weight:bold; color:#166534; background:#f0fdf4; border-top:1px solid #86efac; text-align:center; }
@@ -984,8 +985,8 @@ function renderGrid() {
 
           // Full UI only in first session of span
           if (isFirst) {
-            // Reason label (short version)
-            const reasonLabel = s.reason === 'Other' ? (s.reasonNote || 'Other') : s.reason;
+            // Reason selector
+            const reasonOptionsHtml = reasonOptions(s.tid, s.reason);
 
             // Cover section
             const coverHtml = s.nocover
@@ -1005,7 +1006,7 @@ function renderGrid() {
               <div class="slot-content" onpointerdown="onSlotPointerDown(event,${s.id})">
                 <div class="slot-text">
                   <span class="slot-name">${t ? t.name : s.tid}</span>
-                  <span class="slot-reason">${reasonLabel}</span>
+                  <select class="slot-reason-sel" onclick="event.stopPropagation()" onchange="changeReason(${s.id},this.value)">${reasonOptionsHtml}</select>
                   ${endIndicator}
                 </div>
                 <div class="slot-controls">
@@ -1148,17 +1149,16 @@ document.addEventListener('pointermove', e => {
   // Handle extend drag
   if (extendDrag) {
     const rowIdx = getSessionRowAt(e.clientX, e.clientY);
-    if (rowIdx >= 0 && rowIdx !== extendDrag.startEndIdx) {
-      // Find the session for this row
-      const keys = Object.keys(SESSION_IDX);
-      const newEndIdx = Math.max(extendDrag.startSessionIdx, Math.min(SESSIONS.length - 1, rowIdx));
-      if (newEndIdx !== extendDrag.startEndIdx) {
+    // Map row index to session (rows are in SESSIONS order)
+    if (rowIdx >= 0 && rowIdx < SESSIONS.length) {
+      const newEndIdx = Math.max(extendDrag.startSessionIdx, rowIdx);
+      if (newEndIdx !== extendDrag.currentEndIdx) {
         const s = slots().find(x => x.id === extendDrag.slotId);
         if (s) {
           s.endSession = SESSIONS[newEndIdx];
+          extendDrag.currentEndIdx = newEndIdx;
           stateSave();
           render();
-          extendDrag.startEndIdx = newEndIdx;
         }
       }
     }
@@ -1268,11 +1268,12 @@ function onExtendPointerDown(e, slotId) {
   e.preventDefault();
   const s = slots().find(x => x.id === slotId);
   if (!s) return;
+  const startIdx = SESSION_IDX[s.session] ?? 0;
+  const endIdx = SESSION_IDX[s.endSession] ?? startIdx;
   extendDrag = {
     slotId,
-    startEndIdx: SESSION_IDX[s.endSession] ?? SESSION_IDX[s.session] ?? 0,
-    startDayIdx: s.day,
-    startSessionIdx: SESSION_IDX[s.session] ?? 0,
+    startSessionIdx: startIdx,
+    currentEndIdx: endIdx,
     startY: e.clientY
   };
 }
