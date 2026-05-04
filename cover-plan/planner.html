@@ -98,10 +98,16 @@
     .empty-hint { display:flex; align-items:center; justify-content:center; min-height:40px; color:#e2e8f0; font-size:20px; border-radius:4px; border:1.5px dashed transparent; transition:all .1s; }
     .grid-cell.teacher-over .empty-hint,.grid-cell.slot-over .empty-hint { color:#1798d3; border-color:#1798d3; }
 
-    /* Slot items */
-    .slot-item { border:1.5px solid #e2e8f0; border-radius:5px; margin-bottom:5px; overflow:hidden; font-size:11px; cursor:grab; touch-action:none; }
-    .slot-item:active { cursor:grabbing; }
+    /* Slot items — strip-based design for clear overlapping spans */
+    .slot-item { position:relative; margin-bottom:4px; font-size:11px; }
     .slot-item.slot-dragging { opacity:.3; }
+    .slot-strip { position:absolute; left:0; top:0; bottom:-4px; width:4px; border-radius:4px; z-index:1; }
+    .slot-strip.strip-first { border-radius:4px 4px 0 0; }
+    .slot-strip.strip-last { border-radius:0 0 4px 4px; bottom:0; }
+    .slot-strip.strip-only { border-radius:4px; bottom:0; }
+    .slot-strip.strip-mid { border-radius:0; }
+    .slot-content { margin-left:8px; border:1.5px solid #e2e8f0; border-radius:5px; overflow:hidden; background:white; cursor:grab; touch-action:none; }
+    .slot-content:active { cursor:grabbing; }
     .slot-hd { display:flex; align-items:center; gap:3px; padding:4px 5px; border-bottom:1px solid rgba(0,0,0,.07); }
     .slot-pip { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
     .slot-name { font-weight:bold; flex:1; color:#111; font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -114,23 +120,24 @@
     .slot-cover-assigned .cv-x { margin-left:auto; background:none; border:none; cursor:pointer; color:#94a3b8; font-size:12px; padding:0 1px; border-radius:2px; }
     .slot-cover-assigned .cv-x:hover { color:#dc2626; }
     .cv-mini-avatar { width:16px; height:16px; border-radius:50%; color:white; display:flex; align-items:center; justify-content:center; font-size:7px; font-weight:bold; flex-shrink:0; }
-    .nocover-slot { border-color:#cbd5e1 !important; }
+    .nocover-slot .slot-content { border-color:#cbd5e1 !important; }
     .nocover-slot .slot-hd { background:#f8fafc !important; }
     .nocover-slot .slot-name { color:#475569 !important; }
 
+    /* Continuation cells (show just the strip extending) */
+    .slot-continue-cell { position:relative; min-height:24px; }
+    .slot-continue-strip { position:absolute; left:5px; top:0; bottom:0; width:4px; border-radius:0; }
+    .slot-continue-strip.strip-last { border-radius:0 0 4px 4px; }
+
     /* Session span indicators */
-    .slot-item.span-continue { border-top:none; border-top-left-radius:0; border-top-right-radius:0; margin-top:-5px; margin-bottom:0; }
-    .slot-item.span-start { margin-bottom:0; border-bottom-left-radius:0; border-bottom-right-radius:0; }
-    .slot-item.span-end { border-top:none; border-top-left-radius:0; border-top-right-radius:0; margin-top:0; }
-    .slot-item.span-mid { border-top:none; border-bottom:none; border-radius:0; margin-top:-5px; margin-bottom:0; }
     .slot-span-badge { font-size:8px; background:#e2e8f0; color:#475569; padding:1px 4px; border-radius:3px; margin-left:4px; }
     .end-sel { font-size:8px; font-weight:bold; border:none; border-radius:3px; padding:1px 2px; cursor:pointer; flex-shrink:0; max-width:60px; appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0l3 4 3-4z' fill='currentColor' opacity='.5'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 2px center; padding-right:10px; }
 
     /* Slot extend handle */
     .slot-extend { height:6px; cursor:ns-resize; background:linear-gradient(to bottom, transparent, rgba(23,152,211,.25)); margin:0 4px 2px; border-radius:0 0 3px 3px; opacity:.4; transition:opacity .12s; }
-    .slot-item:hover .slot-extend { opacity:.7; }
+    .slot-content:hover .slot-extend { opacity:.7; }
     .slot-extend:hover { opacity:1 !important; background:linear-gradient(to bottom, transparent, rgba(23,152,211,.5)); }
-    .slot-item.span-end .slot-extend { display:none; }
+    .slot-item.is-last .slot-extend { display:none; }
 
     /* Cover load panel */
     .cover-load-row { display:flex; align-items:center; gap:7px; padding:5px 0; border-bottom:1px solid #f8fafc; }
@@ -246,9 +253,9 @@
     /* Locked state — disable interactive elements */
     body.edit-locked .teacher-chip { cursor:default; pointer-events:none; }
     body.edit-locked .cover-chip   { cursor:default; pointer-events:none; }
-    body.edit-locked .slot-item    { cursor:default; }
-    body.edit-locked .slot-item { pointer-events:none; }
+    body.edit-locked .slot-content { cursor:default; pointer-events:none; }
     body.edit-locked .slot-del     { display:none; }
+    body.edit-locked .slot-extend  { display:none; }
     body.edit-locked .slot-cover-zone { pointer-events:none; }
     body.edit-locked .slot-cover-assigned .cv-x { display:none; }
     body.edit-locked .reason-sel   { pointer-events:none; }
@@ -959,10 +966,16 @@ function renderGrid() {
         </div>`;
       }
 
+      // Calculate slot indices for horizontal offset (to show overlapping spans)
+      const slotIndices = new Map();
+      cellSlots.forEach((s, idx) => slotIndices.set(s.id, idx));
+
       cellSlots.forEach(s => {
         const t = teacher(s.tid);
         const yg = t?.yg || null;
         const draggingThis = state.dragging?.type === 'slot' && state.dragging.slotId === s.id;
+        const slotIdx = slotIndices.get(s.id) || 0;
+        const leftOffset = slotIdx * 5; // 5px offset per overlapping slot
 
         // Determine span position
         const startIdx = SESSION_IDX[s.session] ?? 0;
@@ -970,18 +983,20 @@ function renderGrid() {
         const currentIdx = SESSION_IDX[session] ?? 0;
         const isFirst = currentIdx === startIdx;
         const isLast = currentIdx === endIdx;
-        const isMiddle = currentIdx > startIdx && currentIdx < endIdx;
         const hasSpan = endIdx > startIdx;
 
-        // Span CSS classes
-        let spanCls = '';
+        // Strip classes
+        let stripCls = '';
         if (hasSpan) {
-          if (isFirst && isLast) spanCls = ''; // single session
-          else if (isFirst) spanCls = 'span-start';
-          else if (isLast) spanCls = 'span-end';
-          else if (isMiddle) spanCls = 'span-mid';
+          if (isFirst && isLast) stripCls = 'strip-only';
+          else if (isFirst) stripCls = 'strip-first';
+          else if (isLast) stripCls = 'strip-last';
+          else stripCls = 'strip-mid';
+        } else {
+          stripCls = 'strip-only';
         }
 
+        const col = ygCol(yg);
         const cv = coverByName(s.cover);
 
         // Full UI only in first session of span
@@ -989,7 +1004,7 @@ function renderGrid() {
           const coverHtml = s.nocover
             ? ''
             : s.cover
-              ? `<div class="slot-cover-assigned" style="background:${ygCol(yg)};color:${contrastColor(ygCol(yg))};border-color:${ygCol(yg)}">
+              ? `<div class="slot-cover-assigned" style="background:${col};color:${contrastColor(col)};border-color:${col}">
                    <div class="cv-mini-avatar" style="background:${cv?.col||'#94a3b8'};color:${contrastColor(cv?.col||'#94a3b8')}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</div>
                    ${s.cover}<button class="cv-x" onclick="unassignCover(${s.id})">×</button>
                  </div>`
@@ -1008,25 +1023,28 @@ function renderGrid() {
               </select>`
             : '';
 
-          html += `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''} ${draggingThis?'slot-dragging':''} ${spanCls}"
-            onpointerdown="onSlotPointerDown(event,${s.id})">
-            <div class="slot-hd">
-              <div class="slot-pip ${pipCls(yg)}"></div>
-              <span class="slot-name">${t ? t.name : s.tid}</span>
-              <select class="reason-sel ${rbCls(s.reason)}" onchange="changeReason(${s.id},this.value)" onclick="event.stopPropagation()">
-                ${reasonOptions(s.tid, s.reason)}
-              </select>
-              ${endSelHtml}
-              <button class="slot-del" onclick="removeSlot(${s.id})">×</button>
+          html += `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''} ${draggingThis?'slot-dragging':''} ${isLast?'is-last':''}"
+            style="margin-left:${leftOffset}px">
+            <div class="slot-strip ${stripCls}" style="background:${col};left:${-leftOffset - 4}px"></div>
+            <div class="slot-content" onpointerdown="onSlotPointerDown(event,${s.id})">
+              <div class="slot-hd">
+                <div class="slot-pip ${pipCls(yg)}"></div>
+                <span class="slot-name">${t ? t.name : s.tid}</span>
+                <select class="reason-sel ${rbCls(s.reason)}" onchange="changeReason(${s.id},this.value)" onclick="event.stopPropagation()">
+                  ${reasonOptions(s.tid, s.reason)}
+                </select>
+                ${endSelHtml}
+                <button class="slot-del" onclick="removeSlot(${s.id})">×</button>
+              </div>
+              ${noteHtml ? `<div style="padding:2px 5px 4px">${noteHtml}</div>` : ''}
+              ${coverHtml}
+              <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
             </div>
-            ${noteHtml ? `<div style="padding:2px 5px 4px">${noteHtml}</div>` : ''}
-            ${coverHtml}
-            <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
           </div>`;
         } else {
-          // Continuation session - show minimal indicator
-          html += `<div class="slot-item ${sygCls(yg)} ${spanCls}" style="background:${ygCol(yg)};min-height:18px"
-            onpointerdown="onSlotPointerDown(event,${s.id})">
+          // Continuation session - just show the strip extending down
+          html += `<div class="slot-continue-cell" style="margin-left:${leftOffset}px">
+            <div class="slot-continue-strip ${stripCls}" style="background:${col};left:${-leftOffset + 1}px"></div>
           </div>`;
         }
       });
