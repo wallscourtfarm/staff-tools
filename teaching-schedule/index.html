@@ -1130,6 +1130,9 @@ function getFABDuties(yearGroup, dayIndex, dateKey = null) {
           if (isExcepted) return;
         }
 
+        // Check if staff belongs to this year group
+        if (!staffBelongsToYearGroup(staffId, yearGroup)) return;
+
         const staffInfo = getFABStaffInfo(staffId);
         duties.push({
           staffId,
@@ -1154,6 +1157,9 @@ function getFABDuties(yearGroup, dayIndex, dateKey = null) {
         );
         if (isExcepted) return;
       }
+
+      // Check if staff belongs to this year group
+      if (!staffBelongsToYearGroup(staffId, yearGroup)) return;
 
       const staffInfo = getFABStaffInfo(staffId);
       duties.push({
@@ -1209,6 +1215,32 @@ function getFABStaffInfo(staffId) {
     colour: '#64748b',
     staffId
   };
+}
+
+function staffBelongsToYearGroup(fabStaffId, yearGroup) {
+  // Check if a FAB staff member belongs to a specific year group
+  // by looking up their YearGroup in ALL_SHEET_STAFF
+  const baseId = fabStaffId.replace(/_\d{10,}$/, '');
+
+  const sheetStaff = ALL_SHEET_STAFF.find(r => {
+    const name = (r.Name || '').trim();
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    return id === baseId || id.endsWith('_' + baseId) || baseId.endsWith('_' + id) || fabStaffId === id;
+  });
+
+  if (!sheetStaff) {
+    // If not found in sheet, include them (fallback - don't filter out)
+    return true;
+  }
+
+  const staffYearGroups = (sheetStaff.YearGroup || '').trim();
+  if (!staffYearGroups) {
+    // No year group specified - include them
+    return true;
+  }
+
+  // Check if the year group matches
+  return yearGroupMatches(staffYearGroups, yearGroup);
 }
 
 function getTPActivities(staffName, dayIndex, dateKey = null) {
