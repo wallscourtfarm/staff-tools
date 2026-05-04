@@ -59,9 +59,10 @@
     .chip-name { font-size:12px; font-weight:bold; color:#111; flex:1; }
     .chip-done { width:16px; height:16px; border-radius:50%; background:#22c55e; color:white; font-size:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-weight:bold; }
     .chip-ent-item { display:flex; align-items:center; gap:2px; font-size:9px; color:#64748b; white-space:nowrap; }
-    .chip-ent-item.ent-selected { background:#1798d3; color:white; border-radius:3px; padding:1px 4px; }
-    .chip-ent-item:not(.ent-selected) { cursor:pointer; }
-    .chip-ent-item:not(.ent-selected):hover { background:#e0f2fe; border-radius:3px; }
+    .reason-popup { position:fixed; background:white; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.15); z-index:10000; padding:8px 0; min-width:140px; }
+    .reason-popup-item { padding:8px 16px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
+    .reason-popup-item:hover { background:#f0f9ff; }
+    .reason-popup-item.selected { background:#1798d3; color:white; }
     .ent-mini { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
     .ent-mini.used  { background:#1798d3; }
     .ent-mini.empty { background:#e2e8f0; border:1px solid #cbd5e1; }
@@ -404,7 +405,7 @@ const state = {
   view:      'week',
   myName:    '',
   cellNotes: {},
-  myReason:  null, // selected entitlement reason for dragging
+  pendingDrop: null, // { tid, dayIdx, session } waiting for reason selection
 };
 
 // ── Colour helpers ────────────────────────────────────────────────────────────
@@ -808,22 +809,14 @@ function renderStaff() {
     const namedTotal = maxEnt(t);
     const allNamedDone = t.ent.length > 0 && t.ent.every(e => (usedMap[e.r]||0) >= e.n);
     const dragging = state.dragging?.type === 'teacher' && state.dragging.id === t.id;
-    const isMe = t.name.toLowerCase() === state.myName.toLowerCase();
 
     let entItems = '';
     t.ent.forEach(e => {
       const usedN = usedMap[e.r] || 0;
-      const isSelected = isMe && state.myReason === e.r;
-      const isAvailable = usedN < e.n;
       let pips = '';
       for (let i = 0; i < e.n; i++)     pips += `<div class="ent-mini ${i < usedN ? 'used' : 'empty'}"></div>`;
       for (let i = e.n; i < usedN; i++) pips += `<div class="ent-mini over"></div>`;
-      const inner = `${e.r} ${pips}`;
-      if (isMe && isAvailable) {
-        entItems += `<span class="chip-ent-item ${isSelected?'ent-selected':''}" onclick="event.stopPropagation();setMyReason('${e.r}')">${inner}</span>`;
-      } else {
-        entItems += `<span class="chip-ent-item">${inner}</span>`;
-      }
+      entItems += `<span class="chip-ent-item">${e.r} ${pips}</span>`;
     });
     const extraCount = Math.max(0, totalSlots - namedTotal);
     if (extraCount > 0) {
@@ -849,21 +842,13 @@ function renderStaff() {
       const dragging = state.dragging?.type === 'teacher' && state.dragging.id === t.id;
       const usedMap = teacherReasonUsed(t.id);
       const allNamedDone = t.ent.length > 0 && t.ent.every(e => (usedMap[e.r]||0) >= e.n);
-      const isMe = t.name.toLowerCase() === state.myName.toLowerCase();
       let entItems = '';
       t.ent.forEach(e => {
         const usedN = usedMap[e.r]||0;
-        const isSelected = isMe && state.myReason === e.r;
-        const isAvailable = usedN < e.n;
         let pips = '';
         for (let i=0;i<e.n;i++) pips+=`<div class="ent-mini ${i<usedN?'used':'empty'}"></div>`;
         for (let i=e.n;i<usedN;i++) pips+=`<div class="ent-mini over"></div>`;
-        const inner = `${e.r} ${pips}`;
-        if (isMe && isAvailable) {
-          entItems += `<span class="chip-ent-item ${isSelected?'ent-selected':''}" onclick="event.stopPropagation();setMyReason('${e.r}')">${inner}</span>`;
-        } else {
-          entItems += `<span class="chip-ent-item">${inner}</span>`;
-        }
+        entItems += `<span class="chip-ent-item">${e.r} ${pips}</span>`;
       });
       html += `<div class="teacher-chip ${dragging?'dragging':''}"
         onpointerdown="onTeacherPointerDown(event,'${t.id}')">
@@ -1289,16 +1274,24 @@ function ptrCommitDrop(x, y) {
           const t = teacher(d.id);
           if (!t?.workingDays || t.workingDays.includes(dayIdx)) {
             const isLeader = t?.isLeader || false;
-            const isMe = t && t.name.toLowerCase() === state.myName.toLowerCase();
-            let reason;
             if (isLeader) {
-              reason = t.reasons?.[0] || 'Meeting';
-            } else if (isMe && state.myReason) {
-              reason = state.myReason;
+              // Leaders use first reason directly
+              const reason = t.reasons?.[0] || 'Meeting';
+              setSlots([...slots(), { id: state.nextId++, day: dayIdx, session, endSession: session, tid: d.id, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false }]);
             } else {
-              reason = firstAvailableReason(d.id);
+              // Check available entitlements
+              const used = teacherReasonUsed(d.id);
+              const available = (t.ent || []).filter(e => (used[e.r]||0) < e.n);
+              if (available.length > 1) {
+                // Show popup for reason selection
+                showReasonPopup(d.id, dayIdx, session, available, used, x, y);
+                return; // Don't clear drag yet - popup is showing
+              } else {
+                // Single or no entitlement - use first available
+                const reason = available[0]?.r || firstAvailableReason(d.id);
+                setSlots([...slots(), { id: state.nextId++, day: dayIdx, session, endSession: session, tid: d.id, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false }]);
+              }
             }
-            setSlots([...slots(), { id: state.nextId++, day: dayIdx, session, endSession: session, tid: d.id, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false }]);
           }
         }
       } else if (d.type === 'slot') {
@@ -1407,8 +1400,42 @@ function changeWeek(dir) {
   render();
 }
 function setView(v)            { state.view = v; document.body.classList.toggle('present-mode', v==='present'); render(); }
-function setMyName(n)          { state.myName = n; state.myReason = null; render(); }
-function setMyReason(r)        { state.myReason = r; render(); }
+function setMyName(n)          { state.myName = n; render(); }
+
+function showReasonPopup(tid, dayIdx, session, available, used, x, y) {
+  state.pendingDrop = { tid, dayIdx, session };
+  const t = teacher(tid);
+  let html = '<div class="reason-popup" id="reasonPopup" style="left:' + x + 'px;top:' + y + 'px;" onclick="event.stopPropagation()">';
+  available.forEach(e => {
+    const remaining = e.n - (used[e.r]||0);
+    html += `<div class="reason-popup-item" onclick="selectReason('${e.r}')">${e.r} <span style="color:#94a3b8">${remaining} left</span></div>`;
+  });
+  html += '</div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+
+  // Close popup when clicking outside
+  setTimeout(() => {
+    document.addEventListener('click', closeReasonPopup, { once: true });
+  }, 0);
+}
+
+function selectReason(reason) {
+  if (!state.pendingDrop) return;
+  const { tid, dayIdx, session } = state.pendingDrop;
+  const t = teacher(tid);
+  setSlots([...slots(), { id: state.nextId++, day: dayIdx, session, endSession: session, tid, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false }]);
+  closeReasonPopup();
+}
+
+function closeReasonPopup() {
+  state.pendingDrop = null;
+  const popup = document.getElementById('reasonPopup');
+  if (popup) popup.remove();
+  // Clear the drag state that was paused
+  ptrDrag = null;
+  state.dragging = null;
+  render();
+}
 
 function addCellNote(key) {
   const existing = state.cellNotes[key] || '';
