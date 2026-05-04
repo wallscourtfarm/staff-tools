@@ -205,8 +205,10 @@
     .day-reset-btn { position:absolute; top:4px; right:4px; background:none; border:none; cursor:pointer; color:#cbd5e1; font-size:10px; padding:1px 3px; border-radius:2px; line-height:1; }
     .day-reset-btn:hover { color:#dc2626; background:#fee2e2; }
 
-    /* Whole-school session banners */
-    .session-banner { display:flex; align-items:center; justify-content:center; gap:5px; padding:5px 7px; border-radius:4px; font-size:10.5px; font-weight:bold; margin-bottom:4px; text-align:center; }
+    /* Whole-school session banners (vertical strips) */
+    .event-strip { position:absolute; top:5px; bottom:5px; left:5px; width:32px; display:flex; flex-direction:column; z-index:1; }
+    .event-strip-content { flex:1; display:flex; align-items:center; justify-content:center; border-radius:4px; overflow:hidden; cursor:default; }
+    .event-strip-text { writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg); padding:6px 3px; font-size:11px; font-weight:bold; white-space:nowrap; text-align:center; }
     .cell-note { display:flex; align-items:center; gap:5px; padding:4px 7px; background:#1e293b; border-radius:4px; font-size:10.5px; color:white; font-weight:bold; margin-bottom:4px; }
     .cell-note .note-del { margin-left:auto; background:none; border:none; cursor:pointer; color:rgba(255,255,255,.4); font-size:12px; padding:0 1px; border-radius:2px; }
     .cell-note .note-del:hover { color:white; background:rgba(255,255,255,.15); }
@@ -945,18 +947,25 @@ function renderGrid() {
       html += `<td class="grid-cell ${readyCls}"
         data-day="${dayIdx}" data-session="${session}">`;
 
-      // Whole-school banner (e.g. Staff Meeting)
+      // Collect all session events (wsEvents + session info events)
       const wsEventMatches = wsEvents.filter(e => e.day === dayIdx && e.session === session);
-      wsEventMatches.forEach(wsEvent => {
-        html += `<div class="session-banner" style="background:${wsEvent.bg};color:${contrastColor(wsEvent.bg)}">${wsEvent.label}</div>`;
-      });
+      const sessionInfoEvents = getSessionInfoEvents(state.weekIdx, dayIdx, session);
+      const allEvents = [...wsEventMatches, ...sessionInfoEvents];
 
-      // Session-specific info events (e.g. FLC After School on a specific date)
-      getSessionInfoEvents(state.weekIdx, dayIdx, session).forEach(e => {
-        html += `<div class="session-banner" style="background:#7c3aed;color:${contrastColor('#7c3aed')}">${e.label}</div>`;
-      });
+      // Render event strip if there are events
+      const hasEvents = allEvents.length > 0;
+      if (hasEvents) {
+        // Use first event for display (or could stack multiple)
+        const ev = allEvents[0];
+        const bg = ev.bg || '#7c3aed';
+        html += `<div class="event-strip">
+          <div class="event-strip-content" style="background:${bg};color:${contrastColor(bg)}">
+            <div class="event-strip-text">${ev.label}</div>
+          </div>
+        </div>`;
+      }
 
-      // Per-cell notes (user-added)
+      // Per-cell notes (user-added) - keep horizontal for now
       const noteKey = `${state.weekIdx}-${dayIdx}-${session}`;
       const cellNote = state.cellNotes[noteKey];
       if (cellNote) {
@@ -966,9 +975,9 @@ function renderGrid() {
         </div>`;
       }
 
-      // Horizontal layout: slots side by side
+      // Horizontal layout: slots side by side (adjusted for event strip)
       if (cellSlots.length > 0) {
-        html += `<div class="slots-row">`;
+        html += `<div class="slots-row" ${hasEvents ? 'style="left:40px"' : ''}>`;
         cellSlots.forEach(s => {
           const t = teacher(s.tid);
           const yg = t?.yg || null;
@@ -1015,7 +1024,7 @@ function renderGrid() {
         html += `</div>`;
       }
 
-      if (cellSlots.length === 0 && wsEventMatches.length === 0 && !cellNote) {
+      if (cellSlots.length === 0 && !hasEvents && !cellNote) {
         html += `<div class="empty-hint">＋</div>`;
       }
       html += `</td>`;
