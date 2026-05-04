@@ -90,6 +90,16 @@
     .modal-add button { background: #1798d3; color: white; border: none; border-radius: 5px; padding: 7px 16px; font-size: 13px; font-weight: bold; cursor: pointer; }
     .modal-done { width: 100%; margin-top: 14px; background: #f1f5f9; color: #64748b; border: none; border-radius: 5px; padding: 9px; font-size: 13px; font-weight: bold; cursor: pointer; }
     .modal-done:hover { background: #e2e8f0; }
+
+    /* Year group buttons */
+    .yg-btn { padding: 8px 14px; border: 2px solid #e2e8f0; border-radius: 6px; background: white; cursor: pointer; font-size: 13px; font-weight: bold; color: #1e293b; }
+    .yg-btn:hover { border-color: #1798d3; }
+    .yg-btn.y1 { background: #fff7ed; border-color: #f97316; color: #ea580c; }
+    .yg-btn.y2 { background: #f0fdf4; border-color: #22c55e; color: #16a34a; }
+    .yg-btn.y3 { background: #fff0ff; border-color: #ec4899; color: #db2777; }
+    .yg-btn.y4 { background: #f0f8fd; border-color: #1798d3; color: #0c4a6e; }
+    .yg-btn.y5 { background: #fff7ed; border-color: #f97316; color: #c2410c; }
+    .yg-btn.y6 { background: #f0fdf4; border-color: #22c55e; color: #15803d; }
   </style>
 </head>
 <body>
@@ -138,6 +148,16 @@
   </div>
 </div>
 
+<!-- Year Group Selector Modal for Supply -->
+<div class="modal-bg" id="ygModal">
+  <div class="modal" style="max-width:320px">
+    <h3>Year Group for Supply</h3>
+    <p class="modal-hint">Which year group is this supply covering?</p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px" id="ygButtons"></div>
+    <button class="modal-done" onclick="closeYgModal()">Cancel</button>
+  </div>
+</div>
+
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
@@ -148,6 +168,21 @@ const GROUPS = [
 ];
 
 const PALETTE = ['#1798d3','#f97316','#22c55e','#e879f9','#64748b'];
+
+// Year group colours for supply teachers
+const YG_COLOURS = {
+  Y1: '#f97316', Y2: '#22c55e', Y3: '#ec4899',
+  Y4: '#1798d3', Y5: '#f97316', Y6: '#22c55e',
+  Reception: '#1798d3'
+};
+const YG_LIGHT = {
+  Y1: '#fff7ed', Y2: '#f0fdf4', Y3: '#fff0ff',
+  Y4: '#f0f8fd', Y5: '#fff7ed', Y6: '#f0fdf4',
+  Reception: '#f0f8fd'
+};
+
+// Pending assignment (for year group selection)
+let pendingAssign = null;
 
 const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
 const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
@@ -331,13 +366,56 @@ function getWeek() {
 }
 
 function getSlot(gid, zi, di)        { return getWeek()[gid][zi][di]; }
-function addToSlot(gid, zi, di, sid) {
+function addToSlot(gid, zi, di, sid, yg = null) {
   const arr = getSlot(gid, zi, di);
-  if (!arr.includes(sid)) { arr.push(sid); save(); }
+  // Check if this staff ID already exists (with or without yg)
+  const exists = arr.some(item => {
+    if (typeof item === 'string') return item === sid;
+    return item.id === sid && (!yg || item.yg === yg);
+  });
+  if (!exists) {
+    // Store as object with year group if provided
+    arr.push(yg ? { id: sid, yg } : { id: sid });
+    save();
+  }
 }
-function removeFromSlot(gid, zi, di, sid) {
-  getWeek()[gid][zi][di] = getSlot(gid, zi, di).filter(s => s !== sid);
+function removeFromSlot(gid, zi, di, sid, yg = null) {
+  getWeek()[gid][zi][di] = getSlot(gid, zi, di).filter(item => {
+    const itemId = typeof item === 'string' ? item : item.id;
+    const itemYg = typeof item === 'string' ? null : item.yg;
+    // Remove if ID matches and (yg matches or no yg specified)
+    return !(itemId === sid && (yg === null || itemYg === yg));
+  });
   save(); render();
+}
+
+// Year group modal for supply
+function openYgModal(gid, zi, di, staffId) {
+  pendingAssign = { gid, zi, di, staffId };
+  const container = document.getElementById('ygButtons');
+  container.innerHTML = ['Y1','Y2','Y3','Y4','Y5','Y6'].map(yg =>
+    `<button class="yg-btn ${yg.toLowerCase()}" onclick="selectYg('${yg}')">${yg}</button>`
+  ).join('');
+  document.getElementById('ygModal').classList.add('open');
+}
+function closeYgModal() {
+  document.getElementById('ygModal').classList.remove('open');
+  pendingAssign = null;
+}
+function selectYg(yg) {
+  if (pendingAssign) {
+    addToSlot(pendingAssign.gid, pendingAssign.zi, pendingAssign.di, pendingAssign.staffId, yg);
+    closeYgModal();
+    render();
+  }
+}
+
+// Check if staff is "supply" (needs year group selection)
+function isSupplyStaff(sid) {
+  const s = staffById(sid);
+  if (!s) return false;
+  const name = s.name.toLowerCase();
+  return name === 'supply' || name.includes('supply');
 }
 
 // ── Persistence ───────────────────────────────────────────────────────────────
@@ -382,8 +460,14 @@ function staffAssignCount(sid) {
   const w = getWeek(); let n = 0;
   GROUPS.forEach(g => {
     for (let zi=0; zi<numZones(g); zi++)
-      for (let di=0; di<5; di++)
-        if ((w[g.id]?.[zi]?.[di]||[]).includes(sid)) n++;
+      for (let di=0; di<5; di++) {
+        const arr = (w[g.id]?.[zi]?.[di] || []);
+        // Handle both string (old format) and object (new format)
+        if (arr.some(item => {
+          const itemId = typeof item === 'string' ? item : item.id;
+          return itemId === sid;
+        })) n++;
+      }
   });
   return n;
 }
@@ -473,13 +557,22 @@ function renderStaff() {
   }).join('');
 }
 
-function chipHtml(gid, zi, di, sid) {
+function chipHtml(gid, zi, di, item) {
+  // Handle both string (old format) and object (new format with yg)
+  const sid = typeof item === 'string' ? item : item.id;
+  const yg = typeof item === 'string' ? null : item.yg;
+
   const s = staffById(sid);
   if (!s) return '';
-  return `<div class="assign-chip" style="background:${s.col}22;border:1.5px solid ${s.col}55">
-    <div class="a-avatar" style="background:${s.col};color:${contrastColor(s.col)}">${s.init}</div>
-    <span class="a-name" style="color:#1e293b">${s.name}</span>
-    <button class="a-del" onclick="removeFromSlot('${gid}',${zi},${di},'${sid}')">×</button>
+
+  // Use year group colour for supply, otherwise use staff colour
+  const col = yg ? YG_COLOURS[yg] : s.col;
+  const displayName = yg ? `${s.name} (${yg})` : s.name;
+
+  return `<div class="assign-chip" style="background:${col}22;border:1.5px solid ${col}55">
+    <div class="a-avatar" style="background:${col};color:${contrastColor(col)}">${s.init}</div>
+    <span class="a-name" style="color:#1e293b">${displayName}</span>
+    <button class="a-del" onclick="removeFromSlot('${gid}',${zi},${di},'${sid}'${yg ? `,'${yg}'` : ''})">×</button>
   </div>`;
 }
 
@@ -620,7 +713,14 @@ document.addEventListener('pointerup', e => {
   if (!ptrDrag) return;
   if (ptrDrag.active) {
     const cell = ptrCellAt(e.clientX, e.clientY);
-    if (cell) { addToSlot(cell.gid, cell.zi, cell.di, ptrDrag.info.staffId); }
+    if (cell) {
+      // Check if supply staff - need year group selection
+      if (isSupplyStaff(ptrDrag.info.staffId)) {
+        openYgModal(cell.gid, cell.zi, cell.di, ptrDrag.info.staffId);
+      } else {
+        addToSlot(cell.gid, cell.zi, cell.di, ptrDrag.info.staffId);
+      }
+    }
   }
   ptrGhostRemove(); ptrHL(null);
   ptrDrag = null; isDragging = false;

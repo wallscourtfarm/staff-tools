@@ -1094,7 +1094,8 @@ function yearGroupToFABGroup(yg) {
 function getFABDuties(yearGroup, dayIndex, dateKey = null) {
   // Get FAB duties for a specific year group and day
   // Uses state.weekIdx to look up in FAB_DATA (which uses numeric week indices)
-  // Returns: [{ staffId, staffName, initials, zone, colour }]
+  // Returns: [{ staffId, staffName, initials, zone, colour, supplyYg }]
+  // supplyYg is set for supply staff, indicating their assigned year group
   const weekIdx = state.weekIdx;
   if (!FAB_DATA || FAB_DATA[weekIdx] === undefined) return [];
 
@@ -1108,9 +1109,10 @@ function getFABDuties(yearGroup, dayIndex, dateKey = null) {
   const zones = FAB_GROUPS[fabGroup].zones;
   const hasZones = zones && zones.length > 0;
 
-  // FAB data structure: groupData[zoneIdx][dayIndex] = array of staff IDs
+  // FAB data structure: groupData[zoneIdx][dayIndex] = array of staff IDs or objects
   // For lower (no zones): groupData[0][dayIndex]
   // For upper (4 zones): groupData[zoneIdx][dayIndex] for each zone
+  // Objects: { id: staffId, yg: yearGroup } for supply staff
   const duties = [];
 
   if (hasZones) {
@@ -1119,7 +1121,11 @@ function getFABDuties(yearGroup, dayIndex, dateKey = null) {
       const zoneDays = groupData[zoneIdx];
       if (!zoneDays || !Array.isArray(zoneDays[dayIndex])) return;
 
-      zoneDays[dayIndex].forEach(staffId => {
+      zoneDays[dayIndex].forEach(item => {
+        // Handle both string (old format) and object (new format with yg)
+        const staffId = typeof item === 'string' ? item : item.id;
+        const supplyYg = typeof item === 'string' ? null : item.yg;
+
         // Check for exception
         if (dateKey && FAB_EXCEPTIONS.length) {
           const isExcepted = FAB_EXCEPTIONS.some(exc =>
@@ -1130,16 +1136,17 @@ function getFABDuties(yearGroup, dayIndex, dateKey = null) {
           if (isExcepted) return;
         }
 
-        // Check if staff belongs to this year group
-        if (!staffBelongsToYearGroup(staffId, yearGroup)) return;
+        // Check if staff belongs to this year group (or is supply for this year group)
+        if (!staffBelongsToYearGroup(staffId, yearGroup, supplyYg)) return;
 
-        const staffInfo = getFABStaffInfo(staffId);
+        const staffInfo = getFABStaffInfo(staffId, supplyYg);
         duties.push({
           staffId,
           staffName: staffInfo.name,
           initials: staffInfo.initials,
           zone: zoneName,
-          colour: staffInfo.colour
+          colour: staffInfo.colour,
+          supplyYg
         });
       });
     });
@@ -1148,7 +1155,11 @@ function getFABDuties(yearGroup, dayIndex, dateKey = null) {
     const zoneDays = groupData[0];
     if (!zoneDays || !Array.isArray(zoneDays[dayIndex])) return [];
 
-    zoneDays[dayIndex].forEach(staffId => {
+    zoneDays[dayIndex].forEach(item => {
+      // Handle both string (old format) and object (new format with yg)
+      const staffId = typeof item === 'string' ? item : item.id;
+      const supplyYg = typeof item === 'string' ? null : item.yg;
+
       // Check for exception
       if (dateKey && FAB_EXCEPTIONS.length) {
         const isExcepted = FAB_EXCEPTIONS.some(exc =>
@@ -1158,16 +1169,17 @@ function getFABDuties(yearGroup, dayIndex, dateKey = null) {
         if (isExcepted) return;
       }
 
-      // Check if staff belongs to this year group
-      if (!staffBelongsToYearGroup(staffId, yearGroup)) return;
+      // Check if staff belongs to this year group (or is supply for this year group)
+      if (!staffBelongsToYearGroup(staffId, yearGroup, supplyYg)) return;
 
-      const staffInfo = getFABStaffInfo(staffId);
+      const staffInfo = getFABStaffInfo(staffId, supplyYg);
       duties.push({
         staffId,
         staffName: staffInfo.name,
         initials: staffInfo.initials,
         zone: null,
-        colour: staffInfo.colour
+        colour: staffInfo.colour,
+        supplyYg
       });
     });
   }
@@ -1175,10 +1187,11 @@ function getFABDuties(yearGroup, dayIndex, dateKey = null) {
   return duties;
 }
 
-function getFABStaffInfo(staffId) {
+function getFABStaffInfo(staffId, supplyYg = null) {
   // Get staff info from FAB data
   // FAB staff IDs may have timestamp suffix like "innes_1776441911018"
   // Strip suffix and match against Staff tab
+  // For supply staff, supplyYg provides the year group for colour
 
   // Strip timestamp suffix (pattern: _ followed by 10+ digits)
   const baseId = staffId.replace(/_\d{10,}$/, '');
@@ -1193,13 +1206,15 @@ function getFABStaffInfo(staffId) {
   if (sheetStaff) {
     const name = (sheetStaff.Name || '').trim();
     const initials = (sheetStaff.Initials || '').trim() || name.substring(0, 2).toUpperCase();
-    const colour = (sheetStaff.Colour || '').trim() || '#64748b';
+    // Use year group colour for supply, otherwise staff colour
+    const colour = supplyYg ? (YG_COLOURS[supplyYg] || '#64748b') : ((sheetStaff.Colour || '').trim() || '#64748b');
     return { name, initials, colour, staffId };
   }
 
   // Fall back to staffColours from FAB data if available
   if (FAB_DATA && FAB_DATA.staffColours) {
-    const colour = FAB_DATA.staffColours[staffId] || FAB_DATA.staffColours[baseId] || '#64748b';
+    // Use year group colour for supply
+    const colour = supplyYg ? (YG_COLOURS[supplyYg] || '#64748b') : (FAB_DATA.staffColours[staffId] || FAB_DATA.staffColours[baseId] || '#64748b');
     return {
       name: baseId,
       initials: baseId.substring(0, 2).toUpperCase(),
@@ -1208,18 +1223,27 @@ function getFABStaffInfo(staffId) {
     };
   }
 
-  // Ultimate fallback
+  // Ultimate fallback - still use year group colour for supply
+  const fallbackColour = supplyYg ? (YG_COLOURS[supplyYg] || '#64748b') : '#64748b';
   return {
     name: baseId,
     initials: baseId.substring(0, 2).toUpperCase(),
-    colour: '#64748b',
+    colour: fallbackColour,
     staffId
   };
 }
 
-function staffBelongsToYearGroup(fabStaffId, yearGroup) {
+function staffBelongsToYearGroup(fabStaffId, yearGroup, supplyYg = null) {
   // Check if a FAB staff member belongs to a specific year group
-  // by looking up their YearGroup in ALL_SHEET_STAFF
+  // For supply staff, supplyYg provides the year group they're covering
+  // For regular staff, look up their YearGroup in ALL_SHEET_STAFF
+
+  // If this is a supply assignment, check against the supply year group
+  if (supplyYg) {
+    return yearGroupMatches(supplyYg, yearGroup);
+  }
+
+  // Otherwise, look up in Staff tab
   const baseId = fabStaffId.replace(/_\d{10,}$/, '');
 
   const sheetStaff = ALL_SHEET_STAFF.find(r => {
@@ -1312,10 +1336,21 @@ function renderTPActivityChip(activity, staffName = '', dateKey = '') {
 }
 
 function renderFABChip(duty, dateKey = '', yearGroup = '') {
-  // duty: { staffId, staffName, initials, zone, colour }
+  // duty: { staffId, staffName, initials, zone, colour, supplyYg }
   // Display: "IM MUGA" for upper (with zone), "IM FAB duty" for lower (no zone)
+  // For supply: "Supply (Y4)" or "S (Y4) MUGA"
   const isLower = ['Y1', 'Y2', 'Y3', 'Reception'].includes(yearGroup);
-  const displayText = duty.zone ? `${duty.initials} ${duty.zone}` : (isLower ? `${duty.initials} FAB duty` : duty.initials);
+
+  let displayText;
+  if (duty.supplyYg) {
+    // Supply staff - show with year group
+    const ygText = duty.zone ? `${duty.initials} (${duty.supplyYg}) ${duty.zone}` : `${duty.initials} (${duty.supplyYg})`;
+    displayText = ygText;
+  } else {
+    // Regular staff
+    displayText = duty.zone ? `${duty.initials} ${duty.zone}` : (isLower ? `${duty.initials} FAB duty` : duty.initials);
+  }
+
   // Use dark text for readability regardless of chip colour
   const textColour = '#1e293b';
   // Use dark border for visibility against FAB row background
