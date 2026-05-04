@@ -59,6 +59,9 @@
     .chip-name { font-size:12px; font-weight:bold; color:#111; flex:1; }
     .chip-done { width:16px; height:16px; border-radius:50%; background:#22c55e; color:white; font-size:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-weight:bold; }
     .chip-ent-item { display:flex; align-items:center; gap:2px; font-size:9px; color:#64748b; white-space:nowrap; }
+    .chip-ent-item.ent-selected { background:#1798d3; color:white; border-radius:3px; padding:1px 4px; }
+    .chip-ent-item:not(.ent-selected) { cursor:pointer; }
+    .chip-ent-item:not(.ent-selected):hover { background:#e0f2fe; border-radius:3px; }
     .ent-mini { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
     .ent-mini.used  { background:#1798d3; }
     .ent-mini.empty { background:#e2e8f0; border:1px solid #cbd5e1; }
@@ -404,6 +407,7 @@ const state = {
   view:      'week',
   myName:    '',
   cellNotes: {},
+  myReason:  null, // selected entitlement reason for dragging
 };
 
 // ── Colour helpers ────────────────────────────────────────────────────────────
@@ -807,14 +811,22 @@ function renderStaff() {
     const namedTotal = maxEnt(t);
     const allNamedDone = t.ent.length > 0 && t.ent.every(e => (usedMap[e.r]||0) >= e.n);
     const dragging = state.dragging?.type === 'teacher' && state.dragging.id === t.id;
+    const isMe = t.name.toLowerCase() === state.myName.toLowerCase();
 
     let entItems = '';
     t.ent.forEach(e => {
       const usedN = usedMap[e.r] || 0;
+      const isSelected = isMe && state.myReason === e.r;
+      const isAvailable = usedN < e.n;
       let pips = '';
       for (let i = 0; i < e.n; i++)     pips += `<div class="ent-mini ${i < usedN ? 'used' : 'empty'}"></div>`;
       for (let i = e.n; i < usedN; i++) pips += `<div class="ent-mini over"></div>`;
-      entItems += `<span class="chip-ent-item">${e.r} ${pips}</span>`;
+      const inner = `${e.r} ${pips}`;
+      if (isMe && isAvailable) {
+        entItems += `<span class="chip-ent-item ${isSelected?'ent-selected':''}" onclick="event.stopPropagation();setMyReason('${e.r}')">${inner}</span>`;
+      } else {
+        entItems += `<span class="chip-ent-item">${inner}</span>`;
+      }
     });
     const extraCount = Math.max(0, totalSlots - namedTotal);
     if (extraCount > 0) {
@@ -840,13 +852,21 @@ function renderStaff() {
       const dragging = state.dragging?.type === 'teacher' && state.dragging.id === t.id;
       const usedMap = teacherReasonUsed(t.id);
       const allNamedDone = t.ent.length > 0 && t.ent.every(e => (usedMap[e.r]||0) >= e.n);
+      const isMe = t.name.toLowerCase() === state.myName.toLowerCase();
       let entItems = '';
       t.ent.forEach(e => {
         const usedN = usedMap[e.r]||0;
+        const isSelected = isMe && state.myReason === e.r;
+        const isAvailable = usedN < e.n;
         let pips = '';
         for (let i=0;i<e.n;i++) pips+=`<div class="ent-mini ${i<usedN?'used':'empty'}"></div>`;
         for (let i=e.n;i<usedN;i++) pips+=`<div class="ent-mini over"></div>`;
-        entItems += `<span class="chip-ent-item">${e.r} ${pips}</span>`;
+        const inner = `${e.r} ${pips}`;
+        if (isMe && isAvailable) {
+          entItems += `<span class="chip-ent-item ${isSelected?'ent-selected':''}" onclick="event.stopPropagation();setMyReason('${e.r}')">${inner}</span>`;
+        } else {
+          entItems += `<span class="chip-ent-item">${inner}</span>`;
+        }
       });
       html += `<div class="teacher-chip ${dragging?'dragging':''}"
         onpointerdown="onTeacherPointerDown(event,'${t.id}')">
@@ -1272,8 +1292,16 @@ function ptrCommitDrop(x, y) {
           const t = teacher(d.id);
           if (!t?.workingDays || t.workingDays.includes(dayIdx)) {
             const isLeader = t?.isLeader || false;
-            const defaultReason = isLeader ? (t.reasons?.[0] || 'Meeting') : firstAvailableReason(d.id);
-            setSlots([...slots(), { id: state.nextId++, day: dayIdx, session, endSession: session, tid: d.id, reason: defaultReason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false }]);
+            const isMe = t && t.name.toLowerCase() === state.myName.toLowerCase();
+            let reason;
+            if (isLeader) {
+              reason = t.reasons?.[0] || 'Meeting';
+            } else if (isMe && state.myReason) {
+              reason = state.myReason;
+            } else {
+              reason = firstAvailableReason(d.id);
+            }
+            setSlots([...slots(), { id: state.nextId++, day: dayIdx, session, endSession: session, tid: d.id, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false }]);
           }
         }
       } else if (d.type === 'slot') {
@@ -1382,7 +1410,8 @@ function changeWeek(dir) {
   render();
 }
 function setView(v)            { state.view = v; document.body.classList.toggle('present-mode', v==='present'); render(); }
-function setMyName(n)          { state.myName = n; render(); }
+function setMyName(n)          { state.myName = n; state.myReason = null; render(); }
+function setMyReason(r)        { state.myReason = r; render(); }
 
 function addCellNote(key) {
   const existing = state.cellNotes[key] || '';
