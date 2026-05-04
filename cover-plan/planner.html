@@ -1153,11 +1153,9 @@ document.addEventListener('pointermove', e => {
   // Handle extend drag
   if (extendDrag) {
     const rowIdx = getSessionRowAt(e.clientX, e.clientY);
-    console.log('extendDrag:', extendDrag, 'rowIdx:', rowIdx);
     // Map row index to session (rows are in SESSIONS order)
     if (rowIdx >= 0 && rowIdx < SESSIONS.length) {
       const newEndIdx = Math.max(extendDrag.startSessionIdx, rowIdx);
-      console.log('newEndIdx:', newEndIdx, 'currentEndIdx:', extendDrag.currentEndIdx);
       if (newEndIdx !== extendDrag.currentEndIdx) {
         const s = slots().find(x => x.id === extendDrag.slotId);
         if (s) {
@@ -1269,7 +1267,6 @@ function onSlotPointerDown(e, slotId) {
 let extendDrag = null; // { slotId, startEndIdx, startDayIdx }
 
 function onExtendPointerDown(e, slotId) {
-  console.log('onExtendPointerDown called, slotId:', slotId);
   if (document.body.classList.contains('edit-locked')) return;
   e.stopPropagation();
   e.preventDefault();
@@ -1277,7 +1274,6 @@ function onExtendPointerDown(e, slotId) {
   if (!s) return;
   const startIdx = SESSION_IDX[s.session] ?? 0;
   const endIdx = SESSION_IDX[s.endSession] ?? startIdx;
-  console.log('starting extendDrag, startIdx:', startIdx, 'endIdx:', endIdx);
   extendDrag = {
     slotId,
     startSessionIdx: startIdx,
@@ -1287,12 +1283,9 @@ function onExtendPointerDown(e, slotId) {
 }
 
 function getSessionRowAt(x, y) {
-  // Find which row the Y coordinate is over
   const rows = document.querySelectorAll('.week-grid tbody tr');
-  console.log('getSessionRowAt - found rows:', rows.length, 'y:', y);
   for (const row of rows) {
     const rect = row.getBoundingClientRect();
-    console.log('row:', row.dataset.sessionIdx, 'top:', rect.top, 'bottom:', rect.bottom);
     if (y >= rect.top && y < rect.bottom) {
       return parseInt(row.dataset.sessionIdx, 10);
     }
