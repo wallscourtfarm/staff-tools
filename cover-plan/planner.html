@@ -116,6 +116,14 @@
     .nocover-slot .slot-hd { background:#f8fafc !important; }
     .nocover-slot .slot-name { color:#475569 !important; }
 
+    /* Session span indicators */
+    .slot-item.span-continue { border-top:none; border-top-left-radius:0; border-top-right-radius:0; margin-top:-5px; margin-bottom:0; }
+    .slot-item.span-start { margin-bottom:0; border-bottom-left-radius:0; border-bottom-right-radius:0; }
+    .slot-item.span-end { border-top:none; border-top-left-radius:0; border-top-right-radius:0; margin-top:0; }
+    .slot-item.span-mid { border-top:none; border-bottom:none; border-radius:0; margin-top:-5px; margin-bottom:0; }
+    .slot-span-badge { font-size:8px; background:#e2e8f0; color:#475569; padding:1px 4px; border-radius:3px; margin-left:4px; }
+    .end-sel { font-size:8px; font-weight:bold; border:none; border-radius:3px; padding:1px 2px; cursor:pointer; flex-shrink:0; max-width:60px; appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0l3 4 3-4z' fill='currentColor' opacity='.5'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 2px center; padding-right:10px; }
+
     /* Cover load panel */
     .cover-load-row { display:flex; align-items:center; gap:7px; padding:5px 0; border-bottom:1px solid #f8fafc; }
     .cover-load-row:last-child { border-bottom:none; }
@@ -321,6 +329,7 @@
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SESSIONS      = ['Before School','AM','Lunch','PM','After School'];
+const SESSION_IDX   = { 'Before School': 0, 'AM': 1, 'Lunch': 2, 'PM': 3, 'After School': 4 };
 const OFF_ALLOC     = new Set(['Before School','Lunch','After School']);
 const SESSION_SHORT = {'Before School':'Before School',AM:'AM',Lunch:'Lunch',PM:'PM','After School':'After School'};
 const DAYS          = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
@@ -555,11 +564,13 @@ function buildRecurring(rows) {
     const dayIdx=DAY_IDX[r.Day];
     if (dayIdx===undefined) return;
     const reason=r.Reason||'Other';
+    const session = r.Session;
+    const endSession = r.EndSession || session; // Support spans from sheet
     // Year group shorthand — expand to all class teachers in that group
     if (YG_CODES.has(r.Teacher)) {
       const yg = r.Teacher==='YR' ? 'Reception' : r.Teacher;
       TEACHERS.filter(t=>t.yg===yg && t.role==='Class').forEach(t=>{
-        result.push({id:id++, day:dayIdx, session:r.Session, tid:t.id,
+        result.push({id:id++, day:dayIdx, session, endSession, tid:t.id,
           reason, reasonNote:'', cover:null, nocover:false});
       });
       return;
@@ -567,7 +578,7 @@ function buildRecurring(rows) {
     // Individual teacher by name
     const t=TEACHERS.find(t=>t.name===r.Teacher);
     if (!t) return;
-    result.push({id:id++, day:dayIdx, session:r.Session, tid:t.id,
+    result.push({id:id++, day:dayIdx, session, endSession, tid:t.id,
       reason, reasonNote:'', cover:null, nocover:t.isInfoOnly||false});
   });
   return result;
@@ -868,10 +879,17 @@ function renderGrid() {
   const isDragSlot    = state.dragging?.type === 'slot';
   const isDragCover   = state.dragging?.type === 'cover';
 
-  // Build slot lookup
+  // Build slot lookup - include slots that span multiple sessions
   const slotMap = {};
   DAYS.forEach((_,i) => { slotMap[i] = {}; SESSIONS.forEach(s => { slotMap[i][s] = []; }); });
-  slots().forEach(s => slotMap[s.day][s.session].push(s));
+  slots().forEach(s => {
+    const startIdx = SESSION_IDX[s.session] ?? 0;
+    const endIdx = SESSION_IDX[s.endSession] ?? startIdx;
+    // Add slot to each session it spans
+    for (let i = startIdx; i <= endIdx; i++) {
+      slotMap[s.day][SESSIONS[i]].push(s);
+    }
+  });
 
   let html = `<thead><tr>
     <th></th>
@@ -934,35 +952,71 @@ function renderGrid() {
         const t = teacher(s.tid);
         const yg = t?.yg || null;
         const draggingThis = state.dragging?.type === 'slot' && state.dragging.slotId === s.id;
+
+        // Determine span position
+        const startIdx = SESSION_IDX[s.session] ?? 0;
+        const endIdx = SESSION_IDX[s.endSession ?? s.session] ?? startIdx;
+        const currentIdx = SESSION_IDX[session] ?? 0;
+        const isFirst = currentIdx === startIdx;
+        const isLast = currentIdx === endIdx;
+        const isMiddle = currentIdx > startIdx && currentIdx < endIdx;
+        const hasSpan = endIdx > startIdx;
+
+        // Span CSS classes
+        let spanCls = '';
+        if (hasSpan) {
+          if (isFirst && isLast) spanCls = ''; // single session
+          else if (isFirst) spanCls = 'span-start';
+          else if (isLast) spanCls = 'span-end';
+          else if (isMiddle) spanCls = 'span-mid';
+        }
+
         const cv = coverByName(s.cover);
-        const coverHtml = s.nocover
-          ? '' // leadership/info entries need no cover
-          : s.cover
-            ? `<div class="slot-cover-assigned" style="background:${ygCol(yg)};color:${contrastColor(ygCol(yg))};border-color:${ygCol(yg)}">
-                 <div class="cv-mini-avatar" style="background:${cv?.col||'#94a3b8'};color:${contrastColor(cv?.col||'#94a3b8')}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</div>
-                 ${s.cover}<button class="cv-x" onclick="unassignCover(${s.id})">×</button>
-               </div>`
-            : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`;
 
-        const noteHtml = s.reason === 'Other'
-          ? `<input class="reason-note" type="text" placeholder="specify…" value="${(s.reasonNote||'').replace(/"/g,'&quot;')}"
-               onclick="event.stopPropagation()"
-               onchange="changeReasonNote(${s.id},this.value)">`
-          : '';
+        // Full UI only in first session of span
+        if (isFirst) {
+          const coverHtml = s.nocover
+            ? ''
+            : s.cover
+              ? `<div class="slot-cover-assigned" style="background:${ygCol(yg)};color:${contrastColor(ygCol(yg))};border-color:${ygCol(yg)}">
+                   <div class="cv-mini-avatar" style="background:${cv?.col||'#94a3b8'};color:${contrastColor(cv?.col||'#94a3b8')}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</div>
+                   ${s.cover}<button class="cv-x" onclick="unassignCover(${s.id})">×</button>
+                 </div>`
+              : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`;
 
-        html += `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''} ${draggingThis?'slot-dragging':''}"
-          onpointerdown="onSlotPointerDown(event,${s.id})">
-          <div class="slot-hd">
-            <div class="slot-pip ${pipCls(yg)}"></div>
-            <span class="slot-name">${t ? t.name : s.tid}</span>
-            <select class="reason-sel ${rbCls(s.reason)}" onchange="changeReason(${s.id},this.value)" onclick="event.stopPropagation()">
-              ${reasonOptions(s.tid, s.reason)}
-            </select>
-            <button class="slot-del" onclick="removeSlot(${s.id})">×</button>
-          </div>
-          ${noteHtml ? `<div style="padding:2px 5px 4px">${noteHtml}</div>` : ''}
-          ${coverHtml}
-        </div>`;
+          const noteHtml = s.reason === 'Other'
+            ? `<input class="reason-note" type="text" placeholder="specify…" value="${(s.reasonNote||'').replace(/"/g,'&quot;')}"
+                 onclick="event.stopPropagation()"
+                 onchange="changeReasonNote(${s.id},this.value)">`
+            : '';
+
+          // End session selector (only show if span > 1 session)
+          const endSelHtml = hasSpan
+            ? `<select class="end-sel" onchange="changeEndSession(${s.id},this.value)" onclick="event.stopPropagation()">
+                ${SESSIONS.map((sess, i) => `<option value="${sess}" ${(SESSION_IDX[sess] ?? i) === endIdx ? 'selected' : ''}>→ ${sess}</option>`).join('')}
+              </select>`
+            : '';
+
+          html += `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''} ${draggingThis?'slot-dragging':''} ${spanCls}"
+            onpointerdown="onSlotPointerDown(event,${s.id})">
+            <div class="slot-hd">
+              <div class="slot-pip ${pipCls(yg)}"></div>
+              <span class="slot-name">${t ? t.name : s.tid}</span>
+              <select class="reason-sel ${rbCls(s.reason)}" onchange="changeReason(${s.id},this.value)" onclick="event.stopPropagation()">
+                ${reasonOptions(s.tid, s.reason)}
+              </select>
+              ${endSelHtml}
+              <button class="slot-del" onclick="removeSlot(${s.id})">×</button>
+            </div>
+            ${noteHtml ? `<div style="padding:2px 5px 4px">${noteHtml}</div>` : ''}
+            ${coverHtml}
+          </div>`;
+        } else {
+          // Continuation session - show minimal indicator
+          html += `<div class="slot-item ${sygCls(yg)} ${spanCls}" style="background:${ygCol(yg)};min-height:18px"
+            onpointerdown="onSlotPointerDown(event,${s.id})">
+          </div>`;
+        }
       });
 
       if (cellSlots.length === 0 && wsEventMatches.length === 0 && !cellNote) {
@@ -1129,13 +1183,13 @@ function ptrCommitDrop(x, y) {
           if (!t?.workingDays || t.workingDays.includes(dayIdx)) {
             const isLeader = t?.isLeader || false;
             const defaultReason = isLeader ? (t.reasons?.[0] || 'Meeting') : firstAvailableReason(d.id);
-            setSlots([...slots(), { id: state.nextId++, day: dayIdx, session, tid: d.id, reason: defaultReason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false }]);
+            setSlots([...slots(), { id: state.nextId++, day: dayIdx, session, endSession: session, tid: d.id, reason: defaultReason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false }]);
           }
         }
       } else if (d.type === 'slot') {
         if (!getDayEvent(state.weekIdx, dayIdx)) {
           const s = slots().find(x => x.id === d.slotId);
-          if (s) { s.day = dayIdx; s.session = session; stateSave(); }
+          if (s) { s.day = dayIdx; s.session = session; s.endSession = session; stateSave(); }
         }
       }
     }
@@ -1184,6 +1238,18 @@ function removeSlot(slotId)    { setSlots(slots().filter(s => s.id !== slotId));
 function unassignCover(slotId) { const s = slots().find(x => x.id === slotId); if (s) { s.cover = null; stateSave(); render(); } }
 function changeReason(slotId, reason) { const s = slots().find(x => x.id === slotId); if (s) { s.reason = reason; if (reason !== 'Other') s.reasonNote = ''; stateSave(); render(); } }
 function changeReasonNote(slotId, note) { const s = slots().find(x => x.id === slotId); if (s) { s.reasonNote = note; stateSave(); } }
+function changeEndSession(slotId, endSession) {
+  const s = slots().find(x => x.id === slotId);
+  if (s) {
+    const startIdx = SESSION_IDX[s.session] ?? 0;
+    const endIdx = SESSION_IDX[endSession] ?? startIdx;
+    // Don't allow end before start
+    if (endIdx >= startIdx) {
+      s.endSession = endSession;
+      stateSave(); render();
+    }
+  }
+}
 function changeWeek(dir) {
   state.weekIdx = Math.max(0, Math.min(WEEKS.length-1, state.weekIdx+dir));
   if (!state.weekSlots[state.weekIdx] || state.weekSlots[state.weekIdx].length===0)

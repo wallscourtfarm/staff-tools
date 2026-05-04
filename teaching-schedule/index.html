@@ -1841,11 +1841,15 @@ function renderBody() {
         const di = slot.day;
         if (nsd[di]) return;
 
-        const sessionMap = COVER_SESSION_MAP[slot.session];
-        if (!sessionMap) return;
+        // Use endSession if available, otherwise use session
+        const startSession = slot.session;
+        const endSession = slot.endSession ?? slot.session;
+        const startMap = COVER_SESSION_MAP[startSession];
+        const endMap = COVER_SESSION_MAP[endSession];
+        if (!startMap || !endMap) return;
 
-        const startIdx = ROWS.findIndex(r => r.id === sessionMap.start);
-        const endIdx = ROWS.findIndex(r => r.id === sessionMap.end);
+        const startIdx = ROWS.findIndex(r => r.id === startMap.start);
+        const endIdx = ROWS.findIndex(r => r.id === endMap.end);
         if (startIdx < 0 || endIdx < 0) return;
 
         const staffInfo = COVER_STAFF_LOOKUP[slot.tid] || {};
