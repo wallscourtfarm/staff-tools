@@ -1311,13 +1311,16 @@ function renderTPActivityChip(activity, staffName = '', dateKey = '') {
   </div>`;
 }
 
-function renderFABChip(duty, dateKey = '') {
+function renderFABChip(duty, dateKey = '', yearGroup = '') {
   // duty: { staffId, staffName, initials, zone, colour }
-  // Display: "IM MUGA" for upper (with zone), "IM" for lower (no zone)
-  const displayText = duty.zone ? `${duty.initials} ${duty.zone}` : duty.initials;
+  // Display: "IM MUGA" for upper (with zone), "IM FAB duty" for lower (no zone)
+  const isLower = ['Y1', 'Y2', 'Y3', 'Reception'].includes(yearGroup);
+  const displayText = duty.zone ? `${duty.initials} ${duty.zone}` : (isLower ? `${duty.initials} FAB duty` : duty.initials);
   // Use dark text for readability regardless of chip colour
   const textColour = '#1e293b';
-  return `<div class="cell-chip tp-activity fab-duty" style="background:${duty.colour}20;border:1.5px dashed ${duty.colour}" data-fab-duty="true" data-staff-id="${escAttr(duty.staffId)}" data-date="${escAttr(dateKey)}" data-zone="${escAttr(duty.zone || '')}">
+  // Use dark border for visibility against FAB row background
+  const borderColour = '#64748b';
+  return `<div class="cell-chip tp-activity fab-duty" style="background:${duty.colour}20;border:1.5px dashed ${borderColour}" data-fab-duty="true" data-staff-id="${escAttr(duty.staffId)}" data-date="${escAttr(dateKey)}" data-zone="${escAttr(duty.zone || '')}">
     <button class="tp-remove fab-remove" title="Remove this instance" data-staff-id="${escAttr(duty.staffId)}" data-date="${escAttr(dateKey)}" data-zone="${escAttr(duty.zone || '')}" onclick="removeFABDuty(this)">×</button>
     <div class="chip-top">
       <span class="chip-colour" style="background:${duty.colour}"></span>
@@ -1749,12 +1752,12 @@ function renderBody() {
                   return dBaseId === myBaseId || d.staffId === staffMember.id;
                 });
                 if (myFab) {
-                  fabHtml = renderFABChip(myFab, dk);
+                  fabHtml = renderFABChip(myFab, dk, YEAR_GROUP);
                 }
               }
             } else {
               // Master view: show all FAB duties for this year group
-              fabHtml = fabDuties.map(d => renderFABChip(d, dk)).join('');
+              fabHtml = fabDuties.map(d => renderFABChip(d, dk, YEAR_GROUP)).join('');
             }
           }
           return `<td class="view-cell">${strips}${soTags}${tpActHtml}${fabHtml}<div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div></td>`;
