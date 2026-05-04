@@ -205,7 +205,8 @@
     .day-reset-btn { position:absolute; top:4px; right:4px; background:none; border:none; cursor:pointer; color:#cbd5e1; font-size:10px; padding:1px 3px; border-radius:2px; line-height:1; }
     .day-reset-btn:hover { color:#dc2626; background:#fee2e2; }
 
-    /* Whole-school session banners (vertical strips) */
+    /* Whole-school session banners (vertical strips for tall rows, horizontal for short rows) */
+    .session-banner { display:flex; align-items:center; justify-content:center; gap:5px; padding:5px 7px; border-radius:4px; font-size:10.5px; font-weight:bold; margin-bottom:4px; text-align:center; }
     .event-strip { position:absolute; top:5px; bottom:5px; left:5px; width:32px; display:flex; flex-direction:column; z-index:1; }
     .event-strip-content { flex:1; display:flex; align-items:center; justify-content:center; border-radius:4px; overflow:hidden; cursor:default; }
     .event-strip-text { writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg); padding:6px 3px; font-size:11px; font-weight:bold; white-space:nowrap; text-align:center; }
@@ -952,17 +953,24 @@ function renderGrid() {
       const sessionInfoEvents = getSessionInfoEvents(state.weekIdx, dayIdx, session);
       const allEvents = [...wsEventMatches, ...sessionInfoEvents];
 
-      // Render event strip if there are events
+      // Before School and After School use horizontal banners; AM/Lunch/PM use vertical strips
+      const isShortRow = session === 'Before School' || session === 'After School';
       const hasEvents = allEvents.length > 0;
+
       if (hasEvents) {
-        // Use first event for display (or could stack multiple)
         const ev = allEvents[0];
         const bg = ev.bg || '#7c3aed';
-        html += `<div class="event-strip">
-          <div class="event-strip-content" style="background:${bg};color:${contrastColor(bg)}">
-            <div class="event-strip-text">${ev.label}</div>
-          </div>
-        </div>`;
+        if (isShortRow) {
+          // Horizontal banner for short rows
+          html += `<div class="session-banner" style="background:${bg};color:${contrastColor(bg)}">${ev.label}</div>`;
+        } else {
+          // Vertical strip for AM/Lunch/PM
+          html += `<div class="event-strip">
+            <div class="event-strip-content" style="background:${bg};color:${contrastColor(bg)}">
+              <div class="event-strip-text">${ev.label}</div>
+            </div>
+          </div>`;
+        }
       }
 
       // Per-cell notes (user-added) - keep horizontal for now
@@ -975,9 +983,10 @@ function renderGrid() {
         </div>`;
       }
 
-      // Horizontal layout: slots side by side (adjusted for event strip)
+      // Horizontal layout: slots side by side (adjusted for event strip in tall rows)
       if (cellSlots.length > 0) {
-        html += `<div class="slots-row" ${hasEvents ? 'style="left:40px"' : ''}>`;
+        const hasVerticalEvent = hasEvents && !isShortRow;
+        html += `<div class="slots-row" ${hasVerticalEvent ? 'style="left:40px"' : ''}>`;
         cellSlots.forEach(s => {
           const t = teacher(s.tid);
           const yg = t?.yg || null;
