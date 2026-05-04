@@ -207,9 +207,9 @@
 
     /* Whole-school session banners (vertical strips for tall rows, horizontal for short rows) */
     .session-banner { display:flex; align-items:center; justify-content:center; gap:5px; padding:5px 7px; border-radius:4px; font-size:10.5px; font-weight:bold; margin-bottom:4px; text-align:center; }
-    .event-strip { position:absolute; top:5px; bottom:5px; left:5px; width:32px; display:flex; flex-direction:column; z-index:1; }
+    .event-strip { position:absolute; top:5px; bottom:5px; left:5px; width:20px; display:flex; flex-direction:column; z-index:1; }
     .event-strip-content { flex:1; display:flex; align-items:center; justify-content:center; border-radius:4px; overflow:hidden; cursor:default; }
-    .event-strip-text { writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg); padding:6px 3px; font-size:11px; font-weight:bold; white-space:nowrap; text-align:center; }
+    .event-strip-text { writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg); padding:4px 2px; font-size:10px; font-weight:bold; white-space:nowrap; text-align:center; }
     .cell-note { display:flex; align-items:center; gap:5px; padding:4px 7px; background:#1e293b; border-radius:4px; font-size:10.5px; color:white; font-weight:bold; margin-bottom:4px; }
     .cell-note .note-del { margin-left:auto; background:none; border:none; cursor:pointer; color:rgba(255,255,255,.4); font-size:12px; padding:0 1px; border-radius:2px; }
     .cell-note .note-del:hover { color:white; background:rgba(255,255,255,.15); }
@@ -986,7 +986,7 @@ function renderGrid() {
       // Horizontal layout: slots side by side (adjusted for event strip in tall rows)
       if (cellSlots.length > 0) {
         const hasVerticalEvent = hasEvents && !isShortRow;
-        html += `<div class="slots-row" ${hasVerticalEvent ? 'style="left:40px"' : ''}>`;
+        html += `<div class="slots-row" ${hasVerticalEvent ? 'style="left:25px"' : ''}>`;
         cellSlots.forEach(s => {
           const t = teacher(s.tid);
           const yg = t?.yg || null;
@@ -1100,7 +1100,20 @@ function positionSpanStrips(spans) {
     const containerRect = container.getBoundingClientRect();
     const slotItemRect = slotItem.getBoundingClientRect();
 
-    const left = slotItemRect.left - containerRect.left;
+    // Check if any row in the span has a school event (shift overlay right if so)
+    let hasEventInSpan = false;
+    for (let idx = startIdx; idx <= endIdx; idx++) {
+      const rowSession = SESSIONS[idx];
+      if (rowSession === 'Before School' || rowSession === 'After School') continue; // Short rows don't have vertical events
+      const wsEv = wsEvents.find(e => e.day === s.day && e.session === rowSession);
+      const sessEv = getSessionInfoEvents(state.weekIdx, s.day, rowSession);
+      if (wsEv || sessEv.length > 0) {
+        hasEventInSpan = true;
+        break;
+      }
+    }
+
+    const left = slotItemRect.left - containerRect.left + (hasEventInSpan ? 25 : 0);
     const top = rowTops[startIdx];
     const bottom = rowBottoms[endIdx];
     const height = bottom - top;
