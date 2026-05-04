@@ -88,7 +88,11 @@
     body.present-mode .week-grid th, body.present-mode .week-grid td { font-size:12px; }
     body.present-mode .slot-item { font-size:12px; }
     body.present-mode .slot-name { font-size:12.5px; }
-    .grid-cell { vertical-align:top; padding:5px; border-right:1px solid #d1d5db; border-bottom:1px solid #d1d5db; min-height:56px; min-width:115px; transition:background .1s; }
+    /* Row heights - taller for AM/PM teaching sessions */
+    .srow-before .grid-cell, .srow-after .grid-cell { min-height:40px; }
+    .srow-lunch .grid-cell { min-height:50px; }
+    .srow-am .grid-cell, .srow-pm .grid-cell { min-height:120px; }
+    .grid-cell { vertical-align:top; padding:5px; border-right:1px solid #d1d5db; border-bottom:1px solid #d1d5db; min-width:115px; transition:background .1s; }
     .grid-cell.teacher-ready { background:#f8faff; }
     .grid-cell.teacher-over  { background:#dbeafe !important; outline:2px dashed #1798d3; outline-offset:-2px; }
     .grid-cell.slot-over     { background:#eff6ff !important; outline:2px dashed #60a5fa; outline-offset:-2px; }
@@ -911,10 +915,10 @@ function renderGrid() {
   </tr></thead><tbody>`;
 
   const SESSION_ROW_CLS = {'Before School':'srow-before','AM':'srow-am','Lunch':'srow-lunch','PM':'srow-pm','After School':'srow-after'};
-  SESSIONS.forEach(session => {
+  SESSIONS.forEach((session, sessionIdx) => {
     const isOffAlloc = OFF_ALLOC.has(session);
     const rowCls = SESSION_ROW_CLS[session] || '';
-    html += `<tr class="${rowCls}"><td class="session-cell">${SESSION_SHORT[session]}</td>`;
+    html += `<tr class="${rowCls}" data-session-idx="${sessionIdx}"><td class="session-cell">${SESSION_SHORT[session]}</td>`;
     DAYS.forEach((_,dayIdx) => {
       const ev = getDayEvent(state.weekIdx, dayIdx);
       if (ev) {
@@ -1279,10 +1283,14 @@ function onExtendPointerDown(e, slotId) {
 }
 
 function getSessionRowAt(x, y) {
+  // Find which row the Y coordinate is over
   const rows = document.querySelectorAll('.week-grid tbody tr');
-  for (let i = 0; i < rows.length; i++) {
-    const rect = rows[i].getBoundingClientRect();
-    if (y >= rect.top && y < rect.bottom) return i;
+  for (const row of rows) {
+    const rect = row.getBoundingClientRect();
+    if (y >= rect.top && y < rect.bottom) {
+      // Return the session index from data attribute
+      return parseInt(row.dataset.sessionIdx, 10);
+    }
   }
   return -1;
 }
