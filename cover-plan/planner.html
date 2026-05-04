@@ -979,42 +979,38 @@ function renderGrid() {
 
           // Full UI only in first session of span
           if (isFirst) {
-            // Reason selector
-            const reasonOptionsHtml = reasonOptions(s.tid, s.reason);
+            // For spans, just show placeholder - full content rendered via overlay
+            if (hasSpan) {
+              html += `<div class="slot-item ${sygCls(yg)}" style="visibility:hidden;"></div>`;
+            } else {
+              // Single-session slot: render in-cell
+              const reasonOptionsHtml = reasonOptions(s.tid, s.reason);
+              const coverHtml = s.nocover
+                ? ''
+                : s.cover
+                  ? `<div class="slot-cover-assigned" style="background:${col};color:${contrastColor(col)};border-color:${col}">
+                       <span class="cv-mini-avatar" style="background:${cv?.col||'#94a3b8'};color:${contrastColor(cv?.col||'#94a3b8')}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</span>${s.cover}
+                       <button class="cv-x" onclick="unassignCover(${s.id});event.stopPropagation()">✕</button>
+                     </div>`
+                  : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`;
 
-            // Cover section
-            const coverHtml = s.nocover
-              ? ''
-              : s.cover
-                ? `<div class="slot-cover-assigned" style="background:${col};color:${contrastColor(col)};border-color:${col}">
-                     <span class="cv-mini-avatar" style="background:${cv?.col||'#94a3b8'};color:${contrastColor(cv?.col||'#94a3b8')}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</span>${s.cover}
-                     <button class="cv-x" onclick="unassignCover(${s.id});event.stopPropagation()">✕</button>
-                   </div>`
-                : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`;
-
-            // End session indicator (for spans)
-            const endIndicator = hasSpan ? `<span class="slot-reason">→ ${s.endSession}</span>` : '';
-
-            // Strip rendered in-cell for single session, via overlay for spans
-            const stripHtml = hasSpan ? '' : `<div class="slot-strip strip-only" style="background:${col}"></div>`;
-
-            html += `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''} ${draggingThis?'slot-dragging':''}">
-              ${stripHtml}
-              <div class="slot-content" onpointerdown="onSlotPointerDown(event,${s.id})">
-                <div class="slot-text">
-                  <span class="slot-name">${t ? t.name : s.tid}</span>
-                  <select class="slot-reason-sel" onclick="event.stopPropagation()" onchange="changeReason(${s.id},this.value)">${reasonOptionsHtml}</select>
-                  ${endIndicator}
+              html += `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''} ${draggingThis?'slot-dragging':''}>
+                <div class="slot-strip strip-only" style="background:${col}"></div>
+                <div class="slot-content" onpointerdown="onSlotPointerDown(event,${s.id})">
+                  <div class="slot-text">
+                    <span class="slot-name">${t ? t.name : s.tid}</span>
+                    <select class="slot-reason-sel" onclick="event.stopPropagation()" onchange="changeReason(${s.id},this.value)">${reasonOptionsHtml}</select>
+                  </div>
+                  <div class="slot-controls">
+                    <button class="slot-del" onclick="removeSlot(${s.id});event.stopPropagation()">✕</button>
+                  </div>
+                  ${coverHtml}
+                  <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
                 </div>
-                <div class="slot-controls">
-                  <button class="slot-del" onclick="removeSlot(${s.id});event.stopPropagation()">✕</button>
-                </div>
-                ${coverHtml}
-                <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
-              </div>
-            </div>`;
+              </div>`;
+            }
           } else {
-            // Continuation cell - placeholder for alignment (strip rendered via overlay)
+            // Continuation cell - placeholder for alignment (content rendered via overlay)
             html += `<div class="slot-item ${sygCls(yg)}"></div>`;
           }
         });
@@ -1063,43 +1059,67 @@ function positionSpanStrips(spans) {
     rowBottoms.push(rect.bottom - containerRect.top);
   });
 
-  const headerHeight = document.querySelector('.week-grid thead')?.getBoundingClientRect().height || 0;
-
   spans.forEach(({ slot: s, startIdx, endIdx }) => {
     const t = teacher(s.tid);
-    const col = t?.col || '#94a3b8';
+    const yg = t?.yg || null;
+    const col = ygCol(yg);
+    const cv = coverByName(s.cover);
 
     // Find the slot-item in the first row to get its left position
     const firstCell = document.querySelector(`td[data-day="${s.day}"][data-session="${SESSIONS[startIdx]}"]`);
     if (!firstCell) return;
 
     const slotItems = firstCell.querySelectorAll('.slot-item');
-    // Find which slot-item this is (by checking for matching slot ID in the content)
-    let slotItemIdx = -1;
     const cellSlots = (state.weekSlots[state.weekIdx] || []).filter(sl => {
       const slStart = SESSION_IDX[sl.session] ?? 0;
       const slEnd = SESSION_IDX[sl.endSession ?? sl.session] ?? slStart;
       return sl.day === s.day && slStart === startIdx;
     });
-    slotItemIdx = cellSlots.findIndex(sl => sl.id === s.id);
+    const slotItemIdx = cellSlots.findIndex(sl => sl.id === s.id);
     if (slotItemIdx < 0 || slotItemIdx >= slotItems.length) return;
 
     const slotItem = slotItems[slotItemIdx];
     if (!slotItem) return;
 
-    const cellRect = firstCell.getBoundingClientRect();
     const containerRect = container.getBoundingClientRect();
     const slotItemRect = slotItem.getBoundingClientRect();
 
     const left = slotItemRect.left - containerRect.left;
     const top = rowTops[startIdx];
     const bottom = rowBottoms[endIdx];
-    const width = 3;
+    const height = bottom - top;
+    const width = slotItemRect.width;
 
-    const strip = document.createElement('div');
-    strip.className = 'slot-strip strip-first';
-    strip.style.cssText = `position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${bottom - top}px;background:${col};border-radius:3px 3px 0 0;`;
-    container.appendChild(strip);
+    // Build the full slot content for the overlay
+    const reasonOptionsHtml = reasonOptions(s.tid, s.reason);
+    const coverHtml = s.nocover
+      ? ''
+      : s.cover
+        ? `<div class="slot-cover-assigned" style="background:${col};color:${contrastColor(col)};border-color:${col}">
+             <span class="cv-mini-avatar" style="background:${cv?.col||'#94a3b8'};color:${contrastColor(cv?.col||'#94a3b8')}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</span>${s.cover}
+             <button class="cv-x" onclick="unassignCover(${s.id});event.stopPropagation()">✕</button>
+           </div>`
+        : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`;
+
+    const endIndicator = `<span class="slot-reason">→ ${s.endSession}</span>`;
+
+    const slotHtml = `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''}" style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;">
+      <div class="slot-strip strip-first" style="background:${col}"></div>
+      <div class="slot-content" style="height:${height}px" onpointerdown="onSlotPointerDown(event,${s.id})">
+        <div class="slot-text">
+          <span class="slot-name">${t ? t.name : s.tid}</span>
+          <select class="slot-reason-sel" onclick="event.stopPropagation()" onchange="changeReason(${s.id},this.value)">${reasonOptionsHtml}</select>
+          ${endIndicator}
+        </div>
+        <div class="slot-controls">
+          <button class="slot-del" onclick="removeSlot(${s.id});event.stopPropagation()">✕</button>
+        </div>
+        ${coverHtml}
+        <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
+      </div>
+    </div>`;
+
+    container.insertAdjacentHTML('beforeend', slotHtml);
   });
 }
 
