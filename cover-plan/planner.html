@@ -1100,20 +1100,31 @@ function positionSpanStrips(spans) {
     const containerRect = container.getBoundingClientRect();
     const slotItemRect = slotItem.getBoundingClientRect();
 
-    // Check if any row in the span has a school event (shift overlay right if so)
-    let hasEventInSpan = false;
-    for (let idx = startIdx; idx <= endIdx; idx++) {
-      const rowSession = SESSIONS[idx];
-      if (rowSession === 'Before School' || rowSession === 'After School') continue; // Short rows don't have vertical events
-      const wsEv = wsEvents.find(e => e.day === s.day && e.session === rowSession);
-      const sessEv = getSessionInfoEvents(state.weekIdx, s.day, rowSession);
-      if (wsEv || sessEv.length > 0) {
-        hasEventInSpan = true;
-        break;
+    // The slotItemRect.left already includes any offset from slots-row's left style
+    // But if the SPAN extends into rows that have events, we need to shift the overlay
+    // because those rows' cells have event strips that push the slots-row right
+    // However, we should only add offset if the FIRST row doesn't have an event
+    // (if first row has event, the slot-item is already positioned correctly)
+    let needsEventOffset = false;
+    const firstSession = SESSIONS[startIdx];
+    const firstRowHasEvent = wsEvents.some(e => e.day === s.day && e.session === firstSession) ||
+                              getSessionInfoEvents(state.weekIdx, s.day, firstSession).length > 0;
+
+    if (!firstRowHasEvent) {
+      // Check if any OTHER row in the span has an event
+      for (let idx = startIdx + 1; idx <= endIdx; idx++) {
+        const rowSession = SESSIONS[idx];
+        if (rowSession === 'Before School' || rowSession === 'After School') continue;
+        const wsEv = wsEvents.find(e => e.day === s.day && e.session === rowSession);
+        const sessEv = getSessionInfoEvents(state.weekIdx, s.day, rowSession);
+        if (wsEv || sessEv.length > 0) {
+          needsEventOffset = true;
+          break;
+        }
       }
     }
 
-    const left = slotItemRect.left - containerRect.left + (hasEventInSpan ? 25 : 0);
+    const left = slotItemRect.left - containerRect.left + (needsEventOffset ? 25 : 0);
     const top = rowTops[startIdx];
     const bottom = rowBottoms[endIdx];
     const height = bottom - top;
