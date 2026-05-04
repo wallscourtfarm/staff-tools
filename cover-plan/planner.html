@@ -1081,58 +1081,71 @@ function positionSpanStrips(spans) {
     const col = ygCol(yg);
     const cv = coverByName(s.cover);
 
-    // Find the slot-item in the first row to get its left position
-    const firstCell = document.querySelector(`td[data-day="${s.day}"][data-session="${SESSIONS[startIdx]}"]`);
-    if (!firstCell) return;
+    // Find the correct position by checking ALL cells the span passes through
+    // We need to find the maximum index this slot has among all cells it spans
+    let maxSlotIndex = 0;
+    let anyCellHasEvent = false;
 
-    const slotItems = firstCell.querySelectorAll('.slot-item');
-    const cellSlots = (state.weekSlots[state.weekIdx] || []).filter(sl => {
-      const slStart = SESSION_IDX[sl.session] ?? 0;
-      const slEnd = SESSION_IDX[sl.endSession ?? sl.session] ?? slStart;
-      return sl.day === s.day && slStart === startIdx;
-    });
-    const slotItemIdx = cellSlots.findIndex(sl => sl.id === s.id);
-    if (slotItemIdx < 0 || slotItemIdx >= slotItems.length) return;
+    for (let idx = startIdx; idx <= endIdx; idx++) {
+      const session = SESSIONS[idx];
+      if (session === 'Before School' || session === 'After School') continue; // Skip short rows for position calculation
 
-    const slotItem = slotItems[slotItemIdx];
-    if (!slotItem) return;
+      // Check for event in this cell
+      const wsEv = wsEvents.find(e => e.day === s.day && e.session === session);
+      const sessEv = getSessionInfoEvents(state.weekIdx, s.day, session);
+      if (wsEv || sessEv.length > 0) {
+        anyCellHasEvent = true;
+      }
 
-    const containerRect = container.getBoundingClientRect();
-    const slotItemRect = slotItem.getBoundingClientRect();
-
-    // The slotItemRect.left already includes any offset from slots-row's left style
-    // But if the SPAN extends into rows that have events, we need to shift the overlay
-    // because those rows' cells have event strips that push the slots-row right
-    // However, we should only add offset if the FIRST row doesn't have an event
-    // (if first row has event, the slot-item is already positioned correctly)
-    let needsEventOffset = false;
-    const firstSession = SESSIONS[startIdx];
-    const firstRowHasEvent = wsEvents.some(e => e.day === s.day && e.session === firstSession) ||
-                              getSessionInfoEvents(state.weekIdx, s.day, firstSession).length > 0;
-
-    if (!firstRowHasEvent) {
-      // Check if any OTHER row in the span has an event
-      for (let idx = startIdx + 1; idx <= endIdx; idx++) {
-        const rowSession = SESSIONS[idx];
-        if (rowSession === 'Before School' || rowSession === 'After School') continue;
-        const wsEv = wsEvents.find(e => e.day === s.day && e.session === rowSession);
-        const sessEv = getSessionInfoEvents(state.weekIdx, s.day, rowSession);
-        if (wsEv || sessEv.length > 0) {
-          needsEventOffset = true;
-          break;
-        }
+      // Find all slots in this cell (including spans that pass through)
+      const cellSlots = (state.weekSlots[state.weekIdx] || []).filter(sl => {
+        const slStart = SESSION_IDX[sl.session] ?? 0;
+        const slEnd = SESSION_IDX[sl.endSession ?? sl.session] ?? slStart;
+        // Slot is in this cell if it spans this session
+        return sl.day === s.day && slStart <= idx && idx <= slEnd;
+      });
+      const slotIdx = cellSlots.findIndex(sl => sl.id === s.id);
+      if (slotIdx > maxSlotIndex) {
+        maxSlotIndex = slotIdx;
       }
     }
 
-    const left = slotItemRect.left - containerRect.left + (needsEventOffset ? 25 : 0);
+    // Get base position from first cell's geometry
+    const firstCell = document.querySelector(`td[data-day="${s.day}"][data-session="${SESSIONS[startIdx]}"]`);
+    if (!firstCell) return;
+
+    const firstSlotItems = firstCell.querySelectorAll('.slot-item');
+    const firstCellSlots = (state.weekSlots[state.weekIdx] || []).filter(sl => {
+      const slStart = SESSION_IDX[sl.session] ?? 0;
+      return sl.day === s.day && slStart === startIdx;
+    });
+    const firstSlotIdx = firstCellSlots.findIndex(sl => sl.id === s.id);
+
+    // Use a slot item from the first cell to get width
+    const baseSlotItem = firstSlotItems[0];
+    if (!baseSlotItem) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const baseSlotItemRect = baseSlotItem.getBoundingClientRect();
+    const slotWidth = baseSlotItemRect.width;
+    const gap = 3; // gap between slot items
+
+    // Calculate left position: base + (index * (width + gap)) + event offset if needed
+    const firstSession = SESSIONS[startIdx];
+    const firstRowHasEvent = wsEvents.some(e => e.day === s.day && e.session === firstSession) ||
+                              getSessionInfoEvents(state.weekIdx, s.day, firstSession).length > 0;
+    const eventOffset = (!firstRowHasEvent && anyCellHasEvent) ? 25 : 0;
+
+    // Use the first cell's left as base, then add offset for maxSlotIndex
+    const baseLeft = baseSlotItemRect.left - containerRect.left + eventOffset;
+    const left = baseLeft + maxSlotIndex * (slotWidth + gap);
     const top = rowTops[startIdx];
     const bottom = rowBottoms[endIdx];
     const height = bottom - top;
-    const width = slotItemRect.width;
 
-    console.log('Creating overlay slot at left:', left, 'top:', top, 'height:', height, 'width:', width);
+    console.log('Creating overlay slot at left:', left, 'top:', top, 'height:', height, 'width:', slotWidth, 'maxSlotIndex:', maxSlotIndex);
 
-    const slotHtml = `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''}" style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;">
+    const slotHtml = `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''}" style="position:absolute;left:${left}px;top:${top}px;width:${slotWidth}px;height:${height}px;">
       <div class="slot-content" style="height:${height}px;border-left-color:${col}" onpointerdown="onSlotPointerDown(event,${s.id})">
         <button class="slot-del" onclick="removeSlot(${s.id});event.stopPropagation()" title="Delete bar">✕</button>
         <div class="slot-text">
