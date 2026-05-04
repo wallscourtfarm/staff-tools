@@ -490,6 +490,7 @@ const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?t
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbwlNv08Z0cFSgKq_1zcrQw9I2I9ewg8Stj6kcQjSZaBm_uscbIC0V225ez6mVvg75sVfQ/exec';
 const EXCEPTIONS_URL = 'https://script.google.com/macros/s/AKfycbwRTXlq_kqfstCk_lF6qVdoBBZeXdlWV2Gvja1d0H3rYEyCZvPPi2XNhCp3spOsXn3W/exec';
 const FAB_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
+const COVER_SYNC_URL = 'https://script.google.com/macros/s/AKfycbx6CThsZIBj9pxc0noGkgUMaCHTKgUBASm5-wQCIQ6JELoQ4abIctjlpEGPyE_jrlzR/exec';
 
 // FAB zone definitions (must match FAB tool)
 const FAB_GROUPS = {
@@ -660,6 +661,8 @@ let ACTIVITY_EXCEPTIONS = []; // { date, staff, activity, session, type? }
 let FAB_DATA = null; // { weekKey: { lower: [[...]], upper: [[...]] } } - zones x days
 let FAB_STAFF = []; // [{ id, name, init, col }] - staff from FAB tool for ID→initials mapping
 let FAB_EXCEPTIONS = []; // { date, staffId, zone }
+let COVER_DATA = null; // { weekSlots: {weekIdx: [slots]}, staff: [{id, name, yg, col}] } - from cover-plan tool
+let COVER_STAFF_LOOKUP = {}; // name -> {id, yg, col} for quick lookup
 
 // Flat lookup: name → col
 const SUBJECT_COL = {};
@@ -1267,6 +1270,88 @@ function staffBelongsToYearGroup(fabStaffId, yearGroup, supplyYg = null) {
   return yearGroupMatches(staffYearGroups, yearGroup);
 }
 
+// ── Cover-plan integration helpers ─────────────────────────────────────────────
+// Map cover-plan sessions to teaching-schedule row IDs
+const COVER_SESSION_MAP = {
+  'Before School': { start: 'reg-am', end: 'reg-am' },
+  'AM': { start: 's1', end: 'fab' },           // AM session ends before FAB
+  'Lunch': { start: 'lunch', end: 'lunch' },
+  'PM': { start: 's3', end: 's3' },             // PM session
+  'After School': { start: 'after', end: 'after' }
+};
+
+function getCoverPlanStaffOut(weekIdx, dayIdx, staffId) {
+  // Get staff-out spans from cover-plan data for a specific week/day/staff
+  // Returns array of {start, end, label, cover, colour, source: 'cover-plan'}
+  if (!COVER_DATA || !COVER_DATA.weekSlots || !COVER_DATA.weekSlots[weekIdx]) return [];
+
+  const slots = COVER_DATA.weekSlots[weekIdx];
+  const daySlots = slots.filter(s => s.day === dayIdx && s.tid === staffId);
+
+  return daySlots.map(slot => {
+    const sessionMap = COVER_SESSION_MAP[slot.session];
+    if (!sessionMap) return null;
+
+    // Look up staff colour
+    const staffInfo = COVER_STAFF_LOOKUP[slot.tid] || {};
+    const colour = staffInfo.col || '#475569';
+
+    return {
+      start: sessionMap.start,
+      end: sessionMap.end,
+      label: slot.reason || 'Out',
+      cover: slot.cover || null,
+      colour: colour,
+      source: 'cover-plan'
+    };
+  }).filter(Boolean);
+}
+
+function getCoverPlanStaffOutForView(weekIdx, dayIdx, viewId, yearGroup) {
+  // Get all staff-out entries for a specific view (master or staff view)
+  // For master view, get all staff in this year group
+  // For staff view, get just that staff member
+  if (!COVER_DATA || !COVER_DATA.weekSlots || !COVER_DATA.weekSlots[weekIdx]) return [];
+
+  const slots = COVER_DATA.weekSlots[weekIdx];
+  const daySlots = slots.filter(s => s.day === dayIdx);
+
+  // Map view to staff
+  let targetStaffIds = [];
+
+  if (viewId === 'master') {
+    // Get all staff in this year group
+    STAFF.forEach(s => {
+      if (yearGroupMatches(s.yg, yearGroup)) {
+        targetStaffIds.push(s.id);
+      }
+    });
+  } else {
+    // Specific staff view
+    targetStaffIds = [viewId];
+  }
+
+  return daySlots
+    .filter(slot => targetStaffIds.includes(slot.tid))
+    .map(slot => {
+      const sessionMap = COVER_SESSION_MAP[slot.session];
+      if (!sessionMap) return null;
+
+      const staffInfo = COVER_STAFF_LOOKUP[slot.tid] || {};
+      const colour = staffInfo.col || '#475569';
+
+      return {
+        start: sessionMap.start,
+        end: sessionMap.end,
+        label: slot.reason || 'Out',
+        cover: slot.cover || null,
+        colour: colour,
+        source: 'cover-plan',
+        staffId: slot.tid
+      };
+    }).filter(Boolean);
+}
+
 function getTPActivities(staffName, dayIndex, dateKey = null) {
   // dayIndex: 1=Mon, 2=Tue, ... 5=Fri
   if (!TP_ACTIVITIES.length) return [];
@@ -1701,6 +1786,7 @@ function renderBody() {
   // Pre-compute staff-out spans per (dayIndex, rowIndex) — supports multiple overlapping spans
   const staffOutMap = {};
   {
+    // Manual staff-out entries
     DAYS.forEach((d, di) => {
       const day = d.toLowerCase();
       if (nsd[di]) return;
@@ -1721,11 +1807,70 @@ function renderBody() {
               isFirst: ri === startIdx,
               isLast: ri === endIdx,
               isFixed: row.type === 'fixed',
+              source: sp.source || 'manual'
             });
           }
         });
       });
     });
+
+    // Cover-plan staff-out entries (merged with manual)
+    if (COVER_DATA && COVER_DATA.weekSlots && COVER_DATA.weekSlots[state.weekIdx]) {
+      const coverSlots = COVER_DATA.weekSlots[state.weekIdx];
+      const yg = YEAR_GROUP;
+
+      // For master view, get all staff in this year group
+      // For staff view, get just that staff member
+      let targetStaffIds = [];
+      if (view === 'master') {
+        STAFF.forEach(s => {
+          if (yearGroupMatches(s.yg, yg)) {
+            targetStaffIds.push(s.id);
+          }
+        });
+      } else {
+        targetStaffIds = [view];
+      }
+
+      coverSlots.forEach(slot => {
+        if (!targetStaffIds.includes(slot.tid)) return;
+        const di = slot.day;
+        if (nsd[di]) return;
+
+        const sessionMap = COVER_SESSION_MAP[slot.session];
+        if (!sessionMap) return;
+
+        const startIdx = ROWS.findIndex(r => r.id === sessionMap.start);
+        const endIdx = ROWS.findIndex(r => r.id === sessionMap.end);
+        if (startIdx < 0 || endIdx < 0) return;
+
+        const staffInfo = COVER_STAFF_LOOKUP[slot.tid] || {};
+        const colour = staffInfo.col || '#475569';
+
+        ROWS.forEach((row, ri) => {
+          if (ri >= startIdx && ri <= endIdx) {
+            const key = `${di}-${ri}`;
+            if (!staffOutMap[key]) staffOutMap[key] = [];
+            // Avoid duplicates - check if this span already exists
+            const exists = staffOutMap[key].some(s =>
+              s.source === 'cover-plan' && s.label === (slot.reason || 'Out') && s.staffId === slot.tid
+            );
+            if (!exists) {
+              staffOutMap[key].push({
+                label: slot.reason || 'Out',
+                cover: slot.cover || '',
+                colour: colour,
+                isFirst: ri === startIdx,
+                isLast: ri === endIdx,
+                isFixed: row.type === 'fixed',
+                source: 'cover-plan',
+                staffId: slot.tid
+              });
+            }
+          }
+        });
+      });
+    }
   }
 
   let html = '';
@@ -2842,7 +2987,7 @@ async function init() {
   renderGrid();
 
   try {
-    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText, tpActivitiesText, exceptionsData, fabDataRaw] = await Promise.all([
+    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText, tpActivitiesText, exceptionsData, fabDataRaw, coverDataRaw] = await Promise.all([
       fetch(SHEET_BASE + encodeURIComponent('TermDates')).then(r => { if (!r.ok) throw new Error('Terms tab not found'); return r.text(); }),
       fetch(SHEET_BASE + encodeURIComponent('CalendarEvents')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('EventsMeetings')).then(r => r.ok ? r.text() : '').catch(() => ''),
@@ -2853,6 +2998,7 @@ async function init() {
       fetch(SHEET_BASE + encodeURIComponent('DayActivities')).then(r => r.ok ? r.text() : '').catch(() => ''),
 	      EXCEPTIONS_URL ? fetch(EXCEPTIONS_URL + '?action=exceptions').then(r => r.ok ? r.json() : {exceptions:[]}).then(d => d.exceptions || []).catch(() => []) : Promise.resolve([]),
       FAB_SYNC_URL ? fetch(FAB_SYNC_URL).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
+      COVER_SYNC_URL ? fetch(COVER_SYNC_URL).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
     ]);
     WEEKS = buildWeeks(csvToObjects(termsText));
     if (eventsText) {
@@ -2938,6 +3084,26 @@ async function init() {
         zone: e.session || ''
       }));
     ACTIVITY_EXCEPTIONS = ACTIVITY_EXCEPTIONS.filter(e => !e.type || e.type === 'DayActivity');
+
+    // Cover-plan data (from cover-plan tool sync endpoint)
+    if (coverDataRaw && coverDataRaw.weekSlots) {
+      COVER_DATA = {
+        weekSlots: coverDataRaw.weekSlots,
+        staff: coverDataRaw.staff || []
+      };
+      // Build staff lookup from ALL_SHEET_STAFF (use same ID format as cover-plan)
+      COVER_STAFF_LOOKUP = {};
+      ALL_SHEET_STAFF.forEach(r => {
+        const name = (r.Name || '').trim();
+        if (!name) return;
+        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+        COVER_STAFF_LOOKUP[id] = {
+          name: name,
+          yg: (r.YearGroup || '').trim(),
+          col: (r.Colour || '').trim() || '#475569'
+        };
+      });
+    }
 
     migrateScheduleKeys();
     state.weekIdx = currentWeekIdx();
