@@ -1067,6 +1067,12 @@ function parseDayRange(dayStr) {
   return [...days].sort((a, b) => a - b);
 }
 
+function getStaffColour(staffName) {
+  // Look up staff member's colour from Staff tab
+  const staffRow = ALL_SHEET_STAFF.find(r => (r.Name || '').trim() === staffName);
+  return (staffRow && staffRow.Colour && staffRow.Colour.trim()) || null;
+}
+
 function getTPActivities(staffName, dayIndex, dateKey = null) {
   // dayIndex: 1=Mon, 2=Tue, ... 5=Fri
   if (!TP_ACTIVITIES.length) return [];
@@ -1089,11 +1095,16 @@ function getTPActivities(staffName, dayIndex, dateKey = null) {
     }
 
     return true;
-  }).map(row => ({
-    name: (row.Activity || '').trim(),
-    session: (row.Session || '').trim(),
-    colour: (row.Colour || '#64748b').trim()
-  }));
+  }).map(row => {
+    // Colour priority: 1) explicit Colour column, 2) Staff tab colour, 3) fallback gray
+    const explicitColour = (row.Colour || '').trim();
+    const colour = explicitColour || getStaffColour(staffName) || '#64748b';
+    return {
+      name: (row.Activity || '').trim(),
+      session: (row.Session || '').trim(),
+      colour
+    };
+  });
 }
 
 function activityMatchesSession(activity, rowId, rowData) {
@@ -2267,7 +2278,13 @@ function openStaffOutModal(dayIdx) {
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         <span style="font-size:12px;color:#64748b;font-weight:600">Colour:</span>
-        ${STAFF_OUT_COLOURS.map((c, i) => `<label style="cursor:pointer"><input type="radio" name="soColour" value="${c}" id="soColour${i}" ${i === 0 ? 'checked' : ''} style="display:none"><span style="display:inline-block;width:24px;height:24px;border-radius:5px;background:${c};border:2.5px solid ${i===0?'#1e293b':'transparent'};vertical-align:middle;transition:border .1s"></span></label>`).join('')}
+        ${(() => {
+          // Pre-select staff member's colour if on a staff view
+          const staffMember = state.activeView !== 'master' ? STAFF.find(s => s.id === state.activeView) : null;
+          const staffColour = staffMember ? staffMember.col : null;
+          const allColours = [...new Set([staffColour, ...STAFF_OUT_COLOURS].filter(Boolean))];
+          return allColours.map((c, i) => `<label style="cursor:pointer"><input type="radio" name="soColour" value="${c}" id="soColour${i}" ${(staffColour && c === staffColour) || (!staffColour && i === 0) ? 'checked' : ''} style="display:none"><span style="display:inline-block;width:24px;height:24px;border-radius:5px;background:${c};border:2.5px solid ${(staffColour && c === staffColour) || (!staffColour && i === 0) ? '#1e293b' : 'transparent'};vertical-align:middle;transition:border .1s"></span></label>`).join('');
+        })()}
       </div>
     </div>
   `;
