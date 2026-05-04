@@ -1091,59 +1091,61 @@ function yearGroupToFABGroup(yg) {
   return null;
 }
 
-function getFABDuties(weekKey, yearGroup, dayIndex, dateKey = null) {
+function getFABDuties(yearGroup, dayIndex, dateKey = null) {
   // Get FAB duties for a specific year group and day
+  // Uses state.weekIdx to look up in FAB_DATA (which uses numeric week indices)
   // Returns: [{ staffId, staffName, initials, zone, colour }]
-  if (!FAB_DATA || !FAB_DATA[weekKey]) return [];
+  const weekIdx = state.weekIdx;
+  if (!FAB_DATA || FAB_DATA[weekIdx] === undefined) return [];
 
   const fabGroup = yearGroupToFABGroup(yearGroup);
   if (!fabGroup) return [];
 
-  const groupData = FAB_DATA[weekKey][fabGroup];
+  const groupData = FAB_DATA[weekIdx][fabGroup];
   if (!groupData) return [];
-
-  // dayIndex: 0=Mon (FAB data uses 0-indexed days)
-  const dayDuties = groupData[dayIndex];
-  if (!dayDuties) return [];
 
   // Get zones for this group
   const zones = FAB_GROUPS[fabGroup].zones;
   const hasZones = zones && zones.length > 0;
 
-  // Flatten duties: for groups without zones, dayDuties is [staffIds]
-  // For groups with zones, dayDuties is [[staffIds per zone]]
+  // FAB data structure: groupData[zoneIdx][dayIndex] = array of staff IDs
+  // For lower (no zones): groupData[0][dayIndex]
+  // For upper (4 zones): groupData[zoneIdx][dayIndex] for each zone
   const duties = [];
 
   if (hasZones) {
-    // dayDuties is array of zone arrays
-    dayDuties.forEach((zoneStaff, zoneIdx) => {
-      if (!Array.isArray(zoneStaff)) return;
-      zoneStaff.forEach(staffId => {
+    // Iterate through each zone
+    zones.forEach((zoneName, zoneIdx) => {
+      const zoneDays = groupData[zoneIdx];
+      if (!zoneDays || !Array.isArray(zoneDays[dayIndex])) return;
+
+      zoneDays[dayIndex].forEach(staffId => {
         // Check for exception
         if (dateKey && FAB_EXCEPTIONS.length) {
           const isExcepted = FAB_EXCEPTIONS.some(exc =>
             exc.date === dateKey &&
             exc.staffId === staffId &&
-            exc.zone === zones[zoneIdx]
+            exc.zone === zoneName
           );
           if (isExcepted) return;
         }
 
-        // Look up staff info
         const staffInfo = getFABStaffInfo(staffId);
         duties.push({
           staffId,
           staffName: staffInfo.name,
           initials: staffInfo.initials,
-          zone: zones[zoneIdx],
+          zone: zoneName,
           colour: staffInfo.colour
         });
       });
     });
   } else {
-    // No zones - dayDuties is flat array of staff IDs
-    if (!Array.isArray(dayDuties)) return [];
-    dayDuties.forEach(staffId => {
+    // No zones - groupData[0][dayIndex]
+    const zoneDays = groupData[0];
+    if (!zoneDays || !Array.isArray(zoneDays[dayIndex])) return [];
+
+    zoneDays[dayIndex].forEach(staffId => {
       // Check for exception
       if (dateKey && FAB_EXCEPTIONS.length) {
         const isExcepted = FAB_EXCEPTIONS.some(exc =>
@@ -1168,49 +1170,44 @@ function getFABDuties(weekKey, yearGroup, dayIndex, dateKey = null) {
 }
 
 function getFABStaffInfo(staffId) {
-  // Get staff info from FAB_STAFF or fall back to ALL_SHEET_STAFF
-  // Priority: FAB_STAFF (has initials), then ALL_SHEET_STAFF
+  // Get staff info from FAB data
+  // FAB staff IDs may have timestamp suffix like "innes_1776441911018"
+  // Strip suffix and match against Staff tab
 
-  // Check FAB_STAFF first
-  if (FAB_STAFF && FAB_STAFF.length) {
-    const fabStaff = FAB_STAFF.find(s => s.id === staffId);
-    if (fabStaff) {
-      // Also get colour from ALL_SHEET_STAFF if available
-      const sheetStaff = ALL_SHEET_STAFF.find(r => {
-        const name = (r.Name || '').trim();
-        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-        return id === staffId;
-      });
-      return {
-        name: fabStaff.name,
-        initials: fabStaff.init || fabStaff.name.substring(0, 2).toUpperCase(),
-        colour: (sheetStaff && sheetStaff.Colour) || fabStaff.col || '#64748b'
-      };
-    }
-  }
+  // Strip timestamp suffix (pattern: _ followed by 10+ digits)
+  const baseId = staffId.replace(/_\d{10,}$/, '');
 
-  // Fall back to ALL_SHEET_STAFF
+  // Try to find in ALL_SHEET_STAFF by matching the base ID
   const sheetStaff = ALL_SHEET_STAFF.find(r => {
     const name = (r.Name || '').trim();
-    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-    return id === staffId;
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    return id === baseId || id.endsWith('_' + baseId) || baseId.endsWith('_' + id);
   });
 
   if (sheetStaff) {
     const name = (sheetStaff.Name || '').trim();
     const initials = (sheetStaff.Initials || '').trim() || name.substring(0, 2).toUpperCase();
+    const colour = (sheetStaff.Colour || '').trim() || '#64748b';
+    return { name, initials, colour, staffId };
+  }
+
+  // Fall back to staffColours from FAB data if available
+  if (FAB_DATA && FAB_DATA.staffColours) {
+    const colour = FAB_DATA.staffColours[staffId] || FAB_DATA.staffColours[baseId] || '#64748b';
     return {
-      name,
-      initials,
-      colour: (sheetStaff.Colour || '').trim() || '#64748b'
+      name: baseId,
+      initials: baseId.substring(0, 2).toUpperCase(),
+      colour,
+      staffId
     };
   }
 
   // Ultimate fallback
   return {
-    name: staffId,
-    initials: staffId.substring(0, 2).toUpperCase(),
-    colour: '#64748b'
+    name: baseId,
+    initials: baseId.substring(0, 2).toUpperCase(),
+    colour: '#64748b',
+    staffId
   };
 }
 
@@ -1706,14 +1703,20 @@ function renderBody() {
           // FAB duties for FAB row
           let fabHtml = '';
           if (row.id === 'fab' && FAB_DATA) {
-            const fabDuties = getFABDuties(wk, YEAR_GROUP, di, dk);
+            const fabDuties = getFABDuties(YEAR_GROUP, di, dk);
             if (view !== 'master') {
               // Staff view: show only this person's FAB duty
               const staffMember = STAFF.find(s => s.id === view);
-              const staffId = staffMember ? staffMember.id : null;
-              const myFab = fabDuties.find(d => d.staffId === staffId);
-              if (myFab) {
-                fabHtml = renderFABChip(myFab, dk);
+              if (staffMember) {
+                // Match by comparing base IDs (strip timestamp suffix from FAB IDs)
+                const myBaseId = staffMember.id.replace(/_\d+$/, '');
+                const myFab = fabDuties.find(d => {
+                  const dBaseId = d.staffId.replace(/_\d{10,}$/, '');
+                  return dBaseId === myBaseId || d.staffId === staffMember.id;
+                });
+                if (myFab) {
+                  fabHtml = renderFABChip(myFab, dk);
+                }
               }
             } else {
               // Master view: show all FAB duties for this year group
@@ -2844,7 +2847,10 @@ async function init() {
 
     // FAB data (from FAB tool sync endpoint)
     if (fabDataRaw && fabDataRaw.state && fabDataRaw.state.slots) {
-      FAB_DATA = fabDataRaw.state.slots;
+      FAB_DATA = {
+        ...fabDataRaw.state.slots,
+        staffColours: fabDataRaw.staffColours || {}
+      };
       // Also get FAB staff list for ID→initials mapping
       if (fabDataRaw.staff) {
         FAB_STAFF = fabDataRaw.staff;
