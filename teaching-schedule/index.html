@@ -1274,9 +1274,9 @@ function staffBelongsToYearGroup(fabStaffId, yearGroup, supplyYg = null) {
 // Map cover-plan sessions to teaching-schedule row IDs
 const COVER_SESSION_MAP = {
   'Before School': { start: 'reg-am', end: 'reg-am' },
-  'AM': { start: 's1', end: 'fab' },           // AM session ends before FAB
+  'AM': { start: 's1', end: 's2' },              // Morning teaching: Session 1 + Session 2
   'Lunch': { start: 'lunch', end: 'lunch' },
-  'PM': { start: 's3', end: 's3' },             // PM session
+  'PM': { start: 's3', end: 's3' },              // Afternoon teaching: Session 3
   'After School': { start: 'after', end: 'after' }
 };
 
@@ -1292,14 +1292,16 @@ function getCoverPlanStaffOut(weekIdx, dayIdx, staffId) {
     const sessionMap = COVER_SESSION_MAP[slot.session];
     if (!sessionMap) return null;
 
-    // Look up staff colour
+    // Look up staff colour and initials
     const staffInfo = COVER_STAFF_LOOKUP[slot.tid] || {};
     const colour = staffInfo.col || '#475569';
+    const initials = staffInfo.initials || '';
+    const label = initials ? `${initials} ${slot.reason || 'Out'}` : (slot.reason || 'Out');
 
     return {
       start: sessionMap.start,
       end: sessionMap.end,
-      label: slot.reason || 'Out',
+      label: label,
       cover: slot.cover || null,
       colour: colour,
       source: 'cover-plan'
@@ -1339,11 +1341,13 @@ function getCoverPlanStaffOutForView(weekIdx, dayIdx, viewId, yearGroup) {
 
       const staffInfo = COVER_STAFF_LOOKUP[slot.tid] || {};
       const colour = staffInfo.col || '#475569';
+      const initials = staffInfo.initials || '';
+      const label = initials ? `${initials} ${slot.reason || 'Out'}` : (slot.reason || 'Out');
 
       return {
         start: sessionMap.start,
         end: sessionMap.end,
-        label: slot.reason || 'Out',
+        label: label,
         cover: slot.cover || null,
         colour: colour,
         source: 'cover-plan',
@@ -1846,6 +1850,8 @@ function renderBody() {
 
         const staffInfo = COVER_STAFF_LOOKUP[slot.tid] || {};
         const colour = staffInfo.col || '#475569';
+        const initials = staffInfo.initials || '';
+        const label = initials ? `${initials} ${slot.reason || 'Out'}` : (slot.reason || 'Out');
 
         ROWS.forEach((row, ri) => {
           if (ri >= startIdx && ri <= endIdx) {
@@ -1853,11 +1859,11 @@ function renderBody() {
             if (!staffOutMap[key]) staffOutMap[key] = [];
             // Avoid duplicates - check if this span already exists
             const exists = staffOutMap[key].some(s =>
-              s.source === 'cover-plan' && s.label === (slot.reason || 'Out') && s.staffId === slot.tid
+              s.source === 'cover-plan' && s.staffId === slot.tid
             );
             if (!exists) {
               staffOutMap[key].push({
-                label: slot.reason || 'Out',
+                label: label,
                 cover: slot.cover || '',
                 colour: colour,
                 isFirst: ri === startIdx,
@@ -3097,8 +3103,10 @@ async function init() {
         const name = (r.Name || '').trim();
         if (!name) return;
         const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+        const initials = (r.Initials || '').trim() || name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 3);
         COVER_STAFF_LOOKUP[id] = {
           name: name,
+          initials: initials,
           yg: (r.YearGroup || '').trim(),
           col: (r.Colour || '').trim() || '#475569'
         };
