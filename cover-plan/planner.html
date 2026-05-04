@@ -88,7 +88,7 @@
     body.present-mode .week-grid th, body.present-mode .week-grid td { font-size:12px; }
     body.present-mode .slot-item { font-size:12px; }
     body.present-mode .slot-name { font-size:12.5px; }
-    .grid-cell { vertical-align:top; padding:5px; border-right:1px solid #d1d5db; border-bottom:1px solid #d1d5db; min-height:56px; min-width:115px; transition:background .1s; }
+    .grid-cell { position:relative; vertical-align:top; padding:5px; border-right:1px solid #d1d5db; border-bottom:1px solid #d1d5db; min-height:56px; min-width:115px; transition:background .1s; }
     .grid-cell.teacher-ready { background:#f8faff; }
     .grid-cell.teacher-over  { background:#dbeafe !important; outline:2px dashed #1798d3; outline-offset:-2px; }
     .grid-cell.slot-over     { background:#eff6ff !important; outline:2px dashed #60a5fa; outline-offset:-2px; }
@@ -101,12 +101,7 @@
     /* Slot items — strip-based design for clear overlapping spans */
     .slot-item { position:relative; margin-bottom:4px; font-size:11px; }
     .slot-item.slot-dragging { opacity:.3; }
-    .slot-strip { position:absolute; left:0; top:0; bottom:-4px; width:4px; border-radius:4px; z-index:1; }
-    .slot-strip.strip-first { border-radius:4px 4px 0 0; }
-    .slot-strip.strip-last { border-radius:0 0 4px 4px; bottom:0; }
-    .slot-strip.strip-only { border-radius:4px; bottom:0; }
-    .slot-strip.strip-mid { border-radius:0; }
-    .slot-content { margin-left:8px; border:1.5px solid #e2e8f0; border-radius:5px; overflow:hidden; background:white; cursor:grab; touch-action:none; }
+    .slot-content { border:1.5px solid #e2e8f0; border-radius:5px; overflow:hidden; background:white; cursor:grab; touch-action:none; }
     .slot-content:active { cursor:grabbing; }
     .slot-hd { display:flex; align-items:center; gap:3px; padding:4px 5px; border-bottom:1px solid rgba(0,0,0,.07); }
     .slot-pip { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
@@ -124,10 +119,12 @@
     .nocover-slot .slot-hd { background:#f8fafc !important; }
     .nocover-slot .slot-name { color:#475569 !important; }
 
-    /* Continuation cells (show just the strip extending) */
-    .slot-continue-cell { position:relative; min-height:24px; }
-    .slot-continue-strip { position:absolute; left:5px; top:0; bottom:0; width:4px; border-radius:0; }
-    .slot-continue-strip.strip-last { border-radius:0 0 4px 4px; }
+    /* Strips at cell level for proper overlapping */
+    .slot-strip { position:absolute; top:0; width:4px; border-radius:4px; z-index:1; pointer-events:none; }
+    .slot-strip.strip-first { border-radius:4px 4px 0 0; }
+    .slot-strip.strip-last { border-radius:0 0 4px 4px; bottom:0; }
+    .slot-strip.strip-only { border-radius:4px; bottom:0; }
+    .slot-strip.strip-mid { border-radius:0; }
 
     /* Session span indicators */
     .slot-span-badge { font-size:8px; background:#e2e8f0; color:#475569; padding:1px 4px; border-radius:3px; margin-left:4px; }
@@ -970,12 +967,12 @@ function renderGrid() {
       const slotIndices = new Map();
       cellSlots.forEach((s, idx) => slotIndices.set(s.id, idx));
 
+      // Render strips first at cell level (absolute positioned, side by side)
       cellSlots.forEach(s => {
         const t = teacher(s.tid);
         const yg = t?.yg || null;
-        const draggingThis = state.dragging?.type === 'slot' && state.dragging.slotId === s.id;
         const slotIdx = slotIndices.get(s.id) || 0;
-        const leftOffset = slotIdx * 5; // 5px offset per overlapping slot
+        const leftPos = slotIdx * 5 + 2; // 5px offset per slot, 2px padding
 
         // Determine span position
         const startIdx = SESSION_IDX[s.session] ?? 0;
@@ -986,15 +983,38 @@ function renderGrid() {
         const hasSpan = endIdx > startIdx;
 
         // Strip classes
-        let stripCls = '';
+        let stripCls = 'slot-strip';
         if (hasSpan) {
-          if (isFirst && isLast) stripCls = 'strip-only';
-          else if (isFirst) stripCls = 'strip-first';
-          else if (isLast) stripCls = 'strip-last';
-          else stripCls = 'strip-mid';
+          if (isFirst && isLast) stripCls += ' strip-only';
+          else if (isFirst) stripCls += ' strip-first';
+          else if (isLast) stripCls += ' strip-last';
+          else stripCls += ' strip-mid';
         } else {
-          stripCls = 'strip-only';
+          stripCls += ' strip-only';
         }
+
+        // Only first cell of span gets bottom:-4px to extend to next row
+        const bottomStyle = isFirst && !isLast ? 'bottom:-4px;' : (isLast || !hasSpan ? 'bottom:0;' : '');
+
+        const col = ygCol(yg);
+        html += `<div class="${stripCls}" style="left:${leftPos}px;${bottomStyle}background:${col}"></div>`;
+      });
+
+      // Then render slot content items
+      cellSlots.forEach(s => {
+        const t = teacher(s.tid);
+        const yg = t?.yg || null;
+        const draggingThis = state.dragging?.type === 'slot' && state.dragging.slotId === s.id;
+        const slotIdx = slotIndices.get(s.id) || 0;
+        const leftOffset = (cellSlots.length * 5) + 6; // Make room for all strips
+
+        // Determine span position
+        const startIdx = SESSION_IDX[s.session] ?? 0;
+        const endIdx = SESSION_IDX[s.endSession ?? s.session] ?? startIdx;
+        const currentIdx = SESSION_IDX[session] ?? 0;
+        const isFirst = currentIdx === startIdx;
+        const isLast = currentIdx === endIdx;
+        const hasSpan = endIdx > startIdx;
 
         const col = ygCol(yg);
         const cv = coverByName(s.cover);
@@ -1025,7 +1045,6 @@ function renderGrid() {
 
           html += `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''} ${draggingThis?'slot-dragging':''} ${isLast?'is-last':''}"
             style="margin-left:${leftOffset}px">
-            <div class="slot-strip ${stripCls}" style="background:${col};left:${-leftOffset - 4}px"></div>
             <div class="slot-content" onpointerdown="onSlotPointerDown(event,${s.id})">
               <div class="slot-hd">
                 <div class="slot-pip ${pipCls(yg)}"></div>
@@ -1041,12 +1060,8 @@ function renderGrid() {
               <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
             </div>
           </div>`;
-        } else {
-          // Continuation session - just show the strip extending down
-          html += `<div class="slot-continue-cell" style="margin-left:${leftOffset}px">
-            <div class="slot-continue-strip ${stripCls}" style="background:${col};left:${-leftOffset + 1}px"></div>
-          </div>`;
         }
+        // Continuation cells only have strips (rendered above), no content
       });
 
       if (cellSlots.length === 0 && wsEventMatches.length === 0 && !cellNote) {
