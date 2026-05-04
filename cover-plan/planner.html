@@ -1131,10 +1131,11 @@ function positionSpanStrips(spans) {
     const gap = 3; // gap between slot items
 
     // Calculate left position: base + (index * (width + gap)) + event offset if needed
+    // Event offset = difference between slots-row left with event (25px) and without (5px) = 20px
     const firstSession = SESSIONS[startIdx];
     const firstRowHasEvent = wsEvents.some(e => e.day === s.day && e.session === firstSession) ||
                               getSessionInfoEvents(state.weekIdx, s.day, firstSession).length > 0;
-    const eventOffset = (!firstRowHasEvent && anyCellHasEvent) ? 25 : 0;
+    const eventOffset = (!firstRowHasEvent && anyCellHasEvent) ? 20 : 0;
 
     // Use the first cell's left as base, then add offset for maxSlotIndex
     const baseLeft = baseSlotItemRect.left - containerRect.left + eventOffset;
