@@ -94,7 +94,8 @@
     .srow-before, .srow-after { height:40px; }
     .srow-lunch { height:50px; }
     .srow-am, .srow-pm { height:250px; }
-    .grid-cell { vertical-align:top; padding:5px; border-right:1px solid #d1d5db; border-bottom:1px solid #d1d5db; min-width:115px; transition:background .1s; }
+    .grid-cell { vertical-align:top; padding:5px; border-right:1px solid #d1d5db; border-bottom:1px solid #d1d5db; min-width:115px; transition:background .1s; position:relative; }
+    .slots-row { position:absolute; top:5px; bottom:5px; left:5px; right:5px; display:flex; gap:3px; align-items:stretch; }
     .grid-cell.teacher-ready { background:#f8faff; }
     .grid-cell.teacher-over  { background:#dbeafe !important; outline:2px dashed #1798d3; outline-offset:-2px; }
     .grid-cell.slot-over     { background:#eff6ff !important; outline:2px dashed #60a5fa; outline-offset:-2px; }
@@ -106,24 +107,29 @@
 
     /* Slot items — vertical text layout for narrow columns */
     .slots-row { display:flex; gap:3px; align-items:stretch; }
-    .slot-item { position:relative; min-width:24px; font-size:11px; }
+    .slots-row > .slot-item { display:flex; flex-direction:column; width:32px; flex-shrink:0; }
+    .slots-row > .slot-item > .slot-content { flex:1; width:32px; }
+    .span-strips .slot-item { min-width:32px; width:32px; }
+    .span-strips .slot-content { height:100%; width:32px; }
+    .slot-item { position:relative; min-width:32px; font-size:12px; }
     .slot-item.slot-dragging { opacity:.3; }
     .slot-strip { display:none; } /* No longer used - color is now on content border-left */
-    .slot-content { position:relative; z-index:2; border:1.5px solid #e2e8f0; border-left-width:4px; border-left-style:solid; border-radius:4px; overflow:visible; background:white; cursor:grab; touch-action:none; user-select:none; min-height:50px; display:flex; flex-direction:column; }
+    .slot-content { position:relative; z-index:2; border:1.5px solid #e2e8f0; border-left-width:4px; border-left-style:solid; border-radius:4px; overflow:hidden; background:white; cursor:grab; touch-action:none; user-select:none; min-height:50px; display:flex; flex-direction:column; }
     .slot-content:active { cursor:grabbing; }
-    .slot-text { writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg); padding:6px 4px; flex:1; display:flex; flex-direction:column; gap:3px; align-items:flex-start; }
-    .slot-name { font-weight:bold; color:#111; font-size:11px; white-space:nowrap; }
-    .slot-reason { font-size:9px; color:#64748b; white-space:nowrap; }
+    .slot-text { writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg); padding:6px 3px; flex:1; white-space:nowrap; overflow:hidden; text-align:center; }
+    .slot-text > * { display:inline; }
+    .slot-gap { display:inline-block; height:12px; }
+    .slot-name { font-weight:700; color:#111; font-size:13px; white-space:nowrap; }
+    .slot-reason { font-size:11px; color:#64748b; white-space:nowrap; }
+    .slot-cover-name { font-size:11px; color:#166534; font-weight:700; white-space:nowrap; }
+    .slot-cover-x { font-size:11px; color:#94a3b8; cursor:pointer; margin-left:3px; }
+    .slot-cover-x:hover { color:#dc2626; }
+    .slot-avatar { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; color:white; font-size:6px; font-weight:bold; vertical-align:middle; margin-right:4px; }
     .slot-controls { display:flex; flex-direction:column; gap:2px; padding:3px 2px; border-top:1px solid rgba(0,0,0,.07); }
-    .slot-del { background:none; border:none; cursor:pointer; color:#cbd5e1; font-size:12px; line-height:1; padding:1px; border-radius:2px; }
-    .slot-del:hover { color:#dc2626; background:#fee2e2; }
-    .slot-reason-sel { font-size:9px; font-weight:bold; border:none; border-radius:3px; padding:1px 2px; cursor:pointer; max-width:80px; appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0l3 4 3-4z' fill='currentColor' opacity='.5'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 2px center; padding-right:10px; }
-    .slot-cover-zone { padding:3px; font-size:8px; color:#94a3b8; border-top:1px dashed #e2e8f0; text-align:center; cursor:default; }
+    .slot-del { position:absolute; top:2px; right:2px; background:white; border:1px solid #e2e8f0; border-radius:2px; cursor:pointer; color:#cbd5e1; font-size:10px; width:14px; height:14px; display:flex; align-items:center; justify-content:center; z-index:10; }
+    .slot-del:hover { color:#dc2626; border-color:#dc2626; }
+    .slot-cover-zone { padding:3px; font-size:8px; color:#94a3b8; text-align:center; cursor:default; border-top:1px dashed #e2e8f0; }
     .slot-cover-zone.over { border-color:#1798d3 !important; background:#bfdbfe !important; }
-    .slot-cover-assigned { padding:3px; font-size:8px; font-weight:bold; color:#166534; background:#f0fdf4; border-top:1px solid #86efac; text-align:center; }
-    .slot-cover-assigned .cv-x { background:none; border:none; cursor:pointer; color:#94a3b8; font-size:10px; padding:0; display:block; margin-top:2px; }
-    .slot-cover-assigned .cv-x:hover { color:#dc2626; }
-    .cv-mini-avatar { width:14px; height:14px; border-radius:50%; color:white; display:inline-flex; align-items:center; justify-content:center; font-size:6px; font-weight:bold; vertical-align:middle; margin-right:2px; }
     .nocover-slot .slot-content { border-color:#cbd5e1 !important; background:#f8fafc; }
 
     /* Extend handle - positioned at bottom of content */
@@ -262,8 +268,8 @@
 </head>
 <body>
 
-<!-- Version marker: 🔴 red triangle (border-left color) -->
-<div style="position:fixed;top:5px;right:5px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid #ef4444;z-index:9999;" title="v70fb1b0"></div>
+<!-- Version marker: 🔴 red circle (text-align center) -->
+<div style="position:fixed;top:5px;right:5px;width:10px;height:10px;background:#ef4444;border-radius:50%;z-index:9999;" title="v-red-circle"></div>
 
 <div class="header-strip"></div>
 <header>
@@ -984,26 +990,17 @@ function renderGrid() {
               html += `<div class="slot-item ${sygCls(yg)}" style="visibility:hidden;"></div>`;
             } else {
               // Single-session slot: render in-cell
-              const reasonOptionsHtml = reasonOptions(s.tid, s.reason);
-              const coverHtml = s.nocover
-                ? ''
-                : s.cover
-                  ? `<div class="slot-cover-assigned" style="background:${col};color:${contrastColor(col)};border-color:${col}">
-                       <span class="cv-mini-avatar" style="background:${cv?.col||'#94a3b8'};color:${contrastColor(cv?.col||'#94a3b8')}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</span>${s.cover}
-                       <button class="cv-x" onclick="unassignCover(${s.id});event.stopPropagation()">✕</button>
-                     </div>`
-                  : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`;
-
+              const cv = coverByName(s.cover);
               html += `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''} ${draggingThis?'slot-dragging':''}">
                 <div class="slot-content" style="border-left-color:${col}" onpointerdown="onSlotPointerDown(event,${s.id})">
+                  <button class="slot-del" onclick="removeSlot(${s.id});event.stopPropagation()" title="Delete bar">✕</button>
                   <div class="slot-text">
+                    ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</span> ${s.cover} <span class="slot-cover-x" onclick="unassignCover(${s.id});event.stopPropagation()">✕</span></span><span class="slot-gap"></span>` : ''}
+                    <span class="slot-reason">${s.reason}</span>
+                    <span class="slot-gap"></span>
                     <span class="slot-name">${t ? t.name : s.tid}</span>
-                    <select class="slot-reason-sel" onclick="event.stopPropagation()" onchange="changeReason(${s.id},this.value)">${reasonOptionsHtml}</select>
                   </div>
-                  <div class="slot-controls">
-                    <button class="slot-del" onclick="removeSlot(${s.id});event.stopPropagation()">✕</button>
-                  </div>
-                  ${coverHtml}
+                  ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
                   <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
                 </div>
               </div>`;
@@ -1091,30 +1088,16 @@ function positionSpanStrips(spans) {
 
     console.log('Creating overlay slot at left:', left, 'top:', top, 'height:', height, 'width:', width);
 
-    // Build the full slot content for the overlay
-    const reasonOptionsHtml = reasonOptions(s.tid, s.reason);
-    const coverHtml = s.nocover
-      ? ''
-      : s.cover
-        ? `<div class="slot-cover-assigned" style="background:${col};color:${contrastColor(col)};border-color:${col}">
-             <span class="cv-mini-avatar" style="background:${cv?.col||'#94a3b8'};color:${contrastColor(cv?.col||'#94a3b8')}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</span>${s.cover}
-             <button class="cv-x" onclick="unassignCover(${s.id});event.stopPropagation()">✕</button>
-           </div>`
-        : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`;
-
-    const endIndicator = `<span class="slot-reason">→ ${s.endSession}</span>`;
-
     const slotHtml = `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''}" style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;">
       <div class="slot-content" style="height:${height}px;border-left-color:${col}" onpointerdown="onSlotPointerDown(event,${s.id})">
+        <button class="slot-del" onclick="removeSlot(${s.id});event.stopPropagation()" title="Delete bar">✕</button>
         <div class="slot-text">
+          ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</span> ${s.cover} <span class="slot-cover-x" onclick="unassignCover(${s.id});event.stopPropagation()">✕</span></span><span class="slot-gap"></span>` : ''}
+          <span class="slot-reason">${s.reason}</span>
+          <span class="slot-gap"></span>
           <span class="slot-name">${t ? t.name : s.tid}</span>
-          <select class="slot-reason-sel" onclick="event.stopPropagation()" onchange="changeReason(${s.id},this.value)">${reasonOptionsHtml}</select>
-          ${endIndicator}
         </div>
-        <div class="slot-controls">
-          <button class="slot-del" onclick="removeSlot(${s.id});event.stopPropagation()">✕</button>
-        </div>
-        ${coverHtml}
+        ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
         <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
       </div>
     </div>`;
