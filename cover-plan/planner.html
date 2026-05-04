@@ -618,7 +618,8 @@ async function init() {
   document.getElementById('centerPane').innerHTML=
     '<div style="padding:60px;text-align:center;color:#94a3b8;font-size:14px">Loading from Google Sheets…</div>';
   try {
-    const get=tab=>fetch(SHEET_BASE+encodeURIComponent(tab)).then(r=>{if(!r.ok)throw new Error(tab);return r.text();});
+    const cacheBuster = `&_cb=${Date.now()}`;
+    const get=tab=>fetch(SHEET_BASE+encodeURIComponent(tab)+cacheBuster).then(r=>{if(!r.ok)throw new Error(tab);return r.text();});
     const [staffTxt,termsTxt,eventsTxt,wseTxt,recTxt]=await Promise.all([
       get('Staff'),get('TermDates'),get('CalendarEvents'),get('EventsMeetings'),get('RecurringCover')
     ]);
