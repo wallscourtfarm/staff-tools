@@ -88,7 +88,7 @@
     body.present-mode .week-grid th, body.present-mode .week-grid td { font-size:12px; }
     body.present-mode .slot-item { font-size:12px; }
     body.present-mode .slot-name { font-size:12.5px; }
-    .grid-cell { position:relative; vertical-align:top; padding:5px; border-right:1px solid #d1d5db; border-bottom:1px solid #d1d5db; min-height:56px; min-width:115px; transition:background .1s; }
+    .grid-cell { vertical-align:top; padding:5px; border-right:1px solid #d1d5db; border-bottom:1px solid #d1d5db; min-height:56px; min-width:115px; transition:background .1s; }
     .grid-cell.teacher-ready { background:#f8faff; }
     .grid-cell.teacher-over  { background:#dbeafe !important; outline:2px dashed #1798d3; outline-offset:-2px; }
     .grid-cell.slot-over     { background:#eff6ff !important; outline:2px dashed #60a5fa; outline-offset:-2px; }
@@ -98,10 +98,16 @@
     .empty-hint { display:flex; align-items:center; justify-content:center; min-height:40px; color:#e2e8f0; font-size:20px; border-radius:4px; border:1.5px dashed transparent; transition:all .1s; }
     .grid-cell.teacher-over .empty-hint,.grid-cell.slot-over .empty-hint { color:#1798d3; border-color:#1798d3; }
 
-    /* Slot items — strip-based design for clear overlapping spans */
-    .slot-item { position:relative; margin-bottom:4px; font-size:11px; }
+    /* Slot items — horizontal layout for multiple people in same cell */
+    .slots-row { display:flex; gap:4px; align-items:stretch; }
+    .slot-item { position:relative; flex:1; min-width:0; font-size:11px; }
     .slot-item.slot-dragging { opacity:.3; }
-    .slot-content { position:relative; z-index:2; border:1.5px solid #e2e8f0; border-radius:5px; overflow:hidden; background:white; cursor:grab; touch-action:none; user-select:none; }
+    .slot-strip { position:absolute; left:0; top:0; bottom:0; width:4px; border-radius:4px; z-index:1; pointer-events:none; }
+    .slot-strip.strip-first { border-radius:4px 4px 0 0; }
+    .slot-strip.strip-last { border-radius:0 0 4px 4px; }
+    .slot-strip.strip-only { border-radius:4px; }
+    .slot-strip.strip-mid { border-radius:0; }
+    .slot-content { position:relative; z-index:2; margin-left:5px; border:1.5px solid #e2e8f0; border-radius:5px; overflow:hidden; background:white; cursor:grab; touch-action:none; user-select:none; }
     .slot-content:active { cursor:grabbing; }
     .slot-hd { display:flex; align-items:center; gap:3px; padding:4px 5px; border-bottom:1px solid rgba(0,0,0,.07); }
     .slot-pip { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
@@ -118,13 +124,6 @@
     .nocover-slot .slot-content { border-color:#cbd5e1 !important; }
     .nocover-slot .slot-hd { background:#f8fafc !important; }
     .nocover-slot .slot-name { color:#475569 !important; }
-
-    /* Strips at cell level for proper overlapping */
-    .slot-strip { position:absolute; top:0; width:4px; border-radius:4px; z-index:0; pointer-events:none; }
-    .slot-strip.strip-first { border-radius:4px 4px 0 0; }
-    .slot-strip.strip-last { border-radius:0 0 4px 4px; bottom:0; }
-    .slot-strip.strip-only { border-radius:4px; bottom:0; }
-    .slot-strip.strip-mid { border-radius:0; }
 
     /* Session span indicators */
     .slot-span-badge { font-size:8px; background:#e2e8f0; color:#475569; padding:1px 4px; border-radius:3px; margin-left:4px; }
@@ -963,101 +962,86 @@ function renderGrid() {
         </div>`;
       }
 
-      // Calculate slot indices for horizontal offset (to show overlapping spans)
-      const slotIndices = new Map();
-      cellSlots.forEach((s, idx) => slotIndices.set(s.id, idx));
+      // Horizontal layout: slots side by side
+      if (cellSlots.length > 0) {
+        html += `<div class="slots-row">`;
+        cellSlots.forEach(s => {
+          const t = teacher(s.tid);
+          const yg = t?.yg || null;
+          const draggingThis = state.dragging?.type === 'slot' && state.dragging.slotId === s.id;
 
-      // Render strips first at cell level (absolute positioned, side by side)
-      cellSlots.forEach(s => {
-        const t = teacher(s.tid);
-        const yg = t?.yg || null;
-        const slotIdx = slotIndices.get(s.id) || 0;
-        const leftPos = slotIdx * 5 + 2; // 5px offset per slot, 2px padding
+          // Determine span position
+          const startIdx = SESSION_IDX[s.session] ?? 0;
+          const endIdx = SESSION_IDX[s.endSession ?? s.session] ?? startIdx;
+          const currentIdx = SESSION_IDX[session] ?? 0;
+          const isFirst = currentIdx === startIdx;
+          const isLast = currentIdx === endIdx;
+          const hasSpan = endIdx > startIdx;
 
-        // Determine span position
-        const startIdx = SESSION_IDX[s.session] ?? 0;
-        const endIdx = SESSION_IDX[s.endSession ?? s.session] ?? startIdx;
-        const currentIdx = SESSION_IDX[session] ?? 0;
-        const isFirst = currentIdx === startIdx;
-        const isLast = currentIdx === endIdx;
-        const hasSpan = endIdx > startIdx;
+          // Strip classes
+          let stripCls = 'slot-strip';
+          if (hasSpan) {
+            if (isFirst && isLast) stripCls += ' strip-only';
+            else if (isFirst) stripCls += ' strip-first';
+            else if (isLast) stripCls += ' strip-last';
+            else stripCls += ' strip-mid';
+          } else {
+            stripCls += ' strip-only';
+          }
 
-        // Strip classes
-        let stripCls = 'slot-strip';
-        if (hasSpan) {
-          if (isFirst && isLast) stripCls += ' strip-only';
-          else if (isFirst) stripCls += ' strip-first';
-          else if (isLast) stripCls += ' strip-last';
-          else stripCls += ' strip-mid';
-        } else {
-          stripCls += ' strip-only';
-        }
+          const col = ygCol(yg);
+          const cv = coverByName(s.cover);
 
-        // Only first cell of span gets bottom:-4px to extend to next row
-        const bottomStyle = isFirst && !isLast ? 'bottom:-4px;' : (isLast || !hasSpan ? 'bottom:0;' : '');
+          // Full UI only in first session of span
+          if (isFirst) {
+            const coverHtml = s.nocover
+              ? ''
+              : s.cover
+                ? `<div class="slot-cover-assigned" style="background:${col};color:${contrastColor(col)};border-color:${col}">
+                     <div class="cv-mini-avatar" style="background:${cv?.col||'#94a3b8'};color:${contrastColor(cv?.col||'#94a3b8')}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</div>
+                     ${s.cover}<button class="cv-x" onclick="unassignCover(${s.id})">×</button>
+                   </div>`
+                : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`;
 
-        const col = ygCol(yg);
-        html += `<div class="${stripCls}" style="left:${leftPos}px;${bottomStyle}background:${col}"></div>`;
-      });
+            const noteHtml = s.reason === 'Other'
+              ? `<input class="reason-note" type="text" placeholder="specify…" value="${(s.reasonNote||'').replace(/"/g,'&quot;')}"
+                   onclick="event.stopPropagation()"
+                   onchange="changeReasonNote(${s.id},this.value)">`
+              : '';
 
-      // Then render slot content items
-      cellSlots.forEach(s => {
-        const t = teacher(s.tid);
-        const yg = t?.yg || null;
-        const draggingThis = state.dragging?.type === 'slot' && state.dragging.slotId === s.id;
-        const slotIdx = slotIndices.get(s.id) || 0;
-        const leftOffset = (cellSlots.length * 5) + 6; // Make room for all strips
+            // End session selector (only show if span > 1 session)
+            const endSelHtml = hasSpan
+              ? `<select class="end-sel" onchange="changeEndSession(${s.id},this.value)" onclick="event.stopPropagation()">
+                  ${SESSIONS.map((sess, i) => `<option value="${sess}" ${(SESSION_IDX[sess] ?? i) === endIdx ? 'selected' : ''}>→ ${sess}</option>`).join('')}
+                </select>`
+              : '';
 
-        // Determine span position
-        const startIdx = SESSION_IDX[s.session] ?? 0;
-        const endIdx = SESSION_IDX[s.endSession ?? s.session] ?? startIdx;
-        const currentIdx = SESSION_IDX[session] ?? 0;
-        const isFirst = currentIdx === startIdx;
-        const isLast = currentIdx === endIdx;
-        const hasSpan = endIdx > startIdx;
-
-        const col = ygCol(yg);
-        const cv = coverByName(s.cover);
-
-        // Full UI only in first session of span
-        if (isFirst) {
-          const coverHtml = s.nocover
-            ? ''
-            : s.cover
-              ? `<div class="slot-cover-assigned" style="background:${col};color:${contrastColor(col)};border-color:${col}">
-                   <div class="cv-mini-avatar" style="background:${cv?.col||'#94a3b8'};color:${contrastColor(cv?.col||'#94a3b8')}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</div>
-                   ${s.cover}<button class="cv-x" onclick="unassignCover(${s.id})">×</button>
-                 </div>`
-              : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`;
-
-          const noteHtml = s.reason === 'Other'
-            ? `<input class="reason-note" type="text" placeholder="specify…" value="${(s.reasonNote||'').replace(/"/g,'&quot;')}"
-                 onclick="event.stopPropagation()"
-                 onchange="changeReasonNote(${s.id},this.value)">`
-            : '';
-
-          // End session selector (only show if span > 1 session)
-          const endSelHtml = hasSpan
-            ? `<select class="end-sel" onchange="changeEndSession(${s.id},this.value)" onclick="event.stopPropagation()">
-                ${SESSIONS.map((sess, i) => `<option value="${sess}" ${(SESSION_IDX[sess] ?? i) === endIdx ? 'selected' : ''}>→ ${sess}</option>`).join('')}
-              </select>`
-            : '';
-
-          html += `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''} ${draggingThis?'slot-dragging':''} ${isLast?'is-last':''}"
-            style="margin-left:${leftOffset}px">
-            <div class="slot-content" onpointerdown="onSlotPointerDown(event,${s.id})">
-              <div class="slot-hd">
-                <div class="slot-pip ${pipCls(yg)}"></div>
-                <span class="slot-name">${t ? t.name : s.tid}</span>
-                <select class="reason-sel ${rbCls(s.reason)}" onchange="changeReason(${s.id},this.value)" onclick="event.stopPropagation()">
-                  ${reasonOptions(s.tid, s.reason)}
-                </select>
-                ${endSelHtml}
-                <button class="slot-del" onclick="removeSlot(${s.id})">×</button>
+            html += `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''} ${draggingThis?'slot-dragging':''} ${isLast?'is-last':''}">
+              <div class="${stripCls}" style="background:${col}"></div>
+              <div class="slot-content" onpointerdown="onSlotPointerDown(event,${s.id})">
+                <div class="slot-hd">
+                  <div class="slot-pip ${pipCls(yg)}"></div>
+                  <span class="slot-name">${t ? t.name : s.tid}</span>
+                  <select class="reason-sel ${rbCls(s.reason)}" onchange="changeReason(${s.id},this.value)" onclick="event.stopPropagation()">
+                    ${reasonOptions(s.tid, s.reason)}
+                  </select>
+                  ${endSelHtml}
+                  <button class="slot-del" onclick="removeSlot(${s.id})">×</button>
+                </div>
+                ${noteHtml ? `<div style="padding:2px 5px 4px">${noteHtml}</div>` : ''}
+                ${coverHtml}
+                <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
               </div>
-              ${noteHtml ? `<div style="padding:2px 5px 4px">${noteHtml}</div>` : ''}
-              ${coverHtml}
-              <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
+            </div>`;
+          } else {
+            // Continuation cell - just show strip extending down
+            html += `<div class="slot-item ${sygCls(yg)}">
+              <div class="${stripCls}" style="background:${col}"></div>
+            </div>`;
+          }
+        });
+        html += `</div>`;
+      }
             </div>
           </div>`;
         }
