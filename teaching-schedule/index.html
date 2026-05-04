@@ -489,6 +489,13 @@ const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
 const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbwlNv08Z0cFSgKq_1zcrQw9I2I9ewg8Stj6kcQjSZaBm_uscbIC0V225ez6mVvg75sVfQ/exec';
 const EXCEPTIONS_URL = 'https://script.google.com/macros/s/AKfycbwRTXlq_kqfstCk_lF6qVdoBBZeXdlWV2Gvja1d0H3rYEyCZvPPi2XNhCp3spOsXn3W/exec';
+const FAB_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
+
+// FAB zone definitions (must match FAB tool)
+const FAB_GROUPS = {
+  lower: { id: 'lower', zones: null },           // Y1, Y2, Y3
+  upper: { id: 'upper', zones: ['MUGA','Garden Room (+Bell)','Hard Standing','Trim Trail'] }  // Y4, Y5, Y6
+};
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const DAY_SHORT = ['Mon','Tue','Wed','Thu','Fri'];
@@ -649,7 +656,10 @@ let SHEET_SUBJECT_GROUPS = [];
 let SHEET_INTERVENTIONS = [];
 let SHEET_DAY_STRUCTURES = [];
 let TP_ACTIVITIES = [];
-let ACTIVITY_EXCEPTIONS = []; // { date, staff, activity, session }
+let ACTIVITY_EXCEPTIONS = []; // { date, staff, activity, session, type? }
+let FAB_DATA = null; // { weekKey: { lower: [[...]], upper: [[...]] } } - zones x days
+let FAB_STAFF = []; // [{ id, name, init, col }] - staff from FAB tool for ID→initials mapping
+let FAB_EXCEPTIONS = []; // { date, staffId, zone }
 
 // Flat lookup: name → col
 const SUBJECT_COL = {};
@@ -1073,6 +1083,137 @@ function getStaffColour(staffName) {
   return (staffRow && staffRow.Colour && staffRow.Colour.trim()) || null;
 }
 
+// ── FAB duties helpers ───────────────────────────────────────────────────────
+function yearGroupToFABGroup(yg) {
+  // Map year group to FAB group
+  if (['Reception','Y1','Y2','Y3'].includes(yg)) return 'lower';
+  if (['Y4','Y5','Y6'].includes(yg)) return 'upper';
+  return null;
+}
+
+function getFABDuties(weekKey, yearGroup, dayIndex, dateKey = null) {
+  // Get FAB duties for a specific year group and day
+  // Returns: [{ staffId, staffName, initials, zone, colour }]
+  if (!FAB_DATA || !FAB_DATA[weekKey]) return [];
+
+  const fabGroup = yearGroupToFABGroup(yearGroup);
+  if (!fabGroup) return [];
+
+  const groupData = FAB_DATA[weekKey][fabGroup];
+  if (!groupData) return [];
+
+  // dayIndex: 0=Mon (FAB data uses 0-indexed days)
+  const dayDuties = groupData[dayIndex];
+  if (!dayDuties) return [];
+
+  // Get zones for this group
+  const zones = FAB_GROUPS[fabGroup].zones;
+  const hasZones = zones && zones.length > 0;
+
+  // Flatten duties: for groups without zones, dayDuties is [staffIds]
+  // For groups with zones, dayDuties is [[staffIds per zone]]
+  const duties = [];
+
+  if (hasZones) {
+    // dayDuties is array of zone arrays
+    dayDuties.forEach((zoneStaff, zoneIdx) => {
+      if (!Array.isArray(zoneStaff)) return;
+      zoneStaff.forEach(staffId => {
+        // Check for exception
+        if (dateKey && FAB_EXCEPTIONS.length) {
+          const isExcepted = FAB_EXCEPTIONS.some(exc =>
+            exc.date === dateKey &&
+            exc.staffId === staffId &&
+            exc.zone === zones[zoneIdx]
+          );
+          if (isExcepted) return;
+        }
+
+        // Look up staff info
+        const staffInfo = getFABStaffInfo(staffId);
+        duties.push({
+          staffId,
+          staffName: staffInfo.name,
+          initials: staffInfo.initials,
+          zone: zones[zoneIdx],
+          colour: staffInfo.colour
+        });
+      });
+    });
+  } else {
+    // No zones - dayDuties is flat array of staff IDs
+    if (!Array.isArray(dayDuties)) return [];
+    dayDuties.forEach(staffId => {
+      // Check for exception
+      if (dateKey && FAB_EXCEPTIONS.length) {
+        const isExcepted = FAB_EXCEPTIONS.some(exc =>
+          exc.date === dateKey &&
+          exc.staffId === staffId
+        );
+        if (isExcepted) return;
+      }
+
+      const staffInfo = getFABStaffInfo(staffId);
+      duties.push({
+        staffId,
+        staffName: staffInfo.name,
+        initials: staffInfo.initials,
+        zone: null,
+        colour: staffInfo.colour
+      });
+    });
+  }
+
+  return duties;
+}
+
+function getFABStaffInfo(staffId) {
+  // Get staff info from FAB_STAFF or fall back to ALL_SHEET_STAFF
+  // Priority: FAB_STAFF (has initials), then ALL_SHEET_STAFF
+
+  // Check FAB_STAFF first
+  if (FAB_STAFF && FAB_STAFF.length) {
+    const fabStaff = FAB_STAFF.find(s => s.id === staffId);
+    if (fabStaff) {
+      // Also get colour from ALL_SHEET_STAFF if available
+      const sheetStaff = ALL_SHEET_STAFF.find(r => {
+        const name = (r.Name || '').trim();
+        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+        return id === staffId;
+      });
+      return {
+        name: fabStaff.name,
+        initials: fabStaff.init || fabStaff.name.substring(0, 2).toUpperCase(),
+        colour: (sheetStaff && sheetStaff.Colour) || fabStaff.col || '#64748b'
+      };
+    }
+  }
+
+  // Fall back to ALL_SHEET_STAFF
+  const sheetStaff = ALL_SHEET_STAFF.find(r => {
+    const name = (r.Name || '').trim();
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    return id === staffId;
+  });
+
+  if (sheetStaff) {
+    const name = (sheetStaff.Name || '').trim();
+    const initials = (sheetStaff.Initials || '').trim() || name.substring(0, 2).toUpperCase();
+    return {
+      name,
+      initials,
+      colour: (sheetStaff.Colour || '').trim() || '#64748b'
+    };
+  }
+
+  // Ultimate fallback
+  return {
+    name: staffId,
+    initials: staffId.substring(0, 2).toUpperCase(),
+    colour: '#64748b'
+  };
+}
+
 function getTPActivities(staffName, dayIndex, dateKey = null) {
   // dayIndex: 1=Mon, 2=Tue, ... 5=Fri
   if (!TP_ACTIVITIES.length) return [];
@@ -1137,6 +1278,19 @@ function renderTPActivityChip(activity, staffName = '', dateKey = '') {
     <div class="chip-top">
       <span class="chip-colour" style="background:${activity.colour}"></span>
       <span class="chip-name" style="color:${activity.colour}">${escHtml(displayName)}</span>
+    </div>
+  </div>`;
+}
+
+function renderFABChip(duty, dateKey = '') {
+  // duty: { staffId, staffName, initials, zone, colour }
+  // Display: "IM MUGA" for upper (with zone), "IM" for lower (no zone)
+  const displayText = duty.zone ? `${duty.initials} ${duty.zone}` : duty.initials;
+  return `<div class="cell-chip tp-activity fab-duty" style="background:${duty.colour}20;border:1.5px dashed ${duty.colour}" data-fab-duty="true" data-staff-id="${escAttr(duty.staffId)}" data-date="${escAttr(dateKey)}" data-zone="${escAttr(duty.zone || '')}">
+    <button class="tp-remove fab-remove" title="Remove this instance" data-staff-id="${escAttr(duty.staffId)}" data-date="${escAttr(dateKey)}" data-zone="${escAttr(duty.zone || '')}" onclick="removeFABDuty(this)">×</button>
+    <div class="chip-top">
+      <span class="chip-colour" style="background:${duty.colour}"></span>
+      <span class="chip-name" style="color:${duty.colour}">${escHtml(displayText)}</span>
     </div>
   </div>`;
 }
@@ -1549,7 +1703,24 @@ function renderBody() {
             });
             tpActHtml = allTpActs.map(a => renderTPActivityChip(a, a.staffName, dk)).join('');
           }
-          return `<td class="view-cell">${strips}${soTags}${tpActHtml}<div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div></td>`;
+          // FAB duties for FAB row
+          let fabHtml = '';
+          if (row.id === 'fab' && FAB_DATA) {
+            const fabDuties = getFABDuties(wk, YEAR_GROUP, di, dk);
+            if (view !== 'master') {
+              // Staff view: show only this person's FAB duty
+              const staffMember = STAFF.find(s => s.id === view);
+              const staffId = staffMember ? staffMember.id : null;
+              const myFab = fabDuties.find(d => d.staffId === staffId);
+              if (myFab) {
+                fabHtml = renderFABChip(myFab, dk);
+              }
+            } else {
+              // Master view: show all FAB duties for this year group
+              fabHtml = fabDuties.map(d => renderFABChip(d, dk)).join('');
+            }
+          }
+          return `<td class="view-cell">${strips}${soTags}${tpActHtml}${fabHtml}<div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div></td>`;
         }).join('')}
       </tr>`;
     } else {
@@ -1768,6 +1939,39 @@ async function removeTPActivity(btn) {
       console.log('Exception sync result:', result);
     } catch (err) {
       console.warn('Failed to sync exception to sheet:', err);
+    }
+  }
+
+  renderGrid();
+}
+
+async function removeFABDuty(btn) {
+  const { staffId, date, zone } = btn.dataset;
+  console.log('Removing FAB duty:', { staffId, date, zone });
+  if (!staffId || !date) {
+    console.warn('Missing required data:', { staffId, date });
+    return;
+  }
+
+  // Add to local FAB exceptions immediately
+  FAB_EXCEPTIONS.push({ date, staffId, zone: zone || '' });
+
+  // Sync to sheet as an exception with type='FAB'
+  if (EXCEPTIONS_URL) {
+    try {
+      const params = new URLSearchParams({
+        action: 'addException',
+        date: date,
+        staff: staffId, // Use staffId as staff field
+        activity: 'FAB Duty', // Generic activity name
+        session: zone || '',
+        type: 'FAB'
+      });
+      const response = await fetch(EXCEPTIONS_URL + '?' + params.toString());
+      const result = await response.json();
+      console.log('FAB exception sync result:', result);
+    } catch (err) {
+      console.warn('Failed to sync FAB exception to sheet:', err);
     }
   }
 
@@ -2563,7 +2767,7 @@ async function init() {
   renderGrid();
 
   try {
-    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText, tpActivitiesText, exceptionsData] = await Promise.all([
+    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText, tpActivitiesText, exceptionsData, fabDataRaw] = await Promise.all([
       fetch(SHEET_BASE + encodeURIComponent('TermDates')).then(r => { if (!r.ok) throw new Error('Terms tab not found'); return r.text(); }),
       fetch(SHEET_BASE + encodeURIComponent('CalendarEvents')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('EventsMeetings')).then(r => r.ok ? r.text() : '').catch(() => ''),
@@ -2573,6 +2777,7 @@ async function init() {
       fetch(SHEET_BASE + encodeURIComponent('DayTimings')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('DayActivities')).then(r => r.ok ? r.text() : '').catch(() => ''),
 	      EXCEPTIONS_URL ? fetch(EXCEPTIONS_URL + '?action=exceptions').then(r => r.ok ? r.json() : {exceptions:[]}).then(d => d.exceptions || []).catch(() => []) : Promise.resolve([]),
+      FAB_SYNC_URL ? fetch(FAB_SYNC_URL).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
     ]);
     WEEKS = buildWeeks(csvToObjects(termsText));
     if (eventsText) {
@@ -2636,6 +2841,18 @@ async function init() {
     if (exceptionsData && Array.isArray(exceptionsData)) {
       ACTIVITY_EXCEPTIONS = exceptionsData;
     }
+
+    // FAB data (from FAB tool sync endpoint)
+    if (fabDataRaw && fabDataRaw.state && fabDataRaw.state.slots) {
+      FAB_DATA = fabDataRaw.state.slots;
+      // Also get FAB staff list for ID→initials mapping
+      if (fabDataRaw.staff) {
+        FAB_STAFF = fabDataRaw.staff;
+      }
+    }
+    // Separate FAB exceptions from activity exceptions
+    FAB_EXCEPTIONS = ACTIVITY_EXCEPTIONS.filter(e => e.type === 'FAB');
+    ACTIVITY_EXCEPTIONS = ACTIVITY_EXCEPTIONS.filter(e => !e.type || e.type === 'DayActivity');
 
     migrateScheduleKeys();
     state.weekIdx = currentWeekIdx();
