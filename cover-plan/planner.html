@@ -26,14 +26,16 @@
     .view-tab { padding:6px 14px; border:none; border-radius:5px; cursor:pointer; font-family:Arial; font-size:13px; background:#f0f8fd; color:#475569; transition:all .15s; }
     .view-tab:hover { background:#e0f0fa; }
     .view-tab.active { background:#1798d3; color:white; font-weight:bold; }
-    .week-nav { display:flex; align-items:center; gap:6px; margin-left:12px; }
+    .week-nav { display:flex; align-items:center; gap:6px; }
     .week-nav button { padding:5px 11px; border:1px solid #e2e8f0; border-radius:4px; background:white; cursor:pointer; font-size:15px; color:#475569; line-height:1; }
     .week-nav button:hover { background:#f0f8fd; border-color:#93c5fd; }
     .week-nav button:disabled { opacity:.35; cursor:default; }
-    #weekLabel { font-family:'Nunito',sans-serif; font-weight:900; font-size:17px; color:#1798d3; text-align:center; min-width:150px; line-height:1.2; }
+    #weekLabel { font-family:'Nunito',sans-serif; font-weight:900; font-size:14px; color:#1798d3; text-align:center; min-width:150px; line-height:1.2; }
     #weekLabel small { display:block; font-size:10px; color:#94a3b8; font-weight:normal; margin-top:1px; }
+    .sep { color:#e2e8f0; margin:0 8px; }
 
-    .stats-bar { background:white; border-bottom:1px solid #e8eef4; padding:6px 18px; display:flex; gap:18px; font-size:11.5px; color:#64748b; }
+    .stats-bar { background:white; border-bottom:1px solid #e8eef4; padding:6px 18px; display:flex; align-items:center; gap:12px; font-size:11.5px; color:#64748b; }
+    #statsContent { display:flex; gap:18px; align-items:center; margin-left:auto; }
     .stat { display:flex; align-items:center; gap:5px; }
     .stat-dot { width:7px; height:7px; border-radius:50%; }
     .stat strong { color:#1e3a8a; }
@@ -263,7 +265,7 @@
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
     <div class="header-title">Release Schedule</div>
-    <div class="header-sub">Drag teachers into sessions · Drag cover onto TBC slots · Drag slots to move</div>
+    <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
     <button class="view-tab active" id="tab-week" onclick="setView('week')">Week</button>
@@ -272,14 +274,17 @@
     <button class="ws-open-btn" onclick="openWsModal()" title="Manage whole-school events">📅 School events</button>
     <button class="edit-toggle-btn" id="editToggleBtn" onclick="toggleEditMode()" title="Toggle edit mode"></button>
   </div>
+</header>
+
+<div class="stats-bar" id="statsBar">
   <div class="week-nav">
     <button id="prevWeek" onclick="changeWeek(-1)">‹</button>
     <div id="weekLabel"></div>
     <button id="nextWeek" onclick="changeWeek(1)">›</button>
   </div>
-</header>
-
-<div class="stats-bar" id="statsBar"></div>
+  <span class="sep">|</span>
+  <div id="statsContent"></div>
+</div>
 
 <div class="app" id="app">
   <!-- Left: teachers -->
@@ -765,7 +770,7 @@ function renderStats() {
   const pct = total > 0 ? Math.round(covered/total*100) : 100;
   const bar = `<div style="width:${Math.min(pct,100)}%;height:6px;background:${tbc===0?'#22c55e':'#1798d3'};border-radius:3px;transition:width .3s"></div>`;
   const canCopy = state.weekIdx < WEEKS.length - 1;
-  document.getElementById('statsBar').innerHTML = `
+  document.getElementById('statsContent').innerHTML = `
     <div class="stat"><div class="stat-dot" style="background:#e2e8f0"></div><span><strong>${total}</strong> sessions out</span></div>
     <div class="stat"><div class="stat-dot" style="background:#22c55e"></div><span><strong>${covered}</strong> covered</span></div>
     <div class="stat"><div class="stat-dot" style="background:#ef4444"></div><span><strong>${tbc}</strong> TBC</span></div>
@@ -773,7 +778,7 @@ function renderStats() {
       <div style="flex:1;max-width:180px;background:#e2e8f0;border-radius:3px;overflow:hidden">${bar}</div>
       <span style="color:#1e3a8a;font-weight:bold;margin-left:6px">${pct}%</span>
     </div>
-    <div class="stat" style="margin-left:auto;gap:6px">
+    <div class="stat" style="gap:6px">
       <button class="action-btn" onclick="copyToNextWeek()" ${canCopy?'':'disabled'}>Copy → next week</button>
       <button class="action-btn danger" onclick="resetWeek()">Reset week</button>
     </div>`;
