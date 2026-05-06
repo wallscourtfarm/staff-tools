@@ -614,7 +614,13 @@ function doGet(e) {
 
 function doPost(e) {
   try {
-    const payload = JSON.parse(e.postData.contents);
+    // Data arrives as form field 'payload' (sent via hidden iframe form)
+    const payloadStr = e.parameter.payload || (e.postData ? e.postData.contents : null);
+    if (!payloadStr) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'No data received' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    const payload = JSON.parse(payloadStr);
     const changes   = payload.changes || [];
     const weekLabel = payload.weekLabel || 'This week';
     const timestamp = payload.timestamp ? new Date(payload.timestamp) : new Date();

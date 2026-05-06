@@ -311,7 +311,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(f4771bf)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(f4771c0)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -1859,14 +1859,24 @@ async function sendNotification() {
     recipients: recipients.map(r => ({ name: r.name, email: r.email, yg: r.yg }))
   };
 
-  try {
-    await fetch(NOTIFY_URL, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  } catch(e) {
-    // CORS error expected — the request still reaches the server
-  }
+  // Use a hidden iframe form submission to avoid Google Apps Script POST redirect issues
+  const iframe = document.createElement('iframe');
+  iframe.name = 'notify_target';
+  iframe.style.display = 'none';
+  document.body.appendChild(iframe);
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = NOTIFY_URL;
+  form.target = 'notify_target';
+  const input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'payload';
+  input.value = JSON.stringify(payload);
+  form.appendChild(input);
+  document.body.appendChild(form);
+  form.submit();
+  // Cleanup after submission
+  setTimeout(() => { document.body.removeChild(form); document.body.removeChild(iframe); }, 5000);
 
   // Show success
   const body = document.getElementById('notifyPanelBody');
