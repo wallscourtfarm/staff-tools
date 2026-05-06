@@ -593,9 +593,13 @@ function openViewer() {
 
 // doGet handles browser visits — useful for testing and triggering authorization
 function doGet(e) {
+  // Check if this is a notification request (sent as GET with payload parameter)
+  if (e && e.parameter && e.parameter.payload) {
+    return handleNotification(e.parameter.payload);
+  }
   return ContentService.createTextOutput(JSON.stringify({
     status: 'ok',
-    message: 'WFA Notification endpoint is running. Use POST to send notifications.'
+    message: 'WFA Notification endpoint is running. Send a ?payload= parameter to notify.'
   })).setMimeType(ContentService.MimeType.JSON);
 }
 //
@@ -613,9 +617,15 @@ function doGet(e) {
 // ────────────────────────────────────────────────────────────────────────────────
 
 function doPost(e) {
+  // POST also redirects to GET on Google Apps Script, so this may not be called.
+  // Handle via doGet with ?payload= parameter instead.
+  const payloadStr = e.parameter.payload || (e.postData ? e.postData.contents : null);
+  return handleNotification(payloadStr);
+}
+
+// Shared notification handler — called by doGet (primary) and doPost (fallback)
+function handleNotification(payloadStr) {
   try {
-    // Data arrives as form field 'payload' (sent via hidden iframe form)
-    const payloadStr = e.parameter.payload || (e.postData ? e.postData.contents : null);
     if (!payloadStr) {
       return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'No data received' }))
         .setMimeType(ContentService.MimeType.JSON);
