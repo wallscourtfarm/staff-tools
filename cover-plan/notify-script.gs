@@ -590,6 +590,14 @@ function openViewer() {
 }
 
 // ── WEB APP ENDPOINT (called from planner.html) ────────────────────────────
+
+// doGet handles browser visits — useful for testing and triggering authorization
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({
+    status: 'ok',
+    message: 'WFA Notification endpoint is running. Use POST to send notifications.'
+  })).setMimeType(ContentService.MimeType.JSON);
+}
 //
 // Deploy this script as a web app to get a NOTIFY_URL.
 //   Deploy → New deployment → Web app → Execute as: Me → Who has access: Anyone
