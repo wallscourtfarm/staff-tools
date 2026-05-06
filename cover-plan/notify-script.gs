@@ -661,16 +661,12 @@ function handleNotification(payloadStr) {
       reset_week: 'Week reset'
     };
 
-    // Group changes by year group
+    // Group changes by year group (using YG data from the planner, not reading the sheet)
     const changesByYG = {};
     changes.forEach(ch => {
       const ygs = [];
       if (ch.teacherYG) ygs.push(ch.teacherYG);
-      if (ch.coverName) {
-        // Look up cover staff's year group from Staff sheet
-        const coverYG = getStaffYG(ch.coverName);
-        if (coverYG) ygs.push(coverYG);
-      }
+      if (ch.coverYG) ygs.push(ch.coverYG);
       if (ygs.length === 0) ygs.push('Other');
       ygs.forEach(yg => {
         if (!changesByYG[yg]) changesByYG[yg] = [];
@@ -746,23 +742,3 @@ function handleNotification(payloadStr) {
   }
 }
 
-// Look up a staff member's year group from the Staff sheet
-function getStaffYG(name) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Staff');
-  if (!sheet) return '';
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0].map(h => String(h).trim());
-  const nameIdx = headers.indexOf('Name');
-  const ygIdx = headers.indexOf('YearGroup');
-  if (nameIdx === -1 || ygIdx === -1) return '';
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][nameIdx]).trim().toLowerCase() === name.toLowerCase()) {
-      let yg = String(data[i][ygIdx]).trim();
-      // Normalise YR → Reception
-      if (yg === 'YR') yg = 'Reception';
-      return yg;
-    }
-  }
-  return '';
-}
