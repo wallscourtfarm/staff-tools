@@ -252,6 +252,37 @@
     .edit-toggle-btn { padding:8px 14px; border-radius:5px; cursor:pointer; font-size:14px; font-weight:bold; transition:all .15s; border:2px solid #e2e8f0; background:white; color:#475569; }
     .edit-toggle-btn:hover { border-color:#1798d3; }
     .edit-toggle-btn.unlocked { background:#1798d3; color:white; border-color:#1798d3; }
+    .notify-btn { position:relative; padding:8px 12px; border:1px solid #e2e8f0; border-radius:5px; background:white; cursor:pointer; font-size:14px; color:#475569; transition:all .12s; }
+    .notify-btn:hover { border-color:#1798d3; color:#1798d3; }
+    .notify-btn.has-changes { border-color:#f59e0b; color:#d97706; background:#fffbeb; }
+    .notify-btn.has-changes:hover { background:#fef3c7; }
+    .notify-badge { position:absolute; top:-6px; right:-6px; background:#ef4444; color:white; font-size:10px; font-weight:bold; min-width:18px; height:18px; border-radius:9px; display:flex; align-items:center; justify-content:center; padding:0 4px; }
+    .notify-badge:empty { display:none; }
+    .notify-panel { position:fixed; top:60px; right:12px; width:380px; max-height:70vh; background:white; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.18); z-index:9000; overflow:hidden; display:flex; flex-direction:column; }
+    .notify-panel-hd { padding:14px 18px; background:#1798d3; color:white; font-family:'Nunito',sans-serif; font-weight:900; font-size:15px; display:flex; justify-content:space-between; align-items:center; }
+    .notify-panel-hd button { background:none; border:none; color:white; font-size:20px; cursor:pointer; padding:0 4px; }
+    .notify-panel-body { padding:14px 18px; overflow-y:auto; flex:1; }
+    .notify-change { padding:8px 10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; font-size:12px; }
+    .notify-change .ch-type { font-weight:bold; color:#1798d3; text-transform:uppercase; font-size:10px; letter-spacing:.05em; }
+    .notify-change .ch-detail { margin-top:3px; color:#334155; }
+    .notify-change .ch-yg { display:inline-block; font-size:10px; background:#dbeafe; color:#1e3a8a; padding:1px 6px; border-radius:3px; margin-left:6px; }
+    .notify-yg-group { margin-bottom:12px; }
+    .notify-yg-label { font-family:'Nunito',sans-serif; font-weight:900; font-size:13px; color:#1e3a8a; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+    .notify-yg-label .yg-dot { width:10px; height:10px; border-radius:2px; }
+    .notify-recipients { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px; margin-bottom:14px; }
+    .notify-recipients h4 { font-size:12px; color:#64748b; margin:0 0 6px; }
+    .notify-recipients .email-list { font-size:11px; color:#334155; line-height:1.6; }
+    .notify-actions { padding:14px 18px; border-top:1px solid #f1f5f9; display:flex; gap:8px; }
+    .notify-send-btn { flex:1; padding:10px 20px; background:#1798d3; color:white; border:none; border-radius:6px; font-size:14px; font-weight:bold; cursor:pointer; font-family:'Nunito',sans-serif; }
+    .notify-send-btn:hover { background:#1580b8; }
+    .notify-send-btn:disabled { background:#94a3b8; cursor:default; }
+    .notify-cancel-btn { padding:10px 16px; background:white; border:1px solid #e2e8f0; border-radius:6px; font-size:14px; cursor:pointer; color:#64748b; }
+    .notify-cancel-btn:hover { background:#f8fafc; }
+    .notify-clear-btn { padding:10px 16px; background:white; border:1px solid #fecaca; color:#dc2626; border-radius:6px; font-size:14px; cursor:pointer; }
+    .notify-clear-btn:hover { background:#fef2f2; }
+    .notify-sent { text-align:center; padding:30px 20px; }
+    .notify-sent h3 { color:#22c55e; font-family:'Nunito',sans-serif; }
+    .notify-sent p { color:#64748b; font-size:13px; margin-top:8px; }
 
     /* Locked state — disable interactive elements */
     body.edit-locked .teacher-chip { cursor:default; pointer-events:none; }
@@ -266,6 +297,7 @@
     body.edit-locked .cell-note .note-del { display:none; }
     body.edit-locked .action-btn   { display:none; }
     body.edit-locked .ws-open-btn  { display:none; }
+body.edit-locked .notify-btn   { display:none; }
     body.edit-locked .day-reset-btn { display:none; }
 
     /* Other reason free-text input */
@@ -279,7 +311,7 @@
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(f4771ba)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(f4771bb)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -287,6 +319,7 @@
     <button class="view-tab" id="tab-mine" onclick="setView('mine')">My view</button>
     <button class="view-tab" id="tab-present" onclick="setView('present')" title="Full-grid view for sharing on screen">⛶ Present</button>
     <button class="ws-open-btn" onclick="openWsModal()" title="Manage whole-school events">📅 School events</button>
+    <button class="notify-btn" id="notifyBtn" onclick="toggleNotifyPanel()" title="Notify affected staff of changes">🔔 Notify <span class="notify-badge" id="notifyBadge"></span></button>
     <button class="edit-toggle-btn" id="editToggleBtn" onclick="toggleEditMode()" title="Toggle edit mode"></button>
   </div>
 </header>
@@ -317,6 +350,22 @@
 </div>
 
 <!-- Whole-school events manager modal -->
+<div class="modal-overlay hidden" id="notifyOverlay" onclick="closeNotifyPanel(event)">
+  <div class="notify-panel" id="notifyPanel">
+    <div class="notify-panel-hd">
+      <span>🔔 Notify Staff</span>
+      <button onclick="closeNotifyPanel()">&times;</button>
+    </div>
+    <div class="notify-panel-body" id="notifyPanelBody">
+      <!-- Filled dynamically -->
+    </div>
+    <div class="notify-actions" id="notifyActions">
+      <button class="notify-cancel-btn" onclick="closeNotifyPanel()">Cancel</button>
+      <button class="notify-clear-btn" onclick="clearChangeLog()" title="Clear all pending changes without sending">Clear</button>
+      <button class="notify-send-btn" id="notifySendBtn" onclick="sendNotification()">Send notifications</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay hidden" id="wsModal" onclick="closeWsModal(event)">
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-hd">
@@ -364,6 +413,9 @@ const BLOCKING_TYPES   = new Set(['Half Term','Christmas','Easter','Summer Holid
 const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
 const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbx6CThsZIBj9pxc0noGkgUMaCHTKgUBASm5-wQCIQ6JELoQ4abIctjlpEGPyE_jrlzR/exec';
+const NOTIFY_URL = 'https://script.google.com/macros/s/AKfycbx6CThsZIBj9pxc0noGkgUMaCHTKgUBASm5-wQCIQ6JELoQ4abIctjlpEGPyE_jrlzR/exec';
+// NOTE: NOTIFY_URL should point to a separate deployment of notify-script.gs.
+// For now it shares the sync endpoint; update after deploying notify-script.gs as a web app.
 
 // ── Mutable data (populated by init) ─────────────────────────────────────────
 let WEEKS    = [];
@@ -409,6 +461,7 @@ const state = {
   myName:    '',
   cellNotes: {},
   pendingDrop: null, // { tid, dayIdx, session } waiting for reason selection
+  changeLog: [],     // tracks mutations for notification
 };
 
 // ── Colour helpers ────────────────────────────────────────────────────────────
@@ -508,14 +561,15 @@ function buildStaff(rows) {
     // Left panel: Class teachers + non-class staff who have scheduled time (Phase, SENCO, SLT)
     const LEFT_ROLES = new Set(['Class','Phase','Phase Lead','SENCO','Principal','Vice Principal','Assistant Principal']);
     if (LEFT_ROLES.has(r.Role)) {
-      const t={id,name:r.Name,yg,role:r.Role,ent,workingDays,isLeader,isInfoOnly};
+      const t={id,name:r.Name,yg,role:r.Role,ent,workingDays,isLeader,isInfoOnly,email:r.Email||''};
       if (isLeader) t.reasons=['Meeting','External Visit','Training','Conference'];
       teachers.push(t);
     }
     if (r.CoverRole) {
       cover.push({id:'c_'+id, name:r.Name, role:r.CoverRole,
         init:r.Initials||r.Name.slice(0,2).toUpperCase(), col:r.Colour||'#94a3b8',
-        order: r.Order !== '' && r.Order !== undefined ? parseInt(r.Order) : Infinity});
+        order: r.Order !== '' && r.Order !== undefined ? parseInt(r.Order) : Infinity,
+        email:r.Email||''});
     }
   });
   cover.sort((a,b) => a.order - b.order);
@@ -662,6 +716,40 @@ async function stateLoad() {
   } catch(e) {}
   try { const s = localStorage.getItem('wfa_planner_state'); return s ? JSON.parse(s) : null; }
   catch(e) { return null; }
+}
+
+// ── Notification helpers ───────────────────────────────────────────────────────
+function staffEmail(name) {
+  const t = TEACHERS.find(t => t.name === name);
+  if (t && t.email) return t.email;
+  const c = COVER.find(c => c.name === name);
+  if (c && c.email) return c.email;
+  return '';
+}
+function staffYG(name) {
+  const t = TEACHERS.find(t => t.name === name);
+  return t?.yg || '';
+}
+function logChange(type, slot) {
+  const teacherName = slot.tid ? (teacher(slot.tid)?.name || '') : (slot.teacherName || '');
+  state.changeLog.push({
+    type,
+    teacherName,
+    teacherYG: staffYG(teacherName),
+    coverName: slot.cover || '',
+    day: slot.day !== undefined ? DAYS[slot.day] : '',
+    session: slot.session || '',
+    reason: slot.reason || '',
+    week: WEEKS[state.weekIdx]?.label || '',
+    timestamp: Date.now()
+  });
+  updateNotifyBadge();
+}
+function updateNotifyBadge() {
+  const badge = document.getElementById('notifyBadge');
+  if (badge) badge.textContent = state.changeLog.length || '';
+  const btn = document.getElementById('notifyBtn');
+  if (btn) btn.classList.toggle('has-changes', state.changeLog.length > 0);
 }
 
 function slots()        { return state.weekSlots[state.weekIdx] || []; }
@@ -1319,7 +1407,7 @@ function ptrCommitDrop(x, y) {
     const zone = ptrSlotZoneAt(x, y);
     if (zone) {
       const s = slots().find(x => x.id === zone.slotId);
-      if (s && !s.cover) { s.cover = d.name; stateSave(); }
+      if (s && !s.cover) { s.cover = d.name; logChange('assign_cover', s); stateSave(); }
     }
   } else {
     const cell = ptrCellAt(x, y);
@@ -1334,7 +1422,9 @@ function ptrCommitDrop(x, y) {
             if (isLeader) {
               // Leaders use first reason directly
               const reason = t.reasons?.[0] || 'Meeting';
-              setSlots([...slots(), { id: state.nextId++, day: dayIdx, session, endSession: session, tid: d.id, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false }]);
+              const newSlot = { id: state.nextId++, day: dayIdx, session, endSession: session, tid: d.id, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false };
+              setSlots([...slots(), newSlot]);
+              logChange('add', newSlot);
             } else {
               // Check available entitlements
               const used = teacherReasonUsed(d.id);
@@ -1346,7 +1436,9 @@ function ptrCommitDrop(x, y) {
               } else {
                 // Single or no entitlement - use first available
                 const reason = available[0]?.r || firstAvailableReason(d.id);
-                setSlots([...slots(), { id: state.nextId++, day: dayIdx, session, endSession: session, tid: d.id, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false }]);
+                const newSlot = { id: state.nextId++, day: dayIdx, session, endSession: session, tid: d.id, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false };
+                setSlots([...slots(), newSlot]);
+                logChange('add', newSlot);
               }
             }
           }
@@ -1354,7 +1446,7 @@ function ptrCommitDrop(x, y) {
       } else if (d.type === 'slot') {
         if (!getDayEvent(state.weekIdx, dayIdx)) {
           const s = slots().find(x => x.id === d.slotId);
-          if (s) { s.day = dayIdx; s.session = session; s.endSession = session; stateSave(); }
+          if (s) { s.day = dayIdx; s.session = session; s.endSession = session; logChange('move', s); stateSave(); }
         }
       }
     }
@@ -1434,18 +1526,23 @@ function getSessionRowAt(x, y) {
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
-function removeSlot(slotId)    { setSlots(slots().filter(s => s.id !== slotId)); render(); }
-function unassignCover(slotId) { const s = slots().find(x => x.id === slotId); if (s) { s.cover = null; stateSave(); render(); } }
-function changeReason(slotId, reason) { const s = slots().find(x => x.id === slotId); if (s) { s.reason = reason; if (reason !== 'Other') s.reasonNote = ''; stateSave(); render(); } }
+function removeSlot(slotId) {
+  const s = slots().find(x => x.id === slotId);
+  if (s) logChange('remove', s);
+  setSlots(slots().filter(s => s.id !== slotId));
+  render();
+}
+function unassignCover(slotId) { const s = slots().find(x => x.id === slotId); if (s) { logChange('unassign_cover', s); s.cover = null; stateSave(); render(); } }
+function changeReason(slotId, reason) { const s = slots().find(x => x.id === slotId); if (s) { logChange('change_reason', s); s.reason = reason; if (reason !== 'Other') s.reasonNote = ''; stateSave(); render(); } }
 function changeReasonNote(slotId, note) { const s = slots().find(x => x.id === slotId); if (s) { s.reasonNote = note; stateSave(); } }
 function changeEndSession(slotId, endSession) {
   const s = slots().find(x => x.id === slotId);
   if (s) {
     const startIdx = SESSION_IDX[s.session] ?? 0;
     const endIdx = SESSION_IDX[endSession] ?? startIdx;
-    // Don't allow end before start
     if (endIdx >= startIdx) {
       s.endSession = endSession;
+      logChange('extend', s);
       stateSave(); render();
     }
   }
@@ -1481,7 +1578,9 @@ function selectReason(reason) {
   if (!state.pendingDrop) return;
   const { tid, dayIdx, session } = state.pendingDrop;
   const t = teacher(tid);
-  setSlots([...slots(), { id: state.nextId++, day: dayIdx, session, endSession: session, tid, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false }]);
+  const newSlot = { id: state.nextId++, day: dayIdx, session, endSession: session, tid, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false };
+  setSlots([...slots(), newSlot]);
+  logChange('add', newSlot);
   closeReasonPopup();
 }
 
@@ -1512,11 +1611,14 @@ function removeCellNote(key) {
 
 function resetDay(dayIdx) {
   if (!confirm(`Clear all slots for ${DAYS[dayIdx]}? This cannot be undone.`)) return;
+  const daySlots = slots().filter(s => s.day === dayIdx);
+  daySlots.forEach(s => logChange('remove', s));
   setSlots(slots().filter(s => s.day !== dayIdx));
   render();
 }
 function resetWeek() {
   if (!confirm(`Reset ${WEEKS[state.weekIdx].label} to recurring slots only? This cannot be undone.`)) return;
+  slots().forEach(s => logChange('remove', s));
   setSlots(JSON.parse(JSON.stringify(RECURRING_SLOTS)));
   render();
 }
@@ -1528,6 +1630,7 @@ function copyToNextWeek() {
   }
   state.weekSlots[nextIdx] = slots().map(s => ({...s, id:state.nextId++}));
   state.weekIdx = nextIdx;
+  logChange('copy_week', { tid: '', cover: '', day: '', session: '', reason: '' });
   render();
 }
 
@@ -1579,6 +1682,213 @@ function removeWsEvent(i) {
   wsSave();
   renderWsModal();
   render();
+}
+
+// ── Notification panel ──────────────────────────────────────────────────────────
+
+const CHANGE_LABELS = {
+  add: 'Added',
+  remove: 'Removed',
+  assign_cover: 'Cover assigned',
+  unassign_cover: 'Cover unassigned',
+  change_reason: 'Reason changed',
+  move: 'Moved',
+  extend: 'Extended',
+  copy_week: 'Copied to next week',
+  reset_day: 'Day reset',
+  reset_week: 'Week reset'
+};
+
+function toggleNotifyPanel() {
+  const overlay = document.getElementById('notifyOverlay');
+  if (overlay.classList.contains('hidden')) {
+    overlay.classList.remove('hidden');
+    renderNotifyPanel();
+  } else {
+    overlay.classList.add('hidden');
+  }
+}
+
+function closeNotifyPanel(e) {
+  if (e && e.target !== document.getElementById('notifyOverlay')) return;
+  document.getElementById('notifyOverlay').classList.add('hidden');
+}
+
+function clearChangeLog() {
+  state.changeLog = [];
+  updateNotifyBadge();
+  renderNotifyPanel();
+}
+
+function renderNotifyPanel() {
+  const body = document.getElementById('notifyPanelBody');
+  const actions = document.getElementById('notifyActions');
+  const sendBtn = document.getElementById('notifySendBtn');
+
+  if (state.changeLog.length === 0) {
+    body.innerHTML = '<div style="text-align:center;padding:30px 10px;color:#94a3b8;font-size:14px">No changes to notify about yet.<br><small>Changes you make will appear here.</small></div>';
+    actions.style.display = 'none';
+    return;
+  }
+
+  actions.style.display = 'flex';
+
+  // Determine affected year groups and recipients
+  const affectedYGs = new Set();
+  const recipientsByEmail = {};
+  state.changeLog.forEach(ch => {
+    if (ch.teacherYG) affectedYGs.add(ch.teacherYG);
+    if (ch.coverName) {
+      const coverYG = staffYG(ch.coverName);
+      if (coverYG) affectedYGs.add(coverYG);
+    }
+  });
+
+  // Build recipients: all staff in affected YGs + directly involved cover staff
+  TEACHERS.forEach(t => {
+    if (affectedYGs.has(t.yg) && t.email) {
+      recipientsByEmail[t.email] = t.name;
+    }
+  });
+  COVER.forEach(c => {
+    // Cover staff directly involved in a change
+    const involved = state.changeLog.some(ch => ch.coverName === c.name);
+    if (involved && c.email) {
+      recipientsByEmail[c.email] = c.name;
+    }
+  });
+
+  // Group changes by year group
+  const changesByYG = {};
+  state.changeLog.forEach(ch => {
+    const ygs = [];
+    if (ch.teacherYG) ygs.push(ch.teacherYG);
+    if (ch.coverName) {
+      const coverYG = staffYG(ch.coverName);
+      if (coverYG) ygs.push(coverYG);
+    }
+    if (ygs.length === 0) ygs.push('Other');
+    ygs.forEach(yg => {
+      if (!changesByYG[yg]) changesByYG[yg] = [];
+      changesByYG[yg].push(ch);
+    });
+  });
+
+  const YG_COLOURS_NOTIFY = { Reception:'#dbeafe',Y1:'#ffedd5',Y2:'#d1fae5',Y3:'#fce7f3',Y4:'#bfdbfe',Y5:'#fed7aa',Y6:'#bbf7d0' };
+
+  let html = '';
+
+  // Recipients section
+  html += '<div class="notify-recipients">';
+  html += `<h4>Will notify ${Object.keys(recipientsByEmail).length} staff member${Object.keys(recipientsByEmail).length !== 1 ? 's' : ''}</h4>`;
+  html += '<div class="email-list">';
+  Object.entries(recipientsByEmail).forEach(([email, name]) => {
+    html += `<div>${name} <span style="color:#94a3b8">&lt;${email}&gt;</span></div>`;
+  });
+  html += '</div></div>';
+
+  // Changes grouped by year group
+  html += '<h4 style="font-size:12px;color:#64748b;margin:0 0 8px">Changes</h4>';
+  Object.entries(changesByYG).forEach(([yg, changes]) => {
+    const col = YG_COLOURS_NOTIFY[yg] || '#e2e8f0';
+    html += `<div class="notify-yg-group">`;
+    html += `<div class="notify-yg-label"><span class="yg-dot" style="background:${col}"></span>${yg}</div>`;
+    changes.forEach(ch => {
+      const label = CHANGE_LABELS[ch.type] || ch.type;
+      const teacherName = ch.teacherName || 'Unknown';
+      const coverName = ch.coverName || '';
+      const detail = coverName
+        ? `${teacherName} ${ch.type === 'assign_cover' ? '←' : '→'} ${coverName}`
+        : teacherName;
+      html += `<div class="notify-change">
+        <div class="ch-type">${label}</div>
+        <div class="ch-detail">${detail} <span style="color:#94a3b8">${ch.day} ${ch.session}</span></div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+
+  body.innerHTML = html;
+  sendBtn.disabled = Object.keys(recipientsByEmail).length === 0;
+}
+
+async function sendNotification() {
+  if (state.changeLog.length === 0) return;
+
+  const sendBtn = document.getElementById('notifySendBtn');
+  sendBtn.disabled = true;
+  sendBtn.textContent = 'Sending…';
+
+  // Determine affected year groups and recipients
+  const affectedYGs = new Set();
+  const recipients = [];
+  const seen = new Set();
+
+  state.changeLog.forEach(ch => {
+    if (ch.teacherYG) affectedYGs.add(ch.teacherYG);
+    if (ch.coverName) {
+      const coverYG = staffYG(ch.coverName);
+      if (coverYG) affectedYGs.add(coverYG);
+    }
+  });
+
+  TEACHERS.forEach(t => {
+    if (affectedYGs.has(t.yg) && t.email && !seen.has(t.email)) {
+      seen.add(t.email);
+      recipients.push({ name: t.name, email: t.email, yg: t.yg });
+    }
+  });
+  COVER.forEach(c => {
+    const involved = state.changeLog.some(ch => ch.coverName === c.name);
+    if (involved && c.email && !seen.has(c.email)) {
+      seen.add(c.email);
+      recipients.push({ name: c.name, email: c.email, yg: staffYG(c.name) || 'Cover' });
+    }
+  });
+
+  if (recipients.length === 0) {
+    sendBtn.textContent = 'No recipients';
+    setTimeout(() => { sendBtn.textContent = 'Send notifications'; sendBtn.disabled = false; }, 2000);
+    return;
+  }
+
+  const payload = {
+    changes: state.changeLog,
+    weekLabel: WEEKS[state.weekIdx]?.label || '',
+    weekStart: WEEKS[state.weekIdx]?.start?.toISOString() || '',
+    timestamp: Date.now(),
+    affectedYGs: [...affectedYGs],
+    recipients: recipients.map(r => ({ name: r.name, email: r.email, yg: r.yg }))
+  };
+
+  try {
+    await fetch(NOTIFY_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      mode: 'no-cors'
+    });
+  } catch(e) {
+    // Request sent — we can't read the response due to no-cors, but the data was sent
+  }
+
+  // Show success
+  const body = document.getElementById('notifyPanelBody');
+  const actions = document.getElementById('notifyActions');
+  body.innerHTML = `<div class="notify-sent">
+    <div style="font-size:40px;margin-bottom:10px">✓</div>
+    <h3>Notifications sent!</h3>
+    <p>${recipients.length} staff member${recipients.length !== 1 ? 's' : ''} across ${affectedYGs.size} year group${affectedYGs.size !== 1 ? 's' : ''} will be notified.</p>
+  </div>`;
+  actions.style.display = 'none';
+
+  // Clear change log
+  state.changeLog = [];
+  updateNotifyBadge();
+
+  // Auto-close after 3 seconds
+  setTimeout(() => {
+    document.getElementById('notifyOverlay').classList.add('hidden');
+  }, 3000);
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────

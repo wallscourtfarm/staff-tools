@@ -588,3 +588,157 @@ function openViewer() {
   ).setWidth(10).setHeight(10);
   SpreadsheetApp.getUi().showModalDialog(html, 'Opening…');
 }
+
+// ── WEB APP ENDPOINT (called from planner.html) ────────────────────────────
+//
+// Deploy this script as a web app to get a NOTIFY_URL.
+//   Deploy → New deployment → Web app → Execute as: Me → Who has access: Anyone
+//   Copy the URL and set it as NOTIFY_URL in planner.html
+//
+// The planner sends a POST with a JSON payload containing:
+//   changes:   array of { type, teacherName, teacherYG, coverName, day, session, reason, week, timestamp }
+//   weekLabel: e.g. "Term 5  Week 2"
+//   timestamp: milliseconds since epoch
+//   affectedYGs: array of year group strings
+//   recipients: array of { name, email, yg }
+//
+// ────────────────────────────────────────────────────────────────────────────────
+
+function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents);
+    const changes   = payload.changes || [];
+    const weekLabel = payload.weekLabel || 'This week';
+    const timestamp = payload.timestamp ? new Date(payload.timestamp) : new Date();
+    const recipients = payload.recipients || [];
+    const affectedYGs = payload.affectedYGs || [];
+
+    if (recipients.length === 0) {
+      return ContentService.createTextOutput(JSON.stringify({ success: true, message: 'No recipients' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const PLANNER_URL = 'https://wallscourtfarm.github.io/staff-tools/cover-plan/planner.html';
+    const tz = Session.getScriptTimeZone();
+    const dateStr = Utilities.formatDate(timestamp, tz, 'EEEE d MMMM yyyy');
+    const timeStr = Utilities.formatDate(timestamp, tz, 'HH:mm');
+
+    // Build a human-readable summary of changes grouped by year group
+    const CHANGE_LABELS = {
+      add: 'Added',
+      remove: 'Removed',
+      assign_cover: 'Cover assigned',
+      unassign_cover: 'Cover unassigned',
+      change_reason: 'Reason changed',
+      move: 'Moved',
+      extend: 'Extended',
+      copy_week: 'Copied to next week',
+      reset_day: 'Day reset',
+      reset_week: 'Week reset'
+    };
+
+    // Group changes by year group
+    const changesByYG = {};
+    changes.forEach(ch => {
+      const ygs = [];
+      if (ch.teacherYG) ygs.push(ch.teacherYG);
+      if (ch.coverName) {
+        // Look up cover staff's year group from Staff sheet
+        const coverYG = getStaffYG(ch.coverName);
+        if (coverYG) ygs.push(coverYG);
+      }
+      if (ygs.length === 0) ygs.push('Other');
+      ygs.forEach(yg => {
+        if (!changesByYG[yg]) changesByYG[yg] = [];
+        changesByYG[yg].push(ch);
+      });
+    });
+
+    // Build HTML summary
+    let summaryHtml = '<p style="font-size:13px;color:#334155;margin:0 0 12px;">Changes to the release schedule for <strong>' + weekLabel + '</strong>:</p>';
+
+    const YG_COLORS = { Reception:'#dbeafe', Y1:'#ffedd5', Y2:'#d1fae5', Y3:'#fce7f3', Y4:'#bfdbfe', Y5:'#fed7aa', Y6:'#bbf7d0' };
+
+    Object.entries(changesByYG).forEach(([yg, chs]) => {
+      const col = YG_COLORS[yg] || '#e2e8f0';
+      summaryHtml += `<div style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:bold;color:#1e3a8a;margin-bottom:6px;padding:4px 8px;background:${col};border-radius:4px;display:inline-block">${yg}</div>`;
+      chs.forEach(ch => {
+        const label = CHANGE_LABELS[ch.type] || ch.type;
+        const teacher = ch.teacherName || 'Unknown';
+        const cover = ch.coverName || '';
+        const detail = cover
+          ? (ch.type === 'assign_cover' || ch.type === 'unassign_cover')
+            ? `${teacher} ${ch.type === 'assign_cover' ? '←' : '→'} ${cover}`
+            : `${teacher}${cover ? ' / ' + cover : ''}`
+          : teacher;
+        summaryHtml += `<div style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:4px;margin-bottom:4px;font-size:12px">
+          <span style="color:#1798d3;font-weight:bold">${label}</span>
+          <span style="color:#334155;margin-left:4px">${detail}</span>
+          <span style="color:#94a3b8;margin-left:4px">${ch.day || ''} ${ch.session || ''}</span>
+        </div>`;
+      });
+      summaryHtml += '</div>';
+    });
+
+    const subject = `Release schedule updated — ${dateStr} at ${timeStr}`;
+
+    const htmlBody = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;color:#222;">
+        <div style="background:#1798d3;height:8px;border-radius:6px 6px 0 0;"></div>
+        <div style="border:1px solid #ddd;border-top:none;padding:20px 22px;border-radius:0 0 6px 6px;">
+          <h1 style="font-size:16px;margin:0 0 2px;color:#1798d3;">Wallscourt Farm Academy</h1>
+          <p style="font-size:13px;color:#64748b;margin:0 0 18px;">Release schedule updated at <strong>${timeStr}</strong> on ${dateStr}</p>
+          ${summaryHtml}
+          <div style="margin-top:20px;">
+            <a href="${PLANNER_URL}" style="background:#1798d3;color:white;padding:10px 20px;
+              border-radius:4px;text-decoration:none;font-size:14px;font-weight:bold;display:inline-block;">
+              View release schedule →
+            </a>
+          </div>
+          <p style="margin-top:16px;font-size:11px;color:#999;">
+            This is an automated notification from the WFA Release Schedule.
+            If you received this in error, please contact the school office.
+          </p>
+        </div>
+      </div>`;
+
+    // Send one email to all recipients
+    const toList = recipients.map(r => r.email).join(',');
+
+    MailApp.sendEmail({
+      to:       toList,
+      subject:  subject,
+      htmlBody: htmlBody,
+      body:     `Release schedule updated at ${timeStr} on ${dateStr}. View it here: ${PLANNER_URL}`,
+    });
+
+    return ContentService.createTextOutput(JSON.stringify({ success: true, sent: recipients.length }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// Look up a staff member's year group from the Staff sheet
+function getStaffYG(name) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Staff');
+  if (!sheet) return '';
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(h => String(h).trim());
+  const nameIdx = headers.indexOf('Name');
+  const ygIdx = headers.indexOf('YearGroup');
+  if (nameIdx === -1 || ygIdx === -1) return '';
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][nameIdx]).trim().toLowerCase() === name.toLowerCase()) {
+      let yg = String(data[i][ygIdx]).trim();
+      // Normalise YR → Reception
+      if (yg === 'YR') yg = 'Reception';
+      return yg;
+    }
+  }
+  return '';
+}
