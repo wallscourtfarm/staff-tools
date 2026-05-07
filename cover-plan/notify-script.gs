@@ -111,35 +111,10 @@
 
 const VIEWER_URL = 'https://wallscourtfarm.github.io/staff-tools/cover-plan/';
 
-// All staff who should receive the notification email.
+// Staff who should receive the "Publish & Notify" email.
+// Only add staff once notification delivery is confirmed working.
 const NOTIFICATION_EMAILS = [
-  // Class teachers
-  'jess@wallscourt.clf.school',
-  'sarah@wallscourt.clf.school',
-  'eloise@wallscourt.clf.school',
-  'ellie@wallscourt.clf.school',
-  'jo@wallscourt.clf.school',
-  'millie@wallscourt.clf.school',
-  'jamie@wallscourt.clf.school',
-  'reuben@wallscourt.clf.school',
-  'innes@wallscourt.clf.school',
-  'william@wallscourt.clf.school',
-  'laura@wallscourt.clf.school',
-  'lutz-mae@wallscourt.clf.school',
-  'jon@wallscourt.clf.school',
-  'sally@wallscourt.clf.school',
-  // Teaching partners
-  'alasdair@wallscourt.clf.school',
-  'chelsea@wallscourt.clf.school',
-  'catherine@wallscourt.clf.school',
-  'kerry@wallscourt.clf.school',
-  'theresa@wallscourt.clf.school',
-  'emmaj@wallscourt.clf.school',
-  'hettie@wallscourt.clf.school',
-  'sam@wallscourt.clf.school',
-  // Regular cover
-  'ellen@wallscourt.clf.school',
-  'leyla@wallscourt.clf.school',
+  'innes.mclean@clf.uk',
 ];
 
 // ── MENU ─────────────────────────────────────────────────────────────────────
