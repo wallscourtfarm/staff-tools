@@ -526,12 +526,11 @@ function publishAndNotify() {
       </div>
     </div>`;
 
-  MailApp.sendEmail({
-    to:       NOTIFICATION_EMAILS.join(','),
-    subject:  subject,
-    htmlBody: htmlBody,
-    body:     `Release schedule updated at ${timeStr}. View it here: ${VIEWER_URL}`,
-  });
+  GmailApp.sendEmail(NOTIFICATION_EMAILS.join(','),
+    subject,
+    `Release schedule updated at ${timeStr}. View it here: ${VIEWER_URL}`,
+    { htmlBody: htmlBody }
+  );
 
   SpreadsheetApp.getUi().alert(
     `✓ Schedule published\n\nNotification sent to ${NOTIFICATION_EMAILS.length} staff members.`
@@ -726,12 +725,11 @@ function handleNotification(payloadStr) {
     // Send one email to all recipients
     const toList = recipients.map(r => r.email).join(',');
 
-    MailApp.sendEmail({
-      to:       toList,
-      subject:  subject,
-      htmlBody: htmlBody,
-      body:     `Release schedule updated at ${timeStr} on ${dateStr}. View it here: ${PLANNER_URL}`,
-    });
+    GmailApp.sendEmail(toList,
+      subject,
+      `Release schedule updated at ${timeStr} on ${dateStr}. View it here: ${PLANNER_URL}`,
+      { htmlBody: htmlBody }
+    );
 
     return ContentService.createTextOutput(JSON.stringify({ success: true, sent: recipients.length }))
       .setMimeType(ContentService.MimeType.JSON);
