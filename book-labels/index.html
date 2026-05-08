@@ -74,8 +74,8 @@
     .status.error { color: #c0392b; }
 
     .preview-box { background: #f5f5f5; border-radius: 8px; padding: 16px; display: flex; justify-content: center; align-items: center; min-height: 320px; }
-    .label-preview { width: 139mm; height: 99.1mm; position: relative; overflow: hidden; background: #3288ce; }
-    .white-box { position: absolute; background: white; top: 13.05mm; left: 15.5mm; width: 108mm; height: 73mm; font-family: 'Tw Cen MT', Arial, sans-serif; }
+    .label-preview { width: 159mm; height: 119.1mm; position: relative; overflow: hidden; background: #3288ce; }
+    .white-box { position: absolute; background: white; top: 23.05mm; left: 25.5mm; width: 108mm; height: 73mm; font-family: 'Tw Cen MT', Arial, sans-serif; }
 
     .all-labels-checkbox { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 0.85rem; color: var(--text); cursor: pointer; }
     .all-labels-checkbox input { width: 18px; height: 18px; cursor: pointer; accent-color: var(--blue); }
@@ -453,6 +453,8 @@ async function generatePdf() {
   try {
     // A4 LANDSCAPE: 297mm x 210mm
     // Avery L7169: 4 labels per sheet (2x2), each 139 x 99.1mm
+    // BLEED: colour extends 10mm beyond label edges to avoid white gaps when printing
+    const BLEED = 10;
     const WHITE_W = 108;
     const WHITE_H = 73;
     const BORDER_L = (139 - 108) / 2;  // 15.5mm
@@ -522,9 +524,9 @@ async function generatePdf() {
         const bgColour = labelType.greyBorder ? '#808080' : (labelYearData?.hex || '#ccc');
         const [r, g, b] = hexToRgb(bgColour);
 
-        // Fill label background
+        // Fill label background (with bleed extending beyond label edges)
         doc.setFillColor(r, g, b);
-        doc.rect(pos.x, pos.y, 139, 99.1, 'F');
+        doc.rect(pos.x - BLEED, pos.y - BLEED, 139 + 2 * BLEED, 99.1 + 2 * BLEED, 'F');
 
         // Draw white box
         doc.setFillColor(255, 255, 255);
