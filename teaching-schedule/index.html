@@ -1004,14 +1004,13 @@ function buildInterventions(rows, yearGroup) {
 
 // ── Build day structure from sheet ──────────────────────────────────────────────
 function buildDayStructure(rows, yearGroup) {
-  // Blank YearGroup = universal rows; specific YearGroup = overrides
-  // Deduplicate by ID (case-insensitive): specific rows override universal rows with the same ID
-  const matched = rows.filter(r => {
-    const raw = (r.YearGroup || '').trim();
-    return !raw || yearGroupMatches(raw, yearGroup);
-  });
-  const seen = new Set();
-  const result = [];
+  // IDs with blank YearGroup can be either:
+  //  - Truly universal (no specific rows exist for that ID, e.g. reg-am, story, home)
+  //  - Reception-only (specific rows exist for other year groups, e.g. LRSnack, s1, FAB)
+  // For IDs that have both blank and specific rows, blank rows are for Reception only.
+  // If the current year group has a specific match, use it.
+  // If the current year group is Reception (or no specific rows exist), use the blank row.
+  // Otherwise, skip the ID entirely (e.g. LRSnack should not appear for Y4).
   const toRow = r => ({
     type: (r.Type || 'session').trim().toLowerCase(),
     id: (r.ID || '').trim().toLowerCase(),
@@ -1022,24 +1021,40 @@ function buildDayStructure(rows, yearGroup) {
     hideTime: (r.HideTime || '').trim().toLowerCase() === 'true',
     order: parseInt(r.Order) || 99,
   });
-  // Process universal (blank YearGroup) first, then specific
-  const universal = matched.filter(r => !(r.YearGroup || '').trim());
-  const specific = matched.filter(r => !!(r.YearGroup || '').trim());
-  universal.forEach(r => {
+  // Group all rows by ID
+  const byId = new Map();
+  rows.forEach(r => {
     const id = (r.ID || '').trim().toLowerCase();
-    if (seen.has(id)) return;
-    seen.add(id);
-    result.push(toRow(r));
+    if (!byId.has(id)) byId.set(id, []);
+    byId.get(id).push(r);
   });
-  specific.forEach(r => {
-    const id = (r.ID || '').trim().toLowerCase();
-    if (seen.has(id)) {
-      const idx = result.findIndex(e => e.id === id);
-      if (idx >= 0) result[idx] = toRow(r);
-    } else {
-      seen.add(id);
-      result.push(toRow(r));
+  // Determine which IDs have specific (non-blank) YearGroup rows
+  const idsWithSpecific = new Set();
+  byId.forEach((rs, id) => {
+    if (rs.some(r => !!(r.YearGroup || '').trim())) idsWithSpecific.add(id);
+  });
+  const isReception = yearGroup === 'Reception';
+  const result = [];
+  byId.forEach((rs, id) => {
+    const hasSpecific = idsWithSpecific.has(id);
+    // Collect rows that match this year group
+    const matchingSpecific = rs.filter(r => {
+      const raw = (r.YearGroup || '').trim();
+      return raw && yearGroupMatches(raw, yearGroup);
+    });
+    const matchingBlank = rs.filter(r => !(r.YearGroup || '').trim());
+    if (matchingSpecific.length > 0) {
+      // This year group has specific rows — use the last one
+      result.push(toRow(matchingSpecific[matchingSpecific.length - 1]));
+    } else if (!hasSpecific || isReception) {
+      // No specific rows for this ID at all (truly universal) OR
+      // this ID has specific rows but current year group is Reception (use blank rows)
+      if (matchingBlank.length > 0) {
+        result.push(toRow(matchingBlank[0]));
+      }
     }
+    // Otherwise: ID has specific rows for other year groups but not this one,
+    // and current year group is not Reception — skip it (e.g. LRSnack for Y4)
   });
   result.sort((a, b) => a.order - b.order);
   result.forEach(r => delete r.order);
