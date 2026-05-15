@@ -349,7 +349,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.14</span>
+  <span class="version">v0.15</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -655,29 +655,44 @@ function updateSyncStatus(status) {
 }
 
 async function sheetLoadAll() {
-  if (!SYNC_URL) { updateSyncStatus(); return false; }
+  if (!SYNC_URL && !SHEET_BASE) { updateSyncStatus(); return false; }
   updateSyncStatus('loading');
   try {
-    const res = await fetch(SYNC_URL + '?action=loadAll');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    if (!data || !data.pupils) throw new Error('Invalid response');
-
-    // Merge Sheet data into state (rules stay in code)
-    state.pupils = data.pupils || [];
-    state.weeks = data.weeks || [];
-    state.assessments = data.results || [];
-    if (data.config) {
-      if (data.config.currentWeek) state.currentWeek = data.config.currentWeek;
-      if (data.config.adaptedPupils) state.adaptedPupils = String(data.config.adaptedPupils).split(',').filter(Boolean);
-      if (data.config.revisionPupils) state.revisionPupils = String(data.config.revisionPupils).split(',').filter(Boolean);
-      if (data.config.hlMaths !== undefined) state.hlContent.maths = data.config.hlMaths;
-      if (data.config.hlReading !== undefined) state.hlContent.reading = data.config.hlReading;
-      if (data.config.hlMathsAdapted !== undefined) state.hlContent.mathsAdapted = data.config.hlMathsAdapted;
-      if (data.config.hlReadingAdapted !== undefined) state.hlContent.readingAdapted = data.config.hlReadingAdapted;
-      if (data.config.wordBank) state.wordBank = String(data.config.wordBank).split(',').map(w=>w.trim()).filter(Boolean);
+    // Try Apps Script first (returns full JSON)
+    const res = await fetch(SYNC_URL + '?action=loadAll', { redirect: 'follow' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.pupils) {
+        state.pupils = data.pupils || [];
+        state.weeks = data.weeks || [];
+        state.assessments = data.results || [];
+        if (data.config) {
+          if (data.config.currentWeek) state.currentWeek = data.config.currentWeek;
+          if (data.config.adaptedPupils) state.adaptedPupils = String(data.config.adaptedPupils).split(',').filter(Boolean);
+          if (data.config.revisionPupils) state.revisionPupils = String(data.config.revisionPupils).split(',').filter(Boolean);
+          if (data.config.hlMaths !== undefined) state.hlContent.maths = data.config.hlMaths;
+          if (data.config.hlReading !== undefined) state.hlContent.reading = data.config.hlReading;
+          if (data.config.hlMathsAdapted !== undefined) state.hlContent.mathsAdapted = data.config.hlMathsAdapted;
+          if (data.config.hlReadingAdapted !== undefined) state.hlContent.readingAdapted = data.config.hlReadingAdapted;
+          if (data.config.wordBank) state.wordBank = String(data.config.wordBank).split(',').map(w=>w.trim()).filter(Boolean);
+        }
+        if (!state.rules || !state.rules.length) state.rules = defaultRules();
+        saveLocal();
+        updateSyncStatus('ok');
+        return true;
+      }
     }
-    // Ensure rules are always present (they're code-defined, not from Sheet)
+    // Fallback: load from gviz CSV
+    const [pupilsCsv, weeksCsv, resultsCsv, configCsv] = await Promise.all([
+      fetch(SHEET_BASE + 'Pupils').then(r => r.text()),
+      fetch(SHEET_BASE + 'Weeks').then(r => r.text()),
+      fetch(SHEET_BASE + 'Results').then(r => r.text()),
+      fetch(SHEET_BASE + 'Config').then(r => r.text()),
+    ]);
+    state.pupils = parsePupilsCsv(pupilsCsv);
+    state.weeks = parseWeeksCsv(weeksCsv);
+    state.assessments = parseResultsCsv(resultsCsv);
+    parseConfigCsv(configCsv);
     if (!state.rules || !state.rules.length) state.rules = defaultRules();
     saveLocal();
     updateSyncStatus('ok');
@@ -687,6 +702,74 @@ async function sheetLoadAll() {
     updateSyncStatus('err');
     return false;
   }
+}
+
+// ── CSV parsing for gviz fallback ─────────────────────────────────────────────
+function csvRows(csv) {
+  const lines = csv.trim().split('\n');
+  if (lines.length < 2) return [];
+  return lines.slice(1).filter(l => l.trim());
+}
+function csvFields(line) {
+  const fields = []; let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+    else if (c === ',' && !inQ) { fields.push(cur.trim()); cur = ''; }
+    else cur += c;
+  }
+  fields.push(cur.trim());
+  return fields;
+}
+
+function parsePupilsCsv(csv) {
+  const rows = csvRows(csv); if (!rows.length) return [];
+  const result = [];
+  rows.forEach(line => {
+    const f = csvFields(line); if (!f[0]) return;
+    const p = { id: f[0], firstName: f[1]||'', lastName: f[2]||'', class: f[3]||'',
+      pairId: f[4]===''||f[4]===undefined?null:Number(f[4]), tableNum: f[5]===''||f[5]===undefined?null:Number(f[5]),
+      ttSet: f[6]||'', ssUser: f[7]||'', ssPassword: f[8]||'', mastery: {} };
+    if (isNaN(p.pairId)) p.pairId = null;
+    if (f[9]) String(f[9]).split(',').forEach(w => { const k = w.trim().toLowerCase(); if (k) p.mastery[k] = true; });
+    if (f[10]) String(f[10]).split(',').forEach(w => { const k = w.trim().toLowerCase(); if (k) p.mastery[k] = false; });
+    result.push(p);
+  });
+  return result;
+}
+function parseWeeksCsv(csv) {
+  const rows = csvRows(csv); if (!rows.length) return [];
+  return rows.map(line => {
+    const f = csvFields(line);
+    return { id: f[0]||'', label: f[1]||'', ruleId: f[2]||'', revisionRuleId: f[3]||'' };
+  }).filter(w => w.id);
+}
+function parseResultsCsv(csv) {
+  const rows = csvRows(csv); if (!rows.length) return [];
+  return rows.map(line => {
+    const f = csvFields(line);
+    const a = { id: f[0]||'', pupilId: f[1]||'', date: f[2]||'', score: Number(f[3])||0, total: Number(f[4])||0, words: [] };
+    for (let n = 0; n < 10; n++) {
+      const w = f[5+n]; const c = f[15+n];
+      if (w) a.words.push({ word: String(w), correct: c==='Y'||c==='true'||c==='1', response: '' });
+    }
+    return a;
+  }).filter(a => a.id);
+}
+function parseConfigCsv(csv) {
+  const rows = csvRows(csv); if (!rows.length) return;
+  rows.forEach(line => {
+    const f = csvFields(line);
+    const key = f[0], val = f[1];
+    if (key === 'currentWeek') state.currentWeek = val;
+    else if (key === 'adaptedPupils') state.adaptedPupils = String(val).split(',').filter(Boolean);
+    else if (key === 'revisionPupils') state.revisionPupils = String(val).split(',').filter(Boolean);
+    else if (key === 'hlMaths') state.hlContent.maths = val || '';
+    else if (key === 'hlReading') state.hlContent.reading = val || '';
+    else if (key === 'hlMathsAdapted') state.hlContent.mathsAdapted = val || '';
+    else if (key === 'hlReadingAdapted') state.hlContent.readingAdapted = val || '';
+    else if (key === 'wordBank') state.wordBank = String(val).split(',').map(w=>w.trim()).filter(Boolean);
+  });
 }
 
 async function sheetSaveAll() {
@@ -1973,10 +2056,16 @@ function downloadPDF(element, filename, orientation) {
 // ========================
 // INIT
 // ========================
-updateSyncStatus();
 if (SYNC_URL) {
-  sheetLoadAll().then(() => { updateSyncStatus('ok'); renderDashboard(); goTab('dashboard'); });
+  sheetLoadAll().then(ok => {
+    if (!ok) updateSyncStatus('err');
+    renderDashboard(); goTab('dashboard');
+  }).catch(() => {
+    updateSyncStatus('err');
+    renderDashboard(); goTab('dashboard');
+  });
 } else {
+  updateSyncStatus();
   renderDashboard(); goTab('dashboard');
 }
 </script>
