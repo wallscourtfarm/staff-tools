@@ -349,7 +349,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.17</span>
+  <span class="version">v0.18</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -1581,6 +1581,10 @@ function printPupilWords() {
 // ========================
 function initWeekly() {
   const sel = document.getElementById('w-rule');
+  const revSel = document.getElementById('w-revision-rule');
+  // Save current selections before rebuilding
+  const savedRule = sel.value;
+  const savedRev = revSel.value;
   sel.innerHTML = '<option value="">Select a rule...</option>';
   const years = ['Year 1','Year 2','Year 3','Year 4','Year 4 Rev','Year 5','Year 6'];
   years.forEach(y => {
@@ -1591,7 +1595,6 @@ function initWeekly() {
     });
     sel.appendChild(grp);
   });
-  const revSel = document.getElementById('w-revision-rule');
   revSel.innerHTML = '<option value="">None</option>';
   years.forEach(y => {
     const grp = document.createElement('optgroup'); grp.label = y;
@@ -1601,6 +1604,17 @@ function initWeekly() {
     });
     revSel.appendChild(grp);
   });
+  // Restore previous selections or populate from current week
+  if (savedRule) sel.value = savedRule;
+  if (savedRev) revSel.value = savedRev;
+  if (!savedRule && state.currentWeek) {
+    const cw = state.weeks.find(w => w.id === state.currentWeek);
+    if (cw) {
+      sel.value = cw.ruleId;
+      if (cw.revisionRuleId) revSel.value = cw.revisionRuleId;
+      if (!document.getElementById('w-label').value) document.getElementById('w-label').value = cw.label;
+    }
+  }
   previewWeekly();
 }
 function previewWeekly() {
@@ -2051,18 +2065,21 @@ function printHandoutOrder() {
 }
 
 function downloadPDF(element, filename, orientation) {
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;left:0;top:0;width:100%;z-index:9999;background:#fff;overflow:visible;';
   const clone = element.cloneNode(true);
   clone.classList.remove('hidden');
-  clone.style.cssText = 'display:block!important;position:fixed;left:0;top:0;z-index:-1;opacity:1;width:100%;background:#fff;';
-  document.body.appendChild(clone);
+  clone.style.cssText = 'display:block!important;position:static;width:100%;background:#fff;';
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
   const opt = {
     margin: 8,
     filename: filename + '.pdf',
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, windowWidth: 1200 },
+    html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 1200 },
     jsPDF: { unit: 'mm', format: 'a4', orientation: orientation || 'portrait' }
   };
-  html2pdf().set(opt).from(clone).save().then(() => clone.remove());
+  html2pdf().set(opt).from(clone).save().then(() => wrapper.remove()).catch(e => { console.error('PDF error:', e); wrapper.remove(); });
 }
 
 // ========================
