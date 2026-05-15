@@ -333,12 +333,52 @@
   }
   .bee-strip.cut-h { border-bottom: 1px dashed #bbb; padding-bottom: 2mm; }
   .bee-strip.cut-v { border-right: 1px dashed #bbb; padding-right: 2mm; }
+
+  /* ======================== PRINT ======================== */
+  @media print {
+    /* Hide app chrome */
+    header, nav, .sticky-actions, .modal { display: none !important; }
+
+    /* Hide all buttons */
+    button, .btn, .btn.secondary, .btn.small { display: none !important; }
+
+    /* Hide config panels and non-print content */
+    #hl-config, #bee-config, #tt-config,
+    #pupil-detail, #pupil-editor, #admin-section,
+    #weekly, #data, #dashboard { display: none !important; }
+
+    /* Hide empty print areas */
+    .print-area:empty { display: none !important; }
+
+    /* Show populated print areas */
+    .print-area:not(:empty) { display: block !important; }
+
+    /* Reset body */
+    body { background: #fff; margin: 0; padding: 0; }
+
+    /* Sheet styling */
+    .hl-sheet, .tt-sheet, .bee-sheet {
+      margin: 0 auto !important;
+      box-shadow: none !important;
+      page-break-after: always;
+      page-break-inside: avoid;
+    }
+    .hl-sheet:last-child, .tt-sheet:last-child, .bee-sheet:last-child {
+      page-break-after: auto;
+    }
+
+    /* Ensure colours and backgrounds print */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+  }
 </style>
 </head>
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.32</span>
+  <span class="version">v0.34</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -449,6 +489,7 @@
         </table>
       </div>
     </div>
+    <div id="handout-print" class="print-area hidden" style="margin-top:12px;"></div>
   </div>
   <div id="pupil-editor" class="card hidden">
     <h2 id="pe-title">Edit Pupil</h2>
@@ -607,6 +648,22 @@
       <label>Import from Excel CSV (Data sheet)</label>
       <input type="file" id="import-csv" accept=".csv" onchange="importDataCSV(event)">
     </div>
+  </div>
+  <div class="card">
+    <h2>High-Quality PDFs (Python)</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">
+      For the best print quality with the correct Sassoon Infant font and exact layout matching, use the Python script after exporting JSON:
+    </p>
+    <ol style="font-size:13px;margin-bottom:12px;padding-left:18px;color:var(--muted);">
+      <li>Click <strong>Export JSON Backup</strong> above and save the file.</li>
+      <li>Open a terminal in this folder and run:<br>
+        <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:12px;">python generate_pdfs.py wfa-spellings-YYYY-MM-DD.json</code>
+      </li>
+      <li>Four PDFs are created in the current folder.</li>
+    </ol>
+    <p style="font-size:12px;color:var(--muted);">
+      Optional filters: <code>--hl-class IM</code>, <code>--tt-class WU</code>, <code>--bee-class All</code>
+    </p>
   </div>
   <div class="card">
     <h2>Reset</h2>
@@ -1970,7 +2027,14 @@ function printHandoutOrder() {
     container.innerHTML += html;
   });
 
-  savePdfHandout();
+  const printContainer = document.getElementById('handout-print');
+  printContainer.innerHTML = '';
+  printContainer.appendChild(container);
+  printContainer.classList.remove('hidden');
+  doPrint('portrait', () => {
+    printContainer.innerHTML = '';
+    printContainer.classList.add('hidden');
+  });
 }
 
 // ========================
