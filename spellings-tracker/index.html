@@ -98,7 +98,8 @@
   .pupil-sheet td:nth-child(9) { width: 40px; }
   .pupil-sheet td:nth-child(10),
   .pupil-sheet td:nth-child(11),
-  .pupil-sheet td:nth-child(12) { width: 24px; }
+  .pupil-sheet td:nth-child(12),
+  .pupil-sheet td:nth-child(13) { width: 24px; }
   .pupil-sheet td input, .pupil-sheet td select {
     font-size: 13px; padding: 3px 4px; border: 1px solid transparent;
     border-radius: 4px; background: transparent; width: 100%; min-width: 0;
@@ -346,7 +347,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.10</span>
+  <span class="version">v0.11</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -432,11 +433,12 @@
             <th rowspan="2">TT Set</th>
             <th rowspan="2" style="font-size:11px;line-height:1.1">Adapted<br>Home<br>Learning</th>
             <th colspan="2" style="font-size:11px;text-align:center">Spelling Rule</th>
-            <th colspan="3" style="font-size:11px;text-align:center">Tracking</th>
+            <th colspan="4" style="font-size:11px;text-align:center">Tracking</th>
           </tr>
           <tr>
             <th style="font-size:11px;line-height:1.1">Y4<br>Rule</th>
             <th style="font-size:11px;line-height:1.1">Rev<br>Rule</th>
+            <th onclick="sortPupils('masteryKS1')" style="cursor:pointer;font-weight:normal;font-size:11px">KS1</th>
             <th onclick="sortPupils('masteryYear')" style="cursor:pointer;font-weight:normal;font-size:11px">Yr</th>
             <th onclick="sortPupils('masteryLks2')" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2</th>
             <th onclick="sortPupils('masteryAll')" style="cursor:pointer;font-weight:normal;font-size:11px">All</th>
@@ -1019,7 +1021,7 @@ function togglePupilLock() {
 }
 
 function updateSortArrows() {
-  const labels = { firstName:'First', lastName:'Last', class:'Class', pairId:'Pair', tableNum:'Print Sort Order', masteryYear:'Yr', masteryLks2:'LKS2', masteryAll:'All' };
+  const labels = { firstName:'First', lastName:'Last', class:'Class', pairId:'Pair', tableNum:'Print Sort Order', masteryKS1:'KS1', masteryYear:'Yr', masteryLks2:'LKS2', masteryAll:'All' };
   document.querySelectorAll('.pupil-sheet thead th').forEach(th => {
     const onclick = th.getAttribute('onclick') || '';
     const match = onclick.match(/sortPupils\('(\w+)'\)/);
@@ -1037,7 +1039,8 @@ function renderPupils() {
   let list = state.pupils.filter(p => !q || `${p.firstName} ${p.lastName}`.toLowerCase().includes(q));
   list.sort((a, b) => {
     let av, bv;
-    if (pupilSortField === 'masteryYear') { av = masteryBreakdown(a).year; bv = masteryBreakdown(b).year; }
+    if (pupilSortField === 'masteryKS1') { av = masteryBreakdown(a).ks1; bv = masteryBreakdown(b).ks1; }
+    else if (pupilSortField === 'masteryYear') { av = masteryBreakdown(a).year; bv = masteryBreakdown(b).year; }
     else if (pupilSortField === 'masteryLks2') { av = masteryBreakdown(a).lks2; bv = masteryBreakdown(b).lks2; }
     else if (pupilSortField === 'masteryAll') { av = masteryBreakdown(a).overall; bv = masteryBreakdown(b).overall; }
     else { av = a[pupilSortField] || ''; bv = b[pupilSortField] || ''; }
@@ -1073,7 +1076,7 @@ function renderPupils() {
       ? (isRevision ? '✓' : '')
       : `<input type="checkbox" ${isRevision ? 'checked' : ''} onclick="setPupilRule('${p.id}','rev')">`;
     const mb = masteryBreakdown(p);
-    const masteryCells = `<td>${mb.year}%</td><td>${mb.lks2}%</td><td>${mb.overall}%</td>`;
+    const masteryCells = `<td>${mb.ks1}%</td><td>${mb.year}%</td><td>${mb.lks2}%</td><td>${mb.overall}%</td>`;
     tr.innerHTML = `<td>${nameBtn}</td><td>${lastCell}</td><td>${classCell}</td><td>${pairCell}</td><td>${tableCell}</td><td>${ttCell}</td><td style="text-align:center">${adaptedCell}</td><td style="text-align:center">${y4Cell}</td><td style="text-align:center">${revCell}</td>${masteryCells}`;
     tbody.appendChild(tr);
   });
@@ -1099,24 +1102,24 @@ function masteryPercent(p) {
   return Math.round(vals.filter(v => v === true).length / vals.length * 100);
 }
 function masteryBreakdown(p) {
-  if (!p.mastery || !Object.keys(p.mastery).length) return { year: 0, lks2: 0, phase: 0, overall: 0 };
-  const yearWords = { year: new Set(), lks2: new Set(), phase: new Set(), overall: new Set() };
+  if (!p.mastery || !Object.keys(p.mastery).length) return { ks1: 0, year: 0, lks2: 0, overall: 0 };
+  const yearWords = { ks1: new Set(), year: new Set(), lks2: new Set(), overall: new Set() };
   state.rules.forEach(r => {
     const y = r.year || '';
+    const isKS1 = y === 'Year 1' || y === 'Year 2';
     const isYear4 = y === 'Year 4';
     const isLKS2 = y === 'Year 3' || y === 'Year 4';
-    const isUKS2 = y === 'Year 5' || y === 'Year 6';
     r.words.forEach(w => {
       const wl = w.toLowerCase();
       yearWords.overall.add(wl);
+      if (isKS1) yearWords.ks1.add(wl);
       if (isYear4) yearWords.year.add(wl);
       if (isLKS2) yearWords.lks2.add(wl);
-      if (isLKS2 || isUKS2) yearWords.phase.add(wl);
     });
   });
   const mastered = Object.keys(p.mastery).filter(w => p.mastery[w] === true).map(w => w.toLowerCase());
   const pct = (set) => { const arr = [...set]; if (!arr.length) return 0; return Math.round(mastered.filter(w => set.has(w)).length / arr.length * 100); };
-  return { year: pct(yearWords.year), lks2: pct(yearWords.lks2), phase: pct(yearWords.phase), overall: pct(yearWords.overall) };
+  return { ks1: pct(yearWords.ks1), year: pct(yearWords.year), lks2: pct(yearWords.lks2), overall: pct(yearWords.overall) };
 }
 let adminVisible = false;
 function toggleAdmin() {
