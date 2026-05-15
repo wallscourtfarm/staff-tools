@@ -349,7 +349,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.19</span>
+  <span class="version">v0.20</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -2078,21 +2078,24 @@ function printHandoutOrder() {
 }
 
 function downloadPDF(element, filename, orientation) {
-  const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'position:fixed;left:0;top:0;width:100%;z-index:9999;background:#fff;overflow:visible;';
   const clone = element.cloneNode(true);
   clone.classList.remove('hidden');
-  clone.style.cssText = 'display:block!important;position:static;width:100%;background:#fff;';
-  wrapper.appendChild(clone);
-  document.body.appendChild(wrapper);
-  const opt = {
-    margin: 8,
-    filename: filename + '.pdf',
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 1200 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: orientation || 'portrait' }
-  };
-  html2pdf().set(opt).from(clone).save().then(() => wrapper.remove()).catch(e => { console.error('PDF error:', e); wrapper.remove(); });
+  // Must override .hidden's display:none!important with an equally strong rule
+  clone.setAttribute('style', 'display:block!important;position:absolute;left:-9999px;top:0;width:1200px;background:#fff;');
+  document.body.appendChild(clone);
+  // Give the browser a moment to render the clone before capturing
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const opt = {
+        margin: 8,
+        filename: filename + '.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: true, windowWidth: 1200 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: orientation || 'portrait' }
+      };
+      html2pdf().set(opt).from(clone).save().then(() => clone.remove()).catch(e => { console.error('PDF error:', e); clone.remove(); });
+    });
+  });
 }
 
 // ========================
