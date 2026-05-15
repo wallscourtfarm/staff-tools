@@ -86,18 +86,19 @@
   .pupil-sheet { font-size: 12px; width: 100%; border-collapse: collapse; }
   .pupil-sheet th, .pupil-sheet td { border: 1px solid #d1d5db; }
   .pupil-sheet th { padding: 3px 4px; background: #f9fafb; }
-  .pupil-sheet td { padding: 2px 4px; vertical-align: middle; white-space: nowrap; }
-  .pupil-sheet td:nth-child(1) { min-width: auto; }
-  .pupil-sheet td:nth-child(2) { min-width: auto; }
+  .pupil-sheet td { padding: 2px 3px; vertical-align: middle; white-space: nowrap; }
+  .pupil-sheet td:nth-child(1),
+  .pupil-sheet td:nth-child(2),
   .pupil-sheet td:nth-child(3) { min-width: auto; }
   .pupil-sheet td:nth-child(4),
-  .pupil-sheet td:nth-child(5) { min-width: 28px; text-align: center; }
-  .pupil-sheet td:nth-child(6) { min-width: 28px; text-align: center; }
-  .pupil-sheet td:nth-child(7),
-  .pupil-sheet td:nth-child(8) { min-width: 24px; text-align: center; font-size: 12px; }
-  .pupil-sheet td:nth-child(9),
+  .pupil-sheet td:nth-child(5) { min-width: 26px; text-align: center; }
+  .pupil-sheet td:nth-child(6) { min-width: 26px; text-align: center; }
+  .pupil-sheet td:nth-child(7) { min-width: 22px; text-align: center; font-size: 11px; }
+  .pupil-sheet td:nth-child(8),
+  .pupil-sheet td:nth-child(9) { min-width: 22px; text-align: center; }
   .pupil-sheet td:nth-child(10),
-  .pupil-sheet td:nth-child(11) { min-width: 26px; text-align: center; }
+  .pupil-sheet td:nth-child(11),
+  .pupil-sheet td:nth-child(12) { min-width: 24px; text-align: center; }
   .pupil-sheet td input, .pupil-sheet td select {
     font-size: 13px; padding: 3px 4px; border: 1px solid transparent;
     border-radius: 4px; background: transparent; width: 100%; min-width: 0;
@@ -421,7 +422,7 @@
     </div>
     <div style="overflow-x:auto;">
       <table class="pupil-sheet">
-        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">First</th><th onclick="sortPupils('lastName')" style="cursor:pointer">Last</th><th onclick="sortPupils('class')" style="cursor:pointer">Class</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair</th><th onclick="sortPupils('tableNum')" style="cursor:pointer;white-space:normal;line-height:1.1">Alt Print<br>Order</th><th>TT</th><th style="font-size:11px">Adapt</th><th style="font-size:11px">Y4 Rule</th><th onclick="sortPupils('masteryYear')" style="cursor:pointer;font-weight:normal;font-size:11px">Yr</th><th onclick="sortPupils('masteryLks2')" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2</th><th onclick="sortPupils('masteryAll')" style="cursor:pointer;font-weight:normal;font-size:11px">All</th></tr>
+        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">First</th><th onclick="sortPupils('lastName')" style="cursor:pointer">Last</th><th onclick="sortPupils('class')" style="cursor:pointer">Class</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair</th><th onclick="sortPupils('tableNum')" style="cursor:pointer;white-space:normal;line-height:1.1">Alt Print<br>Order</th><th>TT</th><th style="font-size:11px;white-space:normal;line-height:1.1">Adapted<br>HL</th><th style="font-size:11px">Y4</th><th style="font-size:11px">Rev</th><th onclick="sortPupils('masteryYear')" style="cursor:pointer;font-weight:normal;font-size:11px">Yr</th><th onclick="sortPupils('masteryLks2')" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2</th><th onclick="sortPupils('masteryAll')" style="cursor:pointer;font-weight:normal;font-size:11px">All</th></tr>
         <tbody id="pupil-table"></tbody>
       </table>
     </div>
@@ -1046,12 +1047,15 @@ function renderPupils() {
     const adaptedCell = pupilLocked
       ? (isAdapted ? '✓' : '')
       : `<input type="checkbox" ${isAdapted ? 'checked' : ''} onchange="togglePupilList('adaptedPupils','${p.id}')">`;
-    const revisionCell = pupilLocked
+    const y4Cell = pupilLocked
+      ? (isRevision ? '' : '✓')
+      : `<input type="checkbox" ${isRevision ? '' : 'checked'} onclick="setPupilRule('${p.id}','y4')">`;
+    const revCell = pupilLocked
       ? (isRevision ? '✓' : '')
-      : `<input type="checkbox" ${isRevision ? 'checked' : ''} onchange="togglePupilList('revisionPupils','${p.id}')">`;
+      : `<input type="checkbox" ${isRevision ? 'checked' : ''} onclick="setPupilRule('${p.id}','rev')">`;
     const mb = masteryBreakdown(p);
     const masteryCells = `<td>${mb.year}%</td><td>${mb.lks2}%</td><td>${mb.overall}%</td>`;
-    tr.innerHTML = `<td>${nameBtn}</td><td>${lastCell}</td><td>${classCell}</td><td>${pairCell}</td><td>${tableCell}</td><td>${ttCell}</td><td style="text-align:center">${adaptedCell}</td><td style="text-align:center">${revisionCell}</td>${masteryCells}`;
+    tr.innerHTML = `<td>${nameBtn}</td><td>${lastCell}</td><td>${classCell}</td><td>${pairCell}</td><td>${tableCell}</td><td>${ttCell}</td><td style="text-align:center">${adaptedCell}</td><td style="text-align:center">${y4Cell}</td><td style="text-align:center">${revCell}</td>${masteryCells}`;
     tbody.appendChild(tr);
   });
   if (adminVisible) renderAdmin();
@@ -1471,6 +1475,14 @@ function toggleAdapted(id) {
 function togglePupilList(listName, id) {
   if (state[listName].includes(id)) state[listName] = state[listName].filter(x => x !== id);
   else state[listName].push(id);
+  saveState(); renderPupils();
+}
+function setPupilRule(id, rule) {
+  if (rule === 'rev') {
+    if (!state.revisionPupils.includes(id)) state.revisionPupils.push(id);
+  } else {
+    state.revisionPupils = state.revisionPupils.filter(x => x !== id);
+  }
   saveState(); renderPupils();
 }
 function generateHL(filterClass) {
