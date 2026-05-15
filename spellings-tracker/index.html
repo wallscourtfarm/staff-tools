@@ -349,7 +349,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.22</span>
+  <span class="version">v0.23</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -664,8 +664,8 @@ function updateSyncStatus(status) {
 async function sheetLoadAll() {
   if (!SYNC_URL && !SHEET_BASE) { updateSyncStatus(); return false; }
   updateSyncStatus('loading');
+  // Try Apps Script first (returns full JSON)
   try {
-    // Try Apps Script first (returns full JSON)
     const res = await fetch(SYNC_URL + '?action=loadAll', { redirect: 'follow' });
     if (res.ok) {
       const data = await res.json();
@@ -689,7 +689,11 @@ async function sheetLoadAll() {
         return true;
       }
     }
-    // Fallback: load from gviz CSV
+  } catch (e) {
+    console.log('Apps Script load failed (CORS), falling back to gviz:', e.message || e);
+  }
+  // Fallback: load from gviz CSV
+  try {
     const [pupilsCsv, weeksCsv, resultsCsv, configCsv] = await Promise.all([
       fetch(SHEET_BASE + 'Pupils').then(r => r.text()),
       fetch(SHEET_BASE + 'Weeks').then(r => r.text()),
