@@ -338,7 +338,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.26</span>
+  <span class="version">v0.27</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -1747,7 +1747,8 @@ function setPupilRule(id, rule) {
   saveState(); renderPupils();
 }
 function generateHL(filterClass) {
-  hlFilter = filterClass; = document.getElementById('hl-label').value.trim() || 'Home Learning';
+  hlFilter = filterClass;
+  const label = document.getElementById('hl-label').value.trim() || 'Home Learning';
   const maths = document.getElementById('hl-maths').value.trim();
   const reading = document.getElementById('hl-reading').value.trim();
   const mathsA = document.getElementById('hl-maths-a').value.trim();
@@ -1833,7 +1834,8 @@ function initBee() {
 }
 
 function generateBeeSheets(filterClass) {
-  beeFilter = filterClass; = filterClass ? state.pupils.filter(p => p.class === filterClass) : state.pupils;
+  beeFilter = filterClass;
+  let pupils = filterClass ? state.pupils.filter(p => p.class === filterClass) : state.pupils;
   const sortBy = document.getElementById('bee-sort').value || 'name';
   if (sortBy === 'pair') {
     pupils = pupils.slice().sort((a, b) => (a.pairId || 99) - (b.pairId || 99) || a.firstName.localeCompare(b.firstName));
@@ -1909,7 +1911,8 @@ function resetBee() {
 // TT SHEETS
 // ========================
 function generateTT(filterClass) {
-  ttFilter = filterClass; = filterClass ? state.pupils.filter(p => p.class === filterClass) : state.pupils;
+  ttFilter = filterClass;
+  const pupils = filterClass ? state.pupils.filter(p => p.class === filterClass) : state.pupils;
   const container = document.getElementById('tt-print');
   container.innerHTML = '';
 
