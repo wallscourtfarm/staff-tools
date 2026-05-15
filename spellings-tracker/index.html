@@ -83,17 +83,15 @@
   .stat .lbl { font-size: 12px; color: var(--muted); }
   .mark-toggle { display: inline-flex; gap: 4px; }
   .mark-toggle button { padding: 6px 14px; font-size: 13px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; cursor: pointer; }
-  .pupil-sheet { font-size: 13px; }
-  .pupil-sheet th { padding: 6px 4px; white-space: nowrap; }
-  .pupil-sheet td { padding: 3px 4px; vertical-align: middle; white-space: nowrap; }
-  .pupil-sheet td:nth-child(1) { min-width: 120px; }
+  .pupil-sheet { font-size: 13px; width: 100%; }
+  .pupil-sheet th { padding: 4px 3px; white-space: nowrap; }
+  .pupil-sheet td { padding: 2px 3px; vertical-align: middle; white-space: nowrap; }
+  .pupil-sheet td:nth-child(1) { min-width: 100px; }
   .pupil-sheet td:nth-child(2),
-  .pupil-sheet td:nth-child(3) { min-width: 60px; }
+  .pupil-sheet td:nth-child(3) { min-width: 50px; }
   .pupil-sheet td:nth-child(4),
   .pupil-sheet td:nth-child(5),
-  .pupil-sheet td:nth-child(6) { min-width: 40px; }
-  .pupil-sheet td:nth-child(7),
-  .pupil-sheet td:nth-child(8) { min-width: 70px; }
+  .pupil-sheet td:nth-child(6) { min-width: 36px; }
   .pupil-sheet td input, .pupil-sheet td select {
     font-size: 13px; padding: 3px 4px; border: 1px solid transparent;
     border-radius: 4px; background: transparent; width: 100%; min-width: 0;
@@ -132,6 +130,7 @@
   .cut-h { border-bottom: 1px dashed #bbb; }
   .cut-v { border-right: 1px dashed #bbb; }
   #hl-adapt-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; margin-top: 8px; }
+  #hl-adapt-list label { display: flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; }
 
   /* ---- HOME LEARNING ---- */
   .hl-sheet {
@@ -407,7 +406,7 @@
     </div>
     <div style="overflow-x:auto;">
       <table class="pupil-sheet">
-        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">Name ▼</th><th onclick="sortPupils('class')" style="cursor:pointer">Class ▼</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair ▼</th><th onclick="sortPupils('tableNum')" style="cursor:pointer">Table ▼</th><th>TT Set</th><th onclick="sortPupils('mastery')" style="cursor:pointer">Key % ▼</th></tr></thead>
+        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">Name ▼</th><th onclick="sortPupils('class')" style="cursor:pointer">Class ▼</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair ▼</th><th onclick="sortPupils('tableNum')" style="cursor:pointer">Table ▼</th><th>TT Set</th><th onclick="sortPupils('mastery')" style="cursor:pointer">Key % ▼<br><small style="font-weight:normal">Yr | LKS2 | All</small></th></tr></thead>
         <tbody id="pupil-table"></tbody>
       </table>
     </div>
@@ -1023,7 +1022,7 @@ function renderPupils() {
       ? `<span class="tag set">${p.ttSet || 'All'}</span>`
       : `<select onchange="updatePupil('${p.id}','ttSet',this.value)">${['All','2','3','4','5','6','7','8','9','10','11','12'].map(v=>`<option${v===(p.ttSet||'All')?' selected':''}>${v}</option>`).join('')}</select>`;
     const mb = masteryBreakdown(p);
-    const masteryCell = `${mb.year}%<span style="color:var(--muted)">|${mb.lks2}%|${mb.overall}%</span>`;
+    const masteryCell = `${mb.year}%<span style="color:var(--muted)"> | ${mb.lks2}% | ${mb.overall}%</span>`;
     tr.innerHTML = `<td>${nameBtn}</td><td>${classCell}</td><td>${pairCell}</td><td>${tableCell}</td><td>${ttCell}</td><td>${masteryCell}</td>`;
     tbody.appendChild(tr);
   });
@@ -1436,7 +1435,7 @@ function initHL() {
   const list = document.getElementById('hl-adapt-list'); list.innerHTML = '';
   state.pupils.forEach(p => {
     const lbl = document.createElement('label');
-    lbl.style.cssText = 'font-size:14px;cursor:pointer;';
+    lbl.className = '';
     const checked = state.adaptedPupils.includes(p.id) ? 'checked' : '';
     lbl.innerHTML = `<input type="checkbox" value="${p.id}" ${checked} onchange="toggleAdapted('${p.id}')"> ${p.firstName} ${p.lastName}`;
     list.appendChild(lbl);
@@ -1587,7 +1586,7 @@ function generateBeeSheets(filterClass) {
         if (row < 2) strip.classList.add('cut-h');
         if (col < 2) strip.classList.add('cut-v');
         strip.innerHTML = `
-          <div class="bee-strip-name" style="background-color:${colour};color:${txtCol}">${p.firstName} ${p.lastName}</div>
+          <div class="bee-strip-name" style="background-color:${colour};color:${txtCol}">Name: ________________</div>
           <table class="bee-strip-table">${Array.from({length:10}, (_, i) => `<tr><td>${i+1}.</td><td class="blank-line"></td></tr>`).join('')}</table>
         `;
         page.appendChild(strip);
@@ -1773,6 +1772,23 @@ function printHandoutOrder() {
   document.body.appendChild(container);
   downloadPDF(container, 'handout-order', 'portrait');
   setTimeout(() => container.remove(), 1000);
+}
+
+function downloadPDF(element, filename, orientation) {
+  const clone = element.cloneNode(true);
+  clone.classList.remove('hidden');
+  clone.style.position = 'absolute';
+  clone.style.left = '-9999px';
+  clone.style.top = '0';
+  document.body.appendChild(clone);
+  const opt = {
+    margin: 8,
+    filename: filename + '.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: orientation || 'portrait' }
+  };
+  html2pdf().set(opt).from(clone).save().then(() => clone.remove());
 }
 
 // ========================
