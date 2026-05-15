@@ -421,7 +421,7 @@
     </div>
     <div style="overflow-x:auto;">
       <table class="pupil-sheet">
-        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">First</th><th onclick="sortPupils('lastName')" style="cursor:pointer">Last</th><th onclick="sortPupils('class')" style="cursor:pointer">Class</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair</th><th onclick="sortPupils('tableNum')" style="cursor:pointer">Table</th><th>TT</th><th>Adapted</th><th>Rule</th><th onclick="sortPupils('masteryYear')" style="cursor:pointer;font-weight:normal;font-size:11px">Yr</th><th onclick="sortPupils('masteryLks2')" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2</th><th onclick="sortPupils('masteryAll')" style="cursor:pointer;font-weight:normal;font-size:11px">All</th></tr>
+        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">First</th><th onclick="sortPupils('lastName')" style="cursor:pointer">Last</th><th onclick="sortPupils('class')" style="cursor:pointer">Class</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair</th><th onclick="sortPupils('tableNum')" style="cursor:pointer">Table</th><th>TT</th><th style="font-size:11px">Adapted HL</th><th style="font-size:11px">Rev Rule</th><th onclick="sortPupils('masteryYear')" style="cursor:pointer;font-weight:normal;font-size:11px">Yr</th><th onclick="sortPupils('masteryLks2')" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2</th><th onclick="sortPupils('masteryAll')" style="cursor:pointer;font-weight:normal;font-size:11px">All</th></tr>
         <tbody id="pupil-table"></tbody>
       </table>
     </div>
@@ -630,6 +630,7 @@ async function sheetLoadAll() {
     if (data.config) {
       if (data.config.currentWeek) state.currentWeek = data.config.currentWeek;
       if (data.config.adaptedPupils) state.adaptedPupils = String(data.config.adaptedPupils).split(',').filter(Boolean);
+      if (data.config.revisionPupils) state.revisionPupils = String(data.config.revisionPupils).split(',').filter(Boolean);
       if (data.config.hlMaths !== undefined) state.hlContent.maths = data.config.hlMaths;
       if (data.config.hlReading !== undefined) state.hlContent.reading = data.config.hlReading;
       if (data.config.hlMathsAdapted !== undefined) state.hlContent.mathsAdapted = data.config.hlMathsAdapted;
@@ -665,6 +666,7 @@ async function sheetSaveAll() {
     config: {
       currentWeek: state.currentWeek || '',
       adaptedPupils: (state.adaptedPupils || []).join(','),
+      revisionPupils: (state.revisionPupils || []).join(','),
       hlMaths: state.hlContent.maths || '',
       hlReading: state.hlContent.reading || '',
       hlMathsAdapted: state.hlContent.mathsAdapted || '',
@@ -717,7 +719,7 @@ async function forceSyncPush() {
 }
 function defaultState() {
   return { pupils: [], rules: defaultRules(), weeks: [], currentWeek: null, assessments: [],
-    adaptedPupils: [], hlContent: { maths:'',reading:'',mathsAdapted:'',readingAdapted:'' }, wordBank: [] };
+    adaptedPupils: [], revisionPupils: [], hlContent: { maths:'',reading:'',mathsAdapted:'',readingAdapted:'' }, wordBank: [] };
 }
 
 function defaultRules() { return [
@@ -1048,17 +1050,16 @@ function renderPupils() {
       ? `<span class="tag set">${p.ttSet || 'All'}</span>`
       : `<select onchange="updatePupil('${p.id}','ttSet',this.value)">${['All','2','3','4','5','6','7','8','9','10','11','12'].map(v=>`<option${v===(p.ttSet||'All')?' selected':''}>${v}</option>`).join('')}</select>`;
     const isAdapted = state.adaptedPupils.includes(p.id);
+    const isRevision = state.revisionPupils.includes(p.id);
     const adaptedCell = pupilLocked
       ? (isAdapted ? '✓' : '')
-      : `<input type="checkbox" ${isAdapted ? 'checked' : ''} onchange="toggleAdapted('${p.id}');renderPupils()">`;
-    const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
-    const mainRule = cw ? state.rules.find(r => r.id === cw.ruleId) : null;
-    const revRule = cw && cw.revisionRuleId ? state.rules.find(r => r.id === cw.revisionRuleId) : null;
-    const pupilRule = isAdapted && revRule ? revRule : mainRule;
-    const ruleCell = pupilRule ? `<span style="font-size:11px">${pupilRule.step || ''}</span>` : '-';
+      : `<input type="checkbox" ${isAdapted ? 'checked' : ''} onchange="togglePupilList('adaptedPupils','${p.id}')">`;
+    const revisionCell = pupilLocked
+      ? (isRevision ? '✓' : '')
+      : `<input type="checkbox" ${isRevision ? 'checked' : ''} onchange="togglePupilList('revisionPupils','${p.id}')">`;
     const mb = masteryBreakdown(p);
     const masteryCells = `<td>${mb.year}%</td><td>${mb.lks2}%</td><td>${mb.overall}%</td>`;
-    tr.innerHTML = `<td>${nameBtn}</td><td>${lastCell}</td><td>${classCell}</td><td>${pairCell}</td><td>${tableCell}</td><td>${ttCell}</td><td style="text-align:center">${adaptedCell}</td><td style="text-align:center">${ruleCell}</td>${masteryCells}`;
+    tr.innerHTML = `<td>${nameBtn}</td><td>${lastCell}</td><td>${classCell}</td><td>${pairCell}</td><td>${tableCell}</td><td>${ttCell}</td><td style="text-align:center">${adaptedCell}</td><td style="text-align:center">${revisionCell}</td>${masteryCells}`;
     tbody.appendChild(tr);
   });
   if (adminVisible) renderAdmin();
@@ -1441,10 +1442,10 @@ function getPupilWeekWords(pupil) {
   const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
   const rule = cw ? state.rules.find(r => r.id === cw.ruleId) : null;
   const revRule = cw && cw.revisionRuleId ? state.rules.find(r => r.id === cw.revisionRuleId) : null;
-  const isAdapted = state.adaptedPupils.includes(pupil.id);
+  const isRevision = state.revisionPupils.includes(pupil.id);
   const ks = pickKeySpellings(pupil, 5);
   let rw, ruleTitle, explanation;
-  if (isAdapted && revRule) {
+  if (isRevision && revRule) {
     rw = revRule.words.slice(0, 5);
     ruleTitle = revRule.title;
     explanation = revRule.explanation;
@@ -1455,6 +1456,7 @@ function getPupilWeekWords(pupil) {
   } else {
     rw = []; ruleTitle = ''; explanation = '';
   }
+  const isAdapted = state.adaptedPupils.includes(pupil.id);
   return { ks, rw, allWords: [...ks, ...rw], ruleTitle, explanation, isAdapted };
 }
 
@@ -1473,6 +1475,11 @@ function toggleAdapted(id) {
   if (state.adaptedPupils.includes(id)) state.adaptedPupils = state.adaptedPupils.filter(x => x !== id);
   else state.adaptedPupils.push(id);
   saveState();
+}
+function togglePupilList(listName, id) {
+  if (state[listName].includes(id)) state[listName] = state[listName].filter(x => x !== id);
+  else state[listName].push(id);
+  saveState(); renderPupils();
 }
 function generateHL(filterClass) {
   const label = document.getElementById('hl-label').value.trim() || 'Home Learning';
