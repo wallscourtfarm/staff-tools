@@ -93,9 +93,9 @@
   .pupil-sheet td:nth-child(4),
   .pupil-sheet td:nth-child(5) { min-width: 26px; text-align: center; }
   .pupil-sheet td:nth-child(6) { min-width: 26px; text-align: center; }
-  .pupil-sheet td:nth-child(7) { min-width: 22px; text-align: center; font-size: 11px; }
+  .pupil-sheet td:nth-child(7) { min-width: 22px; text-align: center; }
   .pupil-sheet td:nth-child(8),
-  .pupil-sheet td:nth-child(9) { min-width: 22px; text-align: center; }
+  .pupil-sheet td:nth-child(9) { min-width: 20px; text-align: center; }
   .pupil-sheet td:nth-child(10),
   .pupil-sheet td:nth-child(11),
   .pupil-sheet td:nth-child(12) { min-width: 24px; text-align: center; }
@@ -422,7 +422,26 @@
     </div>
     <div style="overflow-x:auto;">
       <table class="pupil-sheet">
-        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">First</th><th onclick="sortPupils('lastName')" style="cursor:pointer">Last</th><th onclick="sortPupils('class')" style="cursor:pointer">Class</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair</th><th onclick="sortPupils('tableNum')" style="cursor:pointer;white-space:normal;line-height:1.1">Alt Print<br>Order</th><th>TT</th><th style="font-size:11px;white-space:normal;line-height:1.1">Adapted<br>HL</th><th style="font-size:11px">Y4</th><th style="font-size:11px">Rev</th><th onclick="sortPupils('masteryYear')" style="cursor:pointer;font-weight:normal;font-size:11px">Yr</th><th onclick="sortPupils('masteryLks2')" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2</th><th onclick="sortPupils('masteryAll')" style="cursor:pointer;font-weight:normal;font-size:11px">All</th></tr>
+        <thead>
+          <tr>
+            <th rowspan="2" onclick="sortPupils('firstName')" style="cursor:pointer">First</th>
+            <th rowspan="2" onclick="sortPupils('lastName')" style="cursor:pointer">Last</th>
+            <th rowspan="2" onclick="sortPupils('class')" style="cursor:pointer">Class</th>
+            <th rowspan="2" onclick="sortPupils('pairId')" style="cursor:pointer">Pair</th>
+            <th rowspan="2" onclick="sortPupils('tableNum')" style="cursor:pointer;white-space:normal;line-height:1.1">Print Sort Order</th>
+            <th rowspan="2">TT</th>
+            <th rowspan="2" style="font-size:11px;white-space:normal;line-height:1.1">Adapted Home Learning</th>
+            <th colspan="2" style="font-size:11px">Spelling Rule</th>
+            <th colspan="3" style="font-size:11px">Tracking</th>
+          </tr>
+          <tr>
+            <th style="font-size:11px">Y4</th>
+            <th style="font-size:11px">Rev</th>
+            <th onclick="sortPupils('masteryYear')" style="cursor:pointer;font-weight:normal;font-size:11px">Yr</th>
+            <th onclick="sortPupils('masteryLks2')" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2</th>
+            <th onclick="sortPupils('masteryAll')" style="cursor:pointer;font-weight:normal;font-size:11px">All</th>
+          </tr>
+        </thead>
         <tbody id="pupil-table"></tbody>
       </table>
     </div>
@@ -1000,15 +1019,15 @@ function togglePupilLock() {
 }
 
 function updateSortArrows() {
-  const fields = ['firstName','lastName','class','pairId','tableNum','masteryYear','masteryLks2','masteryAll'];
-  const labels = { firstName:'First', lastName:'Last', class:'Class', pairId:'Pair', tableNum:'Table', masteryYear:'Yr', masteryLks2:'LKS2', masteryAll:'All' };
+  const labels = { firstName:'First', lastName:'Last', class:'Class', pairId:'Pair', tableNum:'Print Sort Order', masteryYear:'Yr', masteryLks2:'LKS2', masteryAll:'All' };
   document.querySelectorAll('.pupil-sheet thead th').forEach(th => {
     const onclick = th.getAttribute('onclick') || '';
     const match = onclick.match(/sortPupils\('(\w+)'\)/);
-    if (!match) { th.textContent = th.textContent.replace(/\s*[▼▲]\s*$/, ''); return; }
+    if (!match) return;
     const field = match[1];
+    const label = labels[field] || field;
     const arrow = field === pupilSortField ? (pupilSortAsc ? ' ▲' : ' ▼') : '';
-    th.textContent = labels[field] + arrow;
+    th.textContent = label + arrow;
   });
 }
 
