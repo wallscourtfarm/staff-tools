@@ -378,7 +378,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.34</span>
+  <span class="version">v0.36</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -2126,26 +2126,26 @@ function savePdfHL(filterClass) {
     doc.text(instrLines, ML, y, { lineHeightFactor: 1.35 });
     y += instrLines.length * 3.5 + 3;
 
-    // Word table
+    // Word table — match HTML preview: two 8mm .hl-line divs per row
     const wordW = CW * 0.22;
-    const spaceW = CW * 0.78;
     const availH = 210 - MB - y - 4;
-    const rowH = Math.max(11, Math.min(15, availH / allWords.length));
+    const rowH = Math.max(16, availH / allWords.length);
 
     allWords.forEach((w, i) => {
       // Row border
-      doc.setDrawColor(80); doc.setLineWidth(0.2);
+      doc.setDrawColor(51); doc.setLineWidth(0.3);
       doc.rect(ML, y, CW, rowH);
-      // Vertical line between word and space columns
+      // Vertical divider between word and space columns
       doc.line(ML + wordW, y, ML + wordW, y + rowH);
-      // Word
+      // Word — vertically centred in left cell
       doc.setFontSize(9); doc.setFont('times', 'bold');
-      doc.text(`${i + 1}. ${w}`, ML + 2, y + rowH * 0.35);
-      // Two writing lines in space column
-      doc.setDrawColor(180); doc.setLineWidth(0.2);
+      doc.text(`${i + 1}. ${w}`, ML + 2, y + rowH / 2 + 1.5);
+      // Two writing lines in right cell — match .hl-line { height: 0.8cm }
+      // First line at bottom of first 8mm div, second at bottom of second 8mm div
+      doc.setDrawColor(187); doc.setLineWidth(0.2);
       const lx1 = ML + wordW + 2, lx2 = ML + CW - 2;
-      doc.line(lx1, y + rowH * 0.4, lx2, y + rowH * 0.4);
-      doc.line(lx1, y + rowH * 0.75, lx2, y + rowH * 0.75);
+      doc.line(lx1, y + 8, lx2, y + 8);
+      doc.line(lx1, y + 16, lx2, y + 16);
       doc.setDrawColor(0);
       y += rowH;
     });
@@ -2252,7 +2252,16 @@ function savePdfTT(filterClass) {
         if (r === 0) doc.line(px, ry, px + pw, ry);
         // Column dividers in answer area
         const ansX1 = col1X + pw * 0.25, ansX2 = col2X + pw * 0.25;
+        doc.setLineWidth(0.1);
+        doc.line(ansX1, ry + rowH, ansX1, ry);
+        doc.line(ansX2, ry + rowH, ansX2, ry);
+        doc.setLineWidth(0.15);
       }
+
+      // Centre vertical line between question columns
+      const midX = px + pw / 2 + 1.5;
+      doc.setLineWidth(0.2);
+      doc.line(midX, y, midX, y + 20 * rowH);
 
       doc.setDrawColor(0); doc.setLineWidth(0.2);
     });
@@ -2336,6 +2345,12 @@ function savePdfBee(filterClass) {
         wy += rowH;
       });
 
+      // Left, right and bottom border around word area
+      doc.setDrawColor(200); doc.setLineWidth(0.3);
+      doc.line(x0, y0 + 7, x0, y0 + SH);
+      doc.line(x0 + SW, y0 + 7, x0 + SW, y0 + SH);
+      doc.line(x0, y0 + SH, x0 + SW, y0 + SH);
+
       // Dashed cut lines
       doc.setDrawColor(187); doc.setLineWidth(0.15); doc.setLineDash([2, 1.5]);
       if (row < 2) doc.line(x0, y0 + SH + 1, x0 + SW, y0 + SH + 1);
@@ -2373,6 +2388,12 @@ function savePdfBee(filterClass) {
           doc.line(x0 + 7, wy + rowH * 0.7, x0 + SW - 2, wy + rowH * 0.7);
           wy += rowH;
         }
+
+        // Border around writing area
+        doc.setDrawColor(200); doc.setLineWidth(0.3);
+        doc.line(x0, y0 + 7, x0, y0 + SH);
+        doc.line(x0 + SW, y0 + 7, x0 + SW, y0 + SH);
+        doc.line(x0, y0 + SH, x0 + SW, y0 + SH);
 
         doc.setDrawColor(187); doc.setLineWidth(0.15); doc.setLineDash([2, 1.5]);
         if (row < 2) doc.line(x0, y0 + SH + 1, x0 + SW, y0 + SH + 1);
