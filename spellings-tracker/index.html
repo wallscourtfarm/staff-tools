@@ -90,8 +90,10 @@
   .pupil-sheet td:nth-child(2),
   .pupil-sheet td:nth-child(3) { min-width: 50px; }
   .pupil-sheet td:nth-child(4),
-  .pupil-sheet td:nth-child(5),
-  .pupil-sheet td:nth-child(6) { min-width: 36px; }
+  .pupil-sheet td:nth-child(5) { min-width: 36px; }
+  .pupil-sheet td:nth-child(6),
+  .pupil-sheet td:nth-child(7),
+  .pupil-sheet td:nth-child(8) { min-width: 32px; text-align: center; }
   .pupil-sheet td input, .pupil-sheet td select {
     font-size: 13px; padding: 3px 4px; border: 1px solid transparent;
     border-radius: 4px; background: transparent; width: 100%; min-width: 0;
@@ -406,7 +408,8 @@
     </div>
     <div style="overflow-x:auto;">
       <table class="pupil-sheet">
-        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">Name ▼</th><th onclick="sortPupils('class')" style="cursor:pointer">Class ▼</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair ▼</th><th onclick="sortPupils('tableNum')" style="cursor:pointer">Table ▼</th><th>TT Set</th><th onclick="sortPupils('mastery')" style="cursor:pointer">Key % ▼<br><small style="font-weight:normal">Yr | LKS2 | All</small></th></tr></thead>
+        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">Name ▼</th><th onclick="sortPupils('class')" style="cursor:pointer">Class ▼</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair ▼</th><th onclick="sortPupils('tableNum')" style="cursor:pointer">Table ▼</th><th>TT Set</th><th onclick="sortPupils('mastery')" style="cursor:pointer" colspan="3">Key % ▼</th></tr>
+<tr><th></th><th></th><th></th><th></th><th></th><th style="font-weight:normal;font-size:11px">Yr</th><th style="font-weight:normal;font-size:11px">LKS2</th><th style="font-weight:normal;font-size:11px">All</th></tr></thead>
         <tbody id="pupil-table"></tbody>
       </table>
     </div>
@@ -1022,8 +1025,8 @@ function renderPupils() {
       ? `<span class="tag set">${p.ttSet || 'All'}</span>`
       : `<select onchange="updatePupil('${p.id}','ttSet',this.value)">${['All','2','3','4','5','6','7','8','9','10','11','12'].map(v=>`<option${v===(p.ttSet||'All')?' selected':''}>${v}</option>`).join('')}</select>`;
     const mb = masteryBreakdown(p);
-    const masteryCell = `${mb.year}%<span style="color:var(--muted)"> | ${mb.lks2}% | ${mb.overall}%</span>`;
-    tr.innerHTML = `<td>${nameBtn}</td><td>${classCell}</td><td>${pairCell}</td><td>${tableCell}</td><td>${ttCell}</td><td>${masteryCell}</td>`;
+    const masteryCells = `<td>${mb.year}%</td><td>${mb.lks2}%</td><td>${mb.overall}%</td>`;
+    tr.innerHTML = `<td>${nameBtn}</td><td>${classCell}</td><td>${pairCell}</td><td>${tableCell}</td><td>${ttCell}</td>${masteryCells}`;
     tbody.appendChild(tr);
   });
   if (adminVisible) renderAdmin();
