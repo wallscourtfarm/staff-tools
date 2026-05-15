@@ -349,7 +349,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.18</span>
+  <span class="version">v0.19</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -486,8 +486,8 @@
   <div class="card">
     <h2>Weekly Setup</h2>
     <div class="row"><label>Week label</label><input id="w-label" placeholder="e.g. Term 5 Week 4"></div>
-    <div class="row"><label>Rule</label><select id="w-rule" onchange="previewWeekly()"></select></div>
-    <div class="row"><label>Revision rule</label><select id="w-revision-rule" onchange="previewWeekly()"><option value="">None</option></select></div>
+    <div class="row"><label>Y4 Rule</label><select id="w-rule" onchange="previewWeekly()"></select></div>
+    <div class="row"><label>Rev Rule</label><select id="w-revision-rule" onchange="previewWeekly()"><option value="">None</option></select></div>
     <p style="font-size:12px;color:var(--muted);">Adapted pupils are tested on revision rule words (words 6–10) instead of main rule words.</p>
     <div style="margin-top:8px;"><button class="btn small secondary" onclick="showAddRule()">+ Add Custom Rule</button></div>
     <div id="weekly-preview" style="margin-top:12px;"></div>
@@ -636,7 +636,12 @@ const SHEET_ID   = '15MMgd9FT8xuK0DNUqxDj4YTWZC3zpbf91QzHhDkxEUE';
 const SHEET_BASE = SHEET_ID ? `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=` : '';
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbzwY-2zUMhFsNDdck_hgGswxXgOusGozaogPMR5w9-IWgCy4jmLuLcv88r2vs6OYpmW/exec';
 let state = loadLocal();
-let syncInProgress = false;
+// Merge in any new rules from defaultRules() that aren't in state (e.g. Year 1 rules added later)
+(function mergeNewRules() {
+  const defaults = defaultRules();
+  const existing = new Set(state.rules.map(r => r.id));
+  defaults.forEach(r => { if (!existing.has(r.id)) state.rules.push(r); });
+})();
 
 function loadLocal() {
   try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const s = JSON.parse(raw); if (!s.revisionPupils) s.revisionPupils = []; return s; } } catch(e) {}
@@ -1166,7 +1171,10 @@ function renderDashboard() {
   const el = document.getElementById('week-status');
   if (!cw) { el.textContent = 'No week set up yet. Go to Weekly Setup to begin.'; return; }
   const rule = state.rules.find(r => r.id === cw.ruleId);
-  el.innerHTML = `<strong>${cw.label}</strong><br>Rule: ${rule ? rule.title : 'Unknown'}`;
+  const revRule = cw.revisionRuleId ? state.rules.find(r => r.id === cw.revisionRuleId) : null;
+  let html = `<strong>${cw.label}</strong><br>Y4 Rule: ${rule ? rule.title : 'Unknown'}`;
+  if (revRule) html += `<br>Rev Rule: ${revRule.title}`;
+  el.innerHTML = html;
 }
 
 // ========================
@@ -1579,6 +1587,11 @@ function printPupilWords() {
 // ========================
 // RULES / WEEKLY
 // ========================
+function isKeySpelling(rule) {
+  const t = rule.title.toLowerCase();
+  return t.includes('key spelling') || t.includes('challenge word');
+}
+
 function initWeekly() {
   const sel = document.getElementById('w-rule');
   const revSel = document.getElementById('w-revision-rule');
@@ -1589,7 +1602,7 @@ function initWeekly() {
   const years = ['Year 1','Year 2','Year 3','Year 4','Year 4 Rev','Year 5','Year 6'];
   years.forEach(y => {
     const grp = document.createElement('optgroup'); grp.label = y;
-    state.rules.filter(r => r.year === y).forEach(r => {
+    state.rules.filter(r => r.year === y && !isKeySpelling(r)).forEach(r => {
       const opt = document.createElement('option'); opt.value = r.id;
       opt.textContent = r.title; grp.appendChild(opt);
     });
@@ -1598,7 +1611,7 @@ function initWeekly() {
   revSel.innerHTML = '<option value="">None</option>';
   years.forEach(y => {
     const grp = document.createElement('optgroup'); grp.label = y;
-    state.rules.filter(r => r.year === y).forEach(r => {
+    state.rules.filter(r => r.year === y && !isKeySpelling(r)).forEach(r => {
       const opt = document.createElement('option'); opt.value = r.id;
       opt.textContent = r.title; grp.appendChild(opt);
     });
