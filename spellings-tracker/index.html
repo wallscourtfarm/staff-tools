@@ -64,8 +64,8 @@
   th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e5e7eb; }
   th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
   .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
-  .tag.im { background: #dbeafe; color: #1e40af; }
-  .tag.wu { background: #dcfce7; color: #166534; }
+  .tag.im { background: #dbeafe; color: #1e3a5f; }
+  .tag.wu { background: #bae6fd; color: #0c4a6e; }
   .tag.set { background: #fef3c7; color: #92400e; }
   .pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: #f3f4f6; font-size: 13px; margin: 2px; }
   .sheet-status { font-size: 11px; opacity: .8; }
@@ -83,18 +83,19 @@
   .stat .lbl { font-size: 12px; color: var(--muted); }
   .mark-toggle { display: inline-flex; gap: 4px; }
   .mark-toggle button { padding: 6px 14px; font-size: 13px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; cursor: pointer; }
-  .pupil-sheet { font-size: 13px; width: 100%; }
-  .pupil-sheet th { padding: 4px 3px; white-space: nowrap; }
-  .pupil-sheet td { padding: 2px 3px; vertical-align: middle; white-space: nowrap; }
-  .pupil-sheet td:nth-child(1) { min-width: 70px; }
-  .pupil-sheet td:nth-child(2) { min-width: 80px; }
-  .pupil-sheet td:nth-child(3) { min-width: 50px; }
+  .pupil-sheet { font-size: 13px; width: 100%; border-collapse: collapse; }
+  .pupil-sheet th, .pupil-sheet td { border: 1px solid #d1d5db; }
+  .pupil-sheet th { padding: 4px 6px; white-space: nowrap; background: #f9fafb; }
+  .pupil-sheet td { padding: 3px 6px; vertical-align: middle; white-space: nowrap; }
+  .pupil-sheet td:nth-child(1),
+  .pupil-sheet td:nth-child(2) { min-width: auto; }
+  .pupil-sheet td:nth-child(3) { min-width: auto; }
   .pupil-sheet td:nth-child(4),
-  .pupil-sheet td:nth-child(5) { min-width: 36px; }
-  .pupil-sheet td:nth-child(6) { min-width: 36px; }
+  .pupil-sheet td:nth-child(5) { min-width: 32px; text-align: center; }
+  .pupil-sheet td:nth-child(6) { min-width: 32px; text-align: center; }
   .pupil-sheet td:nth-child(7),
   .pupil-sheet td:nth-child(8),
-  .pupil-sheet td:nth-child(9) { min-width: 32px; text-align: center; }
+  .pupil-sheet td:nth-child(9) { min-width: 28px; text-align: center; }
   .pupil-sheet td input, .pupil-sheet td select {
     font-size: 13px; padding: 3px 4px; border: 1px solid transparent;
     border-radius: 4px; background: transparent; width: 100%; min-width: 0;
@@ -1013,8 +1014,8 @@ function renderPupils() {
   });
   list.forEach(p => {
     const tr = document.createElement('tr');
-    const nameBtn = `<button class="btn small" onclick="selectPupil('${p.id}')" style="background:transparent;color:var(--brand);padding:0;font-weight:700;">${p.firstName}</button>`;
-    const lastCell = `<span style="cursor:pointer" onclick="selectPupil('${p.id}')">${p.lastName}</span>`;
+    const nameBtn = `<a href="#" onclick="selectPupil('${p.id}');return false" style="color:var(--brand);font-weight:700;text-decoration:none;">${p.firstName}</a>`;
+    const lastCell = `<a href="#" onclick="selectPupil('${p.id}');return false" style="color:var(--brand);font-weight:600;text-decoration:none;">${p.lastName}</a>`;
     const classCell = pupilLocked
       ? `<span class="tag ${p.class.toLowerCase()}">${p.class}</span>`
       : `<select onchange="updatePupil('${p.id}','class',this.value)"><option value="IM"${p.class==='IM'?' selected':''}>IM</option><option value="WU"${p.class==='WU'?' selected':''}>WU</option></select>`;
