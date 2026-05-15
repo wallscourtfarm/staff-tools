@@ -598,7 +598,7 @@ let state = loadLocal();
 let syncInProgress = false;
 
 function loadLocal() {
-  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const s = JSON.parse(raw); if (!s.revisionPupils) s.revisionPupils = []; return s; } } catch(e) {}
   return defaultState();
 }
 function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -697,12 +697,8 @@ function saveState() {
 async function forceSyncLoad() {
   const ok = await sheetLoadAll();
   if (ok) {
-    updateSyncStatus();
-if (SYNC_URL) {
-  sheetLoadAll().then(() => { renderDashboard(); goTab('dashboard'); });
-} else {
-  renderDashboard();
-}
+    updateSyncStatus('ok');
+    renderDashboard();
     goTab('dashboard');
     alert('Loaded latest data from Sheet.');
   } else {
@@ -1045,8 +1041,8 @@ function renderPupils() {
     const ttCell = pupilLocked
       ? `<span class="tag set">${p.ttSet || 'All'}</span>`
       : `<select onchange="updatePupil('${p.id}','ttSet',this.value)">${['All','2','3','4','5','6','7','8','9','10','11','12'].map(v=>`<option${v===(p.ttSet||'All')?' selected':''}>${v}</option>`).join('')}</select>`;
-    const isAdapted = state.adaptedPupils.includes(p.id);
-    const isRevision = state.revisionPupils.includes(p.id);
+    const isAdapted = (state.adaptedPupils || []).includes(p.id);
+    const isRevision = (state.revisionPupils || []).includes(p.id);
     const adaptedCell = pupilLocked
       ? (isAdapted ? '✓' : '')
       : `<input type="checkbox" ${isAdapted ? 'checked' : ''} onchange="togglePupilList('adaptedPupils','${p.id}')">`;
@@ -1264,7 +1260,7 @@ function printPupilHL() {
   const reading = state.hlContent.reading || '';
   const mathsA = state.hlContent.mathsAdapted || '';
   const readingA = state.hlContent.readingAdapted || '';
-  const isAdapted = state.adaptedPupils.includes(p.id);
+  const isAdapted = (state.adaptedPupils || []).includes(p.id);
   const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
   const rule = cw ? state.rules.find(r => r.id === cw.ruleId) : null;
   const ks = pickKeySpellings(p, 5);
@@ -1438,7 +1434,7 @@ function getPupilWeekWords(pupil) {
   const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
   const rule = cw ? state.rules.find(r => r.id === cw.ruleId) : null;
   const revRule = cw && cw.revisionRuleId ? state.rules.find(r => r.id === cw.revisionRuleId) : null;
-  const isRevision = state.revisionPupils.includes(pupil.id);
+  const isRevision = (state.revisionPupils || []).includes(pupil.id);
   const ks = pickKeySpellings(pupil, 5);
   let rw, ruleTitle, explanation;
   if (isRevision && revRule) {
@@ -1452,7 +1448,7 @@ function getPupilWeekWords(pupil) {
   } else {
     rw = []; ruleTitle = ''; explanation = '';
   }
-  const isAdapted = state.adaptedPupils.includes(pupil.id);
+  const isAdapted = (state.adaptedPupils || []).includes(pupil.id);
   return { ks, rw, allWords: [...ks, ...rw], ruleTitle, explanation, isAdapted };
 }
 
