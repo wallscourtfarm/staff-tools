@@ -2,7 +2,7 @@
 // Deploy as web app (Execute as: Me, Access: Anyone with link)
 // Sheet tabs needed: Pupils, Weeks, Results, Config
 
-const SS_ID = 'PASTE_YOUR_SHEET_ID_HERE';
+const SS_ID = '15MMgd9FT8xuK0DNUqxDj4YTWZC3zpbf91QzHhDkxEUE';
 
 function getSheet() {
   return SpreadsheetApp.openById(SS_ID);
@@ -146,8 +146,8 @@ function saveAll(data) {
 
   // Weeks
   if (data.weeks) {
-    const rows = [['id', 'label', 'ruleId']];
-    data.weeks.forEach(w => rows.push([w.id, w.label || '', w.ruleId || '']));
+    const rows = [['id', 'label', 'ruleId', 'revisionRuleId']];
+    data.weeks.forEach(w => rows.push([w.id, w.label || '', w.ruleId || '', w.revisionRuleId || '']));
     writeTab(ss, 'Weeks', rows);
   }
 
@@ -169,7 +169,7 @@ function saveAll(data) {
 
 // ── Build pupil rows (flatten mastery into mastered/failed word lists) ───────
 function buildPupilRows(pupils) {
-  const rows = [['id', 'firstName', 'lastName', 'class', 'pairId', 'ttSet', 'ssUser', 'ssPassword', 'masteredWords', 'failedWords']];
+  const rows = [['id', 'firstName', 'lastName', 'class', 'pairId', 'tableNum', 'ttSet', 'ssUser', 'ssPassword', 'masteredWords', 'failedWords']];
   pupils.forEach(p => {
     const mastered = [];
     const failed = [];
@@ -182,6 +182,7 @@ function buildPupilRows(pupils) {
     rows.push([
       p.id, p.firstName, p.lastName, p.class,
       p.pairId === null || p.pairId === undefined ? '' : p.pairId,
+      p.tableNum === null || p.tableNum === undefined ? '' : p.tableNum,
       p.ttSet || '', p.ssUser || '', p.ssPassword || '',
       mastered.join(', '),
       failed.join(', ')
