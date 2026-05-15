@@ -410,7 +410,7 @@
     </div>
     <div style="overflow-x:auto;">
       <table class="pupil-sheet">
-        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">First ▼</th><th onclick="sortPupils('lastName')" style="cursor:pointer">Last ▼</th><th onclick="sortPupils('class')" style="cursor:pointer">Class ▼</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair ▼</th><th onclick="sortPupils('tableNum')" style="cursor:pointer">Table ▼</th><th>TT Set</th><th onclick="sortPupils('masteryYear')" style="cursor:pointer;font-weight:normal;font-size:11px">Yr ▼</th><th onclick="sortPupils('masteryLks2')" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2 ▼</th><th onclick="sortPupils('masteryAll')" style="cursor:pointer;font-weight:normal;font-size:11px">All ▼</th></tr>
+        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">First</th><th onclick="sortPupils('lastName')" style="cursor:pointer">Last</th><th onclick="sortPupils('class')" style="cursor:pointer">Class</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair</th><th onclick="sortPupils('tableNum')" style="cursor:pointer">Table</th><th>TT Set</th><th onclick="sortPupils('masteryYear')" style="cursor:pointer;font-weight:normal;font-size:11px">Yr</th><th onclick="sortPupils('masteryLks2')" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2</th><th onclick="sortPupils('masteryAll')" style="cursor:pointer;font-weight:normal;font-size:11px">All</th></tr>
         <tbody id="pupil-table"></tbody>
       </table>
     </div>
@@ -998,6 +998,19 @@ function togglePupilLock() {
   renderPupils();
 }
 
+function updateSortArrows() {
+  const fields = ['firstName','lastName','class','pairId','tableNum','masteryYear','masteryLks2','masteryAll'];
+  const labels = { firstName:'First', lastName:'Last', class:'Class', pairId:'Pair', tableNum:'Table', masteryYear:'Yr', masteryLks2:'LKS2', masteryAll:'All' };
+  document.querySelectorAll('.pupil-sheet thead th').forEach(th => {
+    const onclick = th.getAttribute('onclick') || '';
+    const match = onclick.match(/sortPupils\('(\w+)'\)/);
+    if (!match) { th.textContent = th.textContent.replace(/\s*[▼▲]\s*$/, ''); return; }
+    const field = match[1];
+    const arrow = field === pupilSortField ? (pupilSortAsc ? ' ▲' : ' ▼') : '';
+    th.textContent = labels[field] + arrow;
+  });
+}
+
 function renderPupils() {
   const q = document.getElementById('pupil-search').value.toLowerCase();
   const tbody = document.getElementById('pupil-table'); tbody.innerHTML = '';
@@ -1034,6 +1047,7 @@ function renderPupils() {
     tbody.appendChild(tr);
   });
   if (adminVisible) renderAdmin();
+  updateSortArrows();
 }
 function updatePupil(id, field, value) {
   const p = state.pupils.find(x => x.id === id);
