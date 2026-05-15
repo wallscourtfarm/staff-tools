@@ -286,6 +286,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    height: 100%;
   }
   .bee-strip-name {
     font-size: 14px;
@@ -304,10 +305,15 @@
     line-height: 1.2;
     border: 1px solid #d1d5db;
     border-top: none;
+    flex: 1;
+    height: 100%;
   }
   .bee-strip-table td {
     padding: 1px 4px;
     border-bottom: 1px solid #e5e7eb;
+  }
+  .bee-strip-table tr.writing-row td {
+    height: auto;
   }
   .bee-strip-table td:first-child {
     width: 20px;
@@ -325,7 +331,12 @@
   }
   .bee-strip-table td.blank-line {
     border-bottom: 1px solid #999;
-    height: 18px;
+  }
+  .bee-strip-name.writing-name {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #d1d5db;
+    border-bottom: none;
   }
   .bee-strip.cut-h { border-bottom: 1px dashed #bbb; padding-bottom: 2mm; }
   .bee-strip.cut-v { border-right: 1px dashed #bbb; padding-right: 2mm; }
@@ -1041,7 +1052,10 @@ function renderPupils() {
       ? (isAdapted ? '✓' : '')
       : `<input type="checkbox" ${isAdapted ? 'checked' : ''} onchange="toggleAdapted('${p.id}');renderPupils()">`;
     const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
-    const ruleCell = isAdapted && cw && cw.revisionRuleId ? 'Rev' : 'Y4';
+    const mainRule = cw ? state.rules.find(r => r.id === cw.ruleId) : null;
+    const revRule = cw && cw.revisionRuleId ? state.rules.find(r => r.id === cw.revisionRuleId) : null;
+    const pupilRule = isAdapted && revRule ? revRule : mainRule;
+    const ruleCell = pupilRule ? `<span style="font-size:11px">${pupilRule.step || ''}</span>` : '-';
     const mb = masteryBreakdown(p);
     const masteryCells = `<td>${mb.year}%</td><td>${mb.lks2}%</td><td>${mb.overall}%</td>`;
     tr.innerHTML = `<td>${nameBtn}</td><td>${lastCell}</td><td>${classCell}</td><td>${pairCell}</td><td>${tableCell}</td><td>${ttCell}</td><td style="text-align:center">${adaptedCell}</td><td style="text-align:center">${ruleCell}</td>${masteryCells}`;
@@ -1592,16 +1606,14 @@ function generateBeeSheets(filterClass) {
       page.className = 'bee-sheet';
       const pagePupils = pupils.slice(pageIdx, pageIdx + perPage);
       pagePupils.forEach((p, idx) => {
-        const colour = pairColor(p.pairId || 1);
-        const txtCol = contrastColor(colour);
         const strip = document.createElement('div');
         const row = Math.floor(idx / 3), col = idx % 3;
         strip.className = 'bee-strip';
         if (row < 2) strip.classList.add('cut-h');
         if (col < 2) strip.classList.add('cut-v');
         strip.innerHTML = `
-          <div class="bee-strip-name" style="background-color:${colour};color:${txtCol}">Name: ________________</div>
-          <table class="bee-strip-table">${Array.from({length:10}, (_, i) => `<tr><td>${i+1}.</td><td class="blank-line"></td></tr>`).join('')}</table>
+          <div class="bee-strip-name writing-name">Name: ________________</div>
+          <table class="bee-strip-table">${Array.from({length:10}, (_, i) => `<tr style="height:9%"><td>${i+1}.</td><td class="blank-line"></td></tr>`).join('')}</table>
         `;
         page.appendChild(strip);
       });
@@ -1791,15 +1803,18 @@ function printHandoutOrder() {
 function downloadPDF(element, filename, orientation) {
   const clone = element.cloneNode(true);
   clone.classList.remove('hidden');
-  clone.style.position = 'absolute';
-  clone.style.left = '-9999px';
+  clone.style.display = 'block';
+  clone.style.position = 'fixed';
+  clone.style.left = '0';
   clone.style.top = '0';
+  clone.style.zIndex = '-1';
+  clone.style.opacity = '1';
   document.body.appendChild(clone);
   const opt = {
     margin: 8,
     filename: filename + '.pdf',
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
+    html2canvas: { scale: 2, useCORS: true, windowWidth: 1200 },
     jsPDF: { unit: 'mm', format: 'a4', orientation: orientation || 'portrait' }
   };
   html2pdf().set(opt).from(clone).save().then(() => clone.remove());
