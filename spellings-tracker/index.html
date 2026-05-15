@@ -126,16 +126,6 @@
   }
 
   /* ======================== PRINT ======================== */
-  @media print {
-    @page { margin: 8mm; }
-    body { background: #fff !important; }
-    header, nav, .sticky-actions, #hl-config, #bee-config, #tt-config { display: none !important; }
-    .tab { display: block !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; background: none !important; border: none !important; }
-    .tab > *:not(.print-area) { display: none !important; }
-    .print-area { display: none !important; }
-    .print-area.print-target { display: block !important; position: static !important; width: 100% !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
-    .tt-sheet, .hl-sheet, .bee-sheet { page-break-after: always; page-break-inside: avoid; }
-  }
   .cut-h { border-bottom: 1px dashed #bbb; }
   .cut-v { border-right: 1px dashed #bbb; }
 
@@ -348,7 +338,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.24</span>
+  <span class="version">v0.25</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -515,7 +505,7 @@
 <!-- HOME LEARNING -->
 <section id="hl" class="tab hidden">
   <div class="row sticky-actions" id="hl-actions" style="display:none;">
-    <button class="btn" onclick="printArea(document.getElementById('hl-print'))">Print / Save PDF</button>
+    <button class="btn" onclick="printArea(document.getElementById('hl-print'),'landscape')">Save PDF</button>
     <button class="btn secondary" onclick="resetHL()">Back / Edit</button>
   </div>
   <div id="hl-config">
@@ -541,7 +531,7 @@
 <!-- SPELLING BEE -->
 <section id="bee" class="tab hidden">
   <div class="row sticky-actions" id="bee-actions" style="display:none;">
-    <button class="btn" onclick="printArea(document.getElementById('bee-print'))">Print / Save PDF</button>
+    <button class="btn" onclick="printArea(document.getElementById('bee-print'),'portrait')">Save PDF</button>
     <button class="btn secondary" onclick="resetBee()">Back</button>
   </div>
   <div id="bee-config">
@@ -575,7 +565,7 @@
 <!-- TT SHEETS -->
 <section id="tt" class="tab hidden">
   <div class="row sticky-actions" id="tt-actions" style="display:none;">
-    <button class="btn" onclick="printArea(document.getElementById('tt-print'))">Print / Save PDF</button>
+    <button class="btn" onclick="printArea(document.getElementById('tt-print'),'portrait')">Save PDF</button>
     <button class="btn secondary" onclick="resetTT()">Back</button>
   </div>
   <div id="tt-config">
@@ -1516,7 +1506,7 @@ function printPupilHL() {
   container.appendChild(p2);
 
   container.classList.remove('hidden');
-  printArea(container);
+  printArea(container, 'landscape');
 }
 
 function printPupilTT() {
@@ -1559,7 +1549,7 @@ function printPupilTT() {
   container.appendChild(page);
 
   container.classList.remove('hidden');
-  printArea(container);
+  printArea(container, 'portrait');
 }
 
 function printPupilWords() {
@@ -1584,7 +1574,7 @@ function printPupilWords() {
   container.appendChild(page);
 
   container.classList.remove('hidden');
-  printArea(container);
+  printArea(container, 'portrait');
   setTimeout(() => { container.innerHTML = ''; container.classList.add('hidden'); }, 1000);
 }
 
@@ -2077,19 +2067,48 @@ function printHandoutOrder() {
   });
 
   document.body.appendChild(container);
-  container.classList.add('print-area', 'print-target');
-  window.print();
+  printArea(container, 'portrait');
   container.remove();
 }
 
-function printArea(element) {
-  // Mark which print area to show, then trigger browser print
-  document.querySelectorAll('.print-area').forEach(el => el.classList.remove('print-target'));
-  element.classList.add('print-target');
-  element.classList.remove('hidden');
-  window.print();
-  element.classList.remove('print-target');
-  element.classList.add('hidden');
+function printArea(element, orientation) {
+  // Create an iframe, write the print content + CSS into it, then print just the iframe
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:0;height:0;border:none;';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+
+  // Build the print HTML with all necessary styles
+  const allStyles = document.querySelectorAll('style');
+  let css = '';
+  allStyles.forEach(s => css += s.textContent);
+
+  // Add print-specific overrides
+  const printCss = `
+    @page { margin: 8mm; ${orientation === 'landscape' ? 'size: A4 landscape;' : 'size: A4 portrait;'} }
+    body { background: #fff !important; margin: 0; padding: 0; }
+    .hl-sheet { width: 277mm; height: 190mm; padding: 8mm 12mm; background: #fff; color: #000; font-family: Georgia, 'Times New Roman', serif; margin: 0 auto 16px; box-sizing: border-box; display: flex; flex-direction: column; page-break-after: always; }
+    .hl-sheet:last-child { page-break-after: auto; }
+    .tt-sheet { width: 277mm; height: 190mm; padding: 5mm 8mm; background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; margin: 0 auto 16px; box-sizing: border-box; display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; page-break-after: always; }
+    .tt-sheet:last-child { page-break-after: auto; }
+    .bee-sheet { width: 190mm; height: 277mm; padding: 4mm 6mm; background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; margin: 0 auto 16px; box-sizing: border-box; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 2mm 3mm; page-break-after: always; }
+    .bee-sheet:last-child { page-break-after: auto; }
+  `;
+
+  doc.open();
+  doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${css}${printCss}</style></head><body>${element.innerHTML}</body></html>`);
+  doc.close();
+
+  // Wait for content to render then print
+  iframe.onload = function() {
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      // Clean up after print dialog closes
+      setTimeout(() => iframe.remove(), 1000);
+    }, 300);
+  };
 }
 
 // ========================
