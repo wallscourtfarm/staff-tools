@@ -349,7 +349,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.15</span>
+  <span class="version">v0.16</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -418,6 +418,7 @@
     <div class="row" style="margin-bottom:12px;">
       <input type="text" id="pupil-search" placeholder="Search pupils..." style="flex:1;" oninput="renderPupils()">
       <button class="btn" onclick="editPupil(null)">+ Add Pupil</button>
+      <span style="font-size:11px;color:var(--muted);margin-left:4px;">Shift+click for secondary sort</span>
     </div>
     <div class="row" style="margin-bottom:8px;">
       <button class="btn small secondary" id="pupil-lock-btn" onclick="togglePupilLock()">🔒 Locked</button>
@@ -427,11 +428,11 @@
       <table class="pupil-sheet">
         <thead>
           <tr>
-            <th rowspan="2" onclick="sortPupils('firstName')" style="cursor:pointer;text-align:left">First</th>
-            <th rowspan="2" onclick="sortPupils('lastName')" style="cursor:pointer;text-align:left">Last</th>
-            <th rowspan="2" onclick="sortPupils('class')" style="cursor:pointer">Class</th>
-            <th rowspan="2" onclick="sortPupils('pairId')" style="cursor:pointer">Pair</th>
-            <th rowspan="2" onclick="sortPupils('tableNum')" style="cursor:pointer;line-height:1.1">Print Sort<br>Order</th>
+            <th rowspan="2" onclick="sortPupils('firstName', event)" style="cursor:pointer;text-align:left">First</th>
+            <th rowspan="2" onclick="sortPupils('lastName', event)" style="cursor:pointer;text-align:left">Last</th>
+            <th rowspan="2" onclick="sortPupils('class', event)" style="cursor:pointer">Class</th>
+            <th rowspan="2" onclick="sortPupils('pairId', event)" style="cursor:pointer">Pair</th>
+            <th rowspan="2" onclick="sortPupils('tableNum', event)" style="cursor:pointer;line-height:1.1">Print Sort<br>Order</th>
             <th rowspan="2">TT Set</th>
             <th rowspan="2" style="font-size:11px;line-height:1.1">Adapted<br>Home<br>Learning</th>
             <th colspan="2" style="font-size:11px;text-align:center">Spelling Rule</th>
@@ -440,10 +441,10 @@
           <tr>
             <th style="font-size:11px;line-height:1.1">Y4<br>Rule</th>
             <th style="font-size:11px;line-height:1.1">Rev<br>Rule</th>
-            <th onclick="sortPupils('masteryKS1')" style="cursor:pointer;font-weight:normal;font-size:11px">KS1</th>
-            <th onclick="sortPupils('masteryYear')" style="cursor:pointer;font-weight:normal;font-size:11px">Y4</th>
-            <th onclick="sortPupils('masteryLks2')" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2</th>
-            <th onclick="sortPupils('masteryAll')" style="cursor:pointer;font-weight:normal;font-size:11px">All</th>
+            <th onclick="sortPupils('masteryKS1', event)" style="cursor:pointer;font-weight:normal;font-size:11px">KS1</th>
+            <th onclick="sortPupils('masteryYear', event)" style="cursor:pointer;font-weight:normal;font-size:11px">Y4</th>
+            <th onclick="sortPupils('masteryLks2', event)" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2</th>
+            <th onclick="sortPupils('masteryAll', event)" style="cursor:pointer;font-weight:normal;font-size:11px">All</th>
           </tr>
         </thead>
         <tbody id="pupil-table"></tbody>
@@ -1171,13 +1172,20 @@ function renderDashboard() {
 // ========================
 // PUPILS
 // ========================
-let pupilSortField = 'firstName';
-let pupilSortAsc = true;
+let pupilSortPrimary = 'firstName';
+let pupilSortPrimaryAsc = true;
+let pupilSortSecondary = null;
+let pupilSortSecondaryAsc = true;
 let pupilLocked = true;
 
-function sortPupils(field) {
-  if (pupilSortField === field) pupilSortAsc = !pupilSortAsc;
-  else { pupilSortField = field; pupilSortAsc = true; }
+function sortPupils(field, evt) {
+  if (evt && evt.shiftKey && field !== pupilSortPrimary) {
+    if (pupilSortSecondary === field) pupilSortSecondaryAsc = !pupilSortSecondaryAsc;
+    else { pupilSortSecondary = field; pupilSortSecondaryAsc = true; }
+  } else {
+    if (pupilSortPrimary === field) pupilSortPrimaryAsc = !pupilSortPrimaryAsc;
+    else { pupilSortPrimary = field; pupilSortPrimaryAsc = true; pupilSortSecondary = null; }
+  }
   renderPupils();
 }
 function togglePupilLock() {
@@ -1190,11 +1198,13 @@ function updateSortArrows() {
   const labels = { firstName:'First', lastName:'Last', class:'Class', pairId:'Pair', tableNum:'Print Sort Order', masteryKS1:'KS1', masteryYear:'Y4', masteryLks2:'LKS2', masteryAll:'All' };
   document.querySelectorAll('.pupil-sheet thead th').forEach(th => {
     const onclick = th.getAttribute('onclick') || '';
-    const match = onclick.match(/sortPupils\('(\w+)'\)/);
+    const match = onclick.match(/sortPupils\('(\w+)'/);
     if (!match) return;
     const field = match[1];
     const label = labels[field] || field;
-    const arrow = field === pupilSortField ? (pupilSortAsc ? ' ▲' : ' ▼') : '';
+    let arrow = '';
+    if (field === pupilSortPrimary) arrow = pupilSortPrimaryAsc ? ' ▲' : ' ▼';
+    else if (field === pupilSortSecondary) arrow = pupilSortSecondaryAsc ? ' ▲²' : ' ▼²';
     th.textContent = label + arrow;
   });
 }
@@ -1203,15 +1213,22 @@ function renderPupils() {
   const q = document.getElementById('pupil-search').value.toLowerCase();
   const tbody = document.getElementById('pupil-table'); tbody.innerHTML = '';
   let list = state.pupils.filter(p => !q || `${p.firstName} ${p.lastName}`.toLowerCase().includes(q));
+  function getSortVal(p, field) {
+    if (field === 'masteryKS1') return masteryBreakdown(p).ks1;
+    if (field === 'masteryYear') return masteryBreakdown(p).year;
+    if (field === 'masteryLks2') return masteryBreakdown(p).lks2;
+    if (field === 'masteryAll') return masteryBreakdown(p).overall;
+    return p[field] || '';
+  }
   list.sort((a, b) => {
-    let av, bv;
-    if (pupilSortField === 'masteryKS1') { av = masteryBreakdown(a).ks1; bv = masteryBreakdown(b).ks1; }
-    else if (pupilSortField === 'masteryYear') { av = masteryBreakdown(a).year; bv = masteryBreakdown(b).year; }
-    else if (pupilSortField === 'masteryLks2') { av = masteryBreakdown(a).lks2; bv = masteryBreakdown(b).lks2; }
-    else if (pupilSortField === 'masteryAll') { av = masteryBreakdown(a).overall; bv = masteryBreakdown(b).overall; }
-    else { av = a[pupilSortField] || ''; bv = b[pupilSortField] || ''; }
-    if (av < bv) return pupilSortAsc ? -1 : 1;
-    if (av > bv) return pupilSortAsc ? 1 : -1;
+    let av = getSortVal(a, pupilSortPrimary), bv = getSortVal(b, pupilSortPrimary);
+    if (av < bv) return pupilSortPrimaryAsc ? -1 : 1;
+    if (av > bv) return pupilSortPrimaryAsc ? 1 : -1;
+    if (pupilSortSecondary) {
+      av = getSortVal(a, pupilSortSecondary); bv = getSortVal(b, pupilSortSecondary);
+      if (av < bv) return pupilSortSecondaryAsc ? -1 : 1;
+      if (av > bv) return pupilSortSecondaryAsc ? 1 : -1;
+    }
     return 0;
   });
   list.forEach(p => {
