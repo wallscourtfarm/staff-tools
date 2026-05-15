@@ -349,7 +349,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.21</span>
+  <span class="version">v0.22</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -636,6 +636,7 @@ const SHEET_ID   = '15MMgd9FT8xuK0DNUqxDj4YTWZC3zpbf91QzHhDkxEUE';
 const SHEET_BASE = SHEET_ID ? `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=` : '';
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbzwY-2zUMhFsNDdck_hgGswxXgOusGozaogPMR5w9-IWgCy4jmLuLcv88r2vs6OYpmW/exec';
 let state = loadLocal();
+let syncInProgress = false;
 // Merge in any new rules from defaultRules() that aren't in state (e.g. Year 1 rules added later)
 (function mergeNewRules() {
   const defaults = defaultRules();
@@ -2073,25 +2074,33 @@ function printHandoutOrder() {
   });
 
   document.body.appendChild(container);
-  downloadPDF(container, 'handout-order', 'portrait');
-  setTimeout(() => container.remove(), 1000);
+  downloadPDF(container, 'handout-order', 'portrait').then(() => container.remove());
 }
 
-function downloadPDF(element, filename, orientation) {
-  const clone = element.cloneNode(true);
-  clone.classList.remove('hidden');
-  clone.removeAttribute('class');
-  // Style the clone to be a standalone printable container
-  clone.style.cssText = 'position:fixed;left:0;top:0;width:1200px;z-index:9999;background:#fff;padding:20px;overflow:visible;display:block;';
-  document.body.appendChild(clone);
-  const opt = {
-    margin: [10, 10, 10, 10],
-    filename: filename + '.pdf',
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, logging: false, width: 1200, windowWidth: 1200 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: orientation || 'portrait' }
-  };
-  html2pdf().set(opt).from(clone).save().then(() => clone.remove()).catch(e => { console.error('PDF error:', e); clone.remove(); });
+async function downloadPDF(element, filename, orientation) {
+  const wasHidden = element.classList.contains('hidden');
+  element.classList.remove('hidden');
+  element.style.display = 'block';
+
+  // Wait for browser to render the content
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  try {
+    await html2pdf().set({
+      margin: [5, 5, 5, 5],
+      filename: filename + '.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: orientation || 'portrait' }
+    }).from(element).save();
+  } catch (e) {
+    console.error('PDF error:', e);
+    // Fallback: use browser print dialog
+    window.print();
+  }
+
+  element.style.display = '';
+  if (wasHidden) element.classList.add('hidden');
 }
 
 // ========================
