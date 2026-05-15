@@ -378,7 +378,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.36</span>
+  <span class="version">v0.37</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -2126,26 +2126,30 @@ function savePdfHL(filterClass) {
     doc.text(instrLines, ML, y, { lineHeightFactor: 1.35 });
     y += instrLines.length * 3.5 + 3;
 
-    // Word table — match HTML preview: two 8mm .hl-line divs per row
+    // Word table — proper table: 1 cell left, 2 stacked cells right
     const wordW = CW * 0.22;
-    const availH = 210 - MB - y - 4;
-    const rowH = Math.max(16, availH / allWords.length);
+    const rowH = 20;  // two 10mm writing cells
 
     allWords.forEach((w, i) => {
-      // Row border
+      // Outer row border
       doc.setDrawColor(51); doc.setLineWidth(0.3);
       doc.rect(ML, y, CW, rowH);
-      // Vertical divider between word and space columns
+
+      // Vertical divider between word column and space column
       doc.line(ML + wordW, y, ML + wordW, y + rowH);
+
       // Word — vertically centred in left cell
       doc.setFontSize(9); doc.setFont('times', 'bold');
       doc.text(`${i + 1}. ${w}`, ML + 2, y + rowH / 2 + 1.5);
-      // Two writing lines in right cell — match .hl-line { height: 0.8cm }
-      // First line at bottom of first 8mm div, second at bottom of second 8mm div
+
+      // Right column: two stacked cells with bottom borders as writing lines
       doc.setDrawColor(187); doc.setLineWidth(0.2);
-      const lx1 = ML + wordW + 2, lx2 = ML + CW - 2;
-      doc.line(lx1, y + 8, lx2, y + 8);
-      doc.line(lx1, y + 16, lx2, y + 16);
+      // Horizontal divider between upper and lower right cell (first writing line)
+      doc.line(ML + wordW, y + rowH / 2, ML + CW, y + rowH / 2);
+      // Bottom border of row is already drawn by doc.rect above (second writing line)
+      // But we make it lighter to match the writing-line colour
+      doc.line(ML + wordW, y + rowH, ML + CW, y + rowH);
+
       doc.setDrawColor(0);
       y += rowH;
     });
