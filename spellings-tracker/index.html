@@ -409,8 +409,7 @@
     </div>
     <div style="overflow-x:auto;">
       <table class="pupil-sheet">
-        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">First ▼</th><th onclick="sortPupils('lastName')" style="cursor:pointer">Last ▼</th><th onclick="sortPupils('class')" style="cursor:pointer">Class ▼</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair ▼</th><th onclick="sortPupils('tableNum')" style="cursor:pointer">Table ▼</th><th>TT Set</th><th onclick="sortPupils('mastery')" style="cursor:pointer" colspan="3">Key % ▼</th></tr>
-<tr><th></th><th></th><th></th><th></th><th></th><th></th><th style="font-weight:normal;font-size:11px">Yr</th><th style="font-weight:normal;font-size:11px">LKS2</th><th style="font-weight:normal;font-size:11px">All</th></tr></thead>
+        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">First ▼</th><th onclick="sortPupils('lastName')" style="cursor:pointer">Last ▼</th><th onclick="sortPupils('class')" style="cursor:pointer">Class ▼</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair ▼</th><th onclick="sortPupils('tableNum')" style="cursor:pointer">Table ▼</th><th>TT Set</th><th onclick="sortPupils('masteryYear')" style="cursor:pointer;font-weight:normal;font-size:11px">Yr ▼</th><th onclick="sortPupils('masteryLks2')" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2 ▼</th><th onclick="sortPupils('masteryAll')" style="cursor:pointer;font-weight:normal;font-size:11px">All ▼</th></tr>
         <tbody id="pupil-table"></tbody>
       </table>
     </div>
@@ -1004,7 +1003,9 @@ function renderPupils() {
   let list = state.pupils.filter(p => !q || `${p.firstName} ${p.lastName}`.toLowerCase().includes(q));
   list.sort((a, b) => {
     let av, bv;
-    if (pupilSortField === 'mastery') { av = masteryBreakdown(a).overall; bv = masteryBreakdown(b).overall; }
+    if (pupilSortField === 'masteryYear') { av = masteryBreakdown(a).year; bv = masteryBreakdown(b).year; }
+    else if (pupilSortField === 'masteryLks2') { av = masteryBreakdown(a).lks2; bv = masteryBreakdown(b).lks2; }
+    else if (pupilSortField === 'masteryAll') { av = masteryBreakdown(a).overall; bv = masteryBreakdown(b).overall; }
     else { av = a[pupilSortField] || ''; bv = b[pupilSortField] || ''; }
     if (av < bv) return pupilSortAsc ? -1 : 1;
     if (av > bv) return pupilSortAsc ? 1 : -1;
