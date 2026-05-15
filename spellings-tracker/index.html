@@ -338,7 +338,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.31</span>
+  <span class="version">v0.32</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -1974,101 +1974,359 @@ function printHandoutOrder() {
 }
 
 // ========================
-// PDF GENERATION (html2canvas + jsPDF)
+// PDF GENERATION (jsPDF programmatic)
 // ========================
 
-async function renderToPdf(selector, filename, orientation) {
-  const sheets = document.querySelectorAll(selector);
-  if (!sheets.length) { alert('No sheets to render.'); return; }
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return { r, g, b };
+}
 
+// --- HOME LEARNING ---
+function savePdfHL(filterClass) {
   const { jsPDF } = window.jspdf;
-  const pw = orientation === 'l' ? 297 : 210;
-  const ph = orientation === 'l' ? 210 : 297;
-  const doc = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
+  const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' });
+  // A4 landscape: 297×210. Sheet CSS: 277×190, padding 8mm T/B 12mm L/R
+  const ML = 22, MR = 10, MT = 18, MB = 10;
+  const CW = 297 - ML - MR; // ~265mm
+  const BRAND = [23, 152, 211];
 
-  for (let i = 0; i < sheets.length; i++) {
+  const label = document.getElementById('hl-label').value || 'Home Learning';
+  const maths = document.getElementById('hl-maths').value || '';
+  const reading = document.getElementById('hl-reading').value || '';
+  const mathsA = document.getElementById('hl-maths-a').value || '';
+  const readingA = document.getElementById('hl-reading-a').value || '';
+
+  const pupils = filterClass ? state.pupils.filter(p => p.class === filterClass) : state.pupils;
+  if (!pupils.length) return;
+
+  pupils.forEach((p, idx) => {
+    if (idx > 0) doc.addPage();
+    const { allWords, ruleTitle, explanation, isAdapted } = getPupilWeekWords(p);
+    const tt = p.ttSet || 'All';
+    const contentMaths = (isAdapted && mathsA) ? mathsA : maths || '[Maths content]';
+    const contentReading = (isAdapted && readingA) ? readingA : reading || '[Reading content]';
+
+    // === PAGE 1: Header + two columns + footer ===
+    let y = MT;
+    doc.setFontSize(11); doc.setFont('times', 'bold');
+    doc.text(`${label} — ${p.firstName} ${p.lastName}`, 148.5, y, { align: 'center' });
+    doc.setDrawColor(...BRAND); doc.setLineWidth(0.7);
+    doc.line(ML, y + 2, 297 - MR, y + 2);
+    doc.setDrawColor(0); doc.setLineWidth(0.2);
+    y += 7;
+
+    // Two columns (8mm gap)
+    const gap = 8, colW = (CW - gap) / 2;
+    const col1X = ML, col2X = ML + colW + gap;
+    const contentTop = y + 5;
+    const footerH = 8;
+    const contentH = 210 - MB - contentTop - footerH;
+
+    // Left: Being a Mathematician
+    doc.setFontSize(9); doc.setFont('times', 'bold');
+    doc.text('BEING A MATHEMATICIAN', col1X, y);
+    doc.setLineWidth(0.3); doc.line(col1X, y + 1, col1X + colW, y + 1);
+    doc.rect(col1X, contentTop, colW, contentH);
+    doc.setFontSize(8); doc.setFont('times', 'normal');
+    doc.text(doc.splitTextToSize(contentMaths, colW - 6), col1X + 3, contentTop + 5, { lineHeightFactor: 1.5 });
+
+    // Right: Being a Reader
+    doc.setFontSize(9); doc.setFont('times', 'bold');
+    doc.text('BEING A READER', col2X, y);
+    doc.line(col2X, y + 1, col2X + colW, y + 1);
+    doc.rect(col2X, contentTop, colW, contentH);
+    doc.setFontSize(8); doc.setFont('times', 'normal');
+    doc.text(doc.splitTextToSize(contentReading, colW - 6), col2X + 3, contentTop + 5, { lineHeightFactor: 1.5 });
+
+    // Footer
+    doc.setFontSize(8); doc.setFont('times', 'italic');
+    doc.text(`This week, please practise ${tt} times table(s).`, ML, 210 - MB - 2);
+
+    // === PAGE 2: Words ===
+    doc.addPage();
+    y = MT;
+    doc.setFontSize(10); doc.setFont('times', 'bold');
+    doc.text('Personal Key Spellings and Weekly Spelling Rule Words', ML, y);
+    doc.setFontSize(7); doc.setFont('times', 'normal');
+    doc.text(`Spelling Shed — ${p.ssUser || '-'} / ${p.ssPassword || '-'}`, 297 - MR, y, { align: 'right' });
+    doc.setDrawColor(...BRAND); doc.setLineWidth(0.7);
+    doc.line(ML, y + 2, 297 - MR, y + 2);
+    doc.setDrawColor(0); doc.setLineWidth(0.2);
+    y += 6;
+
+    // Instruction
+    doc.setFontSize(7.5); doc.setFont('times', 'normal');
+    const instr = `The first 5 words below are your Key Spellings. This week’s spelling rule – ${ruleTitle}. ${explanation} Practise spelling these words. Write each word within a sentence in the space below.`;
+    const instrLines = doc.splitTextToSize(instr, CW);
+    doc.text(instrLines, ML, y, { lineHeightFactor: 1.35 });
+    y += instrLines.length * 3.5 + 3;
+
+    // Word table
+    const wordW = CW * 0.22;
+    const spaceW = CW * 0.78;
+    const availH = 210 - MB - y - 4;
+    const rowH = Math.max(11, Math.min(15, availH / allWords.length));
+
+    allWords.forEach((w, i) => {
+      // Row border
+      doc.setDrawColor(80); doc.setLineWidth(0.2);
+      doc.rect(ML, y, CW, rowH);
+      // Vertical line between word and space columns
+      doc.line(ML + wordW, y, ML + wordW, y + rowH);
+      // Word
+      doc.setFontSize(9); doc.setFont('times', 'bold');
+      doc.text(`${i + 1}. ${w}`, ML + 2, y + rowH * 0.35);
+      // Two writing lines in space column
+      doc.setDrawColor(180); doc.setLineWidth(0.2);
+      const lx1 = ML + wordW + 2, lx2 = ML + CW - 2;
+      doc.line(lx1, y + rowH * 0.4, lx2, y + rowH * 0.4);
+      doc.line(lx1, y + rowH * 0.75, lx2, y + rowH * 0.75);
+      doc.setDrawColor(0);
+      y += rowH;
+    });
+
+    doc.setDrawColor(0); doc.setLineWidth(0.2);
+  });
+
+  doc.save('home-learning.pdf');
+}
+
+function savePdfHLOne(pupilId) {
+  const p = state.pupils.find(x => x.id === pupilId);
+  if (!p) return;
+  const orig = state.pupils;
+  state.pupils = [p];
+  try { savePdfHL(); } finally { state.pupils = orig; }
+}
+
+// --- TT SHEETS ---
+function savePdfTT(filterClass) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' });
+  // A4 landscape: 297×210. Sheet CSS: 277×190, padding 5mm T/B 8mm L/R
+  const ML = 18, MR = 10, MT = 15, MB = 10;
+  const IW = 297 - ML - MR; // ~269mm
+  const IH = 210 - MT - MB; // ~185mm
+  const GAP = 8; // 8mm gap between children
+  const COL_W = (IW - GAP) / 2; // ~130.5mm
+
+  const pupils = filterClass ? state.pupils.filter(p => p.class === filterClass) : state.pupils;
+  if (!pupils.length) return;
+
+  for (let i = 0; i < pupils.length; i += 2) {
     if (i > 0) doc.addPage();
-    const canvas = await html2canvas(sheets[i], { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' });
-    const imgData = canvas.toDataURL('image/png');
-    doc.addImage(imgData, 'PNG', 0, 0, pw, ph);
+    const pair = [pupils[i], pupils[i + 1] || null];
+
+    pair.forEach((p, col) => {
+      if (!p) return;
+      const x = ML + col * (COL_W + GAP);
+      const w = COL_W;
+      let y = MT;
+
+      // Outer border (2px → 0.5mm)
+      doc.setDrawColor(0); doc.setLineWidth(0.5);
+      doc.rect(x, y, w, IH);
+
+      // Inner padding: 4mm T/B, 5mm L/R
+      const px = x + 5, pw = w - 10;
+      y += 4;
+
+      // Name line (13px bold underlined)
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+      doc.text(`${p.firstName} ${p.lastName}`, px, y + 3);
+      doc.setLineWidth(0.3);
+      doc.line(px, y + 4, px + pw - 28, y + 4);
+
+      // Score box
+      doc.setLineWidth(0.2);
+      doc.rect(px + pw - 24, y - 2, 24, 10);
+      doc.setFontSize(6); doc.setFont('helvetica', 'normal');
+      doc.text('Score / Time', px + pw - 12, y + 1.5, { align: 'center' });
+      doc.text('___ / ___', px + pw - 12, y + 5, { align: 'center' });
+
+      y += 12;
+
+      // Set label (centred, bordered)
+      const set = p.ttSet || 'All';
+      const setLabel = set === 'All' ? '2,5,3,4,6,8,7,9,11,12 x' : `${set} x`;
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+      const slw = doc.getTextWidth(setLabel) + 6;
+      doc.rect(x + (w - slw) / 2, y, slw, 6);
+      doc.text(setLabel, x + w / 2, y + 4, { align: 'center' });
+
+      y += 10;
+
+      // Questions: 2 columns of 20
+      const nums = set === 'All' ? [2,3,4,5,6,7,8,9,10,11,12] : [parseInt(set) || 2];
+      const qList = [];
+      for (let qi = 0; qi < 40; qi++) {
+        const n = nums[Math.floor(Math.random() * nums.length)];
+        const m = Math.floor(Math.random() * 12) + 1;
+        qList.push({ n, m });
+      }
+
+      const col1X = px, col2X = px + pw / 2 + 3;
+      const qGap = 3; // 6mm gap between columns
+      const rowH = (IH - (y - MT) - 4) / 20; // fill remaining height
+      doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+      doc.setDrawColor(0); doc.setLineWidth(0.15);
+
+      for (let r = 0; r < 20; r++) {
+        const q1 = qList[r], q2 = qList[r + 20];
+        const ry = y + r * rowH;
+        // Left column
+        doc.text(String(r + 1), col1X, ry + rowH * 0.7);
+        doc.text(`${q1.m} × ${q1.n} =`, col1X + 5, ry + rowH * 0.7);
+        // Right column
+        if (q2) {
+          doc.text(String(r + 21), col2X, ry + rowH * 0.7);
+          doc.text(`${q2.m} × ${q2.n} =`, col2X + 5, ry + rowH * 0.7);
+        }
+        // Row borders
+        doc.line(px, ry + rowH, px + pw, ry + rowH);
+        if (r === 0) doc.line(px, ry, px + pw, ry);
+        // Column dividers in answer area
+        const ansX1 = col1X + pw * 0.25, ansX2 = col2X + pw * 0.25;
+      }
+
+      doc.setDrawColor(0); doc.setLineWidth(0.2);
+    });
   }
 
-  doc.save(filename);
+  doc.save('tt-sheets.pdf');
 }
 
-async function savePdfHL() {
-  await renderToPdf('.hl-sheet', 'home-learning.pdf', 'l');
-}
-
-async function savePdfHLOne(pupilId) {
+function savePdfTTOne(pupilId) {
   const p = state.pupils.find(x => x.id === pupilId);
   if (!p) return;
-  const origPupils = state.pupils;
-  const origHTML = document.getElementById('hl-print').innerHTML;
-  const origClass = document.getElementById('hl-print').className;
-  const origConfigClass = document.getElementById('hl-config').className;
-  const origActionsDisplay = document.getElementById('hl-actions').style.display;
-
+  const orig = state.pupils;
   state.pupils = [p];
-  generateHL();
-
-  await renderToPdf('.hl-sheet', `home-learning-${p.firstName}.pdf`, 'l');
-
-  state.pupils = origPupils;
-  document.getElementById('hl-print').innerHTML = origHTML;
-  document.getElementById('hl-print').className = origClass;
-  document.getElementById('hl-config').className = origConfigClass;
-  document.getElementById('hl-actions').style.display = origActionsDisplay;
+  try { savePdfTT(); } finally { state.pupils = orig; }
 }
 
-async function savePdfTT() {
-  await renderToPdf('.tt-sheet', 'tt-sheets.pdf', 'l');
+// --- SPELLING BEE ---
+function savePdfBee(filterClass) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+  // A4 portrait: 210×297. Sheet CSS: 190×277, padding 4mm T/B 6mm L/R
+  const ML = 16, MR = 4, MT = 14, MB = 4;
+  const IW = 210 - ML - MR; // ~190mm
+  const IH = 297 - MT - MB; // ~279mm
+  const COLS = 3, ROWS = 3, GAP_H = 3, GAP_V = 2;
+  const SW = (IW - (COLS - 1) * GAP_H) / COLS;
+  const SH = (IH - (ROWS - 1) * GAP_V) / ROWS;
+
+  let pupils = filterClass ? state.pupils.filter(p => p.class === filterClass) : state.pupils;
+  if (!pupils.length) return;
+  const sortBy = document.getElementById('bee-sort').value || 'name';
+  if (sortBy === 'pair') {
+    pupils = pupils.slice().sort((a, b) => (a.pairId || 99) - (b.pairId || 99) || a.firstName.localeCompare(b.firstName));
+  } else {
+    pupils = pupils.slice().sort((a, b) => a.firstName.localeCompare(b.firstName));
+  }
+  const includeWriting = document.getElementById('bee-include-writing').checked;
+  const perPage = 9;
+
+  // Reader sheets
+  for (let pageIdx = 0; pageIdx < pupils.length; pageIdx += perPage) {
+    if (pageIdx > 0) doc.addPage();
+    const pagePupils = pupils.slice(pageIdx, pageIdx + perPage);
+
+    pagePupils.forEach((p, idx) => {
+      const row = Math.floor(idx / COLS), col = idx % COLS;
+      const x0 = ML + col * (SW + GAP_H);
+      const y0 = MT + row * (SH + GAP_V);
+      const { allWords } = getPupilWeekWords(p);
+      const colour = pairColor(p.pairId || 1);
+      const rgb = hexToRgb(colour);
+      const isLight = (rgb.r * 0.299 + rgb.g * 0.587 + rgb.b * 0.114) > 150;
+
+      // Coloured name header
+      doc.setFillColor(rgb.r, rgb.g, rgb.b);
+      doc.roundedRect(x0, y0, SW, 7, 1.5, 1.5, 'F');
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+      doc.setTextColor(isLight ? 0 : 255, isLight ? 0 : 255, isLight ? 0 : 255);
+      doc.text(`${p.firstName} ${p.lastName}`, x0 + SW / 2, y0 + 4.5, { align: 'center' });
+      doc.setTextColor(0, 0, 0);
+
+      // Word table
+      let wy = y0 + 9;
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+      // Outer border below name
+      doc.setDrawColor(180); doc.setLineWidth(0.2);
+      doc.line(x0, y0 + 7, x0 + SW, y0 + 7);
+
+      const rowH = Math.min(6, (SH - 9) / Math.max(allWords.length, 1));
+      allWords.forEach((w, wi) => {
+        if (wy + rowH > y0 + SH) return;
+        // Number
+        doc.setTextColor(120); doc.setFontSize(7);
+        doc.text(`${wi + 1}.`, x0 + 2, wy + rowH * 0.7);
+        // Word
+        doc.setTextColor(0); doc.setFontSize(9);
+        doc.text(w, x0 + 7, wy + rowH * 0.7);
+        // Row separator
+        doc.setDrawColor(210); doc.setLineWidth(0.1);
+        doc.line(x0 + 1, wy + rowH, x0 + SW - 1, wy + rowH);
+        wy += rowH;
+      });
+
+      // Dashed cut lines
+      doc.setDrawColor(187); doc.setLineWidth(0.15); doc.setLineDash([2, 1.5]);
+      if (row < 2) doc.line(x0, y0 + SH + 1, x0 + SW, y0 + SH + 1);
+      if (col < 2) doc.line(x0 + SW + 1.5, y0, x0 + SW + 1.5, y0 + SH);
+      doc.setLineDash([]); doc.setDrawColor(0); doc.setLineWidth(0.2);
+    });
+  }
+
+  // Writing sheets
+  if (includeWriting) {
+    for (let pageIdx = 0; pageIdx < pupils.length; pageIdx += perPage) {
+      doc.addPage();
+      const pagePupils = pupils.slice(pageIdx, pageIdx + perPage);
+
+      pagePupils.forEach((p, idx) => {
+        const row = Math.floor(idx / COLS), col = idx % COLS;
+        const x0 = ML + col * (SW + GAP_H);
+        const y0 = MT + row * (SH + GAP_V);
+
+        // Blank name header
+        doc.setDrawColor(200); doc.setLineWidth(0.3);
+        doc.roundedRect(x0, y0, SW, 7, 1.5, 1.5, 'S');
+        doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+        doc.text('Name: ________________', x0 + SW / 2, y0 + 4.5, { align: 'center' });
+
+        // Blank lines
+        let wy = y0 + 9;
+        const rowH = (SH - 9) / 10;
+        for (let wi = 0; wi < 10; wi++) {
+          if (wy + rowH > y0 + SH) break;
+          doc.setFontSize(7); doc.setTextColor(120);
+          doc.text(`${wi + 1}.`, x0 + 2, wy + rowH * 0.65);
+          doc.setTextColor(0);
+          doc.setDrawColor(150); doc.setLineWidth(0.2);
+          doc.line(x0 + 7, wy + rowH * 0.7, x0 + SW - 2, wy + rowH * 0.7);
+          wy += rowH;
+        }
+
+        doc.setDrawColor(187); doc.setLineWidth(0.15); doc.setLineDash([2, 1.5]);
+        if (row < 2) doc.line(x0, y0 + SH + 1, x0 + SW, y0 + SH + 1);
+        if (col < 2) doc.line(x0 + SW + 1.5, y0, x0 + SW + 1.5, y0 + SH);
+        doc.setLineDash([]); doc.setDrawColor(0); doc.setLineWidth(0.2);
+      });
+    }
+  }
+
+  doc.save('spelling-lists.pdf');
 }
 
-async function savePdfTTOne(pupilId) {
+function savePdfBeeOne(pupilId) {
   const p = state.pupils.find(x => x.id === pupilId);
   if (!p) return;
-  const origPupils = state.pupils;
-  const origHTML = document.getElementById('tt-print').innerHTML;
-  const origClass = document.getElementById('tt-print').className;
-  const origConfigClass = document.getElementById('tt-config').className;
-  const origActionsDisplay = document.getElementById('tt-actions').style.display;
-
+  const orig = state.pupils;
   state.pupils = [p];
-  generateTT();
-
-  await renderToPdf('.tt-sheet', `tt-sheet-${p.firstName}.pdf`, 'l');
-
-  state.pupils = origPupils;
-  document.getElementById('tt-print').innerHTML = origHTML;
-  document.getElementById('tt-print').className = origClass;
-  document.getElementById('tt-config').className = origConfigClass;
-  document.getElementById('tt-actions').style.display = origActionsDisplay;
-}
-
-async function savePdfBee() {
-  await renderToPdf('.bee-sheet', 'spelling-lists.pdf', 'p');
-}
-
-async function savePdfBeeOne(pupilId) {
-  const p = state.pupils.find(x => x.id === pupilId);
-  if (!p) return;
-  const origPupils = state.pupils;
-  const origHTML = document.getElementById('bee-print').innerHTML;
-  const origClass = document.getElementById('bee-print').className;
-  const origConfigClass = document.getElementById('bee-config').className;
-  const origActionsDisplay = document.getElementById('bee-actions').style.display;
-
-  state.pupils = [p];
-  generateBeeSheets();
-
-  await renderToPdf('.bee-sheet', `spelling-lists-${p.firstName}.pdf`, 'p');
-
-  state.pupils = origPupils;
-  document.getElementById('bee-print').innerHTML = origHTML;
-  document.getElementById('bee-print').className = origClass;
-  document.getElementById('bee-config').className = origConfigClass;
-  document.getElementById('bee-actions').style.display = origActionsDisplay;
+  try { savePdfBee(); } finally { state.pupils = orig; }
 }
 
 function hexToRgb(hex) {
@@ -2148,6 +2406,5 @@ if (SYNC_URL) {
   renderDashboard(); goTab('dashboard');
 }
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </html>
