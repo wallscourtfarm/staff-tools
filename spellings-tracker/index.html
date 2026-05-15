@@ -378,7 +378,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.37</span>
+  <span class="version">v0.38</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -2128,7 +2128,10 @@ function savePdfHL(filterClass) {
 
     // Word table — proper table: 1 cell left, 2 stacked cells right
     const wordW = CW * 0.22;
-    const rowH = 20;  // two 10mm writing cells
+    const tableTop = y;
+    const tableBottom = 210 - MB - 4;  // 4mm padding from bottom margin
+    const availH = tableBottom - tableTop;
+    const rowH = availH / allWords.length;
 
     allWords.forEach((w, i) => {
       // Outer row border
@@ -2146,8 +2149,7 @@ function savePdfHL(filterClass) {
       doc.setDrawColor(187); doc.setLineWidth(0.2);
       // Horizontal divider between upper and lower right cell (first writing line)
       doc.line(ML + wordW, y + rowH / 2, ML + CW, y + rowH / 2);
-      // Bottom border of row is already drawn by doc.rect above (second writing line)
-      // But we make it lighter to match the writing-line colour
+      // Bottom border of row is the second writing line
       doc.line(ML + wordW, y + rowH, ML + CW, y + rowH);
 
       doc.setDrawColor(0);
