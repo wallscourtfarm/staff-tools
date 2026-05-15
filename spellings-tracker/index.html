@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>WFA Spellings &amp; Tables Tracker</title>
+<style>
+  :root {
+    --brand: #1798d3;
+    --brand-dark: #0a0101;
+    --bg: #f5f7fa;
+    --card: #ffffff;
+    --text: #1a1a1a;
+    --muted: #6b7280;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --warn: #d97706;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); }
+  body { display: flex; flex-direction: column; }
+  header { background: var(--brand); color: #fff; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+  header h1 { font-size: 18px; font-weight: 700; }
+  .version { font-size: 11px; opacity: .8; }
+  nav { display: flex; gap: 4px; overflow-x: auto; padding: 8px 12px; background: #fff; border-bottom: 1px solid #e5e7eb; }
+  nav button { white-space: nowrap; border: none; background: transparent; padding: 8px 12px; border-radius: 6px; font-size: 14px; color: var(--muted); cursor: pointer; }
+  nav button.active { background: var(--brand); color: #fff; }
+  main { flex: 1; overflow-y: auto; padding: 16px; }
+  .sticky-actions {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: var(--bg);
+    padding: 10px 0;
+    margin: -16px -16px 12px;
+    padding-left: 16px;
+    padding-right: 16px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .card { background: var(--card); border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .card h2 { font-size: 16px; margin-bottom: 12px; color: var(--brand-dark); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .row label { font-size: 14px; color: var(--muted); min-width: 80px; }
+  input, select, textarea { font-size: 16px; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; width: 100%; background: #fff; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--brand); }
+  textarea { min-height: 120px; resize: vertical; }
+  button.btn { background: var(--brand); color: #fff; border: none; border-radius: 8px; padding: 10px 16px; font-size: 14px; cursor: pointer; }
+  button.btn.secondary { background: #e5e7eb; color: var(--text); }
+  button.btn.small { padding: 6px 10px; font-size: 12px; }
+  button.btn:disabled { opacity: .5; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e5e7eb; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+  .tag.im { background: #dbeafe; color: #1e40af; }
+  .tag.wu { background: #dcfce7; color: #166534; }
+  .tag.set { background: #fef3c7; color: #92400e; }
+  .pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: #f3f4f6; font-size: 13px; margin: 2px; }
+  .sheet-status { font-size: 11px; opacity: .8; }
+  .sheet-status.ok { color: var(--success); }
+  .sheet-status.err { color: var(--danger); }
+  .hidden { display: none !important; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .stat { background: #fff; padding: 12px; border-radius: 8px; text-align: center; }
+  .stat .num { font-size: 24px; font-weight: 700; color: var(--brand); }
+  .stat .lbl { font-size: 12px; color: var(--muted); }
+  .mark-toggle { display: inline-flex; gap: 4px; }
+  .mark-toggle button { padding: 6px 14px; font-size: 13px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; cursor: pointer; }
+  .pupil-sheet { font-size: 13px; }
+  .pupil-sheet th { padding: 6px 4px; white-space: nowrap; }
+  .pupil-sheet td { padding: 3px 4px; vertical-align: middle; white-space: nowrap; }
+  .pupil-sheet td:nth-child(1) { min-width: 120px; }
+  .pupil-sheet td:nth-child(2),
+  .pupil-sheet td:nth-child(3) { min-width: 60px; }
+  .pupil-sheet td:nth-child(4),
+  .pupil-sheet td:nth-child(5),
+  .pupil-sheet td:nth-child(6) { min-width: 40px; }
+  .pupil-sheet td:nth-child(7),
+  .pupil-sheet td:nth-child(8) { min-width: 70px; }
+  .pupil-sheet td input, .pupil-sheet td select {
+    font-size: 13px; padding: 3px 4px; border: 1px solid transparent;
+    border-radius: 4px; background: transparent; width: 100%; min-width: 0;
+  }
+  .pupil-sheet td input:focus, .pupil-sheet td select:focus {
+    border-color: var(--brand); background: #fff; outline: none;
+  }
+  .pupil-sheet td input:hover, .pupil-sheet td select:hover {
+    background: #f3f4f6;
+  }
+  .pupil-sheet td input[type="text"] {
+    -moz-appearance: textfield;
+  }
+  .pupil-sheet td input::-webkit-outer-spin-button,
+  .pupil-sheet td input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .pupil-sheet td .del-btn {
+    font-size: 14px; color: var(--danger); border: none; background: transparent;
+    cursor: pointer; padding: 0 4px;
+  }
+
+  /* ======================== PRINT ======================== */
+  @media print {
+    @page { size: A4 landscape; margin: 8mm; }
+    body { background: #fff; }
+    header, nav { display: none !important; }
+    /* Show the active section but hide everything inside except print area */
+    .tab { display: block !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; background: none !important; border: none !important; }
+    .tab > *:not(.print-area) { display: none !important; }
+    .print-area { display: block !important; position: static !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+    .print-area.hidden { display: block !important; }
+    .tt-sheet, .hl-sheet, .bee-sheet { page-break-after: always; page-break-inside: avoid; }
+  }
+
+  /* ---- HOME LEARNING ---- */
+  .hl-sheet {
+    width: 277mm; height: 190mm;
+    padding: 8mm 12mm;
+    background: #fff; color: #000;
+    font-family: Georgia, 'Times New Roman', serif;
+    margin: 0 auto 16px;
+    page-break-after: always;
+    box-sizing: border-box;
+    display: flex; flex-direction: column;
+  }
+  .hl-sheet:last-child { page-break-after: auto; }
+
+  /* Page 1: split */
+  .hl-p1-header {
+    text-align: center; font-size: 15px; font-weight: 700;
+    border-bottom: 2px solid var(--brand); padding-bottom: 4px; margin-bottom: 8px;
+  }
+  .hl-p1-body {
+    flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 8mm;
+    overflow: hidden;
+  }
+  .hl-p1-col { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+  .hl-p1-col h3 {
+    font-size: 14px; text-decoration: underline; margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .hl-p1-col .content {
+    flex: 1; border: 1px solid #333; padding: 8px; font-size: 12px; line-height: 1.45;
+    white-space: pre-wrap; overflow: hidden;
+  }
+  .hl-p1-footer {
+    font-size: 11px; font-style: italic; margin-top: 6px;
+  }
+
+  /* Page 2: words */
+  .hl-p2-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    border-bottom: 2px solid var(--brand); padding-bottom: 4px; margin-bottom: 8px;
+  }
+  .hl-p2-header .title { font-size: 14px; font-weight: 700; }
+  .hl-p2-header .login { font-size: 11px; text-align: right; line-height: 1.3; }
+  .hl-p2-instruction { font-size: 11px; line-height: 1.4; margin-bottom: 8px; }
+  .hl-p2-table { width: 100%; border-collapse: collapse; flex: 1; }
+  .hl-p2-table td {
+    border: 1px solid #333; padding: 5px 8px; font-size: 14px;
+    vertical-align: top;
+  }
+  .hl-p2-table td.word { width: 22%; font-weight: 600; vertical-align: middle; }
+  .hl-p2-table td.space { width: 78%; padding: 0; vertical-align: top; }
+  .hl-line { height: 0.8cm; border-bottom: 1px solid #bbb; box-sizing: border-box; }
+
+  /* ---- TT CHECK ---- */
+  .tt-sheet {
+    width: 277mm; height: 190mm;
+    padding: 5mm 8mm;
+    background: #fff; color: #000;
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0 auto 16px;
+    page-break-after: always;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8mm;
+  }
+  .tt-sheet:last-child { page-break-after: auto; }
+  .tt-child {
+    border: 2px solid #000;
+    padding: 4mm 5mm;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-sizing: border-box;
+  }
+  .tt-child-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 4mm;
+  }
+  .tt-child-header .name-line {
+    font-size: 13px;
+    font-weight: 700;
+    flex: 1;
+    border-bottom: 1px solid #000;
+    padding-bottom: 1px;
+    margin-right: 12px;
+  }
+  .tt-child-header .score-box {
+    border: 1px solid #000;
+    padding: 2px 10px;
+    font-size: 10px;
+    text-align: center;
+    white-space: nowrap;
+    min-width: 80px;
+  }
+  .tt-set-label {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid #000;
+    padding: 2px 12px;
+    margin: 0 auto 4mm auto;
+    display: inline-block;
+    align-self: center;
+  }
+  .tt-tables-wrap {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6mm;
+    height: 100%;
+  }
+  .tt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    table-layout: fixed;
+    height: 100%;
+  }
+  .tt-table td {
+    border: 1px solid #000;
+    padding: 2px 3px;
+    text-align: center;
+    vertical-align: middle;
+    height: 6.5mm;
+  }
+  .tt-table td.num { width: 10%; }
+  .tt-table td.q { width: 50%; text-align: left; padding-left: 4px; }
+  .tt-table td.ans { width: 40%; }
+
+  /* ---- PAIRED SPELLING BEE ---- */
+  .bee-sheet {
+    width: 277mm; height: 190mm;
+    padding: 4mm 6mm;
+    background: #fff; color: #000;
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0 auto 16px;
+    page-break-after: always;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 3mm 4mm;
+  }
+  .bee-sheet:last-child { page-break-after: auto; }
+  .bee-strip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 2px;
+    overflow: hidden;
+    border-top: 5px solid transparent;
+  }
+  .bee-strip-name {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 2px;
+    border-bottom: 1px solid #000;
+    padding-bottom: 1px;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bee-strip-words {
+    list-style: decimal;
+    padding: 0;
+    padding-left: 18px;
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.15;
+    width: 100%;
+  }
+  .bee-strip-words li {
+    padding: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>WFA Spellings &amp; Tables Tracker</h1>
+  <span class="version">v0.7</span>
+  <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
+</header>
+<nav id="nav">
+  <button data-tab="dashboard" class="active">Dashboard</button>
+  <button data-tab="pupils">Pupils</button>
+  <button data-tab="weekly">Weekly Setup</button>
+  <button data-tab="hl">Home Learning</button>
+  <button data-tab="bee">Spelling Bee</button>
+  <button data-tab="tt">TT Sheets</button>
+  <button data-tab="data">Data</button>
+</nav>
+
+<main id="main">
+
+<!-- DASHBOARD -->
+<section id="dashboard" class="tab">
+  <div class="stats">
+    <div class="stat"><div class="num" id="d-pupils">0</div><div class="lbl">Pupils</div></div>
+    <div class="stat"><div class="num" id="d-rules">0</div><div class="lbl">Rules</div></div>
+    <div class="stat"><div class="num" id="d-week">-</div><div class="lbl">Current Week</div></div>
+    <div class="stat"><div class="num" id="d-assess">0</div><div class="lbl">Assessments</div></div>
+  </div>
+  <div class="card">
+    <h2>Quick Actions</h2>
+    <div class="row">
+      <button class="btn" onclick="goTab('weekly')">Set up this week</button>
+      <button class="btn secondary" onclick="goTab('hl')">Print home learning</button>
+      <button class="btn secondary" onclick="goTab('bee')">Spelling bee sheets</button>
+      <button class="btn secondary" onclick="goTab('tt')">Print TT checks</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>This Week</h2>
+    <div id="week-status">No week set up yet.</div>
+  </div>
+  <div class="card">
+    <h2>Data</h2>
+    <div class="row">
+      <button class="btn" onclick="loadRealData()">Load Real Pupil Data</button>
+      <button class="btn secondary" onclick="exportJSON()">Export JSON Backup</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px;">
+      Load Real Pupil Data imports all 60 Year 4 pupils, pairs, TT sets and Spelling Shed log-ins.
+    </p>
+  </div>
+</section>
+
+<!-- PUPILS -->
+<section id="pupils" class="tab hidden">
+  <div id="pupil-detail" class="card hidden" style="position:sticky;top:0;z-index:30;background:#fff;border:2px solid var(--brand);">
+    <div id="pd-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h2 id="pd-name">Select a pupil</h2>
+      <button class="btn secondary small" onclick="closePupilDetail()">Close</button>
+    </div>
+    <div id="pd-info" style="font-size:13px;color:var(--muted);margin-bottom:10px;"></div>
+    <div id="pd-words"></div>
+    <div class="row" style="margin-top:12px;">
+      <button class="btn" onclick="printPupilHL()">Print Home Learning</button>
+      <button class="btn secondary" onclick="printPupilTT()">Print TT Sheet</button>
+      <button class="btn secondary" onclick="printPupilWords()">Print Word List</button>
+      <button class="btn secondary" onclick="savePupilDetailResults()">Save Results</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Pupils</h2>
+    <div class="row" style="margin-bottom:12px;">
+      <input type="text" id="pupil-search" placeholder="Search pupils..." style="flex:1;" oninput="renderPupils()">
+      <button class="btn" onclick="editPupil(null)">+ Add Pupil</button>
+    </div>
+    <div class="row" style="margin-bottom:8px;">
+      <button class="btn small secondary" id="pupil-lock-btn" onclick="togglePupilLock()">🔒 Locked</button>
+      <span style="font-size:12px;color:var(--muted);">Click name to mark / generate sheets. Unlock to edit fields.</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="pupil-sheet">
+        <thead><tr><th>Name</th><th onclick="sortPupils('firstName')" style="cursor:pointer">First ▼</th><th onclick="sortPupils('lastName')" style="cursor:pointer">Last ▼</th><th onclick="sortPupils('class')" style="cursor:pointer">Class ▼</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair ▼</th><th>TT Set</th><th>Shed User</th><th>Shed Password</th><th onclick="sortPupils('mastery')" style="cursor:pointer">Key % ▼</th><th></th></tr></thead>
+        <tbody id="pupil-table"></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="pupil-editor" class="card hidden">
+    <h2 id="pe-title">Edit Pupil</h2>
+    <div class="grid-2">
+      <div><label>First name</label><input id="pe-first"></div>
+      <div><label>Last name</label><input id="pe-last"></div>
+      <div><label>Class</label><select id="pe-class"><option value="IM">IM</option><option value="WU">WU</option></select></div>
+      <div><label>Pair #</label><input id="pe-pair" type="number" min="1"></div>
+      <div><label>TT Set</label><select id="pe-tt"><option>All</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option></select></div>
+      <div><label>Spelling Shed User</label><input id="pe-ssu"></div>
+      <div><label>Spelling Shed Password</label><input id="pe-ssp"></div>
+    </div>
+    <div class="row" style="margin-top:12px;">
+      <button class="btn" onclick="savePupil()">Save</button>
+      <button class="btn secondary" onclick="cancelPupil()">Cancel</button>
+      <button class="btn secondary small" id="pe-del" onclick="deletePupil()" style="margin-left:auto;color:var(--danger)">Delete</button>
+    </div>
+  </div>
+</section>
+
+<!-- WEEKLY SETUP -->
+<section id="weekly" class="tab hidden">
+  <div class="card">
+    <h2>Weekly Setup</h2>
+    <div class="row"><label>Week label</label><input id="w-label" placeholder="e.g. Term 5 Week 4"></div>
+    <div class="row"><label>Rule</label><select id="w-rule" onchange="previewWeekly()"></select></div>
+    <div id="weekly-preview" style="margin-top:12px;"></div>
+    <div class="row" style="margin-top:16px;">
+      <button class="btn" onclick="saveWeek()">Save Week Setup</button>
+      <button class="btn secondary" onclick="clearWeek()">Clear</button>
+    </div>
+  </div>
+</section>
+
+<!-- HOME LEARNING -->
+<section id="hl" class="tab hidden">
+  <div class="row sticky-actions" id="hl-actions" style="display:none;">
+    <button class="btn" onclick="window.print()">Print</button>
+    <button class="btn secondary" onclick="resetHL()">Back / Edit</button>
+  </div>
+  <div id="hl-config">
+    <div class="card">
+      <h2>Home Learning Content</h2>
+      <div class="row"><label>Week label</label><input id="hl-label" placeholder="Term 5 Week 4"></div>
+      <div class="grid-2">
+        <div><label>Maths (standard)</label><textarea id="hl-maths"></textarea></div>
+        <div><label>Reading (standard)</label><textarea id="hl-reading"></textarea></div>
+        <div><label>Maths (adapted)</label><textarea id="hl-maths-a"></textarea></div>
+        <div><label>Reading (adapted)</label><textarea id="hl-reading-a"></textarea></div>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <button class="btn" onclick="generateHL()">All Pupils</button>
+        <button class="btn secondary" onclick="generateHL('IM')">IM only</button>
+        <button class="btn secondary" onclick="generateHL('WU')">WU only</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Adapted Pupils</h2>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px;">Select pupils who should receive adapted maths/reading:</p>
+      <div id="hl-adapt-list"></div>
+    </div>
+  </div>
+  <div id="hl-print" class="print-area hidden"></div>
+</section>
+
+<!-- SPELLING BEE -->
+<section id="bee" class="tab hidden">
+  <div class="row sticky-actions" id="bee-actions" style="display:none;">
+    <button class="btn" onclick="window.print()">Print</button>
+    <button class="btn secondary" onclick="resetBee()">Back</button>
+  </div>
+  <div id="bee-config">
+    <div class="card">
+      <h2>Paired Spelling Bee</h2>
+      <p style="margin-bottom:12px;color:var(--muted);">
+        Generate paper sheets for all pairs. Each pair gets a <strong>Reader Sheet</strong> (words to read aloud)
+        and a <strong>Writing Sheet</strong> (blank lines to write on). Pairs are colour-coded.
+      </p>
+      <div class="row">
+        <button class="btn" onclick="generateBeeSheets()">Generate All Sheets</button>
+        <button class="btn secondary" onclick="generateBeeSheets('IM')">IM only</button>
+        <button class="btn secondary" onclick="generateBeeSheets('WU')">WU only</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Mark Results</h2>
+      <p style="margin-bottom:12px;color:var(--muted);">
+        After the spelling bee, mark each child's words. This updates their key spelling list for next week.
+      </p>
+      <div class="row"><label>Child</label><select id="bee-pupil" onchange="loadBeeWords()"></select></div>
+      <div id="bee-mark-form"></div>
+      <div class="row" style="margin-top:12px;">
+        <button class="btn" onclick="saveBeeResults()">Save Results</button>
+      </div>
+    </div>
+  </div>
+  <div id="bee-print" class="print-area hidden"></div>
+</section>
+
+<!-- TT SHEETS -->
+<section id="tt" class="tab hidden">
+  <div class="row sticky-actions" id="tt-actions" style="display:none;">
+    <button class="btn" onclick="window.print()">Print</button>
+    <button class="btn secondary" onclick="resetTT()">Back</button>
+  </div>
+  <div id="tt-config">
+    <div class="card">
+      <h2>Times Table Checks</h2>
+      <p style="margin-bottom:12px;color:var(--muted);">
+        Generates landscape sheets with 40 questions per child. Two children per page.
+      </p>
+      <div class="row">
+        <button class="btn" onclick="generateTT()">Generate All</button>
+        <button class="btn secondary" onclick="generateTT('IM')">IM only</button>
+        <button class="btn secondary" onclick="generateTT('WU')">WU only</button>
+      </div>
+    </div>
+  </div>
+  <div id="tt-print" class="print-area hidden"></div>
+</section>
+
+<!-- DATA -->
+<section id="data" class="tab hidden">
+  <div class="card" id="sync-card">
+    <h2>Google Sheet Sync</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">
+      Data syncs automatically. Use <strong>Sync Now</strong> to reload from the Sheet if another teacher has made changes.
+    </p>
+    <div class="row">
+      <button class="btn" onclick="forceSyncLoad()">Sync Now</button>
+      <button class="btn secondary" onclick="forceSyncPush()">Push to Sheet</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Import / Export</h2>
+    <div class="row">
+      <button class="btn" onclick="exportJSON()">Export JSON Backup</button>
+      <button class="btn secondary" onclick="document.getElementById('import-file').click()">Import JSON Backup</button>
+      <input type="file" id="import-file" class="hidden" accept=".json" onchange="importJSON(event)">
+    </div>
+    <div style="margin-top:16px;">
+      <label>Import from Excel CSV (Data sheet)</label>
+      <input type="file" id="import-csv" accept=".csv" onchange="importDataCSV(event)">
+    </div>
+  </div>
+  <div class="card">
+    <h2>Reset</h2>
+    <button class="btn secondary" style="background:var(--danger);color:#fff;" onclick="resetAll()">Clear All Data</button>
+  </div>
+</section>
+
+</main>
+
+<script>
+// ========================
+// STATE
+// ========================
+const STORAGE_KEY = 'wfa-spellings-v4';
+const SHEET_ID   = ''; // Paste your Sheet ID here
+const SHEET_BASE = SHEET_ID ? `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=` : '';
+const SYNC_URL   = ''; // Paste your Apps Script web app URL here
+let state = loadLocal();
+let beeState = { pupilId: null, words: [] };
+let syncInProgress = false;
+
+function loadLocal() {
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
+  return defaultState();
+}
+function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+// ── Sheet sync ───────────────────────────────────────────────────────────────
+function updateSyncStatus(status) {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  if (!SYNC_URL) { el.textContent = '● Local only'; el.className = 'version'; return; }
+  if (status === 'ok')    { el.textContent = '● Synced'; el.className = 'version sheet-status ok'; }
+  else if (status === 'err')  { el.textContent = '● Sync failed'; el.className = 'version sheet-status err'; }
+  else if (status === 'loading') { el.textContent = '● Syncing…'; el.className = 'version'; }
+  else { el.textContent = '● Offline'; el.className = 'version'; }
+}
+
+async function sheetLoadAll() {
+  if (!SYNC_URL) { updateSyncStatus(); return false; }
+  updateSyncStatus('loading');
+  try {
+    const res = await fetch(SYNC_URL + '?action=loadAll');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data || !data.pupils) throw new Error('Invalid response');
+
+    // Merge Sheet data into state (rules stay in code)
+    state.pupils = data.pupils || [];
+    state.weeks = data.weeks || [];
+    state.assessments = data.results || [];
+    if (data.config) {
+      if (data.config.currentWeek) state.currentWeek = data.config.currentWeek;
+      if (data.config.adaptedPupils) state.adaptedPupils = String(data.config.adaptedPupils).split(',').filter(Boolean);
+      if (data.config.hlMaths !== undefined) state.hlContent.maths = data.config.hlMaths;
+      if (data.config.hlReading !== undefined) state.hlContent.reading = data.config.hlReading;
+      if (data.config.hlMathsAdapted !== undefined) state.hlContent.mathsAdapted = data.config.hlMathsAdapted;
+      if (data.config.hlReadingAdapted !== undefined) state.hlContent.readingAdapted = data.config.hlReadingAdapted;
+      if (data.config.wordBank) state.wordBank = String(data.config.wordBank).split(',').map(w=>w.trim()).filter(Boolean);
+    }
+    // Ensure rules are always present (they're code-defined, not from Sheet)
+    if (!state.rules || !state.rules.length) state.rules = defaultRules();
+    saveLocal();
+    updateSyncStatus('ok');
+    return true;
+  } catch (e) {
+    console.error('Sheet load failed:', e);
+    updateSyncStatus('err');
+    return false;
+  }
+}
+
+async function sheetSaveAll() {
+  if (!SYNC_URL) return;
+  if (syncInProgress) return;
+  syncInProgress = true;
+  updateSyncStatus('loading');
+  const payload = {
+    action: 'saveAll',
+    pupils: state.pupils.map(p => ({
+      id: p.id, firstName: p.firstName, lastName: p.lastName, class: p.class,
+      pairId: p.pairId, ttSet: p.ttSet, ssUser: p.ssUser, ssPassword: p.ssPassword,
+      mastery: p.mastery || {}
+    })),
+    weeks: state.weeks,
+    assessments: state.assessments,
+    config: {
+      currentWeek: state.currentWeek || '',
+      adaptedPupils: (state.adaptedPupils || []).join(','),
+      hlMaths: state.hlContent.maths || '',
+      hlReading: state.hlContent.reading || '',
+      hlMathsAdapted: state.hlContent.mathsAdapted || '',
+      hlReadingAdapted: state.hlContent.readingAdapted || '',
+      wordBank: (state.wordBank || []).join(',')
+    }
+  };
+  try {
+    const res = await fetch(SYNC_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'text/plain' }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    updateSyncStatus('ok');
+  } catch (e) {
+    console.error('Sheet save failed:', e);
+    updateSyncStatus('err');
+  }
+  syncInProgress = false;
+}
+
+function saveState() {
+  saveLocal();
+  sheetSaveAll();
+}
+
+async function forceSyncLoad() {
+  const ok = await sheetLoadAll();
+  if (ok) {
+    renderDashboard();
+    goTab('dashboard');
+    alert('Loaded latest data from Sheet.');
+  } else {
+    alert('Could not load from Sheet. Check your connection and Sheet ID.');
+  }
+}
+
+async function forceSyncPush() {
+  updateSyncStatus('loading');
+  await sheetSaveAll();
+  const el = document.getElementById('syncStatus');
+  if (el && el.classList.contains('ok')) alert('Pushed current data to Sheet.');
+  else alert('Push failed. Check your connection and Sheet setup.');
+}
+function defaultState() {
+  return { pupils: [], rules: defaultRules(), weeks: [], currentWeek: null, assessments: [],
+    adaptedPupils: [], hlContent: { maths:'',reading:'',mathsAdapted:'',readingAdapted:'' }, wordBank: [] };
+}
+
+function defaultRules() { return [
+  {id:"y6s1",year:"Year 6",step:1,title:"Year 6 - Step 1: Words with the short vowel sound /i/ spelled ‘y’",explanation:"This week's spellings focus was on the letter 'y' making an /i/ sound.",words:["antonym","crystal","lyrics","mystery","oxygen","rhythm","symbol","symptom","system","typical"]},
+  {id:"y6s2",year:"Year 6",step:2,title:"Year 6 - Step 2: Words with the long vowel sound /igh/ spelled ‘y",explanation:"This week's spellings focus was on the letter 'y' making the long vowel /igh/ sound.",words:["apply","hygiene","hyphen","identify","multiply","occupy","python","recycle","rhyme","supply"]},
+  {id:"y6s3",year:"Year 6",step:3,title:"Year 6 - Step 3: Key Spellings",explanation:"This week's spelling focus was on the Year 6 key spellings.",words:["ancient","cemetery","criticise","equipped","government","leisure","opportunity","recognise","sincerely","variety"]},
+  {id:"y6s4",year:"Year 6",step:4,title:"Year 6 - Step 4: Words with ‘cial’/shul/ after a vowel",explanation:"This week's spellings have the suffix ‘cial’ which makes the /shul/ sound. If the letter preceding the /shul/ sound is a vowel, then we use the suffix ‘cial’.",words:["antisocial","artificial","beneficial","crucial","facial","official","racial","social","special","superficial"]},
+  {id:"y6s5",year:"Year 6",step:5,title:"Year 6 - Step 5: Words with ‘tial’",explanation:"",words:["confidential","essential","influential","martial","partial","potential","sequential","spatial","substantial","torrential"]},
+  {id:"y6s6",year:"Year 6",step:6,title:"Year 6 - Step 6: Key Spellings",explanation:"This week's spelling focus was on the Year 6 key spellings.",words:["amateur","category","correspond","environment","frequently","language","occur","queue","signature","twelfth"]},
+  {id:"y6s7",year:"Year 6",step:7,title:"Year 6 - Step 7: Key Spellings",explanation:"This week's spelling focus was on the Year 6 key spellings.",words:["appreciate","communicate","definite","exaggerate","harass","marvellous","persuade","relevant","stomach","vehicle"]},
+  {id:"y6s8",year:"Year 6",step:8,title:"Year 6 - Step 8: Words with an /oa/ sound spelled ‘ou’ or ‘ow’",explanation:"",words:["blown","known","mould","poultry","shallow","shoulder","smoulder","soul","thrown","window"]},
+  {id:"y6s9",year:"Year 6",step:9,title:"Year 6 - Step 9: Words with a ‘soft c’ spelled ‘ce’",explanation:"",words:["celebrate","cemetery","certificate","deceased","December","hindrance","necessary","nuisance","prejudice","sacrifice"]},
+  {id:"y6s10",year:"Year 6",step:10,title:"Year 6 - Step 10: Key Spellings",explanation:"This week's spelling focus was on the Year 6 key spellings.",words:["apparent","committee","curiosity","especially","guarantee","lightning","parliament","recommend","soldier","vegetable"]},
+  {id:"y6s11",year:"Year 6",step:11,title:"Year 6 - Step 11: Words with the /f/ sound spelled ‘ph’",explanation:"",words:["alphabet","elephant","dolphin","graph","pamphlet","pheasant","phone","photo","physical","sphere"]},
+  {id:"y6s12",year:"Year 6",step:12,title:"Year 6 - Step 12: Key Spellings",explanation:"This week's spelling focus was on the Year 6 key spellings.",words:["according","awkward","conscious","dictionary","familiar","individual","neighbour","profession","sacrifice","system"]},
+  {id:"y6s13",year:"Year 6",step:13,title:"Year 6 - Step 13: Words with the suffix ’-ably’",explanation:"",words:["adorably","believably","changeably","comfortably","considerably","dependably","noticeably","reasonably","tolerably","valuably"]},
+  {id:"y6s14",year:"Year 6",step:14,title:"Year 6 - Step 14: Words with the suffix ’-ible’",explanation:"",words:["forcible","horrible","incredible","legible","possible","responsible","reversible","sensible","terrible","visible"]},
+  {id:"y6s15",year:"Year 6",step:15,title:"Year 6 - Step 15: Key Spellings",explanation:"This week's spelling focus was on the Year 6 key spellings.",words:["attached","community","desperate","excellent","hindrance","mischievous","physical","restaurant","sufficient","yacht"]},
+  {id:"y6s16",year:"Year 6",step:16,title:"Year 6 - Step 16: Words with the suffix ‘-ibly’",explanation:"This week's spelling focus is on the suffix '-ibly'. '-ibly' turns adjectives with the suffix '-ible' (e.g. terrible) into adverbs (e.g. terribly) by replacing the 'e' with a 'y'.",words:["forcibly","horribly","incredibly","legibly","possibly","responsibly","reversibly","sensibly","terribly","visibly"]},
+  {id:"y6s17",year:"Year 6",step:17,title:"Year 6 - Step 17: Words ending in ‘-ent’ and ‘–ence’",explanation:"This week's spelling focus are words ending in '-ent' and '-ence'. Words ending in '-ent' are adjectives and those ending in '-ence' are nouns. Remove the 't' and add 'ce'.",words:["convenience","convenient","difference","different","evidence","evident","excellence","excellent","silence","silent"]},
+  {id:"y6s18",year:"Year 6",step:18,title:"Year 6 - Step 18: Key Spellings",explanation:"This week's spelling focus was on the Year 6 key spellings.",words:["accommodate","available","competition","determined","existence","identity","muscle","prejudice","rhyme","suggest"]},
+  {id:"y6s19",year:"Year 6",step:19,title:"Year 6 - Step 19: Key Spellings",explanation:"This week's spelling focus was on the Year 6 key spellings.",words:["aggressive","bruise","convenience","embarrass","forty","interrupt","occupy","pronunciation","shoulder","thorough"]},
+  {id:"y6s20",year:"Year 6",step:20,title:"Year 6 - Step 20: Words ending in ‘-er’, ‘-or’ and ‘-ar’",explanation:"These endings this week are pronounced as an /uh/.  Nouns for people and objects can be created by adding the suffix ‘-er’ and ‘–or' e.g. farm-farmer and visit-visitor.",words:["calendar","computer","customer","interior","particular","popular","radiator","shoulder","soldier","superior"]},
+  {id:"y6s21",year:"Year 6",step:21,title:"Year 6 - Step 21: Key Spellings",explanation:"This week's spelling focus was on the Year 6 key spellings.",words:["achieve","bargain","controversy","disastrous","foreign","interfere","nuisance","programme","secretary","temperature"]},
+  {id:"y6s22",year:"Year 6",step:22,title:"Year 6 - Step 22: Words beginning with ‘acc-",explanation:"This week's spellings was words beginning with 'acc-'. These words need double c because the first letter c has a hard /k/ sound and the second letter c has a soft /s/.",words:["accentuate","access","accommodate","accompany","accomplish","accost","accrue","accumulate","accuracy","accuse"]},
+  {id:"y6s23",year:"Year 6",step:23,title:"Year 6 - Step 23: Words with the prefixes ‘dis-’, ‘un-’, ‘over-’ and ‘im-’",explanation:"This week' spellings all have the prefixes 'dis-’, ‘un-’, ‘over-’ and ‘im-’. The prefix un- means \"not\" (e.g., unhappy), dis- means \"opposite\" or \"apart\" (e.g. dislike), im- is often used for words starting with 'p' or 'm' (e.g., impossible), and over- meaning \"too much\" or \"above\".",words:["disappointed","dissatisfied","dissimilar","impatient","overreact","overrule","overseas","unnatural","unnecessary","unsure"]},
+  {id:"y6s24",year:"Year 6",step:24,title:"Year 6 - Step 24: Key Spellings",explanation:"This week's spelling focus was on the Year 6 key spellings.",words:["accompany","average","conscience","develop","explanation","immediately","necessary","privilege","rhythm","symbol"]},
+  {id:"y6s25",year:"Year 6",step:25,title:"Year 6 - Step 25: Words with origins in other countries and languages",explanation:"This week's spellings are based on words with origins in other countries and languages.",words:["ballet","blizzard","bungalow","easel","gymkhana","hoist","origin","pyjamas","restaurant","veranda"]},
+  {id:"y6s26",year:"Year 6",step:26,title:"Year 6 - Step 26: Grammar Vocabulary 1",explanation:"This week's spellings are focussed on grammatical language.",words:["adverb","ambiguity","bracket","clause","cohesion","determiner","modal","parenthesis","pronoun","relative"]},
+  {id:"y6s27",year:"Year 6",step:27,title:"Year 6 - Step 27: Grammar Vocabulary 2",explanation:"This week's spellings are focussed on grammatical language.",words:["active","antonym","colon","ellipsis","hyphen","object","passive","punctuation","subject","synonym"]},
+  {id:"y6s28",year:"Year 6",step:28,title:"Year 6 - Step 28: Adding the prefix ‘over-’",explanation:"This week's spelling focus was adding the prefix 'over-'. The prefix 'over-' means to do something 'too much' or 'over'.",words:["overbalance","overcoat","overcook","overlooked","overpaid","overreact","overslept","overthrow","overtired","overturned"]},
+  {id:"y6s29",year:"Year 6",step:29,title:"Year 6 - Step 29: Words with the suffix ‘-ful’",explanation:"This week's spelling focus was adding the suffix '-ful' to words. The suffix '-ful' means to be 'full of' or 'have qualities of'.",words:["beautiful","boastful","doubtful","faithful","fanciful","fearful","merciful","pitiful","plentiful","thankful"]},
+  {id:"y6s30",year:"Year 6",step:30,title:"Year 6 - Step 30: Adjectives used to describe settings",explanation:"",words:["bustling","magnificent","majestic","noiseless","picturesque","regal","sinister","spectacular","tranquil","unsightly"]},
+  {id:"y6s31",year:"Year 6",step:31,title:"Year 6 - Step 31: Adjectives used to describe feelings",explanation:"",words:["apprehensive","delighted","despondent","euphoric","incensed","jittery","optimistic","positive","sanguine","terrified"]},
+  {id:"y6s32",year:"Year 6",step:32,title:"Year 6 - Step 32: Adjectives to describe characters",explanation:"",words:["amiable","courageous","delightful","disagreeable","exquisite","gargantuan","grotesque","obnoxious","repugnant","valiant"]},
+  {id:"y6s33",year:"Year 6",step:33,title:"Year 6 - Step 33: Words that can be nouns and verbs",explanation:"",words:["contest","freeze","impact","increase","object","permit","produce","silence","subject","transport"]},
+  {id:"y6s34",year:"Year 6",step:34,title:"Year 6 - Step 34: Words with unstressed vowel sounds",explanation:"",words:["company","definitely","desperate","environment","explanatory","jewellery","poisonous","reference","secretary","temperature"]},
+  {id:"y6s35",year:"Year 6",step:35,title:"Year 6 - Step 35: Adverbs synonymous with determination",explanation:"This week's spellings are adverbs which are synonymous with determination.",words:["continually","determinedly","diligently","intently","persistently","purposefully","relentlessly","repeatedly","resolutely","tenaciously"]},
+  {id:"y6s36",year:"Year 6",step:36,title:"Year 6 - Step 36: Mathematical Vocabulary",explanation:"",words:["addition","calculation","circumference","diameter","division","horizontal","multiplication","parallel","subtraction","vertical"]},
+  {id:"y5s1",year:"Year 5",step:1,title:"Year 5 - Step 1: Words ending in ‘-tious’ and ‘-ious’",explanation:"test revision rule",words:["ambitious","amphibious","curious","devious","fictitious","infectious","bnotorious","nutritious","repetitious","obvious"]},
+  {id:"y5s2",year:"Year 5",step:2,title:"Year 5 - Step 2: Words ending in ‘-cious’",explanation:"",words:["atrocious","conscious","delicious","ferocious","gracious","luscious","malicious","precious","spacious","suspicious"]},
+  {id:"y5s3",year:"Year 5",step:3,title:"Year 5 - Step 3: Words ending in ‘-cial’",explanation:"",words:["artificial","beneficial","crucial","especially","facial","glacial","judicial","multiracial","official","special"]},
+  {id:"y5s4",year:"Year 5",step:4,title:"Year 5 - Step 4: Words ending in ‘-tial’",explanation:"",words:["circumstantial","confidential","essential","impartial","influential","potential","preferential","residential","substantial","torrential"]},
+  {id:"y5s5",year:"Year 5",step:5,title:"Year 5 - Step 5: Words ending in ‘-cial’ and ‘-tial’",explanation:"",words:["commercial","controversial","controversially","financial","financially","initial","initially","palatial","provincial","spatial"]},
+  {id:"y5s6",year:"Year 5",step:6,title:"Year 5 - Step 6: Key Spellings",explanation:"",words:["appreciate","cemetery","conscious","convenience","environment","immediately","language","sufficient","thorough","vegetable"]},
+  {id:"y5s7",year:"Year 5",step:7,title:"Year 5 - Step 7: Words ending in ‘-ant’",explanation:"",words:["abundant","brilliant","constant","distant","dominant","elegant","fragrant","ignorant","tolerant","vacant"]},
+  {id:"y5s8",year:"Year 5",step:8,title:"Year 5 - Step 8: Words ending in ‘-ance’ and ‘-ancy’",explanation:"",words:["abundance","abundancy","brilliance","dominancy","elegance","extravagance","hesitancy","relevancy","tolerance","vacancy"]},
+  {id:"y5s9",year:"Year 5",step:9,title:"Year 5 - Step 9: Words ending in ‘-ent’ and ‘-ence’",explanation:"",words:["competence","confidence","decent","eloquence","emergent","frequent","innocence","intelligence","transparent","violent"]},
+  {id:"y5s10",year:"Year 5",step:10,title:"Year 5 - Step 10: Words ending in ‘-able’ and ‘-ible’",explanation:"",words:["comfortable","dependable","enjoyable","horrible","incredible","possible","reasonable","reliable","terrible","understandable"]},
+  {id:"y5s11",year:"Year 5",step:11,title:"Year 5 - Step 11: Words ending in ‘-ably’ and ‘-ibly’",explanation:"",words:["comfortably","dependably","horribly","incredibly","legibly","possibly","reliably","sensibly","terribly","visibly"]},
+  {id:"y5s12",year:"Year 5",step:12,title:"Year 5 - Step 12: Key Spellings",explanation:"",words:["accommodate","available","controversy","dictionary","marvellous","opportunity","secretary","sincerely","suggest","twelfth"]},
+  {id:"y5s13",year:"Year 5",step:13,title:"Year 5 - Step 13: Words ending in ‘-able’, where the ‘e’ from the root word remains",explanation:"",words:["agreeable","changeable","irreplaceable","knowledgeable","manageable","microwaveable","noticeable","rechargeable","replaceable","salvageable"]},
+  {id:"y5s14",year:"Year 5",step:14,title:"Year 5 - Step 14: Words that are adverbs of time",explanation:"",words:["afterwards","earlier","eventually","finally","immediately","previously","recently","tomorrow","whilst","yesterday"]},
+  {id:"y5s15",year:"Year 5",step:15,title:"Year 5 - Step 15: Words with suffixes where the base word ends in ‘fer’",explanation:"",words:["conferring","difference","inference","preference","preferred","referee","reference","referring","transference","transferring"]},
+  {id:"y5s16",year:"Year 5",step:16,title:"Year 5 - Step 16: Words with ‘silent’ first letters",explanation:"",words:["knife","knight","knowledge","knuckle","mnemonic","pterodactyl","wreath","wreckage","wrestler","writer"]},
+  {id:"y5s17",year:"Year 5",step:17,title:"Year 5 - Step 17: Words with ‘silent’ letters",explanation:"",words:["ascend","autumn","build","disciple","doubt","island","lamb","receipt","solemn","thistle"]},
+  {id:"y5s18",year:"Year 5",step:18,title:"Year 5 - Step 18: Key Spellings",explanation:"",words:["ancient","amateur","awkward","criticise","equipment","excellent","foreign","pronunciation","symbol","yacht"]},
+  {id:"y5s19",year:"Year 5",step:19,title:"Year 5 - Step 19: Words with ’ie’ after ‘c’",explanation:"",words:["society","deficient","efficient","emergencies","glacier","inefficient","science","scientists","species","sufficient"]},
+  {id:"y5s20",year:"Year 5",step:20,title:"Year 5 - Step 20: Words where ‘ei’ can make an /ee/ sound",explanation:"",words:["caffeine","conceive","deceive","either","neither","perceive","protein","ceiling","receive","seize"]},
+  {id:"y5s21",year:"Year 5",step:21,title:"Year 5 - Step 21: Words where ‘ough’ makes an /or/ sound",explanation:"",words:["afterthought","bought","brought","fought","nought","ought","sought","thought","thoughtfulness","wrought"]},
+  {id:"y5s22",year:"Year 5",step:22,title:"Year 5 - Step 22: Words containing ’ough’",explanation:"",words:["although","bough","dough","doughnut","enough","plough","rough","though","tough","toughen"]},
+  {id:"y5s23",year:"Year 5",step:23,title:"Year 5 - Step 23: Adverbs of possibility and frequency",explanation:"",words:["certainly","definitely","frequently","infrequently","obviously","occasionally","often","probably","possibly","rarely"]},
+  {id:"y5s24",year:"Year 5",step:24,title:"Year 5 - Step 24: Key Spellings",explanation:"",words:["accompany","communicate","conscience","desperate","disastrous","interfere","nuisance","queue","restaurant","rhythm"]},
+  {id:"y5s25",year:"Year 5",step:25,title:"Year 5 - Step 25: Words that are homophones or near homophones",explanation:"",words:["advice","advise","device","devise","licence","license","practice","practise","prophecy","prophesy"]},
+  {id:"y5s26",year:"Year 5",step:26,title:"Year 5 - Step 26: Words that are homophones",explanation:"",words:["aisle","isle","allowed","aloud","altar","alter","ascent","assent","farther","father"]},
+  {id:"y5s27",year:"Year 5",step:27,title:"Year 5 - Step 27: Words that are homophones",explanation:"",words:["bridal","bridle","guessed","guest","heard","herd","morning","mourning","passed","past."]},
+  {id:"y5s28",year:"Year 5",step:28,title:"Year 5 - Step 28: Words that are homophones or near homophones",explanation:"",words:["cereal","serial","complement","compliment","principal","principle","stationary","stationery","wary","weary"]},
+  {id:"y5s29",year:"Year 5",step:29,title:"Year 5 - Step 29: Words that are homophones or near homophones",explanation:"",words:["affect","effect","dessert","desert","draft","draught","precede","proceed","who’s","whose"]},
+  {id:"y5s30",year:"Year 5",step:30,title:"Year 5 - Step 30: Key Spellings",explanation:"",words:["achieve","apparent","bargain","bruise","community","mischievous","muscle","necessary","vehicle","system"]},
+  {id:"y5s31",year:"Year 5",step:31,title:"Year 5 - Step 31: Words with hyphens",explanation:"",words:["co-author","co-operate","coordinate","co-own","re-educate","re-energise","re-enter","re-evaluate","re-examine","re-explain"]},
+  {id:"y5s32",year:"Year 5",step:32,title:"Year 5 - Step 32: Key Spellings",explanation:"",words:["afterwards","amateur","ancient","changeable","deceive","doubt","knight","referring","sincere","immediate"]},
+  {id:"y5s33",year:"Year 5",step:33,title:"Year 5 - Step 33: Revision Words",explanation:"",words:["accompany","achieve","advice","affect","aisle","bought","cereal","definitely","guessed","though"]},
+  {id:"y5s34",year:"Year 5",step:34,title:"Year 5 - Step 34: Revision Words",explanation:"",words:["conscious","constant","controversy","comfortably","earlier","elegance","fictitious","frequent","manageable","understandable"]},
+  {id:"y5s35",year:"Year 5",step:35,title:"Year 5 - Step 35: Revision Words",explanation:"",words:["ascend","awkward","conscience","dough","probably","receive","species","thought","transferring","writer"]},
+  {id:"y5s36",year:"Year 5",step:36,title:"Year 5 - Step 36: Revision Words",explanation:"",words:["aloud","community","complement","desert","device","heard","muscle","precede","principle","stationary"]},
+  {id:"y4s1",year:"Year 4",step:1,title:"Year 4 - Step 1: Words that are homophones",explanation:"",words:["accept","except","knot","not","peace","piece","plain","plane","weather","whether"]},
+  {id:"y4s2",year:"Year 4",step:2,title:"Year 4 - Step 2: Words with the prefix ’in-’ meaning ‘not’",explanation:"",words:["inability","inactive","inadequate","incorrect","incurable","indefinite","inelegant","inflexible","insecure","invisible"]},
+  {id:"y4s3",year:"Year 4",step:3,title:"Year 4 - Step 3: Words with the prefixes ’il-’, ‘im-’ and ‘ir-’",explanation:"",words:["illegal","illegible","immature","immortal","impossible","impatient","imperfect","irregular","irrelevant","irresponsible"]},
+  {id:"y4s4",year:"Year 4",step:4,title:"Year 4 - Step 4: Words with the prefix ’sub-’ meaning ‘below’ or ‘further divided’",explanation:"",words:["subdivide","subheading","subject","submarine","submerge","submit","substandard","subtitle","subtropical","subway"]},
+  {id:"y4s5",year:"Year 4",step:5,title:"Year 4 - Step 5: Words with the prefix ’inter-’ meaning ‘between’ or ‘among’",explanation:"the prefix (letters before the base word) 'inter' mean between or among.  For  example children will 'international' means between countries / nations.",words:["interact","intercept","interchange","intercity","intercom","interface","interfere","international","internet","interview"]},
+  {id:"y4s6",year:"Year 4",step:6,title:"Year 4 - Step 6: Key Spellings",explanation:"These words have irregular spelling patterns. For example letters (graphemes) may make an irregular sound (such as 'o' in women)",words:["strength","grammar","calendar","women","appear","straight","interest","opposite","increase","believe"]},
+  {id:"y4s7",year:"Year 4",step:7,title:"Year 4 - Step 7: Words ending in ’-ation’",explanation:"-ation, turns a verb (v) into a noun (n).  We have focused on words which end in ATE, for example decorate (v) becomes decoration (n)",words:["information","sensation","preparation","vibration","decoration","donation","duration","registration","population","determination"]},
+  {id:"y4s8",year:"Year 4",step:8,title:"Year 4 - Step 8: Words ending in ’-ation’",explanation:"-ation, turns a verb (v) into a noun (n).  We have focused on words which end in E, for example admire (v) becomes admiration (n)",words:["adoration","admiration","coronation","detonation","observation","location","generation","exploration","combination","illustration"]},
+  {id:"y4s9",year:"Year 4",step:9,title:"Year 4 - Step 9: Words ending ’-ly’",explanation:"-ation, turns a verb (v) or adjective (adj) into an adverb (adv).  Look out for words ending in E where we just add LY, LE where we take off the E and add Y.",words:["sadly","completely","wildly","bravely","gently","foolishly","proudly","horribly","nervously","happily"]},
+  {id:"y4s10",year:"Year 4",step:10,title:"Year 4 - Step 10: Words ending ’-lly’",explanation:"-lly, turns an adjective ending with an 'l' into an adverb.",words:["usually","finally","beautifully","thoughtfully","wonderfully","carefully","faithfully","peacefully","cruelly","generally"]},
+  {id:"y4s11",year:"Year 4",step:11,title:"Year 4 - Step 11: Words where ‘ch’ makes a /sh/ sound",explanation:"-ch makes a 'sh' sound with words that originate from french.",words:["chef","chalet","machine","brochure","parachute","chute","chaperone","chandelier","crochet","quiche"]},
+  {id:"y4s12",year:"Year 4",step:12,title:"Year 4 - Step 12: Key Spellings",explanation:"",words:["favourite","complete","continue","experiment","February","naughty","material","knowledge","remember","famous"]},
+  {id:"y4s13",year:"Year 4",step:13,title:"Year 4 - Step 13: Words ending in ’-sion’",explanation:"when the base adjective or verb ends in ‘ d,’ ‘de’ or ‘se’, then the suffix ‘ -sion’ is added in place of the ‘ d,’ ‘de’ or ‘se’ to turn the word into a noun.",words:["expansion","extension","comprehension","tension","suspension","exclusion","provision explosion","erosion","invasion"]},
+  {id:"y4s14",year:"Year 4",step:14,title:"Year 4 - Step 14: Words ending in ’-ous’",explanation:"Usually the base word is a noun (danger, peril…) and adding OUS turns the base word into an adjective perilous, dangerous…",words:["poisonous","dangerous","mountainous","marvellous","perilous","tremendous","enormous","jealous","precious","disastrous"]},
+  {id:"y4s15",year:"Year 4",step:15,title:"Year 4 - Step 15: Words ending in ’-ous’ incl. those where ‘ge’ from the base word remains",explanation:"Turning nouns to adjectives with OUS where the base word ends in ge.  The 'ge' is kept before adding ous",words:["courageous","outrageous","nervous","advantageous","adventurous","disadvantageous","ridiculous","carnivorous","rapturous","torturous"]},
+  {id:"y4s16",year:"Year 4",step:16,title:"Year 4 - Step 16: Words where a suffix is added to words ending in ‘y’",explanation:"Words which have a base word neding in a Y making an /ee/ sound [silly] where the Y is removed before adding i + suffix",words:["merriment","happiness","plentiful","penniless","happily","prettiest","nastiness","beautiful","pitiful","silliness"]},
+  {id:"y4s17",year:"Year 4",step:17,title:"Year 4 - Step 17: Words ending in ’-ious’ and ‘eous’",explanation:"-eous / -ious turn nouns into adjectives, meaning \"full of,\" \"having the quality of.  Base words typically end in Y or ION use IOUS while ending in GE or R use EOUS (fury -> furIOUS / courage -> couragEOUS)",words:["serious","obvious","curious","hideous","spontaneous","courteous","furious","various","victorious","gaseous"]},
+  {id:"y4s18",year:"Year 4",step:18,title:"Year 4 - Step 18: Key Spellings",explanation:"",words:["extreme","although","breath","caught","different","exercise","medicine","thought","business","possession"]},
+  {id:"y4s19",year:"Year 4",step:19,title:"Year 4 - Step 19: Words where ‘au’ makes an /or/ sound",explanation:"AU is a grapheme which makes the 'OR' sound in many words.",words:["automatic","August","launch","haul","astronaut","cause","author","applaud","autumn","audience"]},
+  {id:"y4s20",year:"Year 4",step:20,title:"Year 4 - Step 20: Words ending in ’-tion’",explanation:"Adding TION to a word end (usually) makes the base word into a noun.  E.g. act (v) -> action (n).  TION is the most common way to write /shun/.",words:["invention","injection","action","hesitation","completion","stagnation nomination","migration","communication","selection"]},
+  {id:"y4s21",year:"Year 4",step:21,title:"Year 4 - Step 21: Words ending in ’-ssion’",explanation:"Adding SSION to a word end (usually) makes the base word into a noun.  E.g. express (v) -> expression (n).  Base words with S / SS ending usually use SSION to make /shun/.",words:["expression","discussion","confession","permission","admission","impression","obsession","procession","omission","concussion"]},
+  {id:"y4s22",year:"Year 4",step:22,title:"Year 4 - Step 22: Words ending in ’-cian’",explanation:"Adding CIAN to a word end makes the base word into a job or activity.  E.g. music  -> musician.  If the word is a job or activity choose CIAN when you hear /shun/.",words:["musician","magician","electrician","politician","mathematician","technician","optician","beautician","physician","dietician"]},
+  {id:"y4s23",year:"Year 4",step:23,title:"Year 4 - Step 23: Words that are adverbs of manner",explanation:"Adverbs of manner give information about HOW something is done.  This week's words all follow the \"+LY\" pattern and if the base word ends in LE this is removed first. (gentLE -> gently)",words:["reluctantly","quickly","generously","unexpectedly","gently","curiously","furiously","seriously","victoriously","courteously"]},
+  {id:"y4s24",year:"Year 4",step:24,title:"Year 4 - Step 24: Key Spellings",explanation:"",words:["surprise","separate","group","height","potatoes","though","particular","through","caught","woman"]},
+  {id:"y4s25",year:"Year 4",step:25,title:"Year 4 - Step 25: Words that are homophones",explanation:"Homophones are words which sound the same (or very close) but have a different spelling and meaning.  (e.g. whose / who's)",words:["scene","who’s","affect","hear","whose","heal","effect","here","heel","seen"]},
+  {id:"y4s26",year:"Year 4",step:26,title:"Year 4 - Step 26: Words spelled with ‘c’ before ‘i’ and ‘e’",explanation:"Words where the letter sequence CE or CI results in the C being making a /s/ sound (this can be in any part of the word)",words:["circle","century","medicine","voice","celebrate","curcus","centaur","princess","celery","pencil"]},
+  {id:"y4s27",year:"Year 4",step:27,title:"Year 4 - Step 27: Words containing ‘sol’ and ‘real’",explanation:"Words containing the morphemes 'sol' (linked to whole / one) and 'real' (linked to 'realness').",words:["solve","insoluble","real","reality","dissolve","solution","realistic","unreal","realisation","soluble"]},
+  {id:"y4s28",year:"Year 4",step:28,title:"Year 4 - Step 28: Words containing ‘phon’ and ‘sign’",explanation:"Words containing the morphemes 'phon' (linked to sound) and 'sign' (linked to recording, writing and representations).",words:["signal","telephone","design","microphone","homophone","sign","phonics","signature","megaphone","assign"]},
+  {id:"y4s29",year:"Year 4",step:29,title:"Year 4 - Step 29: Words with the prefixes ’super-’, ‘anti-’ and ‘auto",explanation:"Words with the prefixes auto (self), super (big) and anti (against or opposite) where the base word is not changed",words:["supermarket","autobiography","automatic","anticlockwise","antiseptic","superhero","antisocial","superstar","autograph","superhuman"]},
+  {id:"y4s30",year:"Year 4",step:30,title:"Year 4 - Step 30: Words with the prefix ’bi-’ meaning ‘two’",explanation:"Adding BI as a prefix links to TWO (two lots or two parts) e.g. BIsect means to cut something into two parts. Biplane is a plane with two levels of wings.",words:["bicycle","biplane","biped","bicentennial","biannual","bilingual","biscuit","biceps","binoculars","bisect"]},
+  {id:"y4s31",year:"Year 4",step:31,title:"Year 4 - Step 31: Key Spellings",explanation:"",words:["guide","possess","forwards","accident","eighth","occasion","Wednesday","actually","busy","forward"]},
+  {id:"y4s32",year:"Year 4",step:32,title:"Year 4 - Step 32: Words that are plurals with possessive apostrophes",explanation:"",words:["girls’","boys’","babies’","children’s","men’s","mice’s","ladies’","cats’","women’s","geese’s"]},
+  {id:"y4s33",year:"Year 4",step:33,title:"Year 4 - Step 33: Revision Words",explanation:"",words:["expression","musician","reluctantly","group","scene","circle","solve","supermarket","bicycle","except"]},
+  {id:"y4s34",year:"Year 4",step:34,title:"Year 4 - Step 34: Revision Words",explanation:"",words:["incorrect","illegible","subject","international","believe","wildly preparation","coronation","bravely","thoughtfully"]},
+  {id:"y4s35",year:"Year 4",step:35,title:"Year 4 - Step 35: Revision Words",explanation:"",words:["brochure","famous","tension","penniless","hideous","different","astronaut","completion","admission","mathematician"]},
+  {id:"y4s36",year:"Year 4",step:36,title:"Year 4 - Step 36: Revision Words",explanation:"",words:["gently","separate","affect","unexpectedly","potatoes","circus","insoluble","microphone","superhuman","bicentennial"]},
+  {id:"y3s1",year:"Year 3",step:1,title:"Year 3 - Step 1: Words where the digraph ‘ou’ makes an /ow/ sound",explanation:"",words:["mouth","sprout","around","sound","spout","ouch","hound","trout","found","proud"]},
+  {id:"y3s2",year:"Year 3",step:2,title:"Year 3 - Step 2: Words where the digraph ‘ou’ makes a /u/ sound",explanation:"",words:["touch","double","country","trouble","young","cousin","enough","couple","encourage","flourish"]},
+  {id:"y3s3",year:"Year 3",step:3,title:"Year 3 - Step 3: Words where ‘y’ makes an /i/ sound",explanation:"",words:["symbol","gym","myth","synonym","Egypt","lyrics","pyramid","system","mystery","gymnastics"]},
+  {id:"y3s4",year:"Year 3",step:4,title:"Year 3 - Step 4: Words ending in ‘-sure’",explanation:"",words:["treasure","measure","leisure","pleasure","pressure","exposure","enclosure","closure","disclosure","composure"]},
+  {id:"y3s5",year:"Year 3",step:5,title:"Year 3 - Step 5: Words ending in ‘-ture’",explanation:"",words:["adventure","future","picture","nature","creature","furniture","capture","sculpture","fracture","mixture"]},
+  {id:"y3s6",year:"Year 3",step:6,title:"Year 3 - Step 6: Key Spellings",explanation:"",words:["actual","bicycle","answer","circle","earth","enough","island","fruit","often","popular"]},
+  {id:"y3s7",year:"Year 3",step:7,title:"Year 3 - Step 7: Words with the prefix ’re-’",explanation:"",words:["redo","return","refresh","redecorate","reappear","review","replay","reaction","rebound","revenge"]},
+  {id:"y3s8",year:"Year 3",step:8,title:"Year 3 - Step 8: Words with the prefix ’dis-’",explanation:"",words:["disappoint","disobey","disappear","disapprove","disable","dislike","dislocate","disadvantage","dislodge","disagree"]},
+  {id:"y3s9",year:"Year 3",step:9,title:"Year 3 - Step 9: Words with the prefix ’mis-’",explanation:"",words:["mistake","mislead","misbehave","misspell","misplace","misread","mistrust","misunderstanding","misuse","mislaid"]},
+  {id:"y3s10",year:"Year 3",step:10,title:"Year 3 - Step 10: Words where ‘-ing’, ‘-er’ and ‘-ed’ are added to multisyllabic words",explanation:"-ing, er & ed endings change a verb into continuous, comparative or simple past forms without changing the base word.",words:["developing","developed","limiting","covering","limited","gardening","gardener","covered","listening","listened"]},
+  {id:"y3s11",year:"Year 3",step:11,title:"Year 3 - Step 11: Words where ‘-ing’, ‘-en’ and ‘-ed’ are added to multisyllabic words",explanation:"",words:["forgetting","forgotten","beginning","propelled","preferred","permitted","regretting","committed","forbidden","equipped"]},
+  {id:"y3s12",year:"Year 3",step:12,title:"Year 3 - Step 12: Key Spellings",explanation:"",words:["centre","disappear","heart","minute","regular","decide","early","learn","notice","therefore"]},
+  {id:"y3s13",year:"Year 3",step:13,title:"Year 3 - Step 13: Words with the digraph ‘ai’ and tetragraph ‘aigh’",explanation:"ai is a very common grapheme for writing the /ai/ phoneme (sound).  However in very few cases aigh (tetragraph) is used.  e.g. straight",words:["straight","strainer","fainted","claimed","waist","snail","painter","chained","failure","waiter"]},
+  {id:"y3s14",year:"Year 3",step:14,title:"Year 3 - Step 14: Words with the digraph ‘ei’ and tetragraph ‘eigh’",explanation:"",words:["freight","vein","weigh","reins","eight","eighteen","reign","veil","neighbour","sleigh"]},
+  {id:"y3s15",year:"Year 3",step:15,title:"Year 3 - Step 15: Words where the digraph ‘ey’ makes an /ai/ sound",explanation:"",words:["obey","osprey","prey","disobey","they","convey","they","survey","surveyor","conveyor"]},
+  {id:"y3s16",year:"Year 3",step:16,title:"Year 3 - Step 16: Words with the suffix ‘–ly’",explanation:"",words:["calmly","exactly","deadly","bravely","boldly","gladly","deeply","clearly","hourly","quickly"]},
+  {id:"y3s17",year:"Year 3",step:17,title:"Year 3 - Step 17: Words that are homophones",explanation:"Homophones are words which sound the same (or very close) but have a different spelling and meaning.  (e.g. great / grate)",words:["great","main","grown","missed","meet","grate","mane","groan","mist","meat"]},
+  {id:"y3s18",year:"Year 3",step:18,title:"Year 3 - Step 18: Key Spellings",explanation:"",words:["build","describe","imagine","library","natural","ordinary","promise","recent","suppose","weight"]},
+  {id:"y3s19",year:"Year 3",step:19,title:"Year 3 - Step 19: Words ending in ‘al’",explanation:"Words ending in 'al are usually nouns, recognise the word class to help spell it with the correct /l/ spelling at the end.",words:["arrival","burial","comical","magical","emotional","national","personal","optional","survival","tropical"]},
+  {id:"y3s20",year:"Year 3",step:20,title:"Year 3 - Step 20: Words ending in ‘le’",explanation:"",words:["battle","settle","article","humble","struggle","terrible","possible","example","capable","adjustable"]},
+  {id:"y3s21",year:"Year 3",step:21,title:"Year 3 - Step 21: Words ending in ‘-ly’ where the base word ends in ‘le’",explanation:"",words:["gently","simply","humbly","nobly","durably","terribly","incredibly","responsibly","wrinkly","possibly"]},
+  {id:"y3s22",year:"Year 3",step:22,title:"Year 3 - Step 22: Words ending in ‘-ly’ where the base word ends in ‘-ic’",explanation:"This week's spellings have the suffix '-ly' added to root words ending in '-ic' or '-ical' e.g. tragic - tragically.",words:["basically","frantically","logically","tragically","magically","publicly","dramatically","historically","automatically","specifically"]},
+  {id:"y3s23",year:"Year 3",step:23,title:"Year 3 - Step 23: Words ending in ‘-ly’; exceptions",explanation:"",words:["truly","slyly","fully","duly","shyly","wholly","drily","coyly","happily","daily"]},
+  {id:"y3s24",year:"Year 3",step:24,title:"Year 3 - Step 24: Key Spellings",explanation:"",words:["address","mention","arrive","occasionally","certainly","probably","experience","reign","history","sentence"]},
+  {id:"y3s25",year:"Year 3",step:25,title:"Year 3 - Step 25: Words with the suffix ‘-er",explanation:"",words:["teacher","stretcher","dispatcher","catcher","butcher","richer","scorcher","preacher","cruncher","watcher"]},
+  {id:"y3s26",year:"Year 3",step:26,title:"Year 3 - Step 26: Words where the digraph ‘ch’ makes a /k/ sound",explanation:"",words:["scheme","chorus","echo","chemist","character","stomach","monarch","school","anchor","chaos"]},
+  {id:"y3s27",year:"Year 3",step:27,title:"Year 3 - Step 27: Words ending in ‘-gue’ and ‘-que’",explanation:"In these words the trigraphs GUE (/g/) and QUE (k/) are used.  These are uncommon, in and at the end of the word they will always make these sounds.",words:["vague","league","plague","fatigue","antique","dialogue","unique","grotesque","plaque","mosque"]},
+  {id:"y3s28",year:"Year 3",step:28,title:"Year 3 - Step 28: Words where the digraph ‘sc’ makes a /s/ sound",explanation:"",words:["science","scene","discipline","scissors","ascends","scented","fascinate","scenery","crescent","descend"]},
+  {id:"y3s29",year:"Year 3",step:29,title:"Year 3 - Step 29: Words that are homophones",explanation:"",words:["ball","bawl","break","brake","male","mail","fair","fare","berry","bury"]},
+  {id:"y3s30",year:"Year 3",step:30,title:"Year 3 - Step 30: Key Spellings",explanation:"",words:["accidentally","breathe","century","eight","consider","guard","heard","peculiar","possible","quarter"]},
+  {id:"y3s31",year:"Year 3",step:31,title:"Year 3 - Step 31: Words ending in ’-sion’",explanation:"",words:["vision","confusion","division","television","invasion","erosion","collision","decision","fusion","revision"]},
+  {id:"y3s32",year:"Year 3",step:32,title:"Year 3 - Step 32: Key Spellings",explanation:"",words:["special","strange","difficult","important","length","perhaps","position","pressure","question","purpose"]},
+  {id:"y3s33",year:"Year 3",step:33,title:"Year 3 - Step 33: Revision Words",explanation:"",words:["exactly","bravely","pleasure","dislocate","island","decide","disadvantage","survey","ordinary","promise"]},
+  {id:"y3s34",year:"Year 3",step:34,title:"Year 3 - Step 34: Revision Words",explanation:"",words:["freight","hourly","missed","scented","suppose","plaque","grotesque","daily","descend","automatically"]},
+  {id:"y3s35",year:"Year 3",step:35,title:"Year 3 - Step 35: Revision Words",explanation:"",words:["teacher","scheme","history","mention","bawl","crescent","eighteen","regular","mane","disable"]},
+  {id:"y3s36",year:"Year 3",step:36,title:"Year 3 - Step 36: Revision Words",explanation:"",words:["disappear","specifically","reaction","committed","misunderstanding","forbidden","capable","neighbour","personal","confusion"]},
+  {id:"y2s1",year:"Year 2",step:1,title:"Year 2 - Step 1: Words where ‘dge’ makes a /j/ sound",explanation:"This week’s words all have the trigraph ‘dge’.  It makes a /j/ sound.",words:["badge","edge","bridge","dodge","fudge","ridge","smudge","judge","wedge","lodge"]},
+  {id:"y2s4",year:"Year 2",step:4,title:"Year 2 - Step 4: Adding '-s' and'-es' to make plurals",explanation:"These words end with letters (e.g. sh, x…) which require us to add ES to make a plural (more than 1)",words:["boxes","brushes","lunches","foxes","dishes"]},
+  {id:"y2s4_1",year:"Year 2",step:4,title:"Year 2 - Step 4a: Making words into plurals which end in 'f'",explanation:"These words end with 'F' which usually requires us to remove the F, add V before adding ES to make plurals (elf -> elves)",words:["leaves","thieves","halves","shelves","knives"]},
+  {id:"y2s4_2",year:"Year 2",step:4,title:"Year 2 - Step 4b: Making words into plurals which end in 'y'",explanation:"These words end with 'y' which usually requires us to remove the y and add 'i before adding 'es' to make plurals (cherry -> cherries)",words:["stories","counties","countries,","libraries,","mysteries"]},
+  {id:"y2s32",year:"Year 2",step:32,title:"Year 2 - Step 32 To spell words that are homophones",explanation:"These words sound the same or similar but are spelled differentlty and have different meanings, so it's important to distinguish between them.",words:["there","their","here","hear","see","sea","too","two","blue","blew"]},
+  {id:"y2s32_1",year:"Year 2",step:32,title:"Year 2 - Step 32-1 To spell words that are homophones",explanation:"These words sound the same or similar but are spelled differentlty and have different meanings, so it's important to distinguish between them.",words:["quiet","quite","sun","son","bear","bare","night","knight","be","bee"]},
+  {id:"y2s35",year:"Year 2",step:35,title:"Year 2 - Step 35: Possessive apostrophes",explanation:"These words have an added 's.  This shows possession or that something belongs to someone or something.  The class's resources.",words:["dog's","child's","boy's","lady's","man's"]},
+  {id:"y2s8",year:"Year 2",step:8,title:"Year 2 - Step 8: To spell words ending in ‘le’",explanation:"The /l/ syllable at the end of some words is spelled 'le'. This is the most common /l/ ending.",words:["table","apple","bottle","little","middle","bubble","cable","uncle","ankle","eagle"]},
+  {id:"y2s9",year:"Year 2",step:9,title:"Year 2 - Step 9: To spell words ending in ‘el’",explanation:"The /l/ syllable at the end of some words is spelled 'el'. This is a less common /l/ ending.",words:["camel","tunnel","squirrel","towel","jewel"]},
+  {id:"y2s9_1",year:"Year 2",step:9,title:"Year 2 - Step 9: To spell words ending in ‘il’",explanation:"The /l/ syllable at the end of some words is spelled 'il'. This is a much less common /l/ ending.",words:["pencil","lentil","anvil","pupil","stencil"]},
+  {id:"y2s28",year:"Year 2",step:28,title:"Year 2 - Step 28: Words where ‘si’ and ‘s’ makes an /zh/ sound",explanation:"in words with sion or sure the si / s part often makes a /zh/ sound.  ZH is not a grapheme (we don't write these letters).  It is the sound in televiSIon or uSual",words:["usual","vision","measure","decision","visual"]},
+  {id:"y2s0",year:"Year 2",step:0,title:"Year 2 - Step: words which require the ending consonant to be doubled when adding -ED",explanation:"Words like mat or knit, which have a short vowel sound before the final consonant need to have the final consonant doubled to 'protect' the short vowel sound. (e.g. pat -> patted)",words:["patted","stopped","clapped","dragged","hummed"]},
+  {id:"y4revs0",year:"Year 4 Rev",step:0,title:"Year 4 Rev - Words that are homophones",explanation:"Homophones are words which sound the same (or very close) but have a different spelling and meaning.  (e.g. so / sew / sow)",words:["accept","weather","except","whether","piece"]},
+  {id:"y4revs0_1",year:"Year 4 Rev",step:0,title:"Year 4 Rev - Adding ER and EST to words ending in Y",explanation:"Words ending in Y (happy, spicy…) are turned into comparative (happier) and superlative adjectives (happiest).  The Y from the base is removed and I added before adding ER or EST",words:["happier","shiniest","easier","luckiest","spiciest"]},
+];}
+
+const REAL_PUPILS = [
+  {id:"ch01",firstName:"Aaliyah",lastName:"Rehman",class:"WU",pairId:14,ttSet:"9",ssUser:"aaliyahr67",ssPassword:"funman25",mastery:{}},
+  {id:"ch02",firstName:"Amir",lastName:"Al Arab",class:"IM",pairId:2,ttSet:"All",ssUser:"amira63",ssPassword:"redsun31",mastery:{}},
+  {id:"ch03",firstName:"Arthur",lastName:"Elliott",class:"IM",pairId:7,ttSet:"All",ssUser:"arthure82",ssPassword:"funcap89",mastery:{}},
+  {id:"ch04",firstName:"Asel",lastName:"Acar",class:"IM",pairId:9,ttSet:"All",ssUser:"asela4",ssPassword:"tinycar42",mastery:{}},
+  {id:"ch05",firstName:"Asimenia",lastName:"Chatzinathanail",class:"WU",pairId:6,ttSet:"9",ssUser:"asimenic",ssPassword:"shybun96",mastery:{}},
+  {id:"ch06",firstName:"Bailey",lastName:"Silvers",class:"IM",pairId:13,ttSet:"7",ssUser:"baileys105",ssPassword:"badcap05",mastery:{}},
+  {id:"ch07",firstName:"Bonnie",lastName:"Forster",class:"IM",pairId:6,ttSet:"All",ssUser:"bonnief27",ssPassword:"drypin27",mastery:{}},
+  {id:"ch08",firstName:"Callum",lastName:"Teddy",class:"WU",pairId:20,ttSet:"2",ssUser:"callumt62",ssPassword:"tinypin26",mastery:{}},
+  {id:"ch09",firstName:"Cameron",lastName:"Davidson",class:"WU",pairId:5,ttSet:"12",ssUser:"camerond75",ssPassword:"newmap50",mastery:{}},
+  {id:"ch10",firstName:"Carena",lastName:"Douglas",class:"IM",pairId:15,ttSet:"11",ssUser:"carenad",ssPassword:"olddot73",mastery:{}},
+  {id:"ch11",firstName:"Ceecee",lastName:"Timm",class:"IM",pairId:6,ttSet:"All",ssUser:"ceciliat9",ssPassword:"bigcat45",mastery:{}},
+  {id:"ch12",firstName:"Cody",lastName:"Cheuk Nok Lam",class:"IM",pairId:1,ttSet:"All",ssUser:"codyl18",ssPassword:"tidymap05",mastery:{}},
+  {id:"ch13",firstName:"Connie",lastName:"Reilly",class:"IM",pairId:3,ttSet:"4",ssUser:"connier12",ssPassword:"funpup70",mastery:{}},
+  {id:"ch14",firstName:"Cruz",lastName:"Kelly",class:"WU",pairId:7,ttSet:"All",ssUser:"cruzk5",ssPassword:"tincat44",mastery:{}},
+  {id:"ch15",firstName:"Daisy",lastName:"Chase-Williams",class:"IM",pairId:8,ttSet:"9",ssUser:"daisyc35",ssPassword:"badpin95",mastery:{}},
+  {id:"ch16",firstName:"Delton",lastName:"Heavens",class:"WU",pairId:13,ttSet:"12",ssUser:"deltonh",ssPassword:"oddgig31",mastery:{}},
+  {id:"ch17",firstName:"Diyan",lastName:"Gottipulla",class:"IM",pairId:12,ttSet:"All",ssUser:"diyang11",ssPassword:"newfox97",mastery:{}},
+  {id:"ch18",firstName:"Dovind",lastName:"Nalabolu",class:"WU",pairId:5,ttSet:"All",ssUser:"dovindn",ssPassword:"shypop27",mastery:{}},
+  {id:"ch19",firstName:"Elliot",lastName:"Berry",class:"WU",pairId:11,ttSet:"All",ssUser:"elliotb202",ssPassword:"oldmop95",mastery:{}},
+  {id:"ch20",firstName:"Eloho",lastName:"Evwerhamre",class:"WU",pairId:10,ttSet:"All",ssUser:"elohoe",ssPassword:"slyant40",mastery:{}},
+  {id:"ch21",firstName:"Emilia",lastName:"Hamerski",class:"IM",pairId:5,ttSet:"All",ssUser:"emiliah16",ssPassword:"funsun78",mastery:{}},
+  {id:"ch22",firstName:"Fola",lastName:"Adeniji",class:"WU",pairId:9,ttSet:"All",ssUser:"folaa8",ssPassword:"bluecat41",mastery:{}},
+  {id:"ch23",firstName:"Freya",lastName:"Baker",class:"IM",pairId:1,ttSet:"12",ssUser:"freyab429",ssPassword:"toypin17",mastery:{}},
+  {id:"ch24",firstName:"Haris",lastName:"Ahmed",class:"IM",pairId:14,ttSet:"12",ssUser:"harisa51",ssPassword:"toppup65",mastery:{}},
+  {id:"ch25",firstName:"Heidi",lastName:"Smith",class:"WU",pairId:9,ttSet:"All",ssUser:"heidis134",ssPassword:"slymop32",mastery:{}},
+  {id:"ch26",firstName:"Hope",lastName:"Dempsey",class:"WU",pairId:12,ttSet:"2",ssUser:"hoped43",ssPassword:"badcar82",mastery:{}},
+  {id:"ch27",firstName:"Iris",lastName:"Myers",class:"IM",pairId:4,ttSet:"7",ssUser:"irism39",ssPassword:"bigpin24",mastery:{}},
+  {id:"ch28",firstName:"Isabelle",lastName:"Watkins",class:"WU",pairId:10,ttSet:"11",ssUser:"isabellw625",ssPassword:"oldmop58",mastery:{}},
+  {id:"ch29",firstName:"Isla",lastName:"Wilkinson",class:"WU",pairId:4,ttSet:"7",ssUser:"islaw155",ssPassword:"topmat67",mastery:{}},
+  {id:"ch30",firstName:"Izzy",lastName:"Headings",class:"IM",pairId:10,ttSet:"9",ssUser:"isabellh606",ssPassword:"tinyant66",mastery:{}},
+  {id:"ch31",firstName:"Jacob",lastName:"O'Brien",class:"WU",pairId:7,ttSet:"11",ssUser:"jacobo62",ssPassword:"tinymop02",mastery:{}},
+  {id:"ch32",firstName:"Jesse",lastName:"Jones-Wojtyla",class:"IM",pairId:9,ttSet:"All",ssUser:"jessej16",ssPassword:"bigpup69",mastery:{}},
+  {id:"ch33",firstName:"Jimi",lastName:"Alatise",class:"WU",pairId:4,ttSet:"All",ssUser:"jimia4",ssPassword:"blueegg09",mastery:{}},
+  {id:"ch34",firstName:"Josh",lastName:"Holloway",class:"WU",pairId:2,ttSet:"All",ssUser:"joshh59",ssPassword:"oddrug00",mastery:{}},
+  {id:"ch35",firstName:"Maisie",lastName:"Boulton-Jeanes",class:"WU",pairId:14,ttSet:"2",ssUser:"maisieb403",ssPassword:"bluecar00",mastery:{}},
+  {id:"ch36",firstName:"Lilly",lastName:"Williams-Lock",class:"WU",pairId:8,ttSet:"All",ssUser:"lillyw183",ssPassword:"reddot68",mastery:{}},
+  {id:"ch37",firstName:"Lily H",lastName:"Hamerski",class:"WU",pairId:6,ttSet:"7",ssUser:"lilyh469",ssPassword:"oddegg62",mastery:{}},
+  {id:"ch38",firstName:"Lois",lastName:"Druce",class:"IM",pairId:13,ttSet:"9",ssUser:"loisd5",ssPassword:"bigbun11",mastery:{}},
+  {id:"ch39",firstName:"Louie",lastName:"Hinam",class:"IM",pairId:14,ttSet:"All",ssUser:"louieh14",ssPassword:"badman99",mastery:{}},
+  {id:"ch40",firstName:"Maddie",lastName:"Steele",class:"IM",pairId:12,ttSet:"4",ssUser:"maddys",ssPassword:"oldjet68",mastery:{}},
+  {id:"ch41",firstName:"Adnan",lastName:"Sadat",class:"WU",pairId:null,ttSet:"5",ssUser:"",ssPassword:"",mastery:{}},
+  {id:"ch42",firstName:"Mary",lastName:"Pillot",class:"WU",pairId:13,ttSet:"All",ssUser:"maryp38",ssPassword:"oddpin37",mastery:{}},
+  {id:"ch43",firstName:"Max",lastName:"Fong",class:"IM",pairId:2,ttSet:"All",ssUser:"maximilf3",ssPassword:"slyegg15",mastery:{}},
+  {id:"ch44",firstName:"Meshach",lastName:"Brown",class:"WU",pairId:2,ttSet:"All",ssUser:"meshachb",ssPassword:"oddrug86",mastery:{}},
+  {id:"ch45",firstName:"Mia",lastName:"Petran",class:"WU",pairId:1,ttSet:"All",ssUser:"miap257",ssPassword:"tinman26",mastery:{}},
+  {id:"ch46",firstName:"Penny",lastName:"Mace",class:"IM",pairId:8,ttSet:"All",ssUser:"penelopm3",ssPassword:"tidydot99",mastery:{}},
+  {id:"ch47",firstName:"Phoebe",lastName:"Edge",class:"IM",pairId:10,ttSet:"All",ssUser:"phoebee88",ssPassword:"shymat39",mastery:{}},
+  {id:"ch48",firstName:"Ralf",lastName:"Williams-Lock",class:"WU",pairId:3,ttSet:"11",ssUser:"ralfw17",ssPassword:"tinrug76",mastery:{}},
+  {id:"ch49",firstName:"Ramani",lastName:"Mallapurapu",class:"IM",pairId:11,ttSet:"12",ssUser:"ramanim",ssPassword:"funant89",mastery:{}},
+  {id:"ch50",firstName:"Reggie",lastName:"Greenwood",class:"WU",pairId:11,ttSet:"All",ssUser:"reggieg59",ssPassword:"badmop85",mastery:{}},
+  {id:"ch51",firstName:"Roland",lastName:"Farago",class:"WU",pairId:12,ttSet:"9",ssUser:"rolandf",ssPassword:"toyrug70",mastery:{}},
+  {id:"ch52",firstName:"Rory",lastName:"Thomas",class:"IM",pairId:11,ttSet:"All",ssUser:"roryt2",ssPassword:"topmat94",mastery:{}},
+  {id:"ch53",firstName:"Ruby",lastName:"Randall",class:"WU",pairId:8,ttSet:"9",ssUser:"rubyr113",ssPassword:"redpop96",mastery:{}},
+  {id:"ch54",firstName:"Sam",lastName:"Nutt",class:"IM",pairId:15,ttSet:"2",ssUser:"samueln18",ssPassword:"shygig43",mastery:{}},
+  {id:"ch55",firstName:"Seb",lastName:"File",class:"WU",pairId:1,ttSet:"All",ssUser:"sebastif10",ssPassword:"oddjet25",mastery:{}},
+  {id:"ch56",firstName:"Sohan",lastName:"Jhagra",class:"IM",pairId:7,ttSet:"All",ssUser:"sohanj",ssPassword:"toyrug59",mastery:{}},
+  {id:"ch57",firstName:"Taylor",lastName:"Bridgman",class:"WU",pairId:3,ttSet:"All",ssUser:"taylorb153",ssPassword:"oldcat34",mastery:{}},
+  {id:"ch58",firstName:"Teddie",lastName:"Richards",class:"IM",pairId:4,ttSet:"9",ssUser:"teddier15",ssPassword:"slydot08",mastery:{}},
+  {id:"ch59",firstName:"Zeek",lastName:"Ansah",class:"IM",pairId:3,ttSet:"All",ssUser:"zeeka",ssPassword:"topmat47",mastery:{}},
+  {id:"ch60",firstName:"Ziyad",lastName:"Eisa",class:"IM",pairId:5,ttSet:"All",ssUser:"ziyade7",ssPassword:"slypop40",mastery:{}},
+];
+
+function loadRealData() {
+  if (state.pupils.length > 0 && !confirm('Replace current pupil list with the 60 real Year 4 pupils?')) return;
+  state.pupils = JSON.parse(JSON.stringify(REAL_PUPILS));
+  saveState(); renderDashboard();
+  alert('Loaded 60 real pupils with pairs, TT sets and Spelling Shed log-ins.');
+}
+
+// ========================
+// NAVIGATION
+// ========================
+function goTab(id) {
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('hidden', t.id !== id));
+  if (id === 'pupils') renderPupils();
+  if (id === 'weekly') initWeekly();
+  if (id === 'hl') initHL();
+  if (id === 'bee') initBee();
+  if (id === 'tt') resetTT();
+  if (id === 'dashboard') renderDashboard();
+}
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => goTab(b.dataset.tab)));
+
+// ========================
+// DASHBOARD
+// ========================
+function renderDashboard() {
+  document.getElementById('d-pupils').textContent = state.pupils.length;
+  document.getElementById('d-rules').textContent = state.rules.length;
+  const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
+  document.getElementById('d-week').textContent = cw ? cw.label : '-';
+  document.getElementById('d-assess').textContent = state.assessments.length;
+  const el = document.getElementById('week-status');
+  if (!cw) { el.textContent = 'No week set up yet. Go to Weekly Setup to begin.'; return; }
+  const rule = state.rules.find(r => r.id === cw.ruleId);
+  el.innerHTML = `<strong>${cw.label}</strong><br>Rule: ${rule ? rule.title : 'Unknown'}`;
+}
+
+// ========================
+// PUPILS
+// ========================
+let pupilSortField = 'firstName';
+let pupilSortAsc = true;
+let pupilLocked = true;
+
+function sortPupils(field) {
+  if (pupilSortField === field) pupilSortAsc = !pupilSortAsc;
+  else { pupilSortField = field; pupilSortAsc = true; }
+  renderPupils();
+}
+function togglePupilLock() {
+  pupilLocked = !pupilLocked;
+  document.getElementById('pupil-lock-btn').textContent = pupilLocked ? '🔒 Locked' : '🔓 Unlocked';
+  renderPupils();
+}
+
+function renderPupils() {
+  const q = document.getElementById('pupil-search').value.toLowerCase();
+  const tbody = document.getElementById('pupil-table'); tbody.innerHTML = '';
+  let list = state.pupils.filter(p => !q || `${p.firstName} ${p.lastName}`.toLowerCase().includes(q));
+  list.sort((a, b) => {
+    let av, bv;
+    if (pupilSortField === 'mastery') { av = masteryPercent(a); bv = masteryPercent(b); }
+    else { av = a[pupilSortField] || ''; bv = b[pupilSortField] || ''; }
+    if (av < bv) return pupilSortAsc ? -1 : 1;
+    if (av > bv) return pupilSortAsc ? 1 : -1;
+    return 0;
+  });
+  list.forEach(p => {
+    const tr = document.createElement('tr');
+    const nameBtn = `<button class="btn small" onclick="selectPupil('${p.id}')" style="background:transparent;color:var(--brand);padding:0;font-weight:700;">${p.firstName} ${p.lastName}</button>`;
+    const classCell = pupilLocked
+      ? `<span class="tag ${p.class.toLowerCase()}">${p.class}</span>`
+      : `<select onchange="updatePupil('${p.id}','class',this.value)"><option value="IM"${p.class==='IM'?' selected':''}>IM</option><option value="WU"${p.class==='WU'?' selected':''}>WU</option></select>`;
+    const pairCell = pupilLocked
+      ? (p.pairId || '-')
+      : `<input type="text" value="${p.pairId || ''}" onchange="updatePupil('${p.id}','pairId',this.value)" style="width:42px;text-align:center;">`;
+    const ttCell = pupilLocked
+      ? `<span class="tag set">${p.ttSet || 'All'}</span>`
+      : `<select onchange="updatePupil('${p.id}','ttSet',this.value)">${['All','2','3','4','5','6','7','8','9','10','11','12'].map(v=>`<option${v===(p.ttSet||'All')?' selected':''}>${v}</option>`).join('')}</select>`;
+    const ssuCell = pupilLocked
+      ? (p.ssUser || '-')
+      : `<input value="${p.ssUser || ''}" onchange="updatePupil('${p.id}','ssUser',this.value)" placeholder="user">`;
+    const sspCell = pupilLocked
+      ? (p.ssPassword || '-')
+      : `<input value="${p.ssPassword || ''}" onchange="updatePupil('${p.id}','ssPassword',this.value)" placeholder="pass">`;
+    tr.innerHTML = `
+      <td>${nameBtn}</td>
+      <td>${p.firstName}</td>
+      <td>${p.lastName}</td>
+      <td>${classCell}</td>
+      <td>${pairCell}</td>
+      <td>${ttCell}</td>
+      <td>${ssuCell}</td>
+      <td>${sspCell}</td>
+      <td>${masteryPercent(p)}%</td>
+      <td><button class="del-btn" onclick="deletePupilById('${p.id}')">&times;</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+function updatePupil(id, field, value) {
+  const p = state.pupils.find(x => x.id === id);
+  if (!p) return;
+  if (field === 'pairId') p[field] = value ? parseInt(value) : null;
+  else p[field] = value;
+  saveState();
+  renderPupils();
+}
+function deletePupilById(id) {
+  if (!confirm('Delete this pupil?')) return;
+  state.pupils = state.pupils.filter(p => p.id !== id);
+  saveState(); renderPupils();
+}
+function masteryPercent(p) {
+  if (!p.mastery || !Object.keys(p.mastery).length) return 0;
+  const vals = Object.values(p.mastery);
+  return Math.round(vals.filter(v => v === true).length / vals.length * 100);
+}
+
+let editingPupilId = null;
+function editPupil(id) {
+  document.getElementById('pupil-editor').classList.remove('hidden');
+  editingPupilId = id;
+  if (id) {
+    const p = state.pupils.find(x => x.id === id);
+    document.getElementById('pe-title').textContent = 'Edit Pupil';
+    document.getElementById('pe-first').value = p.firstName;
+    document.getElementById('pe-last').value = p.lastName;
+    document.getElementById('pe-class').value = p.class;
+    document.getElementById('pe-pair').value = p.pairId || '';
+    document.getElementById('pe-tt').value = p.ttSet || 'All';
+    document.getElementById('pe-ssu').value = p.ssUser || '';
+    document.getElementById('pe-ssp').value = p.ssPassword || '';
+    document.getElementById('pe-del').classList.remove('hidden');
+  } else {
+    document.getElementById('pe-title').textContent = 'Add Pupil';
+    ['pe-first','pe-last','pe-pair','pe-ssu','pe-ssp'].forEach(i => document.getElementById(i).value = '');
+    document.getElementById('pe-class').value = 'IM';
+    document.getElementById('pe-tt').value = 'All';
+    document.getElementById('pe-del').classList.add('hidden');
+  }
+}
+function savePupil() {
+  const first = document.getElementById('pe-first').value.trim();
+  const last = document.getElementById('pe-last').value.trim();
+  if (!first || !last) return alert('First and last name required');
+  const data = {
+    id: editingPupilId || 'ch' + (Math.max(0, ...state.pupils.map(p => parseInt(p.id.replace('ch',''))||0)) + 1).toString().padStart(2,'0'),
+    firstName: first, lastName: last,
+    class: document.getElementById('pe-class').value,
+    pairId: parseInt(document.getElementById('pe-pair').value) || null,
+    ttSet: document.getElementById('pe-tt').value,
+    ssUser: document.getElementById('pe-ssu').value.trim(),
+    ssPassword: document.getElementById('pe-ssp').value.trim(),
+    mastery: {}
+  };
+  if (editingPupilId) {
+    const idx = state.pupils.findIndex(p => p.id === editingPupilId);
+    data.mastery = state.pupils[idx].mastery || {};
+    state.pupils[idx] = data;
+  } else { state.pupils.push(data); }
+  saveState(); cancelPupil(); renderPupils();
+}
+function cancelPupil() { document.getElementById('pupil-editor').classList.add('hidden'); editingPupilId = null; }
+function deletePupil() { if (!confirm('Delete this pupil?')) return; state.pupils = state.pupils.filter(p => p.id !== editingPupilId); saveState(); cancelPupil(); renderPupils(); }
+
+let activePupilId = null;
+let activePupilWords = [];
+
+function selectPupil(id) {
+  activePupilId = id;
+  const p = state.pupils.find(x => x.id === id);
+  if (!p) return;
+  const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
+  const rule = cw ? state.rules.find(r => r.id === cw.ruleId) : null;
+  const ks = pickKeySpellings(p, 5);
+  const rw = rule ? rule.words.slice(0,5) : [];
+  const allWords = [...ks, ...rw];
+  activePupilWords = allWords.map(w => ({ word: w, correct: null }));
+
+  document.getElementById('pd-name').textContent = `${p.firstName} ${p.lastName}`;
+  document.getElementById('pd-info').innerHTML = `
+    <span class="tag ${p.class.toLowerCase()}">${p.class}</span>
+    Pair ${p.pairId || '-'} · TT Set: ${p.ttSet || 'All'}
+    · Shed: ${p.ssUser || '-'} / ${p.ssPassword || '-'}
+    · Key Spellings: ${masteryPercent(p)}%
+  `;
+
+  let html = `<div style="display:flex;flex-direction:column;gap:6px;max-width:480px;">`;
+  allWords.forEach((w, i) => {
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;background:#fff;">
+      <span style="font-size:14px;font-weight:600;">${i+1}. ${w}</span>
+      <span class="mark-toggle" id="pd-toggle-${i}">
+        <button onclick="setPupilDetailResult(${i}, true)">Y</button>
+        <button onclick="setPupilDetailResult(${i}, false)">N</button>
+      </span>
+    </div>`;
+  });
+  html += `</div>`;
+  document.getElementById('pd-words').innerHTML = html;
+  document.getElementById('pupil-detail').classList.remove('hidden');
+  document.getElementById('pupil-detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function setPupilDetailResult(wordIdx, correct) {
+  activePupilWords[wordIdx].correct = correct;
+  const toggle = document.getElementById(`pd-toggle-${wordIdx}`);
+  const btns = toggle.querySelectorAll('button');
+  btns[0].style.background = correct === true ? 'var(--success)' : '#fff';
+  btns[0].style.color = correct === true ? '#fff' : '#333';
+  btns[0].style.borderColor = correct === true ? 'var(--success)' : '#d1d5db';
+  btns[1].style.background = correct === false ? 'var(--danger)' : '#fff';
+  btns[1].style.color = correct === false ? '#fff' : '#333';
+  btns[1].style.borderColor = correct === false ? 'var(--danger)' : '#d1d5db';
+}
+
+function savePupilDetailResults() {
+  if (!activePupilId) return;
+  const p = state.pupils.find(x => x.id === activePupilId);
+  const unset = activePupilWords.filter(w => w.correct === null).length;
+  if (unset > 0 && !confirm(`${unset} word(s) not marked. Save anyway?`)) return;
+  if (!p.mastery) p.mastery = {};
+  activePupilWords.forEach(w => { if (w.correct !== null) p.mastery[w.word.toLowerCase()] = w.correct === true; });
+  state.assessments.push({
+    id: 'a' + Date.now(), pupilId: activePupilId, date: new Date().toISOString(),
+    words: activePupilWords.map(w => ({ word: w.word, correct: w.correct === true, response: '' })),
+    score: activePupilWords.filter(w => w.correct === true).length,
+    total: activePupilWords.length
+  });
+  saveState();
+  alert(`Saved results for ${p.firstName} ${p.lastName}.`);
+  closePupilDetail();
+  renderPupils();
+}
+
+function closePupilDetail() {
+  document.getElementById('pupil-detail').classList.add('hidden');
+  activePupilId = null;
+  activePupilWords = [];
+}
+
+function printPupilHL() {
+  if (!activePupilId) return;
+  const p = state.pupils.find(x => x.id === activePupilId);
+  const label = state.hlContent.maths ? 'Home Learning' : 'Home Learning (replace content in Home Learning tab)';
+  const maths = state.hlContent.maths || '';
+  const reading = state.hlContent.reading || '';
+  const mathsA = state.hlContent.mathsAdapted || '';
+  const readingA = state.hlContent.readingAdapted || '';
+  const isAdapted = state.adaptedPupils.includes(p.id);
+  const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
+  const rule = cw ? state.rules.find(r => r.id === cw.ruleId) : null;
+  const ks = pickKeySpellings(p, 5);
+  const rw = rule ? rule.words.slice(0,5) : [];
+  const ruleTitle = rule ? `${rule.year} Step ${rule.step}: ${rule.title}` : 'Spelling Rule';
+  const explanation = rule ? rule.explanation : '';
+  const tt = p.ttSet || 'All';
+
+  const container = document.getElementById('hl-print');
+  container.innerHTML = '';
+
+  const p1 = document.createElement('div');
+  p1.className = 'hl-sheet';
+  p1.innerHTML = `
+    <div class="hl-p1-header">${label} — ${p.firstName} ${p.lastName}</div>
+    <div class="hl-p1-body">
+      <div class="hl-p1-col"><h3>Being a Mathematician</h3><div class="content">${(isAdapted ? mathsA : maths) || '[Maths content]'}</div></div>
+      <div class="hl-p1-col"><h3>Being a Reader</h3><div class="content">${(isAdapted ? readingA : reading) || '[Reading content]'}</div></div>
+    </div>
+    <div class="hl-p1-footer">This week, please practise <strong>${tt}</strong> times table(s).</div>
+  `;
+  container.appendChild(p1);
+
+  const p2 = document.createElement('div');
+  p2.className = 'hl-sheet';
+  const allWords = [...ks, ...rw];
+  p2.innerHTML = `
+    <div class="hl-p2-header"><div class="title">Personal Key Spellings and Weekly Spelling Rule Words</div><div class="login">Spelling Shed — ${p.ssUser || '-'} / ${p.ssPassword || '-'}</div></div>
+    <div class="hl-p2-instruction">The first 5 words below are your <strong>Key Spellings</strong>. This week's spelling rule – <em>${ruleTitle}</em>. ${explanation} Practise spelling these words. Write each word within a sentence in the space below.</div>
+    <table class="hl-p2-table">${allWords.map((w,i) => `<tr><td class="word">${i+1}. ${w}</td><td class="space"><div class="hl-line"></div><div class="hl-line"></div></td></tr>`).join('')}</table>
+  `;
+  container.appendChild(p2);
+
+  container.classList.remove('hidden');
+  window.print();
+  setTimeout(() => { container.innerHTML = ''; container.classList.add('hidden'); }, 1000);
+}
+
+function printPupilTT() {
+  if (!activePupilId) return;
+  const p = state.pupils.find(x => x.id === activePupilId);
+  const set = p.ttSet || 'All';
+  const nums = set === 'All' ? [2,3,4,5,6,7,8,9,10,11,12] : [parseInt(set)];
+  const qs = [];
+  for (let qi = 1; qi <= 40; qi++) {
+    const n = nums[Math.floor(Math.random() * nums.length)];
+    const m = Math.floor(Math.random() * 12) + 1;
+    qs.push({ n, m });
+  }
+
+  const container = document.getElementById('tt-print');
+  container.innerHTML = '';
+  const page = document.createElement('div');
+  page.className = 'tt-sheet';
+
+  const childDiv = document.createElement('div');
+  let html = `<div class="tt-child">`;
+  html += `<div class="tt-child-header"><div class="name-line">${p.firstName} ${p.lastName}</div><div class="score-box">Score / Time<br>___ / ___</div></div>`;
+  html += `<div class="tt-set-label">${set === 'All' ? '2,5,3,4,6,8,7,9,11,12 x' : set + ' x'}</div>`;
+  html += `<div class="tt-tables-wrap">`;
+  html += `<table class="tt-table"><tbody>`;
+  for (let r = 0; r < 20; r++) {
+    const q = qs[r];
+    html += `<tr><td class="num">${r+1}</td><td class="q">${q.m} x ${q.n} =</td><td class="ans"></td></tr>`;
+  }
+  html += `</tbody></table>`;
+  html += `<table class="tt-table"><tbody>`;
+  for (let r = 20; r < 40; r++) {
+    const q = qs[r];
+    html += `<tr><td class="num">${r+1}</td><td class="q">${q.m} x ${q.n} =</td><td class="ans"></td></tr>`;
+  }
+  html += `</tbody></table>`;
+  html += `</div></div>`;
+  childDiv.innerHTML = html;
+  page.appendChild(childDiv);
+  container.appendChild(page);
+
+  container.classList.remove('hidden');
+  window.print();
+  setTimeout(() => { container.innerHTML = ''; container.classList.add('hidden'); }, 1000);
+}
+
+function printPupilWords() {
+  if (!activePupilId) return;
+  const p = state.pupils.find(x => x.id === activePupilId);
+  const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
+  const rule = cw ? state.rules.find(r => r.id === cw.ruleId) : null;
+  const ks = pickKeySpellings(p, 5);
+  const rw = rule ? rule.words.slice(0,5) : [];
+  const all = [...ks, ...rw];
+
+  const container = document.getElementById('bee-print');
+  container.innerHTML = '';
+  const page = document.createElement('div');
+  page.className = 'bee-sheet';
+
+  const strip = document.createElement('div');
+  strip.className = 'bee-strip';
+  strip.style.borderTopColor = pairColor(p.pairId || 1);
+  strip.innerHTML = `
+    <div class="bee-strip-name">${p.firstName} ${p.lastName}</div>
+    <ol class="bee-strip-words">${all.map(w => `<li>${w}</li>`).join('')}</ol>
+  `;
+  page.appendChild(strip);
+  container.appendChild(page);
+
+  container.classList.remove('hidden');
+  window.print();
+  setTimeout(() => { container.innerHTML = ''; container.classList.add('hidden'); }, 1000);
+}
+
+// ========================
+// RULES / WEEKLY
+// ========================
+function initWeekly() {
+  const sel = document.getElementById('w-rule');
+  sel.innerHTML = '<option value="">Select a rule...</option>';
+  state.rules.forEach(r => {
+    const opt = document.createElement('option'); opt.value = r.id;
+    opt.textContent = `${r.year} Step ${r.step}: ${r.title}`;
+    sel.appendChild(opt);
+  });
+  previewWeekly();
+}
+function previewWeekly() {
+  const ruleId = document.getElementById('w-rule').value;
+  const container = document.getElementById('weekly-preview');
+  if (!ruleId) { container.innerHTML = '<p style="color:var(--muted)">Select a rule to see preview.</p>'; return; }
+  const rule = state.rules.find(r => r.id === ruleId);
+  container.innerHTML = `<p><strong>${rule.title}</strong></p>
+    <p style="font-size:13px;color:var(--muted)">${rule.explanation}</p>
+    <p style="margin-top:8px;"><strong>Words:</strong> ${rule.words.join(', ')}</p>`;
+}
+function saveWeek() {
+  const label = document.getElementById('w-label').value.trim();
+  const ruleId = document.getElementById('w-rule').value;
+  if (!label || !ruleId) return alert('Enter a week label and select a rule.');
+  const week = { id: 'w' + Date.now(), label, ruleId, date: new Date().toISOString().split('T')[0] };
+  state.weeks.push(week); state.currentWeek = week.id;
+  saveState(); alert('Week saved: ' + label); goTab('dashboard');
+}
+function clearWeek() { document.getElementById('w-label').value = ''; document.getElementById('w-rule').value = ''; previewWeekly(); }
+
+function pickKeySpellings(pupil, n) {
+  const bank = defaultWordBank();
+  const known = pupil.mastery || {};
+  const unmastered = bank.filter(w => !known[w.toLowerCase()]);
+  if (unmastered.length >= n) return unmastered.slice(0, n);
+  return [...unmastered, ...bank.filter(w => !unmastered.includes(w))].slice(0, n);
+}
+function defaultWordBank() {
+  if (state.wordBank && state.wordBank.length) return state.wordBank;
+  const all = [];
+  const common = ["I","no","go","to","into","the","is","his","has","had","as","at","an","and","am","are","was","were","be","been","being","have","do","does","did","done","will","would","could","should","shall","may","might","must","can","can't","don't","didn't","hasn't","haven't","isn't","aren't","wasn't","weren't","won't","wouldn't","couldn't","shouldn't"];
+  all.push(...common);
+  state.rules.filter(r => r.year === 'Year 4').forEach(r => all.push(...r.words));
+  return [...new Set(all)];
+}
+
+// ========================
+// HOME LEARNING
+// ========================
+function initHL() {
+  const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
+  document.getElementById('hl-label').value = cw ? cw.label : '';
+  document.getElementById('hl-maths').value = state.hlContent.maths || '';
+  document.getElementById('hl-reading').value = state.hlContent.reading || '';
+  document.getElementById('hl-maths-a').value = state.hlContent.mathsAdapted || '';
+  document.getElementById('hl-reading-a').value = state.hlContent.readingAdapted || '';
+  const list = document.getElementById('hl-adapt-list'); list.innerHTML = '';
+  state.pupils.forEach(p => {
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:6px;margin:4px 0;font-size:14px;cursor:pointer;';
+    const checked = state.adaptedPupils.includes(p.id) ? 'checked' : '';
+    lbl.innerHTML = `<input type="checkbox" value="${p.id}" ${checked} onchange="toggleAdapted('${p.id}')"> ${p.firstName} ${p.lastName}`;
+    list.appendChild(lbl);
+  });
+}
+function toggleAdapted(id) {
+  if (state.adaptedPupils.includes(id)) state.adaptedPupils = state.adaptedPupils.filter(x => x !== id);
+  else state.adaptedPupils.push(id);
+  saveState();
+}
+function generateHL(filterClass) {
+  const label = document.getElementById('hl-label').value.trim() || 'Home Learning';
+  const maths = document.getElementById('hl-maths').value.trim();
+  const reading = document.getElementById('hl-reading').value.trim();
+  const mathsA = document.getElementById('hl-maths-a').value.trim();
+  const readingA = document.getElementById('hl-reading-a').value.trim();
+  state.hlContent = { maths, reading, mathsAdapted: mathsA, readingAdapted: readingA };
+  saveState();
+
+  const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
+  const rule = cw ? state.rules.find(r => r.id === cw.ruleId) : null;
+  const container = document.getElementById('hl-print');
+  container.innerHTML = '';
+
+  const pupils = filterClass ? state.pupils.filter(p => p.class === filterClass) : state.pupils;
+  pupils.forEach(p => {
+    const isAdapted = state.adaptedPupils.includes(p.id);
+    const ks = pickKeySpellings(p, 5);
+    const rw = rule ? rule.words.slice(0,5) : [];
+    const ruleTitle = rule ? `${rule.year} Step ${rule.step}: ${rule.title}` : 'Spelling Rule';
+    const explanation = rule ? rule.explanation : '';
+    const tt = p.ttSet || 'All';
+
+    // Page 1 — landscape split
+    const p1 = document.createElement('div');
+    p1.className = 'hl-sheet';
+    p1.innerHTML = `
+      <div class="hl-p1-header">${label} — ${p.firstName} ${p.lastName}</div>
+      <div class="hl-p1-body">
+        <div class="hl-p1-col">
+          <h3>Being a Mathematician</h3>
+          <div class="content">${(isAdapted ? mathsA : maths) || '[Maths content]'}</div>
+        </div>
+        <div class="hl-p1-col">
+          <h3>Being a Reader</h3>
+          <div class="content">${(isAdapted ? readingA : reading) || '[Reading content]'}</div>
+        </div>
+      </div>
+      <div class="hl-p1-footer">This week, please practise <strong>${tt}</strong> times table(s).</div>
+    `;
+    container.appendChild(p1);
+
+    // Page 2 — landscape words
+    const p2 = document.createElement('div');
+    p2.className = 'hl-sheet';
+    const allWords = [...ks, ...rw];
+    p2.innerHTML = `
+      <div class="hl-p2-header">
+        <div class="title">Personal Key Spellings and Weekly Spelling Rule Words</div>
+        <div class="login">Spelling Shed — ${p.ssUser || '-'} / ${p.ssPassword || '-'}</div>
+      </div>
+      <div class="hl-p2-instruction">
+        The first 5 words below are your <strong>Key Spellings</strong>. This week's spelling rule – <em>${ruleTitle}</em>. ${explanation}
+        Practise spelling these words. Write each word within a sentence in the space below. These words will be checked in your paired spelling bee.
+      </div>
+      <table class="hl-p2-table">
+        ${allWords.map((w,i) => `<tr><td class="word">${i+1}. ${w}</td><td class="space"><div class="hl-line"></div><div class="hl-line"></div></td></tr>`).join('')}
+      </table>
+    `;
+    container.appendChild(p2);
+  });
+
+  document.getElementById('hl-config').classList.add('hidden');
+  container.classList.remove('hidden');
+  document.getElementById('hl-actions').style.display = 'flex';
+}
+function resetHL() {
+  document.getElementById('hl-config').classList.remove('hidden');
+  document.getElementById('hl-print').classList.add('hidden');
+  document.getElementById('hl-actions').style.display = 'none';
+}
+
+// ========================
+// SPELLING BEE
+// ========================
+const PAIR_COLORS = [
+  '#E53935','#FB8C00','#FDD835','#43A047','#1E88E5',
+  '#8E24AA','#00ACC1','#C0CA33','#3949AB','#D81B60',
+  '#6D4C41','#546E7A','#00897B','#7CB342','#5E35B1'
+];
+function pairColor(n) { return PAIR_COLORS[(parseInt(n)-1) % PAIR_COLORS.length]; }
+
+function initBee() {
+  resetBee();
+  const sel = document.getElementById('bee-pupil');
+  sel.innerHTML = '<option value="">Select child...</option>';
+  state.pupils.slice().sort((a,b) => a.firstName.localeCompare(b.firstName)).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = `${p.firstName} ${p.lastName} (${p.class}) — Pair ${p.pairId || '-'}`;
+    sel.appendChild(opt);
+  });
+  document.getElementById('bee-mark-form').innerHTML = '';
+}
+
+function generateBeeSheets(filterClass) {
+  const pupils = filterClass ? state.pupils.filter(p => p.class === filterClass) : state.pupils;
+  // Sort alphabetically by first name to match the PDF
+  const sorted = pupils.slice().sort((a, b) => a.firstName.localeCompare(b.firstName));
+
+  const container = document.getElementById('bee-print');
+  container.innerHTML = '';
+  container.className = 'print-area';
+
+  const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
+  const rule = cw ? state.rules.find(r => r.id === cw.ruleId) : null;
+
+  // 3 columns x 3 rows = 9 children per page
+  const perPage = 9;
+  for (let pageIdx = 0; pageIdx < sorted.length; pageIdx += perPage) {
+    const page = document.createElement('div');
+    page.className = 'bee-sheet';
+
+    const pagePupils = sorted.slice(pageIdx, pageIdx + perPage);
+    pagePupils.forEach(p => {
+      const ks = pickKeySpellings(p, 5);
+      const rw = rule ? rule.words.slice(0, 5) : [];
+      const all = [...ks, ...rw];
+
+      const strip = document.createElement('div');
+      strip.className = 'bee-strip';
+      strip.style.borderTopColor = pairColor(p.pairId || 1);
+      strip.innerHTML = `
+        <div class="bee-strip-name">${p.firstName} ${p.lastName}</div>
+        <ol class="bee-strip-words">${all.map(w => `<li>${w}</li>`).join('')}</ol>
+      `;
+      page.appendChild(strip);
+    });
+
+    container.appendChild(page);
+  }
+
+  document.getElementById('bee-config').classList.add('hidden');
+  container.classList.remove('hidden');
+  document.getElementById('bee-actions').style.display = 'flex';
+}
+
+function loadBeeWords() {
+  const pupilId = document.getElementById('bee-pupil').value;
+  const container = document.getElementById('bee-mark-form');
+  container.innerHTML = '';
+  if (!pupilId) return;
+
+  const p = state.pupils.find(x => x.id === pupilId);
+  const ks = pickKeySpellings(p, 5);
+  const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
+  const rule = cw ? state.rules.find(r => r.id === cw.ruleId) : null;
+  const rw = rule ? rule.words.slice(0,5) : [];
+  const allWords = [...ks, ...rw];
+  beeState = { pupilId, words: allWords.map(w => ({ word: w, correct: null })) };
+
+  const div = document.createElement('div');
+  div.className = 'card';
+  div.style.marginTop = '12px';
+  let html = `<h3>${p.firstName} ${p.lastName} — ${allWords.length} words</h3>`;
+  html += `<p style="font-size:12px;color:var(--muted);margin-bottom:8px;"><strong>Key:</strong> ${ks.join(', ')}<br><strong>Rule:</strong> ${rw.join(', ')}</p>`;
+  html += `<div style="display:flex;flex-direction:column;gap:6px;max-width:480px;">`;
+  allWords.forEach((w, i) => {
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;background:#fff;">
+      <span style="font-size:14px;font-weight:600;">${i+1}. ${w}</span>
+      <span class="mark-toggle" id="toggle-${pupilId}-${i}">
+        <button onclick="setBeeResult(${i}, true)">Y</button>
+        <button onclick="setBeeResult(${i}, false)">N</button>
+      </span>
+    </div>`;
+  });
+  html += `</div>`;
+  div.innerHTML = html;
+  container.appendChild(div);
+}
+
+function setBeeResult(wordIdx, correct) {
+  beeState.words[wordIdx].correct = correct;
+  const toggle = document.getElementById(`toggle-${beeState.pupilId}-${wordIdx}`);
+  const btns = toggle.querySelectorAll('button');
+  btns[0].style.background = correct === true ? 'var(--success)' : '#fff';
+  btns[0].style.color = correct === true ? '#fff' : '#333';
+  btns[0].style.borderColor = correct === true ? 'var(--success)' : '#d1d5db';
+  btns[1].style.background = correct === false ? 'var(--danger)' : '#fff';
+  btns[1].style.color = correct === false ? '#fff' : '#333';
+  btns[1].style.borderColor = correct === false ? 'var(--danger)' : '#d1d5db';
+}
+
+function saveBeeResults() {
+  if (!beeState.pupilId) return alert('Select a child first.');
+  const p = state.pupils.find(x => x.id === beeState.pupilId);
+  const unset = beeState.words.filter(w => w.correct === null).length;
+  if (unset > 0 && !confirm(`${unset} word(s) not marked. Save anyway?`)) return;
+  if (!p.mastery) p.mastery = {};
+  beeState.words.forEach(w => { if (w.correct !== null) p.mastery[w.word.toLowerCase()] = w.correct === true; });
+  state.assessments.push({
+    id: 'a' + Date.now(), pupilId: beeState.pupilId, date: new Date().toISOString(),
+    words: beeState.words.map(w => ({ word: w.word, correct: w.correct === true, response: '' })),
+    score: beeState.words.filter(w => w.correct === true).length,
+    total: beeState.words.length
+  });
+  saveState();
+  alert(`Saved results for ${p.firstName} ${p.lastName}.`);
+  document.getElementById('bee-mark-form').innerHTML = '';
+  document.getElementById('bee-pupil').value = '';
+  beeState = { pupilId: null, words: [] };
+}
+
+function resetBee() {
+  document.getElementById('bee-config').classList.remove('hidden');
+  document.getElementById('bee-print').classList.add('hidden');
+  document.getElementById('bee-print').innerHTML = '';
+  document.getElementById('bee-actions').style.display = 'none';
+}
+
+// ========================
+// TT SHEETS
+// ========================
+function generateTT(filterClass) {
+  const pupils = filterClass ? state.pupils.filter(p => p.class === filterClass) : state.pupils;
+  const container = document.getElementById('tt-print');
+  container.innerHTML = '';
+
+  // Group into pairs of 2 children per page
+  for (let i = 0; i < pupils.length; i += 2) {
+    const page = document.createElement('div');
+    page.className = 'tt-sheet';
+    const chunk = pupils.slice(i, i + 2);
+    while (chunk.length < 2) chunk.push(null); // pad if odd
+
+    chunk.forEach(p => {
+      const childDiv = document.createElement('div');
+      if (!p) { childDiv.innerHTML = '<div></div>'; page.appendChild(childDiv); return; }
+
+      const set = p.ttSet || 'All';
+      const nums = set === 'All' ? [2,3,4,5,6,7,8,9,10,11,12] : [parseInt(set)];
+      const qs = [];
+      for (let qi = 1; qi <= 40; qi++) {
+        const n = nums[Math.floor(Math.random() * nums.length)];
+        const m = Math.floor(Math.random() * 12) + 1;
+        qs.push({ n, m });
+      }
+
+      let html = `<div class="tt-child">`;
+      html += `<div class="tt-child-header">
+        <div class="name-line">${p.firstName} ${p.lastName}</div>
+        <div class="score-box">Score / Time<br>___ / ___</div>
+      </div>`;
+      html += `<div class="tt-set-label">${set === 'All' ? '2,5,3,4,6,8,7,9,11,12 x' : set + ' x'}</div>`;
+      html += `<div class="tt-tables-wrap">`;
+      // Left column: questions 1-20
+      html += `<table class="tt-table"><tbody>`;
+      for (let r = 0; r < 20; r++) {
+        const q = qs[r];
+        html += `<tr><td class="num">${r+1}</td><td class="q">${q.m} x ${q.n} =</td><td class="ans"></td></tr>`;
+      }
+      html += `</tbody></table>`;
+      // Right column: questions 21-40
+      html += `<table class="tt-table"><tbody>`;
+      for (let r = 20; r < 40; r++) {
+        const q = qs[r];
+        html += `<tr><td class="num">${r+1}</td><td class="q">${q.m} x ${q.n} =</td><td class="ans"></td></tr>`;
+      }
+      html += `</tbody></table>`;
+      html += `</div></div>`;
+      childDiv.innerHTML = html;
+      page.appendChild(childDiv);
+    });
+
+    container.appendChild(page);
+  }
+
+  document.getElementById('tt-config').classList.add('hidden');
+  container.classList.remove('hidden');
+  document.getElementById('tt-actions').style.display = 'flex';
+}
+
+function resetTT() {
+  document.getElementById('tt-config').classList.remove('hidden');
+  document.getElementById('tt-print').classList.add('hidden');
+  document.getElementById('tt-actions').style.display = 'none';
+}
+
+// ========================
+// DATA
+// ========================
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `wfa-spellings-${new Date().toISOString().split('T')[0]}.json`; a.click();
+}
+function importJSON(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    try {
+      const data = JSON.parse(evt.target.result);
+      if (!data.pupils || !Array.isArray(data.pupils)) throw new Error('Invalid file');
+      if (!confirm(`Import backup with ${data.pupils.length} pupils? This will replace current data.`)) return;
+      state = data; saveState(); alert('Import complete.'); goTab('dashboard');
+    } catch(err) { alert('Import failed: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+function importDataCSV(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    const lines = evt.target.result.split(/\r?\n/).filter(l => l.trim());
+    let headerRow = 0;
+    for (let r = 0; r < Math.min(lines.length, 10); r++) {
+      if (lines[r].toLowerCase().includes('ch#') || lines[r].toLowerCase().includes('ch id')) { headerRow = r; break; }
+    }
+    const headers = lines[headerRow].split(',').map(h => h.trim().toLowerCase().replace(/"/g,''));
+    const idIdx = headers.indexOf('ch#') >= 0 ? headers.indexOf('ch#') : headers.indexOf('ch id');
+    if (idIdx < 0) { alert('CSV must have CH# or CH ID column'); return; }
+    const metaCols = ['first','last','class','pp','rank','set','h','lks2','uks2','all','100 hfw','ks1'];
+    const wordCols = headers.map((h,i) => ({h,i})).filter(({h,i}) => i !== idIdx && h && !/^y\d/.test(h) && !metaCols.includes(h));
+    const newBank = wordCols.map(({h}) => h);
+    if (newBank.length) state.wordBank = newBank;
+    let updated = 0;
+    for (let i = headerRow + 1; i < lines.length; i++) {
+      const cols = lines[i].split(',');
+      const id = cols[idIdx].trim();
+      const p = state.pupils.find(x => x.id === id);
+      if (!p) continue;
+      if (!p.mastery) p.mastery = {};
+      wordCols.forEach(({i:colIdx, h}) => {
+        const val = cols[colIdx] ? cols[colIdx].trim() : '';
+        if (val === '1' || val === 'y') p.mastery[h] = true;
+        else if (val === '0' || val === 'n') p.mastery[h] = false;
+      });
+      updated++;
+    }
+    saveState();
+    alert(`Updated ${updated} pupils with ${wordCols.length} words of mastery data.`);
+  };
+  reader.readAsText(file);
+}
+function resetAll() {
+  if (!confirm('DELETE ALL DATA? This cannot be undone.')) return;
+  localStorage.removeItem(STORAGE_KEY); state = defaultState(); saveState(); goTab('dashboard');
+}
+
+// ========================
+// INIT
+// ========================
+updateSyncStatus();
+if (SYNC_URL) {
+  sheetLoadAll().then(() => { renderDashboard(); goTab('dashboard'); });
+} else {
+  renderDashboard();
+}
+</script>
+</body>
+</html>
