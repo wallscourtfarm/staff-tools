@@ -127,14 +127,13 @@
 
   /* ======================== PRINT ======================== */
   @media print {
-    @page { size: A4 landscape; margin: 8mm; }
-    body { background: #fff; }
-    header, nav { display: none !important; }
-    /* Show the active section but hide everything inside except print area */
+    @page { margin: 8mm; }
+    body { background: #fff !important; }
+    header, nav, .sticky-actions, #hl-config, #bee-config, #tt-config { display: none !important; }
     .tab { display: block !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; background: none !important; border: none !important; }
     .tab > *:not(.print-area) { display: none !important; }
-    .print-area { display: block !important; position: static !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-    .print-area.hidden { display: block !important; }
+    .print-area { display: none !important; }
+    .print-area.print-target { display: block !important; position: static !important; width: 100% !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
     .tt-sheet, .hl-sheet, .bee-sheet { page-break-after: always; page-break-inside: avoid; }
   }
   .cut-h { border-bottom: 1px dashed #bbb; }
@@ -349,7 +348,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">v0.23</span>
+  <span class="version">v0.24</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <nav id="nav">
@@ -516,7 +515,7 @@
 <!-- HOME LEARNING -->
 <section id="hl" class="tab hidden">
   <div class="row sticky-actions" id="hl-actions" style="display:none;">
-    <button class="btn" onclick="downloadPDF(document.getElementById('hl-print'),'home-learning','landscape')">Download PDF</button>
+    <button class="btn" onclick="printArea(document.getElementById('hl-print'))">Print / Save PDF</button>
     <button class="btn secondary" onclick="resetHL()">Back / Edit</button>
   </div>
   <div id="hl-config">
@@ -542,7 +541,7 @@
 <!-- SPELLING BEE -->
 <section id="bee" class="tab hidden">
   <div class="row sticky-actions" id="bee-actions" style="display:none;">
-    <button class="btn" onclick="downloadPDF(document.getElementById('bee-print'),'spelling-lists','portrait')">Download PDF</button>
+    <button class="btn" onclick="printArea(document.getElementById('bee-print'))">Print / Save PDF</button>
     <button class="btn secondary" onclick="resetBee()">Back</button>
   </div>
   <div id="bee-config">
@@ -576,7 +575,7 @@
 <!-- TT SHEETS -->
 <section id="tt" class="tab hidden">
   <div class="row sticky-actions" id="tt-actions" style="display:none;">
-    <button class="btn" onclick="downloadPDF(document.getElementById('tt-print'),'tt-sheets','portrait')">Download PDF</button>
+    <button class="btn" onclick="printArea(document.getElementById('tt-print'))">Print / Save PDF</button>
     <button class="btn secondary" onclick="resetTT()">Back</button>
   </div>
   <div id="tt-config">
@@ -1517,7 +1516,7 @@ function printPupilHL() {
   container.appendChild(p2);
 
   container.classList.remove('hidden');
-  downloadPDF(container, 'home-learning-' + p.firstName + '-' + p.lastName, 'landscape');
+  printArea(container);
 }
 
 function printPupilTT() {
@@ -1560,7 +1559,7 @@ function printPupilTT() {
   container.appendChild(page);
 
   container.classList.remove('hidden');
-  downloadPDF(container, 'tt-sheet-' + p.firstName + '-' + p.lastName, 'portrait');
+  printArea(container);
 }
 
 function printPupilWords() {
@@ -1585,7 +1584,7 @@ function printPupilWords() {
   container.appendChild(page);
 
   container.classList.remove('hidden');
-  downloadPDF(container, 'spelling-list-' + p.firstName + '-' + p.lastName, 'portrait');
+  printArea(container);
   setTimeout(() => { container.innerHTML = ''; container.classList.add('hidden'); }, 1000);
 }
 
@@ -2078,33 +2077,19 @@ function printHandoutOrder() {
   });
 
   document.body.appendChild(container);
-  downloadPDF(container, 'handout-order', 'portrait').then(() => container.remove());
+  container.classList.add('print-area', 'print-target');
+  window.print();
+  container.remove();
 }
 
-async function downloadPDF(element, filename, orientation) {
-  const wasHidden = element.classList.contains('hidden');
+function printArea(element) {
+  // Mark which print area to show, then trigger browser print
+  document.querySelectorAll('.print-area').forEach(el => el.classList.remove('print-target'));
+  element.classList.add('print-target');
   element.classList.remove('hidden');
-  element.style.display = 'block';
-
-  // Wait for browser to render the content
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-  try {
-    await html2pdf().set({
-      margin: [5, 5, 5, 5],
-      filename: filename + '.pdf',
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: orientation || 'portrait' }
-    }).from(element).save();
-  } catch (e) {
-    console.error('PDF error:', e);
-    // Fallback: use browser print dialog
-    window.print();
-  }
-
-  element.style.display = '';
-  if (wasHidden) element.classList.add('hidden');
+  window.print();
+  element.classList.remove('print-target');
+  element.classList.add('hidden');
 }
 
 // ========================
@@ -2123,6 +2108,5 @@ if (SYNC_URL) {
   renderDashboard(); goTab('dashboard');
 }
 </script>
-<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 </body>
 </html>
