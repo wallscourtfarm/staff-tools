@@ -94,8 +94,10 @@
   .pupil-sheet td:nth-child(5) { min-width: 32px; text-align: center; }
   .pupil-sheet td:nth-child(6) { min-width: 32px; text-align: center; }
   .pupil-sheet td:nth-child(7),
-  .pupil-sheet td:nth-child(8),
-  .pupil-sheet td:nth-child(9) { min-width: 28px; text-align: center; }
+  .pupil-sheet td:nth-child(8) { min-width: 32px; text-align: center; font-size: 12px; }
+  .pupil-sheet td:nth-child(9),
+  .pupil-sheet td:nth-child(10),
+  .pupil-sheet td:nth-child(11) { min-width: 28px; text-align: center; }
   .pupil-sheet td input, .pupil-sheet td select {
     font-size: 13px; padding: 3px 4px; border: 1px solid transparent;
     border-radius: 4px; background: transparent; width: 100%; min-width: 0;
@@ -133,8 +135,6 @@
   }
   .cut-h { border-bottom: 1px dashed #bbb; }
   .cut-v { border-right: 1px dashed #bbb; }
-  #hl-adapt-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; margin-top: 8px; }
-  #hl-adapt-list label { display: flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; }
 
   /* ---- HOME LEARNING ---- */
   .hl-sheet {
@@ -410,7 +410,7 @@
     </div>
     <div style="overflow-x:auto;">
       <table class="pupil-sheet">
-        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">First</th><th onclick="sortPupils('lastName')" style="cursor:pointer">Last</th><th onclick="sortPupils('class')" style="cursor:pointer">Class</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair</th><th onclick="sortPupils('tableNum')" style="cursor:pointer">Table</th><th>TT Set</th><th onclick="sortPupils('masteryYear')" style="cursor:pointer;font-weight:normal;font-size:11px">Yr</th><th onclick="sortPupils('masteryLks2')" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2</th><th onclick="sortPupils('masteryAll')" style="cursor:pointer;font-weight:normal;font-size:11px">All</th></tr>
+        <thead><tr><th onclick="sortPupils('firstName')" style="cursor:pointer">First</th><th onclick="sortPupils('lastName')" style="cursor:pointer">Last</th><th onclick="sortPupils('class')" style="cursor:pointer">Class</th><th onclick="sortPupils('pairId')" style="cursor:pointer">Pair</th><th onclick="sortPupils('tableNum')" style="cursor:pointer">Table</th><th>TT</th><th>Adapted</th><th>Rule</th><th onclick="sortPupils('masteryYear')" style="cursor:pointer;font-weight:normal;font-size:11px">Yr</th><th onclick="sortPupils('masteryLks2')" style="cursor:pointer;font-weight:normal;font-size:11px">LKS2</th><th onclick="sortPupils('masteryAll')" style="cursor:pointer;font-weight:normal;font-size:11px">All</th></tr>
         <tbody id="pupil-table"></tbody>
       </table>
     </div>
@@ -482,11 +482,6 @@
         <button class="btn secondary" onclick="generateHL('IM')">IM only</button>
         <button class="btn secondary" onclick="generateHL('WU')">WU only</button>
       </div>
-    </div>
-    <div class="card">
-      <h2>Adapted Pupils</h2>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:8px;">Select pupils who should receive adapted maths/reading:</p>
-      <div id="hl-adapt-list"></div>
     </div>
   </div>
   <div id="hl-print" class="print-area hidden"></div>
@@ -1041,9 +1036,15 @@ function renderPupils() {
     const ttCell = pupilLocked
       ? `<span class="tag set">${p.ttSet || 'All'}</span>`
       : `<select onchange="updatePupil('${p.id}','ttSet',this.value)">${['All','2','3','4','5','6','7','8','9','10','11','12'].map(v=>`<option${v===(p.ttSet||'All')?' selected':''}>${v}</option>`).join('')}</select>`;
+    const isAdapted = state.adaptedPupils.includes(p.id);
+    const adaptedCell = pupilLocked
+      ? (isAdapted ? '✓' : '')
+      : `<input type="checkbox" ${isAdapted ? 'checked' : ''} onchange="toggleAdapted('${p.id}');renderPupils()">`;
+    const cw = state.currentWeek ? state.weeks.find(w => w.id === state.currentWeek) : null;
+    const ruleCell = isAdapted && cw && cw.revisionRuleId ? 'Rev' : 'Y4';
     const mb = masteryBreakdown(p);
     const masteryCells = `<td>${mb.year}%</td><td>${mb.lks2}%</td><td>${mb.overall}%</td>`;
-    tr.innerHTML = `<td>${nameBtn}</td><td>${lastCell}</td><td>${classCell}</td><td>${pairCell}</td><td>${tableCell}</td><td>${ttCell}</td>${masteryCells}`;
+    tr.innerHTML = `<td>${nameBtn}</td><td>${lastCell}</td><td>${classCell}</td><td>${pairCell}</td><td>${tableCell}</td><td>${ttCell}</td><td style="text-align:center">${adaptedCell}</td><td style="text-align:center">${ruleCell}</td>${masteryCells}`;
     tbody.appendChild(tr);
   });
   if (adminVisible) renderAdmin();
@@ -1453,14 +1454,6 @@ function initHL() {
   document.getElementById('hl-reading').value = state.hlContent.reading || '';
   document.getElementById('hl-maths-a').value = state.hlContent.mathsAdapted || '';
   document.getElementById('hl-reading-a').value = state.hlContent.readingAdapted || '';
-  const list = document.getElementById('hl-adapt-list'); list.innerHTML = '';
-  state.pupils.forEach(p => {
-    const lbl = document.createElement('label');
-    lbl.className = '';
-    const checked = state.adaptedPupils.includes(p.id) ? 'checked' : '';
-    lbl.innerHTML = `<input type="checkbox" value="${p.id}" ${checked} onchange="toggleAdapted('${p.id}')"> ${p.firstName} ${p.lastName}`;
-    list.appendChild(lbl);
-  });
 }
 function toggleAdapted(id) {
   if (state.adaptedPupils.includes(id)) state.adaptedPupils = state.adaptedPupils.filter(x => x !== id);
