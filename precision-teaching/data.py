@@ -561,6 +561,183 @@ def get_pupil(pupils_data, pupil_id):
     return None
 
 
+# ── Skill Status Helpers ─────────────────────────────────────────────────────
+
+# currentSkills maps skill_id → {"status": "mastered"|"active"|"upcoming",
+#   "masteredDate": "2026-05-22"|None, "nextReview": "2026-05-29"|None,
+#   "reviewStage": 0|1|2|None}
+#
+# Review stages:
+#   0 = review 1 week after mastery
+#   1 = review 2 weeks after stage 0 passes
+#   2 = review 1 month after stage 1 passes
+#   After stage 2 passes → status becomes "secure" (no more reviews)
+
+REVIEW_DELTAS = {
+    0: 7,   # 1 week
+    1: 14,  # 2 weeks
+    2: 28,  # 4 weeks (1 month)
+}
+
+def migrate_skills_format(pupil):
+    """Convert old string-format currentSkills to new object format."""
+    skills = pupil.get("currentSkills", {})
+    if not skills:
+        return False
+    changed = False
+    for skill_id, value in list(skills.items()):
+        if isinstance(value, str):
+            # Old format: "mastered", "active", "upcoming"
+            skills[skill_id] = {
+                "status": value,
+                "masteredDate": date.today().isoformat() if value == "mastered" else None,
+                "nextReview": None,
+                "reviewStage": None,
+            }
+            # Schedule review for newly migrated mastered skills
+            if value == "mastered":
+                skills[skill_id]["nextReview"] = (date.today()).isoformat()
+                skills[skill_id]["reviewStage"] = 0
+            changed = True
+    return changed
+
+
+def get_skill_status(pupil, skill_id):
+    """Get the status string for a skill, handling both old and new formats."""
+    skills = pupil.get("currentSkills", {})
+    entry = skills.get(skill_id)
+    if entry is None:
+        return None
+    if isinstance(entry, str):
+        return entry
+    return entry.get("status")
+
+
+def set_skill_status(pupil, skill_id, status, mastered_date=None):
+    """Set a skill status with review scheduling.
+
+    When marking as mastered, automatically schedules the first review (1 week).
+    When marking as active, clears review data.
+    """
+    skills = pupil.setdefault("currentSkills", {})
+    if status == "mastered":
+        m_date = mastered_date or date.today().isoformat()
+        skills[skill_id] = {
+            "status": "mastered",
+            "masteredDate": m_date,
+            "nextReview": (date.today() + __import__("datetime").timedelta(days=7)).isoformat(),
+            "reviewStage": 0,
+        }
+    elif status == "active":
+        skills[skill_id] = {
+            "status": "active",
+            "masteredDate": None,
+            "nextReview": None,
+            "reviewStage": None,
+        }
+    elif status == "secure":
+        skills[skill_id] = {
+            "status": "secure",
+            "masteredDate": skills.get(skill_id, {}).get("masteredDate") if isinstance(skills.get(skill_id), dict) else None,
+            "nextReview": None,
+            "reviewStage": None,
+        }
+    else:  # upcoming or other
+        skills[skill_id] = {
+            "status": status,
+            "masteredDate": None,
+            "nextReview": None,
+            "reviewStage": None,
+        }
+
+
+def pass_review(pupil, skill_id):
+    """Mark a review as passed. Schedules the next review or marks as secure."""
+    entry = pupil["currentSkills"].get(skill_id)
+    if not entry or not isinstance(entry, dict):
+        return
+
+    stage = entry.get("reviewStage", 0)
+    if stage is None:
+        stage = 0
+
+    next_stage = stage + 1
+    if next_stage >= len(REVIEW_DELTAS):
+        # Completed all review stages — mark as secure
+        entry["status"] = "secure"
+        entry["nextReview"] = None
+        entry["reviewStage"] = None
+    else:
+        # Schedule next review
+        delta_days = REVIEW_DELTAS[next_stage]
+        entry["status"] = "mastered"
+        entry["nextReview"] = (date.today() + __import__("datetime").timedelta(days=delta_days)).isoformat()
+        entry["reviewStage"] = next_stage
+
+
+def fail_review(pupil, skill_id):
+    """Mark a review as failed. Resets to active for re-practice."""
+    entry = pupil["currentSkills"].get(skill_id)
+    if not entry or not isinstance(entry, dict):
+        return
+    entry["status"] = "active"
+    entry["nextReview"] = None
+    entry["reviewStage"] = None
+
+
+def get_reviews_due(pupils_data, ladders_data, as_of_date=None):
+    """Get a list of reviews due today or overdue for all pupils.
+
+    Returns: [{pupil, skill_id, step, reviewStage, nextReview, overdue}]
+    """
+    as_of = as_of_date or date.today()
+    reviews = []
+    for p in pupils_data["pupils"]:
+        skills = p.get("currentSkills", {})
+        for skill_id, entry in skills.items():
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("nextReview"):
+                next_review = date.fromisoformat(entry["nextReview"])
+                if next_review <= as_of:
+                    step = get_step(ladders_data, skill_id)
+                    if step:
+                        reviews.append({
+                            "pupil": p,
+                            "skill_id": skill_id,
+                            "step": step,
+                            "reviewStage": entry.get("reviewStage", 0),
+                            "nextReview": entry["nextReview"],
+                            "overdue": (as_of - next_review).days,
+                        })
+    return reviews
+
+
+def skill_status(entry):
+    """Get the status string from a currentSkills entry, handling both old (str) and new (dict) formats."""
+    if isinstance(entry, str):
+        return entry
+    if isinstance(entry, dict):
+        return entry.get("status", "")
+    return ""
+
+
+def active_skills_for(pupil):
+    """Get dict of skill_id → entry for all active skills of a pupil."""
+    return {k: v for k, v in pupil.get("currentSkills", {}).items()
+            if skill_status(v) == "active"}
+
+
+def count_by_status(pupils_data, status):
+    """Count total skills with a given status across all pupils."""
+    count = 0
+    for p in pupils_data["pupils"]:
+        for entry in p.get("currentSkills", {}).values():
+            if skill_status(entry) == status:
+                count += 1
+    return count
+
+
 def ensure_data_files():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     PROBES_DIR.mkdir(parents=True, exist_ok=True)
