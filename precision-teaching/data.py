@@ -402,7 +402,8 @@ def save_probes(pupil_id, skill_id, probes_data):
     write_json(path, probes_data)
 
 
-def add_probe(pupil_id, skill_id, mode, correct, errors, items_shown, duration_sec, notes=""):
+def add_probe(pupil_id, skill_id, mode, correct, errors, items_shown, duration_sec, notes="", item_results=None):
+    """Add a probe record. item_results is a dict of {item: True/False} for per-item tracking."""
     probes_data = load_probes(pupil_id, skill_id)
     probe = {
         "date": date.today().isoformat(),
@@ -413,6 +414,8 @@ def add_probe(pupil_id, skill_id, mode, correct, errors, items_shown, duration_s
         "itemsShown": items_shown,
         "notes": notes,
     }
+    if item_results:
+        probe["itemResults"] = item_results
     probes_data["probes"].append(probe)
     save_probes(pupil_id, skill_id, probes_data)
     return probes_data
@@ -501,3 +504,130 @@ def ensure_data_files():
         save_pupils(default_pupils())
     if not (DATA_DIR / "skill-ladders.json").exists():
         save_ladders(default_skill_ladders())
+
+
+# ── Progress Calculation ────────────────────────────────────────────────────
+
+def get_baseline(probes_data):
+    """Return the first baseline probe, or None."""
+    baselines = [p for p in probes_data.get("probes", []) if p.get("mode") == "baseline"]
+    return baselines[0] if baselines else None
+
+
+def get_item_mastery(probes_data, step_items):
+    """Calculate per-item mastery from all probes.
+
+    Returns dict: {item: {"known": True/False, "firstKnown": "date"|None, "baselineKnown": bool}}
+    An item is 'known' if it was correct in the most recent probe it appeared in.
+    """
+    mastery = {}
+    for item in step_items:
+        mastery[item] = {"known": False, "firstKnown": None, "baselineKnown": False}
+
+    baseline = get_baseline(probes_data)
+    if baseline and "itemResults" in baseline:
+        for item, correct in baseline["itemResults"].items():
+            if item in mastery:
+                mastery[item]["baselineKnown"] = correct
+                mastery[item]["known"] = correct
+                if correct:
+                    mastery[item]["firstKnown"] = baseline["date"]
+
+    # Process all probes in order — most recent result wins
+    for probe in probes_data.get("probes", []):
+        if "itemResults" not in probe:
+            continue
+        for item, correct in probe["itemResults"].items():
+            if item in mastery:
+                mastery[item]["known"] = correct
+                if correct and mastery[item]["firstKnown"] is None:
+                    mastery[item]["firstKnown"] = probe["date"]
+
+    return mastery
+
+
+def get_progress_summary(probes_data, step):
+    """Get a progress summary for a pupil on a skill.
+
+    Returns: {
+        "baselineDate": str|None,
+        "baselineCorrect": int,
+        "baselineTotal": int,
+        "baselineCpm": float|None,
+        "latestDate": str|None,
+        "latestCorrect": int,
+        "latestTotal": int,
+        "latestCpm": float|None,
+        "newFactsLearned": int,   # items known now but not at baseline
+        "totalFactsKnown": int,   # items known now
+        "totalFacts": int,        # total items in skill
+        "improvementPct": float,  # % improvement from baseline to latest
+        "probesCount": int,
+        "timedProbesCount": int,
+    }
+    """
+    items = step["items"]
+    total_items = len(items)
+    probes = probes_data.get("probes", [])
+
+    baseline = get_baseline(probes_data)
+    timed_probes = [p for p in probes if p.get("mode") == "timed"]
+
+    # Baseline stats
+    baseline_date = baseline["date"] if baseline else None
+    baseline_correct = baseline["correct"] if baseline else 0
+    baseline_total = baseline["correct"] + baseline["errors"] if baseline else 0
+    baseline_cpm = None
+    if baseline and baseline.get("durationSec", 0) > 0:
+        baseline_cpm = round(baseline["correct"] / (baseline["durationSec"] / 60), 1)
+
+    # Baseline item-level
+    baseline_known_items = set()
+    if baseline and "itemResults" in baseline:
+        baseline_known_items = {item for item, correct in baseline["itemResults"].items() if correct}
+
+    # Latest probe stats
+    latest = probes[-1] if probes else None
+    latest_date = latest["date"] if latest else None
+    latest_correct = latest["correct"] if latest else 0
+    latest_total = (latest["correct"] + latest["errors"]) if latest else 0
+    latest_cpm = None
+    if latest and latest.get("durationSec", 0) > 0 and latest["mode"] == "timed":
+        latest_cpm = round(latest["correct"] / (latest["durationSec"] / 60), 1)
+
+    # Current item-level mastery
+    mastery = get_item_mastery(probes_data, items)
+    current_known = sum(1 for m in mastery.values() if m["known"])
+
+    # New facts = known now but not at baseline
+    new_facts = 0
+    for item in items:
+        if mastery[item]["known"] and item not in baseline_known_items:
+            new_facts += 1
+
+    # Improvement percentage
+    if baseline_cpm is not None and latest_cpm is not None and baseline_cpm > 0:
+        improvement_pct = round((latest_cpm - baseline_cpm) / baseline_cpm * 100, 1)
+    elif baseline_total > 0 and latest_total > 0:
+        baseline_acc = baseline_correct / baseline_total * 100 if baseline_total else 0
+        latest_acc = latest_correct / latest_total * 100 if latest_total else 0
+        improvement_pct = round(latest_acc - baseline_acc, 1)
+    else:
+        improvement_pct = 0
+
+    return {
+        "baselineDate": baseline_date,
+        "baselineCorrect": baseline_correct,
+        "baselineTotal": baseline_total,
+        "baselineCpm": baseline_cpm,
+        "latestDate": latest_date,
+        "latestCorrect": latest_correct,
+        "latestTotal": latest_total,
+        "latestCpm": latest_cpm,
+        "newFactsLearned": new_facts,
+        "totalFactsKnown": current_known,
+        "totalFacts": total_items,
+        "improvementPct": improvement_pct,
+        "probesCount": len(probes),
+        "timedProbesCount": len(timed_probes),
+    }

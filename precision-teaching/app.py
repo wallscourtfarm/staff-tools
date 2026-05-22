@@ -7,7 +7,7 @@ from data import (
     ensure_data_files, load_pupils, save_pupils, load_ladders, save_ladders,
     load_probes, add_probe, load_all_probes_for_pupil, get_all_steps, get_step,
     get_next_step, check_aim_met, add_pupil, get_pupil, git_pull, git_add_commit_push,
-    git_pending_commits, PROBES_DIR,
+    git_pending_commits, PROBES_DIR, get_baseline, get_item_mastery, get_progress_summary,
 )
 
 st.set_page_config(page_title="WFA Precision Teaching", page_icon="📊", layout="wide")
@@ -320,23 +320,144 @@ with tab2:
     pupils_data = st.session_state.pupils_data
     ladders_data = st.session_state.ladders_data
 
-    st.subheader("Add Pupil")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        first = st.text_input("First name", key="new_first")
-    with col2:
-        last = st.text_input("Last name", key="new_last")
-    with col3:
-        cls = st.text_input("Class", key="new_class")
+    add_mode = st.radio("Add pupils:", ["One at a time", "Bulk import"], horizontal=True, key="add_mode")
 
-    if st.button("Add Pupil", disabled=not first):
-        pupil = add_pupil(pupils_data, first, last, cls)
-        save_pupils(pupils_data)
-        filepath = str(DATA_DIR / "pupils.json").replace("/data/data/", "/data/")
-        from pathlib import Path
-        git_add_commit_push("data/pupils.json", f"Add pupil: {first} {last}")
-        st.success(f"Added {first} {last} (token: **{pupil['token']}**)")
-        st.rerun()
+    if add_mode == "One at a time":
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            first = st.text_input("First name", key="new_first")
+        with col2:
+            last = st.text_input("Last name", key="new_last")
+        with col3:
+            cls = st.text_input("Class", key="new_class")
+
+        if st.button("Add Pupil", disabled=not first):
+            pupil = add_pupil(pupils_data, first, last, cls)
+            save_pupils(pupils_data)
+            git_add_commit_push("data/pupils.json", f"Add pupil: {first} {last}")
+            st.success(f"Added {first} {last} (token: **{pupil['token']}**)")
+            st.rerun()
+
+    else:  # Bulk import
+        st.markdown("**Paste pupil names below** — one per line as `FirstName LastName [Class]`")
+        bulk_text = st.text_area("Pupil list", placeholder="Aaliyah Rehman IM\nBen Smith IM\nCharlotte Jones WU", height=150, key="bulk_pupils")
+        default_class = st.text_input("Default class (if not specified per line)", value="IM", key="bulk_class")
+
+        if st.button("Import All", disabled=not bulk_text.strip(), type="primary"):
+            lines = [l.strip() for l in bulk_text.strip().split("\n") if l.strip()]
+            added = 0
+            for line in lines:
+                parts = line.split()
+                if len(parts) >= 2:
+                    first_name = parts[0]
+                    last_name = parts[1]
+                    cls = parts[2] if len(parts) >= 3 else default_class
+                    add_pupil(pupils_data, first_name, last_name, cls)
+                    added += 1
+            if added:
+                save_pupils(pupils_data)
+                git_add_commit_push("data/pupils.json", f"Bulk import {added} pupils")
+                st.success(f"Added {added} pupil{'s' if added != 1 else ''}!")
+                st.rerun()
+
+    # ── Set Starting Points ──────────────────────────────────────────────
+
+    st.divider()
+    st.subheader("Set Starting Points")
+    st.caption("Mark what each pupil has already mastered and where they're currently working.")
+
+    if not pupils_data["pupils"]:
+        st.info("Add pupils first, then set their starting points.")
+    else:
+        pupil_options = [(p["id"], f"{p['firstName']} {p['lastName']}") for p in pupils_data["pupils"]]
+        sp_pupil = st.selectbox("Select pupil", pupil_options, format_func=lambda x: x[1], key="sp_pupil")
+        sp_pupil_id = sp_pupil[0] if sp_pupil else None
+
+        if sp_pupil_id:
+            sp_pupil_data = get_pupil(pupils_data, sp_pupil_id)
+            skills = sp_pupil_data.get("currentSkills", {})
+
+            for ladder in ladders_data["ladders"]:
+                with st.expander(f"{ladder['name']} ({ladder['subject']})"):
+                    # Find current position in this ladder
+                    current_active = None
+                    for step in ladder["steps"]:
+                        if skills.get(step["id"]) == "active":
+                            current_active = step
+
+                    if current_active:
+                        st.info(f"Currently working on: **{current_active['name']}**")
+                    elif any(skills.get(s["id"]) == "mastered" for s in ladder["steps"]):
+                        st.info("All mastered steps complete. Assign a new active skill below.")
+                    else:
+                        st.info("No skills assigned from this ladder yet.")
+
+                    # Visual ladder progression
+                    cols = st.columns(min(len(ladder["steps"]), 6))
+                    for i, step in enumerate(ladder["steps"]):
+                        with cols[i % len(cols)]:
+                            sid = step["id"]
+                            status = skills.get(sid)
+                            if status == "mastered":
+                                st.markdown(f"✅ **{step['name']}**")
+                            elif status == "active":
+                                st.markdown(f"🔵 **{step['name']}**")
+                            elif status == "upcoming":
+                                st.markdown(f"⬜ {step['name']}")
+                            else:
+                                st.markdown(f"— {step['name']}")
+
+                    # Quick set: "Mastered up to X" and "Currently working on Y"
+                    step_options = [(s["id"], s["name"]) for s in ladder["steps"]]
+                    step_options.insert(0, ("none", "— not assigned —"))
+
+                    # Pre-select current values
+                    current_mastered_id = "none"
+                    current_active_id = "none"
+                    for s in ladder["steps"]:
+                        if skills.get(s["id"]) == "mastered":
+                            current_mastered_id = s["id"]
+                        if skills.get(s["id"]) == "active":
+                            current_active_id = s["id"]
+
+                    col_a, col_b = st.columns(3)
+                    with col_a:
+                        mastered_up_to = st.selectbox(
+                            "Mastered up to",
+                            options=step_options,
+                            format_func=lambda x: x[1],
+                            key=f"mastered_{sp_pupil_id}_{ladder['id']}"
+                        )
+                    with col_b:
+                        active_skill = st.selectbox(
+                            "Currently working on",
+                            options=step_options,
+                            format_func=lambda x: x[1],
+                            key=f"active_{sp_pupil_id}_{ladder['id']}"
+                        )
+
+                    if st.button(f"Set starting point", key=f"set_sp_{sp_pupil_id}_{ladder['id']}"):
+                        # Clear all skills in this ladder first
+                        for step in ladder["steps"]:
+                            sp_pupil_data.setdefault("currentSkills", {}).pop(step["id"], None)
+
+                        # Set mastered steps (everything up to and including mastered_up_to)
+                        if mastered_up_to[0] != "none":
+                            for step in ladder["steps"]:
+                                sp_pupil_data["currentSkills"][step["id"]] = "mastered"
+                                if step["id"] == mastered_up_to[0]:
+                                    break
+
+                        # Set active skill
+                        if active_skill[0] != "none":
+                            sp_pupil_data["currentSkills"][active_skill[0]] = "active"
+
+                        save_pupils(pupils_data)
+                        git_add_commit_push("data/pupils.json", f"Set starting point for {sp_pupil_data['firstName']}: {ladder['name']}")
+                        st.success(f"Updated {ladder['name']} for {sp_pupil_data['firstName']}!")
+                        st.rerun()
+
+    # ── Pupil List ─────────────────────────────────────────────────────────
 
     st.divider()
     st.subheader("Pupils")
@@ -345,42 +466,28 @@ with tab2:
         st.info("No pupils added yet.")
     else:
         for p in pupils_data["pupils"]:
-            with st.expander(f"{p['firstName']} {p['lastName']} ({p.get('class', '—')}) — Token: `{p['token']}`"):
-                skills = p.get("currentSkills", {})
-                all_steps = get_all_steps(ladders_data)
+            skills = p.get("currentSkills", {})
+            active_count = sum(1 for v in skills.values() if v == "active")
+            mastered_count = sum(1 for v in skills.values() if v == "mastered")
+            label = f"{p['firstName']} {p['lastName']} ({p.get('class', '—')}) — {active_count} active, {mastered_count} mastered — Token: `{p['token']}`"
 
-                st.markdown("**Skill Assignments:**")
-                for ladder in ladders_data["ladders"]:
-                    step_ids = [s["id"] for s in ladder["steps"]]
-                    assigned = [s for s in step_ids if s in skills]
-                    current = [s for s in step_ids if skills.get(s) == "active"]
+            with st.expander(label):
+                if skills:
+                    st.markdown("**Current skills:**")
+                    for ladder in ladders_data["ladders"]:
+                        ladder_steps = []
+                        for step in ladder["steps"]:
+                            sid = step["id"]
+                            if sid in skills:
+                                status = skills[sid]
+                                icon = {"mastered": "✅", "active": "🔵", "upcoming": "⬜"}[status]
+                                ladder_steps.append(f"{icon} {step['name']}")
+                        if ladder_steps:
+                            st.markdown(f"**{ladder['name']}:** {' → '.join(ladder_steps)}")
+                else:
+                    st.info("No skills assigned yet. Use 'Set Starting Points' above.")
 
-                    cols = st.columns(len(ladder["steps"])[:6] if len(ladder["steps"]) > 6 else len(ladder["steps"]))
-                    for i, step in enumerate(ladder["steps"]):
-                        with cols[i % len(cols)]:
-                            status = skills.get(step["id"], "—")
-                            label = {"mastered": "✅", "active": "🔵", "upcoming": "⬜", "—": "—"} .get(status, "—")
-                            if st.button(f"{label} {step['name'][:15]}", key=f"skill_{p['id']}_{step['id']}"):
-                                pass
-
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    new_skill = st.selectbox(
-                        "Assign skill",
-                        options=[s["id"] for s in all_steps],
-                        format_func=lambda x: next((f"{s['ladder_name']}: {s['name']}" for s in all_steps if s["id"] == x), x),
-                        key=f"assign_{p['id']}"
-                    )
-                with col2:
-                    new_status = st.selectbox("Status", ["active", "upcoming", "mastered"], key=f"status_{p['id']}")
-                with col3:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("Assign", key=f"do_assign_{p['id']}"):
-                        p.setdefault("currentSkills", {})[new_skill] = new_status
-                        save_pupils(pupils_data)
-                        git_add_commit_push("data/pupils.json", f"Assign skill {new_skill} to {p['firstName']}")
-                        st.rerun()
-
+                # Remove pupil
                 if st.button(f"Remove {p['firstName']}", key=f"remove_{p['id']}"):
                     pupils_data["pupils"] = [pp for pp in pupils_data["pupils"] if pp["id"] != p["id"]]
                     save_pupils(pupils_data)
@@ -439,9 +546,57 @@ with tab4:
                         aim = step["aim"]
                         st.markdown(f"**Aim:** {aim['correctPerMin']} correct/min, max {aim['maxErrors']} errors, {aim['timedSec']}s")
 
-                        mode = st.radio("Assessment mode:", ["Timed Probe", "Untimed Check"], horizontal=True)
+                        # Check if baseline exists
+                        probes_data = load_probes(pupil_id, skill_id)
+                        has_baseline = any(p.get("mode") == "baseline" for p in probes_data.get("probes", []))
 
-                        if mode == "Timed Probe":
+                        mode = st.radio("Assessment mode:", ["Timed Probe", "Untimed Check", "Baseline Assessment"], horizontal=True)
+
+                        if mode == "Baseline Assessment":
+                            if has_baseline:
+                                st.warning("A baseline already exists for this skill. Recording a new baseline will replace the old one's position.")
+                            st.markdown(f"**Items ({len(step['items'])}):** Mark each item the pupil already knows.")
+                            st.caption("This records their starting point. Only items they can do confidently and quickly should be marked correct.")
+
+                            if "baseline_results" not in st.session_state:
+                                st.session_state.baseline_results = {item: None for item in step["items"]}
+
+                            results = st.session_state.baseline_results
+                            for item in step["items"]:
+                                current = results.get(item)
+                                col1, col2, col3 = st.columns([4, 1, 1])
+                                with col1:
+                                    emoji = "✅" if current is True else ("❌" if current is False else "⬜")
+                                    st.markdown(f"{emoji} **{item}**")
+                                with col2:
+                                    if st.button("✓", key=f"bl_correct_{item}"):
+                                        st.session_state.baseline_results[item] = True
+                                        st.rerun()
+                                with col3:
+                                    if st.button("✗", key=f"bl_incorrect_{item}"):
+                                        st.session_state.baseline_results[item] = False
+                                        st.rerun()
+
+                            answered = {k: v for k, v in results.items() if v is not None}
+                            if answered:
+                                correct = sum(1 for v in answered.values() if v)
+                                total = len(answered)
+                                st.metric("Known items", f"{correct}/{len(step['items'])}", f"{correct}/{total} assessed")
+
+                            if st.button("Save Baseline", use_container_width=True, type="primary"):
+                                answered = {k: v for k, v in results.items() if v is not None}
+                                correct = sum(1 for v in answered.values() if v)
+                                errors = sum(1 for v in answered.values() if not v)
+                                item_results = {k: v for k, v in results.items() if v is not None}
+                                add_probe(pupil_id, skill_id, "baseline", correct, errors, len(step["items"]), 0, "", item_results)
+                                filepath = str(PROBES_DIR / pupil_id / f"{skill_id}.json")
+                                git_add_commit_push(filepath, f"Baseline: {pupil['firstName']} {step['name']}")
+                                if "baseline_results" in st.session_state:
+                                    del st.session_state.baseline_results
+                                st.success("Baseline saved!")
+                                st.rerun()
+
+                        elif mode == "Timed Probe":
                             st.markdown(f"**Items ({len(step['items'])}):** {', '.join(step['items'][:12])}{'...' if len(step['items']) > 12 else ''}")
 
                             if "probe_active" not in st.session_state:
@@ -476,7 +631,8 @@ with tab4:
 
                                     notes = st.text_input("Notes (optional)", key="probe_notes")
                                     if st.button("Save Probe", use_container_width=True, type="primary"):
-                                        add_probe(pupil_id, skill_id, "timed", correct, errors, len(step["items"]), duration, notes)
+                                        item_results = {k: v for k, v in st.session_state.probe_results.items() if v is not None}
+                                        add_probe(pupil_id, skill_id, "timed", correct, errors, len(step["items"]), duration, notes, item_results)
                                         filepath = str(PROBES_DIR / pupil_id / f"{skill_id}.json")
                                         git_add_commit_push(filepath, f"Timed probe: {pupil['firstName']} {step['name']}")
 
@@ -570,7 +726,8 @@ with tab4:
                                 answered = {k: v for k, v in results.items() if v is not None}
                                 correct = sum(1 for v in answered.values() if v)
                                 errors = sum(1 for v in answered.values() if not v)
-                                add_probe(pupil_id, skill_id, "untimed", correct, errors, len(step["items"]), 0)
+                                item_results = dict(answered)
+                                add_probe(pupil_id, skill_id, "untimed", correct, errors, len(step["items"]), 0, "", item_results)
                                 filepath = str(PROBES_DIR / pupil_id / f"{skill_id}.json")
                                 git_add_commit_push(filepath, f"Untimed check: {pupil['firstName']} {step['name']}")
                                 if "untimed_results" in st.session_state:
@@ -592,32 +749,118 @@ with tab5:
         pupil_id = selected_pupil[0] if selected_pupil else None
 
         if pupil_id:
+            pupil = get_pupil(pupils_data, pupil_id)
             all_probes = load_all_probes_for_pupil(pupil_id)
-            skills = pupils_data["pupils"][[p["id"] for p in pupils_data["pupils"]].index(pupil_id)].get("currentSkills", {})
+            skills = pupil.get("currentSkills", {})
 
-            if not all_probes:
-                st.info("No probe data yet for this pupil.")
+            # Show all skills (mastered, active, upcoming) that have any data
+            skill_ids_with_data = set(all_probes.keys())
+            skill_ids_assigned = set(skills.keys())
+            all_skill_ids = skill_ids_with_data | skill_ids_assigned
+
+            if not all_skill_ids:
+                st.info("No skills assigned yet. Use the Pupils tab to set starting points, then run a baseline.")
             else:
-                skill_options = [(sid, f"{get_step(ladders_data, sid)['ladder_name']}: {get_step(ladders_data, sid)['name']}") for sid in all_probes if get_step(ladders_data, sid)]
+                # Overview: all skills with progress summaries
+                st.subheader("Progress Overview")
+                overview_rows = []
+                for skill_id in sorted(all_skill_ids):
+                    step = get_step(ladders_data, skill_id)
+                    if not step:
+                        continue
+                    status = skills.get(skill_id, "—")
+                    status_icon = {"mastered": "✅", "active": "🔵", "upcoming": "⬜", "—": "—"}.get(status, "—")
+                    probes_data = all_probes.get(skill_id, {"pupilId": pupil_id, "skillId": skill_id, "probes": []})
+                    summary = get_progress_summary(probes_data, step)
+                    overview_rows.append({
+                        "Skill": f"{status_icon} {step['name']}",
+                        "Ladder": step["ladder_name"],
+                        "Baseline": f"{summary['baselineCorrect']}/{summary['baselineTotal']}" if summary["baselineDate"] else "—",
+                        "Latest": f"{summary['latestCorrect']}/{summary['latestTotal']}" if summary["latestDate"] else "—",
+                        "Known": f"{summary['totalFactsKnown']}/{summary['totalFacts']}",
+                        "New facts": f"+{summary['newFactsLearned']}" if summary["newFactsLearned"] > 0 else "—",
+                        "Probes": summary["probesCount"],
+                    })
+                st.dataframe(overview_rows, use_container_width=True, hide_index=True)
+
+                st.divider()
+
+                # Detailed view for one skill
+                skill_options = []
+                for skill_id in sorted(all_skill_ids):
+                    step = get_step(ladders_data, skill_id)
+                    if step:
+                        status = skills.get(skill_id, "—")
+                        status_icon = {"mastered": "✅", "active": "🔵", "upcoming": "⬜", "—": "—"}.get(status, "—")
+                        skill_options.append((skill_id, f"{status_icon} {step['ladder_name']}: {step['name']}"))
+
                 if not skill_options:
                     st.info("No matching skill data.")
                 else:
-                    selected_skill = st.selectbox("Select skill", skill_options, format_func=lambda x: x[1], key="progress_skill")
+                    selected_skill = st.selectbox("View skill detail", skill_options, format_func=lambda x: x[1], key="progress_skill")
                     skill_id = selected_skill[0] if selected_skill else None
 
                     if skill_id:
                         step = get_step(ladders_data, skill_id)
-                        probes_data = all_probes[skill_id]
-                        probes = probes_data["probes"]
+                        probes_data = all_probes.get(skill_id, {"pupilId": pupil_id, "skillId": skill_id, "probes": []})
+                        probes = probes_data.get("probes", [])
+                        summary = get_progress_summary(probes_data, step)
 
+                        # Progress metrics
+                        col1, col2, col3, col4, col5 = st.columns(5)
+                        with col1:
+                            st.metric("Total facts", f"{summary['totalFactsKnown']}/{summary['totalFacts']}")
+                        with col2:
+                            st.metric("New facts learned", f"+{summary['newFactsLearned']}" if summary["newFactsLearned"] > 0 else "0")
+                        with col3:
+                            st.metric("Baseline", summary["baselineCpm"] or f"{summary['baselineCorrect']}/{summary['baselineTotal']}")
+                        with col4:
+                            st.metric("Latest", summary["latestCpm"] or f"{summary['latestCorrect']}/{summary['latestTotal']}")
+                        with col5:
+                            improvement = summary["improvementPct"]
+                            st.metric("Improvement", f"+{improvement}%" if improvement > 0 else f"{improvement}%")
+
+                        # Item-level mastery
                         if probes:
+                            mastery = get_item_mastery(probes_data, step["items"])
+                            baseline = get_baseline(probes_data)
+
+                            st.markdown("#### Item Mastery")
+                            known_new = []
+                            known_baseline = []
+                            unknown = []
+
+                            for item in step["items"]:
+                                m = mastery[item]
+                                if m["known"]:
+                                    if m["baselineKnown"]:
+                                        known_baseline.append(item)
+                                    else:
+                                        known_new.append((item, m.get("firstKnown", "?")))
+                                else:
+                                    unknown.append(item)
+
+                            if known_baseline:
+                                st.markdown(f"**Already known at baseline ({len(known_baseline)}):** {', '.join(known_baseline)}")
+                            if known_new:
+                                new_strs = [f"{item} (since {date})" for item, date in known_new]
+                                st.markdown(f"**Newly learned ({len(known_new)}):** {', '.join(new_strs)}")
+                            if unknown:
+                                st.markdown(f"**Still learning ({len(unknown)}):** {', '.join(unknown)}")
+
+                            # Progress bar
+                            known_pct = summary["totalFactsKnown"] / summary["totalFacts"] * 100 if summary["totalFacts"] > 0 else 0
+                            baseline_pct = len(known_baseline) / summary["totalFacts"] * 100 if summary["totalFacts"] > 0 else 0
+                            st.progress(known_pct / 100)
+                            st.caption(f"{known_pct:.0f}% known ({baseline_pct:.0f}% at baseline)")
+
+                            # Celeration chart
                             aim = step["aim"]
                             st.markdown(f"**Aim:** {aim['correctPerMin']}/min, max {aim['maxErrors']} errors")
 
                             try:
-                                import plotly.graph_objects as go
                                 from charts import celeration_chart
-                                fig = celeration_chart(probes, aim, step["name"], pupils_data["pupils"][[p["id"] for p in pupils_data["pupils"]].index(pupil_id)]["firstName"])
+                                fig = celeration_chart(probes, aim, step["name"], pupil["firstName"])
                                 st.plotly_chart(fig, use_container_width=True)
                             except ImportError:
                                 st.warning("Install plotly for charts: pip install plotly")
@@ -627,10 +870,10 @@ with tab5:
                             for p in reversed(probes):
                                 duration_min = p["durationSec"] / 60 if p.get("durationSec", 0) > 0 else None
                                 cpm = round(p["correct"] / duration_min, 1) if duration_min else "—"
-                                status = "timed" if p["mode"] == "timed" else "untimed"
+                                mode_label = {"timed": "Timed", "untimed": "Untimed", "baseline": "Baseline"}.get(p["mode"], p["mode"])
                                 rows.append({
                                     "Date": p["date"],
-                                    "Mode": status,
+                                    "Mode": mode_label,
                                     "Correct": p["correct"],
                                     "Errors": p["errors"],
                                     "CPM": cpm,
@@ -641,7 +884,7 @@ with tab5:
                             if check_aim_met(step, probes_data):
                                 st.success(f"🎯 {step['name']} — Aim achieved!")
                         else:
-                            st.info("No probes recorded yet for this skill.")
+                            st.info("No probes recorded yet. Run a baseline assessment to set the starting point.")
 
 # ── Tab 6: Print Grids ─────────────────────────────────────────────────────
 
