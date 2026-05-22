@@ -1,6 +1,7 @@
 """WFA Precision Teaching Grids — Streamlit app for fluency assessment and tracking."""
 
 import json
+from datetime import date
 import streamlit as st
 import time
 from data import (
@@ -8,6 +9,8 @@ from data import (
     load_probes, add_probe, load_all_probes_for_pupil, get_all_steps, get_step,
     get_next_step, check_aim_met, add_pupil, get_pupil, git_pull, git_add_commit_push,
     git_pending_commits, PROBES_DIR, get_baseline, get_item_mastery, get_progress_summary,
+    get_skill_status, set_skill_status, pass_review, fail_review, get_reviews_due,
+    migrate_skills_format, skill_status, active_skills_for, count_by_status,
 )
 
 st.set_page_config(page_title="WFA Precision Teaching", page_icon="📊", layout="wide")
@@ -59,6 +62,14 @@ if "pupils_data" not in st.session_state:
     git_pull()
     st.session_state.pupils_data = load_pupils()
     st.session_state.ladders_data = load_ladders()
+    # Migrate old string-format currentSkills to new object format
+    migrated = False
+    for p in st.session_state.pupils_data["pupils"]:
+        if migrate_skills_format(p):
+            migrated = True
+    if migrated:
+        save_pupils(st.session_state.pupils_data)
+        git_add_commit_push("data/pupils.json", "Migrate skills to new review format")
 
 
 # ── Self-Assessment Mode ───────────────────────────────────────────────────
@@ -79,7 +90,7 @@ if query_params.get("mode") == "self_assess":
 
     st.title(f"Hi {pupil['firstName']}! 👋")
 
-    active_skills = {k: v for k, v in pupil.get("currentSkills", {}).items() if v == "active"}
+    active_skills = active_skills_for(pupil)
     if not active_skills:
         st.info("No skills assigned yet. Ask your teacher to set up your practice.")
         st.stop()
@@ -265,24 +276,21 @@ with tab1:
     pupils_data = st.session_state.pupils_data
     ladders_data = st.session_state.ladders_data
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     total_pupils = len(pupils_data["pupils"])
-    active_skills = sum(
-        sum(1 for s in p.get("currentSkills", {}).values() if s == "active")
-        for p in pupils_data["pupils"]
-    )
-    mastered = sum(
-        sum(1 for s in p.get("currentSkills", {}).values() if s == "mastered")
-        for p in pupils_data["pupils"]
-    )
+    active_count = count_by_status(pupils_data, "active")
+    mastered_count = count_by_status(pupils_data, "mastered") + count_by_status(pupils_data, "secure")
+    reviews_due = get_reviews_due(pupils_data, ladders_data)
 
     with col1:
         st.markdown(f'<div class="metric-card"><h2>{total_pupils}</h2><p>Pupils</p></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown(f'<div class="metric-card"><h2>{active_skills}</h2><p>Active Skills</p></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><h2>{active_count}</h2><p>Active Skills</p></div>', unsafe_allow_html=True)
     with col3:
-        st.markdown(f'<div class="metric-card"><h2>{mastered}</h2><p>Mastered</p></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><h2>{mastered_count}</h2><p>Mastered</p></div>', unsafe_allow_html=True)
     with col4:
+        st.markdown(f'<div class="metric-card"><h2>{len(reviews_due)}</h2><p>Reviews Due</p></div>', unsafe_allow_html=True)
+    with col5:
         st.markdown(f'<div class="metric-card"><h2>—</h2><p>Avg Celeration</p></div>', unsafe_allow_html=True)
 
     st.divider()
@@ -293,7 +301,9 @@ with tab1:
         rows = []
         for p in pupils_data["pupils"]:
             skills = p.get("currentSkills", {})
-            active = [s for s, v in skills.items() if v == "active"]
+            active = [s for s, entry in skills.items()
+                      if (isinstance(entry, dict) and entry.get("status") == "active") or
+                         (isinstance(entry, str) and entry == "active")]
             latest = ""
             if active:
                 skill_id = active[0]
@@ -309,10 +319,41 @@ with tab1:
                 "Name": f"{p['firstName']} {p['lastName']}",
                 "Class": p.get("class", ""),
                 "Active Skills": len(active),
-                "Mastered": sum(1 for v in skills.values() if v == "mastered"),
+                "Mastered": sum(1 for entry in skills.values()
+                               if (isinstance(entry, dict) and entry.get("status") in ("mastered", "secure")) or
+                                  (isinstance(entry, str) and entry == "mastered")),
                 "Latest": latest,
             })
         st.dataframe(rows, use_container_width=True, hide_index=True)
+
+    # ── Reviews Due ──────────────────────────────────────────────────────────
+
+    st.divider()
+    st.subheader("Reviews Due")
+    if reviews_due:
+        for review in reviews_due:
+            p = review["pupil"]
+            step = review["step"]
+            stage = review["reviewStage"]
+            stage_labels = {0: "1 week", 1: "2 weeks", 2: "1 month"}
+            overdue = review["overdue"]
+            overdue_text = f" ({overdue}d overdue)" if overdue > 0 else ""
+            col1, col2, col3 = st.columns([3, 2, 1])
+            with col1:
+                st.markdown(f"**{p['firstName']} {p['lastName']}** — {step['ladder_name']}: {step['name']}")
+            with col2:
+                stage_label = stage_labels.get(stage, "?")
+                if overdue > 0:
+                    st.warning(f"{stage_label} review{overdue_text}")
+                else:
+                    st.info(f"{stage_label} review")
+            with col3:
+                if st.button("Review", key=f"review_{p['id']}_{review['skill_id']}"):
+                    st.session_state.review_pupil_id = p["id"]
+                    st.session_state.review_skill_id = review["skill_id"]
+                    st.rerun()
+    else:
+        st.success("No reviews due today ✓")
 
 # ── Tab 2: Pupils ──────────────────────────────────────────────────────────
 
@@ -384,11 +425,13 @@ with tab2:
                     for i, step in enumerate(ladder["steps"]):
                         with cols[i % len(cols)]:
                             sid = step["id"]
-                            status = skills.get(sid)
+                            status = skill_status(skills.get(sid, ""))
                             if status == "mastered":
                                 st.markdown(f"✅ **{step['name']}**")
                             elif status == "active":
                                 st.markdown(f"🔵 **{step['name']}**")
+                            elif status == "secure":
+                                st.markdown(f"🟢 **{step['name']}**")
                             else:
                                 st.markdown(f"⬜ {step['name']}")
 
@@ -445,10 +488,10 @@ with tab2:
                             for step in ladder["steps"]:
                                 if step["id"] == selected_step_id:
                                     break
-                                sp_pupil_data["currentSkills"][step["id"]] = "mastered"
+                                set_skill_status(sp_pupil_data, step["id"], "mastered")
 
                             # Set selected step as active
-                            sp_pupil_data["currentSkills"][selected_step_id] = "active"
+                            set_skill_status(sp_pupil_data, selected_step_id, "active")
 
                             # Save a baseline probe for this skill with per-item data
                             step_data = None
@@ -482,8 +525,8 @@ with tab2:
     else:
         for p in pupils_data["pupils"]:
             skills = p.get("currentSkills", {})
-            active_count = sum(1 for v in skills.values() if v == "active")
-            mastered_count = sum(1 for v in skills.values() if v == "mastered")
+            active_count = sum(1 for v in skills.values() if skill_status(v) == "active")
+            mastered_count = sum(1 for v in skills.values() if skill_status(v) in ("mastered", "secure"))
             label = f"{p['firstName']} {p['lastName']} ({p.get('class', '—')}) — {active_count} active, {mastered_count} mastered — Token: `{p['token']}`"
 
             with st.expander(label):
@@ -494,8 +537,8 @@ with tab2:
                         for step in ladder["steps"]:
                             sid = step["id"]
                             if sid in skills:
-                                status = skills[sid]
-                                icon = {"mastered": "✅", "active": "🔵", "upcoming": "⬜"}[status]
+                                s = skill_status(skills[sid])
+                                icon = {"mastered": "✅", "active": "🔵", "secure": "🟢", "upcoming": "⬜"}.get(s, "—")
                                 ladder_steps.append(f"{icon} {step['name']}")
                         if ladder_steps:
                             st.markdown(f"**{ladder['name']}:** {' → '.join(ladder_steps)}")
@@ -539,7 +582,7 @@ with tab4:
 
         if pupil_id:
             pupil = get_pupil(pupils_data, pupil_id)
-            active_skills = {k: v for k, v in pupil.get("currentSkills", {}).items() if v == "active"}
+            active_skills = active_skills_for(pupil)
 
             if not active_skills:
                 st.info(f"No active skills for {pupil['firstName']}. Assign skills in the Pupils tab.")
@@ -654,8 +697,8 @@ with tab4:
                                         if aim_met:
                                             next_step = get_next_step(ladders_data, skill_id)
                                             if next_step:
-                                                pupil["currentSkills"][skill_id] = "mastered"
-                                                pupil["currentSkills"][next_step["id"]] = "active"
+                                                set_skill_status(pupil, skill_id, "mastered")
+                                                set_skill_status(pupil, next_step["id"], "active")
                                                 save_pupils(pupils_data)
                                                 git_add_commit_push("data/pupils.json", f"Progress {pupil['firstName']}: {step['name']} → {next_step['name']}")
 
@@ -783,8 +826,8 @@ with tab5:
                     step = get_step(ladders_data, skill_id)
                     if not step:
                         continue
-                    status = skills.get(skill_id, "—")
-                    status_icon = {"mastered": "✅", "active": "🔵", "upcoming": "⬜", "—": "—"}.get(status, "—")
+                    status = skill_status(skills.get(skill_id, ""))
+                    status_icon = {"mastered": "✅", "active": "🔵", "secure": "🟢", "upcoming": "⬜"}.get(status, "—")
                     probes_data = all_probes.get(skill_id, {"pupilId": pupil_id, "skillId": skill_id, "probes": []})
                     summary = get_progress_summary(probes_data, step)
                     overview_rows.append({
@@ -805,8 +848,8 @@ with tab5:
                 for skill_id in sorted(all_skill_ids):
                     step = get_step(ladders_data, skill_id)
                     if step:
-                        status = skills.get(skill_id, "—")
-                        status_icon = {"mastered": "✅", "active": "🔵", "upcoming": "⬜", "—": "—"}.get(status, "—")
+                        status = skill_status(skills.get(skill_id, ""))
+                        status_icon = {"mastered": "✅", "active": "🔵", "secure": "🟢", "upcoming": "⬜"}.get(status, "—")
                         skill_options.append((skill_id, f"{status_icon} {step['ladder_name']}: {step['name']}"))
 
                 if not skill_options:
@@ -862,6 +905,25 @@ with tab5:
                                 st.markdown(f"**Newly learned ({len(known_new)}):** {', '.join(new_strs)}")
                             if unknown:
                                 st.markdown(f"**Still learning ({len(unknown)}):** {', '.join(unknown)}")
+
+                            # Review schedule
+                            skill_entry = skills.get(skill_id, {})
+                            if isinstance(skill_entry, dict):
+                                review_date = skill_entry.get("nextReview")
+                                review_stage = skill_entry.get("reviewStage")
+                                s_status = skill_entry.get("status", "")
+                                if s_status == "secure":
+                                    st.success("Fully secure — no more reviews needed")
+                                elif s_status == "mastered" and review_date:
+                                    stage_labels = {0: "1 week", 1: "2 weeks", 2: "1 month"}
+                                    review_label = stage_labels.get(review_stage, "?")
+                                    overdue = (date.today() - date.fromisoformat(review_date)).days
+                                    if overdue > 0:
+                                        st.warning(f"Review overdue! ({review_label} review was due {overdue}d ago)")
+                                    elif overdue == 0:
+                                        st.info(f"Review due today ({review_label} review)")
+                                    else:
+                                        st.caption(f"Next review: {review_date} ({review_label})")
 
                             # Progress bar
                             known_pct = summary["totalFactsKnown"] / summary["totalFacts"] * 100 if summary["totalFacts"] > 0 else 0
