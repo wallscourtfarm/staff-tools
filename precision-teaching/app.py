@@ -364,7 +364,7 @@ with tab2:
 
     st.divider()
     st.subheader("Set Starting Points")
-    st.caption("Mark what each pupil has already mastered and where they're currently working.")
+    st.caption("Choose where each pupil is working. Prior steps are marked mastered automatically. Mark which individual items they already know within their current skill.")
 
     if not pupils_data["pupils"]:
         st.info("Add pupils first, then set their starting points.")
@@ -379,19 +379,6 @@ with tab2:
 
             for ladder in ladders_data["ladders"]:
                 with st.expander(f"{ladder['name']} ({ladder['subject']})"):
-                    # Find current position in this ladder
-                    current_active = None
-                    for step in ladder["steps"]:
-                        if skills.get(step["id"]) == "active":
-                            current_active = step
-
-                    if current_active:
-                        st.info(f"Currently working on: **{current_active['name']}**")
-                    elif any(skills.get(s["id"]) == "mastered" for s in ladder["steps"]):
-                        st.info("All mastered steps complete. Assign a new active skill below.")
-                    else:
-                        st.info("No skills assigned from this ladder yet.")
-
                     # Visual ladder progression
                     cols = st.columns(min(len(ladder["steps"]), 6))
                     for i, step in enumerate(ladder["steps"]):
@@ -402,58 +389,86 @@ with tab2:
                                 st.markdown(f"✅ **{step['name']}**")
                             elif status == "active":
                                 st.markdown(f"🔵 **{step['name']}**")
-                            elif status == "upcoming":
-                                st.markdown(f"⬜ {step['name']}")
                             else:
-                                st.markdown(f"— {step['name']}")
+                                st.markdown(f"⬜ {step['name']}")
 
-                    # Quick set: "Mastered up to X" and "Currently working on Y"
+                    # One dropdown: "Where is this pupil working?"
+                    # Selecting a step marks all prior steps as mastered, this one as active
                     step_options = [(s["id"], s["name"]) for s in ladder["steps"]]
                     step_options.insert(0, ("none", "— not assigned —"))
 
-                    # Pre-select current values
-                    current_mastered_id = "none"
-                    current_active_id = "none"
+                    current_step_id = "none"
                     for s in ladder["steps"]:
-                        if skills.get(s["id"]) == "mastered":
-                            current_mastered_id = s["id"]
                         if skills.get(s["id"]) == "active":
-                            current_active_id = s["id"]
+                            current_step_id = s["id"]
 
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        mastered_up_to = st.selectbox(
-                            "Mastered up to",
-                            options=step_options,
-                            format_func=lambda x: x[1],
-                            key=f"mastered_{sp_pupil_id}_{ladder['id']}"
-                        )
-                    with col_b:
-                        active_skill = st.selectbox(
-                            "Currently working on",
-                            options=step_options,
-                            format_func=lambda x: x[1],
-                            key=f"active_{sp_pupil_id}_{ladder['id']}"
-                        )
+                    selected_step = st.selectbox(
+                        "Currently working on",
+                        options=step_options,
+                        index=[o[0] for o in step_options].index(current_step_id) if current_step_id in [o[0] for o in step_options] else 0,
+                        format_func=lambda x: x[1],
+                        key=f"active_{sp_pupil_id}_{ladder['id']}"
+                    )
+
+                    # Per-item baseline within the selected skill
+                    selected_step_id = selected_step[0]
+                    item_defaults = {}
+                    if selected_step_id != "none":
+                        selected_step_data = None
+                        for s in ladder["steps"]:
+                            if s["id"] == selected_step_id:
+                                selected_step_data = s
+                                break
+
+                        if selected_step_data:
+                            st.markdown(f"**Items in {selected_step_data['name']}:** Tick the ones {sp_pupil_data['firstName']} already knows confidently.")
+                            # Load any existing baseline for this skill
+                            existing_probes = load_probes(sp_pupil_id, selected_step_id)
+                            existing_baseline = get_baseline(existing_probes)
+                            if existing_baseline and "itemResults" in existing_baseline:
+                                item_defaults = existing_baseline["itemResults"]
+
+                            known_items = st.multiselect(
+                                "Known items",
+                                options=selected_step_data["items"],
+                                default=[k for k, v in item_defaults.items() if v] if item_defaults else [],
+                                key=f"known_items_{sp_pupil_id}_{selected_step_id}"
+                            )
 
                     if st.button(f"Set starting point", key=f"set_sp_{sp_pupil_id}_{ladder['id']}"):
-                        # Clear all skills in this ladder first
+                        # Clear all skills in this ladder
                         for step in ladder["steps"]:
                             sp_pupil_data.setdefault("currentSkills", {}).pop(step["id"], None)
 
-                        # Set mastered steps (everything up to and including mastered_up_to)
-                        if mastered_up_to[0] != "none":
+                        if selected_step_id != "none":
+                            # Mark all steps before the selected one as mastered
                             for step in ladder["steps"]:
-                                sp_pupil_data["currentSkills"][step["id"]] = "mastered"
-                                if step["id"] == mastered_up_to[0]:
+                                if step["id"] == selected_step_id:
                                     break
+                                sp_pupil_data["currentSkills"][step["id"]] = "mastered"
 
-                        # Set active skill
-                        if active_skill[0] != "none":
-                            sp_pupil_data["currentSkills"][active_skill[0]] = "active"
+                            # Set selected step as active
+                            sp_pupil_data["currentSkills"][selected_step_id] = "active"
+
+                            # Save a baseline probe for this skill with per-item data
+                            step_data = None
+                            for s in ladder["steps"]:
+                                if s["id"] == selected_step_id:
+                                    step_data = s
+                                    break
+                            if step_data:
+                                known_set = set(known_items) if selected_step_id != "none" else set()
+                                item_results = {item: (item in known_set) for item in step_data["items"]}
+                                correct = sum(1 for v in item_results.values() if v)
+                                errors = sum(1 for v in item_results.values() if not v)
+                                add_probe(sp_pupil_id, selected_step_id, "baseline", correct, errors, len(step_data["items"]), 0, "", item_results)
 
                         save_pupils(pupils_data)
+                        # Commit both pupils.json and any probe files
                         git_add_commit_push("data/pupils.json", f"Set starting point for {sp_pupil_data['firstName']}: {ladder['name']}")
+                        if selected_step_id != "none":
+                            filepath = str(PROBES_DIR / sp_pupil_id / f"{selected_step_id}.json")
+                            git_add_commit_push(filepath, f"Baseline for {sp_pupil_data['firstName']}: {selected_step_id}")
                         st.success(f"Updated {ladder['name']} for {sp_pupil_data['firstName']}!")
                         st.rerun()
 
