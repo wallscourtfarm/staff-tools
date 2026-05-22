@@ -420,7 +420,7 @@ with tab2:
                         if skills.get(s["id"]) == "active":
                             current_active_id = s["id"]
 
-                    col_a, col_b = st.columns(3)
+                    col_a, col_b = st.columns(2)
                     with col_a:
                         mastered_up_to = st.selectbox(
                             "Mastered up to",
