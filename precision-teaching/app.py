@@ -14,6 +14,109 @@ from data import (
     generate_sheet, get_answer, get_review_items,
 )
 
+# ── PDF Helper ────────────────────────────────────────────────────────────────
+
+def _build_grid_elements(p, sheet, styles, title_style, info_style, answer_style, include_answers, usable_w):
+    """Build PDF elements for a single grid."""
+    from reportlab.lib.units import mm
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib import colors
+
+    elements = []
+
+    # Title line: Name | Skill | Date
+    title = f"{p['firstName']} {p['lastName']} &nbsp;&nbsp;|&nbsp;&nbsp; {sheet['skill_name']} &nbsp;&nbsp;|&nbsp;&nbsp; {date.today().strftime('%d/%m/%y')}"
+    elements.append(Paragraph(title, title_style))
+
+    aim = sheet["aim"]
+    info = f"Aim: {aim['correctPerMin']}/min &nbsp;&bull;&nbsp; Max {aim['maxErrors']} errors &nbsp;&bull;&nbsp; {aim['timedSec']}s"
+    elements.append(Paragraph(info, info_style))
+    elements.append(Spacer(1, 2*mm))
+
+    questions = sheet["questions"]
+
+    if sheet["subject"] == "maths":
+        table_data = []
+        for i, q in enumerate(questions):
+            num = i + 1
+            review_mark = " *" if q.get("is_review") else ""
+            table_data.append([f"{num}.", f"{q['question']} ={review_mark}", ""])
+
+        half = (len(table_data) + 1) // 2
+        left_rows = table_data[:half]
+        right_rows = table_data[half:]
+
+        combined = []
+        for row_i in range(half):
+            left = left_rows[row_i] if row_i < len(left_rows) else ["", "", ""]
+            right = right_rows[row_i] if row_i < len(right_rows) else ["", "", ""]
+            combined.append(left + right)
+
+        col_w = usable_w / 2 - 2*mm
+        t = Table(combined, colWidths=[8*mm, col_w - 28*mm, 20*mm, 8*mm, col_w - 28*mm, 20*mm])
+        t.setStyle(TableStyle([
+            ('FONT', (0, 0), (-1, -1), 'Helvetica', 9),
+            ('FONT', (0, 0), (0, -1), 'Helvetica-Bold', 9),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LINEBELOW', (2, 0), (2, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
+            ('LINEBELOW', (5, 0), (5, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+            ('ROWBACKGROUNDS', (0, 0), (2, -1), [colors.white, colors.Color(0.97, 0.97, 0.97)]),
+            ('ROWBACKGROUNDS', (3, 0), (5, -1), [colors.white, colors.Color(0.97, 0.97, 0.97)]),
+        ]))
+        elements.append(t)
+
+        if include_answers:
+            answers_left = ", ".join(f"{q['question']}={q['answer']}" for q in questions[:half])
+            answers_right = ", ".join(f"{q['question']}={q['answer']}" for q in questions[half:])
+            elements.append(Spacer(1, 1*mm))
+            elements.append(Paragraph(f"Answers: {answers_left}", answer_style))
+            elements.append(Paragraph(f"Answers: {answers_right}", answer_style))
+
+    elif sheet["subject"] == "phonics":
+        cols = 8
+        gpcs = [q["question"] for q in questions]
+        while len(gpcs) % cols != 0:
+            gpcs.append("")
+
+        table_data = []
+        for i in range(0, len(gpcs), cols):
+            table_data.append(gpcs[i:i+cols])
+
+        col_w = usable_w / cols
+        t = Table(table_data, colWidths=[col_w]*cols)
+        t.setStyle(TableStyle([
+            ('FONT', (0, 0), (-1, -1), 'Helvetica', 14),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.Color(0.7, 0.7, 0.7)),
+            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.Color(0.85, 0.85, 0.85)),
+            ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.Color(0.96, 0.96, 0.96)]),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(t)
+
+    else:  # spellings
+        table_data = []
+        for i, q in enumerate(questions):
+            review_mark = " *" if q.get("is_review") else ""
+            table_data.append([f"{i+1}.", f"____{review_mark}", ""])
+
+        t = Table(table_data, colWidths=[10*mm, usable_w - 60*mm, 50*mm])
+        t.setStyle(TableStyle([
+            ('FONT', (0, 0), (-1, -1), 'Helvetica', 10),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LINEBELOW', (1, 0), (2, -1), 0.5, colors.Color(0.75, 0.75, 0.75)),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        elements.append(t)
+
+    return elements
+
+
 st.set_page_config(page_title="WFA Precision Teaching", page_icon="📊", layout="wide")
 
 # ── Custom CSS ──────────────────────────────────────────────────────────────
@@ -1351,112 +1454,3 @@ with tab6:
                         )
                     except ImportError:
                         st.error("Install reportlab for PDF generation: pip install reportlab")
-
-
-def _build_grid_elements(p, sheet, styles, title_style, info_style, answer_style, include_answers, usable_w):
-    """Build PDF elements for a single grid."""
-    from reportlab.lib.units import mm
-    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib import colors
-
-    elements = []
-
-    # Title line: Name | Skill | Date
-    title = f"{p['firstName']} {p['lastName']} &nbsp;&nbsp;|&nbsp;&nbsp; {sheet['skill_name']} &nbsp;&nbsp;|&nbsp;&nbsp; {date.today().strftime('%d/%m/%y')}"
-    elements.append(Paragraph(title, title_style))
-
-    aim = sheet["aim"]
-    info = f"Aim: {aim['correctPerMin']}/min &nbsp;&bull;&nbsp; Max {aim['maxErrors']} errors &nbsp;&bull;&nbsp; {aim['timedSec']}s"
-    elements.append(Paragraph(info, info_style))
-    elements.append(Spacer(1, 2*mm))
-
-    questions = sheet["questions"]
-
-    if sheet["subject"] == "maths":
-        # Two-column layout: question | answer box
-        # Compact: number + question + = _____
-        table_data = []
-        for i, q in enumerate(questions):
-            num = i + 1
-            review_mark = " *" if q.get("is_review") else ""
-            table_data.append([f"{num}.", f"{q['question']} ={review_mark}", ""])
-
-        # Split into two columns side by side
-        half = (len(table_data) + 1) // 2
-        left_rows = table_data[:half]
-        right_rows = table_data[half:]
-
-        # Build a combined table: left_col | gap | right_col
-        combined = []
-        for row_i in range(half):
-            left = left_rows[row_i] if row_i < len(left_rows) else ["", "", ""]
-            right = right_rows[row_i] if row_i < len(right_rows) else ["", "", ""]
-            combined.append(left + right)
-
-        col_w = usable_w / 2 - 2*mm
-        t = Table(combined, colWidths=[8*mm, col_w - 28*mm, 20*mm, 8*mm, col_w - 28*mm, 20*mm])
-        t.setStyle(TableStyle([
-            ('FONT', (0, 0), (-1, -1), 'Helvetica', 9),
-            ('FONT', (0, 0), (0, -1), 'Helvetica-Bold', 9),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LINEBELOW', (2, 0), (2, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
-            ('LINEBELOW', (5, 0), (5, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
-            ('TOPPADDING', (0, 0), (-1, -1), 1),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-            ('ROWBACKGROUNDS', (0, 0), (2, -1), [colors.white, colors.Color(0.97, 0.97, 0.97)]),
-            ('ROWBACKGROUNDS', (3, 0), (5, -1), [colors.white, colors.Color(0.97, 0.97, 0.97)]),
-        ]))
-        elements.append(t)
-
-        if include_answers:
-            # Compact answer key
-            answers_left = ", ".join(f"{q['question']}={q['answer']}" for q in questions[:half])
-            answers_right = ", ".join(f"{q['question']}={q['answer']}" for q in questions[half:])
-            elements.append(Spacer(1, 1*mm))
-            elements.append(Paragraph(f"Answers: {answers_left}", answer_style))
-            elements.append(Paragraph(f"Answers: {answers_right}", answer_style))
-
-    elif sheet["subject"] == "phonics":
-        # Grid of GPCs in a compact table
-        cols = 8
-        gpcs = [q["question"] for q in questions]
-        # Pad to fill grid
-        while len(gpcs) % cols != 0:
-            gpcs.append("")
-
-        table_data = []
-        for i in range(0, len(gpcs), cols):
-            table_data.append(gpcs[i:i+cols])
-
-        col_w = usable_w / cols
-        t = Table(table_data, colWidths=[col_w]*cols)
-        t.setStyle(TableStyle([
-            ('FONT', (0, 0), (-1, -1), 'Helvetica', 14),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('BOX', (0, 0), (-1, -1), 0.5, colors.Color(0.7, 0.7, 0.7)),
-            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.Color(0.85, 0.85, 0.85)),
-            ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.Color(0.96, 0.96, 0.96)]),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
-        elements.append(t)
-
-    else:  # spellings
-        # Compact list: number + word (TTS reminder) + writing line
-        table_data = []
-        for i, q in enumerate(questions):
-            review_mark = " *" if q.get("is_review") else ""
-            table_data.append([f"{i+1}.", f"____{review_mark}", ""])
-
-        t = Table(table_data, colWidths=[10*mm, usable_w - 60*mm, 50*mm])
-        t.setStyle(TableStyle([
-            ('FONT', (0, 0), (-1, -1), 'Helvetica', 10),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LINEBELOW', (1, 0), (2, -1), 0.5, colors.Color(0.75, 0.75, 0.75)),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ]))
-        elements.append(t)
-
-    return elements
