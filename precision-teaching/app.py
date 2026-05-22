@@ -11,6 +11,7 @@ from data import (
     git_pending_commits, PROBES_DIR, get_baseline, get_item_mastery, get_progress_summary,
     get_skill_status, set_skill_status, pass_review, fail_review, get_reviews_due,
     migrate_skills_format, skill_status, active_skills_for, count_by_status,
+    generate_sheet, get_answer, get_review_items,
 )
 
 st.set_page_config(page_title="WFA Precision Teaching", page_icon="📊", layout="wide")
@@ -107,119 +108,329 @@ if query_params.get("mode") == "self_assess":
 
     if skill_id:
         step = get_step(ladders_data, skill_id)
-        st.subheader(step["name"])
+        sheet = generate_sheet(pupil, skill_id, ladders_data)
 
-        mode = st.radio("Choose your activity:", ["Timed Probe", "Accuracy Check"], horizontal=True)
+        # Determine subject for mode-specific UI
+        ladder = None
+        for l in ladders_data["ladders"]:
+            if l["id"] == step["ladder_id"]:
+                ladder = l
+                break
+        subject = ladder["subject"] if ladder else "maths"
 
-        if mode == "Timed Probe":
+        # ── MATHS MODE: Auto-marking timed probe ──────────────────────────
+        if subject == "maths":
+            st.subheader(f"🔢 {step['name']}")
             aim = step["aim"]
             st.markdown(f"**Aim:** {aim['correctPerMin']} correct per minute, max {aim['maxErrors']} errors")
+            st.caption(f"You'll have {aim['timedSec']} seconds. Type your answer for each question.")
 
-            if "self_assess_start" not in st.session_state:
-                if st.button("Start! 🚀", use_container_width=True):
-                    st.session_state.self_assess_start = time.time()
-                    st.session_state.self_assess_items = step["items"][:]
-                    st.session_state.self_assess_results = []
-                    st.session_state.self_assess_idx = 0
+            if "maths_start" not in st.session_state:
+                if st.button("Start! 🚀", use_container_width=True, type="primary"):
+                    st.session_state.maths_start = time.time()
+                    st.session_state.maths_questions = sheet["questions"]
+                    st.session_state.maths_answers = {}
+                    st.session_state.maths_idx = 0
                     st.rerun()
 
-            if "self_assess_start" in st.session_state:
-                elapsed = time.time() - st.session_state.self_assess_start
+            if "maths_start" in st.session_state:
+                elapsed = time.time() - st.session_state.maths_start
                 remaining = max(0, aim["timedSec"] - elapsed)
+                questions = st.session_state.maths_questions
 
                 if remaining <= 0:
-                    results = st.session_state.self_assess_results
+                    # Time's up — auto-mark
+                    answers = st.session_state.maths_answers
+                    correct = 0
+                    errors = 0
+                    item_results = {}
+                    for q in questions:
+                        user_answer = str(answers.get(q["question"], "")).strip().lower()
+                        expected = str(q["answer"]).strip().lower()
+                        is_correct = user_answer == expected
+                        if is_correct:
+                            correct += 1
+                        else:
+                            errors += 1
+                        item_results[q["question"]] = is_correct
+
+                    duration = aim["timedSec"]
+                    cpm = round(correct / (duration / 60), 1) if duration > 0 else 0
+                    aim_met = cpm >= aim["correctPerMin"] and errors <= aim["maxErrors"]
+
+                    st.markdown("### Time's up!")
+                    st.metric("Correct per minute", cpm)
+                    st.metric("Correct", correct)
+                    st.metric("Errors", errors)
+
+                    if aim_met:
+                        st.balloons()
+                        st.success(f"🎯 Well done {pupil['firstName']}! Aim achieved!")
+                    else:
+                        st.info(f"Keep practising — you got {correct} right. You'll get there!")
+
+                    # Show which ones were wrong
+                    wrong = [q for q in questions if not item_results.get(q["question"], False)]
+                    if wrong:
+                        with st.expander("Questions to practise"):
+                            for q in wrong:
+                                st.markdown(f"❌ **{q['question']}** = {q['answer']} (you said: {answers.get(q['question'], '—')})")
+
+                    if st.button("Save my result", use_container_width=True, type="primary"):
+                        add_probe(pupil["id"], skill_id, "timed", correct, errors, len(questions), duration, "", item_results)
+                        filepath = str(PROBES_DIR / pupil["id"] / f"{skill_id}.json")
+                        git_add_commit_push(filepath, f"Maths probe: {pupil['firstName']} {step['name']}")
+                        # Clean up session state
+                        for key in ["maths_start", "maths_questions", "maths_answers", "maths_idx"]:
+                            st.session_state.pop(key, None)
+                        st.rerun()
+
+                else:
+                    # Active probe — show question and answer input
+                    idx = st.session_state.get("maths_idx", 0)
+                    if idx < len(questions):
+                        q = questions[idx]
+                        progress_pct = int((1 - remaining / aim["timedSec"]) * 100)
+                        st.progress(progress_pct)
+                        st.markdown(f"## ⏱️ {int(remaining)}s")
+
+                        # Review item indicator
+                        if q.get("is_review"):
+                            st.caption("🔄 Review question")
+
+                        st.markdown(f"# {q['question']}")
+
+                        # Number input for answer
+                        user_answer = st.text_input(
+                            "Your answer:", key=f"maths_ans_{idx}",
+                            placeholder="Type your answer...",
+                        )
+
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("Next →", key=f"maths_next_{idx}", use_container_width=True, type="primary"):
+                                if user_answer:
+                                    st.session_state.maths_answers[q["question"]] = user_answer
+                                st.session_state.maths_idx = idx + 1
+                                st.rerun()
+                        with col2:
+                            if st.button("Skip", key=f"maths_skip_{idx}", use_container_width=True):
+                                st.session_state.maths_idx = idx + 1
+                                st.rerun()
+
+                        # Show progress
+                        answered = len(st.session_state.maths_answers)
+                        st.caption(f"Question {idx + 1} of {len(questions)} · {answered} answered")
+                    else:
+                        # All questions answered but time remaining
+                        st.progress(int((1 - remaining / aim["timedSec"]) * 100))
+                        st.info(f"All questions attempted! {int(remaining)}s remaining — wait for the timer or end early.")
+                        if st.button("End Early", type="secondary"):
+                            st.session_state.maths_start = time.time() - aim["timedSec"]
+                            st.rerun()
+
+        # ── PHONICS MODE: Adult-led timed reading ─────────────────────────
+        elif subject == "phonics":
+            st.subheader(f"📖 {step['name']}")
+            aim = step["aim"]
+            st.markdown(f"**Aim:** {aim['correctPerMin']} correct per minute, max {aim['maxErrors']} errors")
+            st.caption("Adult: listen to the child read each grapheme and mark correct or incorrect.")
+
+            if "phonics_start" not in st.session_state:
+                if st.button("Start! 🚀", use_container_width=True, type="primary"):
+                    st.session_state.phonics_start = time.time()
+                    st.session_state.phonics_questions = sheet["questions"]
+                    st.session_state.phonics_results = []
+                    st.session_state.phonics_idx = 0
+                    st.rerun()
+
+            if "phonics_start" in st.session_state:
+                elapsed = time.time() - st.session_state.phonics_start
+                remaining = max(0, aim["timedSec"] - elapsed)
+                questions = st.session_state.phonics_questions
+
+                if remaining <= 0:
+                    # Time's up
+                    results = st.session_state.phonics_results
                     correct = sum(1 for r in results if r)
                     errors = sum(1 for r in results if not r)
                     duration = aim["timedSec"]
                     cpm = round(correct / (duration / 60), 1) if duration > 0 else 0
-                    aim_met = correct / (duration / 60) >= aim["correctPerMin"] and errors <= aim["maxErrors"] if duration > 0 else False
+                    aim_met = cpm >= aim["correctPerMin"] and errors <= aim["maxErrors"]
+
+                    st.markdown("### Time's up!")
+                    st.metric("Correct per minute", cpm)
+                    st.metric("Correct", correct)
+                    st.metric("Errors", errors)
 
                     if aim_met:
                         st.balloons()
-                        st.success(f"Well done {pupil['firstName']}! You got {correct} correct ({cpm}/min)! Aim achieved! 🎉")
+                        st.success(f"🎯 Well done {pupil['firstName']}! Aim achieved!")
                     else:
-                        st.info(f"You got {correct} correct ({cpm}/min). Keep practising — you'll get there!")
+                        st.info(f"Keep practising — you got {correct} right!")
 
-                    if st.button("Save my result", use_container_width=True):
-                        probes_data = add_probe(
-                            pupil["id"], skill_id, "timed",
-                            correct, errors, len(results), duration
-                        )
+                    if st.button("Save result", use_container_width=True, type="primary"):
+                        item_results = {}
+                        idx = 0
+                        for q in questions:
+                            if idx < len(results):
+                                item_results[q["question"]] = results[idx]
+                            idx += 1
+                        add_probe(pupil["id"], skill_id, "timed", correct, errors, len(results), duration, "", item_results)
                         filepath = str(PROBES_DIR / pupil["id"] / f"{skill_id}.json")
-                        git_add_commit_push(filepath, f"Self-assess probe: {pupil['firstName']} {step['name']}")
-                        del st.session_state.self_assess_start
-                        if "self_assess_items" in st.session_state:
-                            del st.session_state.self_assess_items
-                        if "self_assess_results" in st.session_state:
-                            del st.session_state.self_assess_results
-                        if "self_assess_idx" in st.session_state:
-                            del st.session_state.self_assess_idx
+                        git_add_commit_push(filepath, f"Phonics probe: {pupil['firstName']} {step['name']}")
+                        for key in ["phonics_start", "phonics_questions", "phonics_results", "phonics_idx"]:
+                            st.session_state.pop(key, None)
                         st.rerun()
+
                 else:
-                    idx = st.session_state.get("self_assess_idx", 0)
-                    items = st.session_state.get("self_assess_items", [])
-                    if idx < len(items):
-                        progress = int((1 - remaining / aim["timedSec"]) * 100)
-                        st.progress(progress)
-                        st.markdown(f"### ⏱️ {int(remaining)}s remaining")
-                        st.markdown(f"## {items[idx]}")
+                    idx = st.session_state.get("phonics_idx", 0)
+                    if idx < len(questions):
+                        q = questions[idx]
+                        progress_pct = int((1 - remaining / aim["timedSec"]) * 100)
+                        st.progress(progress_pct)
+                        st.markdown(f"## ⏱️ {int(remaining)}s remaining")
+
+                        if q.get("is_review"):
+                            st.caption("🔄 Review")
+
+                        st.markdown(f"# {q['question']}")
+
                         col1, col2 = st.columns(2)
                         with col1:
-                            if st.button("✅ Got it!", key=f"correct_{idx}", use_container_width=True):
-                                st.session_state.self_assess_results.append(True)
-                                st.session_state.self_assess_idx = idx + 1
+                            if st.button("✅ Correct", key=f"ph_correct_{idx}", use_container_width=True, type="primary"):
+                                st.session_state.phonics_results.append(True)
+                                st.session_state.phonics_idx = idx + 1
                                 st.rerun()
                         with col2:
-                            if st.button("❌ Not yet", key=f"incorrect_{idx}", use_container_width=True):
-                                st.session_state.self_assess_results.append(False)
-                                st.session_state.self_assess_idx = idx + 1
+                            if st.button("❌ Not yet", key=f"ph_incorrect_{idx}", use_container_width=True):
+                                st.session_state.phonics_results.append(False)
+                                st.session_state.phonics_idx = idx + 1
                                 st.rerun()
+
+                        st.caption(f"Sound {idx + 1} of {len(questions)}")
                     else:
-                        st.info("All items attempted! Waiting for timer...")
                         st.progress(int((1 - remaining / aim["timedSec"]) * 100))
+                        st.info(f"All sounds attempted! {int(remaining)}s remaining.")
+                        if st.button("End Early", type="secondary"):
+                            st.session_state.phonics_start = time.time() - aim["timedSec"]
+                            st.rerun()
 
-        else:  # Accuracy Check
-            items = step["items"]
-            if "untimed_results" not in st.session_state:
-                st.session_state.untimed_results = {item: None for item in items}
+        # ── SPELLING MODE: TTS + auto-marking weekly check ────────────────
+        elif subject == "spellings":
+            st.subheader(f"✏️ {step['name']}")
+            st.caption("Listen to each word, then type it. The app will check your spelling.")
+            items = sheet["questions"]
 
-            for item in items:
-                col1, col2, col3 = st.columns([3, 1, 1])
+            if "spell_idx" not in st.session_state:
+                st.session_state.spell_idx = 0
+                st.session_state.spell_answers = {}
+
+            idx = st.session_state.spell_idx
+            total = len(items)
+
+            if idx < total:
+                q = items[idx]
+                word = q["question"]
+
+                if q.get("is_review"):
+                    st.caption("🔄 Review word")
+
+                st.markdown(f"### Word {idx + 1} of {total}")
+
+                # TTS button using JavaScript Web Speech API
+                st.markdown(f"""
+                <div style="text-align: center; margin: 1rem 0;">
+                    <button onclick="sayWord('{word}')" style="
+                        background-color: #1798d3; color: white; border: none; border-radius: 50%;
+                        width: 80px; height: 80px; font-size: 2rem; cursor: pointer;
+                        box-shadow: 0 4px 12px rgba(23,152,211,0.3);
+                    ">🔊</button>
+                    <p style="margin-top: 0.5rem; color: #666;">Tap to hear the word</p>
+                </div>
+                <script>
+                function sayWord(word) {{
+                    var u = new SpeechSynthesisUtterance(word);
+                    u.lang = 'en-GB';
+                    u.rate = 0.8;
+                    speechSynthesis.speak(u);
+                }}
+                </script>
+                """, unsafe_allow_html=True)
+
+                user_answer = st.text_input(
+                    "Type the word:", key=f"spell_ans_{idx}",
+                    placeholder="Spell the word...",
+                    autocomplete="off",
+                )
+
+                col1, col2 = st.columns(2)
                 with col1:
-                    st.markdown(f"**{item}**")
-                with col2:
-                    if st.button("✅", key=f"u_correct_{item}"):
-                        st.session_state.untimed_results[item] = True
+                    if st.button("Check →", key=f"spell_next_{idx}", use_container_width=True, type="primary"):
+                        if user_answer:
+                            st.session_state.spell_answers[word] = user_answer.strip()
+                        else:
+                            st.session_state.spell_answers[word] = ""
+                        st.session_state.spell_idx = idx + 1
                         st.rerun()
-                with col3:
-                    if st.button("❌", key=f"u_incorrect_{item}"):
-                        st.session_state.untimed_results[item] = False
+                with col2:
+                    if st.button("Skip", key=f"spell_skip_{idx}", use_container_width=True):
+                        st.session_state.spell_answers[word] = ""
+                        st.session_state.spell_idx = idx + 1
                         st.rerun()
 
-            results = st.session_state.untimed_results
-            answered = {k: v for k, v in results.items() if v is not None}
-            if answered:
-                correct = sum(1 for v in answered.values() if v)
-                total = len(answered)
+                # Progress bar
+                st.progress(idx / total)
+
+            else:
+                # All words answered — show results
+                answers = st.session_state.spell_answers
+                correct = 0
+                errors = 0
+                item_results = {}
+                for q in items:
+                    word = q["question"]
+                    user_ans = str(answers.get(word, "")).strip().lower()
+                    expected = word.lower()
+                    is_correct = user_ans == expected
+                    item_results[word] = is_correct
+                    if is_correct:
+                        correct += 1
+                    else:
+                        errors += 1
+
                 accuracy = round(correct / total * 100, 1) if total > 0 else 0
+
+                st.markdown("### Spelling Check Complete!")
                 st.metric("Accuracy", f"{accuracy}%", f"{correct}/{total} correct")
 
-            if st.button("Save check", use_container_width=True):
-                results = st.session_state.untimed_results
-                answered = {k: v for k, v in results.items() if v is not None}
-                correct = sum(1 for v in answered.values() if v)
-                errors = sum(1 for v in answered.values() if not v)
-                probes_data = add_probe(
-                    pupil["id"], skill_id, "untimed",
-                    correct, errors, len(step["items"]), 0
-                )
-                filepath = str(PROBES_DIR / pupil["id"] / f"{skill_id}.json")
-                git_add_commit_push(filepath, f"Self-assess check: {pupil['firstName']} {step['name']}")
-                if "untimed_results" in st.session_state:
-                    del st.session_state.untimed_results
-                st.success("Saved! Great effort! 🌟")
-                st.rerun()
+                if accuracy == 100:
+                    st.balloons()
+                    st.success(f"🌟 Amazing {pupil['firstName']}! All words correct!")
+                elif accuracy >= 80:
+                    st.success(f"Good effort {pupil['firstName']}! {correct} out of {total} correct.")
+                else:
+                    st.info(f"You got {correct} out of {total}. Keep practising!")
+
+                # Show each word with result
+                with st.expander("See your answers"):
+                    for q in items:
+                        word = q["question"]
+                        result = item_results.get(word, False)
+                        user_ans = answers.get(word, "—")
+                        icon = "✅" if result else "❌"
+                        if result:
+                            st.markdown(f"{icon} **{word}**")
+                        else:
+                            st.markdown(f"{icon} ~~{user_ans}~~ → **{word}**")
+
+                if st.button("Save my result", use_container_width=True, type="primary"):
+                    add_probe(pupil["id"], skill_id, "untimed", correct, errors, total, 0, "", item_results)
+                    filepath = str(PROBES_DIR / pupil["id"] / f"{skill_id}.json")
+                    git_add_commit_push(filepath, f"Spelling check: {pupil['firstName']} {step['name']}")
+                    for key in ["spell_idx", "spell_answers"]:
+                        st.session_state.pop(key, None)
+                    st.rerun()
 
     st.stop()
 
@@ -325,6 +536,54 @@ with tab1:
                 "Latest": latest,
             })
         st.dataframe(rows, use_container_width=True, hide_index=True)
+
+    # ── Today's Activity ─────────────────────────────────────────────────────
+
+    st.divider()
+    st.subheader("Today's Activity")
+
+    # Count sheets to print by subject
+    maths_sheets = []
+    phonics_sheets = []
+    spelling_checks = []
+    for p in pupils_data["pupils"]:
+        active = active_skills_for(p)
+        for skill_id in active:
+            step = get_step(ladders_data, skill_id)
+            if not step:
+                continue
+            ladder = None
+            for l in ladders_data["ladders"]:
+                if l["id"] == step["ladder_id"]:
+                    ladder = l
+                    break
+            subject = ladder["subject"] if ladder else "maths"
+            if subject == "maths":
+                maths_sheets.append((p, step))
+            elif subject == "phonics":
+                phonics_sheets.append((p, step))
+            elif subject == "spellings":
+                spelling_checks.append((p, step))
+
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        st.metric("Maths sheets to print", len(maths_sheets))
+        if maths_sheets:
+            with st.expander("Who needs maths"):
+                for p, step in maths_sheets:
+                    st.markdown(f"- {p['firstName']} {p['lastName']}: {step['name']}")
+    with col_b:
+        st.metric("Phonics (adult needed)", len(phonics_sheets))
+        if phonics_sheets:
+            with st.expander("Who needs reading"):
+                for p, step in phonics_sheets:
+                    st.markdown(f"- {p['firstName']} {p['lastName']}: {step['name']}")
+    with col_c:
+        st.metric("Spelling checks due", len(spelling_checks))
+        if spelling_checks:
+            with st.expander("Who needs spelling check"):
+                for p, step in spelling_checks:
+                    st.markdown(f"- {p['firstName']} {p['lastName']}: {step['name']}")
 
     # ── Reviews Due ──────────────────────────────────────────────────────────
 
@@ -966,4 +1225,238 @@ with tab5:
 # ── Tab 6: Print Grids ─────────────────────────────────────────────────────
 
 with tab6:
-    st.info("Print grid PDF generation coming soon. Use the Progress tab to view and export data.")
+    pupils_data = st.session_state.pupils_data
+    ladders_data = st.session_state.ladders_data
+
+    if not pupils_data["pupils"]:
+        st.info("Add pupils first.")
+    else:
+        st.subheader("Generate Activity Sheets")
+
+        # Select pupil(s)
+        pupil_options = [(p["id"], f"{p['firstName']} {p['lastName']}") for p in pupils_data["pupils"]]
+        pupil_options.insert(0, ("all", "Whole class"))
+        selected = st.selectbox("Select pupil", pupil_options, format_func=lambda x: x[1], key="print_pupil")
+        selected_id = selected[0] if selected else None
+
+        if selected_id:
+            # Determine which pupils to generate sheets for
+            if selected_id == "all":
+                target_pupils = pupils_data["pupils"]
+            else:
+                target_pupils = [get_pupil(pupils_data, selected_id)]
+
+            # Collect all active skills across selected pupils
+            sheets_to_generate = []
+            for p in target_pupils:
+                active = active_skills_for(p)
+                for skill_id in active:
+                    step = get_step(ladders_data, skill_id)
+                    if step:
+                        sheets_to_generate.append((p, skill_id, step))
+
+            if not sheets_to_generate:
+                st.info("No active skills to generate sheets for.")
+            else:
+                # Options
+                col_opt1, col_opt2, col_opt3 = st.columns(3)
+                with col_opt1:
+                    num_questions = st.selectbox("Questions per grid", [20, 25, 30, 35, 40], index=2, key="print_numq")
+                with col_opt2:
+                    grids_per_page = st.selectbox("Grids per page", [1, 2], index=1, key="print_grids")
+                with col_opt3:
+                    include_answers = st.checkbox("Include answer key", value=True, key="print_answers")
+
+                st.markdown(f"**{len(sheets_to_generate)} sheet{'s' if len(sheets_to_generate) != 1 else ''}:**")
+                for p, skill_id, step in sheets_to_generate:
+                    st.markdown(f"- {p['firstName']} {p['lastName']} — {step['ladder_name']}: {step['name']}")
+
+                if st.button("Generate PDF", type="primary", use_container_width=True):
+                    try:
+                        from reportlab.lib.pagesizes import A4
+                        from reportlab.lib.units import mm, cm
+                        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Frame, PageTemplate
+                        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                        from reportlab.lib import colors
+                        from reportlab.pdfgen import canvas as pdfcanvas
+                        from io import BytesIO
+
+                        buf = BytesIO()
+                        # Tight margins for maximum space
+                        margin = 10*mm
+                        page_w, page_h = A4
+                        usable_w = page_w - 2 * margin
+                        usable_h = page_h - 2 * margin
+
+                        doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=margin, bottomMargin=margin, leftMargin=margin, rightMargin=margin)
+                        styles = getSampleStyleSheet()
+
+                        # Compact styles
+                        title_style = ParagraphStyle('GridTitle', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', spaceAfter=1, spaceBefore=0, leading=13)
+                        info_style = ParagraphStyle('GridInfo', parent=styles['Normal'], fontSize=8, textColor=colors.Color(0.4, 0.4, 0.4), spaceAfter=2, spaceBefore=0, leading=10)
+                        answer_style = ParagraphStyle('GridAnswer', parent=styles['Normal'], fontSize=6, textColor=colors.Color(0.6, 0.6, 0.6), spaceAfter=0, spaceBefore=0, leading=8)
+
+                        elements = []
+
+                        # Build grids, pair them 2-up on a page
+                        grids = []
+                        for p, skill_id, step in sheets_to_generate:
+                            # Generate sheet with desired number of questions
+                            sheet = generate_sheet(p, skill_id, ladders_data)
+                            if not sheet:
+                                continue
+                            # Adjust question count
+                            if len(sheet["questions"]) > num_questions:
+                                sheet["questions"] = sheet["questions"][:num_questions]
+                                sheet["total_questions"] = num_questions
+
+                            grids.append((p, sheet))
+
+                        # Layout grids
+                        if grids_per_page == 2:
+                            # Two grids per page
+                            for i in range(0, len(grids), 2):
+                                pair = grids[i:i+2]
+                                grid_elements = []
+
+                                for j, (p, sheet) in enumerate(pair):
+                                    grid_elements.extend(_build_grid_elements(p, sheet, styles, title_style, info_style, answer_style, include_answers, usable_w))
+
+                                # Add spacer between the two grids
+                                if len(pair) == 2:
+                                    # Insert a divider between the two grids
+                                    # We'll use a table layout: top grid and bottom grid
+                                    grid_elements.insert(len(grid_elements) // 2 if len(grid_elements) > 1 else 0, Spacer(1, 4*mm))
+
+                                elements.extend(grid_elements)
+                                if i + 2 < len(grids):
+                                    elements.append(PageBreak())
+                        else:
+                            # One grid per page (full size)
+                            for p, sheet in grids:
+                                elements.extend(_build_grid_elements(p, sheet, styles, title_style, info_style, answer_style, include_answers, usable_w))
+                                if grids.index((p, sheet)) < len(grids) - 1:
+                                    elements.append(PageBreak())
+
+                        doc.build(elements)
+                        buf.seek(0)
+
+                        st.success("PDF generated!")
+                        st.download_button(
+                            "Download PDF", buf.getvalue(),
+                            file_name=f"precision-teach-sheets-{date.today().isoformat()}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True,
+                            type="primary",
+                        )
+                    except ImportError:
+                        st.error("Install reportlab for PDF generation: pip install reportlab")
+
+
+def _build_grid_elements(p, sheet, styles, title_style, info_style, answer_style, include_answers, usable_w):
+    """Build PDF elements for a single grid."""
+    from reportlab.lib.units import mm
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib import colors
+
+    elements = []
+
+    # Title line: Name | Skill | Date
+    title = f"{p['firstName']} {p['lastName']} &nbsp;&nbsp;|&nbsp;&nbsp; {sheet['skill_name']} &nbsp;&nbsp;|&nbsp;&nbsp; {date.today().strftime('%d/%m/%y')}"
+    elements.append(Paragraph(title, title_style))
+
+    aim = sheet["aim"]
+    info = f"Aim: {aim['correctPerMin']}/min &nbsp;&bull;&nbsp; Max {aim['maxErrors']} errors &nbsp;&bull;&nbsp; {aim['timedSec']}s"
+    elements.append(Paragraph(info, info_style))
+    elements.append(Spacer(1, 2*mm))
+
+    questions = sheet["questions"]
+
+    if sheet["subject"] == "maths":
+        # Two-column layout: question | answer box
+        # Compact: number + question + = _____
+        table_data = []
+        for i, q in enumerate(questions):
+            num = i + 1
+            review_mark = " *" if q.get("is_review") else ""
+            table_data.append([f"{num}.", f"{q['question']} ={review_mark}", ""])
+
+        # Split into two columns side by side
+        half = (len(table_data) + 1) // 2
+        left_rows = table_data[:half]
+        right_rows = table_data[half:]
+
+        # Build a combined table: left_col | gap | right_col
+        combined = []
+        for row_i in range(half):
+            left = left_rows[row_i] if row_i < len(left_rows) else ["", "", ""]
+            right = right_rows[row_i] if row_i < len(right_rows) else ["", "", ""]
+            combined.append(left + right)
+
+        col_w = usable_w / 2 - 2*mm
+        t = Table(combined, colWidths=[8*mm, col_w - 28*mm, 20*mm, 8*mm, col_w - 28*mm, 20*mm])
+        t.setStyle(TableStyle([
+            ('FONT', (0, 0), (-1, -1), 'Helvetica', 9),
+            ('FONT', (0, 0), (0, -1), 'Helvetica-Bold', 9),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LINEBELOW', (2, 0), (2, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
+            ('LINEBELOW', (5, 0), (5, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+            ('ROWBACKGROUNDS', (0, 0), (2, -1), [colors.white, colors.Color(0.97, 0.97, 0.97)]),
+            ('ROWBACKGROUNDS', (3, 0), (5, -1), [colors.white, colors.Color(0.97, 0.97, 0.97)]),
+        ]))
+        elements.append(t)
+
+        if include_answers:
+            # Compact answer key
+            answers_left = ", ".join(f"{q['question']}={q['answer']}" for q in questions[:half])
+            answers_right = ", ".join(f"{q['question']}={q['answer']}" for q in questions[half:])
+            elements.append(Spacer(1, 1*mm))
+            elements.append(Paragraph(f"Answers: {answers_left}", answer_style))
+            elements.append(Paragraph(f"Answers: {answers_right}", answer_style))
+
+    elif sheet["subject"] == "phonics":
+        # Grid of GPCs in a compact table
+        cols = 8
+        gpcs = [q["question"] for q in questions]
+        # Pad to fill grid
+        while len(gpcs) % cols != 0:
+            gpcs.append("")
+
+        table_data = []
+        for i in range(0, len(gpcs), cols):
+            table_data.append(gpcs[i:i+cols])
+
+        col_w = usable_w / cols
+        t = Table(table_data, colWidths=[col_w]*cols)
+        t.setStyle(TableStyle([
+            ('FONT', (0, 0), (-1, -1), 'Helvetica', 14),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.Color(0.7, 0.7, 0.7)),
+            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.Color(0.85, 0.85, 0.85)),
+            ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.Color(0.96, 0.96, 0.96)]),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(t)
+
+    else:  # spellings
+        # Compact list: number + word (TTS reminder) + writing line
+        table_data = []
+        for i, q in enumerate(questions):
+            review_mark = " *" if q.get("is_review") else ""
+            table_data.append([f"{i+1}.", f"____{review_mark}", ""])
+
+        t = Table(table_data, colWidths=[10*mm, usable_w - 60*mm, 50*mm])
+        t.setStyle(TableStyle([
+            ('FONT', (0, 0), (-1, -1), 'Helvetica', 10),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LINEBELOW', (1, 0), (2, -1), 0.5, colors.Color(0.75, 0.75, 0.75)),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        elements.append(t)
+
+    return elements

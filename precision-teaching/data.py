@@ -872,3 +872,238 @@ def get_progress_summary(probes_data, step):
         "probesCount": len(probes),
         "timedProbesCount": len(timed_probes),
     }
+
+
+# ── Answer Parsing ──────────────────────────────────────────────────────────
+
+def get_answer(item: str, step_id: str = "") -> str:
+    """Convert an item string to its expected answer for auto-marking.
+
+    Handles maths items like '7×3', '7 × 3', '0+5', 'double 5', 'half of 10'.
+    For spelling and phonics items, returns the item itself (for comparison).
+    """
+    item = item.strip()
+
+    # Doubles: "double 5" → "10"
+    if item.lower().startswith("double "):
+        try:
+            n = int(item.split()[-1])
+            return str(n * 2)
+        except (ValueError, IndexError):
+            return item
+
+    # Halves: "half of 10" → "5"
+    if item.lower().startswith("half of "):
+        try:
+            n = int(item.split()[-1])
+            return str(n // 2)
+        except (ValueError, IndexError):
+            return item
+
+    # Multiplication: "7×3" or "7 × 3"
+    if "×" in item:
+        try:
+            parts = item.replace(" ", "").split("×")
+            a, b = int(parts[0]), int(parts[1])
+            return str(a * b)
+        except (ValueError, IndexError):
+            return item
+
+    # Addition: "0+5" or "3 + 7"
+    if "+" in item:
+        try:
+            parts = item.replace(" ", "").split("+")
+            a, b = int(parts[0]), int(parts[1])
+            return str(a + b)
+        except (ValueError, IndexError):
+            return item
+
+    # Subtraction: "10-3"
+    if "-" in item and not item.startswith("-"):
+        try:
+            parts = item.replace(" ", "").split("-")
+            a, b = int(parts[0]), int(parts[1])
+            return str(a - b)
+        except (ValueError, IndexError):
+            return item
+
+    # Default: the item itself (spelling words, phonics GPCs)
+    return item.lower()
+
+
+# ── Distributed Review Items ─────────────────────────────────────────────────
+
+def get_review_items(pupil, current_skill_id, ladders_data, max_items=2):
+    """Select 1-2 items from previously mastered skills in the same ladder for distributed practice.
+
+    Prioritises skills closest to their review due date.
+    Returns a list of dicts: {"item": "...", "question": "...", "answer": "...", "from_skill": "...", "from_skill_name": "..."}
+    """
+    # Find which ladder the current skill is in
+    current_step = get_step(ladders_data, current_skill_id)
+    if not current_step:
+        return []
+
+    ladder_id = current_step["ladder_id"]
+    ladder = None
+    for l in ladders_data["ladders"]:
+        if l["id"] == ladder_id:
+            ladder = l
+            break
+    if not ladder:
+        return []
+
+    # Find mastered skills in this ladder that have review dates
+    skills = pupil.get("currentSkills", {})
+    candidates = []
+    for step in ladder["steps"]:
+        if step["id"] == current_skill_id:
+            continue
+        entry = skills.get(step["id"])
+        if not entry or not isinstance(entry, dict):
+            continue
+        if entry.get("status") not in ("mastered", "secure"):
+            continue
+        # Pick items from this step
+        for item in step["items"]:
+            candidates.append({
+                "item": item,
+                "question": item,
+                "answer": get_answer(item, step["id"]),
+                "from_skill": step["id"],
+                "from_skill_name": step["name"],
+                "review_due": entry.get("nextReview", ""),
+            })
+
+    if not candidates:
+        return []
+
+    # Sort by review due date (closest first)
+    candidates.sort(key=lambda c: c.get("review_due") or "9999-99-99")
+
+    # Pick random items, preferring those closest to review
+    random.shuffle(candidates[:4])  # shuffle among the most due
+    return candidates[:max_items]
+
+
+# ── Sheet Generator ───────────────────────────────────────────────────────────
+
+def generate_sheet(pupil, skill_id, ladders_data, probes_data=None, include_review=True):
+    """Generate a practice sheet for a pupil on a given skill.
+
+    Returns a dict with:
+      - "pupil_name": str
+      - "skill_name": str
+      - "ladder_name": str
+      - "subject": str ("maths", "phonics", "spellings")
+      - "aim": dict (correctPerMin, maxErrors, timedSec)
+      - "items": list of question dicts for the current skill
+      - "review_items": list of review item dicts from mastered skills
+      - "questions": list of all question dicts (skill items + review, shuffled appropriately)
+      - "total_questions": int
+    """
+    step = get_step(ladders_data, skill_id)
+    if not step:
+        return None
+
+    ladder = None
+    for l in ladders_data["ladders"]:
+        if step["ladder_id"] == l["id"]:
+            ladder = l
+            break
+
+    subject = ladder["subject"] if ladder else "maths"
+
+    # Build items with question format and answers
+    skill_items = []
+    for item in step["items"]:
+        answer = get_answer(item, skill_id)
+        if subject == "maths":
+            # For maths, the question IS the item (e.g. "7×3") and the answer is the result
+            skill_items.append({
+                "item": item,
+                "question": item,
+                "answer": answer,
+                "is_review": False,
+                "from_skill": skill_id,
+                "from_skill_name": step["name"],
+            })
+        elif subject == "phonics":
+            # GPCs: show the grapheme, answer is the grapheme itself (for display)
+            skill_items.append({
+                "item": item,
+                "question": item,
+                "answer": answer,
+                "is_review": False,
+                "from_skill": skill_id,
+                "from_skill_name": step["name"],
+            })
+        else:  # spellings
+            # Spelling: question is the word spoken aloud, answer is the spelling
+            skill_items.append({
+                "item": item,
+                "question": item,
+                "answer": item.lower(),
+                "is_review": False,
+                "from_skill": skill_id,
+                "from_skill_name": step["name"],
+            })
+
+    # Get distributed review items
+    review_items = []
+    if include_review:
+        review_items = get_review_items(pupil, skill_id, ladders_data, max_items=2)
+
+    # Build the question list based on subject
+    if subject == "maths":
+        # Maths: repeat items to fill ~25 questions, shuffle
+        all_unique = skill_items + review_items
+        questions = []
+        while len(questions) < 25:
+            shuffled_batch = skill_items[:]
+            random.shuffle(shuffled_batch)
+            questions.extend(shuffled_batch)
+        # Insert review items at random positions
+        for ri in review_items:
+            ri_copy = {**ri, "is_review": True}
+            pos = random.randint(0, min(len(questions), 24))
+            questions.insert(pos, ri_copy)
+        questions = questions[:25]
+        random.shuffle(questions)
+
+    elif subject == "phonics":
+        # Phonics: show all GPCs, repeat 2-3 times for a 1-min probe, shuffle each batch
+        all_unique = skill_items + review_items
+        questions = []
+        for _ in range(3):
+            batch = skill_items[:]
+            random.shuffle(batch)
+            questions.extend(batch)
+        # Insert review items
+        for ri in review_items:
+            ri_copy = {**ri, "is_review": True}
+            pos = random.randint(0, len(questions))
+            questions.insert(pos, ri_copy)
+        # Trim to ~25
+        questions = questions[:25]
+
+    else:  # spellings
+        # Spelling: just the 3-5 words, no repetition, plus review items
+        questions = list(skill_items)
+        for ri in review_items:
+            ri_copy = {**ri, "is_review": True}
+            questions.append(ri_copy)
+        random.shuffle(questions)
+
+    return {
+        "pupil_name": f"{pupil['firstName']} {pupil['lastName']}",
+        "skill_name": step["name"],
+        "ladder_name": step["ladder_name"] if "ladder_name" in step else ladder["name"],
+        "subject": subject,
+        "aim": step["aim"],
+        "untimedAim": step.get("untimedAim"),
+        "items": skill_items,
+        "review_items": review_items,
+        "questions": questions,
+        "total_questions": len(questions),
+    }
