@@ -260,7 +260,8 @@ function buildStaff(rows) {
       const name = r.Name.trim();
       const init = (r.Initials || '').trim() || mkInitials(name);
       const id   = name.toLowerCase().replace(/[^a-z0-9]+/g,'_');
-      let col    = colourById[id] || PALETTE[i % PALETTE.length];
+      const sheetCol = (r.Colour || '').trim();
+      let col    = sheetCol || colourById[id] || PALETTE[i % PALETTE.length];
       return { id, name, init, col };
     });
 }
@@ -806,9 +807,8 @@ async function init() {
           state.weekIdx = remote.state.weekIdx  ?? state.weekIdx;
         }
         if (remote.termTemplate !== undefined) termTemplate = remote.termTemplate;
-        if (remote.staffColours) {
-          STAFF = STAFF.map(s => ({ ...s, col: remote.staffColours[s.id] || s.col }));
-        }
+        // Don't override sheet colours with remote data — sheet is authoritative
+        // (remote.staffColours may contain stale PALETTE values from before Colour column was read)
       } catch(e) {}
     }
 
