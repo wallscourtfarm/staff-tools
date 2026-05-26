@@ -260,8 +260,9 @@ function buildStaff(rows) {
       const name = r.Name.trim();
       const init = (r.Initials || '').trim() || mkInitials(name);
       const id   = name.toLowerCase().replace(/[^a-z0-9]+/g,'_');
-      const sheetCol = (r.Colour || '').trim();
-      let col    = sheetCol || colourById[id] || PALETTE[i % PALETTE.length];
+      const yg   = (r.YearGroup || '').trim();
+      const ygKey = yg === 'YR' ? 'Reception' : yg;
+      let col    = YG_COLOURS[ygKey] || colourById[id] || PALETTE[i % PALETTE.length];
       return { id, name, init, col };
     });
 }
