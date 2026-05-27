@@ -238,6 +238,7 @@
     .ws-del { background:none; border:none; cursor:pointer; color:#cbd5e1; font-size:14px; padding:2px 4px; border-radius:3px; }
     .ws-del:hover { color:#dc2626; background:#fee2e2; }
     .ws-add-form { background:#f8fafc; border-radius:6px; padding:12px; border:1px solid #e2e8f0; }
+    .ws-section-hd { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#64748b; font-weight:bold; margin:0 0 8px; padding-bottom:6px; border-bottom:1px solid #e2e8f0; }
     .ws-add-form h3 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#64748b; font-weight:bold; margin:0 0 10px; }
     .ws-add-row { display:flex; gap:7px; align-items:flex-end; flex-wrap:wrap; }
     .ws-add-row label { font-size:11px; color:#475569; }
@@ -369,13 +370,34 @@ body.edit-locked .notify-btn   { display:none; }
 <div class="modal-overlay hidden" id="wsModal" onclick="closeWsModal(event)">
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-hd">
-      <h2>Whole-school events</h2>
+      <h2>School events</h2>
       <button onclick="closeWsModal()">×</button>
     </div>
+    <!-- Sports section -->
+    <div class="ws-section-hd">Sports</div>
+    <div class="ws-list" id="wsSportsList"></div>
+    <div class="ws-add-form" style="margin-bottom:16px">
+      <div class="ws-add-row">
+        <label>Year Group<select id="ws-sport-yg">
+          <option>Reception</option><option>Y1</option><option>Y2</option><option>Y3</option><option selected>Y4</option><option>Y5</option><option>Y6</option>
+        </select></label>
+        <label>Day<select id="ws-sport-day">
+          <option value="0">Monday</option><option value="1">Tuesday</option>
+          <option value="2">Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option>
+        </select></label>
+        <label>Session<select id="ws-sport-session">
+          <option>AM</option><option>PM</option>
+        </select></label>
+        <label>Provider<select id="ws-sport-provider">
+          <option value="">None</option><option value="AB">AB</option><option value="Brs">Brs</option>
+        </select></label>
+        <button class="ws-save-btn" onclick="addSportEvent()">Add</button>
+      </div>
+    </div>
+    <!-- Other events section -->
+    <div class="ws-section-hd">Other events</div>
     <div class="ws-list" id="wsEventList"></div>
-    <button class="ws-save-btn" onclick="resetWsToSheetDefaults()" style="margin-bottom:12px;background:#f8fafc;color:#475569;border:1px solid #e2e8f0;font-weight:normal;font-size:11px;padding:4px 10px">Reset to sheet defaults</button>
     <div class="ws-add-form">
-      <h3>Add new</h3>
       <div class="ws-add-row">
         <label>Day<select id="ws-day">
           <option value="0">Monday</option><option value="1">Tuesday</option>
@@ -626,9 +648,17 @@ function buildEvents(rows) {
   return {blocking,info,sessionInfo};
 }
 function buildSchoolEvents(rows) {
-  return rows.map(r=>({
-    day:DAY_IDX[r.Day]??0, session:r.Session, label:r.Label, bg:r.Colour||'#1e3a8a'
-  })).filter(e=>e.label);
+  return rows.map(r=>{
+    const ev = { day:DAY_IDX[r.Day]??0, session:r.Session, label:r.Label, bg:r.Colour||'#1e3a8a' };
+    // Parse Sports entries: "Y4 Sports", "Y3 (AB) Sports", "Y6 (Brs) Sports"
+    const sportMatch = r.Label?.match(/^(Reception|Y[1-6]|YR)\s*(?:\((AB|Brs)\)\s*)?Sports$/i);
+    if (sportMatch) {
+      ev.sport = true;
+      ev.yg = sportMatch[1] === 'YR' ? 'Reception' : sportMatch[1];
+      ev.provider = sportMatch[2] || '';
+    }
+    return ev;
+  }).filter(e=>e.label);
 }
 function buildRecurring(rows) {
   const YG_CODES = new Set(['Reception','YR','Y1','Y2','Y3','Y4','Y5','Y6']);
@@ -1647,12 +1677,38 @@ function closeWsModal(e) {
 }
 function renderWsModal() {
   const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
-  let html = '';
-  if (!wsEvents.length) {
-    html = '<p style="color:#94a3b8;font-size:12px;padding:4px 0 10px">No events yet.</p>';
+  // Split sports vs other events
+  const sportsEvents = wsEvents.filter(e => e.sport);
+  const otherEvents = wsEvents.filter(e => !e.sport);
+
+  // Sports list
+  let sportsHtml = '';
+  if (!sportsEvents.length) {
+    sportsHtml = '<p style="color:#94a3b8;font-size:12px;padding:4px 0 10px">No sports scheduled.</p>';
   } else {
-    wsEvents.forEach((ev, i) => {
-      html += `<div class="ws-row">
+    sportsEvents.forEach((ev) => {
+      const i = wsEvents.indexOf(ev);
+      const provStr = ev.provider ? ` (${ev.provider})` : '';
+      sportsHtml += `<div class="ws-row">
+        <div class="ws-swatch" style="background:${ev.bg}"></div>
+        <div class="ws-info">
+          <strong>${ev.yg} Sports${provStr}</strong>
+          <span>${days[ev.day]} · ${ev.session}</span>
+        </div>
+        <button class="ws-del" onclick="removeWsEvent(${i})">×</button>
+      </div>`;
+    });
+  }
+  document.getElementById('wsSportsList').innerHTML = sportsHtml;
+
+  // Other events list
+  let otherHtml = '';
+  if (!otherEvents.length) {
+    otherHtml = '<p style="color:#94a3b8;font-size:12px;padding:4px 0 10px">No other events.</p>';
+  } else {
+    otherEvents.forEach((ev) => {
+      const i = wsEvents.indexOf(ev);
+      otherHtml += `<div class="ws-row">
         <div class="ws-swatch" style="background:${ev.bg}"></div>
         <div class="ws-info">
           <strong>${ev.label}</strong>
@@ -1662,7 +1718,7 @@ function renderWsModal() {
       </div>`;
     });
   }
-  document.getElementById('wsEventList').innerHTML = html;
+  document.getElementById('wsEventList').innerHTML = otherHtml;
 }
 function addWsEvent() {
   const label = document.getElementById('ws-label').value.trim();
@@ -1678,20 +1734,30 @@ function addWsEvent() {
   renderWsModal();
   render();
 }
+const SPORT_YG_COLOURS = {Reception:'#93c5fd',Y1:'#fb923c',Y2:'#6ee7b7',Y3:'#f5aad4',Y4:'#60a5fa',Y5:'#fdba74',Y6:'#4ade80'};
+function addSportEvent() {
+  const yg = document.getElementById('ws-sport-yg').value;
+  const provider = document.getElementById('ws-sport-provider').value;
+  const label = yg + ' Sports' + (provider ? ` (${provider})` : '');
+  wsEvents.push({
+    day: parseInt(document.getElementById('ws-sport-day').value),
+    session: document.getElementById('ws-sport-session').value,
+    label,
+    bg: SPORT_YG_COLOURS[yg] || '#94a3b8',
+    sport: true,
+    yg,
+    provider,
+  });
+  wsSave();
+  renderWsModal();
+  render();
+}
 function removeWsEvent(i) {
   wsEvents.splice(i, 1);
   wsSave();
   renderWsModal();
   render();
 }
-function resetWsToSheetDefaults() {
-  if (WS_SHEET_DEFAULTS.length === 0) { alert('No sheet defaults loaded.'); return; }
-  wsEvents = JSON.parse(JSON.stringify(WS_SHEET_DEFAULTS));
-  wsSave();
-  renderWsModal();
-  render();
-}
-
 // ── Notification panel ──────────────────────────────────────────────────────────
 
 const CHANGE_LABELS = {
