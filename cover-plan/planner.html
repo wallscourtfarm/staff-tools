@@ -373,6 +373,7 @@ body.edit-locked .notify-btn   { display:none; }
       <button onclick="closeWsModal()">×</button>
     </div>
     <div class="ws-list" id="wsEventList"></div>
+    <button class="ws-save-btn" onclick="resetWsToSheetDefaults()" style="margin-bottom:12px;background:#f8fafc;color:#475569;border:1px solid #e2e8f0;font-weight:normal;font-size:11px;padding:4px 10px">Reset to sheet defaults</button>
     <div class="ws-add-form">
       <h3>Add new</h3>
       <div class="ws-add-row">
@@ -1679,6 +1680,13 @@ function addWsEvent() {
 }
 function removeWsEvent(i) {
   wsEvents.splice(i, 1);
+  wsSave();
+  renderWsModal();
+  render();
+}
+function resetWsToSheetDefaults() {
+  if (WS_SHEET_DEFAULTS.length === 0) { alert('No sheet defaults loaded.'); return; }
+  wsEvents = JSON.parse(JSON.stringify(WS_SHEET_DEFAULTS));
   wsSave();
   renderWsModal();
   render();
