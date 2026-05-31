@@ -1494,7 +1494,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const inp=document.getElementById('img-input');
   if(inp)inp.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{document.getElementById('img-el').src=ev.target.result;document.getElementById('img-pane').classList.add('visible');};r.readAsDataURL(f);});
   const urlInp=document.getElementById('img-url-input');
-  if(urlInp)document.getElementById('img-url-btn').onclick=()=>{const u=urlInp.value.trim();if(!u)return;document.getElementById('img-el').src=u;document.getElementById('img-pane').classList.add('visible');closeImgModal();};
+  if(urlInp)document.getElementById('img-url-btn').onclick=()=>{const u=urlInp.value.trim();if(!u)return;fetch(u).then(r=>r.blob()).then(blob=>{const r=new FileReader();r.onload=ev=>{document.getElementById('img-el').src=ev.target.result;document.getElementById('img-pane').classList.add('visible');closeImgModal()};r.readAsDataURL(blob)}).catch(()=>{document.getElementById('img-el').src=u;document.getElementById('img-pane').classList.add('visible');closeImgModal();})};
 });
 function openImgModal(){document.getElementById('img-ov').classList.add('on');}
 function closeImgModal(){document.getElementById('img-ov').classList.remove('on');}
