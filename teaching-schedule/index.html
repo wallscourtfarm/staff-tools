@@ -98,6 +98,16 @@
     .day-hd-date { font-size: 10px; font-weight: 600; color: #94a3b8; }
     .day-hd.today .day-hd-name { color: var(--brand); }
     .day-hd.today .day-hd-date { color: var(--brand); }
+    .day-hd-actions { display: flex; align-items: center; justify-content: center; gap: 3px; margin-top: 3px; }
+    .day-copy-btn, .day-paste-btn {
+      background: none; border: 1px solid #e2e8f0; border-radius: 4px;
+      font-size: 10px; color: #94a3b8; cursor: pointer; padding: 1px 5px; line-height: 1.4;
+      font-family: 'Nunito', sans-serif; font-weight: 700; white-space: nowrap;
+    }
+    .day-copy-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
+    .day-paste-btn { border-color: #86efac; color: #16a34a; background: #f0fdf4; }
+    .day-paste-btn:hover { background: #dcfce7; border-color: #4ade80; }
+    .day-copied-badge { font-size: 9px; color: var(--brand); font-weight: 700; font-family: 'Nunito', sans-serif; }
     .time-col { width: 90px; }
     .slot-label { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 11px; color: var(--brand); display: block; }
     .slot-time { font-size: 9px; color: #94a3b8; font-weight: 600; }
@@ -876,6 +886,9 @@ let state = {
   nonSchoolDays: {}, // 'YYYY-MM-DD' → { label, type }
   schoolEvents: {},  // 'YYYY-MM-DD' → [{ label, type }]
 };
+
+// ── Day clipboard ────────────────────────────────────────────────────────────
+let dayClipboard = null; // { dayName, allViews: { view → { sessionId → [items] } } }
 
 // ── Persistence ─────────────────────────────────────────────────────────────
 function loadStaff() {
@@ -1799,7 +1812,10 @@ function renderHead() {
       const cls = `day-hd${isToday(i) ? ' today' : ''}${nsd ? ' non-school-day' : ''}`;
       const tags = evts.map(e => `<span class="day-event-tag">${escHtml(e.label)}</span>`).join(' ');
       const addBtn = !nsd ? `<span class="day-hd-add" onclick="openStaffOutModal(${i})" title="Add staff out">＋</span>` : '';
-      return `<th class="${cls}"><span class="day-hd-name">${d}${addBtn}</span><br><span class="day-hd-date">${dayDate(i)}</span>${tags ? '<br>' + tags : ''}</th>`;
+      const isCopied = dayClipboard && dayClipboard.dayName === d.toLowerCase();
+      const copyBtn = !nsd ? `<button class="day-copy-btn" onclick="copyDay('${d.toLowerCase()}')" title="Copy this day">${isCopied ? '✓ Copied' : 'Copy'}</button>` : '';
+      const pasteBtn = dayClipboard && !isCopied && !nsd ? `<button class="day-paste-btn" onclick="pasteDay('${d.toLowerCase()}')" title="Paste ${dayClipboard.dayName} here">Paste ${dayClipboard.dayName.charAt(0).toUpperCase()+dayClipboard.dayName.slice(1)}</button>` : '';
+      return `<th class="${cls}"><span class="day-hd-name">${d}${addBtn}</span><br><span class="day-hd-date">${dayDate(i)}</span>${tags ? '<br>' + tags : ''}<div class="day-hd-actions">${copyBtn}${pasteBtn}</div></th>`;
     }).join('')}
   </tr>`;
 }
@@ -2696,6 +2712,29 @@ function clearActiveView() {
   if (!confirm(`Clear the ${state.activeView.toUpperCase()} view for this week?`)) return;
   const wk = schedKey();
   if (state.schedule[wk]) delete state.schedule[wk][state.activeView];
+  persistLocal(); syncSave();
+  renderGrid();
+}
+
+function copyDay(dayName) {
+  const wk = schedKey();
+  const allViews = {};
+  VIEWS.forEach(v => {
+    const dayObj = (state.schedule[wk] && state.schedule[wk][v] && state.schedule[wk][v][dayName]) || {};
+    allViews[v] = JSON.parse(JSON.stringify(dayObj));
+  });
+  dayClipboard = { dayName, allViews };
+  renderHead();
+}
+
+function pasteDay(targetDay) {
+  if (!dayClipboard) return;
+  if (!confirm(`Paste ${dayClipboard.dayName} → ${targetDay}? This will overwrite ${targetDay}'s current content.`)) return;
+  const wk = schedKey();
+  ensureWeek(wk);
+  VIEWS.forEach(v => {
+    state.schedule[wk][v][targetDay] = JSON.parse(JSON.stringify(dayClipboard.allViews[v] || {}));
+  });
   persistLocal(); syncSave();
   renderGrid();
 }
