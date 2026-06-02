@@ -2209,11 +2209,22 @@ function showChipTime(btn) {
   const { wk, view, day, session, idx } = btn.dataset;
   const slot = getSlot(wk, view, day, session);
   const item = slot[Number(idx)];
-  // Suggest start time from session definition
   if (item.startMins == null) {
-    const row = ROWS.find(r => r.id === session);
-    const sessionStart = row && row.time ? row.time.split('-')[0].trim() : null;
-    item.startMins = sessionStart ? HHMMtoMins(sessionStart) : HHMMtoMins('09:00');
+    // Use end time of nearest chip above that has timing, else session start
+    let startMins = null;
+    for (let i = Number(idx) - 1; i >= 0; i--) {
+      const above = slot[i];
+      if (above && above.startMins != null && above.durationMins != null) {
+        startMins = above.startMins + above.durationMins;
+        break;
+      }
+    }
+    if (startMins == null) {
+      const row = ROWS.find(r => r.id === session);
+      const sessionStart = row && row.time ? row.time.split('-')[0].trim() : null;
+      startMins = sessionStart ? HHMMtoMins(sessionStart) : HHMMtoMins('09:00');
+    }
+    item.startMins = startMins;
     item.durationMins = 30;
     persistLocal(); syncSave();
   }
