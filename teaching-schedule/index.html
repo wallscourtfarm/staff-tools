@@ -253,11 +253,38 @@
     .chip-note {
       width: 100%; border: none; outline: none; background: transparent;
       font-size: 11px; color: #334155; font-family: 'Nunito', sans-serif; font-weight: 600;
-      padding: 0; resize: none; line-height: 1.35; min-height: 15px;
+      padding: 0; resize: vertical; line-height: 1.35; min-height: 15px; overflow: hidden;
     }
     .chip-note::placeholder { color: #cbd5e1; font-style: italic; }
     .chip-note.hidden { display: none; }
     .cell-chip:hover { box-shadow: 0 3px 8px rgba(15,23,42,.08); }
+
+    /* ── Chip timing strip ───────────────────────────────────────────── */
+    .chip-time-wrap {
+      padding: 2px 7px 3px; border-top: 1px solid rgba(0,0,0,.06);
+      background: rgba(255,255,255,.55); display: flex; align-items: center; gap: 4px;
+    }
+    .chip-time-toggle {
+      background: none; border: none; cursor: pointer;
+      font-size: 11px; color: rgba(0,0,0,.2); line-height: 1; padding: 0; flex-shrink: 0;
+    }
+    .chip-time-toggle:hover { color: var(--brand); }
+    .chip-time-toggle.has-time { display: none; }
+    .chip-time-inputs { display: flex; align-items: center; gap: 4px; flex: 1; }
+    .chip-time-inputs.hidden { display: none; }
+    .chip-time-input {
+      border: none; outline: none; background: transparent;
+      font-size: 10px; font-weight: 700; font-family: 'Nunito', sans-serif;
+      color: #475569; width: 46px; padding: 0; cursor: pointer;
+    }
+    .chip-time-input:focus { color: var(--brand); cursor: text; }
+    .chip-time-sep { font-size: 10px; color: #94a3b8; }
+    .chip-time-dur { font-size: 9px; color: #94a3b8; font-weight: 600; white-space: nowrap; flex: 1; }
+    .chip-time-clear {
+      background: none; border: none; cursor: pointer; font-size: 11px;
+      color: rgba(0,0,0,.2); padding: 0; line-height: 1; flex-shrink: 0;
+    }
+    .chip-time-clear:hover { color: #dc2626; }
 
     /* ── TP Activity chips (with remove X) ───────────────────────────── */
     .tp-activity { position: relative; }
@@ -705,6 +732,9 @@ const FALLBACK_INTERVENTIONS_DATA = [
   ]},
   { label: 'HomeZone', subjects: [
     { name: 'HomeZone', col:'#94a3b8', colourable: true },
+  ]},
+  { label: 'Other', subjects: [
+    { name: 'Other (colour)', col:'#64748b', colourable: true, colourOnly: true },
   ]},
 ];
 
@@ -1737,7 +1767,7 @@ function renderSidebar() {
         <div class="subj-chip"
           style="background:${s.col}50"
           data-subject="${escHtml(s.name)}"
-          data-col="${s.col}"${s.colourable ? ' data-colourable="true"' : ''}>
+          data-col="${s.col}"${s.colourable ? ' data-colourable="true"' : ''}${s.colourOnly ? ' data-colouronly="true"' : ''}>
           <span class="subj-dot" style="background:${s.col}"></span>
           <span class="subj-name">${escHtml(s.name)}</span>
         </div>
@@ -2043,6 +2073,8 @@ function renderBody() {
   el.querySelectorAll('.item-note').forEach(input => {
     input.addEventListener('blur', onNoteBlur);
     input.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); input.blur(); } });
+    input.addEventListener('input', function() { this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'; });
+    if (input.value) { input.style.height = 'auto'; input.style.height = input.scrollHeight + 'px'; }
   });
   el.querySelectorAll('.chip-handle').forEach(h => {
     h.addEventListener('pointerdown', onChipPointerDown);
@@ -2052,12 +2084,27 @@ function renderBody() {
   });
 }
 
+function minsToHHMM(mins) {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+function HHMMtoMins(hhmm) {
+  const [h,m] = hhmm.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+function durLabel(mins) {
+  if (!mins) return '';
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins/60), m = mins%60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
 function renderItem(item, wk, view, day, session, idx) {
   const col = item.hzCol || SUBJECT_COL[item.subject] || SUBJECT_COL[item.subjectLeft] || '#64748b';
   const light = col + '50';
   const dur = item.duration || 1;
-  const minH = Math.max(32, dur * 32);
-  const isColourable = item.colourable || (item.subject && (item.subject === 'HomeZone' || item.subject.startsWith('HomeZone - ')));
+  const minH = item.durationMins ? Math.max(36, item.durationMins * 1.2) : Math.max(32, dur * 32);
+  const isColourable = item.colourable || item.colourOnly || (item.subject && (item.subject === 'HomeZone' || item.subject.startsWith('HomeZone - ')));
   const colCls = isColourable ? 'chip-colour colourable' : 'chip-colour';
   const colClick = isColourable ? ` onclick="showHzPalette(event,this)"` : '';
   if (item.split) {
@@ -2076,6 +2123,10 @@ function renderItem(item, wk, view, day, session, idx) {
       <div class="chip-resize" style="background:${col}"></div>
     </div>`;
   }
+  const hasTime = item.startMins != null && item.durationMins != null;
+  const endMins = hasTime ? item.startMins + item.durationMins : null;
+  const timeToggleCls = `chip-time-toggle${hasTime ? ' has-time' : ''}`;
+  const timeInputsCls = `chip-time-inputs${hasTime ? '' : ' hidden'}`;
   return `<div class="cell-chip" style="background:${light};min-height:${minH}px" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">
     <div class="chip-top">
       <span class="chip-handle" title="Drag to reorder">≡</span>
@@ -2087,6 +2138,16 @@ function renderItem(item, wk, view, day, session, idx) {
     <div class="chip-note-wrap">
       <button class="chip-note-toggle${item.note ? ' has-note' : ''}" onclick="this.style.display='none';this.nextElementSibling.classList.remove('hidden');this.nextElementSibling.focus();return false">+</button>
       <textarea class="item-note chip-note${item.note ? '' : ' hidden'}" rows="1" placeholder="Note…" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">${escHtml(item.note||'')}</textarea>
+    </div>
+    <div class="chip-time-wrap">
+      <button class="${timeToggleCls}" title="Add timing" onclick="showChipTime(this)" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">⏱</button>
+      <div class="${timeInputsCls}">
+        <input type="time" class="chip-time-input chip-time-start" value="${hasTime ? minsToHHMM(item.startMins) : ''}" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}" onchange="onTimeChange(this,'start')" oninput="onTimeChange(this,'start')">
+        <span class="chip-time-sep">–</span>
+        <input type="time" class="chip-time-input chip-time-end" value="${hasTime ? minsToHHMM(endMins) : ''}" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}" onchange="onTimeChange(this,'end')" oninput="onTimeChange(this,'end')">
+        <span class="chip-time-dur">${hasTime ? durLabel(item.durationMins) : ''}</span>
+        <button class="chip-time-clear" title="Remove timing" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}" onclick="clearChipTime(this)">×</button>
+      </div>
     </div>
     <div class="chip-resize" style="background:${col}"></div>
   </div>`;
@@ -2121,7 +2182,9 @@ function showHzPalette(e, dotEl) {
     const swatch = ev.target.closest('[data-col]');
     if (!swatch) return;
     item.hzCol = swatch.dataset.col;
-    item.subject = swatch.dataset.name === 'Other' ? 'HomeZone - Other' : `HomeZone - ${swatch.dataset.name}`;
+    if (!item.colourOnly) {
+      item.subject = swatch.dataset.name === 'Other' ? 'HomeZone - Other' : `HomeZone - ${swatch.dataset.name}`;
+    }
     persistLocal(); syncSave();
     pop.remove();
     renderGrid();
@@ -2138,6 +2201,55 @@ function removeItem(btn) {
   const { wk, view, day, session, idx } = btn.dataset;
   const slot = getSlot(wk, view, day, session);
   slot.splice(Number(idx), 1);
+  persistLocal(); syncSave();
+  renderGrid();
+}
+
+function showChipTime(btn) {
+  const { wk, view, day, session, idx } = btn.dataset;
+  const slot = getSlot(wk, view, day, session);
+  const item = slot[Number(idx)];
+  // Suggest start time from session definition
+  if (item.startMins == null) {
+    const row = ROWS.find(r => r.id === session);
+    const sessionStart = row && row.time ? row.time.split('-')[0].trim() : null;
+    item.startMins = sessionStart ? HHMMtoMins(sessionStart) : HHMMtoMins('09:00');
+    item.durationMins = 30;
+    persistLocal(); syncSave();
+  }
+  renderGrid();
+}
+
+function onTimeChange(input, field) {
+  const { wk, view, day, session, idx } = input.dataset;
+  const slot = getSlot(wk, view, day, session);
+  const item = slot[Number(idx)];
+  const wrap = input.closest('.chip-time-wrap');
+  const startInput = wrap.querySelector('.chip-time-start');
+  const endInput = wrap.querySelector('.chip-time-end');
+  const durEl = wrap.querySelector('.chip-time-dur');
+  if (field === 'start' && startInput.value && endInput.value) {
+    const s = HHMMtoMins(startInput.value);
+    const e = HHMMtoMins(endInput.value);
+    if (e > s) { item.startMins = s; item.durationMins = e - s; }
+  } else if (field === 'end' && startInput.value && endInput.value) {
+    const s = HHMMtoMins(startInput.value);
+    const e = HHMMtoMins(endInput.value);
+    if (e > s) { item.startMins = s; item.durationMins = e - s; }
+  }
+  if (durEl && item.durationMins) durEl.textContent = durLabel(item.durationMins);
+  // Update chip min-height live
+  const chip = input.closest('.cell-chip');
+  if (chip && item.durationMins) chip.style.minHeight = Math.max(36, item.durationMins * 1.2) + 'px';
+  persistLocal(); syncSave();
+}
+
+function clearChipTime(btn) {
+  const { wk, view, day, session, idx } = btn.dataset;
+  const slot = getSlot(wk, view, day, session);
+  const item = slot[Number(idx)];
+  delete item.startMins;
+  delete item.durationMins;
   persistLocal(); syncSave();
   renderGrid();
 }
@@ -2305,7 +2417,7 @@ function onSubjectPointerDown(e) {
   const subject = chip.dataset.subject;
   const col = chip.dataset.col;
 
-  drag = { subject, col, colourable: chip.dataset.colourable === 'true', sourceType: 'sidebar', sourceChip: chip, sourceData: null };
+  drag = { subject, col, colourable: chip.dataset.colourable === 'true', colourOnly: chip.dataset.colouronly === 'true', sourceType: 'sidebar', sourceChip: chip, sourceData: null };
   chip.classList.add('dragging');
   chip.setPointerCapture(e.pointerId);
 
@@ -2405,8 +2517,9 @@ function onDragEnd(e) {
       slot.splice(insertAt, 0, drag.sourceData.item);
     } else {
       const insertAt = insertIdx < 0 ? slot.length : Math.min(insertIdx, slot.length);
-      const newItem = { subject: drag.subject, note: '', duration: 1 };
+      const newItem = { subject: drag.colourOnly ? 'Other' : drag.subject, note: '', duration: 1 };
       if (drag.colourable) newItem.colourable = true;
+      if (drag.colourOnly) newItem.colourOnly = true;
       slot.splice(insertAt, 0, newItem);
     }
     persistLocal(); syncSave();
