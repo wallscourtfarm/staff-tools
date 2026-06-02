@@ -233,6 +233,7 @@
     .hz-colour-pop span { width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
     .hz-colour-pop span:hover { border-color: #1e293b; }
     .chip-name { font-size: 13px; font-weight: 800; flex: 1; line-height: 1.25; color: #1e293b; font-family: 'Nunito', sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chip-name-edit { border: none; outline: none; background: transparent; padding: 0; width: 100%; min-width: 40px; cursor: text; }
 .chip-handle {
       cursor: grab; font-size: 10px; color: rgba(0,0,0,.18); padding: 0 2px;
       line-height: 1; flex-shrink: 0; user-select: none; touch-action: none;
@@ -2182,7 +2183,9 @@ function renderItem(item, wk, view, day, session, idx) {
     <div class="chip-top">
       <span class="chip-handle" title="Drag to reorder">≡</span>
       <span class="${colCls}" style="background:${col}"${colClick}></span>
-      <span class="chip-name">${escHtml(item.subject)}</span>
+      ${item.colourOnly
+        ? `<input class="chip-name chip-name-edit" value="${escAttr(item.customName || 'Other')}" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}" onblur="onChipNameBlur(this)" onkeydown="if(event.key==='Enter')this.blur()">`
+        : `<span class="chip-name">${escHtml(item.subject)}</span>`}
       <button class="chip-split" title="Split into two groups" onclick="splitItem(this)">⇔</button>
       <button class="chip-del" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}" onclick="removeItem(this)">×</button>
     </div>
@@ -2303,6 +2306,16 @@ function onTimeChange(input, field) {
   // Update chip min-height live
   const chip = input.closest('.cell-chip');
   if (chip && item.durationMins) chip.style.minHeight = Math.max(36, item.durationMins * 1.2) + 'px';
+  persistLocal(); syncSave();
+}
+
+function onChipNameBlur(input) {
+  const { wk, view, day, session, idx } = input.dataset;
+  const slot = getSlot(wk, view, day, session);
+  const item = slot[Number(idx)];
+  if (!item) return;
+  const val = input.value.trim();
+  item.customName = val || 'Other';
   persistLocal(); syncSave();
 }
 
