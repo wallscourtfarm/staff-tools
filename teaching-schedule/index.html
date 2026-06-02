@@ -888,7 +888,7 @@ let state = {
 };
 
 // ── Day clipboard ────────────────────────────────────────────────────────────
-let dayClipboard = null; // { dayName, allViews: { view → { sessionId → [items] } } }
+let dayClipboard = null; // { dayName, view, data: { sessionId → [items] } }
 
 // ── Persistence ─────────────────────────────────────────────────────────────
 function loadStaff() {
@@ -1812,9 +1812,10 @@ function renderHead() {
       const cls = `day-hd${isToday(i) ? ' today' : ''}${nsd ? ' non-school-day' : ''}`;
       const tags = evts.map(e => `<span class="day-event-tag">${escHtml(e.label)}</span>`).join(' ');
       const addBtn = !nsd ? `<span class="day-hd-add" onclick="openStaffOutModal(${i})" title="Add staff out">＋</span>` : '';
-      const isCopied = dayClipboard && dayClipboard.dayName === d.toLowerCase();
+      const isCopied = dayClipboard && dayClipboard.dayName === d.toLowerCase() && dayClipboard.view === state.activeView;
+      const canPaste = dayClipboard && dayClipboard.view === state.activeView && !isCopied && !nsd;
       const copyBtn = !nsd ? `<button class="day-copy-btn" onclick="copyDay('${d.toLowerCase()}')" title="Copy this day">${isCopied ? '✓ Copied' : 'Copy'}</button>` : '';
-      const pasteBtn = dayClipboard && !isCopied && !nsd ? `<button class="day-paste-btn" onclick="pasteDay('${d.toLowerCase()}')" title="Paste ${dayClipboard.dayName} here">Paste ${dayClipboard.dayName.charAt(0).toUpperCase()+dayClipboard.dayName.slice(1)}</button>` : '';
+      const pasteBtn = canPaste ? `<button class="day-paste-btn" onclick="pasteDay('${d.toLowerCase()}')" title="Paste ${dayClipboard.dayName} here">Paste ${dayClipboard.dayName.charAt(0).toUpperCase()+dayClipboard.dayName.slice(1)}</button>` : '';
       return `<th class="${cls}"><span class="day-hd-name">${d}${addBtn}</span><br><span class="day-hd-date">${dayDate(i)}</span>${tags ? '<br>' + tags : ''}<div class="day-hd-actions">${copyBtn}${pasteBtn}</div></th>`;
     }).join('')}
   </tr>`;
@@ -2718,23 +2719,19 @@ function clearActiveView() {
 
 function copyDay(dayName) {
   const wk = schedKey();
-  const allViews = {};
-  VIEWS.forEach(v => {
-    const dayObj = (state.schedule[wk] && state.schedule[wk][v] && state.schedule[wk][v][dayName]) || {};
-    allViews[v] = JSON.parse(JSON.stringify(dayObj));
-  });
-  dayClipboard = { dayName, allViews };
+  const v = state.activeView;
+  const dayObj = (state.schedule[wk] && state.schedule[wk][v] && state.schedule[wk][v][dayName]) || {};
+  dayClipboard = { dayName, view: v, data: JSON.parse(JSON.stringify(dayObj)) };
   renderHead();
 }
 
 function pasteDay(targetDay) {
   if (!dayClipboard) return;
-  if (!confirm(`Paste ${dayClipboard.dayName} → ${targetDay}? This will overwrite ${targetDay}'s current content.`)) return;
+  const v = state.activeView;
+  if (!confirm(`Paste ${dayClipboard.dayName} → ${targetDay} (${v} view)? This will overwrite ${targetDay}'s current content.`)) return;
   const wk = schedKey();
   ensureWeek(wk);
-  VIEWS.forEach(v => {
-    state.schedule[wk][v][targetDay] = JSON.parse(JSON.stringify(dayClipboard.allViews[v] || {}));
-  });
+  state.schedule[wk][v][targetDay] = JSON.parse(JSON.stringify(dayClipboard.data));
   persistLocal(); syncSave();
   renderGrid();
 }
