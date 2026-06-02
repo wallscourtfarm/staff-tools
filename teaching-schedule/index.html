@@ -1996,7 +1996,14 @@ function renderBody() {
               fabHtml = fabDuties.map(d => renderFABChip(d, dk, YEAR_GROUP)).join('');
             }
           }
-          return `<td class="view-cell"><div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div>${strips}${soTags}${tpActHtml}${fabHtml}</td>`;
+          const isStaffFixed = (view !== 'master');
+          const fixedChips = isStaffFixed ? (() => {
+            const day = DAYS[di].toLowerCase();
+            const items = getSlot(wk, view, day, row.id);
+            return items.map((item, idx) => renderItem(item, wk, view, day, row.id, idx)).join('');
+          })() : '';
+          const fixedDayAttr = isStaffFixed ? ` data-day="${DAYS[di].toLowerCase()}" data-session="${row.id}"` : '';
+          return `<td class="view-cell"${fixedDayAttr}><div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div>${strips}${soTags}${tpActHtml}${fabHtml}${fixedChips}</td>`;
         }).join('')}
       </tr>`;
     } else {
