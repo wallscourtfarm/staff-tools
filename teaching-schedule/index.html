@@ -801,6 +801,7 @@ ROWS = fallbackDayStructure(YEAR_GROUP);
 let STAFF  = loadStaff();
 let SUBJECTS = loadSubjects();
 let INTERVENTIONS = loadInterventions();
+injectBuiltinInterventions();
 let WEEKS  = [];
 
 // ── Subject name migration ────────────────────────────────────────────────
@@ -1089,6 +1090,18 @@ function buildDayStructure(rows, yearGroup) {
 }
 
 // ── Rebuild SUBJECT_COL from current data ─────────────────────────────────────
+function injectBuiltinInterventions() {
+  // Ensure the colourable Other always appears in TP/LP sidebar regardless of sheet data
+  let otherGroup = INTERVENTIONS.find(g => g.label === 'Other');
+  if (!otherGroup) {
+    otherGroup = { label: 'Other', subjects: [] };
+    INTERVENTIONS.push(otherGroup);
+  }
+  if (!otherGroup.subjects.find(s => s.colourOnly)) {
+    otherGroup.subjects.push({ name: 'Other (colour)', col: '#64748b', colourable: true, colourOnly: true });
+  }
+}
+
 function rebuildSubjectCol() {
   for (const key of Object.keys(SUBJECT_COL)) delete SUBJECT_COL[key];
   SUBJECTS.forEach(g => g.subjects.forEach(s => { SUBJECT_COL[s.name] = s.col; }));
@@ -3105,6 +3118,7 @@ function changeYearGroup(newYG) {
   } else {
     INTERVENTIONS = fallbackInterventions();
   }
+  injectBuiltinInterventions();
   saveInterventionsLocal();
 
   // Rebuild day structure
@@ -3232,6 +3246,7 @@ async function init() {
       const intRows = csvToObjects(interventionsText);
       SHEET_INTERVENTIONS = intRows;
       INTERVENTIONS = buildInterventions(intRows, YEAR_GROUP);
+      injectBuiltinInterventions();
       saveInterventionsLocal();
       rebuildSubjectCol();
     }
