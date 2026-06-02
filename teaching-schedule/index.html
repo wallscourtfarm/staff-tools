@@ -2110,6 +2110,10 @@ function renderItem(item, wk, view, day, session, idx) {
   if (item.split) {
     const colL = SUBJECT_COL[item.subjectLeft] || '#64748b';
     const colR = SUBJECT_COL[item.subjectRight] || '#64748b';
+    const hasTimeS = item.startMins != null && item.durationMins != null;
+    const endMinsS = hasTimeS ? item.startMins + item.durationMins : null;
+    const timeToggleClsS = `chip-time-toggle${hasTimeS ? ' has-time' : ''}`;
+    const timeInputsClsS = `chip-time-inputs${hasTimeS ? '' : ' hidden'}`;
     return `<div class="cell-chip" style="min-height:${minH}px" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">
       <div class="split-wrap" style="flex:1">
         <div class="split-half" style="background:${colL}50"><span class="chip-colour" style="background:${colL};display:inline-block;margin-right:3px"></span><span style="font-size:13px;font-weight:800;font-family:'Nunito',sans-serif">${escHtml(item.subjectLeft || '')}</span><textarea class="item-note chip-note" rows="1" data-side="left" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">${escHtml(item.noteLeft || '')}</textarea></div>
@@ -2119,6 +2123,16 @@ function renderItem(item, wk, view, day, session, idx) {
         <button class="chip-split" title="Unsplit" onclick="unsplitItem(this)">↔</button>
         <span style="flex:1"></span>
         <button class="chip-del" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}" onclick="removeItem(this)">×</button>
+      </div>
+      <div class="chip-time-wrap">
+        <button class="${timeToggleClsS}" title="Add timing" onclick="showChipTime(this)" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">⏱</button>
+        <div class="${timeInputsClsS}">
+          <input type="time" class="chip-time-input chip-time-start" value="${hasTimeS ? minsToHHMM(item.startMins) : ''}" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}" onchange="onTimeChange(this,'start')" oninput="onTimeChange(this,'start')">
+          <span class="chip-time-sep">–</span>
+          <input type="time" class="chip-time-input chip-time-end" value="${hasTimeS ? minsToHHMM(endMinsS) : ''}" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}" onchange="onTimeChange(this,'end')" oninput="onTimeChange(this,'end')">
+          <span class="chip-time-dur">${hasTimeS ? durLabel(item.durationMins) : ''}</span>
+          <button class="chip-time-clear" title="Remove timing" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}" onclick="clearChipTime(this)">×</button>
+        </div>
       </div>
       <div class="chip-resize" style="background:${col}"></div>
     </div>`;
