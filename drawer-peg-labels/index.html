@@ -6,6 +6,7 @@
   <title>Drawer & Peg Labels — Wallscourt Farm Academy</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
   <style>
     @font-face {
       font-family: 'Tw Cen MT';
@@ -228,7 +229,7 @@ function init() {
   yearGrid.addEventListener('click', onYearClick);
   namesInput.addEventListener('input', onNamesInput);
   fileInput.addEventListener('change', onFileUpload);
-  dlBtn.addEventListener('click', generatePdf);
+  dlBtn.addEventListener('click', () => currentLabelType === 'avery' ? generateDocx() : generatePdf());
 
   updatePreview();
 }
@@ -248,6 +249,7 @@ function onLabelTypeClick(e) {
   } else {
     sizeInfo.innerHTML = `<strong>Avery L7651:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border (A4 portrait)`;
   }
+  dlBtn.textContent = currentLabelType === 'avery' ? '↓ Download Labels (Word)' : '↓ Download Labels (PDF)';
 
   labelPreview.className = `label-preview ${currentLabelType}-preview`;
   updatePreview();
@@ -478,6 +480,130 @@ async function generatePdf() {
     dlBtn.disabled = false;
   }
 }
+async function generateDocx() {
+  const { Document, Table, TableRow, TableCell, Paragraph, TextRun, ImageRun,
+          WidthType, HeightRule, BorderStyle, AlignmentType, VerticalAlign, Packer } = window.docx;
+
+  const config = LABEL_CONFIG['avery'];
+  const yearData = YEAR_COLOURS[currentYear];
+  const borderHex = yearData.hex.replace('#', '');
+
+  statusEl.className = 'status';
+  statusEl.textContent = 'Building…';
+  dlBtn.disabled = true;
+
+  try {
+    const mmTw = mm => Math.round(mm * 56.6929); // mm to twips
+    const mmPx = mm => Math.round(mm / 25.4 * 96); // mm to px at 96dpi (for ImageRun)
+
+    const cellW = mmTw(config.width);   // 38.1mm
+    const cellH = mmTw(config.height);  // 21.2mm
+
+    // Avery L7651 page margins (symmetric, A4 portrait)
+    const margin = {
+      top: mmTw(10.7), bottom: mmTw(10.7),
+      left: mmTw(9.75), right: mmTw(9.75),
+      header: 0, footer: 0,
+    };
+
+    // Border thickness ~1.5mm: in docx size = eighths of a point; 1.5mm ≈ 4.25pt → 34
+    const bSz = 34;
+
+    // Decode logo to Uint8Array
+    const b64 = logoData.split(',')[1];
+    const bin = atob(b64);
+    const logoBytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) logoBytes[i] = bin.charCodeAt(i);
+
+    // Logo display size (px at 96dpi): 13mm
+    const logoPx = mmPx(13);
+
+    const sheetsNeeded = Math.ceil(names.length / config.perSheet) || 1;
+    const sections = [];
+
+    for (let si = 0; si < sheetsNeeded; si++) {
+      const sheetNames = names.slice(si * config.perSheet, (si + 1) * config.perSheet);
+      let ni = 0;
+      const rows = [];
+
+      for (let r = 0; r < config.rows; r++) {
+        const cells = [];
+        for (let c = 0; c < config.cols; c++) {
+          const name = sheetNames[ni++] || null;
+          const para = new Paragraph({
+            children: name ? [
+              new ImageRun({
+                data: logoBytes,
+                transformation: { width: logoPx, height: logoPx },
+                type: 'jpg',
+              }),
+              new TextRun({
+                text: '  ' + name,
+                font: 'Tw Cen MT',
+                size: 28,        // 14pt (half-points)
+                bold: true,
+                color: '1e2d3d',
+              }),
+            ] : [],
+            spacing: { before: 0, after: 0 },
+          });
+
+          cells.push(new TableCell({
+            children: [para],
+            width: { size: cellW, type: WidthType.DXA },
+            borders: {
+              top:    { style: BorderStyle.SINGLE, size: bSz, color: borderHex },
+              bottom: { style: BorderStyle.SINGLE, size: bSz, color: borderHex },
+              left:   { style: BorderStyle.SINGLE, size: bSz, color: borderHex },
+              right:  { style: BorderStyle.SINGLE, size: bSz, color: borderHex },
+            },
+            verticalAlign: VerticalAlign.CENTER,
+            margins: { top: 0, bottom: 0, left: mmTw(1.5), right: mmTw(0.5) },
+          }));
+        }
+        rows.push(new TableRow({
+          children: cells,
+          height: { value: cellH, rule: HeightRule.EXACT },
+          cantSplit: true,
+        }));
+      }
+
+      sections.push({
+        properties: {
+          page: {
+            size: { width: mmTw(210), height: mmTw(297) },
+            margin,
+          },
+        },
+        children: [
+          new Table({
+            rows,
+            width: { size: cellW * config.cols, type: WidthType.DXA },
+            layout: 'fixed',
+          }),
+        ],
+      });
+    }
+
+    const doc = new Document({ sections });
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `WFA_Avery_L7651_Labels_Y${currentYear}.docx`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    statusEl.textContent = '✓ Downloaded';
+    setTimeout(() => { statusEl.textContent = ''; dlBtn.disabled = false; updatePreview(); }, 3000);
+  } catch(e) {
+    console.error(e);
+    statusEl.className = 'status error';
+    statusEl.textContent = 'Error: ' + e.message;
+    dlBtn.disabled = false;
+  }
+}
+
 </script>
 </body>
 </html>
