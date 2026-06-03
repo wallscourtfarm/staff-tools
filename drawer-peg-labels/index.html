@@ -72,6 +72,7 @@
     .label-preview { position: relative; overflow: hidden; }
     .drawer-preview { width: 240px; height: 60px; }
     .peg-preview { width: 84px; height: 22px; }
+    .avery-preview { width: 114px; height: 64px; }
 
     footer { text-align: center; color: var(--muted); font-size: 0.7rem; padding: 14px; }
     .size-info { background: var(--blue-lt); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 0.8rem; color: var(--blue-dk); }
@@ -96,6 +97,7 @@
         <div class="mode-tabs" id="labelTypeTabs">
           <button class="mode-tab active" data-type="drawer">Drawer Labels (120×30mm)</button>
           <button class="mode-tab" data-type="peg">Peg Labels (42×11mm)</button>
+          <button class="mode-tab" data-type="avery">Avery L7651 (38×21mm)</button>
         </div>
         <div class="size-info" id="sizeInfo">
           <strong>Drawer:</strong> 12 per sheet — 120mm × 30mm with 5mm coloured border
@@ -175,6 +177,15 @@ const LABEL_CONFIG = {
     perSheet: 102,
     cols: 6,
     rows: 17
+  },
+  avery: {
+    width: 38.1,
+    height: 21.2,
+    border: 1.5,
+    perSheet: 65,
+    cols: 5,
+    rows: 13,
+    orientation: 'portrait'
   }
 };
 
@@ -227,8 +238,10 @@ function onLabelTypeClick(e) {
   const config = LABEL_CONFIG[currentLabelType];
   if (currentLabelType === 'drawer') {
     sizeInfo.innerHTML = `<strong>Drawer:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border`;
-  } else {
+  } else if (currentLabelType === 'peg') {
     sizeInfo.innerHTML = `<strong>Peg:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border`;
+  } else {
+    sizeInfo.innerHTML = `<strong>Avery L7651:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border (A4 portrait)`;
   }
 
   labelPreview.className = `label-preview ${currentLabelType}-preview`;
@@ -329,8 +342,8 @@ async function generatePdf() {
   dlBtn.disabled = true;
 
   try {
-    const pageW = 297;
-    const pageH = 210;
+    const pageW = config.orientation === 'portrait' ? 210 : 297;
+    const pageH = config.orientation === 'portrait' ? 297 : 210;
     const gap = 0.2;
 
     const totalW = config.cols * config.width + (config.cols - 1) * gap;
@@ -338,8 +351,9 @@ async function generatePdf() {
     const marginLeft = (pageW - totalW) / 2;
     const marginTop = (pageH - totalH) / 2;
 
+    const isPortrait = config.orientation === 'portrait';
     const doc = new jsPDF({
-      orientation: 'landscape',
+      orientation: isPortrait ? 'portrait' : 'landscape',
       unit: 'mm',
       format: 'a4'
     });
@@ -368,12 +382,12 @@ async function generatePdf() {
     const innerW = config.width - config.border * 2;
     const innerH = config.height - config.border * 2;
 
-    // Font sizes: 54pt for drawer, 19pt for peg
-    const fontSize = currentLabelType === 'drawer' ? 54 : 19;
+    // Font sizes: 54pt for drawer, 19pt for peg, 16pt for avery
+    const fontSize = currentLabelType === 'drawer' ? 54 : currentLabelType === 'peg' ? 19 : 16;
     // Convert pt to mm: 1pt ≈ 0.352778mm
     const fontHmm = fontSize * 0.352778;
-    // Logo sizes: 20mm for drawer, 7mm for peg
-    const logoHmm = currentLabelType === 'drawer' ? 20 : 7;
+    // Logo sizes: 20mm for drawer, 7mm for peg, 10mm for avery
+    const logoHmm = currentLabelType === 'drawer' ? 20 : currentLabelType === 'peg' ? 7 : 10;
     const logoWmm = logoHmm;
 
     for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
@@ -428,14 +442,14 @@ async function generatePdf() {
           // Vertical centre: position baseline lower to centre text visually
           // Recalculate font height for shrunk font
           const actualFontHmm = actualFontSize * 0.352778;
-          const textYoffset = currentLabelType === 'drawer' ? 4 : 1;
+          const textYoffset = currentLabelType === 'drawer' ? 4 : currentLabelType === 'peg' ? 1 : 2;
           const textY = y + config.border + (innerH + actualFontHmm) / 2 - textYoffset;
           doc.text(name, textX, textY);
         }
       }
     }
 
-    const typeStr = currentLabelType === 'drawer' ? 'Drawer' : 'Peg';
+    const typeStr = currentLabelType === 'drawer' ? 'Drawer' : currentLabelType === 'peg' ? 'Peg' : 'Avery_L7651';
     const filename = `WFA_${typeStr}_Labels_Y${currentYear}.pdf`;
     doc.save(filename);
 
