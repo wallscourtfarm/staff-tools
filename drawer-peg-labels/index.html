@@ -188,8 +188,9 @@ const LABEL_CONFIG = {
     orientation: 'portrait',
     insetX: 0.8,
     insetY: 0.8,
-    offsetX: -5,
-    offsetY: 1.5
+    fixedMarginLeft: 9.75,
+    fixedMarginTop: 10.7,
+    gap: 0
   }
 };
 
@@ -348,12 +349,12 @@ async function generatePdf() {
   try {
     const pageW = config.orientation === 'portrait' ? 210 : 297;
     const pageH = config.orientation === 'portrait' ? 297 : 210;
-    const gap = 0.2;
 
+    const gap = config.gap !== undefined ? config.gap : 0.2;
     const totalW = config.cols * config.width + (config.cols - 1) * gap;
     const totalH = config.rows * config.height + (config.rows - 1) * gap;
-    const marginLeft = (pageW - totalW) / 2 + (config.offsetX || 0);
-    const marginTop = (pageH - totalH) / 2 + (config.offsetY || 0);
+    const marginLeft = config.fixedMarginLeft !== undefined ? config.fixedMarginLeft : (pageW - totalW) / 2 + (config.offsetX || 0);
+    const marginTop = config.fixedMarginTop !== undefined ? config.fixedMarginTop : (pageH - totalH) / 2 + (config.offsetY || 0);
 
     const isPortrait = config.orientation === 'portrait';
     const doc = new jsPDF({
