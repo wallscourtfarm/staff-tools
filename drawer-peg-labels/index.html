@@ -147,7 +147,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Drawer & Peg Label Generator · <strong>v1.0</strong></footer>
+<footer>Wallscourt Farm Academy — Drawer & Peg Label Generator · <strong>v1.1</strong></footer>
 
 <script>
 // Year group colours
@@ -508,8 +508,19 @@ async function generateDocx() {
     // (most classes < 65 pupils). Multi-sheet support can be added later.
     const sheetNames = names.slice(0, PER);
 
-    // Modify document.xml: replace {N} with name, CLRPLCH with year colour
+    // Modify document.xml
     let docXml = await zip.file('word/document.xml').async('string');
+
+    // Trim rows we don't need — prevents Word cantSplit logic overflowing to page 2
+    const rowsNeeded = Math.min(13, Math.max(1, Math.ceil(sheetNames.length / 5)));
+    for (let r = 12; r >= rowsNeeded; r--) {
+      const marker  = `{{${r * 5}}}`;
+      const mPos    = docXml.indexOf(marker);
+      if (mPos === -1) continue;
+      const trStart = docXml.lastIndexOf('<w:tr', mPos);
+      const trEnd   = docXml.indexOf('</w:tr>', mPos) + 7;
+      if (trStart >= 0 && trEnd > 7) docXml = docXml.slice(0, trStart) + docXml.slice(trEnd);
+    }
 
     // Replace colour placeholder
     docXml = docXml.split('CLRPLCH').join(bColor);
@@ -517,7 +528,6 @@ async function generateDocx() {
     // Replace name placeholders
     for (let i = 0; i < PER; i++) {
       const name = sheetNames[i] || '';
-      // Escape XML special chars
       const safe = name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       docXml = docXml.split(`{{${i}}}`).join(safe);
     }
