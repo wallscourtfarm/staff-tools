@@ -185,7 +185,9 @@ const LABEL_CONFIG = {
     perSheet: 65,
     cols: 5,
     rows: 13,
-    orientation: 'portrait'
+    orientation: 'portrait',
+    insetX: 0.8,
+    insetY: 0.8
   }
 };
 
@@ -404,17 +406,27 @@ async function generatePdf() {
           const x = marginLeft + col * (config.width + gap);
           const y = marginTop + row * (config.height + gap);
 
+          // Apply inset for labels that need print tolerance (e.g. Avery)
+          const ix = config.insetX || 0;
+          const iy = config.insetY || 0;
+          const lx = x + ix;
+          const ly = y + iy;
+          const lw = config.width - ix * 2;
+          const lh = config.height - iy * 2;
+          const liW = lw - config.border * 2;
+          const liH = lh - config.border * 2;
+
           // Draw coloured border
           doc.setFillColor(r, g, b);
-          doc.rect(x, y, config.width, config.height, 'F');
+          doc.rect(lx, ly, lw, lh, 'F');
 
           // Draw white inner
           doc.setFillColor(255, 255, 255);
-          doc.rect(x + config.border, y + config.border, innerW, innerH, 'F');
+          doc.rect(lx + config.border, ly + config.border, liW, liH, 'F');
 
           // Logo on left, vertically centred
-          const logoX = x + config.border + 1;
-          const logoY = y + config.border + (innerH - logoHmm) / 2;
+          const logoX = lx + config.border + 1;
+          const logoY = ly + config.border + (liH - logoHmm) / 2;
           doc.addImage(logoData, 'JPEG', logoX, logoY, logoWmm, logoHmm);
 
           // Set font and colour
@@ -424,7 +436,7 @@ async function generatePdf() {
 
           // Calculate available text width and shrink font if needed
           const textLeft = logoX + logoWmm + (currentLabelType === 'avery' ? 2 : 5);
-          const textRight = x + config.border + innerW - 5;
+          const textRight = lx + config.border + liW - 5;
           const availableWidth = textRight - textLeft;
           let actualFontSize = fontSize;
           doc.setFontSize(actualFontSize);
@@ -443,7 +455,7 @@ async function generatePdf() {
           // Recalculate font height for shrunk font
           const actualFontHmm = actualFontSize * 0.352778;
           const textYoffset = currentLabelType === 'drawer' ? 4 : currentLabelType === 'peg' ? 1 : 2;
-          const textY = y + config.border + (innerH + actualFontHmm) / 2 - textYoffset;
+          const textY = ly + config.border + (liH + actualFontHmm) / 2 - textYoffset;
           doc.text(name, textX, textY);
         }
       }
