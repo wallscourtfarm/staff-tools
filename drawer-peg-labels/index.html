@@ -6,7 +6,7 @@
   <title>Drawer & Peg Labels — Wallscourt Farm Academy</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
     @font-face {
       font-family: 'Tw Cen MT';
@@ -481,116 +481,202 @@ async function generatePdf() {
   }
 }
 async function generateDocx() {
-  const { Document, Table, TableRow, TableCell, Paragraph, TextRun, ImageRun,
-          WidthType, HeightRule, BorderStyle, AlignmentType, VerticalAlign, Packer } = window.docx;
-
-  const config = LABEL_CONFIG['avery'];
   const yearData = YEAR_COLOURS[currentYear];
-  const borderHex = yearData.hex.replace('#', '');
+  const bColor  = yearData.hex.replace('#', '');
 
   statusEl.className = 'status';
   statusEl.textContent = 'Building…';
   dlBtn.disabled = true;
 
   try {
-    const mmTw = mm => Math.round(mm * 56.6929); // mm to twips
-    const mmPx = mm => Math.round(mm / 25.4 * 96); // mm to px at 96dpi (for ImageRun)
+    // unit helpers
+    const tw  = mm => Math.round(mm * 1440 / 25.4);   // mm → twips
+    const emu = mm => Math.round(mm * 914400 / 25.4);  // mm → EMU
 
-    const cellW = mmTw(config.width);   // 38.1mm
-    const cellH = mmTw(config.height);  // 21.2mm
+    const CW   = tw(38.1);  // cell width  2160 twips
+    const CH   = tw(21.2);  // cell height 1202 twips
+    const COLS = 5, ROWS = 13, PER = COLS * ROWS;
 
-    // Avery L7651 page margins (symmetric, A4 portrait)
-    const margin = {
-      top: mmTw(10.7), bottom: mmTw(10.7),
-      left: mmTw(9.75), right: mmTw(9.75),
-      header: 0, footer: 0,
-    };
+    // Page (A4 portrait) — inner area = exactly 5×38.1mm wide, 13×21.2mm tall
+    const PW = tw(210), PH = tw(297);
+    const ML = tw(9.75), MR = tw(9.75), MT = tw(10.7), MB = tw(10.7);
 
-    // Border thickness ~1.5mm: in docx size = eighths of a point; 1.5mm ≈ 4.25pt → 34
-    const bSz = 34;
+    // Logo binary
+    const logoB64  = logoData.split(',')[1];
+    const logoBin  = atob(logoB64);
+    const logoBytes = new Uint8Array(logoBin.length);
+    for (let i = 0; i < logoBin.length; i++) logoBytes[i] = logoBin.charCodeAt(i);
 
-    // Decode logo to Uint8Array
-    const b64 = logoData.split(',')[1];
-    const bin = atob(b64);
-    const logoBytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) logoBytes[i] = bin.charCodeAt(i);
+    const LOGO_EMU = emu(10);   // 10 mm logo square
+    const GAP_EMU  = emu(2.5);  // gap between logo and text
 
-    // Logo display size (px at 96dpi): 13mm
-    const logoPx = mmPx(13);
+    const esc = s => String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-    const sheetsNeeded = Math.ceil(names.length / config.perSheet) || 1;
-    const sections = [];
+    let imgId = 1;
 
-    for (let si = 0; si < sheetsNeeded; si++) {
-      const sheetNames = names.slice(si * config.perSheet, (si + 1) * config.perSheet);
-      let ni = 0;
-      const rows = [];
-
-      for (let r = 0; r < config.rows; r++) {
-        const cells = [];
-        for (let c = 0; c < config.cols; c++) {
-          const name = sheetNames[ni++] || null;
-          const para = new Paragraph({
-            children: name ? [
-              new ImageRun({
-                data: logoBytes,
-                transformation: { width: logoPx, height: logoPx },
-                type: 'jpg',
-              }),
-              new TextRun({
-                text: '  ' + name,
-                font: 'Tw Cen MT',
-                size: 28,        // 14pt (half-points)
-                bold: true,
-                color: '1e2d3d',
-              }),
-            ] : [],
-            spacing: { before: 0, after: 0 },
-          });
-
-          cells.push(new TableCell({
-            children: [para],
-            width: { size: cellW, type: WidthType.DXA },
-            borders: {
-              top:    { style: BorderStyle.SINGLE, size: bSz, color: borderHex },
-              bottom: { style: BorderStyle.SINGLE, size: bSz, color: borderHex },
-              left:   { style: BorderStyle.SINGLE, size: bSz, color: borderHex },
-              right:  { style: BorderStyle.SINGLE, size: bSz, color: borderHex },
-            },
-            verticalAlign: VerticalAlign.CENTER,
-            margins: { top: 0, bottom: 0, left: mmTw(1.5), right: mmTw(0.5) },
-          }));
-        }
-        rows.push(new TableRow({
-          children: cells,
-          height: { value: cellH, rule: HeightRule.EXACT },
-          cantSplit: true,
-        }));
-      }
-
-      sections.push({
-        properties: {
-          page: {
-            size: { width: mmTw(210), height: mmTw(297) },
-            margin,
-          },
-        },
-        children: [
-          new Table({
-            rows,
-            width: { size: cellW * config.cols, type: WidthType.DXA },
-            layout: 'fixed',
-          }),
-        ],
-      });
+    function imgXml(id) {
+      return `<w:r><w:rPr><w:noProof/></w:rPr><w:drawing>` +
+        `<wp:inline distT="0" distB="0" distL="0" distR="${GAP_EMU}" ` +
+        `xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">` +
+        `<wp:extent cx="${LOGO_EMU}" cy="${LOGO_EMU}"/>` +
+        `<wp:effectExtent l="0" t="0" r="0" b="0"/>` +
+        `<wp:docPr id="${id}" name="logo${id}"/>` +
+        `<wp:cNvGraphicFramePr>` +
+          `<a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>` +
+        `</wp:cNvGraphicFramePr>` +
+        `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">` +
+          `<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+            `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+              `<pic:nvPicPr>` +
+                `<pic:cNvPr id="${id}" name="logo${id}"/>` +
+                `<pic:cNvPicPr><a:picLocks noChangeAspect="1"/></pic:cNvPicPr>` +
+              `</pic:nvPicPr>` +
+              `<pic:blipFill>` +
+                `<a:blip r:embed="rId1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>` +
+                `<a:stretch><a:fillRect/></a:stretch>` +
+              `</pic:blipFill>` +
+              `<pic:spPr>` +
+                `<a:xfrm><a:off x="0" y="0"/><a:ext cx="${LOGO_EMU}" cy="${LOGO_EMU}"/></a:xfrm>` +
+                `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>` +
+              `</pic:spPr>` +
+            `</pic:pic>` +
+          `</a:graphicData>` +
+        `</a:graphic>` +
+      `</wp:inline></w:drawing></w:r>`;
     }
 
-    const doc = new Document({ sections });
-    const blob = await Packer.toBlob(doc);
+    function cellXml(name) {
+      const runs = name
+        ? imgXml(imgId++) +
+          `<w:r><w:rPr>` +
+            `<w:rFonts w:ascii="Tw Cen MT" w:hAnsi="Tw Cen MT"/>` +
+            `<w:b/><w:sz w:val="28"/><w:color w:val="1e2d3d"/>` +
+          `</w:rPr><w:t xml:space="preserve">${esc(name)}</w:t></w:r>`
+        : '';
+      return `<w:tc>` +
+        `<w:tcPr>` +
+          `<w:tcW w:w="${CW}" w:type="dxa"/>` +
+          `<w:tcBorders>` +
+            `<w:top    w:val="single" w:sz="34" w:space="0" w:color="${bColor}"/>` +
+            `<w:left   w:val="single" w:sz="34" w:space="0" w:color="${bColor}"/>` +
+            `<w:bottom w:val="single" w:sz="34" w:space="0" w:color="${bColor}"/>` +
+            `<w:right  w:val="single" w:sz="34" w:space="0" w:color="${bColor}"/>` +
+          `</w:tcBorders>` +
+          `<w:tcMar>` +
+            `<w:top    w:w="0"   w:type="dxa"/>` +
+            `<w:left   w:w="85"  w:type="dxa"/>` +
+            `<w:bottom w:w="0"   w:type="dxa"/>` +
+            `<w:right  w:w="57"  w:type="dxa"/>` +
+          `</w:tcMar>` +
+          `<w:vAlign w:val="center"/>` +
+        `</w:tcPr>` +
+        `<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr>` +
+        runs + `</w:p></w:tc>`;
+    }
+
+    function tableXml(sheetNames) {
+      const grid = Array(COLS).fill(`<w:gridCol w:w="${CW}"/>`).join('');
+      let rows = '', ni = 0;
+      for (let r = 0; r < ROWS; r++) {
+        let cells = '';
+        for (let c = 0; c < COLS; c++) cells += cellXml(sheetNames[ni++] || null);
+        rows += `<w:tr><w:trPr>` +
+          `<w:trHeight w:val="${CH}" w:hRule="exact"/>` +
+          `<w:cantSplit/>` +
+          `</w:trPr>${cells}</w:tr>`;
+      }
+      return `<w:tbl>` +
+        `<w:tblPr>` +
+          `<w:tblW w:w="${CW * COLS}" w:type="dxa"/>` +
+          `<w:tblLayout w:type="fixed"/>` +
+          `<w:tblInd w:w="0" w:type="dxa"/>` +
+          `<w:tblCellSpacing w:w="0" w:type="dxa"/>` +
+          `<w:tblBorders>` +
+            `<w:insideH w:val="none" w:sz="0" w:space="0" w:color="auto"/>` +
+            `<w:insideV w:val="none" w:sz="0" w:space="0" w:color="auto"/>` +
+          `</w:tblBorders>` +
+          `<w:tblCellMar>` +
+            `<w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/>` +
+            `<w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/>` +
+          `</w:tblCellMar>` +
+        `</w:tblPr>` +
+        `<w:tblGrid>${grid}</w:tblGrid>` +
+        rows + `</w:tbl>`;
+    }
+
+    const sheetsNeeded = Math.ceil(names.length / PER) || 1;
+    const padded = [...names];
+    while (padded.length < sheetsNeeded * PER) padded.push(null);
+
+    let body = '';
+    for (let si = 0; si < sheetsNeeded; si++) {
+      if (si > 0) body += `<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:br w:type="page"/></w:r></w:p>`;
+      body += tableXml(padded.slice(si * PER, (si + 1) * PER));
+    }
+
+    const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+  <w:body>${body}
+    <w:sectPr>
+      <w:pgSz w:w="${PW}" w:h="${PH}" w:orient="portrait"/>
+      <w:pgMar w:top="${MT}" w:right="${MR}" w:bottom="${MB}" w:left="${ML}" w:header="0" w:footer="0" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+    const ctXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml"  ContentType="application/xml"/>
+  <Default Extension="jpg"  ContentType="image/jpeg"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml"   ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>`;
+
+    const pkgRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+    const wordRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo.jpg"/>
+</Relationships>`;
+
+    const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults>
+    <w:rPrDefault><w:rPr>
+      <w:rFonts w:ascii="Tw Cen MT" w:hAnsi="Tw Cen MT"/>
+      <w:sz w:val="28"/>
+    </w:rPr></w:rPrDefault>
+    <w:pPrDefault><w:pPr>
+      <w:spacing w:before="0" w:after="0"/>
+    </w:pPr></w:pPrDefault>
+  </w:docDefaults>
+</w:styles>`;
+
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', ctXml);
+    zip.file('_rels/.rels', pkgRels);
+    zip.file('word/document.xml', docXml);
+    zip.file('word/_rels/document.xml.rels', wordRels);
+    zip.file('word/styles.xml', stylesXml);
+    zip.file('word/media/logo.jpg', logoBytes);
+
+    const blob = await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `WFA_Avery_L7651_Labels_Y${currentYear}.docx`;
+    a.href = url; a.download = `WFA_Avery_L7651_Labels_Y${currentYear}.docx`;
     a.click();
     URL.revokeObjectURL(url);
 
