@@ -494,7 +494,7 @@ async function generateDocx() {
     const emu = mm => Math.round(mm * 914400 / 25.4);  // mm → EMU
 
     const CW   = tw(38.1);  // cell width  2160 twips
-    const CH   = tw(21.2);  // cell height 1202 twips
+    const CH   = 1201;      // 13×1201=15613 < 15624 available (tw(21.2)=1202 overflows by 2)
     const COLS = 5, ROWS = 13, PER = COLS * ROWS;
 
     // Page (A4 portrait) — inner area = exactly 5×38.1mm wide, 13×21.2mm tall
@@ -610,11 +610,20 @@ async function generateDocx() {
     const padded = [...names];
     while (padded.length < sheetsNeeded * PER) padded.push(null);
 
+    // sectPr MUST live inside the final paragraph's pPr — if it's a bare <w:body> child
+    // Word ignores it and falls back to 1-inch default margins.
+    const sectPr = `<w:sectPr>` +
+      `<w:pgSz w:w="${PW}" w:h="${PH}" w:orient="portrait"/>` +
+      `<w:pgMar w:top="${MT}" w:right="${MR}" w:bottom="${MB}" w:left="${ML}" w:header="0" w:footer="0" w:gutter="0"/>` +
+      `</w:sectPr>`;
+    const finalPar = `<w:p><w:pPr><w:spacing w:before="0" w:after="0"/>${sectPr}</w:pPr></w:p>`;
+
     let body = '';
     for (let si = 0; si < sheetsNeeded; si++) {
       if (si > 0) body += `<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:br w:type="page"/></w:r></w:p>`;
       body += tableXml(padded.slice(si * PER, (si + 1) * PER));
     }
+    body += finalPar;
 
     const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -622,12 +631,7 @@ async function generateDocx() {
   xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
   xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
   xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
-  <w:body>${body}
-    <w:sectPr>
-      <w:pgSz w:w="${PW}" w:h="${PH}" w:orient="portrait"/>
-      <w:pgMar w:top="${MT}" w:right="${MR}" w:bottom="${MB}" w:left="${ML}" w:header="0" w:footer="0" w:gutter="0"/>
-    </w:sectPr>
-  </w:body>
+  <w:body>${body}</w:body>
 </w:document>`;
 
     const ctXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
