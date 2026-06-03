@@ -146,7 +146,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Drawer & Peg Label Generator · <strong>v1.2</strong></footer>
+<footer>Wallscourt Farm Academy — Drawer & Peg Label Generator · <strong>v1.3</strong></footer>
 
 <script>
 // Year group colours
@@ -179,18 +179,21 @@ const LABEL_CONFIG = {
     rows: 17
   },
   avery: {
-    width: 38.1,
-    height: 21.2,
+    width: 38.1,      // label width (used for perSheet only)
+    height: 21.2,     // label height (used for perSheet only)
     border: 1.5,
     perSheet: 65,
     cols: 5,
     rows: 13,
     orientation: 'portrait',
-    insetX: 2.5,
-    insetY: 0.8,
-    fixedMarginLeft: 9.75,
-    fixedMarginTop: 10.7,
-    gap: 0
+    gap: 0,
+    // Explicit nameimage positioning — bypasses inset/margin calculations
+    nameimageW:    35,   // nameimage width  (mm)
+    nameimageH:    17,   // nameimage height (mm)
+    nameimageLeft: 6,    // x of col-1 nameimage left edge from paper left edge
+    nameimageGapX: 5,    // horizontal gap between nameimages
+    nameimageTop:  11,   // y of row-1 nameimage top edge from paper top edge
+    nameimageGapY: 3     // vertical gap between nameimages
   }
 };
 
@@ -246,7 +249,7 @@ function onLabelTypeClick(e) {
   } else if (currentLabelType === 'peg') {
     sizeInfo.innerHTML = `<strong>Peg:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border`;
   } else {
-    sizeInfo.innerHTML = `<strong>Avery L7651:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border (A4 portrait)`;
+    sizeInfo.innerHTML = `<strong>Avery L7651:</strong> ${config.perSheet} per sheet — nameimage ${config.nameimageW}mm × ${config.nameimageH}mm, ${config.border}mm border`;
   }
 
   labelPreview.className = `label-preview ${currentLabelType}-preview`;
@@ -392,7 +395,7 @@ async function generatePdf() {
     // Convert pt to mm: 1pt ≈ 0.352778mm
     const fontHmm = fontSize * 0.352778;
     // Logo sizes: 20mm for drawer, 7mm for peg, 10mm for avery
-    const logoHmm = currentLabelType === 'drawer' ? 20 : currentLabelType === 'peg' ? 7 : 6;
+    const logoHmm = currentLabelType === 'drawer' ? 20 : currentLabelType === 'peg' ? 7 : 8;
     const logoWmm = logoHmm;
 
     for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
@@ -412,12 +415,22 @@ async function generatePdf() {
           // Apply inset for labels that need print tolerance (e.g. Avery)
           const ix = config.insetX || 0;
           const iy = config.insetY || 0;
-          const lx = x + ix;
-          const ly = y + iy;
-          const lw = config.width - ix * 2;
-          const lh = config.height - iy * 2;
-          const liW = lw - config.border * 2;
-          const liH = lh - config.border * 2;
+          let lx = x + ix;
+          let ly = y + iy;
+          let lw = config.width - ix * 2;
+          let lh = config.height - iy * 2;
+          let liW = lw - config.border * 2;
+          let liH = lh - config.border * 2;
+
+          // Avery: use explicit nameimage coordinates
+          if (config.nameimageLeft !== undefined) {
+            lx  = config.nameimageLeft + col * (config.nameimageW + config.nameimageGapX);
+            ly  = config.nameimageTop  + row * (config.nameimageH + config.nameimageGapY);
+            lw  = config.nameimageW;
+            lh  = config.nameimageH;
+            liW = lw - config.border * 2;
+            liH = lh - config.border * 2;
+          }
 
           // Draw coloured border
           doc.setFillColor(r, g, b);
@@ -439,7 +452,7 @@ async function generatePdf() {
 
           // Calculate available text width and shrink font if needed
           const textLeft = logoX + logoWmm + (currentLabelType === 'avery' ? 2 : 5);
-          const textRight = lx + config.border + liW - 5;
+          const textRight = lx + config.border + liW - (currentLabelType === 'avery' ? 1.5 : 5);
           const availableWidth = textRight - textLeft;
           let actualFontSize = fontSize;
           doc.setFontSize(actualFontSize);
@@ -457,7 +470,7 @@ async function generatePdf() {
           // Vertical centre: position baseline lower to centre text visually
           // Recalculate font height for shrunk font
           const actualFontHmm = actualFontSize * 0.352778;
-          const textYoffset = currentLabelType === 'drawer' ? 4 : currentLabelType === 'peg' ? 1 : 2;
+          const textYoffset = currentLabelType === 'drawer' ? 4 : currentLabelType === 'peg' ? 1 : 1;
           const textY = ly + config.border + (liH + actualFontHmm) / 2 - textYoffset;
           doc.text(name, textX, textY);
         }
