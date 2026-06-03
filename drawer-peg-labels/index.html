@@ -387,7 +387,7 @@ async function generatePdf() {
     // Convert pt to mm: 1pt ≈ 0.352778mm
     const fontHmm = fontSize * 0.352778;
     // Logo sizes: 20mm for drawer, 7mm for peg, 10mm for avery
-    const logoHmm = currentLabelType === 'drawer' ? 20 : currentLabelType === 'peg' ? 7 : 10;
+    const logoHmm = currentLabelType === 'drawer' ? 20 : currentLabelType === 'peg' ? 7 : 6;
     const logoWmm = logoHmm;
 
     for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
@@ -423,7 +423,7 @@ async function generatePdf() {
           doc.setTextColor(30, 45, 61);
 
           // Calculate available text width and shrink font if needed
-          const textLeft = logoX + logoWmm + 5;
+          const textLeft = logoX + logoWmm + (currentLabelType === 'avery' ? 2 : 5);
           const textRight = x + config.border + innerW - 5;
           const availableWidth = textRight - textLeft;
           let actualFontSize = fontSize;
