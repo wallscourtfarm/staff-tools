@@ -146,7 +146,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Drawer & Peg Label Generator · <strong>v1.5</strong></footer>
+<footer>Wallscourt Farm Academy — Drawer & Peg Label Generator · <strong>v1.6</strong></footer>
 
 <script>
 // Year group colours
@@ -192,9 +192,10 @@ const LABEL_CONFIG = {
     nameimageH:    17,   // nameimage height (mm)
     nameimageLeft: 9,    // x of col-1 nameimage left edge from paper left edge
     nameimageGapX: 5,    // horizontal gap between nameimages
-    colOffsets: [0, 0, 0, 1, 1],  // per-column x nudge (mm)
+    colOffsets: [-4, -2, 0, 1, 4],  // per-column x nudge (mm)
     nameimageTop:  11,   // y of row-1 nameimage top edge from paper top edge
-    nameimageGapY: 3     // vertical gap between nameimages
+    nameimageGapY: 3,    // vertical gap between nameimages
+    rowOffsets: [-3, -1, 1, 3, 5, 7, 8, 9, 14, 16, 18, 20, 21]  // per-row y nudge mm (neg=up, pos=down)
   }
 };
 
@@ -426,7 +427,7 @@ async function generatePdf() {
           // Avery: use explicit nameimage coordinates
           if (config.nameimageLeft !== undefined) {
             lx  = config.nameimageLeft + col * (config.nameimageW + config.nameimageGapX) + (config.colOffsets ? config.colOffsets[col] || 0 : 0);
-            ly  = config.nameimageTop  + row * (config.nameimageH + config.nameimageGapY);
+            ly  = config.nameimageTop  + row * (config.nameimageH + config.nameimageGapY) + (config.rowOffsets ? config.rowOffsets[row] || 0 : 0);
             lw  = config.nameimageW;
             lh  = config.nameimageH;
             liW = lw - config.border * 2;
