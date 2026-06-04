@@ -520,10 +520,12 @@ function update() {
           '<div style="font-size:0.6rem;font-weight:700;text-decoration:underline">Key Question: <span style="font-weight:400;text-decoration:none">' + esc(kq||'\u2026') + '</span></div>' +
           '<div style="font-size:0.6rem;font-weight:700;text-decoration:underline;margin-top:2px">Learning Focus: <span style="font-weight:400;text-decoration:none">' + esc(lf||'\u2026') + '</span></div>' +
         '</div>' +
-        '<div class="pr-etiw-writer">' +
-          (writerIcon ? '<img src="' + writerIcon + '" class="pr-icon" style="margin:0 0 1px 0">' : '') +
-          '<span style="font-size:0.45rem;color:var(--text)">Writer</span>' +
-          (code ? '<span style="font-size:0.5rem;font-weight:700;color:var(--text);margin-top:2px">' + esc(code) + '</span>' : '') +
+        '<div class="pr-etiw-writer" style="flex-direction:row;align-items:center;gap:3px;">' +
+          (code ? '<span style="font-size:0.9rem;font-weight:900;color:var(--text);line-height:1;">' + esc(code) + '</span>' : '') +
+          '<div style="display:flex;flex-direction:column;align-items:center;">' +
+            (writerIcon ? '<img src="' + writerIcon + '" class="pr-icon" style="margin:0 0 1px 0">' : '') +
+            '<span style="font-size:0.45rem;color:var(--text)">Writer</span>' +
+          '</div>' +
         '</div>' +
       '</div>' +
       '<div style="display:flex;gap:3px;justify-content:space-between;margin-top:5px;">' +
@@ -683,11 +685,13 @@ async function generateEtiwPdf() {
         doc.setFontSize(6);
         doc.setFont('helvetica', 'normal');
         doc.text('Writer', wx + WRITER_SZ / 2, wy + WRITER_SZ + 3, { align: 'center' });
-        if (code) {
-          doc.setFontSize(7);
-          doc.setFont('helvetica', 'bold');
-          doc.text(code, wx + WRITER_SZ / 2, wy + WRITER_SZ + 7, { align: 'center' });
-        }
+      }
+      if (code) {
+        const wx = PAGE_W - PAD_R - WRITER_SZ;
+        const wy = y + 4;
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(code, wx - 2, wy + WRITER_SZ / 2 + 2, { align: 'right' });
       }
 
       // ── ETIW icons row ──
@@ -1043,26 +1047,48 @@ async function generateEtiwDocx() {
       // date is shown under logo instead
 
       // ── Writer cell ──
-      const writerParas = [];
+      // ── Writer cell: code (left) + icon+label (right) ──
+      const CODE_COL   = code ? 420 : 0;
+      const ICON_COL   = WRITER_COL - CODE_COL;
+      const iconParas = [];
       if (writerBytes) {
-        writerParas.push(new Paragraph({
+        iconParas.push(new Paragraph({
           alignment: AlignmentType.CENTER,
           spacing: { before: 0, after: 20, line: 240 },
           children: [new ImageRun({ data: writerBytes, transformation: { width: WRITER_PX_W, height: WRITER_PX_H }, type: 'png' })],
         }));
       }
-      writerParas.push(new Paragraph({
+      iconParas.push(new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { before: 0, after: 0, line: 220 },
         children: [new TextRun({ text: 'Writer', size: 14, font: 'Calibri' })],
       }));
-      if (code) {
-        writerParas.push(new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 20, after: 0, line: 220 },
-          children: [new TextRun({ text: code, size: 16, bold: true, font: 'Calibri' })],
-        }));
-      }
+      const codeParas = [new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 0, line: 240 },
+        children: code ? [new TextRun({ text: code, size: 36, bold: true, font: 'Calibri' })] : [],
+      })];
+      const writerInner = new Table({
+        width: { size: WRITER_COL, type: WidthType.DXA },
+        columnWidths: code ? [CODE_COL, ICON_COL] : [WRITER_COL],
+        rows: [new TableRow({ children: [
+          ...(code ? [new TableCell({
+            width: { size: CODE_COL, type: WidthType.DXA },
+            borders: allNone,
+            margins: { top: 0, bottom: 0, left: 0, right: 40 },
+            verticalAlign: VerticalAlign.CENTER,
+            children: codeParas,
+          })] : []),
+          new TableCell({
+            width: { size: ICON_COL, type: WidthType.DXA },
+            borders: allNone,
+            margins: { top: 0, bottom: 0, left: 0, right: 0 },
+            verticalAlign: VerticalAlign.CENTER,
+            children: iconParas,
+          }),
+        ]})],
+      });
+      const writerParas = [writerInner];
 
       // ── Top row: 3-column nested table ──
       const topTable = new Table({
