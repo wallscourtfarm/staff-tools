@@ -171,6 +171,13 @@
           <input type="date" class="plain" id="etiwDate" oninput="update()" onchange="update()">
         </div>
       </div>
+      <div class="two-col" style="margin-top:11px;">
+        <div class="field">
+          <label>Code</label>
+          <input type="text" class="plain" id="etiwCode" placeholder="e.g. S1" maxlength="6" oninput="update()">
+        </div>
+        <div class="field"></div>
+      </div>
       <div class="field" style="margin-top:11px;">
         <label>Key Question</label>
         <div class="q-row">
@@ -497,6 +504,7 @@ function update() {
     const dateVal = fmtDate(g('etiwDate'));
     const kq = g('etiwQuestion');
     const lf = g('etiwLf');
+    const code = g('etiwCode');
     const ready = !!(phase && (kq || lf));
     previewCard.classList.toggle('hidden', !ready);
     dlBtn.disabled = !ready;
@@ -515,6 +523,7 @@ function update() {
         '<div class="pr-etiw-writer">' +
           (writerIcon ? '<img src="' + writerIcon + '" class="pr-icon" style="margin:0 0 1px 0">' : '') +
           '<span style="font-size:0.45rem;color:var(--text)">Writer</span>' +
+          (code ? '<span style="font-size:0.5rem;font-weight:700;color:var(--text);margin-top:2px">' + esc(code) + '</span>' : '') +
         '</div>' +
       '</div>' +
       '<div style="display:flex;gap:3px;justify-content:space-between;margin-top:5px;">' +
@@ -597,6 +606,7 @@ async function generateEtiwPdf() {
     const date  = fmtDate(g('etiwDate'));
     const kq    = g('etiwQuestion');
     const lf    = g('etiwLf');
+    const code  = g('etiwCode');
 
     const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
@@ -673,6 +683,11 @@ async function generateEtiwPdf() {
         doc.setFontSize(6);
         doc.setFont('helvetica', 'normal');
         doc.text('Writer', wx + WRITER_SZ / 2, wy + WRITER_SZ + 3, { align: 'center' });
+        if (code) {
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'bold');
+          doc.text(code, wx + WRITER_SZ / 2, wy + WRITER_SZ + 7, { align: 'center' });
+        }
       }
 
       // ── ETIW icons row ──
@@ -892,6 +907,7 @@ async function generateEtiwDocx() {
     const date  = fmtDate(g('etiwDate'));
     const kq    = g('etiwQuestion');
     const lf    = g('etiwLf');
+    const code  = g('etiwCode');
 
     function decodeB64(dataUri) {
       const raw = dataUri.replace(/^data:image\/[a-z]+;base64,/, '');
@@ -1040,6 +1056,13 @@ async function generateEtiwDocx() {
         spacing: { before: 0, after: 0, line: 220 },
         children: [new TextRun({ text: 'Writer', size: 14, font: 'Calibri' })],
       }));
+      if (code) {
+        writerParas.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 20, after: 0, line: 220 },
+          children: [new TextRun({ text: code, size: 16, bold: true, font: 'Calibri' })],
+        }));
+      }
 
       // ── Top row: 3-column nested table ──
       const topTable = new Table({
