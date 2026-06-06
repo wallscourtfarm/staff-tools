@@ -166,7 +166,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>06.06.26b</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>06.06.26c</strong></footer>
 
 <script>
 // Year group colours
@@ -453,10 +453,14 @@ async function generatePdf() {
           const liW = lw - imgConfig.border*2;
           const liH = lh - imgConfig.border*2;
 
-          // Draw image filling the inner area first
+          // White base so transparent images don't show jsPDF's default background
+          doc.setFillColor(255,255,255);
+          doc.rect(lx, ly, lw, lh, 'F');
+
+          // Draw image filling the inner area
           doc.addImage(imgDataUrl, lx+imgConfig.border, ly+imgConfig.border, liW, liH, undefined, 'FAST');
 
-          // Draw coloured border as 4 strips on top (not a full background fill)
+          // Draw coloured border as 4 strips on top
           doc.setFillColor(cr,cg,cb);
           doc.rect(lx,                      ly,                       lw,              imgConfig.border, 'F'); // top
           doc.rect(lx,                      ly+lh-imgConfig.border,   lw,              imgConfig.border, 'F'); // bottom
