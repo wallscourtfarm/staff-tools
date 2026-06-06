@@ -166,7 +166,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>v2.2</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>06.06.26b</strong></footer>
 
 <script>
 // Year group colours
@@ -453,12 +453,15 @@ async function generatePdf() {
           const liW = lw - imgConfig.border*2;
           const liH = lh - imgConfig.border*2;
 
-          // Draw coloured border (filled rect, same as name labels)
-          doc.setFillColor(cr,cg,cb);
-          doc.rect(lx, ly, lw, lh, 'F');
-
-          // Draw image filling the inner area
+          // Draw image filling the inner area first
           doc.addImage(imgDataUrl, lx+imgConfig.border, ly+imgConfig.border, liW, liH, undefined, 'FAST');
+
+          // Draw coloured border as 4 strips on top (not a full background fill)
+          doc.setFillColor(cr,cg,cb);
+          doc.rect(lx,                      ly,                       lw,              imgConfig.border, 'F'); // top
+          doc.rect(lx,                      ly+lh-imgConfig.border,   lw,              imgConfig.border, 'F'); // bottom
+          doc.rect(lx,                      ly+imgConfig.border,      imgConfig.border, liH,             'F'); // left
+          doc.rect(lx+lw-imgConfig.border,  ly+imgConfig.border,      imgConfig.border, liH,             'F'); // right
         }
       }
 
