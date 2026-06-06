@@ -349,8 +349,8 @@ function updatePreview() {
     const fmt = getImgFmt();
     const hint = document.getElementById('imgHint');
     if (hint) hint.textContent = fmt === '12'
-      ? 'Ideal: 930×360px (2.58:1) — fills 99×42mm label inside 3mm border'
-      : 'Ideal: 414×215px (1.93:1) — fills 38×21mm label inside 1.5mm border';
+      ? 'Ideal: 1140×240px (4.75:1) — fills drawer label inner area (120×30mm minus 3mm border each side)'
+      : 'Ideal: 320×136px (2.35:1) — fills Avery L7651 inner area (35×17mm inside 1.5mm border)';
     const yearData = currentYear ? YEAR_COLOURS[currentYear] : null;
     const colour = yearData?.hex || '#ccc';
     const border = fmt === '12' ? 3 : 1.5;
@@ -410,7 +410,7 @@ function updatePreview() {
 }
 
 async function generatePdf() {
-  // ── Image mode ──
+  // ── Image mode — uses exact same layout as name labels ──
   if (currentLabelType === 'image') {
     const { jsPDF } = window.jspdf;
     const fmt = getImgFmt();
@@ -419,27 +419,49 @@ async function generatePdf() {
     statusEl.textContent = 'Building…';
     dlBtn.disabled = true;
     try {
-      let cols, rows, LW, LH, marginL, marginT, gapX, gapY, border;
-      if (fmt === '12') {
-        cols=2; rows=6; LW=99.1; LH=42.3; marginL=6.35; marginT=21.15; gapX=0; gapY=0; border=3;
-      } else {
-        cols=5; rows=13; LW=38.1; LH=21.2; marginL=8.6; marginT=11; gapX=2.5; gapY=0; border=1.5;
-      }
+      // Reuse the existing label config: drawer for 12-per-sheet, avery for 65-per-sheet
+      const imgConfig = fmt === '12' ? LABEL_CONFIG.drawer : LABEL_CONFIG.avery;
+      const isPortrait = imgConfig.orientation === 'portrait';
+      const pageW = isPortrait ? 210 : 297;
+      const pageH = isPortrait ? 297 : 210;
+      const gap = imgConfig.gap !== undefined ? imgConfig.gap : 0.2;
+      const totalW = imgConfig.cols * imgConfig.width + (imgConfig.cols - 1) * gap;
+      const totalH = imgConfig.rows * imgConfig.height + (imgConfig.rows - 1) * gap;
+      const marginLeft = (pageW - totalW) / 2;
+      const marginTop  = (pageH - totalH) / 2;
+
       const hex = colour.replace('#','');
       const cr=parseInt(hex.substring(0,2),16), cg=parseInt(hex.substring(2,4),16), cb=parseInt(hex.substring(4,6),16);
-      const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' });
-      for (let row=0; row<rows; row++) {
-        for (let col=0; col<cols; col++) {
-          const x = marginL + col*(LW+gapX);
-          const y = marginT + row*(LH+gapY);
-          doc.addImage(imgDataUrl, x+border, y+border, LW-2*border, LH-2*border, undefined, 'FAST');
+
+      const doc = new jsPDF({ orientation: isPortrait ? 'portrait' : 'landscape', unit:'mm', format:'a4' });
+
+      for (let row=0; row<imgConfig.rows; row++) {
+        for (let col=0; col<imgConfig.cols; col++) {
+          // Replicate exact same lx/ly/lw/lh logic as name labels
+          let lx, ly, lw, lh;
+          if (imgConfig.nameimageLeft !== undefined) {
+            lx = imgConfig.nameimageLeft + col*(imgConfig.nameimageW+imgConfig.nameimageGapX) + (imgConfig.colOffsets ? imgConfig.colOffsets[col]||0 : 0);
+            ly = imgConfig.nameimageTop  + row*(imgConfig.nameimageH+imgConfig.nameimageGapY) + (imgConfig.rowOffsets ? imgConfig.rowOffsets[row]||0 : 0);
+            lw = imgConfig.nameimageW;
+            lh = imgConfig.nameimageH;
+          } else {
+            lx = marginLeft + col*(imgConfig.width+gap);
+            ly = marginTop  + row*(imgConfig.height+gap);
+            lw = imgConfig.width;
+            lh = imgConfig.height;
+          }
+          const liW = lw - imgConfig.border*2;
+          const liH = lh - imgConfig.border*2;
+
+          // Draw coloured border (filled rect, same as name labels)
           doc.setFillColor(cr,cg,cb);
-          doc.rect(x,            y,           LW,    border, 'F');
-          doc.rect(x,            y+LH-border, LW,    border, 'F');
-          doc.rect(x,            y+border,    border, LH-2*border, 'F');
-          doc.rect(x+LW-border,  y+border,    border, LH-2*border, 'F');
+          doc.rect(lx, ly, lw, lh, 'F');
+
+          // Draw image filling the inner area
+          doc.addImage(imgDataUrl, lx+imgConfig.border, ly+imgConfig.border, liW, liH, undefined, 'FAST');
         }
       }
+
       doc.save(`WFA_Image_Labels_Y${currentYear}_${fmt}ps.pdf`);
       statusEl.textContent = '✓ Downloaded';
       setTimeout(()=>{ statusEl.textContent=''; dlBtn.disabled=false; updatePreview(); }, 3000);
