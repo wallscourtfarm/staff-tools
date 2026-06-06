@@ -36,6 +36,28 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
 
 /* COMBINED PUZZLE */
 #combined-panel{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;min-height:0;overflow:hidden}
+#sats-drill-panel{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;min-height:0;overflow:hidden}
+.sats-body{overflow-y:auto;align-items:stretch;justify-content:flex-start;padding:0.4vh 0.5vw;gap:0.3vh}
+.sats-label{font-size:clamp(0.65rem,1.3vh,0.9rem);font-weight:800;text-transform:uppercase;color:#27AE60;letter-spacing:0.06em;margin-bottom:0.15em}
+.sats-para{font-size:clamp(0.75rem,1.6vh,1.05rem);line-height:1.4;color:#222}
+.sats-ans{margin-top:0.3em}
+.sats-ans.hidden,.sats-arith-a.hidden{opacity:0;pointer-events:none}
+.sats-err{font-size:clamp(0.65rem,1.3vh,0.9rem);padding:0.1em 0;border-bottom:1px solid #f0f0f0}
+.sats-wrong{color:#e74c3c;font-weight:700;text-decoration:line-through}
+.sats-fix{color:#27AE60;font-weight:700}
+.sats-why{color:#666;font-size:0.9em;font-style:italic}
+.sats-divider{height:1px;background:#EEE;margin:0.4vh 0}
+.sats-arith-row{display:flex;justify-content:space-between;align-items:center;font-size:clamp(0.85rem,1.8vh,1.2rem);padding:0.2em 0;border-bottom:1px solid #f0f0f0}
+.sats-arith-q{font-weight:600;color:#222}
+.sats-arith-a{font-weight:900;color:#27AE60;min-width:4em;text-align:right}
+.sats-reason-block{margin-bottom:0.6vh;padding-bottom:0.4vh;border-bottom:1px solid #EEE}
+.sats-reason-q{font-size:clamp(0.75rem,1.6vh,1.05rem);font-weight:600;color:#222;line-height:1.3}
+.sats-reason-block .sats-ans{font-size:clamp(0.7rem,1.4vh,0.95rem);color:#27AE60;margin-top:0.2em}
+.sats-wod-word{font-size:clamp(1.1rem,2.5vh,1.8rem);font-weight:900;color:#27AE60}
+.sats-wod-cls{font-size:0.7em;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.08em}
+.sats-wod-def{font-size:clamp(0.75rem,1.6vh,1rem);color:#222;margin:0.2em 0}
+.sats-wod-eg{font-size:clamp(0.7rem,1.4vh,0.95rem);color:#555;font-style:italic;margin:0.2em 0}
+.sats-wod-qs{font-size:clamp(0.7rem,1.4vh,0.95rem);color:#27AE60;font-weight:600;margin-top:0.3em}
 .cpanel{display:flex;flex-direction:column;padding:0.5vh 0.8vw;border-right:2.5px solid #EEE;border-bottom:2.5px solid #EEE;overflow:hidden;min-height:0}
 .cpanel:nth-child(2),.cpanel:nth-child(4){border-right:none}
 .cpanel:nth-child(3),.cpanel:nth-child(4){border-bottom:none}
@@ -355,7 +377,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Elm</span><span id="version-tag">e.06.06.26f</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Elm</span><span id="version-tag">e.06.06.26g</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -3044,6 +3066,114 @@ function getTTSet(){
 // STATE & INIT
 // ═══════════════════════════════════════════════════════════
 let pType='boggle',cur=null,solsOpen=false;
+const ARITHMETIC_SATS=[
+{q:'4,567 + 2,893',a:'7,460',type:'addition'},
+{q:'3,841 + 5,276',a:'9,117',type:'addition'},
+{q:'6,094 + 3,758',a:'9,852',type:'addition'},
+{q:'7,436 + 4,985',a:'12,421',type:'addition'},
+{q:'12,847 + 9,364',a:'22,211',type:'addition'},
+{q:'5,709 + 8,463',a:'14,172',type:'addition'},
+{q:'34,816 + 27,495',a:'62,311',type:'addition'},
+{q:'48,307 + 36,594',a:'84,901',type:'addition'},
+{q:'7,000 − 3,486',a:'3,514',type:'subtraction'},
+{q:'10,000 − 6,347',a:'3,653',type:'subtraction'},
+{q:'8,503 − 2,768',a:'5,735',type:'subtraction'},
+{q:'15,000 − 8,742',a:'6,258',type:'subtraction'},
+{q:'20,014 − 9,857',a:'10,157',type:'subtraction'},
+{q:'43,200 − 17,648',a:'25,552',type:'subtraction'},
+{q:'62,005 − 38,476',a:'23,529',type:'subtraction'},
+{q:'100,000 − 54,381',a:'45,619',type:'subtraction'},
+{q:'423 × 36',a:'15,228',type:'multiplication'},
+{q:'617 × 48',a:'29,616',type:'multiplication'},
+{q:'284 × 57',a:'16,188',type:'multiplication'},
+{q:'509 × 73',a:'37,157',type:'multiplication'},
+{q:'836 × 64',a:'53,504',type:'multiplication'},
+{q:'1,247 × 28',a:'34,916',type:'multiplication'},
+{q:'3,046 × 35',a:'106,610',type:'multiplication'},
+{q:'2,183 × 47',a:'102,601',type:'multiplication'},
+{q:'2,952 ÷ 8',a:'369',type:'division'},
+{q:'4,836 ÷ 6',a:'806',type:'division'},
+{q:'7,245 ÷ 9',a:'805',type:'division'},
+{q:'3,528 ÷ 12',a:'294',type:'division'},
+{q:'5,616 ÷ 16',a:'351',type:'division'},
+{q:'9,108 ÷ 18',a:'506',type:'division'},
+{q:'17,550 ÷ 25',a:'702',type:'division'},
+{q:'2/3 + 1/4',a:'11/12',type:'fraction'},
+{q:'3/5 + 2/3',a:'19/15',type:'fraction'},
+{q:'5/6 − 1/4',a:'7/12',type:'fraction'},
+{q:'7/8 − 2/5',a:'19/40',type:'fraction'},
+{q:'3/5 × 4/7',a:'12/35',type:'fraction'},
+{q:'2/3 × 9/10',a:'3/5',type:'fraction'},
+{q:'3/4 of 960',a:'720',type:'fraction'},
+{q:'2/5 of 735',a:'294',type:'fraction'},
+{q:'7/8 of 648',a:'567',type:'fraction'},
+{q:'35% of 420',a:'147',type:'percentage'},
+{q:'15% of 260',a:'39',type:'percentage'},
+{q:'45% of 680',a:'306',type:'percentage'},
+{q:'70% of 350',a:'245',type:'percentage'},
+{q:'12.5% of 480',a:'60',type:'percentage'},
+{q:'8% of 7,500',a:'600',type:'percentage'},
+{q:'17.5% of 240',a:'42',type:'percentage'},
+{q:'65% of 820',a:'533',type:'percentage'},
+{q:'6.4 × 0.7',a:'4.48',type:'decimal'},
+{q:'3.8 × 1.5',a:'5.7',type:'decimal'},
+{q:'12.6 ÷ 0.3',a:'42',type:'decimal'},
+{q:'7.56 ÷ 0.4',a:'18.9',type:'decimal'},
+{q:'4.73 + 8.96',a:'13.69',type:'decimal'},
+{q:'15.4 − 6.87',a:'8.53',type:'decimal'},
+{q:'2³',a:'8',type:'power'},
+{q:'√225',a:'15',type:'power'},
+{q:'4,705 × 62',a:'291,710',type:'multiplication'},
+{q:'14,364 ÷ 24',a:'598.5',type:'division'},
+{q:'4/5 ÷ 2/3',a:'6/5',type:'fraction'},
+{q:'3,046 × 19',a:'57,874',type:'multiplication'},
+{q:'72,450 − 39,867',a:'32,583',type:'subtraction'},
+{q:'57,284 + 38,716',a:'96,000',type:'addition'},
+];
+
+const REASONING_SATS=[
+{q:'A train journey takes 2 hours 35 minutes. If the train leaves at 09:47, what time does it arrive?',a:'12:22',exp:'09:47 + 2h = 11:47, + 35min = 12:22',topic:'time'},
+{q:'A shop buys a jacket for £45 and sells it for £67.50. What is the percentage profit?',a:'50%',exp:'Profit = £22.50. 22.50 ÷ 45 × 100 = 50%',topic:'money'},
+{q:'A recipe for 6 people needs 450g of flour. How much flour is needed for 10 people?',a:'750g',exp:'450 ÷ 6 = 75g per person. 75 × 10 = 750g',topic:'ratio'},
+{q:'A rectangle has a perimeter of 54cm. Its length is 16cm. What is its area?',a:'176cm²',exp:'Width = (54 − 32) ÷ 2 = 11cm. Area = 16 × 11 = 176cm²',topic:'measurement'},
+{q:'n × 7 − 4 = 38. What is the value of n?',a:'6',exp:'38 + 4 = 42. 42 ÷ 7 = 6',topic:'algebra'},
+{q:'The mean of five numbers is 13. Four of the numbers are 9, 15, 11, and 17. What is the fifth number?',a:'13',exp:'Total = 13 × 5 = 65. 65 − (9+15+11+17) = 13',topic:'statistics'},
+{q:'A bus leaves at 07:25 and arrives at 09:10. How long is the journey in minutes?',a:'105 minutes',exp:'07:25 to 09:10 = 1h 45min = 105 minutes',topic:'time'},
+{q:'Amara and Ben share £72 in the ratio 5:3. How much does Amara receive?',a:'£45',exp:'8 parts total. 1 part = £9. Amara = 5 × £9 = £45',topic:'ratio'},
+{q:'A shirt costs £24. In a sale it is reduced by 35%. What is the sale price?',a:'£15.60',exp:'35% of £24 = £8.40. £24 − £8.40 = £15.60',topic:'money'},
+{q:'What is 3/8 of 480?',a:'180',exp:'480 ÷ 8 = 60. 60 × 3 = 180',topic:'fractions'},
+{q:'The sequence is 3, 7, 11, 15, … What is the 20th term?',a:'79',exp:'nth term = 4n − 1. 20th term = 4 × 20 − 1 = 79',topic:'algebra'},
+{q:'A pie chart shows how 120 pupils travel to school. 45° represents those who cycle. How many pupils cycle?',a:'15',exp:'45 ÷ 360 × 120 = 15',topic:'statistics'},
+{q:'Two numbers have a sum of 91 and a difference of 17. What are the two numbers?',a:'54 and 37',exp:'(91+17)÷2 = 54 and (91−17)÷2 = 37',topic:'number'},
+{q:'A train timetable shows departures every 25 minutes from 06:00. What is the time of the 7th departure?',a:'07:30',exp:'6 gaps × 25min = 150min = 2h 30min. 06:00 + 2:30 = 07:30',topic:'time'},
+{q:'A shopkeeper buys 60 apples for £4.80 and sells them at 12p each. What is his total profit?',a:'£2.40',exp:'Revenue = 60 × 12p = £7.20. Profit = £7.20 − £4.80 = £2.40',topic:'money'},
+{q:'A car travels at 60mph. How far does it travel in 1 hour 45 minutes?',a:'105 miles',exp:'1.75 hours × 60 = 105 miles',topic:'measurement'},
+{q:'Find the value of n: 5n + 9 = 4n + 23',a:'14',exp:'5n − 4n = 23 − 9. n = 14',topic:'algebra'},
+{q:'In a class of 30 pupils, 2/5 are boys. How many girls are in the class?',a:'18',exp:'Boys = 2/5 × 30 = 12. Girls = 30 − 12 = 18',topic:'fractions'},
+{q:'A bar chart shows sales of 35, 48, 27, and 50 items over four weeks. What is the mean weekly sales figure?',a:'40',exp:'Total = 160. Mean = 160 ÷ 4 = 40',topic:'statistics'},
+{q:'Three friends share a prize of £156 in the ratio 2:3:7. What does the person with the largest share receive?',a:'£91',exp:'12 parts total. 1 part = £13. Largest share = 7 × £13 = £91',topic:'ratio'},
+{q:'What is 40% of 350 added to 15% of 200?',a:'170',exp:'40% of 350 = 140. 15% of 200 = 30. 140 + 30 = 170',topic:'fractions'},
+{q:'A number is multiplied by 6 then 15 is subtracted. The result is 51. What is the number?',a:'11',exp:'51 + 15 = 66. 66 ÷ 6 = 11',topic:'algebra'},
+{q:'Eggs are sold in boxes of 6 for £1.50 or boxes of 12 for £2.76. Which is better value?',a:'Box of 12 (23p each vs 25p each)',exp:'Box of 6: 25p each. Box of 12: 23p each.',topic:'money'},
+{q:'A map has a scale of 1:50,000. Two towns are 6cm apart on the map. What is the real distance in km?',a:'3km',exp:'6 × 50,000 = 300,000cm = 3,000m = 3km',topic:'proportion'},
+{q:'The temperature at midnight is −8°C. By noon it has risen by 13°C. What is the temperature at noon?',a:'5°C',exp:'−8 + 13 = 5°C',topic:'number'},
+{q:'A flight departs at 14:55 and lasts 3 hours 40 minutes. What is the arrival time?',a:'18:35',exp:'14:55 + 3h = 17:55, + 40min = 18:35',topic:'time'},
+{q:'A rectangular garden is 12m long and 8.5m wide. Grass seed costs £3.20 per m². What is the total cost?',a:'£326.40',exp:'Area = 12 × 8.5 = 102m². 102 × £3.20 = £326.40',topic:'money'},
+{q:'A school has 540 pupils. 3/4 attend a trip. Of those, 1/3 bring a packed lunch. How many bring a packed lunch?',a:'135',exp:'540 × 3/4 = 405. 405 × 1/3 = 135',topic:'fractions'},
+{q:'What are the two prime numbers that multiply to make 87?',a:'3 and 29',exp:'87 ÷ 3 = 29. Both 3 and 29 are prime.',topic:'number'},
+{q:'A sequence starts 100, 91, 82, 73, … What is the first term below zero?',a:'−8',exp:'Subtract 9 each time. Term 13 = 100 − (12 × 9) = −8',topic:'algebra'},
+{q:'A triangle has a base of 14cm and a height of 9cm. What is its area?',a:'63cm²',exp:'Area = ½ × 14 × 9 = 63cm²',topic:'geometry'},
+{q:'The mean of 4 test scores is 76. Three scores are 68, 82, and 79. What is the fourth score?',a:'75',exp:'Total = 76 × 4 = 304. Fourth = 304 − (68+82+79) = 75',topic:'statistics'},
+{q:'A builder needs 840 bricks. They come in pallets of 45. How many full pallets must he buy?',a:'19 pallets',exp:'840 ÷ 45 = 18.67. Must round up to 19.',topic:'number'},
+{q:'Lena cycles 3/5 of a 25km route before lunch and 7km after. How far does she still have to travel?',a:'3km',exp:'Before lunch = 15km. Total done = 22km. Remaining = 25 − 22 = 3km',topic:'fractions'},
+{q:'A hexagon has a perimeter of 72cm. All sides are equal. What is the length of each side?',a:'12cm',exp:'72 ÷ 6 = 12cm',topic:'geometry'},
+{q:'Orange juice is sold in 330ml cans for 75p or 1.5 litre bottles for £2.85. Which gives more juice per penny?',a:'1.5 litre bottle',exp:'Can: 4.4ml/p. Bottle: 5.26ml/p. Bottle is better value.',topic:'proportion'},
+{q:'A compound shape is made of a 10cm × 6cm rectangle with a 4cm × 3cm rectangle removed from one corner. What is the area?',a:'48cm²',exp:'60 − 12 = 48cm²',topic:'measurement'},
+{q:'A clock shows 11:48. How many degrees has the minute hand moved from 12 o\'clock?',a:'288°',exp:'48 minutes × 6° per minute = 288°',topic:'geometry'},
+{q:'A number squared is 289. What is the number?',a:'17',exp:'17 × 17 = 289',topic:'number'},
+{q:'Share 420 in the ratio 2:5. What is the smaller share?',a:'120',exp:'7 parts total. 1 part = 60. Smaller share = 2 × 60 = 120',topic:'ratio'},
+];
+
 const ALL_TYPES=['boggle','number','combined','literacy','spotmistakecombo','maths','humanities'];
 
 
@@ -3100,12 +3230,12 @@ function pickPhased(prev,curr){
 function getActivityPool(){
   const base=['boggle','number','combined','literacy','spotmistakecombo','maths','humanities'];
   if(SCHOOL_PHASE>=4){
-    // Spr2 / Summer — heavy SATs focus: GPS and maths heavily weighted
-    return [...base,'literacy','maths','spotmistakecombo','literacy','maths','spotmistakecombo'];
+    // Spr2 / Summer — heavy SATs focus: satsdrill, GPS and maths heavily weighted
+    return [...base,'satsdrill','literacy','maths','spotmistakecombo','satsdrill','literacy','maths','spotmistakecombo'];
   }
   if(SCHOOL_PHASE===3){
-    // Spr1 — building toward SATs: gentle boost to literacy and maths
-    return [...base,'literacy','maths','spotmistakecombo'];
+    // Spr1 — building toward SATs: add satsdrill, gentle boost to literacy and maths
+    return [...base,'satsdrill','literacy','maths','spotmistakecombo'];
   }
   return base;
 }
@@ -3230,8 +3360,84 @@ function newPuzzle(){
     const eGq=pickFresh(GEOGRAPHY_QUICK,'gq');
     cur={type:'humanities',map:eMap,tl:eTl,kq:eKq,gq:eGq};
     renderHumanitiesQuad(eMap,eTl,eKq,eGq);
+  } else if(pType==='satsdrill'){
+    cur={type:'satsdrill'};renderSATSDrill();
   }
   closeSols();
+}
+
+// ── SATs Drill panel ──────────────────────────────────────────────────────────
+function renderSATSDrill(){
+  const pp=document.getElementById('puzzle-panel');
+  pp.style.display='none';
+  let panel=document.getElementById('sats-drill-panel');
+  if(!panel){panel=document.createElement('div');panel.id='sats-drill-panel';pp.parentNode.insertBefore(panel,pp);}
+
+  // GPS: 1 spot-the-mistake + 1 punctuation fix
+  const eStm=pickFresh(SPOT_MISTAKE,'stm');
+  const ePunc=pickFresh(PUNCTUATION_FIX,'pf');
+  const gpsHtml=`
+    <div class="sats-gps-block">
+      <div class="sats-label">📝 Spot the Mistake</div>
+      <div class="sats-para">${eStm.para}</div>
+      <div class="sats-ans hidden" id="sats-stm-ans">
+        ${eStm.errors.map(e=>`<div class="sats-err"><span class="sats-wrong">${e.wrong}</span> → <span class="sats-fix">${e.correct||e.fix}</span> <span class="sats-why">${e.exp||e.why}</span></div>`).join('')}
+      </div>
+    </div>
+    <div class="sats-divider"></div>
+    <div class="sats-gps-block">
+      <div class="sats-label">📝 Punctuation Fix</div>
+      <div class="sats-para">${ePunc.wrong}</div>
+      <div class="sats-ans hidden" id="sats-punc-ans"><span class="sats-fix">${ePunc.correct}</span><div class="sats-why">${ePunc.note||''}</div></div>
+    </div>`;
+
+  // Arithmetic: 6 questions from ARITHMETIC_SATS
+  const arithPool=[...ARITHMETIC_SATS].sort(()=>Math.random()-0.5).slice(0,6);
+  const arithHtml=arithPool.map((q,i)=>`
+    <div class="sats-arith-row">
+      <span class="sats-arith-q">${i+1}. ${q.q}</span>
+      <span class="sats-arith-a hidden" data-ans="${q.a}">${q.a}</span>
+    </div>`).join('');
+
+  // Reasoning: 2 word problems from REASONING_SATS
+  const rPool=[...REASONING_SATS].sort(()=>Math.random()-0.5).slice(0,2);
+  const rHtml=rPool.map((q,i)=>`
+    <div class="sats-reason-block">
+      <div class="sats-reason-q">${i+1}. ${q.q}</div>
+      <div class="sats-ans hidden" data-ans="${q.a}"><strong>${q.a}</strong> — ${q.exp}</div>
+    </div>`).join('');
+
+  // Vocabulary: 1 word of the day
+  const eWod=pickFresh(WORD_OF_DAY,'wod');
+  const wodHtml=`
+    <div class="sats-wod-word">${eWod.word} <span class="sats-wod-cls">${eWod.cls}</span></div>
+    <div class="sats-wod-def">${eWod.def}</div>
+    <div class="sats-wod-eg">"${eWod.example||eWod.ex||''}"</div>
+    <div class="sats-wod-qs">💬 ${eWod.qs||''}</div>`;
+
+  const revBtn=`<button class="reveal-btn" onclick="revealSATSAll()">👁 Reveal</button>`;
+
+  panel.innerHTML=`
+    <div class="cpanel sats-gps">
+      <div class="cpanel-hdr"><span>📝 GPS</span>${revBtn}</div>
+      <div class="cpanel-body sats-body">${gpsHtml}</div>
+    </div>
+    <div class="cpanel sats-arith">
+      <div class="cpanel-hdr"><span>🔢 Arithmetic</span>${revBtn}</div>
+      <div class="cpanel-body sats-body">${arithHtml}</div>
+    </div>
+    <div class="cpanel sats-reason">
+      <div class="cpanel-hdr"><span>🧩 Reasoning</span>${revBtn}</div>
+      <div class="cpanel-body sats-body">${rHtml}</div>
+    </div>
+    <div class="cpanel sats-vocab">
+      <div class="cpanel-hdr"><span>📖 Vocabulary</span></div>
+      <div class="cpanel-body sats-body">${wodHtml}</div>
+    </div>`;
+}
+
+function revealSATSAll(){
+  document.querySelectorAll('#sats-drill-panel .sats-ans,.sats-arith-a').forEach(el=>el.classList.remove('hidden'));
 }
 
 function clearPuzzlePanel(){
@@ -3242,6 +3448,7 @@ function clearPuzzlePanel(){
   const sp=document.getElementById('stmcombo-panel');if(sp)sp.remove();
   const mp=document.getElementById('maths-panel');if(mp)mp.remove();
   const hp=document.getElementById('humanities-panel');if(hp)hp.remove();
+  const xp=document.getElementById('sats-drill-panel');if(xp)xp.remove();
 }
 function toggleType(){
   // Use phase-weighted pool so SATs-relevant types appear more in Spr/Sum
