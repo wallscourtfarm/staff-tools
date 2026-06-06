@@ -166,7 +166,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>06.06.26c</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>06.06.26d</strong></footer>
 
 <script>
 // Year group colours
@@ -354,17 +354,19 @@ function updatePreview() {
     const yearData = currentYear ? YEAR_COLOURS[currentYear] : null;
     const colour = yearData?.hex || '#ccc';
     const border = fmt === '12' ? 3 : 1.5;
+    const imgCfg = fmt === '12' ? LABEL_CONFIG.drawer : LABEL_CONFIG.avery;
+    const imgLW = imgCfg.nameimageW || imgCfg.width;
+    const imgLH = imgCfg.nameimageH || imgCfg.height;
+    const ipW = 240;
+    const ipH = Math.round(ipW * imgLH / imgLW);
+    const ipB = Math.max(2, Math.round(ipW * imgCfg.border / imgLW));
+    labelPreview.style.width = ipW + 'px';
+    labelPreview.style.height = ipH + 'px';
+    labelPreview.className = 'label-preview';
     if (imgDataUrl) {
-      const previewW = 240, previewH = 60, previewBorder = fmt === '12' ? 8 : 5;
-      labelPreview.style.width = previewW + 'px';
-      labelPreview.style.height = previewH + 'px';
-      labelPreview.className = 'label-preview';
-      labelPreview.innerHTML = `<div style="position:absolute;inset:0;border:${previewBorder}px solid ${colour};box-sizing:border-box;"><img src="${imgDataUrl}" style="width:100%;height:100%;display:block;object-fit:fill;"></div>`;
+      labelPreview.innerHTML = `<div style="position:absolute;inset:0;border:${ipB}px solid ${colour};box-sizing:border-box;background:#fff;"><img src="${imgDataUrl}" style="width:100%;height:100%;display:block;object-fit:fill;"></div>`;
     } else {
-      labelPreview.style.width = '240px';
-      labelPreview.style.height = '60px';
-      labelPreview.className = 'label-preview';
-      labelPreview.innerHTML = `<div style="position:absolute;inset:0;border:8px solid ${colour};box-sizing:border-box;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:0.75rem;">Upload an image</div>`;
+      labelPreview.innerHTML = `<div style="position:absolute;inset:0;border:${ipB}px solid ${colour};box-sizing:border-box;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:0.75rem;">Upload an image</div>`;
     }
     dlBtn.disabled = !imgDataUrl || !currentYear;
     labelCount.textContent = imgDataUrl && currentYear ? `${fmt === '12' ? 12 : 65} labels per sheet` : '';
@@ -377,17 +379,20 @@ function updatePreview() {
   const bgColour = yearData?.hex || '#ccc';
 
   // Fixed preview size for both label types
+  // Scale preview to correct aspect ratio for each label type
+  const labelW = config.nameimageW || config.width;
+  const labelH = config.nameimageH || config.height;
   const previewW = 240;
-  const previewH = 60;
-  const previewBorder = 6;
+  const previewH = Math.round(previewW * labelH / labelW);
+  const previewBorder = Math.max(2, Math.round(previewW * config.border / labelW));
 
   // Inner white area dimensions
   const innerW = previewW - previewBorder * 2;
   const innerH = previewH - previewBorder * 2;
 
-  // Preview font/logo sizes - same for both types
-  const fontSizePx = 24;
-  const logoHpx = 40;
+  // Scale font and logo to preview height
+  const fontSizePx = Math.round(innerH * 0.55);
+  const logoHpx = Math.round(innerH * 0.75);
 
   labelPreview.style.width = previewW + 'px';
   labelPreview.style.height = previewH + 'px';
