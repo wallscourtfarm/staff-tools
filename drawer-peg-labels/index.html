@@ -133,8 +133,11 @@
             </div>
           </div>
           <div class="field" style="flex:2;min-width:200px;">
-            <label>Upload label image</label>
+            <label>Upload or paste label image</label>
             <input type="file" id="imgFile" accept="image/*" onchange="onImgFile(event)" style="margin-top:4px;font-size:0.85rem;">
+            <div id="imgPasteZone" style="margin-top:8px;border:2px dashed #ccc;border-radius:6px;padding:10px;text-align:center;font-size:0.78rem;color:#999;cursor:pointer;">
+              📋 Or paste image here (Ctrl+V / ⌘V)
+            </div>
             <p class="hint" id="imgHint" style="margin-top:5px;"></p>
           </div>
         </div>
@@ -166,7 +169,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>06.06.26d</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>06.06.26e</strong></footer>
 
 <script>
 // Year group colours
@@ -256,6 +259,7 @@ function init() {
   fileInput.addEventListener('change', onFileUpload);
   dlBtn.addEventListener('click', generatePdf);
 
+  initPasteZone();
   updatePreview();
 }
 
@@ -264,12 +268,43 @@ function getImgFmt() {
   for (let i = 0; i < radios.length; i++) { if (radios[i].checked) return radios[i].value; }
   return '12';
 }
-function onImgFile(e) {
-  const file = e.target.files[0];
+function loadImgFromFile(file) {
   if (!file) { imgDataUrl = null; updatePreview(); return; }
   const reader = new FileReader();
-  reader.onload = function(ev) { imgDataUrl = ev.target.result; updatePreview(); };
+  reader.onload = function(ev) {
+    imgDataUrl = ev.target.result;
+    const zone = document.getElementById('imgPasteZone');
+    if (zone) zone.innerHTML = '✓ Image loaded — paste again to replace';
+    updatePreview();
+  };
   reader.readAsDataURL(file);
+}
+function onImgFile(e) {
+  loadImgFromFile(e.target.files[0]);
+}
+function initPasteZone() {
+  const zone = document.getElementById('imgPasteZone');
+  if (!zone) return;
+  // Click the zone to focus it so keyboard paste works
+  zone.setAttribute('tabindex', '0');
+  zone.addEventListener('click', function() { zone.focus(); });
+  zone.addEventListener('focus', function() { zone.style.borderColor = '#2a7fc1'; zone.style.color = '#2a7fc1'; });
+  zone.addEventListener('blur',  function() { zone.style.borderColor = '#ccc';    zone.style.color = '#999'; });
+  // Listen for paste on the zone AND on the document when image mode is active
+  function handlePaste(e) {
+    if (currentLabelType !== 'image') return;
+    const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        e.preventDefault();
+        loadImgFromFile(items[i].getAsFile());
+        return;
+      }
+    }
+  }
+  zone.addEventListener('paste', handlePaste);
+  document.addEventListener('paste', handlePaste);
 }
 
 function onLabelTypeClick(e) {
