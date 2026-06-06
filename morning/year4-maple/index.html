@@ -42,8 +42,9 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
 .mtc-q-text{font-weight:700;color:#333}
 .mtc-ans{font-weight:900;color:#1798d3;min-width:2.5em;display:inline-block;background:#e8f4fc;border-radius:4px;padding:0.05em 0.4em;cursor:pointer;transition:color 0.2s}
 .mtc-ans.hidden{color:transparent;background:#1798d3;user-select:none}
+.mtc-focus-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 0.8vw;width:100%}
 .mtc-focus-row{display:flex;justify-content:space-between;align-items:center;font-size:clamp(0.85rem,1.9vh,1.3rem);padding:0.1em 0;border-bottom:1px solid #f0f0f0;font-weight:600}
-.mtc-focus-ans{color:#1798d3;font-weight:900;min-width:3em;text-align:right}
+.mtc-focus-ans{color:#1798d3;font-weight:900;min-width:2.5em;text-align:right}
 .mtc-focus-ans.hidden{color:transparent;background:#1798d3;border-radius:3px;padding:0 0.3em;user-select:none}
 .cpanel{display:flex;flex-direction:column;padding:0.5vh 0.8vw;border-right:2.5px solid #EEE;border-bottom:2.5px solid #EEE;overflow:hidden;min-height:0}
 .cpanel:nth-child(2),.cpanel:nth-child(4){border-right:none}
@@ -364,7 +365,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26g</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26h</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -2675,11 +2676,12 @@ function renderMTCDrill(){
   }).join('');
 
   const focusT=MTC_FOCUS[new Date().getDay()];
-  const focusHtml=Array.from({length:12},(_,i)=>i+1).map(n=>`
+  const focusRows=Array.from({length:12},(_,i)=>i+1).map(n=>`
     <div class="mtc-focus-row">
       <span>${focusT} &times; ${n}</span>
       <span class="mtc-focus-ans hidden" data-ans="${focusT*n}" onclick="this.classList.remove('hidden')">${focusT*n}</span>
     </div>`).join('');
+  const focusHtml=`<div class="mtc-focus-grid">${focusRows}</div>`;
 
   const dv=genMTCFacts(6,'dv');
   const dvHtml=dv.map(q=>mtcRow(`${q.a} &divide; ${q.t} =`,q.f)).join('');
