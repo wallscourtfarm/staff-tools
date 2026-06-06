@@ -366,7 +366,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26i</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26j</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -2490,7 +2490,7 @@ function getActivityPool(){
   if(SCHOOL_PHASE>=3){
     // MTC season: mtcdrill first so it's the first Switch from combined;
     // number and maths also boosted for MTC prep
-    return ['combined','mtcdrill','number','maths','literacy','spotmistakecombo','humanities','boggle','number','maths','mtcdrill'];
+    return ['mtcdrill','combined','maths','number','literacy','spotmistakecombo','humanities','boggle'];
   }
   return ALL_TYPES;
 }
@@ -2668,18 +2668,18 @@ function renderMTCDrill(){
   panel.dataset.revealed='0';
 
   const qf=genMTCFacts(14,'qf');
-  const qfHtml=`<div class="mtc-2col">${qf.map(q=>mtcRow(`${q.t} &times; ${q.f} =`,q.a)).join('')}</div>`;
+  const qfHtml=`<div class="mtc-2col">${qf.map(q=>mtcRow(`${Math.max(q.t,q.f)} &times; ${Math.min(q.t,q.f)} =`,q.a)).join('')}</div>`;
 
   const mn=genMTCFacts(12,'mn');
   const mnHtml=`<div class="mtc-2col">${mn.map(q=>{
-    const showA=Math.random()<0.5;
-    return showA?mtcRow(`${q.t} &times; ? = ${q.a}`,q.f):mtcRow(`? &times; ${q.f} = ${q.a}`,q.t);
+    const big=Math.max(q.t,q.f),small=Math.min(q.t,q.f);
+    return mtcRow(`${big} &times; ? = ${q.a}`,small);
   }).join('')}</div>`;
 
   const focusT=MTC_FOCUS[new Date().getDay()];
   const focusRows=Array.from({length:12},(_,i)=>i+1).map(n=>`
     <div class="mtc-focus-row">
-      <span>${focusT} &times; ${n}</span>
+      <span>${focusT} &times; ${n} =</span>
       <span class="mtc-focus-ans hidden" data-ans="${focusT*n}" onclick="this.classList.remove('hidden')">${focusT*n}</span>
     </div>`).join('');
   const focusHtml=`<div class="mtc-focus-grid">${focusRows}</div>`;
