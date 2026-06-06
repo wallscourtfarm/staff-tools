@@ -366,7 +366,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26m</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26n</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -474,6 +474,10 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
       <div class="tt-lie-label">The lie is statement <select id="tt-new-lie"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
       <button class="oadd" onclick="addTTSet()" style="margin-top:6px">Add to bank</button>
     </div>
+
+    <h3 style="margin-top:1.5rem">✕ MTC — Tables to practise</h3>
+    <p style="font-size:0.82rem;color:#666;margin-bottom:8px">Tick only the tables your class has learned. Quick Fire, Missing Number and Division Link will only use ticked tables.</p>
+    <div id="mtc-tables-form" style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:4px"></div>
 
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:1.5rem">
       <button class="oclose" onclick="closeSetup()">Cancel</button>
@@ -2637,15 +2641,23 @@ function newPuzzle(){
 }
 
 // ── MTC Drill panel ──────────────────────────────────────────────────────────
-const MTC_HARD_TABLES=[6,7,8,9,12];
-const MTC_ALL_TABLES=[2,3,4,5,6,7,8,9,11,12];
-// Focus table rotates by day of week (Mon=6, Tue=7, Wed=8, Thu=9, Fri=12, Sat=11, Sun=3)
-const MTC_FOCUS=[3,6,7,8,9,12,11];
+const MTC_ALL_DEFAULT=[2,3,4,5,6,7,8,9,10,11,12];
+const MTC_HARD_BASE=[6,7,8,9,12];
+
+function getMTCTables(){
+  try{
+    const s=JSON.parse(localStorage.getItem('y4_mtc_tables'));
+    if(Array.isArray(s)&&s.length>0)return s;
+  }catch(e){}
+  return MTC_ALL_DEFAULT;
+}
 
 function genMTCFacts(n,keyPrefix){
+  const enabled=getMTCTables();
+  const hard=enabled.filter(t=>MTC_HARD_BASE.includes(t));
   const used=new Set();const qs=[];
   while(qs.length<n){
-    const pool=Math.random()<0.65?MTC_HARD_TABLES:MTC_ALL_TABLES;
+    const pool=(Math.random()<0.65&&hard.length>0)?hard:enabled;
     const t=pool[Math.floor(Math.random()*pool.length)];
     const f=Math.floor(Math.random()*12)+1;
     const key=keyPrefix+'-'+t+'-'+f;
@@ -2676,7 +2688,8 @@ function renderMTCDrill(){
     return showA?mtcRow(`? &times; ${q.f} = ${q.a}`,q.t):mtcRow(`${q.t} &times; ? = ${q.a}`,q.f);
   }).join('')}</div>`;
 
-  const focusT=MTC_FOCUS[new Date().getDay()];
+  const enabled=getMTCTables();
+  const focusT=enabled[new Date().getDay()%enabled.length];
   const focusRows=Array.from({length:12},(_,i)=>i+1).map(n=>`
     <div class="mtc-focus-row">
       <span>${Math.max(focusT,n)} &times; ${Math.min(focusT,n)} =</span>
@@ -3846,6 +3859,14 @@ function openSetup(){
   document.getElementById('menu-form').innerHTML=html;
   pendingTTBank=JSON.parse(JSON.stringify(JSON.parse(localStorage.getItem('y4_tt_bank')||'[]')));
   renderTTBank();
+  // MTC table selector
+  const savedTables=getMTCTables();
+  document.getElementById('mtc-tables-form').innerHTML=MTC_ALL_DEFAULT.map(t=>
+    `<label style="display:flex;align-items:center;gap:5px;font-size:0.95rem;font-weight:700;cursor:pointer">
+      <input type="checkbox" id="mtc_t_${t}" ${savedTables.includes(t)?'checked':''}
+        style="width:18px;height:18px;accent-color:#1798d3;cursor:pointer"> ×${t}
+    </label>`
+  ).join('');
   document.getElementById('setup-ov').classList.add('on');
 }
 function closeSetup(){document.getElementById('setup-ov').classList.remove('on')}
@@ -3890,6 +3911,8 @@ function saveSetup(){
   }
   localStorage.setItem('y4_menu',JSON.stringify(saved));
   localStorage.setItem('y4_tt_bank',JSON.stringify(pendingTTBank));
+  const tables=MTC_ALL_DEFAULT.filter(t=>document.getElementById('mtc_t_'+t)?.checked);
+  if(tables.length>0)localStorage.setItem('y4_mtc_tables',JSON.stringify(tables));
   closeSetup();renderLunch();
 }
 
