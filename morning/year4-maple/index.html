@@ -41,10 +41,10 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
 .mtc-row{display:flex;align-items:baseline;gap:0.3em;font-size:clamp(1rem,2.2vh,1.5rem);padding:0.15em 0;border-bottom:1px solid #f0f0f0}
 .mtc-q-text{font-weight:700;color:#333}
 .mtc-ans{font-weight:900;color:#1798d3;min-width:2.5em;display:inline-block;background:#e8f4fc;border-radius:4px;padding:0.05em 0.4em;cursor:pointer;transition:color 0.2s}
-.mtc-ans.hidden{color:#e8f4fc;background:#1798d3}
+.mtc-ans.hidden{color:transparent;background:#1798d3;user-select:none}
 .mtc-focus-row{display:flex;justify-content:space-between;align-items:center;font-size:clamp(0.85rem,1.9vh,1.3rem);padding:0.1em 0;border-bottom:1px solid #f0f0f0;font-weight:600}
 .mtc-focus-ans{color:#1798d3;font-weight:900;min-width:3em;text-align:right}
-.mtc-focus-ans.hidden{color:#e8f4fc;background:#1798d3;border-radius:3px;padding:0 0.3em}
+.mtc-focus-ans.hidden{color:transparent;background:#1798d3;border-radius:3px;padding:0 0.3em;user-select:none}
 .cpanel{display:flex;flex-direction:column;padding:0.5vh 0.8vw;border-right:2.5px solid #EEE;border-bottom:2.5px solid #EEE;overflow:hidden;min-height:0}
 .cpanel:nth-child(2),.cpanel:nth-child(4){border-right:none}
 .cpanel:nth-child(3),.cpanel:nth-child(4){border-bottom:none}
@@ -364,7 +364,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26f</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26g</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -2663,6 +2663,7 @@ function renderMTCDrill(){
   pp.style.display='none';
   let panel=document.getElementById('mtc-drill-panel');
   if(!panel){panel=document.createElement('div');panel.id='mtc-drill-panel';pp.parentNode.insertBefore(panel,pp);}
+  panel.dataset.revealed='0';
 
   const qf=genMTCFacts(8,'qf');
   const qfHtml=qf.map(q=>mtcRow(`${q.t} &times; ${q.f} =`,q.a)).join('');
@@ -2705,7 +2706,12 @@ function renderMTCDrill(){
 }
 
 function revealMTCAll(){
-  document.querySelectorAll('.mtc-ans,.mtc-focus-ans').forEach(el=>el.classList.remove('hidden'));
+  const panel=document.getElementById('mtc-drill-panel');
+  if(!panel)return;
+  const hiding=panel.dataset.revealed==='1';
+  panel.querySelectorAll('.mtc-ans,.mtc-focus-ans').forEach(el=>el.classList.toggle('hidden',hiding));
+  panel.dataset.revealed=hiding?'0':'1';
+  panel.querySelectorAll('.reveal-btn').forEach(btn=>btn.textContent=hiding?'👁 Reveal all':'🙈 Hide all');
 }
 
 function clearPuzzlePanel(){
