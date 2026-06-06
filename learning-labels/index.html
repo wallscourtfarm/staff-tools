@@ -90,6 +90,10 @@
   .icon-toggle.off { background: var(--white); color: var(--muted); border-color: var(--border); }
   .icon-toggle:hover { opacity: 0.85; }
   footer { text-align: center; color: var(--muted); font-size: 0.68rem; padding: 14px; }
+  .img-year-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .img-year-btn { padding: 5px 11px; border: 2.5px solid #ccc; border-radius: 6px; background: #fff; cursor: pointer; font-size: 0.82rem; font-weight: 700; font-family: inherit; transition: all 0.15s; }
+  .img-year-btn.active { color: #fff; }
+  .img-file-input { margin-top: 4px; font-size: 0.85rem; }
   .mode-tabs { display: flex; gap: 0; border-radius: 8px; overflow: hidden; border: 1.5px solid var(--border); }
   .mode-tab { flex: 1; padding: 9px 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; background: var(--white); border: none; color: var(--muted); font-family: inherit; transition: background 0.15s, color 0.15s; border-right: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.05em; }
   .mode-tab:last-child { border-right: none; }
@@ -105,7 +109,7 @@
   <div>
     <div class="school-name">Wallscourt Farm Academy</div>
     <h1 class="header-text" style="color:var(--blue);font-size:1.1rem;font-weight:700;">Learning Labels</h1>
-    <p style="color:var(--muted);font-size:0.72rem;">Enquiry &amp; Mathematician: Avery 99&times;42 &mdash; 12 per sheet &nbsp;|&nbsp; ETIW: A4 &mdash; 6 per sheet</p>
+    <p style="color:var(--muted);font-size:0.72rem;">Enquiry &amp; Mathematician: Avery 99&times;42 &mdash; 12 per sheet &nbsp;|&nbsp; ETIW: A4 &mdash; 6 per sheet &nbsp;|&nbsp; Image: 12 or 65 per sheet</p>
   </div>
 </header>
 <main>
@@ -118,6 +122,7 @@
         <button class="mode-tab active" id="modeEnquiry" onclick="setMode('enquiry')">Enquiry</button>
         <button class="mode-tab" id="modeMaths" onclick="setMode('maths')">Mathematician</button>
         <button class="mode-tab" id="modeEtiw" onclick="setMode('etiw')">ETIW</button>
+        <button class="mode-tab" id="modeImage" onclick="setMode('image')">Image</button>
       </div>
     </div>
   </div>
@@ -196,6 +201,34 @@
       <div class="field hidden" id="etiwIconField" style="margin-top:11px;">
         <label>Include / exclude icons <span style="font-weight:400;color:var(--muted)">(tap to toggle)</span></label>
         <div class="icon-toggles" id="etiwIconToggles"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card hidden" id="imageDetailsCard">
+    <div class="card-header"><h2>Image label</h2></div>
+    <div class="card-body">
+      <div class="field">
+        <label>Year group border colour</label>
+        <div class="img-year-btns" id="imgYearBtns"></div>
+      </div>
+      <div class="two-col" style="margin-top:11px;">
+        <div class="field">
+          <label>Custom colour <span style="font-weight:400;color:var(--muted)">(overrides year group)</span></label>
+          <input type="color" id="imgColourPicker" value="#3288ce" oninput="imgClearYear();update()">
+        </div>
+        <div class="field">
+          <label>Sheet format</label>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+            <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="imgFormat" value="12" checked onchange="update()"> 12 per sheet <span style="color:var(--muted)">(99&times;42mm)</span></label>
+            <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="imgFormat" value="65" onchange="update()"> 65 per sheet <span style="color:var(--muted)">(38&times;21mm)</span></label>
+          </div>
+        </div>
+      </div>
+      <div class="field" style="margin-top:11px;">
+        <label>Upload label image</label>
+        <input type="file" class="img-file-input" id="imgFile" accept="image/*" onchange="onImgFile(event)">
+        <p class="pr-note" id="imgDimsHint" style="text-align:left;margin-top:5px;"></p>
       </div>
     </div>
   </div>
@@ -401,6 +434,62 @@ const PHASE_LOGOS = {
 const STORAGE_KEY = 'wfa_ll_questions';
 let currentMode = 'enquiry';
 
+// ── Image mode state ──
+let imgDataUrl = null;
+let imgYearSelected = null;
+const IMG_YEAR_COLOURS = {
+  'R':'#3288ce','Y1':'#f57721','Y2':'#63b44a',
+  'Y3':'#c1126d','Y4':'#3288ce','Y5':'#f57721','Y6':'#63b44a'
+};
+function initImgYearBtns() {
+  const wrap = document.getElementById('imgYearBtns');
+  if (!wrap) return;
+  ['R','Y1','Y2','Y3','Y4','Y5','Y6'].forEach(function(yr) {
+    const btn = document.createElement('button');
+    btn.className = 'img-year-btn';
+    btn.textContent = yr === 'R' ? 'EYFS/R' : yr;
+    btn.dataset.year = yr;
+    btn.style.borderColor = IMG_YEAR_COLOURS[yr];
+    btn.addEventListener('click', function() { imgSelectYear(yr); });
+    wrap.appendChild(btn);
+  });
+}
+function imgSelectYear(yr) {
+  imgYearSelected = yr;
+  document.querySelectorAll('.img-year-btn').forEach(function(b) {
+    const on = b.dataset.year === yr;
+    b.classList.toggle('active', on);
+    b.style.background = on ? IMG_YEAR_COLOURS[yr] : '';
+    b.style.color = on ? '#fff' : '';
+  });
+  document.getElementById('imgColourPicker').value = IMG_YEAR_COLOURS[yr];
+  update();
+}
+function imgClearYear() {
+  imgYearSelected = null;
+  document.querySelectorAll('.img-year-btn').forEach(function(b) {
+    b.classList.remove('active');
+    b.style.background = '';
+    b.style.color = '';
+  });
+}
+function onImgFile(e) {
+  const file = e.target.files[0];
+  if (!file) { imgDataUrl = null; update(); return; }
+  const reader = new FileReader();
+  reader.onload = function(ev) { imgDataUrl = ev.target.result; update(); };
+  reader.readAsDataURL(file);
+}
+function getImgFormat() {
+  const radios = document.querySelectorAll('input[name="imgFormat"]');
+  for (let i = 0; i < radios.length; i++) { if (radios[i].checked) return radios[i].value; }
+  return '12';
+}
+function getImgColour() {
+  const el = document.getElementById('imgColourPicker');
+  return el ? el.value : '#3288ce';
+}
+
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
   catch(e) { return []; }
@@ -455,19 +544,21 @@ function renderSaved() {
 
 function setMode(mode) {
   currentMode = mode;
-  ['enquiry','maths','etiw'].forEach(function(m) {
+  ['enquiry','maths','etiw','image'].forEach(function(m) {
     const id = 'mode' + m.charAt(0).toUpperCase() + m.slice(1);
     const tab = document.getElementById(id);
     if (tab) tab.classList.toggle('active', m === mode);
   });
-  const isEtiw = mode === 'etiw';
-  const isMaths = mode === 'maths';
+  const isEtiw    = mode === 'etiw';
+  const isMaths   = mode === 'maths';
   const isEnquiry = mode === 'enquiry';
+  const isImage   = mode === 'image';
   document.getElementById('enquiryDetailsCard').classList.toggle('hidden', !isEnquiry);
   document.getElementById('etiwDetailsCard').classList.toggle('hidden', !isEtiw);
+  document.getElementById('imageDetailsCard').classList.toggle('hidden', !isImage);
   document.getElementById('enquiryCard').classList.toggle('hidden', !isEnquiry);
   document.getElementById('mathsCard').classList.toggle('hidden', !isMaths);
-  document.getElementById('lfCard').classList.toggle('hidden', isEtiw);
+  document.getElementById('lfCard').classList.toggle('hidden', isEtiw || isImage);
   update();
 }
 
@@ -494,9 +585,37 @@ function update() {
   const dlBtn = document.getElementById('dlBtn');
   const note = document.getElementById('previewNote');
 
-  dlBtn.innerHTML = currentMode === 'etiw'
+  dlBtn.innerHTML = currentMode === 'etiw' || currentMode === 'image'
     ? '↓&nbsp; Download Label Sheet (PDF)'
     : '↓&nbsp; Download Label Sheet (DOCX)';
+
+  if (currentMode === 'image') {
+    const colour = getImgColour();
+    const fmt = getImgFormat();
+    const hint = document.getElementById('imgDimsHint');
+    if (hint) {
+      hint.textContent = fmt === '12'
+        ? 'Ideal image: 930 × 360 px (2.58:1 ratio — fills inner area of 99×42mm label with 3mm border)'
+        : 'Ideal image: 414 × 215 px (1.93:1 ratio — fills inner area of 38×21mm label with 1.5mm border)';
+    }
+    const ready = !!imgDataUrl;
+    previewCard.classList.toggle('hidden', !ready);
+    dlBtn.disabled = !ready;
+    if (!ready) return;
+    const LW = fmt === '12' ? 99.1 : 38.1;
+    const LH = fmt === '12' ? 42.3 : 21.2;
+    const border = fmt === '12' ? 3 : 1.5;
+    const scale = 280 / LW;
+    const pw = LW * scale, ph = LH * scale, pb = border * scale;
+    p.innerHTML =
+      '<div style="width:' + pw.toFixed(1) + 'px;height:' + ph.toFixed(1) + 'px;background:' + colour + ';border-radius:2px;position:relative;overflow:hidden;flex-shrink:0;">' +
+        '<img src="' + imgDataUrl + '" style="position:absolute;top:' + pb.toFixed(1) + 'px;left:' + pb.toFixed(1) + 'px;width:' + (pw-2*pb).toFixed(1) + 'px;height:' + (ph-2*pb).toFixed(1) + 'px;object-fit:fill;">' +
+      '</div>';
+    note.textContent = fmt === '12'
+      ? '✓ 12 labels per sheet (Avery 99×42mm — 2 columns × 6 rows)'
+      : '✓ 65 labels per sheet (Avery 38×21mm — 5 columns × 13 rows)';
+    return;
+  }
 
   if (currentMode === 'etiw') {
     buildIconToggles();
@@ -587,9 +706,57 @@ function update() {
   }
 }
 
+async function generateImagePdf() {
+  const status = document.getElementById('status');
+  const btn    = document.getElementById('dlBtn');
+  status.className = 'status';
+  status.textContent = 'Building…';
+  btn.disabled = true;
+  try {
+    if (!imgDataUrl) throw new Error('No image loaded');
+    const colour = getImgColour();
+    const fmt    = getImgFormat();
+    const doc    = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+
+    let cols, rows, LW, LH, marginL, marginT, gapX, gapY, border;
+    if (fmt === '12') {
+      cols = 2; rows = 6; LW = 99.1; LH = 42.3;
+      marginL = 6.35; marginT = 21.15; gapX = 0; gapY = 0; border = 3;
+    } else {
+      cols = 5; rows = 13; LW = 38.1; LH = 21.2;
+      marginL = 8.6; marginT = 11; gapX = 2.5; gapY = 0; border = 1.5;
+    }
+
+    const hex = colour.replace('#','');
+    const cr = parseInt(hex.substring(0,2),16);
+    const cg = parseInt(hex.substring(2,4),16);
+    const cb = parseInt(hex.substring(4,6),16);
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const x = marginL + col * (LW + gapX);
+        const y = marginT + row * (LH + gapY);
+        doc.setFillColor(cr, cg, cb);
+        doc.rect(x, y, LW, LH, 'F');
+        doc.addImage(imgDataUrl, x + border, y + border, LW - 2*border, LH - 2*border, undefined, 'FAST');
+      }
+    }
+
+    doc.save('image-labels-' + fmt + '-per-sheet.pdf');
+    status.className = 'status ok';
+    status.textContent = '✓ Downloaded';
+  } catch(e) {
+    status.className = 'status error';
+    status.textContent = 'Error: ' + e.message;
+  }
+  btn.disabled = false;
+}
+
 async function generateDocx() {
   if (currentMode === 'etiw') {
     await generateEtiwPdf();
+  } else if (currentMode === 'image') {
+    await generateImagePdf();
   } else {
     await generateEnquiryDocx();
   }
@@ -1179,6 +1346,7 @@ async function generateEtiwDocx() {
 
 
 renderSaved();
+initImgYearBtns();
 </script>
 </body>
 </html>
