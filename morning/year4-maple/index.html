@@ -36,6 +36,15 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
 
 /* COMBINED PUZZLE */
 #combined-panel{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;min-height:0;overflow:hidden}
+#mtc-drill-panel{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;min-height:0;overflow:hidden}
+#mtc-drill-panel .cpanel-body{overflow-y:auto;align-items:stretch;justify-content:flex-start;padding:0.4vh 0.4vw}
+.mtc-row{display:flex;align-items:baseline;gap:0.3em;font-size:clamp(1rem,2.2vh,1.5rem);padding:0.15em 0;border-bottom:1px solid #f0f0f0}
+.mtc-q-text{font-weight:700;color:#333}
+.mtc-ans{font-weight:900;color:#1798d3;min-width:2.5em;display:inline-block;background:#e8f4fc;border-radius:4px;padding:0.05em 0.4em;cursor:pointer;transition:color 0.2s}
+.mtc-ans.hidden{color:#e8f4fc;background:#1798d3}
+.mtc-focus-row{display:flex;justify-content:space-between;align-items:center;font-size:clamp(0.85rem,1.9vh,1.3rem);padding:0.1em 0;border-bottom:1px solid #f0f0f0;font-weight:600}
+.mtc-focus-ans{color:#1798d3;font-weight:900;min-width:3em;text-align:right}
+.mtc-focus-ans.hidden{color:#e8f4fc;background:#1798d3;border-radius:3px;padding:0 0.3em}
 .cpanel{display:flex;flex-direction:column;padding:0.5vh 0.8vw;border-right:2.5px solid #EEE;border-bottom:2.5px solid #EEE;overflow:hidden;min-height:0}
 .cpanel:nth-child(2),.cpanel:nth-child(4){border-right:none}
 .cpanel:nth-child(3),.cpanel:nth-child(4){border-bottom:none}
@@ -355,7 +364,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26d</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26e</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -2477,7 +2486,8 @@ function pickFresh(bank,key){
 // ── Activity pool — MTC boost from Spr1 ──────────────────────────────────
 function getActivityPool(){
   if(SCHOOL_PHASE>=3){
-    return [...ALL_TYPES,'number','maths','number','maths'];
+    // MTC season: boost number, maths, and add mtcdrill type
+    return [...ALL_TYPES,'number','maths','mtcdrill','number','maths','mtcdrill'];
   }
   return ALL_TYPES;
 }
@@ -2616,8 +2626,84 @@ function newPuzzle(){
     const eGq=pickFresh(GEOGRAPHY_QUICK,'gq');
     cur={type:'humanities',map:eMap,tl:eTl,kq:eKq,gq:eGq};
     renderHumanitiesQuad(eMap,eTl,eKq,eGq);
+  } else if(pType==='mtcdrill'){
+    cur={type:'mtcdrill'};renderMTCDrill();
   }
   closeSols();
+}
+
+// ── MTC Drill panel ──────────────────────────────────────────────────────────
+const MTC_HARD_TABLES=[6,7,8,9,12];
+const MTC_ALL_TABLES=[2,3,4,5,6,7,8,9,11,12];
+// Focus table rotates by day of week (Mon=6, Tue=7, Wed=8, Thu=9, Fri=12, Sat=11, Sun=3)
+const MTC_FOCUS=[3,6,7,8,9,12,11];
+
+function genMTCFacts(n,keyPrefix){
+  const used=new Set();const qs=[];
+  while(qs.length<n){
+    const pool=Math.random()<0.65?MTC_HARD_TABLES:MTC_ALL_TABLES;
+    const t=pool[Math.floor(Math.random()*pool.length)];
+    const f=Math.floor(Math.random()*12)+1;
+    const key=keyPrefix+'-'+t+'-'+f;
+    if(used.has(key))continue;
+    used.add(key);
+    qs.push({t,f,a:t*f});
+  }
+  return qs;
+}
+
+function mtcRow(html,ans){
+  return `<div class="mtc-row"><span class="mtc-q-text">${html}</span><span class="mtc-ans hidden" data-ans="${ans}" onclick="this.classList.remove('hidden')">${ans}</span></div>`;
+}
+
+function renderMTCDrill(){
+  const pp=document.getElementById('puzzle-panel');
+  pp.style.display='none';
+  let panel=document.getElementById('mtc-drill-panel');
+  if(!panel){panel=document.createElement('div');panel.id='mtc-drill-panel';pp.parentNode.insertBefore(panel,pp);}
+
+  const qf=genMTCFacts(8,'qf');
+  const qfHtml=qf.map(q=>mtcRow(`${q.t} &times; ${q.f} =`,q.a)).join('');
+
+  const mn=genMTCFacts(6,'mn');
+  const mnHtml=mn.map(q=>{
+    const showA=Math.random()<0.5;
+    return showA?mtcRow(`${q.t} &times; ? = ${q.a}`,q.f):mtcRow(`? &times; ${q.f} = ${q.a}`,q.t);
+  }).join('');
+
+  const focusT=MTC_FOCUS[new Date().getDay()];
+  const focusHtml=Array.from({length:12},(_,i)=>i+1).map(n=>`
+    <div class="mtc-focus-row">
+      <span>${focusT} &times; ${n}</span>
+      <span class="mtc-focus-ans hidden" data-ans="${focusT*n}" onclick="this.classList.remove('hidden')">${focusT*n}</span>
+    </div>`).join('');
+
+  const dv=genMTCFacts(6,'dv');
+  const dvHtml=dv.map(q=>mtcRow(`${q.a} &divide; ${q.t} =`,q.f)).join('');
+
+  const revealBtn=`<button class="reveal-btn" onclick="revealMTCAll()">👁 Reveal all</button>`;
+
+  panel.innerHTML=`
+    <div class="cpanel">
+      <div class="cpanel-hdr"><span>✕ Quick Fire</span>${revealBtn}</div>
+      <div class="cpanel-body">${qfHtml}</div>
+    </div>
+    <div class="cpanel">
+      <div class="cpanel-hdr"><span>✕ Missing Number</span>${revealBtn}</div>
+      <div class="cpanel-body">${mnHtml}</div>
+    </div>
+    <div class="cpanel">
+      <div class="cpanel-hdr"><span>✕ Table Focus: &times;${focusT}</span>${revealBtn}</div>
+      <div class="cpanel-body">${focusHtml}</div>
+    </div>
+    <div class="cpanel">
+      <div class="cpanel-hdr"><span>✕ Division Link</span>${revealBtn}</div>
+      <div class="cpanel-body">${dvHtml}</div>
+    </div>`;
+}
+
+function revealMTCAll(){
+  document.querySelectorAll('.mtc-ans,.mtc-focus-ans').forEach(el=>el.classList.remove('hidden'));
 }
 
 function clearPuzzlePanel(){
@@ -2628,6 +2714,7 @@ function clearPuzzlePanel(){
   const sp=document.getElementById('stmcombo-panel');if(sp)sp.remove();
   const mp=document.getElementById('maths-panel');if(mp)mp.remove();
   const hp=document.getElementById('humanities-panel');if(hp)hp.remove();
+  const xp=document.getElementById('mtc-drill-panel');if(xp)xp.remove();
 }
 function toggleType(){
   const pool=getActivityPool();
