@@ -608,8 +608,8 @@ function update() {
     const scale = 280 / LW;
     const pw = LW * scale, ph = LH * scale, pb = border * scale;
     p.innerHTML =
-      '<div style="width:' + pw.toFixed(1) + 'px;height:' + ph.toFixed(1) + 'px;background:' + colour + ';border-radius:2px;position:relative;overflow:hidden;flex-shrink:0;">' +
-        '<img src="' + imgDataUrl + '" style="position:absolute;top:' + pb.toFixed(1) + 'px;left:' + pb.toFixed(1) + 'px;width:' + (pw-2*pb).toFixed(1) + 'px;height:' + (ph-2*pb).toFixed(1) + 'px;object-fit:fill;">' +
+      '<div style="width:' + pw.toFixed(1) + 'px;height:' + ph.toFixed(1) + 'px;position:relative;overflow:hidden;flex-shrink:0;border:' + pb.toFixed(1) + 'px solid ' + colour + ';box-sizing:border-box;">' +
+        '<img src="' + imgDataUrl + '" style="width:100%;height:100%;display:block;object-fit:fill;">' +
       '</div>';
     note.textContent = fmt === '12'
       ? '✓ 12 labels per sheet (Avery 99×42mm — 2 columns × 6 rows)'
@@ -714,6 +714,7 @@ async function generateImagePdf() {
   btn.disabled = true;
   try {
     if (!imgDataUrl) throw new Error('No image loaded');
+    const { jsPDF } = window.jspdf;
     const colour = getImgColour();
     const fmt    = getImgFormat();
     const doc    = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
@@ -736,9 +737,15 @@ async function generateImagePdf() {
       for (let col = 0; col < cols; col++) {
         const x = marginL + col * (LW + gapX);
         const y = marginT + row * (LH + gapY);
+        // Draw image in inner area
+        const ix = x + border, iy = y + border, iw = LW - 2*border, ih = LH - 2*border;
+        doc.addImage(imgDataUrl, ix, iy, iw, ih, undefined, 'FAST');
+        // Draw coloured border as 4 filled strips
         doc.setFillColor(cr, cg, cb);
-        doc.rect(x, y, LW, LH, 'F');
-        doc.addImage(imgDataUrl, x + border, y + border, LW - 2*border, LH - 2*border, undefined, 'FAST');
+        doc.rect(x,            y,            LW,    border, 'F'); // top
+        doc.rect(x,            y+LH-border,  LW,    border, 'F'); // bottom
+        doc.rect(x,            y+border,     border, ih,    'F'); // left
+        doc.rect(x+LW-border,  y+border,     border, ih,    'F'); // right
       }
     }
 
