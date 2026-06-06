@@ -632,7 +632,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Acer</span><span id="version-tag">a.06.06.26a</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Acer</span><span id="version-tag">a.06.06.26b</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -1271,7 +1271,10 @@ function renderCombined(){
   let seqHTML='';
   for(const s of seqs){const items=s.seq.map((v,i)=>`<div class="seq-n${i===s.qi?' q':''}"${i===s.qi?` data-ans="${s.seq[s.qi]}"`:''}>${i===s.qi?'?':v}</div>`).join('<div class="seq-arr">→</div>');seqHTML+=`<div class="seq-row">${items}</div><div class="seq-divider"></div>`;}
   seqHTML+=`<div class="seq-instr">What is the rule? Fill in the missing number.</div>`;
-  const ttSet=pick([...DEFAULT_TT,...(JSON.parse(localStorage.getItem('customTT')||'[]'))]);
+  const ttAll=[...DEFAULT_TT,...(JSON.parse(localStorage.getItem('customTT')||'[]'))];
+  const ttPrev=ttAll.filter(x=>x.yr!==3);
+  const ttCurr=ttAll.filter(x=>x.yr===3);
+  const ttSet=pickPhased(ttPrev,ttCurr);
   const ttHTML=`<div class="tt-topic">${ttSet.topic}</div>${ttSet.stmts.map((s,i)=>`<div class="tt-item"${i===ttSet.lie-1?' data-lie="true"':''}><div class="tt-num">${i+1}</div><div class="tt-text">${s}</div></div>`).join('')}<div class="tt-instr">Which statement is the lie?</div>`;
   const oSets=[...ODD_ONE_OUT].sort(()=>Math.random()-0.5).slice(0,2);
   const oooHTML=oSets.map(s=>`<div class="ooo-set"><div class="ooo-grid">${s.items.map(it=>`<div class="ooo-item">${it}</div>`).join('')}</div></div>`).join('')+`<div class="ooo-instr">Which is the odd one out in each group — and why?</div>`;
@@ -1570,12 +1573,48 @@ async function loadSharedMenu(){
   }
 }
 
+// ── School year phase ──────────────────────────────────────────────────────
+function getSchoolPhase(){
+  const now=new Date();
+  const yr=now.getMonth()>=8?now.getFullYear():now.getFullYear()-1;
+  const wks=Math.max(0,Math.floor((now-new Date(yr,8,1))/6048e5));
+  if(wks<8)return 1;
+  if(wks<14)return 2;
+  if(wks<21)return 3;
+  if(wks<28)return 4;
+  return 5;
+}
+const SCHOOL_PHASE=getSchoolPhase();
+const PHASE_LABELS=['','Aut1','Aut2','Spr1','Spr2','Sum'];
+const CURR_WT=[0,0.15,0.35,0.55,0.75,0.95][SCHOOL_PHASE];
+function pickPhased(prev,curr){
+  if(!prev.length)return curr[Math.floor(Math.random()*curr.length)];
+  if(!curr.length)return prev[Math.floor(Math.random()*prev.length)];
+  const pool=Math.random()<CURR_WT?curr:prev;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+// ── Recently-seen avoidance ───────────────────────────────────────────────
+const SEEN_W=15;
+function pickFresh(bank,key){
+  const k='y3_seen_'+key;
+  let seen;try{seen=JSON.parse(localStorage.getItem(k)||'[]')}catch(e){seen=[]}
+  const avail=bank.map((_,i)=>i).filter(i=>!seen.includes(i));
+  const pool=avail.length?avail:bank.map((_,i)=>i);
+  const idx=pool[Math.floor(Math.random()*pool.length)];
+  const ns=[...seen.filter(i=>i!==idx),idx].slice(-SEEN_W);
+  try{localStorage.setItem(k,JSON.stringify(ns))}catch(e){}
+  return bank[idx];
+}
+
 function init(){
   renderDate();renderLunch();renderMsg();
   pType=ALL_TYPES[new Date().getDate()%ALL_TYPES.length];
   newPuzzle();
   const ov=JSON.parse(localStorage.getItem('overrides')||'{}');
   if(Object.keys(ov).length)document.getElementById('override-dot').style.display='inline-block';
+  const vtag=document.getElementById('version-tag');
+  if(vtag)vtag.textContent=vtag.textContent+' · '+PHASE_LABELS[SCHOOL_PHASE];
 }
 loadSharedMenu().then(init);
 
