@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Drawer & Peg Labels — Wallscourt Farm Academy</title>
+  <title>Drawer, Peg & Other Labels — Wallscourt Farm Academy</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
@@ -85,8 +85,7 @@
   <div class="header-divider"></div>
   <div>
     <div class="school-name">Wallscourt Farm Academy</div>
-    <h1 class="header-text">Drawer & Peg Labels</h1>
-    <p>Print on A4 landscape, laminate & cut</p>
+    <h1 class="header-text">Drawer, Peg & Other Labels</h1>
   </div>
 </header>
 <main>
@@ -98,6 +97,7 @@
           <button class="mode-tab active" data-type="drawer">Drawer Labels (120×30mm)</button>
           <button class="mode-tab" data-type="peg">Peg Labels (42×11mm)</button>
           <button class="mode-tab" data-type="avery">Avery L7651 (38×21mm)</button>
+          <button class="mode-tab" data-type="image">Image Labels</button>
         </div>
         <div class="size-info" id="sizeInfo">
           <strong>Drawer:</strong> 12 per sheet — 120mm × 30mm with 5mm coloured border
@@ -121,7 +121,27 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card hidden" id="imageCard">
+      <div class="card-header"><h2>Image label</h2></div>
+      <div class="card-body">
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
+          <div class="field" style="flex:1;min-width:140px;">
+            <label>Sheet format</label>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+              <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="imgFmt" value="12" checked onchange="updatePreview()"> 12 per sheet <span style="color:var(--muted)">(99×42mm)</span></label>
+              <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="imgFmt" value="65" onchange="updatePreview()"> 65 per sheet <span style="color:var(--muted)">(38×21mm)</span></label>
+            </div>
+          </div>
+          <div class="field" style="flex:2;min-width:200px;">
+            <label>Upload label image</label>
+            <input type="file" id="imgFile" accept="image/*" onchange="onImgFile(event)" style="margin-top:4px;font-size:0.85rem;">
+            <p class="hint" id="imgHint" style="margin-top:5px;"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="namesCard">
       <div class="card-header"><h2>Children's Names</h2></div>
       <div class="card-body">
         <textarea id="namesInput" placeholder="Enter names, one per line"></textarea>
@@ -146,7 +166,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Drawer & Peg Label Generator · <strong>v2.0</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>v2.1</strong></footer>
 
 <script>
 // Year group colours
@@ -208,6 +228,7 @@ const fontBase64 = 'AAEAAAATAQAABAAwRFNJR865WLMAARTcAAAVAExUU0i8uXsKAAAY7AAAAS1P
 let currentLabelType = 'drawer';
 let currentYear = null;
 let names = [];
+let imgDataUrl = null;
 
 // DOM elements
 let labelTypeTabs, yearGrid, namesInput, fileInput;
@@ -238,6 +259,19 @@ function init() {
   updatePreview();
 }
 
+function getImgFmt() {
+  const radios = document.querySelectorAll('input[name="imgFmt"]');
+  for (let i = 0; i < radios.length; i++) { if (radios[i].checked) return radios[i].value; }
+  return '12';
+}
+function onImgFile(e) {
+  const file = e.target.files[0];
+  if (!file) { imgDataUrl = null; updatePreview(); return; }
+  const reader = new FileReader();
+  reader.onload = function(ev) { imgDataUrl = ev.target.result; updatePreview(); };
+  reader.readAsDataURL(file);
+}
+
 function onLabelTypeClick(e) {
   if (!e.target.classList.contains('mode-tab')) return;
 
@@ -245,16 +279,22 @@ function onLabelTypeClick(e) {
   e.target.classList.add('active');
   currentLabelType = e.target.dataset.type;
 
+  const isImage = currentLabelType === 'image';
+  document.getElementById('imageCard').classList.toggle('hidden', !isImage);
+  document.getElementById('namesCard').classList.toggle('hidden', isImage);
+
   const config = LABEL_CONFIG[currentLabelType];
   if (currentLabelType === 'drawer') {
     sizeInfo.innerHTML = `<strong>Drawer:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border`;
   } else if (currentLabelType === 'peg') {
     sizeInfo.innerHTML = `<strong>Peg:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border`;
-  } else {
+  } else if (currentLabelType === 'avery') {
     sizeInfo.innerHTML = `<strong>Avery L7651:</strong> ${config.perSheet} per sheet — nameimage ${config.nameimageW}mm × ${config.nameimageH}mm, ${config.border}mm border`;
+  } else {
+    sizeInfo.innerHTML = `<strong>Image Labels:</strong> 12 per sheet (99×42mm) or 65 per sheet (38×21mm) — coloured border from year group selection`;
   }
 
-  labelPreview.className = `label-preview ${currentLabelType}-preview`;
+  if (!isImage) labelPreview.className = `label-preview ${currentLabelType}-preview`;
   updatePreview();
 }
 
@@ -304,6 +344,33 @@ async function onFileUpload(e) {
 }
 
 function updatePreview() {
+  // ── Image mode ──
+  if (currentLabelType === 'image') {
+    const fmt = getImgFmt();
+    const hint = document.getElementById('imgHint');
+    if (hint) hint.textContent = fmt === '12'
+      ? 'Ideal: 930×360px (2.58:1) — fills 99×42mm label inside 3mm border'
+      : 'Ideal: 414×215px (1.93:1) — fills 38×21mm label inside 1.5mm border';
+    const yearData = currentYear ? YEAR_COLOURS[currentYear] : null;
+    const colour = yearData?.hex || '#ccc';
+    const border = fmt === '12' ? 3 : 1.5;
+    if (imgDataUrl) {
+      const previewW = 240, previewH = 60, previewBorder = fmt === '12' ? 8 : 5;
+      labelPreview.style.width = previewW + 'px';
+      labelPreview.style.height = previewH + 'px';
+      labelPreview.className = 'label-preview';
+      labelPreview.innerHTML = `<div style="position:absolute;inset:0;border:${previewBorder}px solid ${colour};box-sizing:border-box;"><img src="${imgDataUrl}" style="width:100%;height:100%;display:block;object-fit:fill;"></div>`;
+    } else {
+      labelPreview.style.width = '240px';
+      labelPreview.style.height = '60px';
+      labelPreview.className = 'label-preview';
+      labelPreview.innerHTML = `<div style="position:absolute;inset:0;border:8px solid ${colour};box-sizing:border-box;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:0.75rem;">Upload an image</div>`;
+    }
+    dlBtn.disabled = !imgDataUrl || !currentYear;
+    labelCount.textContent = imgDataUrl && currentYear ? `${fmt === '12' ? 12 : 65} labels per sheet` : '';
+    return;
+  }
+
   const config = LABEL_CONFIG[currentLabelType];
   const yearData = currentYear ? YEAR_COLOURS[currentYear] : null;
   const previewName = names.length > 0 ? names[0] : '[Name]';
@@ -343,6 +410,47 @@ function updatePreview() {
 }
 
 async function generatePdf() {
+  // ── Image mode ──
+  if (currentLabelType === 'image') {
+    const { jsPDF } = window.jspdf;
+    const fmt = getImgFmt();
+    const yearData = currentYear ? YEAR_COLOURS[currentYear] : null;
+    const colour = yearData?.hex || '#3288ce';
+    statusEl.textContent = 'Building…';
+    dlBtn.disabled = true;
+    try {
+      let cols, rows, LW, LH, marginL, marginT, gapX, gapY, border;
+      if (fmt === '12') {
+        cols=2; rows=6; LW=99.1; LH=42.3; marginL=6.35; marginT=21.15; gapX=0; gapY=0; border=3;
+      } else {
+        cols=5; rows=13; LW=38.1; LH=21.2; marginL=8.6; marginT=11; gapX=2.5; gapY=0; border=1.5;
+      }
+      const hex = colour.replace('#','');
+      const cr=parseInt(hex.substring(0,2),16), cg=parseInt(hex.substring(2,4),16), cb=parseInt(hex.substring(4,6),16);
+      const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' });
+      for (let row=0; row<rows; row++) {
+        for (let col=0; col<cols; col++) {
+          const x = marginL + col*(LW+gapX);
+          const y = marginT + row*(LH+gapY);
+          doc.addImage(imgDataUrl, x+border, y+border, LW-2*border, LH-2*border, undefined, 'FAST');
+          doc.setFillColor(cr,cg,cb);
+          doc.rect(x,            y,           LW,    border, 'F');
+          doc.rect(x,            y+LH-border, LW,    border, 'F');
+          doc.rect(x,            y+border,    border, LH-2*border, 'F');
+          doc.rect(x+LW-border,  y+border,    border, LH-2*border, 'F');
+        }
+      }
+      doc.save(`WFA_Image_Labels_Y${currentYear}_${fmt}ps.pdf`);
+      statusEl.textContent = '✓ Downloaded';
+      setTimeout(()=>{ statusEl.textContent=''; dlBtn.disabled=false; updatePreview(); }, 3000);
+    } catch(e) {
+      statusEl.className='status error';
+      statusEl.textContent='Error: '+e.message;
+      dlBtn.disabled=false;
+    }
+    return;
+  }
+
   const { jsPDF } = window.jspdf;
   const config = LABEL_CONFIG[currentLabelType];
   const yearData = YEAR_COLOURS[currentYear];
