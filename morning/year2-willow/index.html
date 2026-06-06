@@ -475,7 +475,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Willow</span><span id="version-tag">w.06.06.26a</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Willow</span><span id="version-tag">w.06.06.26b</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -1863,8 +1863,8 @@ const GRAPHEME_GROUPS=[
   {label:'Alternative spellings',graphemes:['ph','wh']}
 ];
 function getFilteredPhonics(){
-  const sel=JSON.parse(localStorage.getItem('y1_graphemes')||'[]');
-  const mode=localStorage.getItem('y1_phonics_mode')||'real';  // 'real' | 'alien' | 'mixed'
+  const sel=JSON.parse(localStorage.getItem('y2_graphemes')||'[]');
+  const mode=localStorage.getItem('y2_phonics_mode')||'real';  // 'real' | 'alien' | 'mixed'
   let pool;
   if(mode==='alien') pool=ALIEN_BLEND.map(x=>({...x,isAlien:true}));
   else if(mode==='mixed') pool=[...PHONICS_BLEND.map(x=>({...x,isAlien:false})),...ALIEN_BLEND.map(x=>({...x,isAlien:true}))];
@@ -2173,8 +2173,8 @@ function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.fl
 function getMenu(){
   const ts=todayStr(),dk=getDK(ts);
   if(!['Mon','Tue','Wed','Thu','Fri'].includes(dk))return['No school today',''];
-  const ov=JSON.parse(localStorage.getItem('y1_ov_'+ts)||'{}');
-  const saved=JSON.parse(localStorage.getItem('y1_menu')||'{}');
+  const ov=JSON.parse(localStorage.getItem('y2_ov_'+ts)||'{}');
+  const saved=JSON.parse(localStorage.getItem('y2_menu')||'{}');
   const mon=getMon(ts);
   // check saved overrides first, then new menu, then fallback
   let base;
@@ -2185,17 +2185,19 @@ function getMenu(){
 }
 function getMsg(){
   const ts=todayStr(),dk=getDK(ts);
-  const ov=JSON.parse(localStorage.getItem('y1_ov_'+ts)||'{}');
+  const ov=JSON.parse(localStorage.getItem('y2_ov_'+ts)||'{}');
   if(ov.hasOwnProperty('msg'))return ov.msg;
   return AUTO_MSGS[dk]||'';
 }
 function getTTSet(){
   const ts=todayStr();
-  const ov=JSON.parse(localStorage.getItem('y1_ov_'+ts)||'{}');
+  const ov=JSON.parse(localStorage.getItem('y2_ov_'+ts)||'{}');
   if(ov.tt&&ov.tt.topic){return ov.tt}
-  const userBank=JSON.parse(localStorage.getItem('y1_tt_bank')||'[]');
-  const combined=[...DEFAULT_TT,...userBank];
-  return combined[Math.floor(Math.random()*combined.length)];
+  const userBank=JSON.parse(localStorage.getItem('y2_tt_bank')||'[]');
+  const all=[...DEFAULT_TT,...userBank];
+  const ttPrev=all.filter(x=>x.yr!==2);
+  const ttCurr=all.filter(x=>x.yr===2);
+  return pickPhased(ttPrev,ttCurr);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2227,11 +2229,47 @@ async function loadSharedMenu(){
   }
 }
 
+// ── School year phase ──────────────────────────────────────────────────────
+function getSchoolPhase(){
+  const now=new Date();
+  const yr=now.getMonth()>=8?now.getFullYear():now.getFullYear()-1;
+  const wks=Math.max(0,Math.floor((now-new Date(yr,8,1))/6048e5));
+  if(wks<8)return 1;
+  if(wks<14)return 2;
+  if(wks<21)return 3;
+  if(wks<28)return 4;
+  return 5;
+}
+const SCHOOL_PHASE=getSchoolPhase();
+const PHASE_LABELS=['','Aut1','Aut2','Spr1','Spr2','Sum'];
+const CURR_WT=[0,0.15,0.35,0.55,0.75,0.95][SCHOOL_PHASE];
+function pickPhased(prev,curr){
+  if(!prev.length)return curr[Math.floor(Math.random()*curr.length)];
+  if(!curr.length)return prev[Math.floor(Math.random()*prev.length)];
+  const pool=Math.random()<CURR_WT?curr:prev;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+// ── Recently-seen avoidance ───────────────────────────────────────────────
+const SEEN_W=15;
+function pickFresh(bank,key){
+  const k='y2_seen_'+key;
+  let seen;try{seen=JSON.parse(localStorage.getItem(k)||'[]')}catch(e){seen=[]}
+  const avail=bank.map((_,i)=>i).filter(i=>!seen.includes(i));
+  const pool=avail.length?avail:bank.map((_,i)=>i);
+  const idx=pool[Math.floor(Math.random()*pool.length)];
+  const ns=[...seen.filter(i=>i!==idx),idx].slice(-SEEN_W);
+  try{localStorage.setItem(k,JSON.stringify(ns))}catch(e){}
+  return bank[idx];
+}
+
 function init(){
   renderDate();renderLunch();renderMsg();loadImg();
   // Y2 combined view: rotation of 4-of-5 maths mini-panels (NotD / Times Tables / Fractions / Money / Clock)
   pType='y2combined';
   newPuzzle();updateDot();
+  const vtag=document.getElementById('version-tag');
+  if(vtag)vtag.textContent=vtag.textContent+' · '+PHASE_LABELS[SCHOOL_PHASE];
 }
 
 function renderDate(){
@@ -2250,9 +2288,9 @@ function renderMsg(){
   else el.innerHTML='';
   el.onblur=()=>{
     const ts=todayStr();
-    const ov=JSON.parse(localStorage.getItem('y1_ov_'+ts)||'{}');
+    const ov=JSON.parse(localStorage.getItem('y2_ov_'+ts)||'{}');
     ov.msg=el.innerText.trim();
-    localStorage.setItem('y1_ov_'+ts,JSON.stringify(ov));updateDot();
+    localStorage.setItem('y2_ov_'+ts,JSON.stringify(ov));updateDot();
   };
 }
 
@@ -2270,63 +2308,63 @@ function newPuzzle(){
   } else if(pType==='combined'){
     cur={type:'combined'};renderCombined();
   } else if(pType==='spotmistake'){
-    const e=SPOT_MISTAKE[Math.floor(Math.random()*SPOT_MISTAKE.length)];
+    const e=pickFresh(SPOT_MISTAKE,'stm');
     cur={type:'spotmistake',data:e};renderSpotMistake(e);
   } else if(pType==='wordofday'){
-    const e=WORD_OF_DAY[Math.floor(Math.random()*WORD_OF_DAY.length)];
+    const e=pickFresh(WORD_OF_DAY,'wod');
     cur={type:'wordofday',data:e};renderWordOfDay(e);
   } else if(pType==='synant'){
-    const e=SYN_ANT[Math.floor(Math.random()*SYN_ANT.length)];
+    const e=pickFresh(SYN_ANT,'sna');
     cur={type:'synant',data:e};renderSynAnt(e);
   } else if(pType==='magicnumber'){
-    const e=MAGIC_NUMBER_CLEAN[Math.floor(Math.random()*MAGIC_NUMBER_CLEAN.length)];
+    const e=pickFresh(MAGIC_NUMBER_CLEAN,'mn');
     cur={type:'magicnumber',data:e};renderMagicNumber(e);
   } else if(pType==='shapeday'){
-    const e=SHAPES[Math.floor(Math.random()*SHAPES.length)];
+    const e=pickFresh(SHAPES,'shp');
     cur={type:'shapeday',data:e};renderShapeDay(e);
   } else if(pType==='estimation'){
-    const e=ESTIMATION[Math.floor(Math.random()*ESTIMATION.length)];
+    const e=pickFresh(ESTIMATION,'est');
     cur={type:'estimation',data:e};renderEstimation(e);
   } else if(pType==='mapchallenge'){
-    const e=MAP_CHALLENGE[Math.floor(Math.random()*MAP_CHALLENGE.length)];
+    const e=pickFresh(MAP_CHALLENGE,'map');
     cur={type:'mapchallenge',data:e};renderMapChallenge(e);
   } else if(pType==='timeline'){
-    const e=TIMELINE_SETS[Math.floor(Math.random()*TIMELINE_SETS.length)];
+    const e=pickFresh(TIMELINE_SETS,'tl');
     cur={type:'timeline',data:e};renderTimeline(e);
   } else if(pType==='wouldyourather'){
-    const e=WOULD_YOU_RATHER[Math.floor(Math.random()*WOULD_YOU_RATHER.length)];
+    const e=pickFresh(WOULD_YOU_RATHER,'wyr');
     cur={type:'wouldyourather',data:e};renderWouldYouRather(e);
   } else if(pType==='literacy'){
-    const eA=WORD_OF_DAY[Math.floor(Math.random()*WORD_OF_DAY.length)];
-    const eB=SPOT_MISTAKE[Math.floor(Math.random()*SPOT_MISTAKE.length)];
+    const eA=pickFresh(WORD_OF_DAY,'wod');
+    const eB=pickFresh(SPOT_MISTAKE,'stm');
     cur={type:'literacy',dataA:eA,dataB:eB};renderPairLiteracy(eA,eB);
   } else if(pType==='vocab'){
-    const eA=WORD_OF_DAY[Math.floor(Math.random()*WORD_OF_DAY.length)];
-    const eB=SYN_ANT[Math.floor(Math.random()*SYN_ANT.length)];
+    const eA=pickFresh(WORD_OF_DAY,'wod');
+    const eB=pickFresh(SYN_ANT,'sna');
     cur={type:'vocab',dataA:eA,dataB:eB};renderPairVocab(eA,eB);
   } else if(pType==='mathsreason'){
-    const eA=MAGIC_NUMBER_CLEAN[Math.floor(Math.random()*MAGIC_NUMBER_CLEAN.length)];
-    const eB=WOULD_YOU_RATHER[Math.floor(Math.random()*WOULD_YOU_RATHER.length)];
+    const eA=pickFresh(MAGIC_NUMBER_CLEAN,'mn');
+    const eB=pickFresh(WOULD_YOU_RATHER,'wyr');
     cur={type:'mathsreason',dataA:eA,dataB:eB};renderPairMathsReason(eA,eB);
   } else if(pType==='mathsshape'){
-    const eA=SHAPES[Math.floor(Math.random()*SHAPES.length)];
-    const eB=ESTIMATION[Math.floor(Math.random()*ESTIMATION.length)];
+    const eA=pickFresh(SHAPES,'shp');
+    const eB=pickFresh(ESTIMATION,'est');
     cur={type:'mathsshape',dataA:eA,dataB:eB};renderPairMathsShape(eA,eB);
   } else if(pType==='humanities'){
-    const eA=MAP_CHALLENGE[Math.floor(Math.random()*MAP_CHALLENGE.length)];
-    const eB=TIMELINE_SETS[Math.floor(Math.random()*TIMELINE_SETS.length)];
+    const eA=pickFresh(MAP_CHALLENGE,'map');
+    const eB=pickFresh(TIMELINE_SETS,'tl');
     cur={type:'humanities',dataA:eA,dataB:eB};renderPairHumanities(eA,eB);
   } else if(pType==='subitise'){
-    const e=SUBITISE[Math.floor(Math.random()*SUBITISE.length)];
+    const e=pickFresh(SUBITISE,'sub');
     cur={type:'subitise',data:e};renderSubitise(e);
   } else if(pType==='phonics'){
-    const e=PHONICS_BLEND[Math.floor(Math.random()*PHONICS_BLEND.length)];
+    const e=pickFresh(PHONICS_BLEND,'phon');
     cur={type:'phonics',data:e};renderPhonicsBlend(e);
   } else if(pType==='rhyme'){
-    const e=RHYME_BANK[Math.floor(Math.random()*RHYME_BANK.length)];
+    const e=pickFresh(RHYME_BANK,'rhy');
     cur={type:'rhyme',data:e};renderRhyme(e);
   } else if(pType==='clock'){
-    const e=CLOCK_BANK[Math.floor(Math.random()*CLOCK_BANK.length)];
+    const e=pickFresh(CLOCK_BANK,'clk');
     cur={type:'clock',data:e};renderClock(e);
   } else if(pType==='y2combined'){
     cur={type:'y2combined'};renderY2Combined();
@@ -3729,16 +3767,16 @@ function openImgOverlay(){document.getElementById('img-overlay').classList.add('
 function closeImgOverlay(){document.getElementById('img-overlay').classList.remove('on')}
 function handleImgFile(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>showImg(ev.target.result);r.readAsDataURL(f);e.target.value='';}
 function handleImgUrl(){const url=document.getElementById('img-url-input').value.trim();if(!url)return;fetch(url).then(r=>r.blob()).then(blob=>{const r=new FileReader();r.onload=ev=>{showImg(ev.target.result);closeImgOverlay()};r.readAsDataURL(blob)}).catch(()=>{showImg(url);closeImgOverlay()})}
-function showImg(src){document.getElementById('img-el').src=src;document.getElementById('img-pane').classList.add('visible');try{sessionStorage.setItem('y1_img',src)}catch(e){}}
-function removeImg(){document.getElementById('img-el').src='';document.getElementById('img-pane').classList.remove('visible');try{sessionStorage.removeItem('y1_img')}catch(e){}}
-function loadImg(){try{const s=sessionStorage.getItem('y1_img');if(s)showImg(s)}catch(e){}}
+function showImg(src){document.getElementById('img-el').src=src;document.getElementById('img-pane').classList.add('visible');try{sessionStorage.setItem('y2_img',src)}catch(e){}}
+function removeImg(){document.getElementById('img-el').src='';document.getElementById('img-pane').classList.remove('visible');try{sessionStorage.removeItem('y2_img')}catch(e){}}
+function loadImg(){try{const s=sessionStorage.getItem('y2_img');if(s)showImg(s)}catch(e){}}
 
 // ═══════════════════════════════════════════════════════════
 // OVERRIDE
 // ═══════════════════════════════════════════════════════════
 function openOverride(){
   const ts=todayStr(),dk=getDK(ts);
-  const ov=JSON.parse(localStorage.getItem('y1_ov_'+ts)||'{}');
+  const ov=JSON.parse(localStorage.getItem('y2_ov_'+ts)||'{}');
   document.getElementById('ov-meal1').value=ov.meal1||'';
   document.getElementById('ov-meal2').value=ov.meal2||'';
   document.getElementById('ov-msg').value=ov.hasOwnProperty('msg')?ov.msg:'';
@@ -3755,7 +3793,7 @@ function openOverride(){
 function closeOverride(){document.getElementById('ov-overlay').classList.remove('on')}
 function saveOverride(){
   const ts=todayStr();
-  const ov=JSON.parse(localStorage.getItem('y1_ov_'+ts)||'{}');
+  const ov=JSON.parse(localStorage.getItem('y2_ov_'+ts)||'{}');
   const m1=document.getElementById('ov-meal1').value.trim();
   const m2=document.getElementById('ov-meal2').value.trim();
   if(m1)ov.meal1=m1; else delete ov.meal1;
@@ -3765,11 +3803,11 @@ function saveOverride(){
   if(topic){
     ov.tt={topic,stmts:[document.getElementById('ov-tt-1').value,document.getElementById('ov-tt-2').value,document.getElementById('ov-tt-3').value],lie:parseInt(document.getElementById('ov-tt-lie').value)};
   } else delete ov.tt;
-  localStorage.setItem('y1_ov_'+ts,JSON.stringify(ov));
+  localStorage.setItem('y2_ov_'+ts,JSON.stringify(ov));
   closeOverride();renderLunch();renderMsg();updateDot();
 }
-function clearOverride(){localStorage.removeItem('y1_ov_'+todayStr());closeOverride();renderLunch();renderMsg();updateDot();}
-function updateDot(){const ov=JSON.parse(localStorage.getItem('y1_ov_'+todayStr())||'{}');document.getElementById('override-dot').style.display=Object.keys(ov).length?'inline-block':'none';}
+function clearOverride(){localStorage.removeItem('y2_ov_'+todayStr());closeOverride();renderLunch();renderMsg();updateDot();}
+function updateDot(){const ov=JSON.parse(localStorage.getItem('y2_ov_'+todayStr())||'{}');document.getElementById('override-dot').style.display=Object.keys(ov).length?'inline-block':'none';}
 
 // ═══════════════════════════════════════════════════════════
 // SETUP (menu + TT bank)
@@ -3777,7 +3815,7 @@ function updateDot(){const ov=JSON.parse(localStorage.getItem('y1_ov_'+todayStr(
 let pendingTTBank=[];
 
 function openSetup(){
-  const saved=JSON.parse(localStorage.getItem('y1_menu')||'{}');
+  const saved=JSON.parse(localStorage.getItem('y2_menu')||'{}');
   const days=['Mon','Tue','Wed','Thu','Fri'];
   const weeks=Object.keys(MENU_BY_WEEK).sort();
   let html='';
@@ -3792,11 +3830,11 @@ function openSetup(){
   }
   document.getElementById('menu-form').innerHTML=html;
   // Load grapheme picker state and mode
-  pendingGraphemes=new Set(JSON.parse(localStorage.getItem('y1_graphemes')||'[]'));
-  pendingPhonicsMode=localStorage.getItem('y1_phonics_mode')||'real';
+  pendingGraphemes=new Set(JSON.parse(localStorage.getItem('y2_graphemes')||'[]'));
+  pendingPhonicsMode=localStorage.getItem('y2_phonics_mode')||'real';
   renderPhonicsModeButtons();
   renderGraphemePicker();
-  pendingTTBank=JSON.parse(JSON.stringify(JSON.parse(localStorage.getItem('y1_tt_bank')||'[]')));
+  pendingTTBank=JSON.parse(JSON.stringify(JSON.parse(localStorage.getItem('y2_tt_bank')||'[]')));
   renderTTBank();
   document.getElementById('setup-ov').classList.add('on');
 }
@@ -3901,10 +3939,10 @@ function saveSetup(){
       saved[mon][day]=[document.getElementById(`mn_${mon}_${day}_0`)?.value||'',document.getElementById(`mn_${mon}_${day}_1`)?.value||''];
     }
   }
-  localStorage.setItem('y1_menu',JSON.stringify(saved));
-  localStorage.setItem('y1_tt_bank',JSON.stringify(pendingTTBank));
-  localStorage.setItem('y1_graphemes',JSON.stringify([...pendingGraphemes]));
-  localStorage.setItem('y1_phonics_mode',pendingPhonicsMode);
+  localStorage.setItem('y2_menu',JSON.stringify(saved));
+  localStorage.setItem('y2_tt_bank',JSON.stringify(pendingTTBank));
+  localStorage.setItem('y2_graphemes',JSON.stringify([...pendingGraphemes]));
+  localStorage.setItem('y2_phonics_mode',pendingPhonicsMode);
   closeSetup();renderLunch();
 }
 
