@@ -364,7 +364,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26e</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26f</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -2486,8 +2486,9 @@ function pickFresh(bank,key){
 // ── Activity pool — MTC boost from Spr1 ──────────────────────────────────
 function getActivityPool(){
   if(SCHOOL_PHASE>=3){
-    // MTC season: boost number, maths, and add mtcdrill type
-    return [...ALL_TYPES,'number','maths','mtcdrill','number','maths','mtcdrill'];
+    // MTC season: mtcdrill first so it's the first Switch from combined;
+    // number and maths also boosted for MTC prep
+    return ['combined','mtcdrill','number','maths','literacy','spotmistakecombo','humanities','boggle','number','maths','mtcdrill'];
   }
   return ALL_TYPES;
 }
@@ -2523,7 +2524,8 @@ async function loadSharedMenu(){
 
 function init(){
   renderDate();renderLunch();renderMsg();loadImg();
-  pType='combined'; // Always show combined view (4 puzzles at once)
+  // During MTC season open straight onto the drill panel
+  pType=SCHOOL_PHASE>=3?'mtcdrill':'combined';
   newPuzzle();updateDot();
   const vtag=document.getElementById('version-tag');
   if(vtag){
