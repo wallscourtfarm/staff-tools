@@ -42,6 +42,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
 .mtc-q-text{font-weight:700;color:#333}
 .mtc-ans{font-weight:900;color:#1798d3;min-width:2.5em;display:inline-block;background:#e8f4fc;border-radius:4px;padding:0.05em 0.4em;cursor:pointer;transition:color 0.2s}
 .mtc-ans.hidden{color:transparent;background:#1798d3;user-select:none}
+.mtc-2col{display:grid;grid-template-columns:1fr 1fr;gap:0 0.8vw;width:100%}
 .mtc-focus-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 0.8vw;width:100%}
 .mtc-focus-row{display:flex;justify-content:space-between;align-items:center;font-size:clamp(0.85rem,1.9vh,1.3rem);padding:0.1em 0;border-bottom:1px solid #f0f0f0;font-weight:600}
 .mtc-focus-ans{color:#1798d3;font-weight:900;min-width:2.5em;text-align:right}
@@ -365,7 +366,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26h</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.06.06.26i</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -2666,14 +2667,14 @@ function renderMTCDrill(){
   if(!panel){panel=document.createElement('div');panel.id='mtc-drill-panel';pp.parentNode.insertBefore(panel,pp);}
   panel.dataset.revealed='0';
 
-  const qf=genMTCFacts(8,'qf');
-  const qfHtml=qf.map(q=>mtcRow(`${q.t} &times; ${q.f} =`,q.a)).join('');
+  const qf=genMTCFacts(14,'qf');
+  const qfHtml=`<div class="mtc-2col">${qf.map(q=>mtcRow(`${q.t} &times; ${q.f} =`,q.a)).join('')}</div>`;
 
-  const mn=genMTCFacts(6,'mn');
-  const mnHtml=mn.map(q=>{
+  const mn=genMTCFacts(12,'mn');
+  const mnHtml=`<div class="mtc-2col">${mn.map(q=>{
     const showA=Math.random()<0.5;
     return showA?mtcRow(`${q.t} &times; ? = ${q.a}`,q.f):mtcRow(`? &times; ${q.f} = ${q.a}`,q.t);
-  }).join('');
+  }).join('')}</div>`;
 
   const focusT=MTC_FOCUS[new Date().getDay()];
   const focusRows=Array.from({length:12},(_,i)=>i+1).map(n=>`
@@ -2683,8 +2684,8 @@ function renderMTCDrill(){
     </div>`).join('');
   const focusHtml=`<div class="mtc-focus-grid">${focusRows}</div>`;
 
-  const dv=genMTCFacts(6,'dv');
-  const dvHtml=dv.map(q=>mtcRow(`${q.a} &divide; ${q.t} =`,q.f)).join('');
+  const dv=genMTCFacts(12,'dv');
+  const dvHtml=`<div class="mtc-2col">${dv.map(q=>mtcRow(`${q.a} &divide; ${q.t} =`,q.f)).join('')}</div>`;
 
   const revealBtn=`<button class="reveal-btn" onclick="revealMTCAll()">👁 Reveal all</button>`;
 
