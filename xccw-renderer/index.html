@@ -65,9 +65,7 @@
   .preview span { display: inline; }
   .preview span.va { font-family: 'xccw-a', serif; }
   .preview span.vb { font-family: 'xccw-b', serif; }
-  .note {
-    margin-top: 12px; font-size: 11px; color: #7a9cb0; line-height: 1.5;
-  }
+  .note { margin-top: 12px; font-size: 11px; color: #7a9cb0; line-height: 1.5; }
   .note strong { color: #4a7090; }
   .rule-note {
     margin-top: 10px;
@@ -102,7 +100,7 @@
   <p class="note">
     <strong>Copy text</strong> pastes as live XCCW-joined text (18px) into Word, Keynote, Google Slides &mdash; resize after pasting as needed.
     Requires XCCW fonts installed on the destination machine.
-    <strong>Download PNG</strong> exports a raster image if fonts aren&rsquo;t available.
+    <strong>Download PNG</strong> exports an A4 page (150dpi) with automatic word wrap.
   </p>
   <div class="rule-note">
     <strong>Join rules:</strong>
@@ -111,7 +109,7 @@
     Word and line boundaries reset to 4a.
   </div>
 </div>
-<footer>07.06.26a</footer>
+<footer>07.06.26b</footer>
 <script>
 
 const TOP_EXIT = new Set(['o','r','v','w','x']);
@@ -120,6 +118,17 @@ function variantFor(prev) {
   if (!prev) return 'a';
   if (prev >= 'A' && prev <= 'Z') return 'a';
   return TOP_EXIT.has(prev) ? 'b' : 'a';
+}
+
+// Build runs for a single word (no spaces/newlines)
+function buildWordRuns(word) {
+  const runs = [];
+  let prev = null;
+  for (const ch of word) {
+    runs.push({ ch, variant: variantFor(prev) });
+    prev = ch;
+  }
+  return runs;
 }
 
 function buildRuns(text) {
@@ -197,49 +206,94 @@ async function copyStyledText() {
   }
 }
 
+// ── PNG download — A4 page with word wrap ──────────────────────────────────
 function downloadImage() {
   const text = document.getElementById('input').value;
-  const size = 32;
-  const runs = buildRuns(text);
 
-  const lines = [[]];
-  for (const r of runs) {
-    if (r.ch === '\n') { lines.push([]); }
-    else { lines[lines.length-1].push(r); }
-  }
+  // A4 at 150dpi: 1240 x 1754px
+  const PAGE_W  = 1240;
+  const PAGE_H  = 1754;
+  const MARGIN  = 90;           // ~15mm at 150dpi
+  const CONTENT_W = PAGE_W - MARGIN * 2;
+  const FONT_SIZE = 42;         // ~17pt at 150dpi — comfortable reading size
+  const LINE_H    = Math.round(FONT_SIZE * 1.65);
 
   const cv  = document.createElement('canvas');
+  cv.width  = PAGE_W;
+  cv.height = PAGE_H;
   const ctx = cv.getContext('2d');
-  const PAD = 10;
-  const lineH = Math.round(size * 1.6);
 
-  function measureLine(lineRuns) {
+  // Helper: measure a run array
+  function runsWidth(runs) {
     let w = 0;
-    for (const r of lineRuns) {
-      ctx.font = size + 'px xccw-' + r.variant;
+    for (const r of runs) {
+      ctx.font = FONT_SIZE + 'px xccw-' + r.variant;
       w += ctx.measureText(r.ch).width;
     }
     return w;
   }
 
-  const maxW = Math.max(...lines.map(measureLine), 40);
-  cv.width  = Math.ceil(maxW + PAD * 2);
-  cv.height = Math.ceil(lines.length * lineH + PAD * 2);
+  // Measure a space
+  ctx.font = FONT_SIZE + 'px xccw-a';
+  const spaceW = ctx.measureText(' ').width;
 
+  // Word-wrap: turn raw text into lines of run-arrays
+  function wrapText(rawText) {
+    const outputLines = [];
+
+    for (const para of rawText.split('\n')) {
+      if (para === '') { outputLines.push([]); continue; }
+
+      const words = para.split(' ');
+      let lineBuf  = [];
+      let lineW    = 0;
+
+      for (const word of words) {
+        if (word === '') continue;
+        const wordRuns  = buildWordRuns(word);
+        const wordWidth = runsWidth(wordRuns);
+
+        if (lineBuf.length > 0 && lineW + spaceW + wordWidth > CONTENT_W) {
+          // Flush current line, start new one
+          outputLines.push(lineBuf);
+          lineBuf = wordRuns.slice();
+          lineW   = wordWidth;
+        } else {
+          if (lineBuf.length > 0) {
+            lineBuf.push({ ch: ' ', variant: 'a' });
+            lineW += spaceW;
+          }
+          lineBuf = lineBuf.concat(wordRuns);
+          lineW  += wordWidth;
+        }
+      }
+      if (lineBuf.length > 0) outputLines.push(lineBuf);
+    }
+
+    return outputLines;
+  }
+
+  const wrappedLines = wrapText(text);
+
+  // White background
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+
+  // Draw lines
   ctx.fillStyle = '#0d2841';
   ctx.textBaseline = 'alphabetic';
 
-  lines.forEach((lineRuns, li) => {
-    let x = PAD;
-    const y = PAD + size + li * lineH;
-    for (const r of lineRuns) {
-      ctx.font = size + 'px xccw-' + r.variant;
+  let y = MARGIN + FONT_SIZE;
+  for (const line of wrappedLines) {
+    if (y + LINE_H > PAGE_H - MARGIN) break;   // stop if we'd overflow the page
+    let x = MARGIN;
+    for (const r of line) {
+      ctx.font = FONT_SIZE + 'px xccw-' + r.variant;
       ctx.fillText(r.ch, x, y);
       x += ctx.measureText(r.ch).width;
     }
-  });
+    y += LINE_H;
+  }
 
   const a = document.createElement('a');
   a.download = 'xccw-text.png';
