@@ -85,7 +85,7 @@
     }
 
     /* ── Body ────────────────────────────────────────────────────── */
-    .app-body { display: flex; min-height: calc(100vh - 160px); align-items: stretch; }
+    .app-body { display: flex; min-height: calc(100vh - 160px); align-items: flex-start; }
 
     .view-cell {
       vertical-align: top; padding: 8px; border-right: 1px solid #e2e8f0;
@@ -140,6 +140,8 @@
       width: 130px; flex-shrink: 0; background: white;
       border-right: 1px solid #e2e8f0; padding: 10px 7px;
       overflow-y: auto; overflow-x: hidden;
+      position: sticky; top: 0; max-height: 100vh;
+      align-self: flex-start;
     }
     .sidebar-hd {
       font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 11px;
@@ -439,12 +441,13 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 07.06.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
       <option value="Y4">Y4</option>
     </select>
+    <button class="icon-btn" onclick="printSchedule()" title="Print schedule">🖨️</button>
     <button class="icon-btn" onclick="openStaffModal()" title="Edit staff names">⚙</button>
   </div>
 </div>
@@ -3347,6 +3350,119 @@ async function init() {
 }
 
 init();
+
+// ── Sticky sidebar: track below the sticky header ────────────────────────
+function updateSidebarTop() {
+  const stickyH = document.querySelector('.sticky-top')?.offsetHeight || 0;
+  const sidebar = document.getElementById('subjectsSidebar');
+  if (sidebar) {
+    sidebar.style.top = stickyH + 'px';
+    sidebar.style.maxHeight = `calc(100vh - ${stickyH}px)`;
+  }
+}
+window.addEventListener('resize', updateSidebarTop);
+// Run after tabs render (sticky-top height can change when tabs wrap)
+const _origRenderViewTabs = renderViewTabs;
+renderViewTabs = function() { _origRenderViewTabs(); setTimeout(updateSidebarTop, 0); };
+setTimeout(updateSidebarTop, 200);
+
+// ── Print schedule ────────────────────────────────────────────────────────
+function printSchedule() {
+  const viewName = state.activeView === 'master'
+    ? 'Learning Schedule'
+    : (STAFF.find(s => s.id === state.activeView)?.name || state.activeView.toUpperCase()) + ' — Teaching Programme';
+
+  const tableEl = document.querySelector('.sched-table');
+  if (!tableEl) { alert('Nothing to print yet.'); return; }
+
+  // Clone table, strip interactive elements, keep visual content
+  const clone = tableEl.cloneNode(true);
+  // Remove delete buttons, handles, split buttons, drop hints, edit inputs → replace with text
+  clone.querySelectorAll('.chip-del, .chip-handle, .chip-split, .chip-note-toggle, .chip-time-toggle, .chip-time-clear, .drop-hint, .day-copy-btn, .day-paste-btn, .day-copied-badge, .tp-remove, .hz-colour-pop').forEach(el => el.remove());
+  clone.querySelectorAll('input.chip-name-edit').forEach(inp => {
+    const span = document.createElement('span');
+    span.textContent = inp.value;
+    span.style.cssText = 'font-size:13px;font-weight:800;font-family:Nunito,Arial,sans-serif;';
+    inp.replaceWith(span);
+  });
+  clone.querySelectorAll('textarea.chip-note').forEach(ta => {
+    if (ta.classList.contains('hidden') || !ta.value.trim()) { ta.remove(); return; }
+    const span = document.createElement('span');
+    span.textContent = ta.value;
+    span.style.cssText = 'font-size:11px;color:#334155;display:block;';
+    ta.replaceWith(span);
+  });
+
+  const weekLbl = document.getElementById('weekLabel')?.textContent || '';
+
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head>
+<meta charset="UTF-8">
+<title>${viewName} — ${weekLbl}</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root { --brand: #1798d3; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: white; padding: 18px 20px; font-size: 12px; }
+  .print-header { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid var(--brand); }
+  .print-header img { height: 36px; }
+  .print-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 16px; color: var(--brand); }
+  .print-week { font-size: 11px; color: #64748b; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th { background: #f8fafc; padding: 6px 8px; text-align: center; border-bottom: 2px solid #e2e8f0; border-right: 1px solid #e2e8f0; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 12px; }
+  th:last-child { border-right: none; }
+  th.time-hd { width: 80px; border-right: 2px solid #d1d5db; }
+  td { vertical-align: top; padding: 4px 5px; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
+  td:last-child { border-right: none; }
+  td.time-cell { font-size: 9px; color: #64748b; font-weight: 700; border-right: 2px solid #d1d5db; background: #f8fafc; white-space: nowrap; width: 80px; }
+  .fixed-row td { background: #e8f4fd; }
+  .fixed-row td.time-cell { border-right: 2px solid #bae0f5; }
+  .fixed-label { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 11px; color: var(--brand); }
+  .fixed-sub { font-size: 9px; color: var(--brand); opacity: 0.7; }
+  .cell-chip { border-radius: 5px; margin-bottom: 3px; overflow: hidden; border: 1px solid rgba(0,0,0,.12); }
+  .chip-top { display: flex; align-items: center; gap: 4px; padding: 3px 5px; }
+  .chip-colour { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .chip-name { font-size: 12px; font-weight: 800; font-family: 'Nunito', sans-serif; }
+  .chip-note-wrap { padding: 2px 6px 3px; border-top: 1px solid rgba(0,0,0,.07); font-size: 10px; color: #334155; }
+  .chip-time-wrap { padding: 2px 6px; border-top: 1px solid rgba(0,0,0,.06); font-size: 9px; color: #64748b; }
+  .chip-time-inputs { display: flex; gap: 3px; }
+  .chip-time-inputs.hidden { display: none; }
+  .split-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+  .split-half { border-radius: 4px; padding: 4px 5px; font-size: 11px; font-weight: 700; }
+  .staff-own-col { display: flex; flex-direction: column; gap: 2px; }
+  .view-bar { height: 16px; border-radius: 3px; padding: 0 5px; display: flex; align-items: center; font-size: 9px; font-weight: 700; border: 1px solid rgba(0,0,0,.08); margin-bottom: 4px; }
+  .drop-hint { display: none; }
+  .day-hd { width: 120px; }
+  .day-hd-name { font-size: 12px; color: #1e293b; font-family: 'Nunito', sans-serif; font-weight: 900; }
+  .day-hd-date { font-size: 9px; color: #94a3b8; font-weight: 600; }
+  .day-hd.today .day-hd-name, .day-hd.today .day-hd-date { color: var(--brand); }
+  .staff-hd-name { font-size: 12px; color: #1e293b; }
+  .staff-hd-role { font-size: 9px; color: #94a3b8; }
+  .staff-hd-colour { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 3px; }
+  .non-school-day { background: #f8fafc; color: #94a3b8; }
+  .session-label { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 10px; color: var(--brand); display: block; }
+  .session-time { font-size: 8px; color: #94a3b8; }
+  .tp-activity-chip { background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 4px; padding: 2px 5px; margin-bottom: 2px; font-size: 10px; }
+  @media print {
+    @page { size: A4 landscape; margin: 10mm; }
+    body { padding: 0; }
+  }
+  .no-print { display: none; }
+</style>
+</head><body>
+<div class="print-header">
+  <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA">
+  <div>
+    <div class="print-title">${viewName}</div>
+    <div class="print-week">${weekLbl}</div>
+  </div>
+  <button class="no-print" onclick="window.print()" style="margin-left:auto;padding:7px 18px;background:#1798d3;color:white;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">Print</button>
+</div>
+${clone.outerHTML}
+<script>window.onload = function(){ window.print(); }<\/script>
+</body></html>`);
+  w.document.close();
+}
 </script>
 </body>
 </html>
