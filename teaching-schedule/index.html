@@ -441,7 +441,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 07.06.26b</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 07.06.26c</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -3384,6 +3384,16 @@ function printSchedule() {
     span.textContent = inp.value;
     span.style.cssText = 'font-size:13px;font-weight:800;font-family:Nunito,Arial,sans-serif;';
     inp.replaceWith(span);
+  });
+  // Convert time inputs to plain text spans; hide the whole time-wrap if both are empty
+  clone.querySelectorAll('.chip-time-wrap').forEach(wrap => {
+    const inputs = wrap.querySelectorAll('input.chip-time-input');
+    const vals = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
+    if (!vals.length || wrap.querySelector('.chip-time-inputs.hidden')) { wrap.remove(); return; }
+    const span = document.createElement('span');
+    span.textContent = vals.join(' – ');
+    span.style.cssText = 'font-size:9px;color:#64748b;font-weight:600;display:block;padding:2px 6px 3px;border-top:1px solid rgba(0,0,0,.06);';
+    wrap.replaceWith(span);
   });
   clone.querySelectorAll('textarea.chip-note').forEach(ta => {
     if (ta.classList.contains('hidden') || !ta.value.trim()) { ta.remove(); return; }
