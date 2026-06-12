@@ -406,7 +406,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Beech</span><span id="version-tag">b.12.06.26d</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Beech</span><span id="version-tag">b.12.06.26e</span></div>
   </div>
   <div id="lunch-bar" class="with-imgs">
     <div class="lc lc-r" id="lc0">—</div>
@@ -1271,7 +1271,21 @@ const SUBITISE=[
   {n:6,pattern:'tens'},{n:7,pattern:'tens'},{n:8,pattern:'tens'},{n:9,pattern:'tens'},{n:10,pattern:'tens'},
   // Random arrangements — capped at 7, since true subitising of unstructured dots stops working past that
   {n:3,pattern:'random'},{n:4,pattern:'random'},{n:5,pattern:'random'},
-  {n:6,pattern:'random'},{n:7,pattern:'random'}
+  {n:6,pattern:'random'},{n:7,pattern:'random'},
+  // Dienes (tens rod + unit cubes) — structured representation for T2+ numbers
+  // 1 rod: 11–19
+  {n:11,pattern:'dienes'},{n:12,pattern:'dienes'},{n:13,pattern:'dienes'},
+  {n:14,pattern:'dienes'},{n:15,pattern:'dienes'},{n:16,pattern:'dienes'},
+  {n:17,pattern:'dienes'},{n:18,pattern:'dienes'},{n:19,pattern:'dienes'},
+  // 2 rods: 21–29 (T4+)
+  {n:21,pattern:'dienes'},{n:22,pattern:'dienes'},{n:23,pattern:'dienes'},
+  {n:24,pattern:'dienes'},{n:25,pattern:'dienes'},{n:26,pattern:'dienes'},
+  // 3 rods: 31–35 (T4+)
+  {n:31,pattern:'dienes'},{n:32,pattern:'dienes'},{n:33,pattern:'dienes'},
+  {n:34,pattern:'dienes'},{n:35,pattern:'dienes'},
+  // 4 rods: 41–45 (T5+)
+  {n:41,pattern:'dienes'},{n:42,pattern:'dienes'},{n:43,pattern:'dienes'},
+  {n:44,pattern:'dienes'},{n:45,pattern:'dienes'}
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -2165,6 +2179,7 @@ function getActivityPool(){
 // ═══════════════════════════════════════════════════════════
 let pType='boggle',cur=null,solsOpen=false;
 let boggleDgMode=localStorage.getItem('y1_boggle_dg')!=='0';
+let curTerm=1; // set by loadTermDates() on page load
 const ALL_TYPES=['y1combined','y1maths','y1literacy','boggle','number','phonicsscreen'];
 
 
@@ -2173,6 +2188,64 @@ const ALL_TYPES=['y1combined','y1maths','y1literacy','boggle','number','phonicss
 // Fetches menu.json from the central repo on page load.
 // Falls back silently to in-file MENU_BY_WEEK on any error.
 // ═══════════════════════════════════════════════════════════
+// ── Term dates — live from Google Sheet, cached 24h ──────────────────────────
+async function loadTermDates(){
+  const CACHE_KEY='wfa_term_cache';const TTL=86400000;
+  try{
+    const cached=localStorage.getItem(CACHE_KEY);
+    let rows=null;
+    if(cached){const c=JSON.parse(cached);if(c.ts&&(Date.now()-c.ts)<TTL)rows=c.rows;}
+    if(!rows){
+      const url='https://docs.google.com/spreadsheets/d/1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw/gviz/tq?tqx=out:csv&sheet=TermDates';
+      const text=await fetch(url,{cache:'no-cache'}).then(r=>r.text());
+      rows=parseTermCsv(text);
+      localStorage.setItem(CACHE_KEY,JSON.stringify({ts:Date.now(),rows}));
+    }
+    curTerm=computeTerm(rows);
+    console.log('[TermDates] term='+curTerm);
+  }catch(e){console.log('[TermDates] using default T1:',e.message);}
+}
+function parseCsvLine(line){
+  const r=[];let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'&&!inQ)inQ=true;
+    else if(c==='"'&&inQ){if(line[i+1]==='"'){cur+='"';i++;}else inQ=false;}
+    else if(c===','&&!inQ){r.push(cur);cur='';}
+    else cur+=c;
+  }
+  r.push(cur);return r;
+}
+function parseTermCsv(text){
+  text=text.replace(/^﻿/,'');
+  const lines=text.trim().split('\n');
+  if(lines.length<2)return[];
+  const hdr=parseCsvLine(lines[0]);
+  // gviz headers: "ColumnId label" — strip the label part
+  const norm=hdr.map(h=>h.replace(/^(['"])(.*)\1$/,'$2').replace(/ .*/,'').trim());
+  const tIdx=norm.findIndex(h=>/^Term$/i.test(h));
+  const sIdx=norm.findIndex(h=>/^StartDate$/i.test(h));
+  if(tIdx<0||sIdx<0)return[];
+  return lines.slice(1).map(l=>{
+    const cols=parseCsvLine(l);
+    const term=parseInt((cols[tIdx]||'').trim(),10);
+    const raw=(cols[sIdx]||'').trim();
+    if(!term||!raw)return null;
+    const p=raw.split('/');if(p.length!==3)return null;
+    const yr=parseInt(p[2]);
+    const d=new Date(yr<100?2000+yr:yr,parseInt(p[1])-1,parseInt(p[0]));
+    return isNaN(d.getTime())?null:{term,start:d.getTime()};
+  }).filter(Boolean);
+}
+function computeTerm(rows){
+  if(!rows||!rows.length)return 1;
+  const today=new Date();today.setHours(0,0,0,0);const ts=today.getTime();
+  const sorted=[...rows].sort((a,b)=>a.start-b.start);
+  let t=1;
+  for(const r of sorted){if(r.start<=ts)t=r.term;else break;}
+  return Math.max(1,Math.min(6,t));
+}
+
 async function loadSharedMenu(){
   try{
     const res = await fetch('https://wallscourtfarm.github.io/staff-tools/menu.json', {cache:'no-cache'});
@@ -2331,7 +2404,8 @@ function newPuzzle(){
     const e=RHYME_BANK[Math.floor(Math.random()*RHYME_BANK.length)];
     cur={type:'rhyme',data:e};renderRhyme(e);
   } else if(pType==='clock'){
-    const e=CLOCK_BANK[Math.floor(Math.random()*CLOCK_BANK.length)];
+    const ckPick=CLOCK_BANK.filter(c=>c.m===0||(curTerm>=4&&c.m===30));
+    const e=ckPick[Math.floor(Math.random()*ckPick.length)];
     cur={type:'clock',data:e};renderClock(e);
   } else if(pType==='y1combined'){
     cur={type:'y1combined'};renderY1Combined();
@@ -3046,6 +3120,30 @@ function buildTensFrame(n){
   }
   return `<svg viewBox="0 0 360 280">${cells}</svg>`;
 }
+function buildDienes(n){
+  // Draw n as Dienes blocks: blue rods of 10 (tall divided rectangle) + orange unit squares
+  const tens=Math.floor(n/10),ones=n%10;
+  const rW=22,rH=160,segH=16,uW=22,uH=22,gR=6,gU=5,pad=16;
+  const rodsW=tens*(rW+gR);
+  const colsO=ones?Math.min(5,ones):0;
+  const sep=tens&&ones?10:0;
+  const onesW=colsO*(uW+gU);
+  const W=pad+rodsW+sep+onesW+pad;
+  const H=pad+rH+pad;
+  let s='';
+  for(let i=0;i<tens;i++){
+    const x=pad+i*(rW+gR),y=pad;
+    s+=`<rect x="${x}" y="${y}" width="${rW}" height="${rH}" rx="4" fill="#1798d3" stroke="#0d6e9b" stroke-width="2"/>`;
+    for(let j=1;j<10;j++){const dy=y+j*segH;s+=`<line x1="${x+1}" y1="${dy}" x2="${x+rW-1}" y2="${dy}" stroke="#0d6e9b" stroke-width="1.5"/>`;}
+  }
+  for(let i=0;i<ones;i++){
+    const col=i%5,row=Math.floor(i/5);
+    const x=pad+rodsW+sep+col*(uW+gU);
+    const y=pad+(rH-uH)-row*(uH+gU);
+    s+=`<rect x="${x}" y="${y}" width="${uW}" height="${uH}" rx="3" fill="#e67e22" stroke="#c66610" stroke-width="2"/>`;
+  }
+  return`<svg viewBox="0 0 ${Math.max(W,60)} ${H}" style="height:clamp(80px,13vh,150px);width:auto">${s}</svg>`;
+}
 function buildRandomDots(n){
   // Pseudo-random arrangement (deterministic per n so same display each render)
   const seed=n*73+17;
@@ -3070,12 +3168,14 @@ function renderSubitise(e){
   let svg='';
   if(e.pattern==='dice') svg=buildDicePattern(e.n);
   else if(e.pattern==='tens') svg=buildTensFrame(e.n);
+  else if(e.pattern==='dienes') svg=buildDienes(e.n);
   else svg=buildRandomDots(e.n);
+  const subQ=e.pattern==='dienes'?'What number is shown?':'How many dots can you see?';
   pp.innerHTML=`
     <div class="ptitle" style="font-size:clamp(1rem,2.4vh,1.5rem);color:#888;text-transform:uppercase;letter-spacing:0.1em">Subitise — How Many?</div>
     <div class="sub-card">
       ${svg}
-      <div class="sub-q">How many dots can you see?</div>
+      <div class="sub-q">${subQ}</div>
       <div class="sub-reveal" id="sub-reveal">${e.n}</div>
       <button class="sub-btn" id="sub-btn" onclick="toggleSubReveal()">Reveal</button>
     </div>`;
@@ -3226,12 +3326,16 @@ function renderY1Combined(){
   if(!cp){cp=document.createElement('div');cp.id='combined-panel';pp.parentNode.insertBefore(cp,pp);}
   cp.className='';
 
-  const subs=pickN(SUBITISE,6,x=>x.n);
+  // Term-aware subitise pool
+  const subBank=curTerm<=1?SUBITISE.filter(s=>s.n<=10)
+               :curTerm<=3?SUBITISE.filter(s=>s.n<=15)
+               :SUBITISE.filter(s=>s.pattern==='dienes'&&s.n<=(curTerm>=5?50:35));
+  const subs=pickN(subBank.length?subBank:SUBITISE.filter(s=>s.n<=10),6,x=>x.n+'_'+(x.pattern||''));
   const filteredPhonics=getFilteredPhonics();
   const phs=pickN(filteredPhonics,Math.min(6,filteredPhonics.length),x=>x.word);
   const rhs=pickN(RHYME_BANK,3,x=>x.target);
-  // Y1: only o'clock and half past
-  const ckBank=CLOCK_BANK.filter(c=>c.m===0||c.m===30);
+  // Y1: o'clock T1-T3; add half past T4+
+  const ckBank=CLOCK_BANK.filter(c=>c.m===0||(curTerm>=4&&c.m===30));
   const cks=pickN(ckBank,4,x=>x.h+':'+x.m);
   cur.subs=subs;cur.phs=phs;cur.rhs=rhs;cur.cks=cks;
 
@@ -3239,6 +3343,7 @@ function renderY1Combined(){
     let svg;
     if(s.pattern==='dice') svg=buildDicePattern(s.n);
     else if(s.pattern==='tens') svg=buildTensFrame(s.n);
+    else if(s.pattern==='dienes') svg=buildDienes(s.n);
     else svg=buildRandomDots(s.n);
     return `<div class="y1cd-sub-card">${svg}<div class="y1cd-sub-ans">${s.n}</div></div>`;
   }).join('');
@@ -3815,7 +3920,7 @@ function saveSetup(){
   closeSetup();renderLunch();
 }
 
-loadSharedMenu().then(init);
+Promise.all([loadSharedMenu(),loadTermDates()]).then(init);
 </script>
 </body>
 </html>
