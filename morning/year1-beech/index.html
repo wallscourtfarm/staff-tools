@@ -30,6 +30,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
 #puzzle-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.2vh 2vw;gap:1vh}
 .pgrid{display:grid;grid-template-columns:repeat(3,1fr);border:3px solid #111}
 .pcell{width:clamp(72px,10.5vh,120px);height:clamp(72px,10.5vh,120px);display:flex;align-items:center;justify-content:center;border:1.5px solid #111;font-size:clamp(2.2rem,6vh,4rem);font-weight:800;background:#fff;color:#111}
+.pcell-dg{background:#ddeeff;font-size:clamp(1.5rem,4vh,2.8rem)}
 .ptitle{font-size:clamp(1.6rem,4.5vh,3rem);font-weight:700;text-align:center;color:#111;margin-top:0.5vh}
 .num-tbl{border-collapse:collapse;margin-top:0.6vh}
 .num-tbl th{padding:clamp(6px,1.2vh,13px) clamp(18px,3vw,40px);font-size:clamp(1rem,2.4vh,1.6rem);font-weight:800;border:2.5px solid #111}
@@ -405,7 +406,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Beech</span><span id="version-tag">b.12.06.26c</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Beech</span><span id="version-tag">b.12.06.26d</span></div>
   </div>
   <div id="lunch-bar" class="with-imgs">
     <div class="lc lc-r" id="lc0">—</div>
@@ -507,6 +508,10 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
     <div id="gp-picker"></div>
     <div class="gp-summary" id="gp-summary"></div>
 
+    <h3 style="margin-top:1.5rem">Word Puzzle — How Many Words?</h3>
+    <label style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="setup-boggle-dg" style="width:18px;height:18px;accent-color:#1798d3;cursor:pointer"> Digraph tile mode</label>
+    <p style="font-size:0.82rem;color:#666;margin-bottom:10px">When on, digraphs like <strong>sh</strong>, <strong>ch</strong>, <strong>ng</strong>, <strong>ai</strong> appear as single tiles (highlighted blue). Switch off after Christmas to move to individual letter tiles.</p>
+
     <h3 style="margin-top:1.5rem">Lunch menu — 3-week rotation</h3>
     <p style="font-size:0.82rem;color:#666;margin-bottom:10px">Tomato Pasta, Jacket Potato and Packed Lunch are fixed.</p>
     <div id="menu-form"></div>
@@ -574,66 +579,66 @@ const DAYNAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Sat
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // ═══════════════════════════════════════════════════════════
-// BOGGLE BANK
 // ═══════════════════════════════════════════════════════════
-const BOGGLE=[
-  // Y1/Y2 friendly: 6-letter source words → fill a 3×2 grid cleanly with no empty squares.
-  // Solutions are 2-4 letter words 5-7 year olds can read. Letters in solutions only use
-  // letters present in the source word (counting duplicates).
-  {w:'GARDEN',s:['an','ad','age','are','ear','ran','red','dare','dear','gear','near','read']},
-  {w:'WINTER',s:['in','it','we','net','ten','tin','win','wet','wit','tie','wine','went','twin']},
-  {w:'BASKET',s:['as','at','be','ask','ate','bat','bet','eat','sat','set','tab','tea','sea','bake','base','beak','beat','take','task','seat']},
-  {w:'MOTHER',s:['me','oh','or','to','her','hot','hem','met','the','home','more','term','tore','hero','them']},
-  {w:'PLANET',s:['an','at','ant','ate','eat','lap','let','nap','net','pan','pat','pen','pet','tan','tap','ten','tea','late','lane','neat','pant','plan','tale','tape']},
-  {w:'POCKET',s:['to','cop','cot','pet','pot','top','opt','toe','cope','kept','peck','poke','poet']},
-  {w:'SPRING',s:['in','is','gin','nip','pin','pig','rip','sin','sip','rig','sing','grin','ring','sign','snip','spin']},
-  {w:'STRING',s:['in','is','it','gin','nit','rig','sin','sit','tin','grin','grit','ring','sign','sing','stir']},
-  {w:'ANIMAL',s:['am','an','in','aim','lam','man','nil','lain','mail','main','nail']},
-  {w:'ROCKET',s:['or','to','cot','ore','toe','roe','core','rock','rote']},
-{w:'hop',s:['hop']},
-{w:'fog',s:['fog']},
-{w:'mud',s:['mud']},
-{w:'cup',s:['cup']},
-{w:'box',s:['box']},
-{w:'jug',s:['jug']},
-{w:'pen',s:['pen']},
-{w:'run',s:['run']},
-{w:'gem',s:['gem']},
-{w:'wax',s:['wax']},
-{w:'bus',s:['bus','sub']},
-{w:'bun',s:['bun']},
-{w:'cub',s:['cub']},
-{w:'cut',s:['cut']},
-{w:'dot',s:['dot']},
-{w:'dug',s:['dug']},
-{w:'fun',s:['fun']},
-{w:'gap',s:['gap']},
-{w:'got',s:['got']},
-{w:'gum',s:['gum']},
-{w:'hug',s:['hug']},
-{w:'hut',s:['hut']},
-{w:'log',s:['log']},
-{w:'lot',s:['lot']},
-{w:'mob',s:['mob']},
-{w:'mop',s:['mop']},
-{w:'mug',s:['mug']},
-{w:'nod',s:['nod']},
-{w:'not',s:['not','ton']},
-{w:'pod',s:['pod']},
-{w:'pop',s:['pop']},
-{w:'pot',s:['pot','top','opt']},
-{w:'pub',s:['pub']},
-{w:'rob',s:['rob']},
-{w:'rot',s:['rot']},
-{w:'sob',s:['sob']},
-{w:'tub',s:['tub']},
-{w:'tug',s:['tug']},
-{w:'odd',s:['odd']},
-{w:'pug',s:['pug']},
-{w:'nun',s:['nun']},
-{w:'gun',s:['gun']},
-{w:'gut',s:['gut']},
-{w:'hum',s:['hum']},
+// BOGGLE — DIGRAPH TILE MODE (Aut/Spr)
+// 9 tiles per entry; digraph tiles (sh, ch, th, ng, ai, ee,
+// igh, oa, oo, ar, or, ur, ow, oi) are single units.
+// Solutions are real words children can form from the tiles.
+// ═══════════════════════════════════════════════════════════
+const BOGGLE_DIGRAPH=[
+  // sh + ch
+  {tiles:['sh','ch','a','i','p','t','n','o','e'],s:['ship','shin','shop','shine','shape','shone','chip','chin','chop','chat','chant','inch','pan','pin','tan','tin','top','tip','tap','ten','pet','pen','pot','pat','net','nip','pint','note','tone','tape','pine','pane','open','poet','atop','atone']},
+  // th + ng
+  {tiles:['th','ng','r','i','n','a','e','s','t'],s:['thin','this','that','then','ring','sing','sting','string','rang','sang','tang','sin','sit','tin','tan','ran','ten','net','set','nit','sir','rent','sent','nest','rest','rant','stir','star','stare','snare']},
+  // ai + ch
+  {tiles:['ai','ch','t','r','p','n','a','i','g'],s:['rain','pain','train','grain','chain','chip','chin','chap','chat','chant','arch','pan','pin','tan','tip','rip','trip','trap','nap','rap','grit','grin','grip','pint','tarp','rant']},
+  // ee + sh
+  {tiles:['ee','sh','t','r','n','p','l','a','d'],s:['sheet','sheep','sheer','tree','peel','reel','teen','need','reed','deer','peer','plead','treed','sharp','shard','shalt','plan','plant','rant','ran','tan','pan','lap','nap','trap','land','lard']},
+  // igh + sh
+  {tiles:['igh','sh','t','n','r','a','f','m','o'],s:['night','right','fight','might','tight','short','shorn','shaft','sham','farm','form','fort','torn','norm','front','rant','fan','man','ran','mat','fat','ant','manor']},
+  // oa + ng
+  {tiles:['oa','ng','t','r','a','s','p','i','d'],s:['road','toad','roast','toast','ring','ping','sting','sang','rang','tang','pang','spring','tip','rip','trip','trap','tap','rap','drip','strip','sat','pat','sad','pad']},
+  // oo + sh
+  {tiles:['oo','sh','f','l','t','n','a','r','p'],s:['fool','tool','pool','foot','loot','loop','floor','proof','sharp','shaft','shalt','flat','flan','plan','flap','trap','rant','fan','ran','tan','tap','nap','lap','pal']},
+  // ar + ch
+  {tiles:['ar','ch','t','n','p','a','e','s','i'],s:['arch','parch','starch','art','tar','star','tarp','parse','chin','chip','chap','chat','chant','chest','pan','pin','tan','tip','tap','ten','net','pet','pat','spin','sent','pant','pine','spine']},
+  // ee + ng
+  {tiles:['ee','ng','s','t','r','i','n','p','a'],s:['seen','teen','tree','steep','sneer','peer','steer','seep','preen','ring','ping','sing','sting','string','spring','rang','sang','tang','pang','tip','rip','nip','strip','trip','spin','sin','tin','pin','ran','tan','snap','rant','pant','trap','stir']},
+  // igh + th
+  {tiles:['igh','th','r','i','n','g','t','s','a'],s:['night','right','sight','tight','thigh','thin','this','that','thing','grin','grit','sting','stir','ring','sing','string','snag','stag','sir','nit','tan','ran','sat','ant','arts']},
+  // ow (cow) + sh
+  {tiles:['ow','sh','n','t','a','r','i','p','e'],s:['town','own','prow','shown','shin','ship','shape','sharp','print','pint','rent','rant','pane','pine','ripe','tape','trip','trap','tan','pan','ran','tip','nip','ant']},
+  // oi + ng
+  {tiles:['oi','ng','t','n','p','l','r','i','e'],s:['oil','toil','point','ring','ping','tip','rip','trip','pint','lint','line','pine','tile','pile','rile','pelt','rent','let','net','ten','pet','print']},
+  // ai + oo
+  {tiles:['ai','oo','t','r','n','p','s','a','d'],s:['rain','pain','train','drain','stain','paid','raid','soon','root','soot','droop','troop','stoop','ran','tan','pan','tap','nap','sad','pad','sat','trap','sand','rant','strand']},
+  // ur + ch
+  {tiles:['ur','ch','t','a','n','s','p','i','e'],s:['urn','turn','churn','spurn','nurse','purse','chin','chip','chant','chest','chase','chaste','pan','pin','tan','tip','tap','ten','net','pet','sat','snip','spin','sent','pant','pint','paste']},
+  // or + sh
+  {tiles:['or','sh','t','n','a','s','p','i','e'],s:['sort','sport','snort','short','torn','ports','shin','ship','shape','shine','pan','pin','tan','tip','tap','ten','net','pet','sat','spin','spent','pant','pint','pane','pine','spine']},
+];
+
+// ═══════════════════════════════════════════════════════════
+// BOGGLE — LETTER MODE (Spr/Sum, after Christmas)
+// 9 individual letter tiles — children combine letters
+// themselves to form digraphs/trigraphs.
+// ═══════════════════════════════════════════════════════════
+const BOGGLE_LETTERS=[
+  {tiles:['s','h','i','p','a','t','c','n','o'],s:['ship','shin','shop','chip','chin','chop','inch','this','path','pint','can','cap','sit','tan','nip','tip','top','tap','pan','pot','pat','cot','cop','sap','hat','hip','hot','spit','spin','snap','atop','itch','notch','panic']},
+  {tiles:['t','h','r','i','n','g','a','e','s'],s:['thin','this','that','then','thing','ring','sing','sting','string','shin','grin','grit','nit','tan','ran','ten','net','set','rent','sent','nest','rest','rant','stir','star','snare','stare','sing','rang']},
+  {tiles:['r','a','i','n','c','h','t','p','g'],s:['rain','chain','train','grain','chin','chip','chap','chat','chant','inch','arch','rich','chair','grin','grip','pang','rang','nit','tip','rip','trip','trap','tan','pan','cap','can','nap','rap']},
+  {tiles:['s','h','e','e','t','r','n','p','l'],s:['sheet','sheep','sheer','three','tree','peel','reel','heel','teen','keen','seen','need','reed','sleep','steep','sneer','steer','help','shelf','then','then','hen','rent','sent','nest','rest','pen','ten','net']},
+  {tiles:['n','i','g','h','t','s','r','a','f'],s:['night','right','fight','sight','tight','thigh','sting','grit','grin','fist','gust','ring','sing','rant','ran','tan','fan','fat','sat','sir','nit','ant','art','gift','graft','snarling']},
+  {tiles:['r','o','a','d','t','n','g','s','p'],s:['road','toad','roast','toast','groan','sport','rant','sang','pang','tang','rang','snap','trap','sad','pad','rap','sap','tap','ran','tan','pan','sat','pat','rod','dot','not','top','pod','got']},
+  {tiles:['f','o','o','l','t','s','h','a','r'],s:['fool','tool','stool','floor','loft','soft','lost','sort','flash','slash','rash','shot','shop','hops','flat','flog','loaf','raft','fast','last','salt','slot','lots','froth','sloth']},
+  {tiles:['s','t','a','r','c','h','n','p','e'],s:['starch','stare','snare','chain','chair','chant','chest','chase','parse','spare','shape','parch','arch','star','cars','cart','char','cane','span','tape','pant','rent','sent','spent','cape','peat','snip','spin']},
+  {tiles:['s','p','r','i','n','g','e','t','a'],s:['spring','string','sting','spine','stripe','print','pint','ripe','pine','pane','grin','trip','trap','sing','ring','rang','ping','pang','nit','tip','tan','pan','ran','rap','sap','sent','rent','pant','snap']},
+  {tiles:['n','i','g','h','t','h','i','n','k'],s:['night','knight','king','kind','knit','think','thing','thin','hint','hink','ting','tink','gink','ink','nil','gin','kit','nit','tin','kin','dig','dig']},
+  {tiles:['s','h','o','w','n','t','a','r','i'],s:['shown','throw','thorn','short','shirt','inshore','worn','writ','snit','into','town','stir','whir','riant','train','rosin','ratio','iris','rant','rant','ran','tan','sit','sin','nit','sir','not','hot','hat','tar','ant']},
+  {tiles:['o','i','l','t','n','p','r','i','e'],s:['toil','point','pilot','liner','inlet','print','rile','pile','tile','pine','line','lint','pint','rein','trip','rip','tip','let','net','ten','pet','lit','nit','rot','pot','top','pro','ore']},
+  {tiles:['r','a','i','n','s','t','o','d','p'],s:['rain','drain','stain','train','raids','roads','toad','roast','toast','ponds','drops','sport','rant','rand','sand','paid','drip','dip','rod','dot','not','top','tip','tap','ran','tan','pan','sad','pat']},
+  {tiles:['t','u','r','n','c','h','a','s','p'],s:['churn','chant','chase','chaste','nurse','purse','crust','starch','crash','rants','pants','snatch','turns','pan','pin','tap','tan','sap','cup','rut','nut','sun','pun','hun','chap','nap','ran','cat']},
+  {tiles:['s','h','o','r','t','n','a','p','i'],s:['short','shirt','thorn','sharp','shins','sport','snort','hosp','pint','span','rant','trap','trip','rip','tip','sip','nip','hip','hot','not','top','pin','tin','tan','pan','ran','sat','pat','art','tap','nap']},
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -2159,6 +2164,7 @@ function getActivityPool(){
 // STATE & INIT
 // ═══════════════════════════════════════════════════════════
 let pType='boggle',cur=null,solsOpen=false;
+let boggleDgMode=localStorage.getItem('y1_boggle_dg')!=='0';
 const ALL_TYPES=['y1combined','y1maths','y1literacy','boggle','number','phonicsscreen'];
 
 
@@ -2259,8 +2265,10 @@ function renderMsg(){
 function newPuzzle(){
   clearPuzzlePanel();
   if(pType==='boggle'){
-    const e=BOGGLE[Math.floor(Math.random()*BOGGLE.length)];
-    cur={type:'boggle',word:e.w,letters:[...e.w].sort(()=>Math.random()-.5),sols:e.s};
+    const bank=boggleDgMode?BOGGLE_DIGRAPH:BOGGLE_LETTERS;
+    const e=bank[Math.floor(Math.random()*bank.length)];
+    const tiles=[...e.tiles].sort(()=>Math.random()-.5);
+    cur={type:'boggle',tiles,sols:e.s};
     renderBoggle(cur);
   } else if(pType==='number'){
     cur={type:'number',...genNum()};renderNum(cur);
@@ -2434,7 +2442,7 @@ function revealPhonicsAll(){
 
 function renderBoggle(p){
   const pp=document.getElementById('puzzle-panel');
-  pp.innerHTML=`<div class="pgrid">${p.letters.map(l=>`<div class="pcell">${l.toLowerCase()}</div>`).join('')}</div>
+  pp.innerHTML=`<div class="pgrid">${p.tiles.map(t=>`<div class="pcell${t.length>1?' pcell-dg':''}">${t.toLowerCase()}</div>`).join('')}</div>
      <div class="ptitle">How Many Words Can You Make?</div>`;
 }
 function renderNum(p){
@@ -3441,9 +3449,9 @@ function toggleSols(){
   if(solsOpen){closeSols();return}
   const t=document.getElementById('sol-title'),c=document.getElementById('sol-content');
   if(cur.type==='boggle'){
-    t.textContent=`Boggle — ${cur.word}`;
+    t.textContent=`Boggle — ${cur.tiles.join(' ')}`;
     const grouped={};
-    [...cur.sols].sort((a,b)=>a.localeCompare(b)).forEach(w=>{const l=w.length;if(l>=2&&l<=cur.word.length){if(!grouped[l])grouped[l]=[];grouped[l].push(w);}});
+    [...cur.sols].sort((a,b)=>a.localeCompare(b)).forEach(w=>{const l=w.length;if(l>=2){if(!grouped[l])grouped[l]=[];grouped[l].push(w);}});
     c.innerHTML=Object.keys(grouped).sort((a,b)=>a-b).map(l=>`
       <div style="margin-bottom:6px"><span style="font-size:0.78rem;font-weight:900;color:#888;text-transform:uppercase;letter-spacing:0.07em">${l} letters</span>
       <div class="sol-words" style="margin-top:3px">${grouped[l].map(w=>`<span class="sol-w">${w}</span>`).join('')}</div></div>`).join('');
@@ -3679,6 +3687,7 @@ function openSetup(){
   renderGraphemePicker();
   pendingTTBank=JSON.parse(JSON.stringify(JSON.parse(localStorage.getItem('y1_tt_bank')||'[]')));
   renderTTBank();
+  document.getElementById('setup-boggle-dg').checked=localStorage.getItem('y1_boggle_dg')!=='0';
   document.getElementById('setup-ov').classList.add('on');
 }
 function closeSetup(){document.getElementById('setup-ov').classList.remove('on')}
@@ -3801,6 +3810,8 @@ function saveSetup(){
   localStorage.setItem('y1_tt_bank',JSON.stringify(pendingTTBank));
   localStorage.setItem('y1_graphemes',JSON.stringify([...pendingGraphemes]));
   localStorage.setItem('y1_phonics_mode',pendingPhonicsMode);
+  if(document.getElementById('setup-boggle-dg').checked)localStorage.removeItem('y1_boggle_dg');else localStorage.setItem('y1_boggle_dg','0');
+  boggleDgMode=localStorage.getItem('y1_boggle_dg')!=='0';
   closeSetup();renderLunch();
 }
 
