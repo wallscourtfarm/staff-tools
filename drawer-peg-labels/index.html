@@ -183,7 +183,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>13.06.26g</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>13.06.26h</strong></footer>
 
 <script>
 // Year group colours
@@ -257,7 +257,7 @@ const LABEL_CONFIG = {
     gap: 2.52,
     fixedMarginLeft: 9.4,
     fixedMarginTop: 13.05,
-    fontSize: 36,
+    fontSize: 28,
     logoH: 12,
     wrapNames: true
   }
@@ -483,9 +483,9 @@ function updatePreview() {
   const innerW = previewW - previewBorder * 2;
   const innerH = previewH - previewBorder * 2;
 
-  // Scale font and logo to preview height
-  const fontSizePx = Math.round(innerH * 0.55);
-  const logoHpx = Math.round(innerH * 0.75);
+  // Scale font and logo to preview height (2-line labels use smaller font)
+  const fontSizePx = config.wrapNames ? Math.round(innerH * 0.32) : Math.round(innerH * 0.55);
+  const logoHpx = Math.round(innerH * (config.wrapNames ? 0.5 : 0.75));
 
   labelPreview.style.width = previewW + 'px';
   labelPreview.style.height = previewH + 'px';
@@ -714,7 +714,7 @@ async function generatePdf() {
             if (maxW > availableWidth) fs = fs * (availableWidth / maxW);
             doc.setFontSize(fs);
             const lineHmm = fs * 0.352778;
-            const lineGap = 1.5;
+            const lineGap = 3;
             const totalH = line2 ? lineHmm * 2 + lineGap : lineHmm;
             const blockTop = ly + config.border + (liH - totalH) / 2;
             doc.text(line1, cx, blockTop + lineHmm, { align: 'center' });
