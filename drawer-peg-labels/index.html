@@ -183,7 +183,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>13.06.26i</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>13.06.26j</strong></footer>
 
 <script>
 // Year group colours
@@ -232,7 +232,10 @@ const LABEL_CONFIG = {
     colOffsets: [-4, -2, 0, 1, 4],  // per-column x nudge (mm)
     nameimageTop:  11,   // y of row-1 nameimage top edge from paper top edge
     nameimageGapY: 3,    // vertical gap between nameimages
-    rowOffsets: [-3, -1, 1, 2, 4, 7, 10, 12, 14, 16, 18, 20, 22]  // per-row y nudge mm (neg=up, pos=down)
+    rowOffsets: [-3, -1, 1, 2, 4, 7, 10, 12, 14, 16, 18, 20, 22],  // per-row y nudge mm (neg=up, pos=down)
+    fontSize: 14,
+    wrapNames: true,
+    wrapLineGap: 1.5
   },
   l7164: {
     width: 63.5,
@@ -718,7 +721,7 @@ async function generatePdf() {
             if (maxW > availableWidth) fs = fs * (availableWidth / maxW);
             doc.setFontSize(fs);
             const lineHmm = fs * 0.352778;
-            const lineGap = 3;
+            const lineGap = config.wrapLineGap || 3;
             const totalH = line2 ? lineHmm * 2 + lineGap : lineHmm;
             const blockTop = ly + config.border + (liH - totalH) / 2;
             doc.text(line1, cx, blockTop + lineHmm, { align: 'center' });
