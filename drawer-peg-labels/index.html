@@ -93,14 +93,14 @@
 <main>
   <div class="panel">
     <div class="card">
-      <div class="card-header"><h2>Label Type</h2></div>
+      <div class="card-header"><h2>Type</h2></div>
       <div class="card-body">
         <div class="mode-tabs" id="labelTypeTabs">
           <button class="mode-tab active" data-type="drawer">Drawer Signs</button>
           <button class="mode-tab" data-type="peg">Peg Signs</button>
           <button class="mode-tab" data-type="labels">Labels</button>
         </div>
-        <div class="size-info" id="sizeInfo">
+        <div class="size-info" id="sizeInfo" style="display:none">
           <strong>Drawer:</strong> 12 per sheet — 120mm × 30mm with 5mm coloured border
         </div>
       </div>
@@ -181,7 +181,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>13.06.26b</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>13.06.26c</strong></footer>
 
 <script>
 // Year group colours
@@ -360,11 +360,12 @@ function initPasteZone() {
 
 function updateSizeInfo() {
   const config = LABEL_CONFIG[currentLabelType];
-  if (currentLabelType === 'drawer') {
-    sizeInfo.innerHTML = `<strong>Drawer Signs:</strong> 12 per sheet`;
-  } else if (currentLabelType === 'peg') {
-    sizeInfo.innerHTML = `<strong>Peg Signs:</strong> 102 per sheet`;
-  } else if (currentLabelType === 'avery') {
+  if (currentLabelType === 'drawer' || currentLabelType === 'peg') {
+    sizeInfo.style.display = 'none';
+    return;
+  }
+  sizeInfo.style.display = '';
+  if (currentLabelType === 'avery') {
     sizeInfo.innerHTML = `<strong>Avery L7651:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm`;
   } else if (currentLabelType === 'l7164') {
     sizeInfo.innerHTML = `<strong>Avery L7164:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm`;
