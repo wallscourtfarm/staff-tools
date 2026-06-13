@@ -73,6 +73,8 @@
     .drawer-preview { width: 240px; height: 60px; }
     .peg-preview { width: 84px; height: 22px; }
     .avery-preview { width: 114px; height: 64px; }
+    .l7164-preview { width: 96px; height: 108px; }
+    .label64x34-preview { width: 96px; height: 51px; }
 
     footer { text-align: center; color: var(--muted); font-size: 0.7rem; padding: 14px; }
     .size-info { background: var(--blue-lt); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 0.8rem; color: var(--blue-dk); }
@@ -97,6 +99,8 @@
           <button class="mode-tab active" data-type="drawer">Drawer Labels (120×30mm)</button>
           <button class="mode-tab" data-type="peg">Peg Labels (42×11mm)</button>
           <button class="mode-tab" data-type="avery">Avery L7651 (38×21mm)</button>
+          <button class="mode-tab" data-type="l7164">Avery L7164 (63×72mm)</button>
+          <button class="mode-tab" data-type="label64x34">Labels (64×34mm)</button>
           <button class="mode-tab" data-type="image">Image Labels</button>
         </div>
         <div class="size-info" id="sizeInfo">
@@ -169,7 +173,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>06.06.26e</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>06.06.26f</strong></footer>
 
 <script>
 // Year group colours
@@ -219,6 +223,32 @@ const LABEL_CONFIG = {
     nameimageTop:  11,   // y of row-1 nameimage top edge from paper top edge
     nameimageGapY: 3,    // vertical gap between nameimages
     rowOffsets: [-3, -1, 1, 2, 4, 7, 10, 12, 14, 16, 18, 20, 22]  // per-row y nudge mm (neg=up, pos=down)
+  },
+  l7164: {
+    width: 63.5,
+    height: 72,
+    border: 2,
+    perSheet: 12,
+    cols: 3,
+    rows: 4,
+    orientation: 'portrait',
+    gap: 2.5,
+    fontSize: 28,
+    logoH: 22
+  },
+  label64x34: {
+    width: 63.5,
+    height: 34,
+    border: 2,
+    perSheet: 24,
+    cols: 3,
+    rows: 8,
+    orientation: 'portrait',
+    gap: 2.52,
+    fixedMarginLeft: 9.4,
+    fixedMarginTop: 13.05,
+    fontSize: 22,
+    logoH: 12
   }
 };
 
@@ -325,11 +355,16 @@ function onLabelTypeClick(e) {
     sizeInfo.innerHTML = `<strong>Peg:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border`;
   } else if (currentLabelType === 'avery') {
     sizeInfo.innerHTML = `<strong>Avery L7651:</strong> ${config.perSheet} per sheet — nameimage ${config.nameimageW}mm × ${config.nameimageH}mm, ${config.border}mm border`;
+  } else if (currentLabelType === 'l7164') {
+    sizeInfo.innerHTML = `<strong>Avery L7164:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border`;
+  } else if (currentLabelType === 'label64x34') {
+    sizeInfo.innerHTML = `<strong>Labels 64×34mm:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border`;
   } else {
     sizeInfo.innerHTML = `<strong>Image Labels:</strong> 12 per sheet (99×42mm) or 65 per sheet (38×21mm) — coloured border from year group selection`;
   }
 
   if (!isImage) labelPreview.className = `label-preview ${currentLabelType}-preview`;
+  else labelPreview.className = `label-preview drawer-preview`;
   updatePreview();
 }
 
@@ -569,12 +604,12 @@ async function generatePdf() {
     const innerW = config.width - config.border * 2;
     const innerH = config.height - config.border * 2;
 
-    // Font sizes: 54pt for drawer, 19pt for peg, 16pt for avery
-    const fontSize = currentLabelType === 'drawer' ? 54 : currentLabelType === 'peg' ? 19 : 16;
+    // Font sizes: from config if set, otherwise defaults per type
+    const fontSize = config.fontSize || (currentLabelType === 'drawer' ? 54 : currentLabelType === 'peg' ? 19 : 16);
     // Convert pt to mm: 1pt ≈ 0.352778mm
     const fontHmm = fontSize * 0.352778;
-    // Logo sizes: 20mm for drawer, 7mm for peg, 10mm for avery
-    const logoHmm = currentLabelType === 'drawer' ? 20 : currentLabelType === 'peg' ? 7 : 8;
+    // Logo sizes: from config if set, otherwise defaults per type
+    const logoHmm = config.logoH || (currentLabelType === 'drawer' ? 20 : currentLabelType === 'peg' ? 7 : 8);
     const logoWmm = logoHmm;
 
     for (let sheetIdx = 0; sheetIdx < sheetsNeeded; sheetIdx++) {
@@ -630,8 +665,9 @@ async function generatePdf() {
           doc.setTextColor(30, 45, 61);
 
           // Calculate available text width and shrink font if needed
-          const textLeft = logoX + logoWmm + (currentLabelType === 'avery' ? 2 : 5);
-          const textRight = lx + config.border + liW - (currentLabelType === 'avery' ? 1.5 : 5);
+          const isSmallLabel = currentLabelType === 'avery';
+          const textLeft = logoX + logoWmm + (isSmallLabel ? 2 : 5);
+          const textRight = lx + config.border + liW - (isSmallLabel ? 1.5 : 5);
           const availableWidth = textRight - textLeft;
           let actualFontSize = fontSize;
           doc.setFontSize(actualFontSize);
@@ -649,14 +685,14 @@ async function generatePdf() {
           // Vertical centre: position baseline lower to centre text visually
           // Recalculate font height for shrunk font
           const actualFontHmm = actualFontSize * 0.352778;
-          const textYoffset = currentLabelType === 'drawer' ? 4 : currentLabelType === 'peg' ? 1 : 1;
+          const textYoffset = currentLabelType === 'drawer' ? 4 : currentLabelType === 'peg' ? 1 : currentLabelType === 'l7164' ? 3 : currentLabelType === 'label64x34' ? 2 : 1;
           const textY = ly + config.border + (liH + actualFontHmm) / 2 - textYoffset;
           doc.text(name, textX, textY);
         }
       }
     }
 
-    const typeStr = currentLabelType === 'drawer' ? 'Drawer' : currentLabelType === 'peg' ? 'Peg' : 'Avery_L7651';
+    const typeStr = currentLabelType === 'drawer' ? 'Drawer' : currentLabelType === 'peg' ? 'Peg' : currentLabelType === 'l7164' ? 'Avery_L7164' : currentLabelType === 'label64x34' ? 'Labels_64x34' : 'Avery_L7651';
     const filename = `WFA_${typeStr}_Labels_Y${currentYear}.pdf`;
     doc.save(filename);
 
