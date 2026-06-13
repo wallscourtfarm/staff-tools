@@ -183,7 +183,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>13.06.26f</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>13.06.26g</strong></footer>
 
 <script>
 // Year group colours
@@ -257,8 +257,9 @@ const LABEL_CONFIG = {
     gap: 2.52,
     fixedMarginLeft: 9.4,
     fixedMarginTop: 13.05,
-    fontSize: 22,
-    logoH: 12
+    fontSize: 36,
+    logoH: 12,
+    wrapNames: true
   }
 };
 
@@ -493,7 +494,16 @@ function updatePreview() {
     <div style="position:absolute;inset:0;background:${bgColour};">
       <div style="position:absolute;top:${previewBorder}px;left:${previewBorder}px;width:${innerW}px;height:${innerH}px;background:white;display:flex;align-items:center;justify-content:flex-start;padding:0 12px 0 4px;">
         <img src="${logoData}" style="height:${logoHpx}px;width:${logoHpx}px;object-fit:contain;margin-right:12px;flex-shrink:0;">
-        <span style="font-family:'Tw Cen MT',Arial,sans-serif;font-size:${fontSizePx}px;font-weight:bold;color:#1e2d3d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${previewName}</span>
+        ${(() => {
+          if (config.wrapNames) {
+            const si = previewName.indexOf(' ');
+            const l1 = si > 0 ? previewName.slice(0, si) : previewName;
+            const l2 = si > 0 ? previewName.slice(si + 1) : '';
+            const lStyle = `font-family:'Tw Cen MT',Arial,sans-serif;font-size:${fontSizePx}px;font-weight:bold;color:#1e2d3d;white-space:nowrap;`;
+            return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;overflow:hidden;"><span style="${lStyle}">${l1}</span>${l2 ? `<span style="${lStyle}">${l2}</span>` : ''}</div>`;
+          }
+          return `<span style="font-family:'Tw Cen MT',Arial,sans-serif;font-size:${fontSizePx}px;font-weight:bold;color:#1e2d3d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${previewName}</span>`;
+        })()}
       </div>
     </div>
   `;
@@ -685,30 +695,45 @@ async function generatePdf() {
           doc.setFont(fontName, 'normal');
           doc.setTextColor(30, 45, 61);
 
-          // Calculate available text width and shrink font if needed
+          // Calculate available text area
           const isSmallLabel = currentLabelType === 'avery';
           const textLeft = logoX + logoWmm + (isSmallLabel ? 2 : 5);
           const textRight = lx + config.border + liW - (isSmallLabel ? 1.5 : 5);
           const availableWidth = textRight - textLeft;
-          let actualFontSize = fontSize;
-          doc.setFontSize(actualFontSize);
-          let textWidth = doc.getTextWidth(name);
+          const cx = (textLeft + textRight) / 2;
 
-          // Shrink font if text is too wide
-          if (textWidth > availableWidth) {
-            actualFontSize = fontSize * (availableWidth / textWidth);
+          if (config.wrapNames) {
+            // Two-line rendering: split at first space
+            const spaceIdx = name.indexOf(' ');
+            const line1 = spaceIdx > 0 ? name.slice(0, spaceIdx) : name;
+            const line2 = spaceIdx > 0 ? name.slice(spaceIdx + 1) : '';
+            // Shrink font to fit widest line
+            let fs = fontSize;
+            doc.setFontSize(fs);
+            const maxW = Math.max(doc.getTextWidth(line1), line2 ? doc.getTextWidth(line2) : 0);
+            if (maxW > availableWidth) fs = fs * (availableWidth / maxW);
+            doc.setFontSize(fs);
+            const lineHmm = fs * 0.352778;
+            const lineGap = 1.5;
+            const totalH = line2 ? lineHmm * 2 + lineGap : lineHmm;
+            const blockTop = ly + config.border + (liH - totalH) / 2;
+            doc.text(line1, cx, blockTop + lineHmm, { align: 'center' });
+            if (line2) doc.text(line2, cx, blockTop + lineHmm + lineGap + lineHmm, { align: 'center' });
+          } else {
+            let actualFontSize = fontSize;
             doc.setFontSize(actualFontSize);
-            textWidth = doc.getTextWidth(name);
+            let textWidth = doc.getTextWidth(name);
+            if (textWidth > availableWidth) {
+              actualFontSize = fontSize * (availableWidth / textWidth);
+              doc.setFontSize(actualFontSize);
+              textWidth = doc.getTextWidth(name);
+            }
+            const textX = (textLeft + textRight - textWidth) / 2;
+            const actualFontHmm = actualFontSize * 0.352778;
+            const textYoffset = currentLabelType === 'drawer' ? 4 : currentLabelType === 'peg' ? 1 : currentLabelType === 'l7164' ? 3 : 1;
+            const textY = ly + config.border + (liH + actualFontHmm) / 2 - textYoffset;
+            doc.text(name, textX, textY);
           }
-
-          const textX = (textLeft + textRight - textWidth) / 2;
-
-          // Vertical centre: position baseline lower to centre text visually
-          // Recalculate font height for shrunk font
-          const actualFontHmm = actualFontSize * 0.352778;
-          const textYoffset = currentLabelType === 'drawer' ? 4 : currentLabelType === 'peg' ? 1 : currentLabelType === 'l7164' ? 3 : currentLabelType === 'label64x34' ? 2 : 1;
-          const textY = ly + config.border + (liH + actualFontHmm) / 2 - textYoffset;
-          doc.text(name, textX, textY);
         }
       }
     }
