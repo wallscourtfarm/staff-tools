@@ -183,7 +183,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>13.06.26h</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>13.06.26i</strong></footer>
 
 <script>
 // Year group colours
@@ -259,6 +259,7 @@ const LABEL_CONFIG = {
     fixedMarginTop: 13.05,
     fontSize: 28,
     logoH: 12,
+    logoInset: 3,
     wrapNames: true
   }
 };
@@ -483,9 +484,12 @@ function updatePreview() {
   const innerW = previewW - previewBorder * 2;
   const innerH = previewH - previewBorder * 2;
 
-  // Scale font and logo to preview height (2-line labels use smaller font)
-  const fontSizePx = config.wrapNames ? Math.round(innerH * 0.32) : Math.round(innerH * 0.55);
+  // Scale font and logo to preview height; for 2-line labels also cap by available width
   const logoHpx = Math.round(innerH * (config.wrapNames ? 0.5 : 0.75));
+  const approxTextW = innerW - logoHpx - 20;
+  const fontSizePx = config.wrapNames
+    ? Math.min(Math.round(innerH * 0.32), Math.round(approxTextW / 6))
+    : Math.round(innerH * 0.55);
 
   labelPreview.style.width = previewW + 'px';
   labelPreview.style.height = previewH + 'px';
@@ -499,8 +503,8 @@ function updatePreview() {
             const si = previewName.indexOf(' ');
             const l1 = si > 0 ? previewName.slice(0, si) : previewName;
             const l2 = si > 0 ? previewName.slice(si + 1) : '';
-            const lStyle = `font-family:'Tw Cen MT',Arial,sans-serif;font-size:${fontSizePx}px;font-weight:bold;color:#1e2d3d;white-space:nowrap;`;
-            return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;overflow:hidden;"><span style="${lStyle}">${l1}</span>${l2 ? `<span style="${lStyle}">${l2}</span>` : ''}</div>`;
+            const lStyle = `font-family:'Tw Cen MT',Arial,sans-serif;font-size:${fontSizePx}px;font-weight:bold;color:#1e2d3d;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;`;
+            return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:0;overflow:hidden;"><span style="${lStyle}">${l1}</span>${l2 ? `<span style="${lStyle}">${l2}</span>` : ''}</div>`;
           }
           return `<span style="font-family:'Tw Cen MT',Arial,sans-serif;font-size:${fontSizePx}px;font-weight:bold;color:#1e2d3d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${previewName}</span>`;
         })()}
@@ -686,7 +690,7 @@ async function generatePdf() {
           doc.rect(lx + config.border, ly + config.border, liW, liH, 'F');
 
           // Logo on left, vertically centred
-          const logoX = lx + config.border + 1;
+          const logoX = lx + config.border + (config.logoInset || 1);
           const logoY = ly + config.border + (liH - logoHmm) / 2;
           doc.addImage(logoData, 'JPEG', logoX, logoY, logoWmm, logoHmm);
 
