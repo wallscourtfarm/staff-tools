@@ -96,8 +96,8 @@
       <div class="card-header"><h2>Label Type</h2></div>
       <div class="card-body">
         <div class="mode-tabs" id="labelTypeTabs">
-          <button class="mode-tab active" data-type="drawer">Drawer Labels (120×30mm)</button>
-          <button class="mode-tab" data-type="peg">Peg Labels (42×11mm)</button>
+          <button class="mode-tab active" data-type="drawer">Drawer Signs</button>
+          <button class="mode-tab" data-type="peg">Peg Signs</button>
           <button class="mode-tab" data-type="avery">Avery L7651 (38×21mm)</button>
           <button class="mode-tab" data-type="l7164">Avery L7164 (63×72mm)</button>
           <button class="mode-tab" data-type="label64x34">Labels (64×34mm)</button>
@@ -132,8 +132,10 @@
           <div class="field" style="flex:1;min-width:140px;">
             <label>Sheet format</label>
             <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
-              <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="imgFmt" value="12" checked onchange="updatePreview()"> 12 per sheet <span style="color:var(--muted)">(99×42mm)</span></label>
-              <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="imgFmt" value="65" onchange="updatePreview()"> 65 per sheet <span style="color:var(--muted)">(38×21mm)</span></label>
+              <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="imgFmt" value="drawer" checked onchange="updatePreview()"> 12 per sheet <span style="color:var(--muted)">(99×42mm)</span></label>
+              <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="imgFmt" value="avery" onchange="updatePreview()"> 65 per sheet <span style="color:var(--muted)">(38×21mm)</span></label>
+              <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="imgFmt" value="l7164" onchange="updatePreview()"> 12 per sheet <span style="color:var(--muted)">(63×72mm)</span></label>
+              <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="imgFmt" value="label64x34" onchange="updatePreview()"> 24 per sheet <span style="color:var(--muted)">(64×34mm)</span></label>
             </div>
           </div>
           <div class="field" style="flex:2;min-width:200px;">
@@ -173,7 +175,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>06.06.26f</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>06.06.26g</strong></footer>
 
 <script>
 // Year group colours
@@ -350,9 +352,9 @@ function onLabelTypeClick(e) {
 
   const config = LABEL_CONFIG[currentLabelType];
   if (currentLabelType === 'drawer') {
-    sizeInfo.innerHTML = `<strong>Drawer:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border`;
+    sizeInfo.innerHTML = `<strong>Drawer Signs:</strong> 12 per sheet`;
   } else if (currentLabelType === 'peg') {
-    sizeInfo.innerHTML = `<strong>Peg:</strong> ${config.perSheet} per sheet — ${config.width}mm × ${config.height}mm with ${config.border}mm coloured border`;
+    sizeInfo.innerHTML = `<strong>Peg Signs:</strong> 102 per sheet`;
   } else if (currentLabelType === 'avery') {
     sizeInfo.innerHTML = `<strong>Avery L7651:</strong> ${config.perSheet} per sheet — nameimage ${config.nameimageW}mm × ${config.nameimageH}mm, ${config.border}mm border`;
   } else if (currentLabelType === 'l7164') {
@@ -418,13 +420,17 @@ function updatePreview() {
   if (currentLabelType === 'image') {
     const fmt = getImgFmt();
     const hint = document.getElementById('imgHint');
-    if (hint) hint.textContent = fmt === '12'
-      ? 'Ideal: 1140×240px (4.75:1) — fills drawer label inner area (120×30mm minus 3mm border each side)'
-      : 'Ideal: 320×136px (2.35:1) — fills Avery L7651 inner area (35×17mm inside 1.5mm border)';
+    const imgHints = {
+      drawer:     'Ideal: 1140×240px (4.75:1) — fills drawer sign inner area (120×30mm minus 3mm border each side)',
+      avery:      'Ideal: 320×136px (2.06:1) — fills Avery L7651 inner area (35×17mm inside 1.5mm border)',
+      l7164:      'Ideal: 595×680px (0.88:1) — fills Avery L7164 inner area (59.5×68mm inside 2mm border)',
+      label64x34: 'Ideal: 595×300px (1.98:1) — fills 64×34mm label inner area (59.5×30mm inside 2mm border)'
+    };
+    if (hint) hint.textContent = imgHints[fmt] || '';
     const yearData = currentYear ? YEAR_COLOURS[currentYear] : null;
     const colour = yearData?.hex || '#ccc';
-    const border = fmt === '12' ? 3 : 1.5;
-    const imgCfg = fmt === '12' ? LABEL_CONFIG.drawer : LABEL_CONFIG.avery;
+    const imgCfg = LABEL_CONFIG[fmt] || LABEL_CONFIG.drawer;
+    const border = imgCfg.border;
     const imgLW = imgCfg.nameimageW || imgCfg.width;
     const imgLH = imgCfg.nameimageH || imgCfg.height;
     const ipW = 240;
@@ -439,7 +445,7 @@ function updatePreview() {
       labelPreview.innerHTML = `<div style="position:absolute;inset:0;border:${ipB}px solid ${colour};box-sizing:border-box;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:0.75rem;">Upload an image</div>`;
     }
     dlBtn.disabled = !imgDataUrl || !currentYear;
-    labelCount.textContent = imgDataUrl && currentYear ? `${fmt === '12' ? 12 : 65} labels per sheet` : '';
+    labelCount.textContent = imgDataUrl && currentYear ? `${imgCfg.perSheet} labels per sheet` : '';
     return;
   }
 
@@ -494,8 +500,7 @@ async function generatePdf() {
     statusEl.textContent = 'Building…';
     dlBtn.disabled = true;
     try {
-      // Reuse the existing label config: drawer for 12-per-sheet, avery for 65-per-sheet
-      const imgConfig = fmt === '12' ? LABEL_CONFIG.drawer : LABEL_CONFIG.avery;
+      const imgConfig = LABEL_CONFIG[fmt] || LABEL_CONFIG.drawer;
       const isPortrait = imgConfig.orientation === 'portrait';
       const pageW = isPortrait ? 210 : 297;
       const pageH = isPortrait ? 297 : 210;
