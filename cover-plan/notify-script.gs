@@ -661,11 +661,12 @@ function handleNotification(payloadStr) {
         const label = CHANGE_LABELS[ch.type] || ch.type;
         const teacher = ch.teacherName || 'Unknown';
         const cover = ch.coverName || '';
+        const reason = ch.reason || '';
         const detail = cover
           ? (ch.type === 'assign_cover' || ch.type === 'unassign_cover')
             ? `${teacher} ${ch.type === 'assign_cover' ? '←' : '→'} ${cover}`
             : `${teacher}${cover ? ' / ' + cover : ''}`
-          : teacher;
+          : (ch.type === 'add' && reason) ? `${reason} ${teacher}` : teacher;
         summaryHtml += `<div style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:4px;margin-bottom:4px;font-size:12px">
           <span style="color:#1798d3;font-weight:bold">${label}</span>
           <span style="color:#334155;margin-left:4px">${detail}</span>
