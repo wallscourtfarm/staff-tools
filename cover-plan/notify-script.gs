@@ -567,8 +567,10 @@ function openViewer() {
 
 // doGet handles browser visits — useful for testing and triggering authorization
 function doGet(e) {
-  // Check if this is a notification request (sent as GET with payload parameter)
-  if (e && e.parameter && e.parameter.payload) {
+  const hasPayload = !!(e && e.parameter && e.parameter.payload);
+  const payloadLen = hasPayload ? e.parameter.payload.length : 0;
+  console.log('doGet called. hasPayload=' + hasPayload + ' payloadLen=' + payloadLen);
+  if (hasPayload) {
     return handleNotification(e.parameter.payload);
   }
   return ContentService.createTextOutput(JSON.stringify({
@@ -591,9 +593,10 @@ function doGet(e) {
 // ────────────────────────────────────────────────────────────────────────────────
 
 function doPost(e) {
-  // POST also redirects to GET on Google Apps Script, so this may not be called.
-  // Handle via doGet with ?payload= parameter instead.
-  const payloadStr = e.parameter.payload || (e.postData ? e.postData.contents : null);
+  const paramPayload = e && e.parameter && e.parameter.payload;
+  const bodyPayload  = e && e.postData ? e.postData.contents : null;
+  console.log('doPost called. paramPayload=' + !!paramPayload + ' bodyPayload=' + !!bodyPayload + ' bodyLen=' + (bodyPayload ? bodyPayload.length : 0));
+  const payloadStr = paramPayload || bodyPayload;
   return handleNotification(payloadStr);
 }
 
@@ -601,9 +604,11 @@ function doPost(e) {
 function handleNotification(payloadStr) {
   try {
     if (!payloadStr) {
+      console.log('handleNotification: no payload received');
       return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'No data received' }))
         .setMimeType(ContentService.MimeType.JSON);
     }
+    console.log('handleNotification: payloadStr length=' + payloadStr.length);
     const payload = JSON.parse(payloadStr);
     const changes   = payload.changes || [];
     const weekLabel = payload.weekLabel || 'This week';
@@ -611,7 +616,10 @@ function handleNotification(payloadStr) {
     const recipients = payload.recipients || [];
     const affectedYGs = payload.affectedYGs || [];
 
+    console.log('handleNotification: recipients=' + recipients.length + ' changes=' + changes.length);
+
     if (recipients.length === 0) {
+      console.log('handleNotification: no recipients, skipping');
       return ContentService.createTextOutput(JSON.stringify({ success: true, message: 'No recipients' }))
         .setMimeType(ContentService.MimeType.JSON);
     }
