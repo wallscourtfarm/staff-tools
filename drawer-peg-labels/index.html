@@ -183,7 +183,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>13.06.26n</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>15.06.26a</strong></footer>
 
 <script>
 // Year group colours
@@ -247,7 +247,9 @@ const LABEL_CONFIG = {
     orientation: 'portrait',
     gap: 2.5,
     fontSize: 28,
-    logoH: 22
+    logoH: 22,
+    colOffsets: [-3, 0, 4],   // col 1 left 3mm, col 2 none, col 3 right 4mm
+    rowOffsets: [-2, -1, 1, 2] // row 1 up 2mm, row 2 up 1mm, row 3 down 1mm, row 4 down 2mm
   },
   label64x34: {
     width: 63.5,
@@ -667,8 +669,8 @@ async function generatePdf() {
           // Apply inset for labels that need print tolerance (e.g. Avery)
           const ix = config.insetX || 0;
           const iy = config.insetY || 0;
-          let lx = x + ix;
-          let ly = y + iy;
+          let lx = x + ix + (config.colOffsets ? config.colOffsets[col] || 0 : 0);
+          let ly = y + iy + (config.rowOffsets ? config.rowOffsets[row] || 0 : 0);
           let lw = config.width - ix * 2;
           let lh = config.height - iy * 2;
           let liW = lw - config.border * 2;
