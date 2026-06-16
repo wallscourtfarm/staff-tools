@@ -616,13 +616,17 @@ function handleNotification(payloadStr) {
     const recipients = payload.recipients || [];
     const affectedYGs = payload.affectedYGs || [];
 
-    console.log('handleNotification: recipients=' + recipients.length + ' changes=' + changes.length);
+    // Always include NOTIFICATION_EMAILS so the admin always gets a copy.
+    // Merge with payload recipients (de-duplicate by email).
+    const seenEmails = new Set(recipients.map(r => r.email));
+    NOTIFICATION_EMAILS.forEach(email => {
+      if (!seenEmails.has(email)) {
+        recipients.push({ name: email, email: email, yg: '' });
+        seenEmails.add(email);
+      }
+    });
 
-    if (recipients.length === 0) {
-      console.log('handleNotification: no recipients, skipping');
-      return ContentService.createTextOutput(JSON.stringify({ success: true, message: 'No recipients' }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
+    console.log('handleNotification: recipients=' + recipients.length + ' changes=' + changes.length + ' to=' + recipients.map(r=>r.email).join(','));
 
     const PLANNER_URL = 'https://wallscourtfarm.github.io/staff-tools/cover-plan/planner.html';
     const tz = Session.getScriptTimeZone();
