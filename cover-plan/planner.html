@@ -318,7 +318,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(14.06.26b)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(16.06.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -1290,15 +1290,17 @@ function renderMyView() {
   if (!me) {
     html += `<div class="my-empty">Select your name above to see your schedule.</div>`;
   } else {
+    const daySessionSort = (a, b) => a.day !== b.day ? a.day - b.day : (SESSION_IDX[a.session]??99) - (SESSION_IDX[b.session]??99);
+
     // Entries where I'm OUT
     const outEntries = slots().filter(s => {
       const t = teacher(s.tid);
       return t && t.name.toLowerCase() === me.toLowerCase();
-    });
+    }).sort(daySessionSort);
     // Entries where I'm covering someone
     const coveringEntries = slots().filter(s =>
       s.cover && s.cover.toLowerCase() === me.toLowerCase()
-    );
+    ).sort(daySessionSort);
 
     if (outEntries.length === 0 && coveringEntries.length === 0) {
       html += `<div class="my-empty">No arrangements found for <strong>${me}</strong> this week.</div>`;
