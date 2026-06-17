@@ -598,12 +598,19 @@ function handleEventWrite(payload) {
     }
 
     if (action === 'update' || action === 'delete') {
-      const idCol = col('ID');
-      if (idCol < 0) throw new Error('No ID column in CalendarEvents');
-      const data = sheet.getDataRange().getValues();
       let rowNum = -1;
-      for (let i = 1; i < data.length; i++) {
-        if (String(data[i][idCol]).trim() === String(ev.id)) { rowNum = i + 1; break; }
+
+      // sheet_row_N IDs are virtual row numbers assigned by the front end for rows without an ID
+      const sheetRowMatch = String(ev.id).match(/^sheet_row_(\d+)$/);
+      if (sheetRowMatch) {
+        rowNum = parseInt(sheetRowMatch[1]);
+      } else {
+        const idCol = col('ID');
+        if (idCol < 0) throw new Error('No ID column in CalendarEvents');
+        const data = sheet.getDataRange().getValues();
+        for (let i = 1; i < data.length; i++) {
+          if (String(data[i][idCol]).trim() === String(ev.id)) { rowNum = i + 1; break; }
+        }
       }
       if (rowNum < 0) throw new Error('Event not found: ' + ev.id);
 
