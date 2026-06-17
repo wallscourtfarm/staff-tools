@@ -556,6 +556,62 @@ function buildTodaySummary(planSheet, todayStr) {
   return html;
 }
 
+// ── CONCERN HANDLER ───────────────────────────────────────────────────────────
+
+function handleConcern(payload) {
+  const from      = payload.from    || 'Anonymous';
+  const message   = payload.message || '(no message)';
+  const weekLabel = payload.weekLabel || '';
+  const timestamp = payload.timestamp ? new Date(payload.timestamp) : new Date();
+  const recipients = (payload.recipients || []).map(r => r.email).filter(Boolean);
+
+  const PLANNER_URL = 'https://wallscourtfarm.github.io/staff-tools/cover-plan/planner.html';
+  const tz      = Session.getScriptTimeZone();
+  const dateStr = Utilities.formatDate(timestamp, tz, 'EEEE d MMMM yyyy');
+  const timeStr = Utilities.formatDate(timestamp, tz, 'HH:mm');
+
+  if (recipients.length === 0) {
+    return ContentService.createTextOutput(JSON.stringify({ success: true, message: 'No recipients for concern' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const subject = `Cover schedule concern raised by ${from}`;
+
+  const htmlBody = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;color:#222;">
+      <div style="background:#f59e0b;height:8px;border-radius:6px 6px 0 0;"></div>
+      <div style="border:1px solid #ddd;border-top:none;padding:20px 22px;border-radius:0 0 6px 6px;">
+        <h1 style="font-size:16px;margin:0 0 2px;color:#d97706;">Wallscourt Farm Academy</h1>
+        <p style="font-size:13px;color:#64748b;margin:0 0 18px;">A concern was raised at <strong>${timeStr}</strong> on ${dateStr}${weekLabel ? ' regarding <strong>' + weekLabel + '</strong>' : ''}.</p>
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:14px 16px;margin-bottom:18px;">
+          <p style="margin:0 0 6px;font-size:12px;font-weight:bold;color:#92400e;text-transform:uppercase;letter-spacing:0.05em;">From: ${from}</p>
+          <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.6;">${message.replace(/\n/g, '<br>')}</p>
+        </div>
+        <div style="margin-top:20px;">
+          <a href="${PLANNER_URL}" style="background:#1798d3;color:white;padding:10px 20px;
+            border-radius:4px;text-decoration:none;font-size:14px;font-weight:bold;display:inline-block;">
+            View release schedule →
+          </a>
+        </div>
+        <p style="margin-top:16px;font-size:11px;color:#999;">
+          This is an automated notification from the WFA Release Schedule.
+          Reply directly to this email or contact ${from} to respond.
+        </p>
+      </div>
+    </div>`;
+
+  GmailApp.sendEmail(
+    recipients.join(','),
+    subject,
+    `Cover schedule concern from ${from}: ${message}`,
+    { htmlBody: htmlBody }
+  );
+
+  console.log('handleConcern: sent to ' + recipients.join(','));
+  return ContentService.createTextOutput(JSON.stringify({ success: true, sent: recipients.length }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function openViewer() {
   const html = HtmlService.createHtmlOutput(
     `<script>window.open('${VIEWER_URL}','_blank');google.script.host.close();<\/script>`
@@ -610,6 +666,12 @@ function handleNotification(payloadStr) {
     }
     console.log('handleNotification: payloadStr length=' + payloadStr.length);
     const payload = JSON.parse(payloadStr);
+
+    // ── Concern / question submitted by a staff member ────────────────────────
+    if (payload.type === 'concern') {
+      return handleConcern(payload);
+    }
+
     const changes   = payload.changes || [];
     const weekLabel = payload.weekLabel || 'This week';
     const timestamp = payload.timestamp ? new Date(payload.timestamp) : new Date();
