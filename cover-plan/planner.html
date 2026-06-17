@@ -2078,45 +2078,15 @@ function openConcernPanel() {
 function closeConcernPanel() {
   document.getElementById('concernPanel').style.display = 'none';
 }
-async function sendConcern() {
+function sendConcern() {
   const name = document.getElementById('concernName').value.trim();
   const text = document.getElementById('concernText').value.trim();
   if (!text) { document.getElementById('concernText').focus(); return; }
-  const btn = document.getElementById('concernSendBtn');
-  btn.disabled = true; btn.textContent = 'Sending…';
-  const payload = {
-    type: 'concern',
-    from: name || 'Anonymous',
-    message: text,
-    weekLabel: WEEKS[state.weekIdx]?.label || '',
-    timestamp: Date.now(),
-    recipients: PLANNER_EMAILS.map(e => ({ email: e }))
-  };
-  const url = NOTIFY_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload));
-  fetch(url, { mode: 'no-cors' }).catch(() => {});
-  document.getElementById('concernPanel').innerHTML = `
-    <div class="concern-panel-hd"><span>? Raise a concern</span><button onclick="closeConcernPanel()">&times;</button></div>
-    <div class="notify-sent" style="padding:30px 20px">
-      <div style="font-size:36px;margin-bottom:10px">✓</div>
-      <h3 style="color:#f59e0b;font-family:Nunito,sans-serif">Concern sent!</h3>
-      <p style="color:#64748b;font-size:13px;margin-top:8px">The cover-planning team will be in touch.</p>
-    </div>`;
-  setTimeout(() => {
-    closeConcernPanel();
-    // Reset panel for next use
-    document.getElementById('concernPanel').innerHTML = `
-      <div class="concern-panel-hd"><span>? Raise a concern</span><button onclick="closeConcernPanel()">&times;</button></div>
-      <div class="concern-panel-body">
-        <label class="concern-label">Your name</label>
-        <input class="concern-input" id="concernName" placeholder="e.g. Jo Smith" autocomplete="off">
-        <label class="concern-label" style="margin-top:12px;display:block">Question or concern about the schedule</label>
-        <textarea class="concern-textarea" id="concernText" placeholder="e.g. Cover required on Wednesday 24th in the afternoon for both teachers in Y2 from 1:15–2:15…"></textarea>
-      </div>
-      <div class="concern-actions">
-        <button class="concern-cancel-btn" onclick="closeConcernPanel()">Cancel</button>
-        <button class="concern-send-btn" id="concernSendBtn" onclick="sendConcern()">Send to cover planners</button>
-      </div>`;
-  }, 2500);
+  const weekLabel = WEEKS[state.weekIdx]?.label || '';
+  const subject = encodeURIComponent(`Cover schedule concern${weekLabel ? ' — ' + weekLabel : ''}${name ? ' (from ' + name + ')' : ''}`);
+  const body = encodeURIComponent((name ? 'From: ' + name + '\n\n' : '') + text);
+  const to = PLANNER_EMAILS.join(',');
+  window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
 }
 
 // ── Term overview ─────────────────────────────────────────────────────────────
