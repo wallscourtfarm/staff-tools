@@ -681,12 +681,11 @@ function handleConcern(payload) {
         <div style="margin-top:20px;">
           <a href="${PLANNER_URL}" style="background:#1798d3;color:white;padding:10px 20px;
             border-radius:4px;text-decoration:none;font-size:14px;font-weight:bold;display:inline-block;">
-            View release schedule →
+            View release schedule &rarr;
           </a>
         </div>
         <p style="margin-top:16px;font-size:11px;color:#999;">
-          This is an automated notification from the WFA Release Schedule.
-          Reply directly to this email or contact ${from} to respond.
+          Automated notification from the WFA Release Schedule.
         </p>
       </div>
     </div>`;
