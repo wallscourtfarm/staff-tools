@@ -556,6 +556,89 @@ function buildTodaySummary(planSheet, todayStr) {
   return html;
 }
 
+// ── CALENDAR EVENT WRITE HANDLER ─────────────────────────────────────────────
+
+function handleEventWrite(payload) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('CalendarEvents');
+    if (!sheet) throw new Error('CalendarEvents sheet not found');
+
+    const action = payload.action; // 'add' | 'update' | 'delete'
+    const ev = payload.event || {};
+
+    // Read column headers (position-agnostic)
+    const lastCol = Math.max(sheet.getLastColumn(), 1);
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+    const col = name => headers.indexOf(name); // returns -1 if missing
+
+    // Convert YYYY-MM-DD → DD/MM/YYYY for the sheet
+    function toSheetDate(isoDate) {
+      if (!isoDate) return '';
+      const [y, m, d] = String(isoDate).split('-');
+      return `${d}/${m}/${y}`;
+    }
+
+    if (action === 'add') {
+      const row = new Array(headers.length).fill('');
+      const set = (name, val) => { const i = col(name); if (i >= 0) row[i] = val; };
+      set('StartDate', toSheetDate(ev.date));
+      set('EndDate',   toSheetDate(ev.date));
+      set('Type',      'Event');
+      set('Label',     ev.label || '');
+      set('Session',   ev.session || '');
+      set('Colour',    ev.colour || '#1798d3');
+      set('Source',    'FrontEnd');
+      set('ID',        ev.id || '');
+      set('Notes',     ev.notes || '');
+      sheet.appendRow(row);
+      console.log('handleEventWrite: added ' + ev.id);
+      return ok({ action:'added', id:ev.id });
+    }
+
+    if (action === 'update' || action === 'delete') {
+      const idCol = col('ID');
+      if (idCol < 0) throw new Error('No ID column in CalendarEvents');
+      const data = sheet.getDataRange().getValues();
+      let rowNum = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][idCol]).trim() === String(ev.id)) { rowNum = i + 1; break; }
+      }
+      if (rowNum < 0) throw new Error('Event not found: ' + ev.id);
+
+      if (action === 'delete') {
+        sheet.deleteRow(rowNum);
+        console.log('handleEventWrite: deleted ' + ev.id);
+        return ok({ action:'deleted' });
+      }
+
+      // update
+      const row = sheet.getRange(rowNum, 1, 1, headers.length).getValues()[0];
+      const set = (name, val) => { const i = col(name); if (i >= 0) row[i] = val; };
+      set('StartDate', toSheetDate(ev.date));
+      set('EndDate',   toSheetDate(ev.date));
+      set('Label',     ev.label || '');
+      set('Session',   ev.session || '');
+      set('Colour',    ev.colour || '#1798d3');
+      set('Notes',     ev.notes || '');
+      sheet.getRange(rowNum, 1, 1, headers.length).setValues([row]);
+      console.log('handleEventWrite: updated ' + ev.id);
+      return ok({ action:'updated' });
+    }
+
+    throw new Error('Unknown action: ' + action);
+  } catch(err) {
+    console.error('handleEventWrite error: ' + err.message);
+    return ContentService.createTextOutput(JSON.stringify({ success:false, error:err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function ok(extra) {
+  return ContentService.createTextOutput(JSON.stringify({ success:true, ...extra }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 // ── CONCERN HANDLER ───────────────────────────────────────────────────────────
 
 function handleConcern(payload) {
@@ -670,6 +753,11 @@ function handleNotification(payloadStr) {
     // ── Concern / question submitted by a staff member ────────────────────────
     if (payload.type === 'concern') {
       return handleConcern(payload);
+    }
+
+    // ── Front-end CalendarEvents CRUD ─────────────────────────────────────────
+    if (payload.type === 'event_write') {
+      return handleEventWrite(payload);
     }
 
     const changes   = payload.changes || [];
