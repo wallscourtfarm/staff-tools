@@ -294,21 +294,6 @@
     /* Concern panel */
     .concern-btn { padding:8px 12px; border:1px solid #e2e8f0; border-radius:5px; background:white; cursor:pointer; font-size:14px; color:#475569; transition:all .12s; }
     .concern-btn:hover { border-color:#f59e0b; color:#d97706; background:#fffbeb; }
-    .concern-panel { position:fixed; top:60px; right:12px; width:360px; background:white; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.18); z-index:9000; overflow:hidden; }
-    .concern-panel-hd { padding:14px 18px; background:#f59e0b; color:white; font-family:'Nunito',sans-serif; font-weight:900; font-size:15px; display:flex; justify-content:space-between; align-items:center; }
-    .concern-panel-hd button { background:none; border:none; color:white; font-size:20px; cursor:pointer; padding:0 4px; }
-    .concern-panel-body { padding:16px 18px; }
-    .concern-label { font-size:12px; font-weight:bold; color:#475569; margin-bottom:4px; display:block; }
-    .concern-input { width:100%; border:1.5px solid #e2e8f0; border-radius:5px; padding:7px 10px; font-size:13px; font-family:Arial; color:#1e293b; outline:none; transition:border .12s; }
-    .concern-input:focus { border-color:#f59e0b; }
-    .concern-textarea { width:100%; border:1.5px solid #e2e8f0; border-radius:5px; padding:7px 10px; font-size:13px; font-family:Arial; color:#1e293b; outline:none; resize:vertical; min-height:100px; transition:border .12s; margin-top:10px; }
-    .concern-textarea:focus { border-color:#f59e0b; }
-    .concern-actions { padding:12px 18px 16px; display:flex; gap:8px; border-top:1px solid #f1f5f9; }
-    .concern-send-btn { flex:1; padding:10px 20px; background:#f59e0b; color:white; border:none; border-radius:6px; font-size:14px; font-weight:bold; cursor:pointer; font-family:'Nunito',sans-serif; }
-    .concern-send-btn:hover { background:#d97706; }
-    .concern-send-btn:disabled { background:#94a3b8; cursor:default; }
-    .concern-cancel-btn { padding:10px 16px; background:white; border:1px solid #e2e8f0; border-radius:6px; font-size:14px; cursor:pointer; color:#64748b; }
-    .concern-cancel-btn:hover { background:#f8fafc; }
 
     /* Term overview view */
     .term-view { background:white; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:auto; padding:12px; }
@@ -380,7 +365,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(17.06.26b)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(17.06.26c)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -468,22 +453,6 @@ body.edit-locked .notify-btn   { display:none; }
 </div>
 
 <!-- Concern panel -->
-<div class="concern-panel" id="concernPanel" style="display:none">
-  <div class="concern-panel-hd">
-    <span>? Raise a concern</span>
-    <button onclick="closeConcernPanel()">&times;</button>
-  </div>
-  <div class="concern-panel-body">
-    <label class="concern-label">Your name</label>
-    <input class="concern-input" id="concernName" placeholder="e.g. Jo Smith" autocomplete="off">
-    <label class="concern-label" style="margin-top:12px;display:block">Question or concern about the schedule</label>
-    <textarea class="concern-textarea" id="concernText" placeholder="e.g. Cover required on Wednesday 24th in the afternoon for both teachers in Y2 from 1:15–2:15…"></textarea>
-  </div>
-  <div class="concern-actions">
-    <button class="concern-cancel-btn" onclick="closeConcernPanel()">Cancel</button>
-    <button class="concern-send-btn" id="concernSendBtn" onclick="sendConcern()">Send to cover planners</button>
-  </div>
-</div>
 
 <footer>Wallscourt Farm Academy · Release Schedule</footer>
 
@@ -503,7 +472,6 @@ const COUNTED_SESSIONS = new Set(['Before School','AM','Lunch','PM','After Schoo
 const BLOCKING_TYPES   = new Set(['Half Term','Christmas','Easter','Summer Holiday','INSET','CLF Conference','Bank Holiday']);
 
 // ── Sheet config ──────────────────────────────────────────────────────────────
-const PLANNER_EMAILS = ['innes.mclean@clf.uk'];  // add cover-planner emails here when ready
 const COLOUR_PRESETS = ['#1798d3','#7c3aed','#059669','#dc2626','#f59e0b','#0891b2','#d97706','#64748b'];
 
 let FRONT_END_EVENTS = []; // { id, date (YYYY-MM-DD), label, colour, session, notes }
@@ -2071,22 +2039,9 @@ async function sendNotification() {
 }
 
 // ── Concern panel ─────────────────────────────────────────────────────────────
+const CONCERN_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfA6o9EZQZ_wNQn_s7V-M2sE-T-vPpkFct9ZaPYjlan7r7I4g/viewform';
 function openConcernPanel() {
-  document.getElementById('concernPanel').style.display = 'block';
-  document.getElementById('concernName').focus();
-}
-function closeConcernPanel() {
-  document.getElementById('concernPanel').style.display = 'none';
-}
-function sendConcern() {
-  const name = document.getElementById('concernName').value.trim();
-  const text = document.getElementById('concernText').value.trim();
-  if (!text) { document.getElementById('concernText').focus(); return; }
-  const weekLabel = WEEKS[state.weekIdx]?.label || '';
-  const subject = encodeURIComponent(`Cover schedule concern${weekLabel ? ' — ' + weekLabel : ''}${name ? ' (from ' + name + ')' : ''}`);
-  const body = encodeURIComponent((name ? 'From: ' + name + '\n\n' : '') + text);
-  const to = PLANNER_EMAILS.join(',');
-  window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
+  window.open(CONCERN_FORM_URL, '_blank', 'noopener');
 }
 
 // ── Term overview ─────────────────────────────────────────────────────────────
