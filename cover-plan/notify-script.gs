@@ -560,7 +560,8 @@ function buildTodaySummary(planSheet, todayStr) {
 
 function handleEventWrite(payload) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const COVER_PLAN_SHEET_ID = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
+    const ss = SpreadsheetApp.openById(COVER_PLAN_SHEET_ID);
     const sheet = ss.getSheetByName('CalendarEvents');
     if (!sheet) throw new Error('CalendarEvents sheet not found');
 
@@ -687,7 +688,7 @@ function handleConcern(payload) {
     recipients.join(','),
     subject,
     `Cover schedule concern from ${from}: ${message}`,
-    { htmlBody: htmlBody }
+    { htmlBody: htmlBody, from: 'wallscourt.scheduling@gmail.com' }
   );
 
   console.log('handleConcern: sent to ' + recipients.join(','));
@@ -871,5 +872,77 @@ function handleNotification(payloadStr) {
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.message }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+// ── CONCERN FORM TRIGGER ──────────────────────────────────────────────────────
+// Runs automatically when someone submits the "Cover Schedule — Raise a Concern" form.
+// Install once by running setupConcernTrigger() from the Apps Script editor.
+
+const CONCERN_FORM_ID  = '1kHljV3RG78Ey3OeCOWftS9Q5ZcDH69Wh3mfB81Iu6PM';
+const CONCERN_SENDER   = 'wallscourt.scheduling@gmail.com';
+const CONCERN_RECIPIENTS = [
+  'innes.mclean@clf.uk',
+  // add other planner emails here when ready
+];
+
+function onConcernFormSubmit(e) {
+  const responses = e.response.getItemResponses();
+  let name    = '';
+  let concern = '';
+  for (const r of responses) {
+    const title = r.getItem().getTitle().toLowerCase();
+    if (title.includes('name'))    name    = r.getResponse();
+    if (title.includes('concern') || title.includes('question')) concern = r.getResponse();
+  }
+
+  const ts      = e.response.getTimestamp();
+  const tz      = Session.getScriptTimeZone();
+  const dateStr = Utilities.formatDate(ts, tz, 'EEEE d MMMM yyyy');
+  const timeStr = Utilities.formatDate(ts, tz, 'HH:mm');
+
+  const subject = `Cover schedule concern raised${name ? ' by ' + name : ''}`;
+
+  const htmlBody = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;color:#222;">
+      <div style="background:#f59e0b;height:8px;border-radius:6px 6px 0 0;"></div>
+      <div style="border:1px solid #ddd;border-top:none;padding:20px 22px;border-radius:0 0 6px 6px;">
+        <h1 style="font-size:16px;margin:0 0 2px;color:#d97706;">Wallscourt Farm Academy</h1>
+        <p style="font-size:13px;color:#64748b;margin:0 0 18px;">
+          A concern was raised at <strong>${timeStr}</strong> on ${dateStr}.
+        </p>
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:14px 16px;margin-bottom:18px;">
+          ${name ? `<p style="margin:0 0 6px;font-size:12px;font-weight:bold;color:#92400e;text-transform:uppercase;letter-spacing:0.05em;">From: ${name}</p>` : ''}
+          <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.6;">${concern.replace(/\n/g,'<br>')}</p>
+        </div>
+        <a href="${VIEWER_URL}" style="background:#1798d3;color:white;padding:10px 20px;
+          border-radius:4px;text-decoration:none;font-size:14px;font-weight:bold;display:inline-block;">
+          View release schedule →
+        </a>
+        <p style="margin-top:16px;font-size:11px;color:#999;">
+          Automated notification from the WFA Release Schedule concern form.
+        </p>
+      </div>
+    </div>`;
+
+  GmailApp.sendEmail(
+    CONCERN_RECIPIENTS.join(','),
+    subject,
+    `${name ? 'From: ' + name + '\n\n' : ''}${concern}`,
+    { htmlBody: htmlBody, from: CONCERN_SENDER }
+  );
+}
+
+function setupConcernTrigger() {
+  // Delete any existing concern form triggers first (avoid duplicates)
+  ScriptApp.getProjectTriggers()
+    .filter(t => t.getHandlerFunction() === 'onConcernFormSubmit')
+    .forEach(t => ScriptApp.deleteTrigger(t));
+
+  ScriptApp.newTrigger('onConcernFormSubmit')
+    .forForm(FormApp.openById(CONCERN_FORM_ID))
+    .onFormSubmit()
+    .create();
+
+  console.log('Concern form trigger installed.');
 }
 
