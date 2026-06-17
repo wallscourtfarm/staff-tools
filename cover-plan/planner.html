@@ -482,6 +482,13 @@ body.edit-locked .notify-btn   { display:none; }
   </div>
 </div>
 
+<div id="deleteChoiceMenu" style="display:none;position:fixed;z-index:2000;background:#1e293b;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.4);padding:10px;min-width:180px;font-size:13px;color:#f1f5f9;">
+  <div style="font-weight:600;margin-bottom:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.05em">Delete event?</div>
+  <button id="dcmThisDate" style="display:block;width:100%;text-align:left;background:rgba(255,255,255,.08);border:none;color:#f1f5f9;padding:6px 10px;border-radius:5px;cursor:pointer;margin-bottom:4px;font-size:13px" onmouseover="this.style.background='rgba(255,255,255,.16)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">Just this date</button>
+  <button id="dcmAllDates" style="display:block;width:100%;text-align:left;background:rgba(220,38,38,.18);border:none;color:#fca5a5;padding:6px 10px;border-radius:5px;cursor:pointer;margin-bottom:4px;font-size:13px" onmouseover="this.style.background='rgba(220,38,38,.32)'" onmouseout="this.style.background='rgba(220,38,38,.18)'">All dates</button>
+  <button onclick="closeDeleteMenu()" style="display:block;width:100%;text-align:left;background:none;border:none;color:#64748b;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:12px">Cancel</button>
+</div>
+
 <footer>Wallscourt Farm Academy · Release Schedule</footer>
 
 <script>
@@ -517,6 +524,7 @@ let EVENTS             = {};  // YYYY-MM-DD → {label,type:'bank-holiday'|'inse
 let INFO_EVENTS        = {};  // YYYY-MM-DD → [{label,type}]                       — day header banners
 let SESSION_INFO_EVENTS= {};  // 'YYYY-MM-DD|Session' → [{label,type}]             — cell banners
 let RECURRING_SLOTS  = [];   // master copy of recurring, used to seed new weeks
+let HIDDEN_EVENT_DATES = JSON.parse(localStorage.getItem('hiddenEventDates')||'{}'); // {id:[dateKey,...]}
 
 // ── Whole-school events (localStorage-backed; defaults loaded from sheet) ─────
 let WS_SHEET_DEFAULTS = [];
@@ -792,6 +800,16 @@ async function init() {
     const {blocking,info,sessionInfo,frontEnd}=buildEvents(csvToObjects(eventsTxt));
     EVENTS=blocking; INFO_EVENTS=info; SESSION_INFO_EVENTS=sessionInfo;
     FRONT_END_EVENTS=frontEnd;
+    // Apply per-date suppressions (single-date deletes that survived refresh)
+    Object.entries(HIDDEN_EVENT_DATES).forEach(([id, dates]) => {
+      dates.forEach(dk => {
+        if (INFO_EVENTS[dk]) { INFO_EVENTS[dk]=INFO_EVENTS[dk].filter(ev=>ev.id!==id); if (!INFO_EVENTS[dk].length) delete INFO_EVENTS[dk]; }
+        Object.keys(SESSION_INFO_EVENTS).filter(k=>k.startsWith(dk+'|')).forEach(k => {
+          SESSION_INFO_EVENTS[k]=SESSION_INFO_EVENTS[k].filter(ev=>ev.id!==id);
+          if (!SESSION_INFO_EVENTS[k].length) delete SESSION_INFO_EVENTS[k];
+        });
+      });
+    });
     WS_SHEET_DEFAULTS=buildSchoolEvents(csvToObjects(wseTxt));
     wsEvents=wsLoad();
     ensureAllSports();
@@ -2166,7 +2184,7 @@ function renderTermView() {
           <span>${ev.label}</span>
           <span class="term-ev-controls">
             ${owned?`<button class="term-ev-btn" onclick="openEditEvent('${ev.id}',event)" title="Edit">✏</button>`:''}
-            <button class="term-ev-btn" onclick="deleteTermEvent('${ev.id}','${ev.source}',event)" title="Remove">✕</button>
+            <button class="term-ev-btn" onclick="deleteTermEvent('${ev.id}','${ev.source}','${dk}',event)" title="Remove">✕</button>
           </span>
         </div>`;
       });
@@ -2181,7 +2199,7 @@ function renderTermView() {
             <span>${ev.label} <span style="opacity:.65;font-size:9px">${s}</span></span>
             <span class="term-ev-controls">
               ${owned?`<button class="term-ev-btn" onclick="openEditEvent('${ev.id}',event)" title="Edit">✏</button>`:''}
-              <button class="term-ev-btn" onclick="deleteTermEvent('${ev.id}','${ev.source}',event)" title="Remove">✕</button>
+              <button class="term-ev-btn" onclick="deleteTermEvent('${ev.id}','${ev.source}','${dk}',event)" title="Remove">✕</button>
             </span>
           </div>`;
         });
@@ -2247,7 +2265,7 @@ function _showTermPopup({ mode, date, id, label, colour, session, notes }, trigg
     <input id="tp-notes" type="text" placeholder="Any extra detail" value="${(notes||'').replace(/"/g,'&quot;')}">
     <div class="term-popup-btns">
       <button class="tp-cancel" onclick="_closeTermPopup()">Cancel</button>
-      ${mode==='edit'?`<button class="tp-delete" onclick="deleteTermEvent('${id}','FrontEnd',event)">Delete</button>`:''}
+      ${mode==='edit'?`<button class="tp-delete" onclick="deleteTermEvent('${id}','FrontEnd','${date}',event)">Delete</button>`:''}
       <button class="tp-save" onclick="saveTermEvent('${mode}','${date}','${id}')">Save</button>
     </div>`;
   document.body.appendChild(el);
@@ -2294,30 +2312,89 @@ function saveTermEvent(mode, date, id) {
   fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
 }
 
-function deleteTermEvent(id, source, e) {
+function _eventDateKeys(id) {
+  const keys = new Set();
+  Object.keys(INFO_EVENTS).forEach(k => { if (INFO_EVENTS[k].some(ev=>ev.id===id)) keys.add(k); });
+  Object.keys(SESSION_INFO_EVENTS).forEach(k => { if (SESSION_INFO_EVENTS[k].some(ev=>ev.id===id)) keys.add(k.split('|')[0]); });
+  return [...keys].sort();
+}
+
+function closeDeleteMenu() {
+  const m = document.getElementById('deleteChoiceMenu');
+  m.style.display = 'none';
+  document.removeEventListener('click', closeDeleteMenu);
+}
+
+function deleteTermEvent(id, source, dk, e) {
   if (e) e.stopPropagation();
   _closeTermPopup();
+
   if (source === 'FrontEnd') {
+    // FrontEnd events are always single-date — delete immediately
     FRONT_END_EVENTS = FRONT_END_EVENTS.filter(f=>f.id!==id);
     _syncFrontEndToInfoEvents();
-  } else {
-    // Remove from in-memory maps; if event has an ID also delete from sheet
-    [INFO_EVENTS, SESSION_INFO_EVENTS].forEach(map => {
-      Object.keys(map).forEach(k => {
-        map[k] = map[k].filter(ev => ev.id !== id);
-        if (!map[k].length) delete map[k];
-      });
-    });
-    if (id) {
-      const payload = { type:'event_write', action:'delete', event:{ id } };
-      fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
-    }
+    renderTermView();
+    const payload = { type:'event_write', action:'delete', event:{ id } };
+    fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
+    return;
   }
+
+  // For sheet events, check if multi-day
+  const allKeys = _eventDateKeys(id);
+  if (allKeys.length <= 1) {
+    // Single-day — delete immediately
+    _deleteSheetEventAll(id);
+    return;
+  }
+
+  // Multi-day series — show choice menu
+  const fmt = d => { const [y,m,day]=d.split('-'); return `${day}/${m}`; };
+  const menu = document.getElementById('deleteChoiceMenu');
+  document.getElementById('dcmThisDate').textContent = `Just ${fmt(dk)}`;
+  document.getElementById('dcmAllDates').textContent  = `All dates (${fmt(allKeys[0])}–${fmt(allKeys[allKeys.length-1])})`;
+  document.getElementById('dcmThisDate').onclick = ev => { ev.stopPropagation(); closeDeleteMenu(); _deleteSheetEventOneDate(id, dk); };
+  document.getElementById('dcmAllDates').onclick  = ev => { ev.stopPropagation(); closeDeleteMenu(); _deleteSheetEventAll(id); };
+
+  const rect = e && e.target ? e.target.getBoundingClientRect() : { right: window.innerWidth/2, top: window.innerHeight/2 };
+  menu.style.left = Math.min(rect.right + 4, window.innerWidth - 200) + 'px';
+  menu.style.top  = Math.min(rect.top,       window.innerHeight - 150) + 'px';
+  menu.style.display = 'block';
+  setTimeout(() => document.addEventListener('click', closeDeleteMenu, { once:true }), 0);
+}
+
+function _deleteSheetEventOneDate(id, dk) {
+  // Suppress this date in memory and localStorage
+  if (!HIDDEN_EVENT_DATES[id]) HIDDEN_EVENT_DATES[id] = [];
+  if (!HIDDEN_EVENT_DATES[id].includes(dk)) HIDDEN_EVENT_DATES[id].push(dk);
+  localStorage.setItem('hiddenEventDates', JSON.stringify(HIDDEN_EVENT_DATES));
+  // Remove from in-memory maps for this date only
+  [INFO_EVENTS].forEach(map => {
+    if (map[dk]) { map[dk] = map[dk].filter(ev=>ev.id!==id); if (!map[dk].length) delete map[dk]; }
+  });
+  Object.keys(SESSION_INFO_EVENTS).forEach(k => {
+    if (k.startsWith(dk+'|')) {
+      SESSION_INFO_EVENTS[k] = SESSION_INFO_EVENTS[k].filter(ev=>ev.id!==id);
+      if (!SESSION_INFO_EVENTS[k].length) delete SESSION_INFO_EVENTS[k];
+    }
+  });
   renderTermView();
-  if (source === 'FrontEnd') {
+}
+
+function _deleteSheetEventAll(id) {
+  // Clear any per-date suppressions for this id
+  delete HIDDEN_EVENT_DATES[id];
+  localStorage.setItem('hiddenEventDates', JSON.stringify(HIDDEN_EVENT_DATES));
+  [INFO_EVENTS, SESSION_INFO_EVENTS].forEach(map => {
+    Object.keys(map).forEach(k => {
+      map[k] = map[k].filter(ev => ev.id !== id);
+      if (!map[k].length) delete map[k];
+    });
+  });
+  if (id) {
     const payload = { type:'event_write', action:'delete', event:{ id } };
     fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
   }
+  renderTermView();
 }
 
 function _syncFrontEndToInfoEvents() {
