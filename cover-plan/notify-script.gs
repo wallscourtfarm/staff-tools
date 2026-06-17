@@ -952,3 +952,20 @@ function setupConcernTrigger() {
   console.log('Concern form trigger installed.');
 }
 
+function testConcernEmail() {
+  try {
+    GmailApp.sendEmail(
+      'innes.mclean@clf.uk',
+      'TEST: Concern email alias check',
+      'This is a test to verify wallscourt.scheduling@gmail.com alias works.',
+      {
+        htmlBody: '<p>Test email from GAS with alias override.</p>',
+        from: 'wallscourt.scheduling@gmail.com'
+      }
+    );
+    console.log('SUCCESS: email sent from wallscourt.scheduling@gmail.com');
+  } catch(err) {
+    console.error('FAILED: ' + err.message);
+  }
+}
+
