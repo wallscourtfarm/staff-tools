@@ -294,6 +294,19 @@
     /* Concern panel */
     .concern-btn { padding:8px 12px; border:1px solid #e2e8f0; border-radius:5px; background:white; cursor:pointer; font-size:14px; color:#475569; transition:all .12s; }
     .concern-btn:hover { border-color:#f59e0b; color:#d97706; background:#fffbeb; }
+    #concernOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:1100; align-items:center; justify-content:center; }
+    #concernOverlay.open { display:flex; }
+    #concernPanel { background:white; border-radius:10px; box-shadow:0 8px 32px rgba(0,0,0,.18); width:min(440px,92vw); padding:24px; }
+    #concernPanel h3 { margin:0 0 4px; font-family:Nunito,sans-serif; font-size:17px; color:#1e3a8a; }
+    #concernPanel p.sub { margin:0 0 16px; font-size:12px; color:#64748b; }
+    #concernPanel label { display:block; font-size:12px; font-weight:600; color:#374151; margin-bottom:4px; }
+    #concernPanel input, #concernPanel textarea { width:100%; box-sizing:border-box; border:1px solid #d1d5db; border-radius:6px; padding:8px 10px; font-size:13px; font-family:inherit; margin-bottom:12px; }
+    #concernPanel textarea { height:100px; resize:vertical; }
+    #concernPanel .concern-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
+    #concernPanel .concern-cancel { padding:8px 16px; border:1px solid #e2e8f0; border-radius:6px; background:white; cursor:pointer; font-size:13px; color:#475569; }
+    #concernPanel .concern-send { padding:8px 18px; border:none; border-radius:6px; background:#f59e0b; color:white; font-weight:700; cursor:pointer; font-size:13px; }
+    #concernPanel .concern-send:disabled { opacity:.5; cursor:default; }
+    #concernStatus { font-size:13px; text-align:center; padding:6px 0 0; min-height:20px; }
 
     /* Term overview view */
     .term-view { background:white; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:auto; padding:12px; }
@@ -365,7 +378,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(17.06.26c)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(17.06.26d)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -453,6 +466,21 @@ body.edit-locked .notify-btn   { display:none; }
 </div>
 
 <!-- Concern panel -->
+<div id="concernOverlay" onclick="if(event.target===this)closeConcernPanel()">
+  <div id="concernPanel">
+    <h3>? Raise a concern</h3>
+    <p class="sub">Your message will be sent directly to the cover-planning team.</p>
+    <label for="concernName">Your name</label>
+    <input id="concernName" type="text" placeholder="e.g. Sarah Jones">
+    <label for="concernMsg">Your question or concern</label>
+    <textarea id="concernMsg" placeholder="Describe your question or concern about the schedule…"></textarea>
+    <div id="concernStatus"></div>
+    <div class="concern-actions">
+      <button class="concern-cancel" onclick="closeConcernPanel()">Cancel</button>
+      <button class="concern-send" id="concernSendBtn" onclick="submitConcern()">Send</button>
+    </div>
+  </div>
+</div>
 
 <footer>Wallscourt Farm Academy · Release Schedule</footer>
 
@@ -2039,9 +2067,54 @@ async function sendNotification() {
 }
 
 // ── Concern panel ─────────────────────────────────────────────────────────────
-const CONCERN_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfA6o9EZQZ_wNQn_s7V-M2sE-T-vPpkFct9ZaPYjlan7r7I4g/viewform';
+const CONCERN_RECIPIENTS = ['innes.mclean@clf.uk'];
+
 function openConcernPanel() {
-  window.open(CONCERN_FORM_URL, '_blank', 'noopener');
+  document.getElementById('concernName').value = state.myName || '';
+  document.getElementById('concernMsg').value = '';
+  document.getElementById('concernStatus').textContent = '';
+  document.getElementById('concernSendBtn').disabled = false;
+  document.getElementById('concernSendBtn').textContent = 'Send';
+  document.getElementById('concernOverlay').classList.add('open');
+}
+function closeConcernPanel() {
+  document.getElementById('concernOverlay').classList.remove('open');
+}
+async function submitConcern() {
+  const from = document.getElementById('concernName').value.trim();
+  const message = document.getElementById('concernMsg').value.trim();
+  const statusEl = document.getElementById('concernStatus');
+  const sendBtn = document.getElementById('concernSendBtn');
+  if (!message) { statusEl.style.color='#dc2626'; statusEl.textContent='Please enter a message.'; return; }
+  sendBtn.disabled = true;
+  sendBtn.textContent = 'Sending…';
+  statusEl.textContent = '';
+  const weekLabel = WEEKS[state.weekIdx]?.label || '';
+  const payload = {
+    type: 'concern',
+    from: from || 'Anonymous',
+    message,
+    weekLabel,
+    timestamp: new Date().toISOString(),
+    recipients: CONCERN_RECIPIENTS.map(e => ({ email: e }))
+  };
+  try {
+    await fetch(NOTIFY_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    statusEl.style.color = '#059669';
+    statusEl.textContent = '✓ Sent — the cover team will be in touch.';
+    sendBtn.textContent = 'Sent';
+    setTimeout(closeConcernPanel, 1800);
+  } catch(e) {
+    statusEl.style.color = '#dc2626';
+    statusEl.textContent = 'Failed to send. Please try again.';
+    sendBtn.disabled = false;
+    sendBtn.textContent = 'Send';
+  }
 }
 
 // ── Term overview ─────────────────────────────────────────────────────────────
