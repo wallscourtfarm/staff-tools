@@ -326,6 +326,32 @@
     .term-blocked-label { font-size:10px; font-weight:bold; color:#dc2626; padding:6px 2px; }
     .term-blocked-label.inset { color:#b45309; }
     .term-today-col { background:#f0f9ff; }
+    .term-cell-inner { position:relative; min-height:36px; }
+    .term-add-btn { display:block; width:100%; text-align:left; padding:2px 5px; margin-top:3px; border:1px dashed #cbd5e1; border-radius:3px; background:none; cursor:pointer; color:#94a3b8; font-size:10px; opacity:0; transition:opacity .12s; }
+    td:hover .term-add-btn { opacity:1; }
+    .term-add-btn:hover { color:#1798d3; border-color:#93c5fd; background:#f0f9ff; }
+    .term-event-wrap { position:relative; padding-right:36px; }
+    .term-ev-controls { display:none; position:absolute; top:1px; right:2px; gap:2px; }
+    .term-event-wrap:hover .term-ev-controls { display:flex; }
+    .term-ev-btn { background:rgba(0,0,0,.18); border:none; cursor:pointer; color:inherit; font-size:9px; padding:1px 3px; border-radius:2px; line-height:1.3; }
+    .term-ev-btn:hover { background:rgba(0,0,0,.35); }
+    /* Term event popup */
+    .term-popup { position:fixed; background:white; border:2px solid #1798d3; border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.2); z-index:10000; padding:14px 16px; width:240px; }
+    .term-popup h4 { font-family:Nunito,sans-serif; font-weight:900; font-size:13px; color:#1e3a8a; margin:0 0 10px; }
+    .tp-label { display:block; font-size:10px; font-weight:bold; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px; margin-top:8px; }
+    .tp-label:first-of-type { margin-top:0; }
+    .term-popup input, .term-popup select { width:100%; border:1.5px solid #e2e8f0; border-radius:4px; padding:5px 8px; font-size:12px; font-family:Arial; outline:none; }
+    .term-popup input:focus, .term-popup select:focus { border-color:#1798d3; }
+    .tp-swatches { display:flex; gap:5px; flex-wrap:wrap; margin-top:3px; }
+    .tp-swatch { width:22px; height:22px; border-radius:4px; cursor:pointer; border:2.5px solid transparent; transition:border .1s; flex-shrink:0; }
+    .tp-swatch.active { border-color:#1e3a8a; }
+    .term-popup-btns { display:flex; gap:6px; margin-top:12px; }
+    .tp-save { flex:1; padding:7px; background:#1798d3; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:12px; font-family:Nunito,sans-serif; }
+    .tp-save:hover { background:#1580b8; }
+    .tp-cancel { padding:7px 10px; background:white; border:1px solid #e2e8f0; border-radius:4px; cursor:pointer; font-size:12px; color:#64748b; }
+    .tp-cancel:hover { background:#f8fafc; }
+    .tp-delete { padding:7px 10px; background:white; border:1px solid #fecaca; border-radius:4px; cursor:pointer; font-size:12px; color:#dc2626; }
+    .tp-delete:hover { background:#fef2f2; }
 
     /* Locked state — disable interactive elements */
     body.edit-locked .teacher-chip { cursor:default; pointer-events:none; }
@@ -354,7 +380,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(17.06.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(17.06.26b)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -478,6 +504,9 @@ const BLOCKING_TYPES   = new Set(['Half Term','Christmas','Easter','Summer Holid
 
 // ── Sheet config ──────────────────────────────────────────────────────────────
 const PLANNER_EMAILS = ['innes.mclean@clf.uk'];  // add cover-planner emails here when ready
+const COLOUR_PRESETS = ['#1798d3','#7c3aed','#059669','#dc2626','#f59e0b','#0891b2','#d97706','#64748b'];
+
+let FRONT_END_EVENTS = []; // { id, date (YYYY-MM-DD), label, colour, session, notes }
 
 const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
 const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
@@ -665,33 +694,41 @@ function buildWeeks(rows) {
   }).filter(Boolean);
 }
 function buildEvents(rows) {
-  const blocking={}, info={}, sessionInfo={};
+  const blocking={}, info={}, sessionInfo={}, frontEnd=[];
   rows.forEach(r=>{
     if (!r.StartDate) return;
     const start=parseDateStr(r.StartDate), end=parseDateStr(r.EndDate||r.StartDate);
     if (!start||!end) return;
+    const isFE = r.Source === 'FrontEnd';
+    // Collect FrontEnd events for editing (single-day only)
+    if (isFE && r.ID) {
+      frontEnd.push({ id:r.ID, date:dateKey(start), label:r.Label||'', colour:r.Colour||'#1798d3', session:r.Session||'', notes:r.Notes||'' });
+    }
     const isBlock=BLOCKING_TYPES.has(r.Type);
     const btype=(r.Type==='INSET'||r.Type==='CLF Conference')?'inset':'bank-holiday';
+    const bg = r.Colour || null;
+    const source = isFE ? 'FrontEnd' : 'sheet';
+    const id = r.ID || '';
     const cur=new Date(start);
     while (cur<=end) {
       const k=dateKey(cur);
       if (isBlock) {
         blocking[k]={label:r.Label||r.Type, type:btype};
       } else {
-        const lbl=r.Type+(r.Label&&r.Label!==r.Type?' · '+r.Label:'');
+        const lbl = isFE ? (r.Label||'') : r.Type+(r.Label&&r.Label!==r.Type?' · '+r.Label:'');
         if (r.Session) {
           const sk=`${k}|${r.Session}`;
           if (!sessionInfo[sk]) sessionInfo[sk]=[];
-          sessionInfo[sk].push({label:r.Label||r.Type, type:r.Type, bg:r.Colour||'#1e3a8a'});
+          sessionInfo[sk].push({label:r.Label||r.Type, type:r.Type, bg:bg||'#1e3a8a', source, id});
         } else {
           if (!info[k]) info[k]=[];
-          info[k].push({label:lbl, type:r.Type});
+          info[k].push({label:lbl, type:r.Type, bg, source, id});
         }
       }
       cur.setDate(cur.getDate()+1);
     }
   });
-  return {blocking,info,sessionInfo};
+  return {blocking,info,sessionInfo,frontEnd};
 }
 function buildSchoolEvents(rows) {
   return rows.map(r=>{
@@ -755,8 +792,9 @@ async function init() {
     const {teachers,cover}=buildStaff(csvToObjects(staffTxt));
     TEACHERS=teachers; COVER=cover;
     WEEKS=buildWeeks(csvToObjects(termsTxt));
-    const {blocking,info,sessionInfo}=buildEvents(csvToObjects(eventsTxt));
+    const {blocking,info,sessionInfo,frontEnd}=buildEvents(csvToObjects(eventsTxt));
     EVENTS=blocking; INFO_EVENTS=info; SESSION_INFO_EVENTS=sessionInfo;
+    FRONT_END_EVENTS=frontEnd;
     WS_SHEET_DEFAULTS=buildSchoolEvents(csvToObjects(wseTxt));
     wsEvents=wsLoad();
     ensureAllSports();
@@ -2086,63 +2124,83 @@ function renderTermView() {
   const center = document.getElementById('centerPane');
   if (!WEEKS.length) { center.innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8">No term data loaded.</div>'; return; }
 
-  // Find the term we're currently in (or nearest)
   const currentTerm = WEEKS[state.weekIdx]?.term || 1;
   const termWeeks = WEEKS.filter(w => w.term === currentTerm);
   if (!termWeeks.length) { center.innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8">No weeks in this term.</div>'; return; }
 
   const today = new Date(); today.setHours(0,0,0,0);
+  const allTerms = [...new Set(WEEKS.map(w => w.term))];
 
   let html = `<div class="term-view">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div style="font-family:Nunito,sans-serif;font-weight:900;font-size:16px;color:#1e3a8a">Term ${currentTerm} Overview</div>
-      <div style="display:flex;gap:6px">
-        ${WEEKS.map((w,i) => w.term).filter((t,i,a) => a.indexOf(t) === i).map(t =>
-          `<button onclick="jumpTerm(${t})" style="padding:4px 10px;border:1px solid ${t===currentTerm?'#1798d3':'#e2e8f0'};border-radius:4px;background:${t===currentTerm?'#1798d3':'white'};color:${t===currentTerm?'white':'#475569'};cursor:pointer;font-size:12px">Term ${t}</button>`
-        ).join('')}
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        ${allTerms.map(t=>`<button onclick="jumpTerm(${t})" style="padding:4px 10px;border:1px solid ${t===currentTerm?'#1798d3':'#e2e8f0'};border-radius:4px;background:${t===currentTerm?'#1798d3':'white'};color:${t===currentTerm?'white':'#475569'};cursor:pointer;font-size:12px">Term ${t}</button>`).join('')}
+        <span style="color:#e2e8f0;margin:0 4px">|</span>
+        <span style="font-size:11px;color:#94a3b8">Click a day to add an event</span>
       </div>
     </div>
     <table class="term-grid"><thead><tr>
-      <th>Week</th>
-      ${DAYS.map(d => `<th>${d}</th>`).join('')}
+      <th>Week</th>${DAYS.map(d=>`<th>${d}</th>`).join('')}
     </tr></thead><tbody>`;
 
   termWeeks.forEach(w => {
     html += '<tr>';
     const wStart = new Date(w.start);
-    html += `<td><div class="term-week-label">${w.shortLabel || ('Wk ' + w.week)}</div><div class="term-date">${wStart.getDate()}/${wStart.getMonth()+1}</div></td>`;
+    html += `<td><div class="term-week-label">${w.shortLabel||'Wk '+w.week}</div><div class="term-date">${wStart.getDate()}/${wStart.getMonth()+1}</div></td>`;
 
     DAYS.forEach((day, di) => {
-      const cellDate = new Date(wStart); cellDate.setDate(wStart.getDate() + di);
+      const cellDate = new Date(wStart); cellDate.setDate(wStart.getDate()+di);
       const dk = dateKey(cellDate);
       const isToday = cellDate.getTime() === today.getTime();
       const blocked = EVENTS[dk];
-      const infos = INFO_EVENTS[dk] || [];
 
       if (blocked) {
-        html += `<td class="${blocked.type==='inset'?'term-blocked-inset':'term-blocked'}">
-          <div class="term-blocked-label${blocked.type==='inset'?' inset':''}">${blocked.label}</div></td>`;
+        html += `<td class="${blocked.type==='inset'?'term-blocked-inset':'term-blocked'}"><div class="term-blocked-label${blocked.type==='inset'?' inset':''}">${blocked.label}</div></td>`;
         return;
       }
 
-      html += `<td${isToday?' style="background:#eff6ff"':''}>`;
-      html += `<div class="term-cell-date" style="color:${isToday?'#1798d3':'#94a3b8'}">${cellDate.getDate()}${isToday?' ◀':''}`;
+      html += `<td${isToday?' style="background:#eff6ff"':''}><div class="term-cell-inner">`;
+      html += `<div class="term-cell-date" style="color:${isToday?'#1798d3':'#94a3b8'}">${cellDate.getDate()}${isToday?' ◀':''}</div>`;
 
-      // School-wide events (from CalendarEvents info rows)
-      infos.forEach(ev => {
-        const bg = ev.type === 'INSET' ? '#f59e0b' : '#1e3a8a';
-        html += `<div class="term-event" style="background:${bg};color:white;margin-top:3px">${ev.label}</div>`;
+      // Date-level info events from CalendarEvents sheet
+      (INFO_EVENTS[dk]||[]).forEach(ev => {
+        const bg = ev.bg || '#1e3a8a';
+        const fg = contrastColor(bg);
+        const owned = ev.source==='FrontEnd';
+        html += `<div class="term-event${owned?' term-event-wrap':''}" style="background:${bg};color:${fg}">
+          <span>${ev.label}</span>
+          ${owned?`<span class="term-ev-controls">
+            <button class="term-ev-btn" onclick="openEditEvent('${ev.id}',event)" title="Edit">✏</button>
+            <button class="term-ev-btn" onclick="deleteTermEvent('${ev.id}',event)" title="Remove">✕</button>
+          </span>`:''}
+        </div>`;
       });
 
-      // wsEvents that fall on this day of week
-      wsEvents.forEach(ev => {
-        if (ev.day === di) {
-          const fg = contrastColor(ev.bg);
-          html += `<div class="term-event" style="background:${ev.bg};color:${fg}">${ev.label}</div>`;
-        }
+      // Session-level events from CalendarEvents
+      SESSIONS.forEach(s => {
+        (SESSION_INFO_EVENTS[`${dk}|${s}`]||[]).forEach(ev => {
+          const bg = ev.bg||'#1e3a8a';
+          const fg = contrastColor(bg);
+          const owned = ev.source==='FrontEnd';
+          html += `<div class="term-event${owned?' term-event-wrap':''}" style="background:${bg};color:${fg}">
+            <span>${ev.label} <span style="opacity:.65;font-size:9px">${s}</span></span>
+            ${owned?`<span class="term-ev-controls">
+              <button class="term-ev-btn" onclick="openEditEvent('${ev.id}',event)" title="Edit">✏</button>
+              <button class="term-ev-btn" onclick="deleteTermEvent('${ev.id}',event)" title="Remove">✕</button>
+            </span>`:''}
+          </div>`;
+        });
       });
 
-      html += '</div></td>';
+      // Recurring wsEvents
+      wsEvents.filter(ev=>ev.day===di).forEach(ev => {
+        const fg = contrastColor(ev.bg);
+        html += `<div class="term-event" style="background:${ev.bg};color:${fg}">${ev.label}</div>`;
+      });
+
+      html += `<button class="term-add-btn" onclick="openAddEvent('${dk}',event)">+ Add event</button>`;
+      html += `</div></td>`;
     });
 
     html += '</tr>';
@@ -2151,14 +2209,128 @@ function renderTermView() {
   html += '</tbody></table></div>';
   center.innerHTML = html;
 
-  // Hide side panels in term view
-  document.querySelectorAll('.app > .panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.app > .panel').forEach(p => p.style.display='none');
   document.getElementById('app').style.gridTemplateColumns = '1fr';
 }
 
 function jumpTerm(t) {
   const idx = WEEKS.findIndex(w => w.term === t);
-  if (idx >= 0) { state.weekIdx = idx; render(); }
+  if (idx >= 0) { state.weekIdx = idx; setView('term'); }
+}
+
+// ── Term event management ─────────────────────────────────────────────────────
+let _tpColour = '#1798d3';
+let _tpEl = null;
+
+function openAddEvent(dk, e) {
+  e.stopPropagation();
+  _showTermPopup({ mode:'add', date:dk, id:'', label:'', colour:'#1798d3', session:'', notes:'' }, e);
+}
+
+function openEditEvent(id, e) {
+  e.stopPropagation();
+  const ev = FRONT_END_EVENTS.find(f=>f.id===id);
+  if (!ev) return;
+  _showTermPopup({ mode:'edit', ...ev }, e);
+}
+
+function _showTermPopup({ mode, date, id, label, colour, session, notes }, triggerEvent) {
+  _closeTermPopup();
+  _tpColour = colour || '#1798d3';
+  const swatches = COLOUR_PRESETS.map(c=>`<div class="tp-swatch${c===_tpColour?' active':''}" style="background:${c}" data-c="${c}" onclick="selectTermColour('${c}')"></div>`).join('');
+  const sessOpts = ['', ...SESSIONS].map(s=>`<option value="${s}"${s===session?' selected':''}>${s||'All day'}</option>`).join('');
+  const el = document.createElement('div');
+  el.className = 'term-popup';
+  el.id = 'termPopup';
+  el.onclick = e => e.stopPropagation();
+  el.innerHTML = `
+    <h4>${mode==='add'?'Add event':'Edit event'}</h4>
+    <label class="tp-label">Label</label>
+    <input id="tp-label" type="text" placeholder="e.g. Y4 Museum Trip" value="${label.replace(/"/g,'&quot;')}">
+    <label class="tp-label">Session</label>
+    <select id="tp-session">${sessOpts}</select>
+    <label class="tp-label">Colour</label>
+    <div class="tp-swatches" id="tpSwatches">${swatches}</div>
+    <label class="tp-label">Notes (optional)</label>
+    <input id="tp-notes" type="text" placeholder="Any extra detail" value="${(notes||'').replace(/"/g,'&quot;')}">
+    <div class="term-popup-btns">
+      <button class="tp-cancel" onclick="_closeTermPopup()">Cancel</button>
+      ${mode==='edit'?`<button class="tp-delete" onclick="deleteTermEvent('${id}',event)">Delete</button>`:''}
+      <button class="tp-save" onclick="saveTermEvent('${mode}','${date}','${id}')">Save</button>
+    </div>`;
+  document.body.appendChild(el);
+  _tpEl = el;
+  // Position near click, keep on screen
+  const x = Math.min(triggerEvent.clientX + 8, window.innerWidth - 260);
+  const y = Math.min(triggerEvent.clientY + 8, window.innerHeight - 340);
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  document.getElementById('tp-label').focus();
+  setTimeout(() => document.addEventListener('click', _closeTermPopup, { once:true }), 0);
+}
+
+function selectTermColour(c) {
+  _tpColour = c;
+  document.querySelectorAll('.tp-swatch').forEach(s => s.classList.toggle('active', s.dataset.c===c));
+}
+
+function _closeTermPopup() {
+  if (_tpEl) { _tpEl.remove(); _tpEl = null; }
+}
+
+function saveTermEvent(mode, date, id) {
+  const label = (document.getElementById('tp-label').value||'').trim();
+  if (!label) { document.getElementById('tp-label').focus(); return; }
+  const session = document.getElementById('tp-session').value;
+  const notes = (document.getElementById('tp-notes').value||'').trim();
+  const colour = _tpColour;
+  _closeTermPopup();
+
+  const newId = id || ('fe_' + Date.now() + '_' + Math.random().toString(36).slice(2,6));
+  const ev = { id:newId, date, label, colour, session, notes };
+
+  if (mode==='add') {
+    FRONT_END_EVENTS.push(ev);
+  } else {
+    const idx = FRONT_END_EVENTS.findIndex(f=>f.id===id);
+    if (idx>=0) FRONT_END_EVENTS[idx]=ev; else FRONT_END_EVENTS.push(ev);
+  }
+  _syncFrontEndToInfoEvents();
+  renderTermView();
+
+  const payload = { type:'event_write', action: mode==='add'?'add':'update', event: ev };
+  fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
+}
+
+function deleteTermEvent(id, e) {
+  if (e) e.stopPropagation();
+  _closeTermPopup();
+  FRONT_END_EVENTS = FRONT_END_EVENTS.filter(f=>f.id!==id);
+  _syncFrontEndToInfoEvents();
+  renderTermView();
+  const payload = { type:'event_write', action:'delete', event:{ id } };
+  fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
+}
+
+function _syncFrontEndToInfoEvents() {
+  // Strip all FrontEnd entries from live event maps, then re-add from FRONT_END_EVENTS
+  [INFO_EVENTS, SESSION_INFO_EVENTS].forEach(map => {
+    Object.keys(map).forEach(k => {
+      map[k] = map[k].filter(ev=>ev.source!=='FrontEnd');
+      if (!map[k].length) delete map[k];
+    });
+  });
+  FRONT_END_EVENTS.forEach(ev => {
+    const bg = ev.colour||'#1798d3';
+    if (ev.session) {
+      const sk = `${ev.date}|${ev.session}`;
+      if (!SESSION_INFO_EVENTS[sk]) SESSION_INFO_EVENTS[sk]=[];
+      SESSION_INFO_EVENTS[sk].push({label:ev.label, type:'Event', bg, source:'FrontEnd', id:ev.id});
+    } else {
+      if (!INFO_EVENTS[ev.date]) INFO_EVENTS[ev.date]=[];
+      INFO_EVENTS[ev.date].push({label:ev.label, type:'Event', bg, source:'FrontEnd', id:ev.id});
+    }
+  });
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
