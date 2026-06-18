@@ -666,14 +666,14 @@ function handleConcern(payload) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  const subject = `Cover schedule concern raised by ${from}`;
+  const subject = `Release schedule message from ${from}`;
 
   const htmlBody = `
     <div style="font-family:Arial,sans-serif;max-width:600px;color:#222;">
       <div style="background:#f59e0b;height:8px;border-radius:6px 6px 0 0;"></div>
       <div style="border:1px solid #ddd;border-top:none;padding:20px 22px;border-radius:0 0 6px 6px;">
         <h1 style="font-size:16px;margin:0 0 2px;color:#d97706;">Wallscourt Farm Academy</h1>
-        <p style="font-size:13px;color:#64748b;margin:0 0 18px;">A concern was raised at <strong>${timeStr}</strong> on ${dateStr}${weekLabel ? ' regarding <strong>' + weekLabel + '</strong>' : ''}.</p>
+        <p style="font-size:13px;color:#64748b;margin:0 0 18px;">A message was sent about the Release Schedule at <strong>${timeStr}</strong> on ${dateStr}${weekLabel ? ' regarding <strong>' + weekLabel + '</strong>' : ''}.</p>
         <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:14px 16px;margin-bottom:18px;">
           <p style="margin:0 0 6px;font-size:12px;font-weight:bold;color:#92400e;text-transform:uppercase;letter-spacing:0.05em;">From: ${from}</p>
           <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.6;">${message.replace(/\n/g, '<br>')}</p>
@@ -693,7 +693,7 @@ function handleConcern(payload) {
   GmailApp.sendEmail(
     recipients.join(','),
     subject,
-    `Cover schedule concern from ${from}: ${message}`,
+    `Release schedule message from ${from}: ${message}`,
     { htmlBody: htmlBody, from: 'wallscourt.scheduling@gmail.com' }
   );
 
