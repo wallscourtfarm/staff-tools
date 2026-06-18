@@ -2250,7 +2250,6 @@ function _showTermPopup({ mode, date, id, label, colour, session, notes }, trigg
   _closeTermPopup();
   _tpColour = colour || '#1798d3';
   const swatches = COLOUR_PRESETS.map(c=>`<div class="tp-swatch${c===_tpColour?' active':''}" style="background:${c}" data-c="${c}" onclick="selectTermColour('${c}')"></div>`).join('');
-  const sessOpts = ['', ...SESSIONS].map(s=>`<option value="${s}"${s===session?' selected':''}>${s||'All day'}</option>`).join('');
   const el = document.createElement('div');
   el.className = 'term-popup';
   el.id = 'termPopup';
@@ -2263,6 +2262,18 @@ function _showTermPopup({ mode, date, id, label, colour, session, notes }, trigg
     <div class="tp-swatches" id="tpSwatches">${swatches}</div>
     <label class="tp-label">Notes (optional)</label>
     <input id="tp-notes" type="text" placeholder="Any extra detail" value="${(notes||'').replace(/"/g,'&quot;')}">
+    ${mode==='add'?`
+    <label class="tp-label">Repeat</label>
+    <select id="tp-repeat" onchange="onRepeatChange()">
+      <option value="none">No repeat</option>
+      <option value="daily">Every weekday</option>
+      <option value="alt">Every other weekday</option>
+      <option value="weekly">Same day each week</option>
+    </select>
+    <div id="tp-repeat-row" style="display:none;margin-top:5px;gap:5px;align-items:center;font-size:12px;color:#475569">
+      for <input id="tp-repeat-n" type="number" min="2" max="52" value="5" style="width:48px;padding:3px 5px;border:1.5px solid #e2e8f0;border-radius:4px;font-size:12px">
+      <span id="tp-repeat-unit">times</span>
+    </div>`:''}
     <div class="term-popup-btns">
       <button class="tp-cancel" onclick="_closeTermPopup()">Cancel</button>
       ${mode==='edit'?`<button class="tp-delete" onclick="deleteTermEvent('${id}','FrontEnd','${date}',event)">Delete</button>`:''}
@@ -2288,28 +2299,85 @@ function _closeTermPopup() {
   if (_tpEl) { _tpEl.remove(); _tpEl = null; }
 }
 
+function onRepeatChange() {
+  const v = document.getElementById('tp-repeat').value;
+  const row = document.getElementById('tp-repeat-row');
+  if (v === 'none') { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  const unit = document.getElementById('tp-repeat-unit');
+  const n = document.getElementById('tp-repeat-n');
+  if (v === 'weekly') { unit.textContent = 'weeks'; n.value = 4; }
+  else { unit.textContent = 'times'; n.value = 5; }
+}
+
 function saveTermEvent(mode, date, id) {
   const label = (document.getElementById('tp-label').value||'').trim();
   if (!label) { document.getElementById('tp-label').focus(); return; }
-  const session = '';
   const notes = (document.getElementById('tp-notes').value||'').trim();
   const colour = _tpColour;
+
+  let repeat = 'none', repeatN = 1;
+  if (mode === 'add') {
+    repeat = document.getElementById('tp-repeat')?.value || 'none';
+    repeatN = Math.max(1, parseInt(document.getElementById('tp-repeat-n')?.value||'1', 10) || 1);
+  }
   _closeTermPopup();
 
-  const newId = id || ('fe_' + Date.now() + '_' + Math.random().toString(36).slice(2,6));
-  const ev = { id:newId, date, label, colour, session, notes };
-
-  if (mode==='add') {
-    FRONT_END_EVENTS.push(ev);
+  if (mode === 'add') {
+    const dates = _generateRepeatDates(date, repeat, repeatN);
+    const seriesId = dates.length > 1 ? ('series_' + Date.now()) : null;
+    dates.forEach((d, i) => {
+      const evId = 'fe_' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + i;
+      const ev = { id:evId, date:d, label, colour, session:'', notes };
+      if (seriesId) ev.seriesId = seriesId;
+      FRONT_END_EVENTS.push(ev);
+      const payload = { type:'event_write', action:'add', event: ev };
+      fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
+    });
   } else {
+    const existing = FRONT_END_EVENTS.find(f=>f.id===id);
+    const ev = { id, date, label, colour, session:'', notes };
+    if (existing?.seriesId) ev.seriesId = existing.seriesId;
     const idx = FRONT_END_EVENTS.findIndex(f=>f.id===id);
     if (idx>=0) FRONT_END_EVENTS[idx]=ev; else FRONT_END_EVENTS.push(ev);
+    const payload = { type:'event_write', action:'update', event: ev };
+    fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
   }
   _syncFrontEndToInfoEvents();
   renderTermView();
+}
 
-  const payload = { type:'event_write', action: mode==='add'?'add':'update', event: ev };
-  fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
+function _generateRepeatDates(startDate, repeat, n) {
+  if (repeat === 'none' || n <= 1) return [startDate];
+  const dates = [];
+  const cur = new Date(startDate + 'T00:00:00');
+
+  if (repeat === 'weekly') {
+    for (let i = 0; i < n; i++) {
+      const dk = dateKey(cur);
+      if (!EVENTS[dk]) dates.push(dk);
+      cur.setDate(cur.getDate() + 7);
+    }
+    return dates;
+  }
+
+  // daily or alt: advance day by day, skip weekends and blocked dates
+  let weekdayIdx = 0;
+  const limit = n * 14 + 60; // safety cap on iterations
+  for (let iter = 0; iter < limit && dates.length < n; iter++) {
+    const day = cur.getDay();
+    const dk = dateKey(cur);
+    if (day !== 0 && day !== 6 && !EVENTS[dk]) {
+      if (repeat === 'daily') {
+        dates.push(dk);
+      } else { // alt: take every other weekday
+        if (weekdayIdx % 2 === 0) dates.push(dk);
+        weekdayIdx++;
+      }
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
 }
 
 function _eventDateKeys(id) {
@@ -2330,12 +2398,24 @@ function deleteTermEvent(id, source, dk, e) {
   _closeTermPopup();
 
   if (source === 'FrontEnd') {
-    // FrontEnd events are always single-date — delete immediately
-    FRONT_END_EVENTS = FRONT_END_EVENTS.filter(f=>f.id!==id);
-    _syncFrontEndToInfoEvents();
-    renderTermView();
-    const payload = { type:'event_write', action:'delete', event:{ id } };
-    fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
+    const feEv = FRONT_END_EVENTS.find(f=>f.id===id);
+    const seriesId = feEv?.seriesId;
+    const seriesEvents = seriesId ? FRONT_END_EVENTS.filter(f=>f.seriesId===seriesId) : [];
+    if (seriesEvents.length > 1) {
+      // Show choice menu for series
+      const menu = document.getElementById('deleteChoiceMenu');
+      document.getElementById('dcmThisDate').textContent = 'Just this date';
+      document.getElementById('dcmAllDates').textContent  = `Whole series (${seriesEvents.length} events)`;
+      document.getElementById('dcmThisDate').onclick = ev2 => { ev2.stopPropagation(); closeDeleteMenu(); _deleteFESingle(id); };
+      document.getElementById('dcmAllDates').onclick  = ev2 => { ev2.stopPropagation(); closeDeleteMenu(); _deleteFESeries(seriesId); };
+      const rect = e && e.target ? e.target.getBoundingClientRect() : { right: window.innerWidth/2, top: window.innerHeight/2 };
+      menu.style.left = Math.min(rect.right + 4, window.innerWidth - 200) + 'px';
+      menu.style.top  = Math.min(rect.top,       window.innerHeight - 150) + 'px';
+      menu.style.display = 'block';
+      setTimeout(() => document.addEventListener('click', closeDeleteMenu, { once:true }), 0);
+      return;
+    }
+    _deleteFESingle(id);
     return;
   }
 
@@ -2395,6 +2475,23 @@ function _deleteSheetEventAll(id) {
     fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
   }
   renderTermView();
+}
+
+function _deleteFESingle(id) {
+  FRONT_END_EVENTS = FRONT_END_EVENTS.filter(f=>f.id!==id);
+  _syncFrontEndToInfoEvents();
+  renderTermView();
+  fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify({type:'event_write',action:'delete',event:{id}})), {mode:'no-cors'}).catch(()=>{});
+}
+
+function _deleteFESeries(seriesId) {
+  const toDelete = FRONT_END_EVENTS.filter(f=>f.seriesId===seriesId);
+  FRONT_END_EVENTS = FRONT_END_EVENTS.filter(f=>f.seriesId!==seriesId);
+  _syncFrontEndToInfoEvents();
+  renderTermView();
+  toDelete.forEach(ev => {
+    fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify({type:'event_write',action:'delete',event:{id:ev.id}})), {mode:'no-cors'}).catch(()=>{});
+  });
 }
 
 function _syncFrontEndToInfoEvents() {
