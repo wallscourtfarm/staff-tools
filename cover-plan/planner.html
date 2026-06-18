@@ -350,6 +350,11 @@
     .tp-cancel:hover { background:#f8fafc; }
     .tp-delete { padding:7px 10px; background:white; border:1px solid #fecaca; border-radius:4px; cursor:pointer; font-size:12px; color:#dc2626; }
     .tp-delete:hover { background:#fef2f2; }
+    .tp-days { display:flex; gap:4px; margin-top:4px; }
+    .tp-day-btn { width:30px; height:26px; border-radius:4px; border:1.5px solid #e2e8f0; background:white; color:#64748b; font-size:11px; font-weight:700; cursor:pointer; font-family:Nunito,sans-serif; transition:all .1s; }
+    .tp-day-btn.active { background:#1798d3; border-color:#1798d3; color:white; }
+    .tp-weeks-row { display:none; margin-top:6px; align-items:center; gap:5px; font-size:12px; color:#475569; }
+    .tp-weeks-row input { width:44px; padding:3px 5px; border:1.5px solid #e2e8f0; border-radius:4px; font-size:12px; }
 
     /* Locked state — disable interactive elements */
     body.edit-locked .teacher-chip { cursor:default; pointer-events:none; }
@@ -378,7 +383,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(18.06.26b)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(18.06.26c)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -2263,16 +2268,12 @@ function _showTermPopup({ mode, date, id, label, colour, session, notes }, trigg
     <label class="tp-label">Notes (optional)</label>
     <input id="tp-notes" type="text" placeholder="Any extra detail" value="${(notes||'').replace(/"/g,'&quot;')}">
     ${mode==='add'?`
-    <label class="tp-label">Repeat</label>
-    <select id="tp-repeat" onchange="onRepeatChange()">
-      <option value="none">No repeat</option>
-      <option value="daily">Every weekday</option>
-      <option value="alt">Every other weekday</option>
-      <option value="weekly">Same day each week</option>
-    </select>
-    <div id="tp-repeat-row" style="display:none;margin-top:5px;gap:5px;align-items:center;font-size:12px;color:#475569">
-      for <input id="tp-repeat-n" type="number" min="2" max="52" value="5" style="width:48px;padding:3px 5px;border:1.5px solid #e2e8f0;border-radius:4px;font-size:12px">
-      <span id="tp-repeat-unit">times</span>
+    <label class="tp-label">Repeat on days</label>
+    <div class="tp-days">
+      ${['M','T','W','T','F'].map((d,i)=>`<button type="button" class="tp-day-btn" data-di="${i}" onclick="toggleRepeatDay(${i})">${d}</button>`).join('')}
+    </div>
+    <div class="tp-weeks-row" id="tp-weeks-row">
+      for <input id="tp-weeks-n" type="number" min="1" max="52" value="2"> weeks
     </div>`:''}
     <div class="term-popup-btns">
       <button class="tp-cancel" onclick="_closeTermPopup()">Cancel</button>
@@ -2287,6 +2288,13 @@ function _showTermPopup({ mode, date, id, label, colour, session, notes }, trigg
   el.style.left = x + 'px';
   el.style.top = y + 'px';
   document.getElementById('tp-label').focus();
+  if (mode === 'add') {
+    // Pre-select the weekday of the start date (Mon=0 … Fri=4)
+    const startDay = new Date(date + 'T00:00:00').getDay(); // 0=Sun,1=Mon…
+    const di = startDay === 0 ? 4 : startDay - 1; // Sun→Fri(4), Mon→0, Tue→1…
+    const btn = document.querySelector(`.tp-day-btn[data-di="${di}"]`);
+    if (btn) btn.classList.add('active');
+  }
   setTimeout(() => document.addEventListener('click', _closeTermPopup, { once:true }), 0);
 }
 
@@ -2299,15 +2307,13 @@ function _closeTermPopup() {
   if (_tpEl) { _tpEl.remove(); _tpEl = null; }
 }
 
-function onRepeatChange() {
-  const v = document.getElementById('tp-repeat').value;
-  const row = document.getElementById('tp-repeat-row');
-  if (v === 'none') { row.style.display = 'none'; return; }
-  row.style.display = 'flex';
-  const unit = document.getElementById('tp-repeat-unit');
-  const n = document.getElementById('tp-repeat-n');
-  if (v === 'weekly') { unit.textContent = 'weeks'; n.value = 4; }
-  else { unit.textContent = 'times'; n.value = 5; }
+function toggleRepeatDay(di) {
+  const btn = document.querySelector(`.tp-day-btn[data-di="${di}"]`);
+  if (!btn) return;
+  btn.classList.toggle('active');
+  const anyActive = document.querySelectorAll('.tp-day-btn.active').length > 0;
+  const row = document.getElementById('tp-weeks-row');
+  if (row) row.style.display = anyActive ? 'flex' : 'none';
 }
 
 function saveTermEvent(mode, date, id) {
@@ -2316,15 +2322,15 @@ function saveTermEvent(mode, date, id) {
   const notes = (document.getElementById('tp-notes').value||'').trim();
   const colour = _tpColour;
 
-  let repeat = 'none', repeatN = 1;
+  let selectedDays = [], repeatWeeks = 1;
   if (mode === 'add') {
-    repeat = document.getElementById('tp-repeat')?.value || 'none';
-    repeatN = Math.max(1, parseInt(document.getElementById('tp-repeat-n')?.value||'1', 10) || 1);
+    document.querySelectorAll('.tp-day-btn.active').forEach(b => selectedDays.push(parseInt(b.dataset.di)));
+    repeatWeeks = Math.max(1, parseInt(document.getElementById('tp-weeks-n')?.value||'1', 10) || 1);
   }
   _closeTermPopup();
 
   if (mode === 'add') {
-    const dates = _generateRepeatDates(date, repeat, repeatN);
+    const dates = _generateRepeatDates(date, selectedDays, repeatWeeks);
     const seriesId = dates.length > 1 ? ('series_' + Date.now()) : null;
     dates.forEach((d, i) => {
       const evId = 'fe_' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + i;
@@ -2347,37 +2353,29 @@ function saveTermEvent(mode, date, id) {
   renderTermView();
 }
 
-function _generateRepeatDates(startDate, repeat, n) {
-  if (repeat === 'none' || n <= 1) return [startDate];
-  const dates = [];
-  const cur = new Date(startDate + 'T00:00:00');
+function _generateRepeatDates(startDate, selectedDays, weeks) {
+  // selectedDays: array of 0–4 (Mon–Fri); weeks: how many weeks to cover
+  if (!selectedDays.length) return [startDate];
+  if (selectedDays.length === 1 && weeks === 1) return [startDate];
 
-  if (repeat === 'weekly') {
-    for (let i = 0; i < n; i++) {
-      const dk = dateKey(cur);
-      if (!EVENTS[dk]) dates.push(dk);
-      cur.setDate(cur.getDate() + 7);
-    }
-    return dates;
-  }
+  const dates = new Set();
+  const start = new Date(startDate + 'T00:00:00');
+  // Find the Monday of the week containing startDate
+  const dow = start.getDay(); // 0=Sun,1=Mon…6=Sat
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(start);
+  monday.setDate(monday.getDate() + mondayOffset);
 
-  // daily or alt: advance day by day, skip weekends and blocked dates
-  let weekdayIdx = 0;
-  const limit = n * 14 + 60; // safety cap on iterations
-  for (let iter = 0; iter < limit && dates.length < n; iter++) {
-    const day = cur.getDay();
-    const dk = dateKey(cur);
-    if (day !== 0 && day !== 6 && !EVENTS[dk]) {
-      if (repeat === 'daily') {
-        dates.push(dk);
-      } else { // alt: take every other weekday
-        if (weekdayIdx % 2 === 0) dates.push(dk);
-        weekdayIdx++;
-      }
-    }
-    cur.setDate(cur.getDate() + 1);
+  for (let w = 0; w < weeks; w++) {
+    selectedDays.forEach(di => { // di 0=Mon…4=Fri
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + w * 7 + di);
+      if (d < start) return; // don't go before the clicked date
+      const dk = dateKey(d);
+      if (!EVENTS[dk]) dates.add(dk);
+    });
   }
-  return dates;
+  return [...dates].sort();
 }
 
 function _eventDateKeys(id) {
