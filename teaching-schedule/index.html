@@ -441,7 +441,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 19.06.26b</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 19.06.26c</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -2534,13 +2534,16 @@ function onResizePointerDown(e) {
 function onResizePointerMove(e) {
   if (!resize) return;
   const dy = e.clientY - resize.startY;
-  const newDur = Math.max(1, Math.round((resize.startDur * 32 + dy) / 32));
-  resize.item.duration = newDur;
-  resize.chipEl.style.minHeight = Math.max(32, newDur * 32) + 'px';
-  // Also update durationMins (1 min ≈ 2px of chip height) so timing stays in sync
   if (resize.startDurMins != null) {
-    const newDurMins = Math.max(5, Math.round((resize.startDurMins * 2 + dy) / 5) * 5);
+    // Time-based resize: 1 min = 2px, snap to 5-min steps
+    const newDurMins = Math.max(5, Math.round((resize.startDurMins + dy / 2) / 5) * 5);
     resize.item.durationMins = newDurMins;
+    resize.chipEl.style.minHeight = Math.max(40, newDurMins * 2) + 'px';
+  } else {
+    // Visual-only resize (no timing set)
+    const newDur = Math.max(1, Math.round((resize.startDur * 32 + dy) / 32));
+    resize.item.duration = newDur;
+    resize.chipEl.style.minHeight = Math.max(32, newDur * 32) + 'px';
   }
 }
 
