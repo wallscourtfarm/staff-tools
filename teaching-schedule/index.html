@@ -441,7 +441,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 19.06.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 19.06.26b</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -2512,7 +2512,7 @@ function onNoteBlur(e) {
 }
 
 // ── Resize chip height ──────────────────────────────────────────────────────
-let resize = null; // { chipEl, startY, startDur, item }
+let resize = null; // { chipEl, startY, startDur, startDurMins, item, slot, session }
 
 function onResizePointerDown(e) {
   if (e.button !== undefined && e.button !== 0) return;
@@ -2524,7 +2524,7 @@ function onResizePointerDown(e) {
   const slot = getSlot(wk, view, day, session);
   const item = slot[Number(idx)];
   if (!item) return;
-  resize = { chipEl, startY: e.clientY, startDur: item.duration || 1, item };
+  resize = { chipEl, startY: e.clientY, startDur: item.duration || 1, startDurMins: item.durationMins ?? null, item, slot, session };
   handle.setPointerCapture(e.pointerId);
   handle.addEventListener('pointermove', onResizePointerMove);
   handle.addEventListener('pointerup', onResizePointerUp);
@@ -2537,6 +2537,11 @@ function onResizePointerMove(e) {
   const newDur = Math.max(1, Math.round((resize.startDur * 32 + dy) / 32));
   resize.item.duration = newDur;
   resize.chipEl.style.minHeight = Math.max(32, newDur * 32) + 'px';
+  // Also update durationMins (1 min ≈ 2px of chip height) so timing stays in sync
+  if (resize.startDurMins != null) {
+    const newDurMins = Math.max(5, Math.round((resize.startDurMins * 2 + dy) / 5) * 5);
+    resize.item.durationMins = newDurMins;
+  }
 }
 
 function onResizePointerUp(e) {
@@ -2545,6 +2550,9 @@ function onResizePointerUp(e) {
   handle.removeEventListener('pointermove', onResizePointerMove);
   handle.removeEventListener('pointerup', onResizePointerUp);
   handle.removeEventListener('pointercancel', onResizePointerUp);
+  if (resize.item.durationMins != null) {
+    cascadeSessionTimes(resize.slot, resize.session);
+  }
   persistLocal(); syncSave();
   resize = null;
 }
@@ -2670,8 +2678,9 @@ function onDragEnd(e) {
       if (drag.colourable) newItem.colourable = true;
       if (drag.colourOnly) newItem.colourOnly = true;
       slot.splice(insertAt, 0, newItem);
-      // Auto-time the new item based on slot position
+      // Auto-time the new item based on slot position, then cascade items below
       autoTimeNewItem(slot, insertAt, session);
+      cascadeSessionTimes(slot, session);
     }
     persistLocal(); syncSave();
   }
