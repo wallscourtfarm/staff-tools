@@ -441,7 +441,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 07.06.26e</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 19.06.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -2322,6 +2322,73 @@ function onChipNameBlur(input) {
   persistLocal(); syncSave();
 }
 
+// ── Auto-time helpers ─────────────────────────────────────────────────────────
+
+function getSessionStartMins(sessionId) {
+  const row = ROWS.find(r => r.id === sessionId);
+  if (row && row.time) {
+    const start = row.time.split('-')[0].trim();
+    return HHMMtoMins(start);
+  }
+  return HHMMtoMins('09:00');
+}
+
+// When a new lesson is dragged from the sidebar into a session, give it a time
+// automatically: start = end of the previous timed item (or session start),
+// duration = 30 min (unless there's already a timed item below, in which case
+// fit between prev end and that item's start, minimum 15 min).
+function autoTimeNewItem(slot, insertAt, sessionId) {
+  const item = slot[insertAt];
+  if (!item || item.startMins != null) return; // already timed
+
+  // Find the timed item directly above in the slot
+  let prevEnd = null;
+  for (let i = insertAt - 1; i >= 0; i--) {
+    const above = slot[i];
+    if (above && above.startMins != null && above.durationMins != null) {
+      prevEnd = above.startMins + above.durationMins;
+      break;
+    }
+  }
+  if (prevEnd === null) prevEnd = getSessionStartMins(sessionId);
+
+  // Find the timed item directly below
+  let nextStart = null;
+  for (let i = insertAt + 1; i < slot.length; i++) {
+    const below = slot[i];
+    if (below && below.startMins != null) { nextStart = below.startMins; break; }
+  }
+
+  const defaultDur = 30;
+  const dur = (nextStart != null && nextStart - prevEnd >= 15)
+    ? Math.min(defaultDur, nextStart - prevEnd)
+    : defaultDur;
+
+  item.startMins = prevEnd;
+  item.durationMins = dur;
+}
+
+// After any reorder within a session, walk through all timed items in slot
+// order and chain each one so it starts where the previous one ends.
+// Items without timing are left alone (they act as "spacers" with no time).
+function cascadeSessionTimes(slot, sessionId) {
+  // Only cascade if at least two items have timing
+  const timedItems = slot.filter(it => it.startMins != null && it.durationMins != null);
+  if (timedItems.length < 2) return;
+
+  // The anchor is the first timed item — keep its startMins, shift the rest
+  let cursor = null;
+  for (const item of slot) {
+    if (item.startMins == null || item.durationMins == null) continue;
+    if (cursor === null) {
+      cursor = item.startMins + item.durationMins; // anchor: keep as-is
+    } else {
+      item.startMins = cursor;
+      cursor = item.startMins + item.durationMins;
+    }
+  }
+}
+
 function clearChipTime(btn) {
   const { wk, view, day, session, idx } = btn.dataset;
   const slot = getSlot(wk, view, day, session);
@@ -2593,12 +2660,18 @@ function onDragEnd(e) {
       if (srcSlot === slot && sd.idx < insertAt) insertAt--;
       if (insertAt < 0) insertAt = slot.length;
       slot.splice(insertAt, 0, drag.sourceData.item);
+      // Cascade times if the item has timing or the slot already has timed items
+      cascadeSessionTimes(slot, session);
+      // Also cascade the source slot if it's different
+      if (srcSlot !== slot) cascadeSessionTimes(srcSlot, sd.session);
     } else {
       const insertAt = insertIdx < 0 ? slot.length : Math.min(insertIdx, slot.length);
       const newItem = { subject: drag.colourOnly ? 'Other' : drag.subject, note: '', duration: 1 };
       if (drag.colourable) newItem.colourable = true;
       if (drag.colourOnly) newItem.colourOnly = true;
       slot.splice(insertAt, 0, newItem);
+      // Auto-time the new item based on slot position
+      autoTimeNewItem(slot, insertAt, session);
     }
     persistLocal(); syncSave();
   }
