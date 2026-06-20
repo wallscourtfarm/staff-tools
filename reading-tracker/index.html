@@ -420,7 +420,7 @@ thead th.nc{text-align:left;padding-left:11px;}
         &nbsp;· Tap any cell to edit
       </div>
     </div>
-    <div class="vf">WFA-20.06.26y</div>
+    <div class="vf">WFA-20.06.26z</div>
   </div>
 </div>
 
@@ -664,7 +664,16 @@ function renderChild(){
   document.getElementById('tr-name-disp').textContent=`${trName} ${trVerb} reading…`;
   const trI=getTr(yr,c);
   const tEl=document.getElementById('tr-items');
-  tEl.innerHTML=!trI.length?'<div class="tr-empty">Nothing added yet</div>':trI.map(it=>`<div class="tr-item"><div class="tr-cover">${it.img?`<img src="${it.img}" alt="">`:(TE[it.type]||'📌')}</div><div class="tr-info"><div class="tr-type">${esc(it.type)}</div><div class="tr-title">${esc(it.title)}</div>${it.sub?`<div class="tr-sub">${esc(it.sub)}</div>`:''}</div></div>`).join('');
+  if(!trI.length){tEl.innerHTML='<div class="tr-empty">Nothing added yet</div>';}else{
+    // Group by type, preserving order of first appearance
+    const typeOrder=[],groups={};
+    trI.forEach(it=>{if(!groups[it.type]){groups[it.type]=[];typeOrder.push(it.type);}groups[it.type].push(it);});
+    tEl.innerHTML=typeOrder.map(type=>{
+      const items=groups[type];
+      const coverSize=items.length>1?'44px':'58px';
+      return`<div class="tr-item"><div style="display:flex;gap:8px;flex-shrink:0;">${items.map(it=>`<div class="tr-cover" style="width:${coverSize};height:${coverSize};">${it.img?`<img src="${it.img}" alt="">`:(TE[it.type]||'📌')}</div>`).join('')}</div><div class="tr-info"><div class="tr-type">${esc(type)}</div>${items.map(it=>`<div class="tr-title" style="font-size:${items.length>1?'13px':'16px'};">${esc(it.title)}</div>`).join('')}</div></div>`;
+    }).join('');
+  }
 
   // Live stats
   const wkTot=classWeekTotal(yr,c,t,w-1);
