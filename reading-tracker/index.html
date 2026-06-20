@@ -420,7 +420,7 @@ thead th.nc{text-align:left;padding-left:11px;}
         &nbsp;· Tap any cell to edit
       </div>
     </div>
-    <div class="vf">WFA-20.06.26q</div>
+    <div class="vf">WFA-20.06.26r</div>
   </div>
 </div>
 
@@ -577,7 +577,9 @@ const getPin=()=>load('rt:pin',PIN_DEF);
 const getTr=(yr,c)=>load(`rt:tr:${yr}:${c}`,[]);
 const setTr=(yr,c,items)=>store(`rt:tr:${yr}:${c}`,items);
 const getTrName=(yr,c)=>load(`rt:trname:${yr}:${c}`,'Your teacher');
-const getTrophies=()=>load('rt:trophies',[]);
+const getManualTrophies=()=>load('rt:trophies:manual',[]);
+const setManualTrophies=v=>store('rt:trophies:manual',v);
+const getTrophies=()=>load('rt:trophies',[]);  // auto-calculated cache for child view
 const setTrophies=v=>store('rt:trophies',v);
 const setTrName=(yr,c,n)=>store(`rt:trname:${yr}:${c}`,n);
 const getTermDates=()=>load('rt:termdates',{});
@@ -855,18 +857,18 @@ function renderDashboard(){
   }).join('');
   // Trophy cabinet — auto-calculated: winner = year group with most reads that term
   // Manual overrides (stored trophies) take precedence if set for that term
-  const manualTrophies=getTrophies();
+  const manualTrophies=getManualTrophies();
   const autoTrophies=TERMS.map(t=>{
     // Check if any reads exist for this term at all
     const totals=YEARS.map(y=>({y,v:yearGroupTermTotal(y,t)}));
     const maxV=Math.max(...totals.map(x=>x.v));
     if(maxV===0)return null; // no data yet for this term
-    // Manual override wins if set
+    // Manual override wins if set for this term
     const manual=manualTrophies.find(m=>m.term===t);
     if(manual)return{term:t,yr:manual.yr,auto:false};
     return{term:t,yr:totals.sort((a,b)=>b.v-a.v)[0].y,auto:true};
   }).filter(Boolean);
-  // Persist auto results so child view can show them
+  // Cache results for child view (auto-calculated, not the manual store)
   setTrophies(autoTrophies.map(x=>({term:x.term,yr:x.yr})));
   const troEl=document.getElementById('dash-trophy');
   if(autoTrophies.length===0){
@@ -1126,24 +1128,24 @@ document.getElementById('csv-import-btn').addEventListener('click',()=>{
 
 // ── TROPHY CABINET ─────────────────────────────────────────
 function renderTrophyList(){
-  const trophies=getTrophies();
+  const trophies=getManualTrophies();
   const el=document.getElementById('tro-list');
-  if(!trophies.length){el.innerHTML='<div class="trophy-empty" style="padding:10px 0;">No winners yet.</div>';return;}
+  if(!trophies.length){el.innerHTML='<div class="trophy-empty" style="padding:10px 0;">No manual overrides set — auto-calculation is active for all terms.</div>';return;}
   el.innerHTML='<div class="tro-grid">'+trophies.map((t,i)=>{
     const col=YC[t.yr]||'#1798d3';
     return`<div class="tro-item" style="border-color:${col};"><span style="color:${col};font-weight:900;">${t.yr}</span><span style="color:var(--muted);">${t.term.replace('Term ','T')}</span><button class="tro-del" data-i="${i}" onclick="deleteTrophy(${i})">×</button></div>`;
   }).join('')+'</div>';
 }
-function deleteTrophy(i){const t=getTrophies();t.splice(i,1);setTrophies(t);renderTrophyList();}
+function deleteTrophy(i){const t=getManualTrophies();t.splice(i,1);setManualTrophies(t);renderTrophyList();}
 document.getElementById('sv-trophy-btn').addEventListener('click',()=>{renderTrophyList();document.getElementById('tro-mo').classList.add('open');});
 document.getElementById('tro-mo').addEventListener('click',e=>{if(e.target===e.currentTarget)document.getElementById('tro-mo').classList.remove('open');});
 document.getElementById('tro-add').addEventListener('click',()=>{
   const yr=document.getElementById('tro-yr-sel').value;
   const term=document.getElementById('tro-trm-sel').value;
-  const t=getTrophies();
+  const t=getManualTrophies();
   if(t.find(x=>x.yr===yr&&x.term===term))return;
   t.push({yr,term});t.sort((a,b)=>TERMS.indexOf(a.term)-TERMS.indexOf(b.term));
-  setTrophies(t);renderTrophyList();
+  setManualTrophies(t);renderTrophyList();
 });
 
 // ── KEYBOARD ───────────────────────────────────────────────
