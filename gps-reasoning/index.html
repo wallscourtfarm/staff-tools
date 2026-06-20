@@ -58,13 +58,6 @@
     /* Loading */
     .wfa-loading { color: #1798d3; font-weight: 700; font-size: 0.9rem; }
 
-    /* API key panel */
-    .api-key-panel { background: #f0f8ff; border: 1.5px solid #c7e3f5; border-radius: 10px;
-      padding: 14px 18px; margin-bottom: 16px; }
-    .api-key-toggle { font-size: 0.8rem; color: #1798d3; background: transparent;
-      border: none; cursor: pointer; font-family: 'Nunito', sans-serif; font-weight: 700;
-      padding: 0; text-align: right; display: block; margin-left: auto; }
-
     @media print {
       .no-print { display: none !important; }
       body { background: white; }
@@ -78,38 +71,15 @@
   <script type="text/babel">
     const { useState, useCallback } = React;
 
-    // Model fallback chain — tries each in order if a model is deprecated/unavailable
-    const CLAUDE_MODELS = [
-      "claude-sonnet-4-6",
-      "claude-sonnet-4-5",
-      "claude-3-5-sonnet-20241022",
-    ];
-
-    async function claudeFetch(apiKey, body) {
-      let lastError;
-      for (const model of CLAUDE_MODELS) {
-        const resp = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-            "anthropic-dangerous-direct-browser-access": "true"
-          },
-          body: JSON.stringify({ ...body, model })
-        });
-        if (!resp.ok) {
-          const errData = await resp.json().catch(() => ({}));
-          const msg = errData?.error?.message || "";
-          if (resp.status === 404 || msg.toLowerCase().includes("model")) {
-            lastError = new Error(msg || `Model ${model} unavailable`);
-            continue; // try next model
-          }
-          throw new Error(msg || `API error ${resp.status}`);
-        }
-        return resp;
-      }
-      throw lastError || new Error("No available Claude model found");
+    async function claudeFetch(body) {
+      const resp = await fetch("https://app.wallscourt-farm-academy.co.uk/api/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || "API error");
+      return data.text;
     }
 
     // ── GPS topic categories ──────────────────────────────────────────────────
@@ -542,49 +512,6 @@ RULES:
       );
     }
 
-    // ── API Key Panel ─────────────────────────────────────────────────────────
-
-    function ApiKeyPanel({ apiKey, onSave }) {
-      const [draft, setDraft] = useState(apiKey);
-      const [open, setOpen] = useState(!apiKey);
-
-      const save = () => {
-        const trimmed = draft.trim();
-        localStorage.setItem("sats_api_key", trimmed);
-        onSave(trimmed);
-        setOpen(false);
-      };
-
-      if (!open) {
-        return (
-          <button className="api-key-toggle" onClick={() => setOpen(true)}>
-            {apiKey ? "API key saved ✓ — change" : "Set API key"}
-          </button>
-        );
-      }
-
-      return (
-        <div className="api-key-panel">
-          <p style={{ margin: "0 0 8px 0", fontSize: "0.88rem", color: "#555" }}>
-            Enter your Anthropic API key. Stored only in your browser's local storage.
-          </p>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input type="password" value={draft}
-              onChange={e => setDraft(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && save()}
-              placeholder="sk-ant-…"
-              className="wfa-input"
-              style={{ flex: 1 }}
-            />
-            <button onClick={save} className="btn-primary" style={{ padding: "8px 18px" }}>Save</button>
-            {apiKey && (
-              <button onClick={() => setOpen(false)} className="btn-secondary" style={{ padding: "8px 14px" }}>Cancel</button>
-            )}
-          </div>
-        </div>
-      );
-    }
-
     // ── Main App ──────────────────────────────────────────────────────────────
 
     function App() {
@@ -598,7 +525,6 @@ RULES:
       const [loading, setLoading] = useState(false);
       const [error, setError]   = useState("");
       const [showMS, setShowMS] = useState(false);
-      const [apiKey, setApiKey] = useState(() => localStorage.getItem("sats_api_key") || "");
 
       const toggleCat = useCallback((k) => {
         setSelectedCats(prev => ({ ...prev, [k]: !prev[k] }));
@@ -608,9 +534,6 @@ RULES:
       const selectNone = useCallback(() => setSelectedCats(allKeys.reduce((a,k)=>({...a,[k]:false}),{})), []);
 
       const generate = useCallback(async () => {
-        const key = localStorage.getItem("sats_api_key") || "";
-        if (!key) { setError("Please enter your Anthropic API key first."); return; }
-
         const active = Object.entries(selectedCats).filter(([, v]) => v).map(([k]) => k);
         if (active.length === 0) { setError("Please select at least one GPS topic."); return; }
 
@@ -624,7 +547,7 @@ RULES:
         setShowMS(false);
 
         try {
-          const resp = await claudeFetch(key, {
+          const raw = await claudeFetch({
             max_tokens: 4000,
             system: SYSTEM_PROMPT,
             messages: [{
@@ -632,9 +555,6 @@ RULES:
               content: `Generate ${count} KS2 SATs GPS questions covering these topics:\n${topicDetails}\n\nSpread questions across the selected topics. Vary question types — do not repeat the same type more than twice. Return ONLY the JSON array.`
             }]
           });
-
-          const data = await resp.json();
-          const raw  = (data.content || []).find(b => b.type === "text")?.text || "";
           const clean = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
           setQs(JSON.parse(clean));
         } catch (e) {
@@ -645,7 +565,7 @@ RULES:
       }, [count, selectedCats]);
 
       const activeCatCount = Object.values(selectedCats).filter(Boolean).length;
-      const canGenerate = activeCatCount > 0 && !!apiKey && !loading;
+      const canGenerate = activeCatCount > 0 && !loading;
 
       return (
         <div style={{ minHeight: "100vh" }}>
@@ -664,8 +584,6 @@ RULES:
               <p style={{ fontSize: "0.88rem", color: "#666", margin: "0 0 16px 0" }}>
                 Generates SATs-style GPS Paper 1 questions. Select topics and click Generate.
               </p>
-
-              <ApiKeyPanel apiKey={apiKey} onSave={setApiKey} />
 
               {/* Topic selector */}
               <div style={{ marginBottom: 18 }}>
@@ -762,6 +680,6 @@ RULES:
     const root = ReactDOM.createRoot(document.getElementById("root"));
     root.render(<App />);
   </script>
-  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">20.06.26b</div>
+  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">20.06.26c</div>
 </body>
 </html>
