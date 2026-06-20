@@ -23,6 +23,40 @@
   <script type="text/babel">
     const { useState, useCallback, useRef, useEffect } = React;
 
+    // Model fallback chain — tries each in order if a model is deprecated/unavailable
+    const CLAUDE_MODELS = [
+      "claude-sonnet-4-6",
+      "claude-sonnet-4-5",
+      "claude-3-5-sonnet-20241022",
+    ];
+
+    async function claudeFetch(apiKey, body) {
+      let lastError;
+      for (const model of CLAUDE_MODELS) {
+        const resp = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true"
+          },
+          body: JSON.stringify({ ...body, model })
+        });
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          const msg = errData?.error?.message || "";
+          if (resp.status === 404 || msg.toLowerCase().includes("model")) {
+            lastError = new Error(msg || `Model ${model} unavailable`);
+            continue;
+          }
+          throw new Error(msg || `API error ${resp.status}`);
+        }
+        return resp;
+      }
+      throw lastError || new Error("No available Claude model found");
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     const SYSTEM_PROMPT = `You are an expert KS2 mathematics question writer. Generate SATs-style reasoning questions that look and feel exactly like genuine KS2 SATs papers (Papers 2 and 3).
@@ -491,29 +525,14 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
         setShowMS(false);
 
         try {
-          const resp = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": key,
-              "anthropic-version": "2023-06-01",
-              "anthropic-dangerous-direct-browser-access": "true"
-            },
-            body: JSON.stringify({
-              model: "claude-sonnet-4-6",
-              max_tokens: 4000,
-              system: SYSTEM_PROMPT,
-              messages: [{
-                role: "user",
-                content: `Generate ${count} KS2 SATs-style reasoning questions for ${CURRICULUM[yearGroup]?.label} on the topic: "${t}". ${diffNote}\n\n${curriculumNote}\n\nReturn ONLY the JSON array.`
-              }]
-            })
+          const resp = await claudeFetch(key, {
+            max_tokens: 4000,
+            system: SYSTEM_PROMPT,
+            messages: [{
+              role: "user",
+              content: `Generate ${count} KS2 SATs-style reasoning questions for ${CURRICULUM[yearGroup]?.label} on the topic: "${t}". ${diffNote}\n\n${curriculumNote}\n\nReturn ONLY the JSON array.`
+            }]
           });
-
-          if (!resp.ok) {
-            const errData = await resp.json().catch(()=>({}));
-            throw new Error(errData?.error?.message || `API error ${resp.status}`);
-          }
 
           const data = await resp.json();
           const raw = (data.content||[]).find(b=>b.type==="text")?.text || "";
@@ -661,6 +680,6 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
 
     ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
   </script>
-  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">20.06.26a</div>
+  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">20.06.26b</div>
 </body>
 </html>
