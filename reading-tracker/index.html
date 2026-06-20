@@ -420,7 +420,7 @@ thead th.nc{text-align:left;padding-left:11px;}
         &nbsp;· Tap any cell to edit
       </div>
     </div>
-    <div class="vf">WFA-20.06.26x</div>
+    <div class="vf">WFA-20.06.26y</div>
   </div>
 </div>
 
@@ -866,11 +866,10 @@ function renderDashboard(){
   // Manual overrides (stored trophies) take precedence if set for that term
   const manualTrophies=getManualTrophies();
   const autoTrophies=TERMS.map(t=>{
-    // Check if any reads exist for this term at all
+    if(t===S.term)return null; // current term not yet complete
     const totals=YEARS.map(y=>({y,v:yearGroupTermTotal(y,t)}));
     const maxV=Math.max(...totals.map(x=>x.v));
     if(maxV===0)return null; // no data yet for this term
-    // Manual override wins if set for this term
     const manual=manualTrophies.find(m=>m.term===t);
     if(manual)return{term:t,yr:manual.yr,auto:false};
     return{term:t,yr:totals.sort((a,b)=>b.v-a.v)[0].y,auto:true};
