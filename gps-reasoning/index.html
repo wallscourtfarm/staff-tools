@@ -4,13 +4,67 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KS2 SATs GPS — Question Generator</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23e67e22'/%3E%3Crect x='6' y='8' width='20' height='16' rx='2' fill='white'/%3E%3Crect x='8' y='4' width='16' height='4' rx='1' fill='%23d35400'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231798d3'/%3E%3Crect x='6' y='8' width='20' height='16' rx='2' fill='white'/%3E%3Crect x='8' y='4' width='16' height='4' rx='1' fill='%230d7ab8'/%3E%3C/svg%3E">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone@7.27.6/babel.min.js"></script>
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; background: #f0f0f0; font-family: Arial, sans-serif; }
+    body { margin: 0; padding: 0; background: #f4f6f8; font-family: 'Nunito', sans-serif; }
+
+    /* WFA Header */
+    .wfa-header { background: linear-gradient(135deg, #1798d3 0%, #0d7ab8 100%); color: white;
+      padding: 0 24px; display: flex; align-items: center; gap: 14px; height: 58px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    .wfa-logo { height: 40px; background: white; border-radius: 8px; padding: 3px 8px; }
+    .wfa-title { font-weight: 900; font-size: 1.1rem; flex: 1; }
+    .wfa-back { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.85rem;
+      font-weight: 700; padding: 6px 12px; border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.4); }
+    .wfa-back:hover { background: rgba(255,255,255,0.15); color: white; }
+
+    /* Controls card */
+    .wfa-card { background: white; border-radius: 14px; padding: 20px 24px;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.07); margin-bottom: 16px; }
+
+    /* Buttons */
+    .btn-primary { background: #1798d3; color: white; border: none; border-radius: 8px;
+      padding: 10px 22px; font-size: 0.9rem; font-weight: 800; cursor: pointer;
+      font-family: 'Nunito', sans-serif; }
+    .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
+    .btn-secondary { background: white; color: #1798d3; border: 1.5px solid #1798d3;
+      border-radius: 8px; padding: 10px 22px; font-size: 0.9rem; font-weight: 700;
+      cursor: pointer; font-family: 'Nunito', sans-serif; }
+
+    /* Inputs */
+    .wfa-input { border: 1.5px solid #ddd; border-radius: 8px; padding: 8px 12px;
+      font-family: 'Nunito', sans-serif; font-size: 0.9rem; }
+    .wfa-input:focus { border-color: #1798d3; outline: none; }
+    .wfa-label { font-weight: 800; font-size: 0.88rem; margin-bottom: 6px; display: block; color: #333; }
+
+    /* Topic pills */
+    .topic-pill { display: flex; align-items: center; gap: 6px; cursor: pointer;
+      border-radius: 8px; padding: 6px 12px; font-size: 0.88rem; font-weight: 700;
+      font-family: 'Nunito', sans-serif; border: 1.5px solid; transition: all 0.15s; }
+    .topic-pill.active { background: #1798d3; color: white; border-color: #1798d3; }
+    .topic-pill.inactive { background: #eee; color: #555; border-color: #ddd; }
+    .topic-pill input[type="checkbox"] { display: none; }
+
+    /* Error */
+    .wfa-error { background: #fde8e8; color: #9b1c1c; padding: 10px 14px;
+      border-radius: 8px; font-size: 0.88rem; font-weight: 600; margin-top: 12px; }
+
+    /* Loading */
+    .wfa-loading { color: #1798d3; font-weight: 700; font-size: 0.9rem; }
+
+    /* API key panel */
+    .api-key-panel { background: #f0f8ff; border: 1.5px solid #c7e3f5; border-radius: 10px;
+      padding: 14px 18px; margin-bottom: 16px; }
+    .api-key-toggle { font-size: 0.8rem; color: #1798d3; background: transparent;
+      border: none; cursor: pointer; font-family: 'Nunito', sans-serif; font-weight: 700;
+      padding: 0; text-align: right; display: block; margin-left: auto; }
+
     @media print {
       .no-print { display: none !important; }
       body { background: white; }
@@ -503,20 +557,15 @@ RULES:
 
       if (!open) {
         return (
-          <div style={{ maxWidth: 820, margin: "0 auto 10px auto", textAlign: "right" }}>
-            <button onClick={() => setOpen(true)}
-              style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", background: "transparent",
-                border: "none", cursor: "pointer", padding: 0, fontFamily: "Arial" }}>
-              {apiKey ? "API key saved ✓ — change" : "Set API key"}
-            </button>
-          </div>
+          <button className="api-key-toggle" onClick={() => setOpen(true)}>
+            {apiKey ? "API key saved ✓ — change" : "Set API key"}
+          </button>
         );
       }
 
       return (
-        <div style={{ maxWidth: 820, margin: "0 auto 12px auto", background: "rgba(0,0,0,0.25)",
-          borderRadius: 4, padding: "14px 18px" }}>
-          <p style={{ margin: "0 0 8px 0", fontSize: 13, color: "rgba(255,255,255,0.9)", fontFamily: "Arial" }}>
+        <div className="api-key-panel">
+          <p style={{ margin: "0 0 8px 0", fontSize: "0.88rem", color: "#555" }}>
             Enter your Anthropic API key. Stored only in your browser's local storage.
           </p>
           <div style={{ display: "flex", gap: 8 }}>
@@ -524,21 +573,12 @@ RULES:
               onChange={e => setDraft(e.target.value)}
               onKeyDown={e => e.key === "Enter" && save()}
               placeholder="sk-ant-…"
-              style={{ flex: 1, padding: "7px 10px", fontSize: 14, fontFamily: "Arial",
-                border: "none", borderRadius: 4 }}
+              className="wfa-input"
+              style={{ flex: 1 }}
             />
-            <button onClick={save}
-              style={{ padding: "7px 16px", fontSize: 13, fontWeight: "bold", background: "#e8a000",
-                color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontFamily: "Arial" }}>
-              Save
-            </button>
+            <button onClick={save} className="btn-primary" style={{ padding: "8px 18px" }}>Save</button>
             {apiKey && (
-              <button onClick={() => setOpen(false)}
-                style={{ padding: "7px 12px", fontSize: 13, background: "transparent",
-                  color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.3)",
-                  borderRadius: 4, cursor: "pointer", fontFamily: "Arial" }}>
-                Cancel
-              </button>
+              <button onClick={() => setOpen(false)} className="btn-secondary" style={{ padding: "8px 14px" }}>Cancel</button>
             )}
           </div>
         </div>
@@ -608,126 +648,113 @@ RULES:
       const canGenerate = activeCatCount > 0 && !!apiKey && !loading;
 
       return (
-        <div style={{ fontFamily: "Arial", background: "#f0f0f0", minHeight: "100vh", padding: "20px 16px" }}>
+        <div style={{ minHeight: "100vh" }}>
 
-          {/* ── Controls panel ── */}
-          <div className="no-print" style={{
-            maxWidth: 820, margin: "0 auto", background: "#1a1a8c",
-            borderRadius: 6, padding: "20px 24px 18px", color: "white"
-          }}>
-            <h1 style={{ fontSize: 19, fontWeight: "bold", margin: "0 0 3px 0" }}>
-              KS2 GPS — Grammar, Punctuation &amp; Spelling Question Generator
-            </h1>
-            <p style={{ fontSize: 13, opacity: 0.8, margin: "0 0 16px 0" }}>
-              Generates SATs-style GPS Paper 1 questions. Select topics and click Generate.
-            </p>
-
-            <ApiKeyPanel apiKey={apiKey} onSave={setApiKey} />
-
-            {/* Topic selector */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 8 }}>
-                <span style={{ fontSize: 12, opacity: 0.85, fontWeight: "bold" }}>GPS Topics</span>
-                <button onClick={selectAll}
-                  style={{ fontSize: 11, background: "none", border: "none", color: "rgba(255,255,255,0.6)",
-                    cursor: "pointer", padding: 0, fontFamily: "Arial" }}>
-                  Select all
-                </button>
-                <button onClick={selectNone}
-                  style={{ fontSize: 11, background: "none", border: "none", color: "rgba(255,255,255,0.6)",
-                    cursor: "pointer", padding: 0, fontFamily: "Arial" }}>
-                  Clear all
-                </button>
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {allKeys.map(k => (
-                  <label key={k} style={{
-                    display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
-                    background: selectedCats[k] ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.18)",
-                    borderRadius: 4, padding: "5px 11px", fontSize: 13, color: "white",
-                    border: selectedCats[k] ? "1px solid rgba(255,255,255,0.45)" : "1px solid rgba(255,255,255,0.12)",
-                  }}>
-                    <input type="checkbox" checked={selectedCats[k]} onChange={() => toggleCat(k)}
-                      style={{ width: 14, height: 14, accentColor: "#e8a000", cursor: "pointer" }} />
-                    {GPS_CATEGORIES[k].label}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Count + Generate */}
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <label style={{ fontSize: 12, opacity: 0.85 }}>Questions</label>
-                <select value={count} onChange={e => setCount(e.target.value)}
-                  style={{ padding: "8px 10px", fontSize: 14, fontFamily: "Arial", border: "none", borderRadius: 4 }}>
-                  {["2","3","4","5","6","8","10"].map(n => <option key={n}>{n}</option>)}
-                </select>
-              </div>
-              <button onClick={generate} disabled={!canGenerate}
-                style={{
-                  padding: "9px 28px", fontSize: 14, fontWeight: "bold",
-                  background: canGenerate ? "#e8a000" : "#555",
-                  color: "white", border: "none", borderRadius: 4,
-                  cursor: canGenerate ? "pointer" : "not-allowed", fontFamily: "Arial"
-                }}>
-                {loading ? "Generating…" : "Generate"}
-              </button>
-            </div>
-
-            {error && (
-              <p style={{ color: "#ffd", fontSize: 13, margin: "10px 0 0 0", fontFamily: "Arial" }}>{error}</p>
-            )}
+          {/* ── WFA Header ── */}
+          <div className="wfa-header no-print">
+            <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA" className="wfa-logo" />
+            <span className="wfa-title">GPS Question Generator</span>
+            <a href="https://staff.wallscourt-farm-academy.co.uk" className="wfa-back">← Staff Tools</a>
           </div>
 
-          {/* ── Paper area ── */}
-          {questions.length > 0 && (
-            <div className="paper-wrap" style={{
-              maxWidth: 820, margin: "18px auto 0", background: "white",
-              borderRadius: 4, padding: "30px 36px 30px 30px",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
-            }}>
-              {/* Print/mark scheme controls */}
-              <div className="no-print" style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginBottom: 18 }}>
-                <button onClick={() => setShowMS(s => !s)}
-                  style={{ padding: "6px 14px", fontSize: 13, border: "1.5px solid #1a1a8c",
-                    borderRadius: 4, background: "white", color: "#1a1a8c", cursor: "pointer", fontFamily: "Arial" }}>
-                  {showMS ? "Hide mark scheme" : "Show mark scheme"}
-                </button>
-                <button onClick={() => window.print()}
-                  style={{ padding: "6px 14px", fontSize: 13, background: "#1a1a8c", color: "white",
-                    border: "none", borderRadius: 4, cursor: "pointer", fontFamily: "Arial" }}>
-                  Print / Save PDF
+          <div style={{ padding: "20px 16px" }}>
+
+            {/* ── Controls card ── */}
+            <div className="wfa-card no-print" style={{ maxWidth: 820, margin: "0 auto" }}>
+              <p style={{ fontSize: "0.88rem", color: "#666", margin: "0 0 16px 0" }}>
+                Generates SATs-style GPS Paper 1 questions. Select topics and click Generate.
+              </p>
+
+              <ApiKeyPanel apiKey={apiKey} onSave={setApiKey} />
+
+              {/* Topic selector */}
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                  <span className="wfa-label" style={{ margin: 0 }}>GPS Topics</span>
+                  <button onClick={selectAll}
+                    style={{ fontSize: "0.8rem", background: "none", border: "none", color: "#1798d3",
+                      cursor: "pointer", padding: 0, fontFamily: "Nunito, sans-serif", fontWeight: 700 }}>
+                    Select all
+                  </button>
+                  <button onClick={selectNone}
+                    style={{ fontSize: "0.8rem", background: "none", border: "none", color: "#1798d3",
+                      cursor: "pointer", padding: 0, fontFamily: "Nunito, sans-serif", fontWeight: 700 }}>
+                    Clear all
+                  </button>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {allKeys.map(k => (
+                    <label key={k} className={`topic-pill ${selectedCats[k] ? "active" : "inactive"}`}
+                      onClick={() => toggleCat(k)}>
+                      <input type="checkbox" checked={selectedCats[k]} onChange={() => toggleCat(k)} />
+                      {GPS_CATEGORIES[k].label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Count + Generate */}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label className="wfa-label">Questions</label>
+                  <select value={count} onChange={e => setCount(e.target.value)} className="wfa-input">
+                    {["2","3","4","5","6","8","10"].map(n => <option key={n}>{n}</option>)}
+                  </select>
+                </div>
+                <button onClick={generate} disabled={!canGenerate} className="btn-primary">
+                  {loading ? <span className="wfa-loading">Generating…</span> : "Generate"}
                 </button>
               </div>
 
-              {/* Paper header */}
-              <div style={{ borderBottom: "3px solid #1a1a8c", paddingBottom: 12, marginBottom: 8 }}>
-                <div style={{ fontFamily: "Arial", fontWeight: "bold", fontSize: 16, color: "#1a1a8c" }}>
-                  Key Stage 2 — Grammar, Punctuation and Spelling
+              {error && <div className="wfa-error">{error}</div>}
+            </div>
+
+            {/* ── Paper area ── */}
+            {questions.length > 0 && (
+              <div className="paper-wrap" style={{
+                maxWidth: 820, margin: "18px auto 0", background: "white",
+                borderRadius: 4, padding: "30px 36px 30px 30px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+              }}>
+                {/* Print/mark scheme controls */}
+                <div className="no-print" style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginBottom: 18 }}>
+                  <button onClick={() => setShowMS(s => !s)} className="btn-secondary" style={{ padding: "6px 14px" }}>
+                    {showMS ? "Hide mark scheme" : "Show mark scheme"}
+                  </button>
+                  <button onClick={() => window.print()} className="btn-primary" style={{ padding: "6px 14px" }}>
+                    Print / Save PDF
+                  </button>
                 </div>
-                <div style={{ fontFamily: "Arial", fontSize: 13, color: "#555", marginTop: 2 }}>
-                  Paper 1: Questions
+
+                {/* Paper header */}
+                <div style={{ borderBottom: "3px solid #1a1a8c", paddingBottom: 12, marginBottom: 8 }}>
+                  <div style={{ fontFamily: "Arial", fontWeight: "bold", fontSize: 16, color: "#1a1a8c" }}>
+                    Key Stage 2 — Grammar, Punctuation and Spelling
+                  </div>
+                  <div style={{ fontFamily: "Arial", fontSize: 13, color: "#555", marginTop: 2 }}>
+                    Paper 1: Questions
+                  </div>
                 </div>
+
+                {/* Questions */}
+                {questions.map((q, i) => <QuestionCard key={q.id || i} q={q} num={i + 1} />)}
+
+                {/* Mark scheme */}
+                {showMS && <MarkScheme questions={questions} />}
               </div>
+            )}
 
-              {/* Questions */}
-              {questions.map((q, i) => <QuestionCard key={q.id || i} q={q} num={i + 1} />)}
+            {/* Empty state */}
+            {questions.length === 0 && !loading && (
+              <div className="no-print" style={{
+                maxWidth: 820, margin: "30px auto 0", textAlign: "center",
+                color: "#999", fontSize: "0.9rem", padding: "50px 0"
+              }}>
+                Select GPS topics above and click Generate.
+              </div>
+            )}
 
-              {/* Mark scheme */}
-              {showMS && <MarkScheme questions={questions} />}
-            </div>
-          )}
-
-          {/* Empty state */}
-          {questions.length === 0 && !loading && (
-            <div className="no-print" style={{
-              maxWidth: 820, margin: "30px auto 0", textAlign: "center",
-              color: "#999", fontSize: 14, fontFamily: "Arial", padding: "50px 0"
-            }}>
-              Select GPS topics above and click Generate.
-            </div>
-          )}
+          </div>
         </div>
       );
     }
