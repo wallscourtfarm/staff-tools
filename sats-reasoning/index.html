@@ -4,13 +4,54 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KS2 SATs Reasoning — Question Generator</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23e67e22'/%3E%3Crect x='6' y='8' width='20' height='16' rx='2' fill='white'/%3E%3Crect x='8' y='4' width='16' height='4' rx='1' fill='%23d35400'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231798d3'/%3E%3Crect x='6' y='8' width='20' height='16' rx='2' fill='white'/%3E%3C/svg%3E">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone@7.27.6/babel.min.js"></script>
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; background: #f0f0f0; font-family: Arial, sans-serif; }
+    body { margin: 0; padding: 0; background: #f4f6f8; font-family: 'Nunito', sans-serif; }
+
+    /* WFA Header */
+    .wfa-header { background: linear-gradient(135deg, #1798d3 0%, #0d7ab8 100%); color: white;
+      padding: 0 24px; display: flex; align-items: center; gap: 14px; height: 58px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    .wfa-logo { height: 40px; background: white; border-radius: 8px; padding: 3px 8px; }
+    .wfa-title { font-weight: 900; font-size: 1.1rem; flex: 1; }
+    .wfa-back { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.85rem;
+      font-weight: 700; padding: 6px 12px; border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.4); }
+    .wfa-back:hover { background: rgba(255,255,255,0.15); color: white; }
+
+    /* Controls card */
+    .wfa-card { background: white; border-radius: 14px; padding: 20px 24px;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.07); margin-bottom: 16px; }
+    .wfa-label { font-weight: 800; font-size: 0.88rem; margin-bottom: 6px; display: block; color: #333; }
+    .wfa-input { border: 1.5px solid #ddd; border-radius: 8px; padding: 8px 12px;
+      font-family: 'Nunito', sans-serif; font-size: 0.9rem; width: 100%; }
+    .wfa-input:focus { border-color: #1798d3; outline: none; }
+    .wfa-select { border: 1.5px solid #ddd; border-radius: 8px; padding: 8px 12px;
+      font-family: 'Nunito', sans-serif; font-size: 0.9rem; background: white; }
+    .wfa-select:focus { border-color: #1798d3; outline: none; }
+    .wfa-btn-primary { background: #1798d3; color: white; border: none; border-radius: 8px;
+      padding: 10px 22px; font-size: 0.9rem; font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; }
+    .wfa-btn-primary:disabled { background: #aaa; cursor: default; }
+    .wfa-btn-secondary { background: white; color: #1798d3; border: 1.5px solid #1798d3; border-radius: 8px;
+      padding: 10px 22px; font-size: 0.9rem; font-weight: 700; cursor: pointer; font-family: 'Nunito', sans-serif; }
+    .wfa-btn-secondary.active { background: #1798d3; color: white; }
+    .wfa-btn-ghost { background: white; color: #555; border: 1.5px solid #999; border-radius: 8px;
+      padding: 10px 22px; font-size: 0.9rem; font-weight: 700; cursor: pointer; font-family: 'Nunito', sans-serif; }
+    .wfa-error { background: #fde8e8; color: #9b1c1c; padding: 10px 14px; border-radius: 8px;
+      font-size: 0.88rem; font-weight: 600; }
+
+    /* API key panel */
+    .api-key-panel { background: #f0f8ff; border: 1.5px solid #c7e3f5; border-radius: 10px;
+      padding: 14px 18px; margin-bottom: 16px; }
+    .api-key-panel p { margin: 0 0 10px 0; font-size: 0.88rem; color: #444; font-weight: 600; }
+    .api-key-toggle { font-size: 0.8rem; color: #1798d3; background: transparent; border: none;
+      cursor: pointer; font-family: 'Nunito', sans-serif; font-weight: 700; padding: 0; }
+
     @media print {
       .no-print { display: none !important; }
       body { background: white; }
@@ -444,9 +485,8 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
 
       if (!open) {
         return (
-          <div style={{maxWidth:820,margin:"0 auto 10px auto",textAlign:"right"}}>
-            <button onClick={()=>setOpen(true)}
-              style={{fontSize:12,color:"rgba(255,255,255,0.65)",background:"transparent",border:"none",cursor:"pointer",padding:0,fontFamily:"Arial"}}>
+          <div style={{textAlign:"right",marginBottom:8}}>
+            <button onClick={()=>setOpen(true)} className="api-key-toggle">
               {apiKey ? "API key saved ✓ — change" : "Set API key"}
             </button>
           </div>
@@ -454,10 +494,8 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
       }
 
       return (
-        <div style={{maxWidth:820,margin:"0 auto 12px auto",background:"rgba(0,0,0,0.25)",borderRadius:4,padding:"14px 18px"}}>
-          <p style={{margin:"0 0 8px 0",fontSize:13,color:"rgba(255,255,255,0.9)",fontFamily:"Arial"}}>
-            Enter your Anthropic API key. It is saved only in your browser's local storage and never sent anywhere except the Anthropic API.
-          </p>
+        <div className="api-key-panel">
+          <p>Enter your Anthropic API key. It is saved only in your browser's local storage and never sent anywhere except the Anthropic API.</p>
           <div style={{display:"flex",gap:8}}>
             <input
               type="password"
@@ -465,18 +503,11 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
               onChange={e=>setDraft(e.target.value)}
               onKeyDown={e=>e.key==="Enter"&&save()}
               placeholder="sk-ant-…"
-              style={{flex:1,padding:"7px 10px",fontSize:14,fontFamily:"Arial",border:"none",borderRadius:4}}
+              className="wfa-input"
+              style={{flex:1}}
             />
-            <button onClick={save}
-              style={{padding:"7px 16px",fontSize:13,fontWeight:"bold",background:"#e8a000",color:"white",
-                border:"none",borderRadius:4,cursor:"pointer",fontFamily:"Arial"}}>
-              Save
-            </button>
-            {apiKey && <button onClick={()=>setOpen(false)}
-              style={{padding:"7px 12px",fontSize:13,background:"transparent",color:"rgba(255,255,255,0.7)",
-                border:"1px solid rgba(255,255,255,0.3)",borderRadius:4,cursor:"pointer",fontFamily:"Arial"}}>
-              Cancel
-            </button>}
+            <button onClick={save} className="wfa-btn-primary">Save</button>
+            {apiKey && <button onClick={()=>setOpen(false)} className="wfa-btn-ghost">Cancel</button>}
           </div>
         </div>
       );
@@ -552,102 +583,85 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
       const topicDisplay = topic.charAt(0).toUpperCase()+topic.slice(1);
 
       return(
-        <div style={{fontFamily:"Arial",background:"#f0f0f0",minHeight:"100vh",padding:"20px 16px"}}>
+        <div style={{minHeight:"100vh"}}>
+
+          {/* WFA Header */}
+          <div className="wfa-header no-print">
+            <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA" className="wfa-logo"/>
+            <span className="wfa-title">SATs Reasoning Question Generator</span>
+            <a href="https://staff.wallscourt-farm-academy.co.uk" className="wfa-back">← Staff Tools</a>
+          </div>
 
           {/* Controls */}
-          <div className="no-print" style={{maxWidth:820,margin:"0 auto 0 auto",background:"#1a1a8c",borderRadius:6,padding:"20px 24px 16px 24px",color:"white"}}>
-            <h1 style={{fontSize:19,fontWeight:"bold",margin:"0 0 3px 0"}}>KS2 Maths Reasoning — Question Generator</h1>
-            <p style={{fontSize:13,opacity:0.8,margin:"0 0 14px 0"}}>Generates SATs-style questions. Type a topic and click Generate.</p>
-
-            <ApiKeyPanel apiKey={apiKey} onSave={setApiKey}/>
-
-            <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end"}}>
-              <div style={{flex:1,minWidth:220,display:"flex",flexDirection:"column",gap:5}}>
-                <label style={{fontSize:12,opacity:0.85}}>Topic</label>
-                <input
-                  type="text"
-                  value={topic}
-                  onChange={handleTopicChange}
-                  onKeyDown={handleKey}
-                  placeholder="e.g. coordinates, fractions, time, percentages…"
-                  style={{padding:"8px 11px",fontSize:14,fontFamily:"Arial",border:"none",borderRadius:4,color:"#111",width:"100%"}}
-                />
+          <div className="no-print" style={{maxWidth:820,margin:"20px auto 0 auto",padding:"0 16px"}}>
+            <div className="wfa-card">
+              <ApiKeyPanel apiKey={apiKey} onSave={setApiKey}/>
+              <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end"}}>
+                <div style={{flex:1,minWidth:220,display:"flex",flexDirection:"column"}}>
+                  <label className="wfa-label">Topic</label>
+                  <input
+                    type="text"
+                    value={topic}
+                    onChange={handleTopicChange}
+                    onKeyDown={handleKey}
+                    placeholder="e.g. coordinates, fractions, time, percentages…"
+                    className="wfa-input"
+                  />
+                </div>
+                <div style={{display:"flex",flexDirection:"column",minWidth:100}}>
+                  <label className="wfa-label">Year group</label>
+                  <select value={yearGroup} onChange={e=>setYearGroup(e.target.value)} className="wfa-select">
+                    {Object.entries(CURRICULUM).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",minWidth:130}}>
+                  <label className="wfa-label">Difficulty</label>
+                  <select value={diff} onChange={e=>setDiff(e.target.value)} className="wfa-select">
+                    <option value="easier">Easier (1 mark)</option>
+                    <option value="mixed">Mixed</option>
+                    <option value="harder">Harder (2–3 mark)</option>
+                  </select>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",minWidth:90}}>
+                  <label className="wfa-label">Questions</label>
+                  <select value={count} onChange={e=>setCount(e.target.value)} className="wfa-select">
+                    {["2","3","4","5","6"].map(n=><option key={n}>{n}</option>)}
+                  </select>
+                </div>
+                <button onClick={generate} disabled={loading||!topic.trim()||!apiKey}
+                  className="wfa-btn-primary" style={{alignSelf:"flex-end"}}>
+                  {loading?"Generating…":"Generate"}
+                </button>
               </div>
-              <div style={{display:"flex",flexDirection:"column",gap:5,minWidth:100}}>
-                <label style={{fontSize:12,opacity:0.85}}>Year group</label>
-                <select value={yearGroup} onChange={e=>setYearGroup(e.target.value)}
-                  style={{padding:"8px 10px",fontSize:14,fontFamily:"Arial",border:"none",borderRadius:4}}>
-                  {Object.entries(CURRICULUM).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
-                </select>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:5,minWidth:130}}>
-                <label style={{fontSize:12,opacity:0.85}}>Difficulty</label>
-                <select value={diff} onChange={e=>setDiff(e.target.value)}
-                  style={{padding:"8px 10px",fontSize:14,fontFamily:"Arial",border:"none",borderRadius:4}}>
-                  <option value="easier">Easier (1 mark)</option>
-                  <option value="mixed">Mixed</option>
-                  <option value="harder">Harder (2–3 mark)</option>
-                </select>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:5,minWidth:90}}>
-                <label style={{fontSize:12,opacity:0.85}}>Questions</label>
-                <select value={count} onChange={e=>setCount(e.target.value)}
-                  style={{padding:"8px 10px",fontSize:14,fontFamily:"Arial",border:"none",borderRadius:4}}>
-                  {["2","3","4","5","6"].map(n=><option key={n}>{n}</option>)}
-                </select>
-              </div>
-              <button onClick={generate} disabled={loading||!topic.trim()||!apiKey}
-                style={{padding:"8px 22px",fontSize:15,fontWeight:"bold",
-                  background:(loading||!apiKey)?"#888":"#e8a000",
-                  color:"white",border:"none",borderRadius:4,
-                  cursor:(loading||!apiKey)?"default":"pointer",
-                  fontFamily:"Arial",alignSelf:"flex-end"}}>
-                {loading?"Generating…":"Generate"}
-              </button>
             </div>
           </div>
 
-          {/* Spacer below controls */}
-          <div className="no-print" style={{maxWidth:820,margin:"0 auto",height:24}}/>
+          <div style={{maxWidth:820,margin:"0 auto",padding:"0 16px"}}>
 
           {/* Error */}
           {error && (
-            <div className="no-print" style={{maxWidth:820,margin:"0 auto 14px auto",padding:"12px 18px",background:"#fff0f0",
-              border:"1.5px solid #e88",borderRadius:4,color:"#c00",fontSize:14}}>
+            <div className="no-print wfa-error" style={{marginBottom:16}}>
               {error}
             </div>
           )}
 
           {/* Loading */}
           {loading && (
-            <div style={{maxWidth:820,margin:"0 auto"}}>
-              <div style={{background:"white",boxShadow:"0 2px 14px rgba(0,0,0,0.12)",padding:"60px 52px",
-                textAlign:"center",color:"#888",fontSize:16}}>
-                Generating questions…
-              </div>
+            <div className="wfa-card" style={{textAlign:"center",padding:"60px 52px",color:"#888",fontSize:"1rem"}}>
+              Generating questions…
             </div>
           )}
 
           {/* Paper */}
           {!loading && questions.length>0 && (
-            <div style={{maxWidth:820,margin:"0 auto"}}>
+            <div>
               <div className="no-print" style={{display:"flex",gap:10,justifyContent:"flex-end",marginBottom:14}}>
-                <button onClick={()=>window.print()}
-                  style={{padding:"7px 15px",fontSize:13,fontFamily:"Arial",
-                    background:"white",color:"#333",border:"1.5px solid #999",borderRadius:4,cursor:"pointer"}}>
-                  Print / Save PDF
-                </button>
+                <button onClick={()=>window.print()} className="wfa-btn-ghost">Print / Save PDF</button>
                 <button onClick={()=>setShowMS(s=>!s)}
-                  style={{padding:"7px 15px",fontSize:13,fontFamily:"Arial",
-                    background:showMS?"#1a1a8c":"white",color:showMS?"white":"#1a1a8c",
-                    border:"1.5px solid #1a1a8c",borderRadius:4,cursor:"pointer"}}>
+                  className={`wfa-btn-secondary${showMS?" active":""}`}>
                   {showMS?"Hide Mark Scheme":"Show Mark Scheme"}
                 </button>
-                <button onClick={generate}
-                  style={{padding:"7px 15px",fontSize:13,fontFamily:"Arial",
-                    background:"white",color:"#555",border:"1.5px solid #999",borderRadius:4,cursor:"pointer"}}>
-                  Regenerate
-                </button>
+                <button onClick={generate} className="wfa-btn-ghost">Regenerate</button>
               </div>
 
               <div style={{background:"white",boxShadow:"0 2px 14px rgba(0,0,0,0.12)",padding:"40px 52px 52px 52px"}}>
@@ -666,14 +680,15 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
 
           {/* Empty state */}
           {!loading && questions.length===0 && !error && (
-            <div style={{maxWidth:820,margin:"0 auto",textAlign:"center",padding:"50px 0",color:"#aaa"}}>
+            <div style={{textAlign:"center",padding:"50px 0",color:"#aaa"}}>
               <div style={{fontSize:48,marginBottom:10}}>✏️</div>
-              <div style={{fontSize:16,color:"#888",marginBottom:6}}>Enter a topic above to generate practice questions</div>
-              <div style={{fontSize:13}}>
+              <div style={{fontSize:"1rem",color:"#888",marginBottom:6}}>Enter a topic above to generate practice questions</div>
+              <div style={{fontSize:"0.85rem"}}>
                 Try: coordinates · fractions · time · percentages · place value · area and perimeter · angles · statistics
               </div>
             </div>
           )}
+          </div>{/* end maxWidth wrapper */}
         </div>
       );
     }
