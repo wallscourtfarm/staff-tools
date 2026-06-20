@@ -420,7 +420,7 @@ thead th.nc{text-align:left;padding-left:11px;}
         &nbsp;· Tap any cell to edit
       </div>
     </div>
-    <div class="vf">WFA-20.06.26s</div>
+    <div class="vf">WFA-20.06.26t</div>
   </div>
 </div>
 
@@ -996,7 +996,8 @@ document.getElementById('sv-tr').addEventListener('click',()=>{
   renderTrEditor();document.getElementById('tr-mo').classList.add('open');
 });
 document.getElementById('tr-mo').addEventListener('click',e=>{if(e.target===e.currentTarget)document.getElementById('tr-mo').classList.remove('open');});
-document.getElementById('tr-add').addEventListener('click',()=>{trItems.push({type:'Book',title:'',sub:'',img:''});renderTrEditor();});
+function syncTrItemsFromDOM(){Array.from(document.querySelectorAll('#tr-ed .tr-card')).forEach((card,i)=>{if(!trItems[i])return;trItems[i].type=card.querySelector('.tr-tsel').value;trItems[i].title=card.querySelector('.tr-ti').value.trim();trItems[i].sub=card.querySelector('.tr-si').value.trim();});}
+document.getElementById('tr-add').addEventListener('click',()=>{syncTrItemsFromDOM();trItems.push({type:'Book',title:'',sub:'',img:''});renderTrEditor();});
 document.getElementById('tr-save').addEventListener('click',()=>{
   const items=Array.from(document.querySelectorAll('.tr-card')).map(card=>({type:card.querySelector('.tr-tsel').value,title:card.querySelector('.tr-ti').value.trim(),sub:card.querySelector('.tr-si').value.trim(),img:card.querySelector('.tr-thumb').dataset.img||''})).filter(i=>i.title);
   setTrName(S.yr,S.trCls,document.getElementById('tr-name-inp').value.trim()||'Your teacher');
