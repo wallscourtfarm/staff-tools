@@ -420,7 +420,7 @@ thead th.nc{text-align:left;padding-left:11px;}
         &nbsp;· Tap any cell to edit
       </div>
     </div>
-    <div class="vf">WFA-20.06.26u</div>
+    <div class="vf">WFA-20.06.26v</div>
   </div>
 </div>
 
@@ -678,16 +678,11 @@ function renderChild(){
   // Trophy in child view — big right-column display
   const cvTroCol=document.getElementById('cv-trophy-col');
   const trophies=getTrophies();
-  if(trophies.length){
+  const wonTerms=trophies.filter(x=>x.yr===yr).map(x=>x.term);
+  if(wonTerms.length){
     document.getElementById('cv-trophy-img').src=TROPHY_IMG;
-    // Group by year: show each year that won, with its term badges
-    const byYr={};
-    trophies.forEach(x=>{if(!byYr[x.yr])byYr[x.yr]=[];byYr[x.yr].push(x.term);});
-    const badgesHtml=Object.entries(byYr).map(([y,terms])=>{
-      const col=YC[y]||'#1798d3';
-      return terms.map(tm=>`<div class="cv-trophy-badge" style="background:${col};">${tm.replace('Term ','T')}</div>`).join('');
-    }).join('');
-    document.getElementById('cv-trophy-badges').innerHTML=badgesHtml;
+    const col=YC[yr]||'var(--blue)';
+    document.getElementById('cv-trophy-badges').innerHTML=wonTerms.map(tm=>`<div class="cv-trophy-badge" style="background:${col};">${tm.replace('Term ','T')}</div>`).join('');
     cvTroCol.style.display='flex';
   }else{cvTroCol.style.display='none';}
   // Also update stats-sub text for week
