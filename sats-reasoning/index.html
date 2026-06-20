@@ -45,13 +45,6 @@
     .wfa-error { background: #fde8e8; color: #9b1c1c; padding: 10px 14px; border-radius: 8px;
       font-size: 0.88rem; font-weight: 600; }
 
-    /* API key panel */
-    .api-key-panel { background: #f0f8ff; border: 1.5px solid #c7e3f5; border-radius: 10px;
-      padding: 14px 18px; margin-bottom: 16px; }
-    .api-key-panel p { margin: 0 0 10px 0; font-size: 0.88rem; color: #444; font-weight: 600; }
-    .api-key-toggle { font-size: 0.8rem; color: #1798d3; background: transparent; border: none;
-      cursor: pointer; font-family: 'Nunito', sans-serif; font-weight: 700; padding: 0; }
-
     @media print {
       .no-print { display: none !important; }
       body { background: white; }
@@ -64,38 +57,15 @@
   <script type="text/babel">
     const { useState, useCallback, useRef, useEffect } = React;
 
-    // Model fallback chain — tries each in order if a model is deprecated/unavailable
-    const CLAUDE_MODELS = [
-      "claude-sonnet-4-6",
-      "claude-sonnet-4-5",
-      "claude-3-5-sonnet-20241022",
-    ];
-
-    async function claudeFetch(apiKey, body) {
-      let lastError;
-      for (const model of CLAUDE_MODELS) {
-        const resp = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-            "anthropic-dangerous-direct-browser-access": "true"
-          },
-          body: JSON.stringify({ ...body, model })
-        });
-        if (!resp.ok) {
-          const errData = await resp.json().catch(() => ({}));
-          const msg = errData?.error?.message || "";
-          if (resp.status === 404 || msg.toLowerCase().includes("model")) {
-            lastError = new Error(msg || `Model ${model} unavailable`);
-            continue;
-          }
-          throw new Error(msg || `API error ${resp.status}`);
-        }
-        return resp;
-      }
-      throw lastError || new Error("No available Claude model found");
+    async function claudeFetch(body) {
+      const resp = await fetch("https://app.wallscourt-farm-academy.co.uk/api/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || "API error");
+      return data.text;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -470,48 +440,6 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
       );
     }
 
-    // ── API Key Panel ────────────────────────────────────────────────────────
-
-    function ApiKeyPanel({ apiKey, onSave }) {
-      const [draft, setDraft] = useState(apiKey);
-      const [open, setOpen] = useState(!apiKey);
-
-      const save = () => {
-        const trimmed = draft.trim();
-        localStorage.setItem("sats_api_key", trimmed);
-        onSave(trimmed);
-        setOpen(false);
-      };
-
-      if (!open) {
-        return (
-          <div style={{textAlign:"right",marginBottom:8}}>
-            <button onClick={()=>setOpen(true)} className="api-key-toggle">
-              {apiKey ? "API key saved ✓ — change" : "Set API key"}
-            </button>
-          </div>
-        );
-      }
-
-      return (
-        <div className="api-key-panel">
-          <p>Enter your Anthropic API key. It is saved only in your browser's local storage and never sent anywhere except the Anthropic API.</p>
-          <div style={{display:"flex",gap:8}}>
-            <input
-              type="password"
-              value={draft}
-              onChange={e=>setDraft(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&save()}
-              placeholder="sk-ant-…"
-              className="wfa-input"
-              style={{flex:1}}
-            />
-            <button onClick={save} className="wfa-btn-primary">Save</button>
-            {apiKey && <button onClick={()=>setOpen(false)} className="wfa-btn-ghost">Cancel</button>}
-          </div>
-        </div>
-      );
-    }
 
     // ── Main App ─────────────────────────────────────────────────────────────
 
@@ -524,7 +452,6 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
       const [loading,   setLoading] = useState(false);
       const [error,     setError]   = useState("");
       const [showMS,    setShowMS]  = useState(false);
-      const [apiKey,    setApiKey]  = useState(() => localStorage.getItem("sats_api_key") || "");
       const topicRef = useRef("");
 
       const handleTopicChange = useCallback((e) => {
@@ -535,12 +462,6 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
       const generate = useCallback(async () => {
         const t = topicRef.current.trim();
         if (!t) return;
-
-        const key = localStorage.getItem("sats_api_key") || "";
-        if (!key) {
-          setError("Please enter your Anthropic API key first.");
-          return;
-        }
 
         const diffNote = diff==="easier"
           ? "Easier — 1-mark questions, straightforward, accessible."
@@ -556,7 +477,7 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
         setShowMS(false);
 
         try {
-          const resp = await claudeFetch(key, {
+          const raw = await claudeFetch({
             max_tokens: 4000,
             system: SYSTEM_PROMPT,
             messages: [{
@@ -564,9 +485,6 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
               content: `Generate ${count} KS2 SATs-style reasoning questions for ${CURRICULUM[yearGroup]?.label} on the topic: "${t}". ${diffNote}\n\n${curriculumNote}\n\nReturn ONLY the JSON array.`
             }]
           });
-
-          const data = await resp.json();
-          const raw = (data.content||[]).find(b=>b.type==="text")?.text || "";
           const clean = raw.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
           setQs(JSON.parse(clean));
         } catch(e) {
@@ -595,7 +513,6 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
           {/* Controls */}
           <div className="no-print" style={{maxWidth:820,margin:"20px auto 0 auto",padding:"0 16px"}}>
             <div className="wfa-card">
-              <ApiKeyPanel apiKey={apiKey} onSave={setApiKey}/>
               <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end"}}>
                 <div style={{flex:1,minWidth:220,display:"flex",flexDirection:"column"}}>
                   <label className="wfa-label">Topic</label>
@@ -628,7 +545,7 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
                     {["2","3","4","5","6"].map(n=><option key={n}>{n}</option>)}
                   </select>
                 </div>
-                <button onClick={generate} disabled={loading||!topic.trim()||!apiKey}
+                <button onClick={generate} disabled={loading||!topic.trim()}
                   className="wfa-btn-primary" style={{alignSelf:"flex-end"}}>
                   {loading?"Generating…":"Generate"}
                 </button>
@@ -695,6 +612,6 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
 
     ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
   </script>
-  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">20.06.26b</div>
+  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">20.06.26c</div>
 </body>
 </html>
