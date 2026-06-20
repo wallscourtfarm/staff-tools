@@ -420,7 +420,7 @@ thead th.nc{text-align:left;padding-left:11px;}
         &nbsp;· Tap any cell to edit
       </div>
     </div>
-    <div class="vf">WFA-20.06.26w</div>
+    <div class="vf">WFA-20.06.26x</div>
   </div>
 </div>
 
@@ -783,6 +783,14 @@ function renderDashboard(){
   const schoolWk=YEARS.reduce((s,y)=>s+yearGroupWeekTotal(y,S.term,S.week-1),0);
   const schoolTrm=YEARS.reduce((s,y)=>s+yearGroupTermTotal(y,S.term),0);
   const schoolYr=YEARS.reduce((s,y)=>s+yearGroupYearTotal(y),0);
+  const grpTags=(vals)=>['PP','EAL','SEN'].map((lbl,i)=>{
+    const flag=['pp','eal','sen'][i];
+    const cls=['tag-pp','tag-eal','tag-sen'][i];
+    return`<span class="${cls}" style="border-radius:5px;padding:2px 6px;font-size:10px;font-weight:800;">${lbl} ${vals[i].toLocaleString()}</span>`;
+  }).join(' ');
+  const grpWk =(['pp','eal','sen']).map(f=>YEARS.reduce((s,y)=>s+getClasses(y).reduce((s2,c)=>s2+getPupils(y,c).filter(p=>f==='sen'?!!p.sen:p[f]).reduce((s3,p)=>{const v=gv(y,c,S.term,pk(p),S.week-1);return s3+(v||0);},0),0),0));
+  const grpTrm=(['pp','eal','sen']).map(f=>YEARS.reduce((s,y)=>s+groupTermTotal(y,f,S.term),0));
+  const grpYr =(['pp','eal','sen']).map(f=>YEARS.reduce((s,y)=>s+TERMS.reduce((s2,t)=>s2+groupTermTotal(y,f,t),0),0));
   const sorted=YEARS.map(y=>({y,t:yearGroupTermTotal(y,S.term)})).sort((a,b)=>b.t-a.t);
   const winner=sorted[0];
   const wCol=YC[winner.y]||'#1798d3';
@@ -792,16 +800,19 @@ function renderDashboard(){
       <h3>This Week</h3>
       <div class="dv">${schoolWk.toLocaleString()}</div>
       <div class="dl">reads school-wide</div>
+      <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">${grpTags(grpWk)}</div>
     </div>
     <div class="dash-kpi">
       <h3>This Term</h3>
       <div class="dv">${schoolTrm.toLocaleString()}</div>
       <div class="dl">reads school-wide</div>
+      <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">${grpTags(grpTrm)}</div>
     </div>
     <div class="dash-kpi">
       <h3>This Year</h3>
       <div class="dv">${schoolYr.toLocaleString()}</div>
       <div class="dl">all terms combined</div>
+      <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">${grpTags(grpYr)}</div>
     </div>
     <div class="dash-kpi kpi-lead" style="border-color:${wCol};background:color-mix(in srgb,${wCol} 9%,white);">
       <h3>🏆 Leading This Term</h3>
