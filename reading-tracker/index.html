@@ -420,7 +420,7 @@ thead th.nc{text-align:left;padding-left:11px;}
         &nbsp;· Tap any cell to edit
       </div>
     </div>
-    <div class="vf">WFA-20.06.26v</div>
+    <div class="vf">WFA-20.06.26w</div>
   </div>
 </div>
 
@@ -1006,7 +1006,7 @@ function renderTrEditor(){
     d.innerHTML=`<div class="tr-thumb" data-img="${it.img||''}" title="Tap to upload">${it.img?`<img src="${it.img}" alt="">`:TE[it.type]||'📌'}</div><div class="tr-bd"><div class="tr-row"><select class="tr-sel tr-tsel">${['Book','Podcast','News','Magazine','Other'].map(t=>`<option${t===it.type?' selected':''}>${t}</option>`).join('')}</select><button class="tr-del" data-d="${i}">✕</button></div><div class="tr-row"><input class="tr-inp tr-ti" placeholder="Title / Name" value="${esc(it.title)}"></div><div class="tr-row"><input class="tr-inp tr-si" placeholder="Author / Show / Source" value="${esc(it.sub||'')}"></div></div>`;
     el.appendChild(d);
     d.querySelector('.tr-thumb').addEventListener('click',()=>{pendImg=i;document.getElementById('img-up').click();});
-    d.querySelector('[data-d]').addEventListener('click',()=>{trItems.splice(i,1);renderTrEditor();});
+    d.querySelector('[data-d]').addEventListener('click',()=>{syncTrItemsFromDOM();trItems.splice(i,1);renderTrEditor();});
     d.querySelector('.tr-tsel').addEventListener('change',e=>{trItems[i].type=e.target.value;const th=d.querySelector('.tr-thumb');if(!trItems[i].img)th.textContent=TE[e.target.value]||'📌';});
   });
 }
