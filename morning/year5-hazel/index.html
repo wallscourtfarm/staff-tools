@@ -358,7 +358,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Hazel</span><span id="version-tag">h.12.06.26a</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Hazel</span><span id="version-tag">h.21.06.26a</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -2431,7 +2431,7 @@ function reach(n){if(n.length===1)return new Set([n[0]]);const o=new Set();for(l
 function fexpr(it,tgt){if(it.length===1)return it[0].val===tgt?it[0]:null;for(let i=0;i<it.length;i++)for(let j=0;j<it.length;j++){if(i===j)continue;const a=it[i],b=it[j],rest=it.filter((_,x)=>x!==i&&x!==j),ops=[['+',a.val+b.val],['−',a.val-b.val],['×',a.val*b.val],...(b.val!==0&&Number.isInteger(a.val/b.val)?[['÷',a.val/b.val]]:[])];for(const[op,v]of ops){if(!Number.isFinite(v)||!Number.isInteger(v))continue;const ni={val:v,tree:{op,l:a.tree,r:b.tree}};const f=rest.length?fexpr([ni,...rest],tgt):(v===tgt?ni:null);if(f)return f}}return null}
 function estr(t){if(typeof t==='number')return''+t;const w=x=>typeof x==='number'?''+x:'('+estr(x)+')';return w(t.l)+' '+t.op+' '+w(t.r)}
 function solveNum(g,tgt,k){for(const c of combos(g,k)){const r=fexpr(c.map(n=>({val:n,tree:n})),tgt);if(r)return estr(r.tree)+' = '+tgt}return'—'}
-function genNum(tr=0){if(tr>50)return null;const pool=Array.from({length:14},(_,i)=>i+2);for(let i=pool.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[pool[i],pool[j]]=[pool[j],pool[i]]}const g=pool.slice(0,9);const s={2:new Set(),3:new Set(),4:new Set()},cap={2:80,3:150,4:300};for(const k of[2,3,4])for(const c of combos(g,k))reach(c).forEach(v=>{if(v>0&&Number.isInteger(v)&&v<=cap[k])s[k].add(v)});if(s[2].size<5||s[3].size<5||s[4].size<2)return genNum(tr+1);const pick=(set,n)=>[...set].sort(()=>Math.random()-.5).slice(0,n).sort((a,b)=>a-b);return{grid:g,targets:{two:pick(s[2],5),three:pick(s[3],5),four:pick(s[4],2)}}}
+function genNum(tr=0){if(tr>50)return null;const pool=Array.from({length:14},(_,i)=>i+2);for(let i=pool.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[pool[i],pool[j]]=[pool[j],pool[i]]}const g=pool.slice(0,9);const s={2:new Set(),3:new Set(),4:new Set()},cap={2:500,3:3000,4:20000};function reach56(n){if(n.length===1)return new Set([n[0]]);const o=new Set();for(let i=0;i<n.length;i++)for(let j=0;j<n.length;j++){if(i===j)continue;const a=n[i],b=n[j],r=n.filter((_,x)=>x!==i&&x!==j);const p=v=>r.length?reach56([v,...r]).forEach(x=>o.add(x)):o.add(v);p(a+b);p(a-b);p(a*b);if(b!==0&&b<=12&&Number.isInteger(a/b))p(a/b)}return o}for(const k of[2,3,4])for(const c of combos(g,k))reach56(c).forEach(v=>{if(v>0&&Number.isInteger(v)&&v<=cap[k])s[k].add(v)});if(s[2].size<5||s[3].size<5||s[4].size<2)return genNum(tr+1);const pick=(set,n)=>[...set].sort(()=>Math.random()-.5).slice(0,n).sort((a,b)=>a-b);return{grid:g,targets:{two:pick(s[2],5),three:pick(s[3],5),four:pick(s[4],2)}}}
 
 // ═══════════════════════════════════════════════════════════
 // ODD ONE OUT BANK
