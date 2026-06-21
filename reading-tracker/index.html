@@ -439,7 +439,7 @@ thead th.nc{text-align:left;padding-left:11px;}
     <button class="back-btn" id="sv-back">← Pupil View</button>
     <span class="sv-ti" id="sv-ti">Staff Dashboard</span>
     <div class="sp"></div>
-    <button class="ib" id="sv-td-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Term Dates</button>
+    
   </header>
 
   <!-- DASHBOARD -->
@@ -487,7 +487,7 @@ thead th.nc{text-align:left;padding-left:11px;}
         &nbsp;· Tap any cell to edit
       </div>
     </div>
-    <div class="vf">WFA-21.06.26f</div>
+    <div class="vf">WFA-21.06.26g</div>
   </div>
 </div>
 
@@ -1254,10 +1254,13 @@ function toast(msg){const el=document.getElementById('toast');el.textContent=msg
 // ── INIT ───────────────────────────────────────────────────
 initY4Pupils();
 try{const s=load('rt:state',{});if(s.yr)S.yr=s.yr;if(s.cls)S.cls=s.cls;if(s.term)S.term=s.term;if(s.week)S.week=s.week;}catch(e){}
+// Fallback auto-detect from localStorage term dates while sheet loads
 const det=autoDetect();if(det){S.term=det.term;S.week=det.week;}
 if(!S.cls||!getClasses(S.yr).includes(S.cls))S.cls=getClasses(S.yr)[0];
 applyYrColour(S.yr);
 renderChild();
+// Load live term dates from shared Google Sheet (updates term/week silently)
+loadTermDatesFromSheet();
 window.addEventListener('beforeunload',()=>store('rt:state',{yr:S.yr,cls:S.cls,term:S.term,week:S.week}));
 
 // ══ MORNING MODE DATA ════════════════════════════════════════════════════════
