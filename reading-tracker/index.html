@@ -1287,20 +1287,21 @@ let tt;
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),2200);}
 
 // ── INIT ───────────────────────────────────────────────────
+const _dbg=(m)=>{const el=document.getElementById('rt-debug');if(el){el.style.display='block';el.textContent+=m+'\n';}}
 initY4Pupils();
-console.log('[RT:1] initY4Pupils done, S=',JSON.stringify({yr:S.yr,cls:S.cls,week:S.week}));
-try{const s=load('rt:state',{});console.log('[RT:2] loaded state=',JSON.stringify(s));if(s.yr)S.yr=s.yr;if(s.cls)S.cls=s.cls;if(s.term)S.term=s.term;if(s.week)S.week=s.week;}catch(e){console.error('[RT:2] state load ERROR',e);}
-console.log('[RT:3] after load S=',JSON.stringify({yr:S.yr,cls:S.cls,week:S.week}));
+_dbg('[RT:1] initY4Pupils done, S=',JSON.stringify({yr:S.yr,cls:S.cls,week:S.week}));
+try{const s=load('rt:state',{});_dbg('[RT:2] loaded state=',JSON.stringify(s));if(s.yr)S.yr=s.yr;if(s.cls)S.cls=s.cls;if(s.term)S.term=s.term;if(s.week)S.week=s.week;}catch(e){_dbg('ERR [RT:2] state load ERROR',e);}
+_dbg('[RT:3] after load S=',JSON.stringify({yr:S.yr,cls:S.cls,week:S.week}));
 if(!S.cls||!getClasses(S.yr).includes(S.cls))S.cls=getClasses(S.yr)[0];
-console.log('[RT:4] after cls-fix S.cls=',S.cls);
+_dbg('[RT:4] after cls-fix S.cls=',S.cls);
 if(!getPupils(S.yr,S.cls).length&&S.yr!=='Y4'){S.yr='Y4';S.cls=getClasses('Y4')[0];}
-console.log('[RT:5] after fallback S=',JSON.stringify({yr:S.yr,cls:S.cls}));
+_dbg('[RT:5] after fallback S=',JSON.stringify({yr:S.yr,cls:S.cls}));
 applyYrColour(S.yr);
-console.log('[RT:6] applyYrColour done');
+_dbg('[RT:6] applyYrColour done');
 const det0=autoDetect();if(det0){S.term=det0.term;S.week=det0.week;}
-console.log('[RT:7] before renderChild S=',JSON.stringify({yr:S.yr,cls:S.cls,term:S.term,week:S.week}));
-try{renderChild();console.log('[RT:8] renderChild OK, wkbar=',document.getElementById('cv-wkbar').children.length);}catch(e){console.error('[RT:8] renderChild ERROR',e);document.getElementById('pupil-grid').innerHTML='<div style="padding:20px;color:red;font-size:13px;">Error: '+e.message+'</div>';}
-console.log('[RT:9] init complete');
+_dbg('[RT:7] before renderChild S=',JSON.stringify({yr:S.yr,cls:S.cls,term:S.term,week:S.week}));
+try{renderChild();_dbg('[RT:8] renderChild OK, wkbar=',document.getElementById('cv-wkbar').children.length);}catch(e){_dbg('ERR [RT:8] renderChild ERROR',e);document.getElementById('pupil-grid').innerHTML='<div style="padding:20px;color:red;font-size:13px;">Error: '+e.message+'</div>';}
+_dbg('[RT:9] init complete');
 // Fetch live term dates in background — re-render only if the week/term changes
 (async()=>{
   const prevTerm=S.term,prevWeek=S.week;
@@ -1734,5 +1735,6 @@ function toggleMorningMode(){
 }
 
 </script>
+<div id="rt-debug" style="display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,.85);color:lime;font-size:11px;font-family:monospace;padding:8px;z-index:9999;max-height:200px;overflow:auto;white-space:pre"></div>
 </body>
 </html>
