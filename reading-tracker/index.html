@@ -487,7 +487,7 @@ thead th.nc{text-align:left;padding-left:11px;}
         &nbsp;· Tap any cell to edit
       </div>
     </div>
-    <div class="vf">WFA-21.06.26e</div>
+    <div class="vf">WFA-21.06.26f</div>
   </div>
 </div>
 
@@ -1612,6 +1612,39 @@ function mpTab(type){
   mpNewPuzzle();
 }
 
+function mpGenNum(){
+  // Year-group-aware number grid — uses current year from S.yr
+  const yr=S&&S.yr||4;
+  if(yr<=3){
+    // Y3: any numbers 1-10, but targets filtered to even-or-÷5 (×2,×4,×5,×8,×10 tables only)
+    const pool=Array.from({length:10},(_,i)=>i+1);
+    for(let i=pool.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[pool[i],pool[j]]=[pool[j],pool[i]];}
+    const g=pool.slice(0,9),s={2:new Set(),3:new Set(),4:new Set()};
+    const cap={2:50,3:100,4:200},floor={2:6,3:12,4:20};
+    for(const k of[2,3,4])for(const c of combos(g,k))reach(c).forEach(v=>{
+      if(v>=floor[k]&&Number.isInteger(v)&&v<=cap[k]&&(v%2===0||v%5===0))s[k].add(v);
+    });
+    if(s[2].size<4||s[3].size<4||s[4].size<2)return mpGenNum();
+    const pck=(set,n)=>[...set].sort(()=>Math.random()-.5).slice(0,n).sort((a,b)=>a-b);
+    return{grid:g,targets:{two:pck(s[2],5),three:pck(s[3],5),four:pck(s[4],2)}};
+  }
+  // Y4: pool 2-15, caps 80/150/300, standard reach
+  const cap4={2:80,3:150,4:300};
+  if(yr===4){
+    const r=genNum();return r;
+  }
+  // Y5/Y6: pool 2-15, high caps, all TTs, division only when divisor ≤12 (no long division)
+  function reach56(n){if(n.length===1)return new Set([n[0]]);const o=new Set();for(let i=0;i<n.length;i++)for(let j=0;j<n.length;j++){if(i===j)continue;const a=n[i],b=n[j],r=n.filter((_,x)=>x!==i&&x!==j);const p=v=>r.length?reach56([v,...r]).forEach(x=>o.add(x)):o.add(v);p(a+b);p(a-b);p(a*b);if(b!==0&&b<=12&&Number.isInteger(a/b))p(a/b)}return o}
+  const cap56=yr>=6?{2:1000,3:6000,4:40000}:{2:500,3:3000,4:20000};
+  const pool=Array.from({length:14},(_,i)=>i+2);
+  for(let i=pool.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[pool[i],pool[j]]=[pool[j],pool[i]];}
+  const g=pool.slice(0,9),s={2:new Set(),3:new Set(),4:new Set()};
+  for(const k of[2,3,4])for(const c of combos(g,k))reach56(c).forEach(v=>{if(v>0&&Number.isInteger(v)&&v<=cap56[k])s[k].add(v)});
+  if(s[2].size<5||s[3].size<5||s[4].size<2)return mpGenNum();
+  const pck=(set,n)=>[...set].sort(()=>Math.random()-.5).slice(0,n).sort((a,b)=>a-b);
+  return{grid:g,targets:{two:pck(s[2],5),three:pck(s[3],5),four:pck(s[4],2)}};
+}
+
 function mpNewPuzzle(){
   const area=document.getElementById('mp-parea');
   if(!area)return;
@@ -1622,7 +1655,7 @@ function mpNewPuzzle(){
       <div class="mp-bhint">How many words can you make?</div>
       <button class="mp-new" onclick="mpNewPuzzle()">New Word Grid</button>`;
   } else {
-    const r=genNum();
+    const r=mpGenNum();
     if(!r){area.innerHTML='<div class="mp-bhint">Generating…</div>';return;}
     const gridHtml=`<div class="mp-ngrid">${r.grid.map(n=>`<div class="mp-ncell">${n}</div>`).join('')}</div>`;
     const groups=[
