@@ -635,7 +635,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Acer</span><span id="version-tag">a.21.06.26c</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Acer</span><span id="version-tag">a.21.06.26d</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -1948,25 +1948,24 @@ function removeImg(){document.getElementById('img-el').src='';document.getElemen
 document.addEventListener('DOMContentLoaded',()=>{
   const inp=document.getElementById('img-input');
   if(inp)inp.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{document.getElementById('img-el').src=ev.target.result;document.getElementById('img-pane').classList.add('visible');};r.readAsDataURL(f);});
-  const urlInp=document.getElementById('img-url-input');
-  if(urlInp)document.getElementById('img-url-btn').onclick=()=>{const u=urlInp.value.trim();if(!u)return;fetch(u).then(r=>r.blob()).then(blob=>{const r=new FileReader();r.onload=ev=>{document.getElementById('img-el').src=ev.target.result;document.getElementById('img-pane').classList.add('visible');closeImgModal()};r.readAsDataURL(blob)}).catch(()=>{document.getElementById('img-el').src=u;document.getElementById('img-pane').classList.add('visible');closeImgModal();})};
 });
-function openImgModal(){document.getElementById('img-ov').classList.add('on');}
-function closeImgModal(){document.getElementById('img-ov').classList.remove('on');}
+function handleImgUrl(){const u=(document.getElementById('img-url-input').value||'').trim();if(!u)return;fetch(u).then(r=>r.blob()).then(blob=>{const r=new FileReader();r.onload=ev=>{document.getElementById('img-el').src=ev.target.result;document.getElementById('img-pane').classList.add('visible');closeImgOverlay();};r.readAsDataURL(blob);}).catch(()=>{document.getElementById('img-el').src=u;document.getElementById('img-pane').classList.add('visible');closeImgOverlay();});}
+function openImgModal(){document.getElementById('img-overlay').classList.add('on');}
+function closeImgModal(){document.getElementById('img-overlay').classList.remove('on');}
 
 // ══════════════════════════════════════════════════════════════
 // OVERRIDE OVERLAY
 // ══════════════════════════════════════════════════════════════
 function openOverride(){
   const ov=JSON.parse(localStorage.getItem('overrides')||'{}');
-  document.getElementById('ov-red').value=ov.red||'';document.getElementById('ov-green').value=ov.green||'';
+  document.getElementById('ov-meal1').value=ov.red||'';document.getElementById('ov-meal2').value=ov.green||'';
   document.getElementById('ov-msg').value=(ov.msg||'').replace(/<br>/g,'\n');
   document.getElementById('ov-tt-topic').value='';['1','2','3'].forEach(n=>document.getElementById('ov-tt-'+n).value='');
-  document.getElementById('override-ov').classList.add('on');
+  document.getElementById('ov-overlay').classList.add('on');
 }
-function closeOverride(){document.getElementById('override-ov').classList.remove('on');}
+function closeOverride(){document.getElementById('ov-overlay').classList.remove('on');}
 function saveOverride(){
-  const ov={};const red=document.getElementById('ov-red').value.trim();const green=document.getElementById('ov-green').value.trim();const msg=document.getElementById('ov-msg').value;
+  const ov={};const red=document.getElementById('ov-meal1').value.trim();const green=document.getElementById('ov-meal2').value.trim();const msg=document.getElementById('ov-msg').value;
   if(red)ov.red=red;if(green)ov.green=green;if(msg.trim())ov.msg=msg.replace(/\n/g,'<br>');
   localStorage.setItem('overrides',JSON.stringify(ov));renderLunch();renderMsg();
   document.getElementById('override-dot').style.display=Object.keys(ov).length?'inline-block':'none';closeOverride();
