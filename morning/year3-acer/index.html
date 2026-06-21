@@ -635,7 +635,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Acer</span><span id="version-tag">a.21.06.26a</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Acer</span><span id="version-tag">a.21.06.26b</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -1515,13 +1515,15 @@ function fexpr(it,tgt){if(it.length===1)return it[0].val===tgt?it[0]:null;for(le
 function estr(t){if(typeof t==='number')return''+t;const w=x=>typeof x==='number'?''+x:'('+estr(x)+')';return w(t.l)+' '+t.op+' '+w(t.r)}
 function solveNum(g,tgt,k){for(const c of combos(g,k)){const r=fexpr(c.map(n=>({val:n,tree:n})),tgt);if(r)return estr(r.tree)+' = '+tgt}return'—'}
 function genNum(tr=0){
-  if(tr>50)return null;
-  const pool=Array.from({length:12},(_,i)=>i+1);
+  if(tr>80)return null;
+  // Y3: pool only from ×2,×4,×5,×8,×10 factors — no 7,9,11,12 which Y3 haven't learned
+  const base=[1,2,4,5,8,10];
+  const pool=[];while(pool.length<18)pool.push(...base);
   for(let i=pool.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[pool[i],pool[j]]=[pool[j],pool[i]];}
   const g=pool.slice(0,9);
   const s={2:new Set(),3:new Set(),4:new Set()};
-  const cap={2:30,3:60,4:90};
-  const floor={2:8,3:15,4:25};
+  const cap={2:50,3:120,4:250};
+  const floor={2:6,3:12,4:20};
   for(const k of[2,3,4])for(const c of combos(g,k))reach(c).forEach(v=>{if(v>=floor[k]&&Number.isInteger(v)&&v<=cap[k])s[k].add(v);});
   if(s[2].size<4||s[3].size<4||s[4].size<2)return genNum(tr+1);
   const pck=(set,n)=>[...set].sort(()=>Math.random()-.5).slice(0,n).sort((a,b)=>a-b);
