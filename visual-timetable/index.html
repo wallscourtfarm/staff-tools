@@ -460,7 +460,7 @@
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26ay</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26az</span>
 </div>
 
 <div class="app">
@@ -599,7 +599,7 @@
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26ay</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26az</div>
 
 <script>
 const ICONS = {
@@ -933,10 +933,11 @@ function downloadPDF() {
   const pages = document.querySelectorAll('#preview-container .page-preview');
   if (!pages.length) return;
 
-  // Set @page size to match selected layout
   const isA3     = currentSize === 'a3';
   const isSquare = currentSize === 'square';
-  let pageSize = isA3 ? 'A3 portrait' : isSquare ? 'A4 landscape' : 'A4 portrait';
+  const pageSize = isA3 ? 'A3 portrait' : isSquare ? 'A4 landscape' : 'A4 portrait';
+  const sizeLabel = isA3 ? 'A3' : 'A4';
+  const orientLabel = isSquare ? 'landscape' : 'portrait';
 
   let printStyle = document.getElementById('print-page-style');
   if (!printStyle) {
@@ -946,7 +947,14 @@ function downloadPDF() {
   }
   printStyle.textContent = `@media print { @page { size: ${pageSize}; margin: 0; } }`;
 
+  // Show paper size reminder — browser can't set this automatically for physical printers
+  const status = document.getElementById('pdf-status');
+  status.innerHTML = `⚠ Set paper size to <strong>${sizeLabel} ${orientLabel}</strong> in the print dialog`;
+  status.style.color = '#c05000';
+
   window.print();
+
+  setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
 }
 </script>
 </body>
