@@ -460,7 +460,7 @@
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26bf</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26bg</span>
 </div>
 
 <div class="app">
@@ -599,7 +599,7 @@
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26bf</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26bg</div>
 
 <script>
 const ICONS = {
@@ -871,24 +871,47 @@ function drawCutLines() {
       page.appendChild(d);
     };
 
-    // Vertical lines between columns
+    const allRects = cards.map(c => c.getBoundingClientRect());
+    const gridLeft  = Math.min(...allRects.map(r => r.left))   - pageRect.left;
+    const gridRight = Math.max(...allRects.map(r => r.right))  - pageRect.left;
+    const gridTop   = Math.min(...allRects.map(r => r.top))    - pageRect.top;
+    const gridBot   = Math.max(...allRects.map(r => r.bottom)) - pageRect.top;
+
+    const vGapHalf = cards.length > 1
+      ? (cards[1].getBoundingClientRect().left - cards[0].getBoundingClientRect().right) / 2
+      : gridLeft / 2;
+    const hGapHalf = cards.length > cols
+      ? (cards[cols].getBoundingClientRect().top - cards[0].getBoundingClientRect().bottom) / 2
+      : gridTop / 2;
+
+    // Outer boundary lines
+    const outerL = gridLeft  - vGapHalf;
+    const outerR = gridRight + vGapHalf;
+    const outerT = gridTop   - hGapHalf;
+    const outerB = gridBot   + hGapHalf;
+
+    // Vertical lines: left edge, between columns, right edge
+    const vXs = [outerL];
     for (let c = 1; c < cols; c++) {
       const prev = cards[c - 1].getBoundingClientRect();
       const curr = cards[c].getBoundingClientRect();
-      const x = (prev.right + curr.left) / 2 - pageRect.left;
-      mkLine(true, x / W * 100);
+      vXs.push((prev.right + curr.left) / 2 - pageRect.left);
     }
+    vXs.push(outerR);
+    vXs.forEach(x => mkLine(true, x / W * 100));
 
-    // Horizontal lines between rows
+    // Horizontal lines: top edge, between rows, bottom edge
+    const hYs = [outerT];
     for (let r = 1; r < rows; r++) {
       const above = cards[(r - 1) * cols];
       const below = cards[r * cols];
       if (!above || !below) continue;
       const aRect = above.getBoundingClientRect();
       const bRect = below.getBoundingClientRect();
-      const y = (aRect.bottom + bRect.top) / 2 - pageRect.top;
-      mkLine(false, y / H * 100);
+      hYs.push((aRect.bottom + bRect.top) / 2 - pageRect.top);
     }
+    hYs.push(outerB);
+    hYs.forEach(y => mkLine(false, y / H * 100));
   });
 }
 
