@@ -448,12 +448,7 @@
       page-break-after: avoid;
       break-after: avoid;
     }
-    /* Hide screen SVG cut lines; replace with CSS outlines that are layout-independent */
-    .cut-overlay { display: none !important; }
-    .card {
-      outline: 1.2px dashed #888 !important;
-      outline-offset: 0px;
-    }
+    /* Cut lines redrawn via beforeprint using % viewBox — no special print CSS needed */
   }
 </style>
 
@@ -465,7 +460,7 @@
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26bb</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26bc</span>
 </div>
 
 <div class="app">
@@ -604,7 +599,7 @@
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26bb</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26bc</div>
 
 <script>
 const ICONS = {
@@ -858,39 +853,42 @@ function drawCutLines() {
     const cols = currentSize === 'square' ? 3 : 2;
     const rows = Math.ceil(cards.length / cols);
     const pageRect = page.getBoundingClientRect();
-
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.classList.add('cut-overlay');
-    svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:10;';
-    page.style.position = 'relative';
-
     const W = pageRect.width;
     const H = pageRect.height;
-    const dash = 'stroke="#888" stroke-width="1.2" stroke-dasharray="6,5" fill="none"';
-    let lines = '';
 
-    // Grid bounds — measure actual gap between cards for consistent spacing
-    const allRects  = cards.map(c => c.getBoundingClientRect());
+    // Express all positions as % of page size — works correctly in both
+    // screen and print without depending on pixel viewport coordinates.
+    const pct = (px, total) => (px / total * 100).toFixed(3) + '%';
+
+    const allRects = cards.map(c => c.getBoundingClientRect());
     const gridLeft  = Math.min(...allRects.map(r => r.left))   - pageRect.left;
     const gridRight = Math.max(...allRects.map(r => r.right))  - pageRect.left;
     const gridTop   = Math.min(...allRects.map(r => r.top))    - pageRect.top;
     const gridBot   = Math.max(...allRects.map(r => r.bottom)) - pageRect.top;
 
-    // Measure half-gap from actual rendered card positions
     const hGapHalf = cards.length > cols
-      ? ((cards[cols].getBoundingClientRect().top - cards[0].getBoundingClientRect().bottom) / 2)
-      : (gridTop / 2);
+      ? (cards[cols].getBoundingClientRect().top - cards[0].getBoundingClientRect().bottom) / 2
+      : gridTop / 2;
     const vGapHalf = cards.length > 1
-      ? ((cards[1].getBoundingClientRect().left - cards[0].getBoundingClientRect().right) / 2)
-      : (gridLeft / 2);
+      ? (cards[1].getBoundingClientRect().left - cards[0].getBoundingClientRect().right) / 2
+      : gridLeft / 2;
 
-    // Outer cut lines are same distance from card edge as internal cut lines
     const outerLeft  = gridLeft  - vGapHalf;
     const outerRight = gridRight + vGapHalf;
     const outerTop   = gridTop   - hGapHalf;
     const outerBot   = gridBot   + hGapHalf;
 
-    // Vertical lines: outer edges + between columns
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('cut-overlay');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;';
+    page.style.position = 'relative';
+
+    const dash = `stroke="#888" stroke-width="${(1.2/W*100).toFixed(4)}" stroke-dasharray="${(6/W*100).toFixed(3)},${(5/W*100).toFixed(3)}" fill="none" vector-effect="non-scaling-stroke"`;
+    let lines = '';
+
+    // Vertical lines between columns
     const vPositions = [outerLeft];
     for (let c = 1; c < cols; c++) {
       const prev = cards[c - 1].getBoundingClientRect();
@@ -899,10 +897,10 @@ function drawCutLines() {
     }
     vPositions.push(outerRight);
     vPositions.forEach(x => {
-      lines += `<line x1="${x.toFixed(1)}" y1="${outerTop.toFixed(1)}" x2="${x.toFixed(1)}" y2="${outerBot.toFixed(1)}" ${dash}/>`;
+      lines += `<line x1="${pct(x,W)}" y1="${pct(outerTop,H)}" x2="${pct(x,W)}" y2="${pct(outerBot,H)}" ${dash}/>`;
     });
 
-    // Horizontal lines: outer edges + between rows
+    // Horizontal lines between rows
     const hPositions = [outerTop];
     for (let r = 1; r < rows; r++) {
       const above = cards[(r - 1) * cols];
@@ -914,7 +912,7 @@ function drawCutLines() {
     }
     hPositions.push(outerBot);
     hPositions.forEach(y => {
-      lines += `<line x1="${outerLeft.toFixed(1)}" y1="${y.toFixed(1)}" x2="${outerRight.toFixed(1)}" y2="${y.toFixed(1)}" ${dash}/>`;
+      lines += `<line x1="${pct(outerLeft,W)}" y1="${pct(y,H)}" x2="${pct(outerRight,W)}" y2="${pct(y,H)}" ${dash}/>`;
     });
 
     svg.innerHTML = lines;
