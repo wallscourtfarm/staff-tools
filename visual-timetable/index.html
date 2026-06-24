@@ -178,6 +178,7 @@
     border-radius: 4px;
     padding: 8mm;
     flex-shrink: 0;
+    box-sizing: border-box;
   }
 
   /* A4 preview */
@@ -838,7 +839,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26aq</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26as</span>
 </div>
 
 <div class="app">
@@ -977,7 +978,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26aq</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26as</div>
 
 <script>
 const ICONS = {
@@ -1318,34 +1319,48 @@ async function downloadPDF() {
   status.textContent = '';
 
   const { jsPDF } = window.jspdf;
-  const pxPerMm = 96 / 25.4;
 
-  // Measure the actual rendered size of the first page (includes padding)
-  const firstPg   = pages[0];
-  const actualWmm = firstPg.offsetWidth  / pxPerMm;
-  const actualHmm = firstPg.offsetHeight / pxPerMm;
-
-  const doc = new jsPDF({
-    orientation: actualWmm >= actualHmm ? 'landscape' : 'portrait',
-    format: [actualWmm, actualHmm],
-    unit: 'mm'
-  });
-
+  const isA3     = currentSize === 'a3';
+  const isSquare = currentSize === 'square';
+  const orientation = isSquare ? 'landscape' : 'portrait';
+  const format      = isA3 ? 'a3' : 'a4';
+  const doc = new jsPDF({ orientation, format, unit: 'mm' });
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
 
   for (let i = 0; i < pages.length; i++) {
     status.textContent = `Page ${i + 1} of ${pages.length}…`;
+    const pg = pages[i];
 
-    const canvas = await html2canvas(pages[i], {
+    // Strip decorative padding so captured pixels match PDF page exactly
+    const savedPad = pg.style.padding;
+    const savedBR  = pg.style.borderRadius;
+    const savedBox = pg.style.boxShadow;
+    pg.style.padding      = '0';
+    pg.style.borderRadius = '0';
+    pg.style.boxShadow    = 'none';
+
+    // Force element to exact PDF pixel dimensions
+    const pxPerMm = 96 / 25.4;
+    pg.style.width  = (pw * pxPerMm) + 'px';
+    pg.style.height = (ph * pxPerMm) + 'px';
+
+    const canvas = await html2canvas(pg, {
       scale: 3,
       useCORS: true,
-      backgroundColor: null,
+      backgroundColor: '#ffffff',
       logging: false,
     });
 
+    // Restore styles
+    pg.style.padding      = savedPad;
+    pg.style.borderRadius = savedBR;
+    pg.style.boxShadow    = savedBox;
+    pg.style.width  = '';
+    pg.style.height = '';
+
     const imgData = canvas.toDataURL('image/jpeg', 0.92);
-    if (i > 0) doc.addPage([actualWmm, actualHmm]);
+    if (i > 0) doc.addPage();
     doc.addImage(imgData, 'JPEG', 0, 0, pw, ph);
   }
 
