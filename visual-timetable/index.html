@@ -840,7 +840,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26au</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26av</span>
 </div>
 
 <div class="app">
@@ -979,7 +979,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26au</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26av</div>
 
 <script>
 const ICONS = {
@@ -1338,16 +1338,17 @@ async function downloadPDF() {
     const swaps = [];
     pages[i].querySelectorAll('.card-icon-wrap img').forEach(img => {
       const wrap = img.parentElement;
+      const isXs = wrap.classList.contains('icon-xs');
+      const isSm = wrap.classList.contains('icon-sm');
+      const pct  = isXs ? '50%' : isSm ? '55%' : '82%';
       const div = document.createElement('div');
-      div.style.cssText = `
-        width: ${img.style.width || getComputedStyle(img).width};
-        height: ${img.style.height || getComputedStyle(img).height};
-        background-image: url('${img.src}');
-        background-size: contain;
-        background-repeat: no-repeat;
-        background-position: center;
-        ${img.style.transform ? 'transform:' + img.style.transform + ';' : ''}
-      `;
+      div.style.width           = pct;
+      div.style.height          = pct;
+      div.style.backgroundImage = `url('${img.src}')`;
+      div.style.backgroundSize  = 'contain';
+      div.style.backgroundRepeat   = 'no-repeat';
+      div.style.backgroundPosition = 'center';
+      if (img.style.transform) div.style.transform = img.style.transform;
       wrap.replaceChild(div, img);
       swaps.push({ wrap, div, img });
     });
