@@ -460,7 +460,7 @@
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26bc</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26bd</span>
 </div>
 
 <div class="app">
@@ -599,7 +599,7 @@
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26bc</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26bd</div>
 
 <script>
 const ICONS = {
@@ -856,64 +856,37 @@ function drawCutLines() {
     const W = pageRect.width;
     const H = pageRect.height;
 
-    // Express all positions as % of page size — works correctly in both
-    // screen and print without depending on pixel viewport coordinates.
-    const pct = (px, total) => (px / total * 100).toFixed(3) + '%';
-
-    const allRects = cards.map(c => c.getBoundingClientRect());
-    const gridLeft  = Math.min(...allRects.map(r => r.left))   - pageRect.left;
-    const gridRight = Math.max(...allRects.map(r => r.right))  - pageRect.left;
-    const gridTop   = Math.min(...allRects.map(r => r.top))    - pageRect.top;
-    const gridBot   = Math.max(...allRects.map(r => r.bottom)) - pageRect.top;
-
-    const hGapHalf = cards.length > cols
-      ? (cards[cols].getBoundingClientRect().top - cards[0].getBoundingClientRect().bottom) / 2
-      : gridTop / 2;
-    const vGapHalf = cards.length > 1
-      ? (cards[1].getBoundingClientRect().left - cards[0].getBoundingClientRect().right) / 2
-      : gridLeft / 2;
-
-    const outerLeft  = gridLeft  - vGapHalf;
-    const outerRight = gridRight + vGapHalf;
-    const outerTop   = gridTop   - hGapHalf;
-    const outerBot   = gridBot   + hGapHalf;
-
+    // Build SVG using pixel coords within the page-preview coordinate space.
+    // Lines run full page width/height so they read as proper "cut here" marks.
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.classList.add('cut-overlay');
-    svg.setAttribute('viewBox', '0 0 100 100');
-    svg.setAttribute('preserveAspectRatio', 'none');
-    svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;';
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:10;';
     page.style.position = 'relative';
 
-    const dash = `stroke="#888" stroke-width="${(1.2/W*100).toFixed(4)}" stroke-dasharray="${(6/W*100).toFixed(3)},${(5/W*100).toFixed(3)}" fill="none" vector-effect="non-scaling-stroke"`;
+    const dash = `stroke="#999" stroke-width="1.5" stroke-dasharray="8,6" fill="none"`;
     let lines = '';
 
-    // Vertical lines between columns
-    const vPositions = [outerLeft];
+    const allRects = cards.map(c => c.getBoundingClientRect());
+
+    // Vertical cut lines: run full page height, positioned between each column
     for (let c = 1; c < cols; c++) {
       const prev = cards[c - 1].getBoundingClientRect();
       const curr = cards[c].getBoundingClientRect();
-      vPositions.push((prev.right + curr.left) / 2 - pageRect.left);
+      const x = (prev.right + curr.left) / 2 - pageRect.left;
+      lines += `<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${H}" ${dash}/>`;
     }
-    vPositions.push(outerRight);
-    vPositions.forEach(x => {
-      lines += `<line x1="${pct(x,W)}" y1="${pct(outerTop,H)}" x2="${pct(x,W)}" y2="${pct(outerBot,H)}" ${dash}/>`;
-    });
 
-    // Horizontal lines between rows
-    const hPositions = [outerTop];
+    // Horizontal cut lines: run full page width, positioned between each row
     for (let r = 1; r < rows; r++) {
       const above = cards[(r - 1) * cols];
       const below = cards[r * cols];
       if (!above || !below) continue;
       const aRect = above.getBoundingClientRect();
       const bRect = below.getBoundingClientRect();
-      hPositions.push((aRect.bottom + bRect.top) / 2 - pageRect.top);
+      const y = (aRect.bottom + bRect.top) / 2 - pageRect.top;
+      lines += `<line x1="0" y1="${y.toFixed(1)}" x2="${W}" y2="${y.toFixed(1)}" ${dash}/>`;
     }
-    hPositions.push(outerBot);
-    hPositions.forEach(y => {
-      lines += `<line x1="${pct(outerLeft,W)}" y1="${pct(y,H)}" x2="${pct(outerRight,W)}" y2="${pct(y,H)}" ${dash}/>`;
-    });
 
     svg.innerHTML = lines;
     page.appendChild(svg);
