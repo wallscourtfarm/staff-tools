@@ -450,6 +450,24 @@
     }
     /* Cut lines redrawn via beforeprint using % viewBox — no special print CSS needed */
   }
+
+  /* ── Cut-line table ── */
+  .cut-table {
+    border-collapse: collapse;
+    width: 100%;
+    height: 100%;
+    table-layout: fixed;
+  }
+  .cut-cell {
+    border: 1.5px dashed #aaa;
+    padding: 0;
+    vertical-align: top;
+  }
+  .cut-cell .card {
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+  }
 </style>
 
 </head>
@@ -460,7 +478,7 @@
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26bg</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26bh</span>
 </div>
 
 <div class="app">
@@ -599,7 +617,7 @@
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26bg</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26bh</div>
 
 <script>
 const ICONS = {
@@ -758,13 +776,22 @@ function renderCards() {
     pages.push(checks.slice(i, i + CARDS_PER_PAGE));
   }
 
-  container.innerHTML = pages.map(page =>
-    `<div class="page-preview ${size}">
-      <div class="card-grid">
-        ${page.map(cb => makeCardHTML(cb, colour, beingA)).join('')}
-      </div>
-    </div>`
-  ).join('');
+  const cols = size === 'square' ? 3 : 2;
+  container.innerHTML = pages.map(page => {
+    // Build rows for the table
+    let rows = '';
+    for (let i = 0; i < page.length; i += cols) {
+      const rowCells = page.slice(i, i + cols);
+      // Pad last row with empty cells so borders are complete
+      while (rowCells.length < cols) rowCells.push(null);
+      rows += `<tr>${rowCells.map(cb =>
+        `<td class="cut-cell">${cb ? makeCardHTML(cb, colour, beingA) : ''}</td>`
+      ).join('')}</tr>`;
+    }
+    return `<div class="page-preview ${size}">
+      <table class="cut-table"><tbody>${rows}</tbody></table>
+    </div>`;
+  }).join('');
 }
 
 // Year group buttons
@@ -841,79 +868,6 @@ document.querySelectorAll('.select-all-btn').forEach(btn => {
 });
 
 // ── Cut lines ────────────────────────────────────────────────────
-function drawCutLines() {
-  document.querySelectorAll('.cut-overlay').forEach(el => el.remove());
-
-  document.querySelectorAll('#preview-container .page-preview').forEach(page => {
-    const grid = page.querySelector('.card-grid');
-    if (!grid) return;
-    const cards = Array.from(grid.querySelectorAll('.card'));
-    if (cards.length < 2) return;
-
-    const cols = currentSize === 'square' ? 3 : 2;
-    const rows = Math.ceil(cards.length / cols);
-    const pageRect = page.getBoundingClientRect();
-    const W = pageRect.width;
-    const H = pageRect.height;
-
-    page.style.position = 'relative';
-
-    // Use simple divs with CSS borders — no SVG, no viewBox issues.
-    // Positions expressed as % so they survive print layout changes.
-    const mkLine = (isVertical, pct) => {
-      const d = document.createElement('div');
-      d.className = 'cut-overlay';
-      if (isVertical) {
-        d.style.cssText = `position:absolute;top:0;bottom:0;left:${pct}%;width:0;border-left:1.5px dashed #999;pointer-events:none;z-index:10;`;
-      } else {
-        d.style.cssText = `position:absolute;left:0;right:0;top:${pct}%;height:0;border-top:1.5px dashed #999;pointer-events:none;z-index:10;`;
-      }
-      page.appendChild(d);
-    };
-
-    const allRects = cards.map(c => c.getBoundingClientRect());
-    const gridLeft  = Math.min(...allRects.map(r => r.left))   - pageRect.left;
-    const gridRight = Math.max(...allRects.map(r => r.right))  - pageRect.left;
-    const gridTop   = Math.min(...allRects.map(r => r.top))    - pageRect.top;
-    const gridBot   = Math.max(...allRects.map(r => r.bottom)) - pageRect.top;
-
-    const vGapHalf = cards.length > 1
-      ? (cards[1].getBoundingClientRect().left - cards[0].getBoundingClientRect().right) / 2
-      : gridLeft / 2;
-    const hGapHalf = cards.length > cols
-      ? (cards[cols].getBoundingClientRect().top - cards[0].getBoundingClientRect().bottom) / 2
-      : gridTop / 2;
-
-    // Outer boundary lines
-    const outerL = gridLeft  - vGapHalf;
-    const outerR = gridRight + vGapHalf;
-    const outerT = gridTop   - hGapHalf;
-    const outerB = gridBot   + hGapHalf;
-
-    // Vertical lines: left edge, between columns, right edge
-    const vXs = [outerL];
-    for (let c = 1; c < cols; c++) {
-      const prev = cards[c - 1].getBoundingClientRect();
-      const curr = cards[c].getBoundingClientRect();
-      vXs.push((prev.right + curr.left) / 2 - pageRect.left);
-    }
-    vXs.push(outerR);
-    vXs.forEach(x => mkLine(true, x / W * 100));
-
-    // Horizontal lines: top edge, between rows, bottom edge
-    const hYs = [outerT];
-    for (let r = 1; r < rows; r++) {
-      const above = cards[(r - 1) * cols];
-      const below = cards[r * cols];
-      if (!above || !below) continue;
-      const aRect = above.getBoundingClientRect();
-      const bRect = below.getBoundingClientRect();
-      hYs.push((aRect.bottom + bRect.top) / 2 - pageRect.top);
-    }
-    hYs.push(outerB);
-    hYs.forEach(y => mkLine(false, y / H * 100));
-  });
-}
 
 
 
@@ -921,7 +875,6 @@ function drawCutLines() {
 const _renderCards = renderCards;
 renderCards = function() {
   _renderCards();
-  requestAnimationFrame(drawCutLines);
 };
 
 // Initial render
