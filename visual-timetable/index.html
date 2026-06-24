@@ -838,7 +838,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26ao</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26ap</span>
 </div>
 
 <div class="app">
@@ -977,7 +977,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26ao</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26ap</div>
 
 <script>
 const ICONS = {
@@ -1326,27 +1326,41 @@ async function downloadPDF() {
   const format = isA3 ? 'a3' : 'a4';
   const doc = new jsPDF({ orientation, format, unit: 'mm' });
 
+  // PDF page dimensions in CSS pixels (96dpi)
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  const pxPerMm = 96 / 25.4;
+  const targetW = Math.round(pw * pxPerMm);
+  const targetH = Math.round(ph * pxPerMm);
+
   for (let i = 0; i < pages.length; i++) {
     status.textContent = `Page ${i + 1} of ${pages.length}…`;
-    const canvas = await html2canvas(pages[i], {
+
+    // Force page to exact PDF dimensions before capture
+    const pg = pages[i];
+    const prevW = pg.style.width;
+    const prevH = pg.style.height;
+    const prevMinH = pg.style.minHeight;
+    pg.style.width    = targetW + 'px';
+    pg.style.height   = targetH + 'px';
+    pg.style.minHeight = targetH + 'px';
+
+    const canvas = await html2canvas(pg, {
       scale: 3,
       useCORS: true,
       backgroundColor: null,
       logging: false,
+      width:  targetW,
+      height: targetH,
     });
+
+    pg.style.width    = prevW;
+    pg.style.height   = prevH;
+    pg.style.minHeight = prevMinH;
+
     const imgData = canvas.toDataURL('image/jpeg', 0.92);
-    const pw = doc.internal.pageSize.getWidth();
-    const ph = doc.internal.pageSize.getHeight();
     if (i > 0) doc.addPage();
-    // Preserve aspect ratio — don't stretch canvas to fill page
-    const scaleX = pw / canvas.width;
-    const scaleY = ph / canvas.height;
-    const scale  = Math.min(scaleX, scaleY);
-    const imgW   = canvas.width  * scale;
-    const imgH   = canvas.height * scale;
-    const offX   = (pw - imgW) / 2;
-    const offY   = (ph - imgH) / 2;
-    doc.addImage(imgData, 'JPEG', offX, offY, imgW, imgH);
+    doc.addImage(imgData, 'JPEG', 0, 0, pw, ph);
   }
 
   const yr = new Date().getFullYear();
