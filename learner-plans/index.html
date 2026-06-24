@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Learner Plans — Wallscourt Farm Academy</title>
+
+<!-- Uses the existing WFA Data API at api.wallscourt-farm-academy.co.uk -->
+<style>
+:root {
+  --blue: #1798d3; --dark: #0a0101; --light-bg: #f4f8fb;
+  --border: #d0e4ef; --green: #2ecc71; --amber: #f39c12;
+  --red: #e74c3c; --text: #2c3e50; --muted: #7f8c8d;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light-bg); color: var(--text); font-size: 15px; }
+
+/* NAV */
+nav { background: var(--blue); color: white; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 56px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+nav .brand { font-size: 1.05rem; font-weight: 700; }
+nav .brand span { opacity: .7; font-weight: 400; font-size: .88rem; }
+.save-status { font-size: .78rem; opacity: .8; }
+.save-status.saving { opacity: .6; }
+.save-status.error { color: #ffcccc; }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 8px 15px; border-radius: 8px; border: none; cursor: pointer; font-size: .86rem; font-weight: 600; transition: all .15s; text-decoration: none; }
+.btn-primary { background: var(--blue); color: white; } .btn-primary:hover { background: #1282b8; }
+.btn-white { background: white; color: var(--blue); } .btn-white:hover { background: #e8f4fb; }
+.btn-outline { background: transparent; color: white; border: 2px solid rgba(255,255,255,.5); } .btn-outline:hover { border-color: white; }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); } .btn-ghost:hover { background: white; color: var(--text); }
+.btn-danger { background: var(--red); color: white; } .btn-danger:hover { background: #c0392b; }
+.btn-green { background: #27ae60; color: white; } .btn-green:hover { background: #219a52; }
+.btn-sm { padding: 5px 10px; font-size: .8rem; }
+
+/* PAGES */
+.page { display: none; } .page.active { display: block; }
+
+/* LOGIN */
+#login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+.login-card { background: white; border-radius: 16px; padding: 40px; max-width: 380px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,.12); text-align: center; }
+.login-card .logo { font-size: 2.5rem; margin-bottom: 8px; }
+.login-card h1 { font-size: 1.3rem; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.login-card p { color: var(--muted); font-size: .88rem; margin-bottom: 28px; }
+.login-card .form-group { text-align: left; margin-bottom: 14px; }
+.login-card label { display: block; font-size: .78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; }
+.login-card input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: .95rem; }
+.login-card input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(23,152,211,.12); }
+.login-error { color: var(--red); font-size: .82rem; margin-top: 10px; }
+
+/* DASHBOARD */
+#dashboard { padding: 24px 20px; max-width: 920px; margin: 0 auto; }
+.dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
+.dash-header h1 { font-size: 1.35rem; font-weight: 700; }
+.search-bar { width: 100%; max-width: 320px; padding: 9px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: .9rem; margin-bottom: 16px; background: white; }
+.search-bar:focus { outline: none; border-color: var(--blue); }
+.children-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.child-card { background: white; border-radius: 12px; padding: 18px; border: 1px solid var(--border); cursor: pointer; transition: all .15s; }
+.child-card:hover { border-color: var(--blue); box-shadow: 0 4px 16px rgba(23,152,211,.15); transform: translateY(-1px); }
+.child-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 3px; }
+.child-card .meta { font-size: .8rem; color: var(--muted); margin-bottom: 10px; }
+.term-pills { display: flex; gap: 4px; flex-wrap: wrap; }
+.pill { font-size: .7rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; background: #eee; color: var(--muted); }
+.pill.complete { background: #d4f0e0; color: #1a7a43; }
+.pill.partial { background: #fff3cd; color: #856404; }
+
+/* PLAN VIEW */
+.plan-header { background: white; border-bottom: 1px solid var(--border); padding: 14px 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.back-btn { color: var(--blue); cursor: pointer; font-weight: 600; font-size: .88rem; background: none; border: none; display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+.back-btn:hover { text-decoration: underline; }
+.plan-header h2 { font-size: 1.15rem; font-weight: 700; flex: 1; min-width: 120px; }
+.plan-header .plan-meta { font-size: .8rem; color: var(--muted); }
+.year-selector { padding: 6px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: .85rem; background: white; cursor: pointer; }
+.year-selector:focus { outline: none; border-color: var(--blue); }
+
+.plan-body { max-width: 960px; margin: 0 auto; padding: 20px; }
+.tabs { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
+.tab { padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: .85rem; font-weight: 600; border: 2px solid transparent; color: var(--muted); background: white; transition: all .15s; position: relative; }
+.tab:hover { color: var(--blue); border-color: var(--blue); }
+.tab.active { background: var(--blue); color: white; border-color: var(--blue); }
+.tab.has-data::after { content: '●'; font-size: .45rem; position: absolute; top: 5px; right: 5px; color: var(--green); }
+.tab.active.has-data::after { color: rgba(255,255,255,.8); }
+
+/* CARDS */
+.card { background: white; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 16px; overflow: hidden; }
+.card-header { padding: 13px 18px; background: var(--light-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.card-header h3 { font-size: .93rem; font-weight: 700; }
+.card-body { padding: 18px; }
+
+/* FORMS */
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: .77rem; font-weight: 700; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .4px; }
+.form-group input, .form-group textarea, .form-group select { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: .9rem; font-family: inherit; color: var(--text); transition: border .15s; }
+.form-group textarea { resize: vertical; min-height: 75px; }
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(23,152,211,.12); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+/* RATING */
+.rating-group { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 8px; }
+.rating-btn { flex: 1; min-width: 90px; padding: 8px 8px; border-radius: 8px; border: 2px solid var(--border); cursor: pointer; font-size: .8rem; font-weight: 700; text-align: center; transition: all .15s; background: white; color: var(--muted); }
+.rating-btn.below.selected { background: #fdecea; border-color: var(--red); color: var(--red); }
+.rating-btn.expected.selected { background: #fff3cd; border-color: var(--amber); color: #856404; }
+.rating-btn.better.selected { background: #d4f0e0; border-color: var(--green); color: #1a7a43; }
+
+/* TARGET ROWS */
+.target-row { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+.target-row .row-num { font-size: .73rem; font-weight: 800; color: var(--blue); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+.remove-target { background: none; border: none; cursor: pointer; color: var(--red); font-size: 1rem; opacity: .5; line-height: 1; }
+.remove-target:hover { opacity: 1; }
+.add-target-btn { width: 100%; padding: 10px; border: 2px dashed var(--border); border-radius: 8px; background: none; cursor: pointer; color: var(--muted); font-size: .84rem; font-weight: 600; transition: all .15s; }
+.add-target-btn:hover { border-color: var(--blue); color: var(--blue); }
+
+/* BANNERS */
+.roll-banner { background: linear-gradient(135deg,#e8f4fb,#d0eaf8); border: 2px solid var(--blue); border-radius: 12px; padding: 16px 18px; margin-bottom: 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.roll-banner .icon { font-size: 1.8rem; }
+.roll-banner .text h4 { font-weight: 700; color: var(--blue); font-size: .95rem; }
+.roll-banner .text p { font-size: .82rem; color: var(--muted); margin-top: 2px; }
+.new-year-banner { background: linear-gradient(135deg,#e8faf0,#c8eedd); border: 2px solid #27ae60; border-radius: 12px; padding: 16px 18px; margin-bottom: 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.new-year-banner .text h4 { font-weight: 700; color: #1a7a43; font-size: .95rem; }
+.new-year-banner .text p { font-size: .82rem; color: var(--muted); margin-top: 2px; }
+
+/* SIGNATURES */
+.section-label { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; color: var(--blue); padding: 5px 0; margin-bottom: 10px; border-bottom: 2px solid var(--blue); }
+.signatures-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 10px; }
+.sig-field label { font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; display: block; margin-bottom: 3px; }
+.sig-field input { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: .85rem; }
+.sig-field input:focus { outline: none; border-color: var(--blue); }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeIn .15s; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal { background: white; border-radius: 16px; padding: 28px; max-width: 480px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.3); animation: slideUp .2s ease; }
+@keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 18px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 24px; right: 24px; background: #2c3e50; color: white; padding: 11px 18px; border-radius: 8px; font-size: .86rem; font-weight: 600; z-index: 9999; animation: toastIn .2s; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+.toast.success { background: #27ae60; }
+.toast.error { background: var(--red); }
+@keyframes toastIn { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* EMPTY STATE */
+.empty-state { text-align: center; padding: 50px 20px; color: var(--muted); grid-column: 1/-1; }
+.empty-state h3 { font-size: 1rem; margin-bottom: 5px; color: var(--text); }
+
+/* PRINT */
+@media print {
+  nav, .tabs, .plan-header, .card-header .btn, .roll-banner, .new-year-banner,
+  .add-target-btn, .remove-target, .btn, .back-btn, .year-selector { display: none !important; }
+  body { background: white; font-size: 11pt; }
+  .page { display: block !important; }
+  #dashboard, #login-page { display: none !important; }
+  .plan-body { padding: 0; max-width: 100%; }
+  .card { break-inside: avoid; border: 1px solid #ccc; margin-bottom: 10px; box-shadow: none; }
+  .card-header { background: #e8f4fb; }
+  .target-row { border: 1px solid #ccc; }
+  .print-header { display: block !important; }
+}
+.print-header { display: none; padding: 0 0 14px; }
+.print-header h1 { font-size: 1.2rem; font-weight: 800; }
+.print-header .pm { display: flex; gap: 20px; font-size: .82rem; margin-top: 4px; color: var(--muted); }
+
+@media (max-width:600px) {
+  .form-row { grid-template-columns: 1fr; }
+  .signatures-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV (hidden on login) -->
+<nav id="mainNav" style="display:none">
+  <div class="brand">Learner Plans <span>— Wallscourt Farm Academy</span></div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="save-status" id="saveStatus"></span>
+    <button class="btn btn-outline btn-sm" onclick="logout()">Sign out</button>
+  </div>
+</nav>
+
+<!-- LOGIN PAGE -->
+<div id="login-page">
+  <div class="login-card">
+    <div class="logo">📋</div>
+    <h1>Learner Plans</h1>
+    <p>Wallscourt Farm Academy</p>
+    <div class="form-group">
+      <label>Staff Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px" onclick="doLogin()" id="loginBtn">Sign in</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="page" id="dashboard">
+  <div style="max-width:920px;margin:0 auto;padding:24px 20px">
+    <div class="dash-header">
+      <h1>All Learner Plans</h1>
+      <button class="btn btn-primary" onclick="showNewChildModal()">+ New Learner</button>
+    </div>
+    <input type="text" class="search-bar" placeholder="Search by name or class…" oninput="renderDashboard(this.value)" id="searchBar">
+    <div class="children-grid" id="childrenGrid"></div>
+  </div>
+</div>
+
+<!-- PLAN VIEW -->
+<div class="page" id="plan-view">
+  <div class="plan-header">
+    <button class="back-btn" onclick="goBack()">← All Plans</button>
+    <div style="flex:1;min-width:100px">
+      <h2 id="planName"></h2>
+      <div class="plan-meta" id="planMeta"></div>
+    </div>
+    <select class="year-selector" id="yearSelector" onchange="switchYear(this.value)"></select>
+    <button class="btn btn-ghost btn-sm" onclick="editChildModal()">Edit Info</button>
+    <button class="btn btn-outline btn-sm" style="background:var(--blue);color:white;border:none" onclick="printPlan()">🖨 Print PDF</button>
+    <button class="btn btn-danger btn-sm" onclick="deleteChild()">Delete</button>
+  </div>
+  <div class="plan-body">
+    <div class="print-header" id="printHeader"></div>
+    <div class="tabs" id="termTabs"></div>
+    <div id="tabContents"></div>
+  </div>
+</div>
+
+<!-- NEW/EDIT CHILD MODAL -->
+<div id="childModal" style="display:none">
+  <div class="modal-overlay" onmousedown="if(event.target===this)closeChildModal()">
+    <div class="modal">
+      <h3 id="childModalTitle">New Learner Plan</h3>
+      <input type="hidden" id="editingChildId">
+      <div class="form-group">
+        <label>Child's Full Name *</label>
+        <input type="text" id="nName" placeholder="e.g. Sohan Jhagra">
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Class</label><input type="text" id="nClass" placeholder="e.g. Clifton 4M2"></div>
+        <div class="form-group"><label>Class Teacher</label><input type="text" id="nTeacher" placeholder="e.g. Innes McLean"></div>
+      </div>
+      <div class="form-group">
+        <label>Year Group</label>
+        <select id="nYear">
+          <option value="">Select…</option>
+          <option>EYFS</option><option>Year 1</option><option>Year 2</option>
+          <option>Year 3</option><option>Year 4</option><option>Year 5</option><option>Year 6</option>
+        </select>
+      </div>
+      <div id="yearFieldWrap" style="display:none">
+        <div class="form-group">
+          <label>Academic Year *</label>
+          <input type="text" id="nAcYear" placeholder="e.g. 2025-26">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeChildModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveChild()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NEW YEAR MODAL -->
+<div id="newYearModal" style="display:none">
+  <div class="modal-overlay" onmousedown="if(event.target===this)document.getElementById('newYearModal').style.display='none'">
+    <div class="modal">
+      <h3 id="newYearTitle">Start New Academic Year</h3>
+      <p style="color:var(--muted);font-size:.88rem;margin-bottom:16px" id="newYearDesc"></p>
+      <div class="form-group">
+        <label>New Academic Year</label>
+        <input type="text" id="newYearInput" placeholder="e.g. 2026-27">
+      </div>
+      <p style="font-size:.82rem;color:var(--muted)">From Term 6 of <span id="prevYearLabel"></span>: <b>new targets → T1 SMART targets</b>, <b>strategies &amp; provision → T1 provision</b>. The Assess section also carries forward.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="document.getElementById('newYearModal').style.display='none'">Cancel</button>
+        <button class="btn btn-green" onclick="createNewYear()">Create New Year →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ───────────────────────────────────────────────────────────────────
+const API = 'https://api.wallscourt-farm-academy.co.uk';
+
+function getToken() { return localStorage.getItem('wfa-lp-token'); }
+function setToken(t) { t ? localStorage.setItem('wfa-lp-token', t) : localStorage.removeItem('wfa-lp-token'); }
+
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  const token = getToken();
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  if (res.status === 401) { setToken(null); showLogin(); throw new Error('Session expired — please sign in again.'); }
+  if (!res.ok) { const t = await res.text(); throw new Error(t || res.statusText); }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let children = [];
+let currentChildId = null;
+let currentPlanId = null;
+let currentPlan = null;   // { id, child_id, academic_year, assess, terms }
+let childPlans = [];      // all plans for current child
+let currentTerm = 1;
+let saveTimer = null;
+
+const TERM_NAMES = ['', 'Term 1', 'Term 2', 'Term 3', 'Term 4', 'Term 5', 'Term 6'];
+const NEXT_LABELS = ['', '', 'term 3', 'term 4', 'term 5', 'term 6', 'next year'];
+
+// ── AUTH ─────────────────────────────────────────────────────────────────────
+async function init() {
+  if (getToken()) showApp();
+  else showLogin();
+}
+
+async function doLogin() {
+  const password = document.getElementById('loginPassword').value;
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('loginError');
+  err.textContent = '';
+  btn.textContent = 'Signing in…';
+  btn.disabled = true;
+  try {
+    const data = await api('POST', '/auth/login', { password });
+    setToken(data.token);
+    showApp();
+  } catch(e) {
+    err.textContent = 'Incorrect password.';
+  }
+  btn.textContent = 'Sign in';
+  btn.disabled = false;
+}
+
+function logout() {
+  setToken(null);
+  showLogin();
+}
+
+function showLogin() {
+  document.getElementById('mainNav').style.display = 'none';
+  document.getElementById('login-page').style.display = 'flex';
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+}
+
+async function showApp() {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('mainNav').style.display = 'flex';
+  await fetchChildren();
+  showPage('dashboard');
+}
+
+// ── DATA FETCHING ─────────────────────────────────────────────────────────────
+async function fetchChildren() {
+  try {
+    children = await api('GET', '/learner-plans/children');
+    children.sort((a, b) => a.name.localeCompare(b.name));
+  } catch(e) { toast('Could not load data: ' + e.message, 'error'); children = []; }
+  renderDashboard(document.getElementById('searchBar')?.value || '');
+}
+
+async function fetchPlansForChild(childId) {
+  try {
+    return await api('GET', `/learner-plans/plans/${childId}`);
+  } catch(e) { toast('Could not load plans: ' + e.message, 'error'); return []; }
+}
+
+// ── SAVING ───────────────────────────────────────────────────────────────────
+function scheduleSave() {
+  setStatus('saving');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSave, 900);
+}
+
+async function flushSave() {
+  if (!currentPlanId || !currentPlan) return;
+  try {
+    await api('PUT', `/learner-plans/plans/${currentPlanId}`, {
+      assess: currentPlan.assess,
+      terms: currentPlan.terms
+    });
+    setStatus('saved');
+  } catch(e) { setStatus('error'); toast('Save failed — check connection', 'error'); }
+}
+
+function setStatus(s) {
+  const el = document.getElementById('saveStatus');
+  if (!el) return;
+  if (s === 'saving') { el.textContent = 'Saving…'; el.className = 'save-status saving'; }
+  else if (s === 'saved') { el.textContent = 'Saved ✓'; el.className = 'save-status'; setTimeout(() => { el.textContent = ''; }, 2500); }
+  else if (s === 'error') { el.textContent = 'Save error!'; el.className = 'save-status error'; }
+}
+
+// ── DATA HELPERS ─────────────────────────────────────────────────────────────
+function ensureTerms(plan) {
+  if (!plan.terms) plan.terms = {};
+  if (!plan.assess) plan.assess = { needs: '', parentView: '', learnerView: '' };
+  for (let t = 1; t <= 6; t++) {
+    if (!plan.terms[t]) plan.terms[t] = { targets: [t === 1 ? emptyT1() : emptyTN()], agreedReviewDate: '', signatures: { teacher: '', parent: '', child: '', senco: '' } };
+  }
+  return plan;
+}
+
+function emptyT1() { return { reviewDate: '', smartTarget: '', provision: '', successCriteria: '' }; }
+function emptyTN() { return { reviewDate: '', smartTarget: '', progressMade: '', progressRating: '', strategiesProvision: '', newTargets: '' }; }
+
+function hasTermData(plan, t) {
+  const term = plan.terms?.[t];
+  if (!term) return false;
+  return term.targets.some(r => r.smartTarget || r.progressMade || r.newTargets);
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+function renderDashboard(filter = '') {
+  const grid = document.getElementById('childrenGrid');
+  let list = children;
+  if (filter) {
+    const q = filter.toLowerCase();
+    list = list.filter(c => c.name.toLowerCase().includes(q) || (c.class_name || '').toLowerCase().includes(q));
+  }
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty-state"><div style="font-size:2.5rem;margin-bottom:10px">📋</div>
+      <h3>${filter ? 'No matching learners' : 'No learner plans yet'}</h3>
+      <p style="margin-top:5px">${filter ? 'Try a different search.' : 'Click <strong>+ New Learner</strong> to create the first plan.'}</p>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = list.map(c => `<div class="child-card" onclick="openChild('${c.id}')">
+    <h3>${esc(c.name)}</h3>
+    <div class="meta">${[c.year_group, c.class_name, c.teacher].filter(Boolean).map(esc).join(' · ')}</div>
+    <div class="term-pills">${TERM_NAMES.slice(1).map(n => `<span class="pill">${n}</span>`).join('')}</div>
+  </div>`).join('');
+}
+
+// ── OPEN CHILD ────────────────────────────────────────────────────────────────
+async function openChild(childId) {
+  currentChildId = childId;
+  const child = children.find(c => c.id === childId);
+  document.getElementById('planName').textContent = child.name;
+  document.getElementById('planMeta').textContent = [child.year_group, child.class_name, child.teacher].filter(Boolean).join(' · ');
+  document.getElementById('printHeader').innerHTML = `<h1>Learner Plan — ${esc(child.name)}</h1>
+    <div class="pm"><span><b>Class:</b> ${esc(child.class_name||'—')}</span><span><b>Teacher:</b> ${esc(child.teacher||'—')}</span><span><b>Year:</b> ${esc(child.year_group||'—')}</span></div>`;
+  showPage('plan-view');
+  childPlans = await fetchPlansForChild(childId);
+  if (!childPlans.length) {
+    // Create a first plan for current academic year
+    const year = currentAcademicYear();
+    await createPlan(childId, year);
+    childPlans = await fetchPlansForChild(childId);
+  }
+  renderYearSelector();
+  await loadPlan(childPlans[childPlans.length - 1].id);
+}
+
+function currentAcademicYear() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth(); // 0-based, August=7
+  const startYear = m >= 7 ? y : y - 1;
+  return `${startYear}-${String(startYear + 1).slice(-2)}`;
+}
+
+function renderYearSelector() {
+  const sel = document.getElementById('yearSelector');
+  sel.innerHTML = childPlans.map(p => `<option value="${p.id}">${p.academic_year}</option>`).join('');
+  sel.value = currentPlanId || childPlans[childPlans.length - 1].id;
+}
+
+async function switchYear(planId) {
+  await flushSave();
+  await loadPlan(planId);
+}
+
+async function loadPlan(planId) {
+  currentPlanId = planId;
+  const raw = childPlans.find(p => p.id === planId);
+  currentPlan = ensureTerms(JSON.parse(JSON.stringify(raw))); // deep clone
+  document.getElementById('yearSelector').value = planId;
+  currentTerm = 1;
+  renderTabs();
+  switchTab(1);
+}
+
+async function createPlan(childId, year, terms = {}, assess = null) {
+  if (!assess) assess = { needs: '', parentView: '', learnerView: '' };
+  try {
+    return await api('POST', '/learner-plans/plans', { child_id: childId, academic_year: year, assess, terms });
+  } catch(e) { toast('Could not create plan: ' + e.message, 'error'); return null; }
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function renderTabs() {
+  const tabs = ['Assess', ...TERM_NAMES.slice(1)];
+  document.getElementById('termTabs').innerHTML = tabs.map((name, i) => {
+    const has = i === 0 ? (currentPlan.assess?.needs || currentPlan.assess?.parentView) : hasTermData(currentPlan, i);
+    return `<button class="tab${has?' has-data':''}" id="tab-${i}" onclick="switchTab(${i})">${name}</button>`;
+  }).join('');
+}
+
+function switchTab(t) {
+  currentTerm = t;
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById(`tab-${t}`)?.classList.add('active');
+  renderTabContent(t);
+}
+
+function updateTabDot(t) {
+  const tab = document.getElementById(`tab-${t}`);
+  if (!tab) return;
+  const has = t === 0 ? (currentPlan.assess?.needs || currentPlan.assess?.parentView) : hasTermData(currentPlan, t);
+  tab.classList.toggle('has-data', !!has);
+}
+
+// ── ASSESS ────────────────────────────────────────────────────────────────────
+function renderAssess() {
+  const a = currentPlan.assess;
+  return `<div class="card">
+    <div class="card-header"><h3>Assess — Child Profile</h3></div>
+    <div class="card-body">
+      <div class="form-group"><label>Child's needs, strengths &amp; areas for development</label>
+        <textarea rows="5" onchange="setAssess('needs',this.value)" placeholder="Describe the child's needs, strengths, and areas for development…">${esc(a.needs)}</textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Parent's View</label>
+          <textarea rows="4" onchange="setAssess('parentView',this.value)" placeholder="Parent perspective, concerns, priorities…">${esc(a.parentView)}</textarea></div>
+        <div class="form-group"><label>Learner's View</label>
+          <textarea rows="4" onchange="setAssess('learnerView',this.value)" placeholder="What is important to the child? What do they enjoy?">${esc(a.learnerView)}</textarea></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function setAssess(field, val) {
+  currentPlan.assess[field] = val;
+  scheduleSave();
+  updateTabDot(0);
+}
+
+// ── TERM 1 ────────────────────────────────────────────────────────────────────
+function renderTerm1() {
+  const term = currentPlan.terms[1];
+  const rows = term.targets.map((t, i) => `<div class="target-row">
+    <div class="row-num">Target ${i+1} <button class="remove-target" onclick="removeTarget(1,${i})">✕</button></div>
+    <div class="form-group" style="max-width:220px"><label>Review Date</label>
+      <input type="date" value="${t.reviewDate||''}" onchange="setTarget(1,${i},'reviewDate',this.value)"></div>
+    <div class="form-group"><label>SMART Target</label>
+      <textarea rows="3" onchange="setTarget(1,${i},'smartTarget',this.value)" placeholder="Specific, measurable target for this child…">${esc(t.smartTarget)}</textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>Provision</label>
+        <textarea rows="3" onchange="setTarget(1,${i},'provision',this.value)" placeholder="What support / provision will be put in place?">${esc(t.provision)}</textarea></div>
+      <div class="form-group"><label>Success Criteria</label>
+        <textarea rows="3" onchange="setTarget(1,${i},'successCriteria',this.value)" placeholder="How will we know this target has been met?">${esc(t.successCriteria)}</textarea></div>
+    </div>
+  </div>`).join('');
+  return `<div class="card">
+    <div class="card-header"><h3>Plan &amp; Do — Term 1 Targets</h3>
+      <button class="btn btn-primary btn-sm" onclick="addTarget(1)">+ Add Target</button></div>
+    <div class="card-body">${rows}<button class="add-target-btn" onclick="addTarget(1)">+ Add another target</button></div>
+  </div>${renderSignatures(1)}`;
+}
+
+// ── REVIEW TERMS ──────────────────────────────────────────────────────────────
+function renderReview(t) {
+  const term = currentPlan.terms[t];
+  const prevTerm = currentPlan.terms[t-1];
+  const sourceField = t === 2 ? 'smartTarget' : 'newTargets';
+  const sourceProvision = t === 2 ? 'provision' : 'strategiesProvision';
+  const canRoll = prevTerm?.targets.some(r => r[sourceField]) && !term.targets.some(r => r.smartTarget);
+
+  const rollBanner = canRoll ? `<div class="roll-banner">
+    <div class="icon">📋</div>
+    <div class="text"><h4>Roll forward from ${TERM_NAMES[t-1]}</h4>
+      <p>Targets and strategies from ${TERM_NAMES[t-1]} will be copied in automatically.</p></div>
+    <button class="btn btn-primary" onclick="rollForward(${t})">Copy Down →</button>
+  </div>` : '';
+
+  // New year banner on T6
+  const isLastPlan = childPlans[childPlans.length - 1]?.id === currentPlanId;
+  const t6HasData = hasTermData(currentPlan, 6);
+  const newYearBanner = (t === 6 && isLastPlan && t6HasData) ? `<div class="new-year-banner">
+    <div class="icon">🗓</div>
+    <div class="text"><h4>Ready to start a new academic year?</h4>
+      <p>Term 6 targets will carry forward into Term 1 of the new year.</p></div>
+    <button class="btn btn-green" onclick="showNewYearModal()">Start New Year →</button>
+  </div>` : '';
+
+  const nextLabel = NEXT_LABELS[t];
+  const rows = term.targets.map((r, i) => {
+    const rBtns = ['below','expected','better'].map(v =>
+      `<button class="rating-btn ${v}${r.progressRating===v?' selected':''}" onclick="setRating(${t},${i},'${v}',this)">${{below:'↓ Below',expected:'✓ Expected',better:'↑ Better than'}[v]}</button>`
+    ).join('');
+    return `<div class="target-row">
+      <div class="row-num">Target ${i+1} <button class="remove-target" onclick="removeTarget(${t},${i})">✕</button></div>
+      <div class="form-group" style="max-width:220px"><label>Review Date</label>
+        <input type="date" value="${r.reviewDate||''}" onchange="setTarget(${t},${i},'reviewDate',this.value)"></div>
+      <div class="form-group"><label>SMART Target</label>
+        <textarea rows="3" onchange="setTarget(${t},${i},'smartTarget',this.value)" placeholder="Target for this term…">${esc(r.smartTarget)}</textarea></div>
+      <div class="form-group"><label>Progress Made</label>
+        <div class="rating-group">${rBtns}</div>
+        <textarea rows="2" onchange="setTarget(${t},${i},'progressMade',this.value)" placeholder="Notes on progress…">${esc(r.progressMade)}</textarea></div>
+      <div class="form-group"><label>Strategies &amp; Provision</label>
+        <textarea rows="3" onchange="setTarget(${t},${i},'strategiesProvision',this.value)" placeholder="Current provision and any changes…">${esc(r.strategiesProvision)}</textarea></div>
+      ${t < 6 ? `<div class="form-group"><label>New / Updated Target for ${nextLabel}</label>
+        <textarea rows="3" onchange="setTarget(${t},${i},'newTargets',this.value)" placeholder="Target to carry into ${nextLabel}…">${esc(r.newTargets)}</textarea></div>` :
+      `<div class="form-group"><label>New Target / Notes for Next Year</label>
+        <textarea rows="3" onchange="setTarget(${t},${i},'newTargets',this.value)" placeholder="What should carry into next year's Term 1?">${esc(r.newTargets)}</textarea></div>`}
+    </div>`;
+  }).join('');
+
+  return `${rollBanner}${newYearBanner}
+  <div class="card">
+    <div class="card-header"><h3>Review — ${TERM_NAMES[t]}</h3>
+      <button class="btn btn-primary btn-sm" onclick="addTarget(${t})">+ Add Target</button></div>
+    <div class="card-body">
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">How effective has the support been? What has the impact been for the child?</p>
+      ${rows}<button class="add-target-btn" onclick="addTarget(${t})">+ Add another target</button>
+    </div>
+  </div>${renderSignatures(t)}`;
+}
+
+function renderSignatures(t) {
+  const term = currentPlan.terms[t];
+  const sig = term.signatures || {};
+  return `<div class="card">
+    <div class="card-header"><h3>Sign-off &amp; Agreed Review Date</h3></div>
+    <div class="card-body">
+      <div class="form-group" style="max-width:240px"><label>Agreed Date to Review Targets</label>
+        <input type="date" value="${term.agreedReviewDate||''}" onchange="setSig(${t},'agreedReviewDate',this.value)"></div>
+      <div class="section-label" style="margin-top:6px">Signatures</div>
+      <div class="signatures-grid">
+        <div class="sig-field"><label>Class Teacher</label><input type="text" value="${esc(sig.teacher||'')}" onchange="setSig(${t},'teacher',this.value)" placeholder="Name"></div>
+        <div class="sig-field"><label>Parent / Carer</label><input type="text" value="${esc(sig.parent||'')}" onchange="setSig(${t},'parent',this.value)" placeholder="Name"></div>
+        <div class="sig-field"><label>Child</label><input type="text" value="${esc(sig.child||'')}" onchange="setSig(${t},'child',this.value)" placeholder="Name"></div>
+        <div class="sig-field"><label>SENCo</label><input type="text" value="${esc(sig.senco||'')}" onchange="setSig(${t},'senco',this.value)" placeholder="Name"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderTabContent(t) {
+  const el = document.getElementById('tabContents');
+  if (t === 0) el.innerHTML = renderAssess();
+  else if (t === 1) el.innerHTML = renderTerm1();
+  else el.innerHTML = renderReview(t);
+}
+
+// ── MUTATIONS ─────────────────────────────────────────────────────────────────
+function setTarget(t, i, field, val) {
+  currentPlan.terms[t].targets[i][field] = val;
+  scheduleSave();
+  updateTabDot(t);
+}
+
+function setRating(t, i, rating, btn) {
+  currentPlan.terms[t].targets[i].progressRating = rating;
+  scheduleSave();
+  btn.closest('.rating-group').querySelectorAll('.rating-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function setSig(t, field, val) {
+  if (!currentPlan.terms[t].signatures) currentPlan.terms[t].signatures = {};
+  if (field === 'agreedReviewDate') currentPlan.terms[t].agreedReviewDate = val;
+  else currentPlan.terms[t].signatures[field] = val;
+  scheduleSave();
+}
+
+function addTarget(t) {
+  currentPlan.terms[t].targets.push(t === 1 ? emptyT1() : emptyTN());
+  scheduleSave();
+  renderTabContent(t);
+}
+
+function removeTarget(t, i) {
+  if (currentPlan.terms[t].targets.length <= 1) { toast('Need at least one target row.'); return; }
+  currentPlan.terms[t].targets.splice(i, 1);
+  scheduleSave();
+  renderTabContent(t);
+}
+
+function rollForward(t) {
+  const prev = currentPlan.terms[t-1];
+  const sf = t === 2 ? 'smartTarget' : 'newTargets';
+  const sp = t === 2 ? 'provision' : 'strategiesProvision';
+  const newTargets = prev.targets.filter(r => r[sf]).map(r => ({ ...emptyTN(), smartTarget: r[sf]||'', strategiesProvision: r[sp]||'' }));
+  if (!newTargets.length) { toast('No targets found in previous term.'); return; }
+  currentPlan.terms[t].targets = newTargets;
+  scheduleSave();
+  renderTabs();
+  renderTabContent(t);
+  toast(`${newTargets.length} target${newTargets.length>1?'s':''} copied from ${TERM_NAMES[t-1]}`, 'success');
+}
+
+// ── NEW YEAR ──────────────────────────────────────────────────────────────────
+function showNewYearModal() {
+  const prevYear = currentPlan.academic_year;
+  const [start] = prevYear.split('-');
+  const nextStart = parseInt(start) + 1;
+  const suggested = `${nextStart}-${String(nextStart+1).slice(-2)}`;
+  document.getElementById('newYearTitle').textContent = `Start ${suggested} Academic Year`;
+  document.getElementById('newYearDesc').textContent = `Creates a new plan for ${suggested} based on Term 6 of ${prevYear}.`;
+  document.getElementById('prevYearLabel').textContent = prevYear;
+  document.getElementById('newYearInput').value = suggested;
+  document.getElementById('newYearModal').style.display = 'flex';
+}
+
+async function createNewYear() {
+  const year = document.getElementById('newYearInput').value.trim();
+  if (!year) { toast('Enter an academic year.'); return; }
+  if (childPlans.some(p => p.academic_year === year)) { toast(`Plan for ${year} already exists.`); return; }
+
+  // T6 of the previous year is the source
+  const t6 = currentPlan.terms[6];
+
+  // T6 "new targets for next year" → T1 SMART target
+  // T6 "strategies & provision"    → T1 provision
+  const t1Targets = t6.targets.filter(r => r.newTargets).map(r => ({
+    ...emptyT1(),
+    smartTarget: r.newTargets || '',
+    provision: r.strategiesProvision || ''
+  }));
+
+  const newTerms = { 1: { targets: t1Targets.length ? t1Targets : [emptyT1()], agreedReviewDate: '', signatures: { teacher: '', parent: '', child: '', senco: '' } } };
+  for (let t = 2; t <= 6; t++) newTerms[t] = { targets: [emptyTN()], agreedReviewDate: '', signatures: { teacher: '', parent: '', child: '', senco: '' } };
+
+  // Carry Assess section forward — child's profile doesn't change year to year
+  const carriedAssess = JSON.parse(JSON.stringify(currentPlan.assess));
+
+  document.getElementById('newYearModal').style.display = 'none';
+  const plan = await createPlan(currentChildId, year, newTerms, carriedAssess);
+  if (!plan) return;
+
+  childPlans = await fetchPlansForChild(currentChildId);
+  renderYearSelector();
+  await loadPlan(plan.id);
+  toast(`${year} plan created — T6 targets and Assess carried forward from ${currentPlan.academic_year}`, 'success');
+}
+
+// ── CHILD CRUD ────────────────────────────────────────────────────────────────
+function showNewChildModal() {
+  document.getElementById('childModalTitle').textContent = 'New Learner Plan';
+  document.getElementById('editingChildId').value = '';
+  document.getElementById('nName').value = '';
+  document.getElementById('nClass').value = '';
+  document.getElementById('nTeacher').value = '';
+  document.getElementById('nYear').value = '';
+  document.getElementById('nAcYear').value = currentAcademicYear();
+  document.getElementById('yearFieldWrap').style.display = 'block';
+  document.getElementById('childModal').style.display = 'flex';
+}
+
+function editChildModal() {
+  const c = children.find(c => c.id === currentChildId);
+  document.getElementById('childModalTitle').textContent = 'Edit Learner Info';
+  document.getElementById('editingChildId').value = c.id;
+  document.getElementById('nName').value = c.name;
+  document.getElementById('nClass').value = c.class_name || '';
+  document.getElementById('nTeacher').value = c.teacher || '';
+  document.getElementById('nYear').value = c.year_group || '';
+  document.getElementById('yearFieldWrap').style.display = 'none';
+  document.getElementById('childModal').style.display = 'flex';
+}
+
+function closeChildModal() { document.getElementById('childModal').style.display = 'none'; }
+
+async function saveChild() {
+  const name = document.getElementById('nName').value.trim();
+  if (!name) { alert('Please enter the child\'s name.'); return; }
+  const editId = document.getElementById('editingChildId').value;
+  const payload = { name, class_name: document.getElementById('nClass').value.trim(), teacher: document.getElementById('nTeacher').value.trim(), year_group: document.getElementById('nYear').value };
+  closeChildModal();
+
+  if (editId) {
+    try {
+      await api('PUT', `/learner-plans/children/${editId}`, payload);
+    } catch(e) { toast('Update failed: ' + e.message, 'error'); return; }
+    await fetchChildren();
+    const c = children.find(c => c.id === editId);
+    document.getElementById('planName').textContent = c.name;
+    document.getElementById('planMeta').textContent = [c.year_group, c.class_name, c.teacher].filter(Boolean).join(' · ');
+    toast('Info updated', 'success');
+  } else {
+    const acYear = document.getElementById('nAcYear').value.trim() || currentAcademicYear();
+    let created;
+    try {
+      created = await api('POST', '/learner-plans/children', payload);
+    } catch(e) { toast('Could not create: ' + e.message, 'error'); return; }
+    await fetchChildren();
+    const plan = await createPlan(created.id, acYear);
+    if (!plan) return;
+    childPlans = [plan];
+    await openChild(created.id);
+  }
+}
+
+async function deleteChild() {
+  const c = children.find(c => c.id === currentChildId);
+  if (!confirm(`Delete ALL plans for ${c.name}? This cannot be undone.`)) return;
+  try {
+    await api('DELETE', `/learner-plans/children/${currentChildId}`);
+  } catch(e) { toast('Delete failed: ' + e.message, 'error'); return; }
+  await fetchChildren();
+  goBack();
+  toast('Plan deleted');
+}
+
+// ── PRINT ─────────────────────────────────────────────────────────────────────
+function printPlan() {
+  const el = document.getElementById('tabContents');
+  const tabs = document.getElementById('termTabs');
+  const origContent = el.innerHTML;
+  let all = renderAssess();
+  for (let t = 1; t <= 6; t++) {
+    all += `<div style="page-break-before:always;padding-top:16px">
+      <div class="section-label" style="font-size:.95rem;margin-bottom:10px">${TERM_NAMES[t]}</div>`;
+    all += (t === 1 ? renderTerm1() : renderReview(t)).replace(/onclick="[^"]*"/g, '');
+    all += '</div>';
+  }
+  el.innerHTML = all;
+  tabs.style.display = 'none';
+  window.print();
+  el.innerHTML = origContent;
+  tabs.style.display = '';
+  renderTabs();
+  switchTab(currentTerm);
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function esc(str) { return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(id).classList.add('active'); window.scrollTo(0,0); }
+function goBack() { showPage('dashboard'); renderDashboard(document.getElementById('searchBar')?.value||''); }
+function toast(msg, type='') {
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' ' + type : '');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+// ── START ─────────────────────────────────────────────────────────────────────
+init();
+</script>
+
+<footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; Y4-24.06.26d
+</footer>
+</body>
+</html>
