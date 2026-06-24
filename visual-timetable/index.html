@@ -235,23 +235,20 @@
   }
 
   .card-icon-wrap img {
-    max-width: 82%;
-    max-height: 82%;
-    width: auto;
-    height: auto;
+    width: 82%;
+    height: 82%;
+    object-fit: contain;
   }
 
   .card-icon-wrap.icon-sm img {
-    max-width: 55%;
-    max-height: 55%;
-    width: auto;
-    height: auto;
+    width: 55%;
+    height: 55%;
+    object-fit: contain;
   }
   .icon-xs img {
-    max-width: 50%;
-    max-height: 50%;
-    width: auto;
-    height: auto;
+    width: 50%;
+    height: 50%;
+    object-fit: contain;
   }
 
   .card-label {
@@ -843,7 +840,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26at</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26au</span>
 </div>
 
 <div class="app">
@@ -982,7 +979,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26at</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26au</div>
 
 <script>
 const ICONS = {
@@ -1334,12 +1331,37 @@ async function downloadPDF() {
 
   for (let i = 0; i < pages.length; i++) {
     status.textContent = `Page ${i + 1} of ${pages.length}…`;
+
+    // html2canvas doesn't render object-fit:contain on <img> correctly.
+    // Swap each card icon img to a background-image div before capture,
+    // then restore afterwards.
+    const swaps = [];
+    pages[i].querySelectorAll('.card-icon-wrap img').forEach(img => {
+      const wrap = img.parentElement;
+      const div = document.createElement('div');
+      div.style.cssText = `
+        width: ${img.style.width || getComputedStyle(img).width};
+        height: ${img.style.height || getComputedStyle(img).height};
+        background-image: url('${img.src}');
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        ${img.style.transform ? 'transform:' + img.style.transform + ';' : ''}
+      `;
+      wrap.replaceChild(div, img);
+      swaps.push({ wrap, div, img });
+    });
+
     const canvas = await html2canvas(pages[i], {
       scale: 3,
       useCORS: true,
       backgroundColor: '#ffffff',
       logging: false,
     });
+
+    // Restore original img elements
+    swaps.forEach(({ wrap, div, img }) => wrap.replaceChild(img, div));
+
     const imgData = canvas.toDataURL('image/jpeg', 0.92);
     if (i > 0) doc.addPage();
     const cw = canvas.width, ch = canvas.height;
