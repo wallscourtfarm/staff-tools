@@ -458,19 +458,19 @@
   .cut-table {
     border-collapse: collapse;
     width: 100%;
-    height: 100%;
     table-layout: fixed;
+    /* NO height:100% — row height set by card content */
   }
   .cut-cell {
     border: 1.5px dashed #aaa;
     padding: 0;
     vertical-align: top;
+    overflow: hidden;
   }
+  /* Card fills cell exactly — height driven by the per-size card CSS */
   .cut-cell .card {
     width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-    border-radius: 4px;
+    border-radius: 0;
     margin: 0;
   }
 </style>
@@ -483,7 +483,7 @@
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26bi</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26bj</span>
 </div>
 
 <div class="app">
@@ -622,7 +622,7 @@
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26bi</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26bj</div>
 
 <script>
 const ICONS = {
@@ -783,14 +783,12 @@ function renderCards() {
 
   const cols = size === 'square' ? 3 : 2;
   container.innerHTML = pages.map(page => {
-    // Build rows for the table
+    // Build rows for the table — no padding of incomplete rows
     let rows = '';
     for (let i = 0; i < page.length; i += cols) {
       const rowCells = page.slice(i, i + cols);
-      // Pad last row with empty cells so borders are complete
-      while (rowCells.length < cols) rowCells.push(null);
       rows += `<tr>${rowCells.map(cb =>
-        `<td class="cut-cell">${cb ? makeCardHTML(cb, colour, beingA) : ''}</td>`
+        `<td class="cut-cell">${makeCardHTML(cb, colour, beingA)}</td>`
       ).join('')}</tr>`;
     }
     return `<div class="page-preview ${size}">
