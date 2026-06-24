@@ -460,7 +460,7 @@
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26bd</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26be</span>
 </div>
 
 <div class="app">
@@ -599,7 +599,7 @@
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26bd</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26be</div>
 
 <script>
 const ICONS = {
@@ -856,28 +856,28 @@ function drawCutLines() {
     const W = pageRect.width;
     const H = pageRect.height;
 
-    // Build SVG using pixel coords within the page-preview coordinate space.
-    // Lines run full page width/height so they read as proper "cut here" marks.
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.classList.add('cut-overlay');
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:10;';
-    page.style.position = 'relative';
+    // Use simple divs with CSS borders — no SVG, no viewBox issues.
+    // Positions expressed as % so they survive print layout changes.
+    const mkLine = (isVertical, pct) => {
+      const d = document.createElement('div');
+      d.className = 'cut-overlay';
+      if (isVertical) {
+        d.style.cssText = `position:absolute;top:0;bottom:0;left:${pct}%;width:0;border-left:1.5px dashed #999;pointer-events:none;z-index:10;`;
+      } else {
+        d.style.cssText = `position:absolute;left:0;right:0;top:${pct}%;height:0;border-top:1.5px dashed #999;pointer-events:none;z-index:10;`;
+      }
+      page.appendChild(d);
+    };
 
-    const dash = `stroke="#999" stroke-width="1.5" stroke-dasharray="8,6" fill="none"`;
-    let lines = '';
-
-    const allRects = cards.map(c => c.getBoundingClientRect());
-
-    // Vertical cut lines: run full page height, positioned between each column
+    // Vertical lines between columns
     for (let c = 1; c < cols; c++) {
       const prev = cards[c - 1].getBoundingClientRect();
       const curr = cards[c].getBoundingClientRect();
       const x = (prev.right + curr.left) / 2 - pageRect.left;
-      lines += `<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${H}" ${dash}/>`;
+      mkLine(true, x / W * 100);
     }
 
-    // Horizontal cut lines: run full page width, positioned between each row
+    // Horizontal lines between rows
     for (let r = 1; r < rows; r++) {
       const above = cards[(r - 1) * cols];
       const below = cards[r * cols];
@@ -885,11 +885,8 @@ function drawCutLines() {
       const aRect = above.getBoundingClientRect();
       const bRect = below.getBoundingClientRect();
       const y = (aRect.bottom + bRect.top) / 2 - pageRect.top;
-      lines += `<line x1="0" y1="${y.toFixed(1)}" x2="${W}" y2="${y.toFixed(1)}" ${dash}/>`;
+      mkLine(false, y / H * 100);
     }
-
-    svg.innerHTML = lines;
-    page.appendChild(svg);
   });
 }
 
