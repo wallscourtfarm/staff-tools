@@ -838,7 +838,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26an</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26ao</span>
 </div>
 
 <div class="app">
@@ -977,7 +977,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26an</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26ao</div>
 
 <script>
 const ICONS = {
@@ -1338,7 +1338,15 @@ async function downloadPDF() {
     const pw = doc.internal.pageSize.getWidth();
     const ph = doc.internal.pageSize.getHeight();
     if (i > 0) doc.addPage();
-    doc.addImage(imgData, 'JPEG', 0, 0, pw, ph);
+    // Preserve aspect ratio — don't stretch canvas to fill page
+    const scaleX = pw / canvas.width;
+    const scaleY = ph / canvas.height;
+    const scale  = Math.min(scaleX, scaleY);
+    const imgW   = canvas.width  * scale;
+    const imgH   = canvas.height * scale;
+    const offX   = (pw - imgW) / 2;
+    const offY   = (ph - imgH) / 2;
+    doc.addImage(imgData, 'JPEG', offX, offY, imgW, imgH);
   }
 
   const yr = new Date().getFullYear();
