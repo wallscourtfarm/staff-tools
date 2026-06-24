@@ -838,7 +838,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26ap</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-24.06.26aq</span>
 </div>
 
 <div class="app">
@@ -977,7 +977,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26ap</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-24.06.26aq</div>
 
 <script>
 const ICONS = {
@@ -1318,48 +1318,34 @@ async function downloadPDF() {
   status.textContent = '';
 
   const { jsPDF } = window.jspdf;
+  const pxPerMm = 96 / 25.4;
 
-  // Determine orientation and paper size from currentSize
-  const isA3 = currentSize === 'a3';
-  const isSquare = currentSize === 'square';
-  const orientation = isSquare ? 'landscape' : 'portrait';
-  const format = isA3 ? 'a3' : 'a4';
-  const doc = new jsPDF({ orientation, format, unit: 'mm' });
+  // Measure the actual rendered size of the first page (includes padding)
+  const firstPg   = pages[0];
+  const actualWmm = firstPg.offsetWidth  / pxPerMm;
+  const actualHmm = firstPg.offsetHeight / pxPerMm;
 
-  // PDF page dimensions in CSS pixels (96dpi)
+  const doc = new jsPDF({
+    orientation: actualWmm >= actualHmm ? 'landscape' : 'portrait',
+    format: [actualWmm, actualHmm],
+    unit: 'mm'
+  });
+
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
-  const pxPerMm = 96 / 25.4;
-  const targetW = Math.round(pw * pxPerMm);
-  const targetH = Math.round(ph * pxPerMm);
 
   for (let i = 0; i < pages.length; i++) {
     status.textContent = `Page ${i + 1} of ${pages.length}…`;
 
-    // Force page to exact PDF dimensions before capture
-    const pg = pages[i];
-    const prevW = pg.style.width;
-    const prevH = pg.style.height;
-    const prevMinH = pg.style.minHeight;
-    pg.style.width    = targetW + 'px';
-    pg.style.height   = targetH + 'px';
-    pg.style.minHeight = targetH + 'px';
-
-    const canvas = await html2canvas(pg, {
+    const canvas = await html2canvas(pages[i], {
       scale: 3,
       useCORS: true,
       backgroundColor: null,
       logging: false,
-      width:  targetW,
-      height: targetH,
     });
 
-    pg.style.width    = prevW;
-    pg.style.height   = prevH;
-    pg.style.minHeight = prevMinH;
-
     const imgData = canvas.toDataURL('image/jpeg', 0.92);
-    if (i > 0) doc.addPage();
+    if (i > 0) doc.addPage([actualWmm, actualHmm]);
     doc.addImage(imgData, 'JPEG', 0, 0, pw, ph);
   }
 
