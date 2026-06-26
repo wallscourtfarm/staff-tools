@@ -441,7 +441,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 19.06.26d</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 26.06.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1103,6 +1103,16 @@ function injectBuiltinInterventions() {
   }
   if (!otherGroup.subjects.find(s => s.colourOnly)) {
     otherGroup.subjects.push({ name: 'Other (colour)', col: '#64748b', colourable: true, colourOnly: true });
+  }
+
+  // Ensure the colourable Other also appears in the master (Learning Schedule) sidebar
+  let subjOtherGroup = SUBJECTS.find(g => g.label === 'Other');
+  if (!subjOtherGroup) {
+    subjOtherGroup = { label: 'Other', subjects: [] };
+    SUBJECTS.push(subjOtherGroup);
+  }
+  if (!subjOtherGroup.subjects.find(s => s.colourOnly)) {
+    subjOtherGroup.subjects.push({ name: 'Other (colour)', col: '#64748b', colourable: true, colourOnly: true });
   }
 }
 
