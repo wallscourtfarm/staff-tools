@@ -383,7 +383,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(18.06.26c)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(02.07.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -519,7 +519,7 @@ let FRONT_END_EVENTS = []; // { id, date (YYYY-MM-DD), label, colour, session, n
 const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
 const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbx6CThsZIBj9pxc0noGkgUMaCHTKgUBASm5-wQCIQ6JELoQ4abIctjlpEGPyE_jrlzR/exec';
-const NOTIFY_URL = 'https://script.google.com/macros/s/AKfycbxF1Bonjs80KHs3yvOY3k6LN7hUs40v-ThjQgd-j8rfo-jnUOIV-Cw-WFKY-JllVLBv/exec';
+let NOTIFY_URL = 'https://script.google.com/macros/s/AKfycbyB-lU6nnGGT_0xoQ10YxVegEW5tm9dKF7Jl6MQDJQ0DI_YJ47zyQ3rIo3mfHJvmSn6/exec'; // overridden by notify-config.json
 
 // ── Mutable data (populated by init) ─────────────────────────────────────────
 let WEEKS    = [];
@@ -791,6 +791,9 @@ function currentWeekIdx() {
   return Math.max(0,WEEKS.length-1);
 }
 async function init() {
+  // Load notify URL from config file — change notify-config.json to update without touching planner.html
+  fetch('notify-config.json').then(r=>r.json()).then(cfg=>{ if(cfg.url) NOTIFY_URL=cfg.url; }).catch(()=>{});
+
   document.getElementById('centerPane').innerHTML=
     '<div style="padding:60px;text-align:center;color:#94a3b8;font-size:14px">Loading from Google Sheets…</div>';
   try {
