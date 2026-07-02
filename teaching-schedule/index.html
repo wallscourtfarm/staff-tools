@@ -441,7 +441,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 26.06.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 02.07.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -2159,16 +2159,28 @@ function renderItem(item, wk, view, day, session, idx) {
   const colCls = isColourable ? 'chip-colour colourable' : 'chip-colour';
   const colClick = isColourable ? ` onclick="showHzPalette(event,this)"` : '';
   if (item.split) {
-    const colL = SUBJECT_COL[item.subjectLeft] || '#64748b';
-    const colR = SUBJECT_COL[item.subjectRight] || '#64748b';
+    const colL = item.hzColLeft || SUBJECT_COL[item.subjectLeft] || '#64748b';
+    const colR = item.hzColRight || SUBJECT_COL[item.subjectRight] || '#64748b';
     const hasTimeS = item.startMins != null && item.durationMins != null;
     const endMinsS = hasTimeS ? item.startMins + item.durationMins : null;
     const timeToggleClsS = `chip-time-toggle${hasTimeS ? ' has-time' : ''}`;
     const timeInputsClsS = `chip-time-inputs${hasTimeS ? '' : ' hidden'}`;
+    const dotL = item.colourOnlyLeft
+      ? `<span class="chip-colour colourable" style="background:${colL};display:inline-block;margin-right:3px;width:10px;height:10px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px #94a3b8;cursor:pointer;flex-shrink:0" onclick="showHzPaletteSplit(event,this,'left')"></span>`
+      : `<span class="chip-colour" style="background:${colL};display:inline-block;margin-right:3px"></span>`;
+    const nameL = item.colourOnlyLeft
+      ? `<input class="chip-name chip-name-edit" style="font-size:13px;font-weight:800;font-family:'Nunito',sans-serif" value="${escAttr(item.customNameLeft || 'Other')}" data-side="left" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}" onblur="onSplitNameBlur(this)" onkeydown="if(event.key==='Enter')this.blur()">`
+      : `<span style="font-size:13px;font-weight:800;font-family:'Nunito',sans-serif">${escHtml(item.subjectLeft || '')}</span>`;
+    const dotR = item.colourOnlyRight
+      ? `<span class="chip-colour colourable" style="background:${colR};display:inline-block;margin-right:3px;width:10px;height:10px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px #94a3b8;cursor:pointer;flex-shrink:0" onclick="showHzPaletteSplit(event,this,'right')"></span>`
+      : `<span class="chip-colour" style="background:${colR};display:inline-block;margin-right:3px"></span>`;
+    const nameR = item.colourOnlyRight
+      ? `<input class="chip-name chip-name-edit" style="font-size:13px;font-weight:800;font-family:'Nunito',sans-serif" value="${escAttr(item.customNameRight || 'Other')}" data-side="right" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}" onblur="onSplitNameBlur(this)" onkeydown="if(event.key==='Enter')this.blur()">`
+      : `<span style="font-size:13px;font-weight:800;font-family:'Nunito',sans-serif">${escHtml(item.subjectRight || '')}</span>`;
     return `<div class="cell-chip" style="min-height:${minH}px" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">
       <div class="split-wrap" style="flex:1">
-        <div class="split-half" style="background:${colL}50"><span class="chip-colour" style="background:${colL};display:inline-block;margin-right:3px"></span><span style="font-size:13px;font-weight:800;font-family:'Nunito',sans-serif">${escHtml(item.subjectLeft || '')}</span><textarea class="item-note chip-note" rows="1" data-side="left" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">${escHtml(item.noteLeft || '')}</textarea></div>
-        <div class="split-half" style="background:${colR}50"><span class="chip-colour" style="background:${colR};display:inline-block;margin-right:3px"></span><span style="font-size:13px;font-weight:800;font-family:'Nunito',sans-serif">${escHtml(item.subjectRight || '')}</span><textarea class="item-note chip-note" rows="1" data-side="right" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">${escHtml(item.noteRight || '')}</textarea></div>
+        <div class="split-half" style="background:${colL}50;position:relative">${dotL}${nameL}<textarea class="item-note chip-note" rows="1" data-side="left" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">${escHtml(item.noteLeft || '')}</textarea></div>
+        <div class="split-half" style="background:${colR}50;position:relative">${dotR}${nameR}<textarea class="item-note chip-note" rows="1" data-side="right" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-session="${escHtml(session)}" data-idx="${idx}">${escHtml(item.noteRight || '')}</textarea></div>
       </div>
       <div style="display:flex;align-items:center;padding:0 5px 3px">
         <button class="chip-split" title="Unsplit" onclick="unsplitItem(this)">↔</button>
@@ -2330,6 +2342,44 @@ function onChipNameBlur(input) {
   const val = input.value.trim();
   item.customName = val || 'Other';
   persistLocal(); syncSave();
+}
+
+function onSplitNameBlur(input) {
+  const { wk, view, day, session, idx, side } = input.dataset;
+  const slot = getSlot(wk, view, day, session);
+  const item = slot[Number(idx)];
+  if (!item) return;
+  const val = input.value.trim() || 'Other';
+  if (side === 'left') item.customNameLeft = val;
+  else item.customNameRight = val;
+  persistLocal(); syncSave();
+}
+
+function showHzPaletteSplit(e, dotEl, side) {
+  e.stopPropagation();
+  const half = dotEl.closest('.split-half');
+  const chip = dotEl.closest('.cell-chip');
+  const existing = half.querySelector('.hz-colour-pop');
+  if (existing) { existing.remove(); return; }
+  const { wk, view, day, session, idx } = chip.dataset;
+  const slot = getSlot(wk, view, day, session);
+  const item = slot[Number(idx)];
+  const colKey = side === 'left' ? 'hzColLeft' : 'hzColRight';
+  const nameKey = side === 'left' ? 'customNameLeft' : 'customNameRight';
+  const currentCol = item[colKey] || '#94a3b8';
+  const pal = hzPalette();
+  const pop = document.createElement('div');
+  pop.className = 'hz-colour-pop';
+  pop.innerHTML = pal.map(p => `<span style="background:${p.col}${p.col === currentCol ? ';border-color:#1e293b' : ''}" data-col="${p.col}" data-name="${p.name}" title="${p.name}"></span>`).join('');
+  pop.addEventListener('click', function(ev) {
+    const swatch = ev.target.closest('[data-col]');
+    if (!swatch) return;
+    item[colKey] = swatch.dataset.col;
+    persistLocal(); syncSave();
+    pop.remove();
+    renderGrid();
+  });
+  half.appendChild(pop);
 }
 
 // ── Auto-time helpers ─────────────────────────────────────────────────────────
@@ -2665,9 +2715,13 @@ function onDragEnd(e) {
           srcSlot.splice(sd.idx, 1);
         }
         if (target.splitTarget.side === 'right') {
-          item.subjectRight = drag.subject; item.noteRight = '';
+          item.subjectRight = drag.colourOnly ? 'Other' : drag.subject; item.noteRight = '';
+          item.colourOnlyRight = drag.colourOnly ? true : undefined;
+          if (drag.colourOnly) item.customNameRight = 'Other';
         } else {
-          item.subjectLeft = drag.subject; item.noteLeft = '';
+          item.subjectLeft = drag.colourOnly ? 'Other' : drag.subject; item.noteLeft = '';
+          item.colourOnlyLeft = drag.colourOnly ? true : undefined;
+          if (drag.colourOnly) item.customNameLeft = 'Other';
         }
       }
       persistLocal(); syncSave(); endDrag(); renderGrid(); return;
