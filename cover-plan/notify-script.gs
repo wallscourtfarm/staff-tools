@@ -868,7 +868,7 @@ function handleNotification(payloadStr) {
     GmailApp.sendEmail(toList,
       subject,
       `Release schedule updated at ${timeStr} on ${dateStr}. View it here: ${PLANNER_URL}`,
-      { htmlBody: htmlBody }
+      { htmlBody: htmlBody, from: 'wallscourt.scheduling@gmail.com' }
     );
 
     return ContentService.createTextOutput(JSON.stringify({ success: true, sent: recipients.length }))
