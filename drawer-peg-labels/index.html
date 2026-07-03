@@ -178,7 +178,26 @@
           <input type="file" id="fieldsFileInput" accept=".xlsx,.xls,.csv">
           <div>📂 Click to upload spreadsheet (Excel or CSV)</div>
         </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;margin-top:8px;cursor:pointer;">
+          <input type="checkbox" id="fieldsHasHeader" checked> First row is a header (skip it)
+        </label>
         <div id="fieldsCount" style="font-size:0.78rem;color:var(--muted);margin-top:6px;"></div>
+        <div style="margin-top:12px;">
+          <div style="font-size:0.72rem;font-weight:700;color:var(--blue-dk);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Field Styling</div>
+          <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+            <thead><tr style="color:var(--muted);">
+              <th style="text-align:left;padding:2px 6px 4px 0;font-weight:600;">Field</th>
+              <th style="padding:2px 6px 4px;font-weight:600;">Size (pt)</th>
+              <th style="padding:2px 6px 4px;font-weight:600;">Bold</th>
+            </tr></thead>
+            <tbody id="fieldStyleRows">
+              <tr><td style="padding:3px 6px 3px 0;">1 — Name</td><td style="padding:3px 6px;"><input type="number" class="field-size-input" data-field="0" value="16" min="6" max="36" style="width:52px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;"></td><td style="padding:3px 6px;text-align:center;"><input type="checkbox" class="field-bold-input" data-field="0" checked></td></tr>
+              <tr><td style="padding:3px 6px 3px 0;">2</td><td style="padding:3px 6px;"><input type="number" class="field-size-input" data-field="1" value="10" min="6" max="36" style="width:52px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;"></td><td style="padding:3px 6px;text-align:center;"><input type="checkbox" class="field-bold-input" data-field="1"></td></tr>
+              <tr><td style="padding:3px 6px 3px 0;">3</td><td style="padding:3px 6px;"><input type="number" class="field-size-input" data-field="2" value="10" min="6" max="36" style="width:52px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;"></td><td style="padding:3px 6px;text-align:center;"><input type="checkbox" class="field-bold-input" data-field="2"></td></tr>
+              <tr><td style="padding:3px 6px 3px 0;">4</td><td style="padding:3px 6px;"><input type="number" class="field-size-input" data-field="3" value="10" min="6" max="36" style="width:52px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;"></td><td style="padding:3px 6px;text-align:center;"><input type="checkbox" class="field-bold-input" data-field="3"></td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -196,7 +215,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>02.07.26c</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>02.07.26d</strong></footer>
 
 <script>
 // Year group colours
@@ -487,7 +506,9 @@ document.addEventListener('DOMContentLoaded', function() {
       const wb = XLSX.read(buf, { type: 'array' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-      fieldData = rows
+      const hasHeader = document.getElementById('fieldsHasHeader').checked;
+      const dataRows = hasHeader ? rows.slice(1) : rows;
+      fieldData = dataRows
         .map(r => r.slice(0, 4).map(c => (c !== undefined && c !== null) ? String(c).trim() : ''))
         .filter(r => r.some(c => c));
       const fieldsCount = document.getElementById('fieldsCount');
@@ -721,18 +742,19 @@ async function generatePdf() {
             const textRight = lx + config.border + liW - 2;
             const availW = textRight - textX;
             const fields = record.filter(f => f);
-            const fontSizes = [16, 10, 10, 10];
-            const lineHeights = [6.5, 4.2, 4.2, 4.2];
+            const fontSizes = [0,1,2,3].map(i => parseFloat(document.querySelector(`.field-size-input[data-field="${i}"]`)?.value) || [16,10,10,10][i]);
+            const fontBolds = [0,1,2,3].map(i => document.querySelector(`.field-bold-input[data-field="${i}"]`)?.checked || false);
+            const lineHeights = fontSizes.map(fs => fs * 0.352778 * 1.4);
             const totalTextH = fields.reduce((sum, _, i) => sum + lineHeights[i] + (i < fields.length - 1 ? 1.5 : 0), 0);
             let ty = ly + config.border + (liH - totalTextH) / 2;
             fields.forEach((field, i) => {
               let fs = fontSizes[i] || 10;
-              doc.setFont(fontName, 'normal');
+              doc.setFont(fontName, fontBolds[i] ? 'bold' : 'normal');
               doc.setFontSize(fs);
               doc.setTextColor(30, 45, 61);
               const tw = doc.getTextWidth(field);
               if (tw > availW) { fs = fs * (availW / tw); doc.setFontSize(fs); }
-              const lhMm = (fontSizes[i] || 10) * 0.352778;
+              const lhMm = fs * 0.352778;
               doc.text(field, textX, ty + lhMm * 0.85);
               ty += lineHeights[i] + (i < fields.length - 1 ? 1.5 : 0);
             });
