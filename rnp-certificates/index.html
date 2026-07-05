@@ -103,10 +103,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#0a0101}
     <div class="cert-tbl" id="cert-tbl"></div>
     <div class="act-row">
       <button class="btn btn-b" onclick="doPrint()">&#128424; &nbsp;Print All Certificates</button>
+      <button class="btn btn-g" id="confirm-btn" onclick="confirmPrinted()" style="display:none">&#10003; &nbsp;Confirm certificates printed</button>
     </div>
   </div>
 
-  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 05.07.26b &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
+  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 05.07.26c &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
 </div>
 
 <div id="prt"></div>
@@ -176,6 +177,7 @@ function processData() {
   btn.disabled = true;
   btn.textContent = '\u23F3  Loading tracking data…';
 
+  var confirmBtn = document.getElementById('confirm-btn'); if (confirmBtn) { confirmBtn.style.display='none'; confirmBtn.disabled=false; confirmBtn.innerHTML='&#10003; &nbsp;Confirm certificates printed'; }
   fetch(API_URL)
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -298,8 +300,16 @@ function renderCerts() {
 
 function doPrint() {
   if (certsToGenerate.length === 0) { alert('No certificates to print this week.'); return; }
-  saveTracking();
   window.print();
+  document.getElementById('confirm-btn').style.display = 'inline-block';
+}
+
+function confirmPrinted() {
+  saveTracking();
+  var btn = document.getElementById('confirm-btn');
+  btn.disabled = true;
+  btn.innerHTML = '&#10003; &nbsp;Tracking saved';
+  btn.style.background = '#718096';
 }
 
 </script>
