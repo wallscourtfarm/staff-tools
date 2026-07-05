@@ -120,7 +120,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#0a0101}
   </div>
   <div class="warn" id="print-tip" style="display:none;margin-top:10px">&#128161; In the print dialog, select <strong>Save as PDF</strong> as the destination to download the certificates as a PDF file.</div>
 
-  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 05.07.26g &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
+  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 05.07.26h &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
 </div>
 
 <div id="prt"></div>
@@ -313,9 +313,16 @@ function renderCerts() {
 
 function doPrint() {
   if (certsToGenerate.length === 0) { alert('No certificates to print this week.'); return; }
-  document.getElementById('print-tip').style.display = 'block';
-  window.print();
-  document.getElementById('confirm-btn').style.display = 'inline-block';
+  var btn = document.querySelector('[onclick="doPrint()"]');
+  btn.disabled = true;
+  btn.innerHTML = '&#8987; &nbsp;Loading fonts…';
+  document.fonts.ready.then(function() {
+    document.getElementById('print-tip').style.display = 'block';
+    btn.disabled = false;
+    btn.innerHTML = '&#128229; &nbsp;Save as PDF / Print';
+    window.print();
+    document.getElementById('confirm-btn').style.display = 'inline-block';
+  });
 }
 
 function confirmPrinted() {
