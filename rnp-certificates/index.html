@@ -94,7 +94,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#0a0101}
     <h2><span class="step">2</span> Milestone thresholds</h2>
     <div class="m-row">
       <label for="mi">Points thresholds (comma-separated):</label>
-      <input type="text" id="mi" value="50, 100, 150, 200, 250, 300">
+      <input type="text" id="mi" value="50, 100, 150, 200, 250, 300" oninput="var pb=document.getElementById('proc-btn');pb.style.background='';pb.innerHTML='&#9881; &nbsp;Process Data';">
     </div>
     <p style="font-size:.78rem;color:#888;margin-top:8px">Add or remove values to adjust milestones. The tool tracks which have already been issued per pupil.</p>
   </div>
@@ -115,7 +115,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#0a0101}
   </div>
   <div class="warn" id="print-tip" style="display:none;margin-top:10px">&#128161; In the print dialog, select <strong>Save as PDF</strong> as the destination to download the certificates as a PDF file.</div>
 
-  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 05.07.26k &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
+  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 05.07.26l &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
 </div>
 
 <div id="prt"></div>
@@ -161,7 +161,10 @@ function loadXlsx(input) {
 }
 
 function checkReady() {
-  document.getElementById('proc-btn').disabled = (xlsxData === null);
+  var pb = document.getElementById('proc-btn');
+  pb.disabled = (xlsxData === null);
+  pb.style.background = '';
+  pb.innerHTML = '&#9881; &nbsp;Process Data';
 }
 
 function getMilestones() {
@@ -219,7 +222,8 @@ function processData() {
       renderResults();
       renderCerts();
       btn.disabled = false;
-      btn.innerHTML = '\u2699\uFE0F &nbsp;Process Data';
+      btn.style.background = '#38a169';
+      btn.innerHTML = '\u2713 &nbsp;Data processed';
     })
     .catch(function(err) {
       alert('Could not load tracking data: ' + err.message);
