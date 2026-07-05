@@ -114,12 +114,13 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#0a0101}
     <div class="res-sum" id="res-sum"></div>
     <div class="cert-tbl" id="cert-tbl"></div>
     <div class="act-row">
-      <button class="btn btn-b" onclick="doPrint()">&#128424; &nbsp;Print All Certificates</button>
+      <button class="btn btn-b" onclick="doPrint()">&#128229; &nbsp;Save as PDF / Print</button>
       <button class="btn btn-g" id="confirm-btn" onclick="confirmPrinted()" style="display:none">&#10003; &nbsp;Confirm certificates printed</button>
     </div>
   </div>
+  <div class="warn" id="print-tip" style="display:none;margin-top:10px">&#128161; In the print dialog, select <strong>Save as PDF</strong> as the destination to download the certificates as a PDF file.</div>
 
-  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 05.07.26e &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
+  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 05.07.26f &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
 </div>
 
 <div id="prt"></div>
@@ -285,16 +286,16 @@ function makeCert(pupil) {
   var ms = pupil.milestone;
   var name = pupil.first + ' ' + pupil.last;
   var bodyText = 'for demonstrating outstanding Future Leader qualities and earning ' + ms + ' Real Nectar Points';
-  var goldFs = ms >= 150 ? '10mm' : ms >= 100 ? '12mm' : '14mm';
+  var goldFs = ms >= 150 ? '13mm' : '16.9mm';
 
   return '<div class="cert-page">'
     + '<div style="position:absolute;inset:0;border:4px solid #1798d3;z-index:10;pointer-events:none"></div>'
     + '<img src="' + LOGO + '" style="position:absolute;right:6mm;top:5mm;height:22mm;width:auto" alt="Wallscourt Farm Academy">'
     + '<img src="' + HEX_GROUP + '" style="position:absolute;left:-18mm;top:62mm;height:152mm;width:auto;pointer-events:none" alt="">'
-    + '<div style="position:absolute;left:0;right:0;top:40mm;text-align:center;font-size:13.5mm;font-weight:bold;color:#CD007A;;line-height:1.1;padding:0 4mm">Certificate of Achievement</div>'
-    + '<div style="position:absolute;left:0;right:0;top:64mm;text-align:center;font-size:6mm;color:#0057B5;">Congratulations to</div>'
-    + '<div style="position:absolute;left:0;right:0;top:82mm;text-align:center;font-size:9mm;font-weight:bold;color:#0a0101;">' + name + '</div>'
-    + '<div style="position:absolute;left:108mm;right:8mm;top:101mm;text-align:center;font-size:5mm;color:#0057B5;;line-height:1.5">' + bodyText + '</div>'
+    + '<div style="position:absolute;left:0;right:0;top:40mm;text-align:center;font-size:19mm;font-weight:bold;color:#CD007A;line-height:1.1;padding:0 4mm">Certificate of Achievement</div>'
+    + '<div style="position:absolute;left:0;right:0;top:64mm;text-align:center;font-size:5.6mm;color:#0057B5;">Congratulations to</div>'
+    + '<div style="position:absolute;left:0;right:0;top:82mm;text-align:center;font-size:9.9mm;font-weight:bold;color:#0a0101;">' + name + '</div>'
+    + '<div style="position:absolute;left:108mm;right:8mm;top:101mm;text-align:center;font-size:7mm;color:#0057B5;line-height:1.5">' + bodyText + '</div>'
     + '<div style="position:absolute;right:10mm;bottom:8mm;width:52mm;height:52mm">'
     +   '<img src="' + GOLD_HEX + '" style="width:100%;height:100%;object-fit:contain" alt="">'
     +   '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:' + goldFs + ';font-weight:bold;color:#0a0101;;padding-bottom:3mm">' + ms + '</div>'
@@ -312,6 +313,7 @@ function renderCerts() {
 
 function doPrint() {
   if (certsToGenerate.length === 0) { alert('No certificates to print this week.'); return; }
+  document.getElementById('print-tip').style.display = 'block';
   window.print();
   document.getElementById('confirm-btn').style.display = 'inline-block';
 }
