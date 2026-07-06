@@ -215,7 +215,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>02.07.26d</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>06.07.26a</strong></footer>
 
 <script>
 // Year group colours
@@ -311,12 +311,14 @@ const LABEL_CONFIG = {
     cols: 2,
     rows: 6,
     orientation: 'portrait',
-    gap: 0,
+    gap: 2,
     fixedMarginLeft: 6.35,
     fixedMarginTop: 21.15,
     multiField: true,
     logoH: 16,
-    logoInset: 3
+    logoInset: 3,
+    colOffsets: [-4, 2],
+    rowOffsets: [-5, -6, -5, -5, -4, -6]
   }
 };
 
@@ -719,8 +721,10 @@ async function generatePdf() {
           for (let col = 0; col < config.cols; col++) {
             const record = sheetData[row * config.cols + col];
             if (!record) continue;
-            const lx = marginLeft + col * (config.width + gap);
-            const ly = marginTop + row * (config.height + gap);
+            const colOff = (config.colOffsets && config.colOffsets[col]) || 0;
+            const rowOff = (config.rowOffsets && config.rowOffsets[row]) || 0;
+            const lx = marginLeft + col * (config.width + gap) + colOff;
+            const ly = marginTop + row * (config.height + gap) + rowOff;
             const lw = config.width;
             const lh = config.height;
             const liW = lw - config.border * 2;
