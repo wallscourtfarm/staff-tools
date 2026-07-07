@@ -103,7 +103,7 @@ TYPES (use exact string):
 - "sequence"        — fill missing terms; options = [100,null,300,null,500]  (null = blank)
 - "draw-on-grid"    — coordinate grid; hasGrid:true, gridType:"coordinate", gridConfig:{...}
 - "number-line"     — number line; hasGrid:true, gridType:"number-line", gridConfig:{...}
-- "multi-part"      — two sub-questions; parts = [{letter:"a",questionText:"...",answerLabel:"",marks:1,showMethod:false,answer:""},{letter:"b",...}]
+- "multi-part"      — two sub-questions sharing a common stimulus (e.g. a number line or coordinate grid shown once above both parts); parts = [{letter:"a",questionText:"...",answerLabel:"",marks:1,showMethod:false,answer:""},{letter:"b",...}]; set hasGrid:true and gridConfig on the parent object to show the visual above all parts
 
 gridConfig for coordinate:
 {"xMin":0,"xMax":10,"yMin":0,"yMax":10,"points":[{"label":"A","x":3,"y":5}],"mirrorLine":null}
@@ -111,6 +111,8 @@ mirrorLine: "vertical" | "horizontal" | null
 
 gridConfig for number-line:
 {"min":0,"max":1,"marked":[0,0.5,1],"labels":["0","0.5","1"]}
+
+VISUAL RULE — CRITICAL: If a question text contains phrases like "Here is a number line", "Look at the grid", "Here are some shapes", "Use the diagram" or any reference to a visual, you MUST provide that visual in the JSON. Use hasGrid:true + gridType + gridConfig for number lines and coordinate grids. Never write question text that refers to a visual without including it. If you cannot render the visual (e.g. a shape diagram), rewrite the question so it does not refer to one.
 
 Set showMethod:true when marks >= 2.
 Vary question types — never make all "write-answer". Generate exactly the count requested.`;
@@ -542,6 +544,8 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
     function MultiPartQ({q}){
       return(<>
         <QText t={q.questionText}/>
+        {q.hasGrid && q.gridType==="number-line" && q.gridConfig && <NumLine cfg={q.gridConfig}/>}
+        {q.hasGrid && q.gridType==="coordinate" && q.gridConfig && <CoordGrid cfg={q.gridConfig}/>}
         {(q.parts||[]).map((p,i)=>(
           <div key={i} style={{marginBottom:16}}>
             <p style={{fontSize:15,fontFamily:"Arial",margin:"0 0 8px 0"}}><strong>{p.letter}</strong>{"  "}{p.questionText}</p>
