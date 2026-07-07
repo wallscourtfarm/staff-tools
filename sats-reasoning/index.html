@@ -113,8 +113,8 @@ gridConfig for number-line:
 {"min":0,"max":1,"marked":[0,0.5,1],"labels":["0","0.5","1"]}
 
 VISUAL RULE — CRITICAL:
-RENDERABLE visuals (use these freely — include hasGrid:true + gridType + gridConfig):
-  • Number lines → gridType:"number-line"
+RENDERABLE visuals (include hasGrid:true + gridType + gridConfig):
+  • Number lines → gridType:"number-line" — use ONLY for locating/estimating a single value or a small set of labelled points (e.g. "mark 3.7 on this number line"). Do NOT use for plotting multiple data values (scores, frequencies, etc.) — a number line cannot show stacked/coincident points and will be meaningless.
   • Coordinate grids → gridType:"coordinate"
 
 NOT RENDERABLE (line graphs, bar charts, pie charts, pictograms, Carroll diagrams, Venn diagrams, shape diagrams, clocks, rulers, measuring jugs, etc.):
@@ -412,16 +412,21 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
     function NumLine({ cfg }) {
       const { min=0, max=10, marked=[], labels } = cfg;
       const labs = labels || marked.map(String);
-      const W=420, H=60, pad=28, lY=36;
+      const W=560, H=72, pad=36, lY=36;
       const toX=v=>pad+((v-min)/(max-min))*(W-pad*2);
+      // stagger labels above/below the line to prevent overlap on dense scales
+      const stagger = marked.length > 6;
       return (
-        <svg width={W} height={H} style={{display:"block",margin:"10px 0"}}>
+        <svg width={W} height={H} style={{display:"block",margin:"10px 0",maxWidth:"100%"}}>
           <line x1={pad} y1={lY} x2={W-pad} y2={lY} stroke="#333" strokeWidth="2"/>
           <polygon points={`${W-pad},${lY} ${W-pad-8},${lY-4} ${W-pad-8},${lY+4}`} fill="#333"/>
-          {marked.map((v,i)=><g key={i}>
-            <line x1={toX(v)} y1={lY-8} x2={toX(v)} y2={lY+8} stroke="#333" strokeWidth="1.5"/>
-            <text x={toX(v)} y={lY+20} textAnchor="middle" fontSize="11" fontFamily="Arial" fill="#333">{labs[i]||String(v)}</text>
-          </g>)}
+          {marked.map((v,i)=>{
+            const above = stagger && i%2===1;
+            return <g key={i}>
+              <line x1={toX(v)} y1={lY-8} x2={toX(v)} y2={lY+8} stroke="#333" strokeWidth="1.5"/>
+              <text x={toX(v)} y={above ? lY-14 : lY+22} textAnchor="middle" fontSize="12" fontFamily="Arial" fill="#333">{labs[i]||String(v)}</text>
+            </g>;
+          })}
         </svg>
       );
     }
@@ -890,6 +895,6 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
 
     ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
   </script>
-  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">07.07.26a</div>
+  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">07.07.26b</div>
 </body>
 </html>
