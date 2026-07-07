@@ -32,7 +32,7 @@
       font-family: 'Nunito', sans-serif; font-size: 0.9rem; width: 100%; }
     .wfa-input:focus { border-color: #1798d3; outline: none; }
     .wfa-select { border: 1.5px solid #ddd; border-radius: 8px; padding: 8px 12px;
-      font-family: 'Nunito', sans-serif; font-size: 0.9rem; background: white; }
+      font-family: 'Nunito', sans-serif; font-size: 0.9rem; background: white; width: 100%; }
     .wfa-select:focus { border-color: #1798d3; outline: none; }
     .wfa-btn-primary { background: #1798d3; color: white; border: none; border-radius: 8px;
       padding: 10px 22px; font-size: 0.9rem; font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; }
@@ -55,7 +55,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useCallback, useRef, useEffect } = React;
+    const { useState, useCallback } = React;
 
     async function claudeFetch(body) {
       const resp = await fetch("https://app.wallscourt-farm-academy.co.uk/api/claude", {
@@ -68,7 +68,7 @@
       return data.text;
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── System prompt ─────────────────────────────────────────────────────────
 
     const SYSTEM_PROMPT = `You are an expert KS2 mathematics question writer. Generate SATs-style reasoning questions that look and feel exactly like genuine KS2 SATs papers (Papers 2 and 3).
 
@@ -115,7 +115,7 @@ gridConfig for number-line:
 Set showMethod:true when marks >= 2.
 Vary question types — never make all "write-answer". Generate exactly the count requested.`;
 
-    // ── Curriculum scope by year group (CLF / NC KS2 maths) ─────────────────
+    // ── Curriculum: domains and topics per year group ─────────────────────────
 
     const CURRICULUM = {
       Y3: {
@@ -129,7 +129,51 @@ Vary question types — never make all "write-answer". Generate exactly the coun
 - Time: tell time to nearest minute; 24-hour clock; Roman numerals; calculate durations
 - Geometry: right angles; parallel and perpendicular lines; classify triangles and quadrilaterals; horizontal/vertical
 - Statistics: bar charts, pictograms, tables — interpret scales; create from data
-IMPORTANT: Use only 3-digit numbers for place value. No decimals. No coordinates. No negative numbers. Keep contexts simple and concrete.`
+IMPORTANT: Use only 3-digit numbers for place value. No decimals. No coordinates. No negative numbers. Keep contexts simple and concrete.`,
+        domains: {
+          "Number and place value": [
+            "Count and represent numbers to 1,000",
+            "Compare and order numbers to 1,000",
+            "Place value in 3-digit numbers",
+            "Number lines and estimation",
+          ],
+          "Addition, subtraction, multiplication and division": [
+            "Add and subtract 3-digit numbers (column method)",
+            "Times tables: 3×, 4×, 8× (and 2×, 5×, 10× review)",
+            "Multiply and divide 2-digit by 1-digit",
+            "Solve multiplication and division problems",
+            "Mental addition and subtraction strategies",
+          ],
+          "Fractions, decimals and percentages": [
+            "Unit and non-unit fractions",
+            "Fractions of quantities and shapes",
+            "Compare and order fractions (same denominator)",
+            "Add and subtract fractions (same denominator)",
+            "Equivalence of simple fractions",
+          ],
+          "Measurement": [
+            "Measure and compare lengths (m, cm, mm)",
+            "Measure and compare mass (kg, g)",
+            "Measure and compare capacity (l, ml)",
+            "Tell time to the nearest minute",
+            "Durations and intervals of time",
+            "Perimeter of simple shapes",
+          ],
+          "Geometry – properties of shapes": [
+            "Properties of 2-D shapes",
+            "Properties of 3-D shapes",
+            "Right angles and comparing angles",
+            "Horizontal, vertical, perpendicular and parallel lines",
+          ],
+          "Geometry – position and direction": [
+            "Describe position and direction",
+            "Patterns and sequences",
+          ],
+          "Statistics": [
+            "Bar charts and pictograms",
+            "Tables and tally charts",
+          ],
+        }
       },
       Y4: {
         label: "Year 4",
@@ -142,7 +186,55 @@ IMPORTANT: Use only 3-digit numbers for place value. No decimals. No coordinates
 - Geometry: classify triangles (scalene, isosceles, equilateral); lines of symmetry; reflections; properties of rectangles/squares
 - Measurement: convert between units (×1000); perimeter of regular and irregular polygons; area by counting squares; money (£/p)
 - Statistics: bar charts and line graphs — read and interpret scales; collect, present and discuss data
-IMPORTANT: Coordinates in first quadrant only (no negatives). Use 4-digit numbers. Fractions may include mixed numbers and improper fractions.`
+IMPORTANT: Coordinates in first quadrant only (no negatives). Use 4-digit numbers. Fractions may include mixed numbers and improper fractions.`,
+        domains: {
+          "Number and place value": [
+            "Numbers to 10,000 (4-digit place value)",
+            "Round to nearest 10, 100 or 1,000",
+            "Count in 25s and 1,000s",
+            "Negative numbers in context",
+            "Roman numerals to 100",
+          ],
+          "Addition, subtraction, multiplication and division": [
+            "Add and subtract 4-digit numbers (column method)",
+            "Times tables to 12 × 12",
+            "Multiply and divide by 10 and 100",
+            "Short multiplication",
+            "Factor pairs",
+            "Solve multiplication and division problems",
+          ],
+          "Fractions, decimals and percentages": [
+            "Equivalent fractions",
+            "Add and subtract fractions (same denominator)",
+            "Decimal equivalents of fractions (¼, ½, ¾)",
+            "Tenths and hundredths as decimals",
+            "Round decimals to nearest whole number",
+            "Compare and order decimals",
+          ],
+          "Measurement": [
+            "Convert between units (km/m, kg/g, l/ml)",
+            "Perimeter of rectangles and polygons",
+            "Area by counting squares",
+            "Read and convert time (12-hour and 24-hour)",
+            "Solve money problems",
+          ],
+          "Geometry – properties of shapes": [
+            "Classify triangles and quadrilaterals",
+            "Identify acute, obtuse and right angles",
+            "Lines of symmetry",
+            "Properties of 3-D shapes",
+          ],
+          "Geometry – position and direction": [
+            "Coordinates in the first quadrant",
+            "Plot points and complete polygons",
+            "Translations on a grid",
+          ],
+          "Statistics": [
+            "Interpret and draw bar charts",
+            "Line graphs",
+            "Compare data sets",
+          ],
+        }
       },
       Y5: {
         label: "Year 5",
@@ -156,7 +248,52 @@ IMPORTANT: Coordinates in first quadrant only (no negatives). Use 4-digit number
 - Angles: acute, obtuse, reflex; measure and draw with protractor; angles on a straight line = 180°; angles around a point = 360°
 - Geometry: regular and irregular polygons; properties of 3D shapes; nets of 3D shapes
 - Statistics: line graphs; reading pie charts (begin); mean average
-IMPORTANT: Include decimals. Use larger numbers (5–6 digits). Introduce angles and volume. Fractions converted to/from decimals.`
+IMPORTANT: Include decimals. Use larger numbers (5–6 digits). Introduce angles and volume. Fractions converted to/from decimals.`,
+        domains: {
+          "Number and place value": [
+            "Numbers to 1,000,000",
+            "Round to nearest 10/100/1,000/10,000/100,000",
+            "Negative numbers on a number line",
+            "Roman numerals to 1,000",
+          ],
+          "Addition, subtraction, multiplication and division": [
+            "Short and long multiplication (4-digit × 2-digit)",
+            "Short division with remainders",
+            "Factors, multiples and prime numbers",
+            "Square and cube numbers",
+            "Multi-step addition and subtraction problems",
+          ],
+          "Fractions, decimals and percentages": [
+            "Compare fractions with related denominators",
+            "Add and subtract fractions (same and related denominators)",
+            "Multiply fractions by whole numbers",
+            "Decimals to 3 decimal places",
+            "Fractions, decimals and percentages equivalence",
+          ],
+          "Measurement": [
+            "Convert between metric units",
+            "Perimeter of composite rectilinear shapes",
+            "Area of rectangles and compound shapes",
+            "Volume of cuboids (counting cubes)",
+            "Solve problems involving time",
+            "Use all four operations with length, mass or capacity",
+          ],
+          "Geometry – properties of shapes": [
+            "Identify and measure angles in degrees",
+            "Angles on a straight line (180°) and at a point (360°)",
+            "Regular and irregular polygons",
+            "Properties of 3-D shapes and nets",
+          ],
+          "Geometry – position and direction": [
+            "Reflect shapes in mirror lines",
+            "Translations on a grid",
+          ],
+          "Statistics": [
+            "Line graphs",
+            "Reading and interpreting pie charts",
+            "Mean average",
+          ],
+        }
       },
       Y6: {
         label: "Year 6",
@@ -170,8 +307,61 @@ IMPORTANT: Include decimals. Use larger numbers (5–6 digits). Introduce angles
 - Area: triangles (½bh); perimeter and area consolidation
 - Coordinates: all four quadrants — plot, read, translate, reflect
 - Statistics: construct and interpret pie charts; line graphs; mean, median, mode; two-way tables
-IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebra, percentages. Multi-step problems. Full SATs style and difficulty.`
-      }
+IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebra, percentages. Multi-step problems. Full SATs style and difficulty.`,
+        domains: {
+          "Number and place value": [
+            "Numbers to 10,000,000",
+            "Round to any power of 10",
+            "Negative numbers",
+            "Order and compare integers and decimals",
+          ],
+          "Addition, subtraction, multiplication and division": [
+            "Long multiplication (4-digit × 2-digit)",
+            "Long division (4-digit ÷ 2-digit)",
+            "Order of operations (BODMAS)",
+            "Multi-step word problems",
+          ],
+          "Fractions, decimals and percentages": [
+            "Add and subtract fractions (different denominators)",
+            "Multiply and divide fractions",
+            "Convert between fractions, decimals and percentages",
+            "Find percentages of amounts",
+            "Solve problems involving FDP",
+          ],
+          "Ratio and proportion": [
+            "Describe and use ratio",
+            "Scale and proportion problems",
+            "Unequal sharing and grouping",
+          ],
+          "Algebra": [
+            "Simple formulae and substitution",
+            "Sequences and linear number patterns",
+            "Balancing equations (two unknowns)",
+          ],
+          "Measurement": [
+            "Area of triangles (½ × b × h)",
+            "Area of parallelograms",
+            "Perimeter and area problems",
+            "Convert metric and imperial units",
+          ],
+          "Geometry – properties of shapes": [
+            "Angles in triangles and quadrilaterals",
+            "Missing angles in polygons",
+            "Circles (radius, diameter)",
+            "3-D shapes and nets",
+          ],
+          "Geometry – position and direction": [
+            "Coordinates in all four quadrants",
+            "Reflect and translate shapes",
+          ],
+          "Statistics": [
+            "Construct and interpret pie charts",
+            "Line graphs",
+            "Mean, median, mode and range",
+            "Two-way tables",
+          ],
+        }
+      },
     };
 
     // ── SVG: Coordinate Grid ─────────────────────────────────────────────────
@@ -389,7 +579,7 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
       }
     }
 
-    function QuestionCard({q, num}){
+    function QuestionCard({q, num, onRegen, regenLoading}){
       const totalMarks = q.type==="multi-part"
         ? (q.parts||[]).reduce((s,p)=>s+(p.marks||1),0)
         : (q.marks||1);
@@ -398,7 +588,18 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
           <div style={{width:38,flexShrink:0,fontSize:19,fontWeight:"bold",paddingTop:1,fontFamily:"Arial"}}>{num}</div>
           <div style={{flex:1}}><QuestionBody q={q}/></div>
           {q.type!=="multi-part" && (
-            <div style={{width:76,flexShrink:0,display:"flex",alignItems:"flex-end",justifyContent:"flex-end"}}>
+            <div style={{width:76,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"flex-end",justifyContent:"space-between",paddingBottom:2}}>
+              <button
+                className="no-print"
+                onClick={()=>onRegen()}
+                disabled={regenLoading}
+                title="Regenerate this question"
+                style={{
+                  background:"none",border:"1px solid #ccc",borderRadius:3,
+                  color:regenLoading?"#bbb":"#888",cursor:regenLoading?"default":"pointer",
+                  fontSize:15,padding:"2px 6px",lineHeight:1,marginBottom:4
+                }}
+              >{regenLoading?"…":"↻"}</button>
               <div style={{fontSize:13,fontFamily:"Arial",color:"#222",borderBottom:"1.5px solid #333",paddingBottom:2,paddingRight:2}}>
                 {totalMarks} {totalMarks===1?"mark":"marks"}
               </div>
@@ -440,50 +641,64 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
       );
     }
 
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function buildUserMessage(yearGroup, domain, topicIdx, count, diff) {
+      const curr = CURRICULUM[yearGroup];
+      const diffNote = diff==="easier"
+        ? "Easier — 1-mark questions, straightforward, accessible."
+        : diff==="harder"
+        ? "Harder — 2 and 3-mark questions, multi-step, challenging."
+        : "Mixed difficulty — some 1-mark and some 2-mark questions.";
+
+      let topicStr;
+      if (domain === "_mixed") {
+        topicStr = "a mixed range of topics across all content domains";
+      } else {
+        const topics = curr.domains[domain] || [];
+        topicStr = topicIdx === -1
+          ? `${domain} — cover a range of topics within this domain`
+          : `${domain}: ${topics[topicIdx]}`;
+      }
+
+      return `Generate ${count} KS2 SATs-style reasoning questions for ${curr.label}.\nTopic: ${topicStr}\nDifficulty: ${diffNote}\n\n${curr.scope}\n\nReturn ONLY the JSON array.`;
+    }
 
     // ── Main App ─────────────────────────────────────────────────────────────
 
     function App(){
-      const [topic,     setTopic]   = useState("");
-      const [yearGroup, setYearGroup] = useState("Y4");
-      const [count,     setCount]   = useState("4");
-      const [diff,      setDiff]    = useState("mixed");
-      const [questions, setQs]      = useState([]);
-      const [loading,   setLoading] = useState(false);
-      const [error,     setError]   = useState("");
-      const [showMS,    setShowMS]  = useState(false);
-      const topicRef = useRef("");
+      const [yearGroup,  setYearGroup]  = useState("Y4");
+      const [domain,     setDomain]     = useState(() => Object.keys(CURRICULUM.Y4.domains)[0]);
+      const [topicIdx,   setTopicIdx]   = useState(-1);
+      const [count,      setCount]      = useState("4");
+      const [diff,       setDiff]       = useState("mixed");
+      const [paperTitle, setPaperTitle] = useState("");
+      const [questions,  setQs]         = useState([]);
+      const [loading,    setLoading]    = useState(false);
+      const [error,      setError]      = useState("");
+      const [showMS,     setShowMS]     = useState(false);
+      const [regenIdx,   setRegenIdx]   = useState(null);
 
-      const handleTopicChange = useCallback((e) => {
-        topicRef.current = e.target.value;
-        setTopic(e.target.value);
+      const handleYearChange = useCallback((e) => {
+        const y = e.target.value;
+        setYearGroup(y);
+        const firstDomain = Object.keys(CURRICULUM[y].domains)[0];
+        setDomain(firstDomain);
+        setTopicIdx(-1);
+      }, []);
+
+      const handleDomainChange = useCallback((e) => {
+        setDomain(e.target.value);
+        setTopicIdx(-1);
       }, []);
 
       const generate = useCallback(async () => {
-        const t = topicRef.current.trim();
-        if (!t) return;
-
-        const diffNote = diff==="easier"
-          ? "Easier — 1-mark questions, straightforward, accessible."
-          : diff==="harder"
-          ? "Harder — 2 and 3-mark questions, multi-step, challenging."
-          : "Mixed difficulty — some 1-mark and some 2-mark questions.";
-
-        const curriculumNote = CURRICULUM[yearGroup]?.scope || "";
-
-        setLoading(true);
-        setError("");
-        setQs([]);
-        setShowMS(false);
-
+        setLoading(true); setError(""); setQs([]); setShowMS(false);
         try {
           const raw = await claudeFetch({
             max_tokens: 4000,
             system: SYSTEM_PROMPT,
-            messages: [{
-              role: "user",
-              content: `Generate ${count} KS2 SATs-style reasoning questions for ${CURRICULUM[yearGroup]?.label} on the topic: "${t}". ${diffNote}\n\n${curriculumNote}\n\nReturn ONLY the JSON array.`
-            }]
+            messages: [{ role: "user", content: buildUserMessage(yearGroup, domain, topicIdx, count, diff) }]
           });
           const clean = raw.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
           setQs(JSON.parse(clean));
@@ -492,13 +707,36 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
           console.error(e);
         }
         setLoading(false);
-      }, [count, diff]);
+      }, [yearGroup, domain, topicIdx, count, diff]);
 
-      const handleKey = useCallback((e) => {
-        if (e.key==="Enter") generate();
-      }, [generate]);
+      const regenerateOne = useCallback(async (idx) => {
+        if (regenIdx !== null) return;
+        setRegenIdx(idx);
+        try {
+          const raw = await claudeFetch({
+            max_tokens: 1500,
+            system: SYSTEM_PROMPT,
+            messages: [{ role: "user", content: buildUserMessage(yearGroup, domain, topicIdx, 1, diff) }]
+          });
+          const clean = raw.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
+          const [newQ] = JSON.parse(clean);
+          setQs(prev => prev.map((q, i) => i === idx ? { ...newQ, id: q.id } : q));
+        } catch(e) {
+          console.error("Regen failed", e);
+        }
+        setRegenIdx(null);
+      }, [yearGroup, domain, topicIdx, diff, regenIdx]);
 
-      const topicDisplay = topic.charAt(0).toUpperCase()+topic.slice(1);
+      const curr = CURRICULUM[yearGroup];
+      const domainKeys = Object.keys(curr.domains);
+      const topicList = domain !== "_mixed" ? (curr.domains[domain] || []) : [];
+
+      const paperHeading = paperTitle.trim() ||
+        (domain === "_mixed"
+          ? `${curr.label} Mixed Reasoning`
+          : topicIdx === -1
+          ? `${curr.label} — ${domain}`
+          : `${curr.label} — ${topicList[topicIdx] || domain}`);
 
       return(
         <div style={{minHeight:"100vh"}}>
@@ -513,25 +751,46 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
           {/* Controls */}
           <div className="no-print" style={{maxWidth:820,margin:"20px auto 0 auto",padding:"0 16px"}}>
             <div className="wfa-card">
-              <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end"}}>
-                <div style={{flex:1,minWidth:220,display:"flex",flexDirection:"column"}}>
-                  <label className="wfa-label">Topic</label>
-                  <input
-                    type="text"
-                    value={topic}
-                    onChange={handleTopicChange}
-                    onKeyDown={handleKey}
-                    placeholder="e.g. coordinates, fractions, time, percentages…"
-                    className="wfa-input"
-                  />
-                </div>
+
+              {/* Row 1: year / domain / topic */}
+              <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:12}}>
                 <div style={{display:"flex",flexDirection:"column",minWidth:100}}>
                   <label className="wfa-label">Year group</label>
-                  <select value={yearGroup} onChange={e=>setYearGroup(e.target.value)} className="wfa-select">
+                  <select value={yearGroup} onChange={handleYearChange} className="wfa-select">
                     {Object.entries(CURRICULUM).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
                   </select>
                 </div>
-                <div style={{display:"flex",flexDirection:"column",minWidth:130}}>
+                <div style={{display:"flex",flexDirection:"column",flex:1,minWidth:180}}>
+                  <label className="wfa-label">Content domain</label>
+                  <select value={domain} onChange={handleDomainChange} className="wfa-select">
+                    <option value="_mixed">Mixed — all domains</option>
+                    {domainKeys.map(d=><option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                {domain !== "_mixed" && (
+                  <div style={{display:"flex",flexDirection:"column",flex:1,minWidth:200}}>
+                    <label className="wfa-label">Topic</label>
+                    <select value={topicIdx} onChange={e=>setTopicIdx(Number(e.target.value))} className="wfa-select">
+                      <option value={-1}>All topics in this domain</option>
+                      {topicList.map((t,i)=><option key={i} value={i}>{t}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Row 2: title / difficulty / count / generate */}
+              <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end"}}>
+                <div style={{display:"flex",flexDirection:"column",flex:1,minWidth:180}}>
+                  <label className="wfa-label">Paper title (optional)</label>
+                  <input
+                    type="text"
+                    value={paperTitle}
+                    onChange={e=>setPaperTitle(e.target.value)}
+                    placeholder="e.g. Spring 2 Assessment — Fractions"
+                    className="wfa-input"
+                  />
+                </div>
+                <div style={{display:"flex",flexDirection:"column",minWidth:140}}>
                   <label className="wfa-label">Difficulty</label>
                   <select value={diff} onChange={e=>setDiff(e.target.value)} className="wfa-select">
                     <option value="easier">Easier (1 mark)</option>
@@ -545,66 +804,73 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
                     {["2","3","4","5","6"].map(n=><option key={n}>{n}</option>)}
                   </select>
                 </div>
-                <button onClick={generate} disabled={loading||!topic.trim()}
+                <button onClick={generate} disabled={loading}
                   className="wfa-btn-primary" style={{alignSelf:"flex-end"}}>
                   {loading?"Generating…":"Generate"}
                 </button>
               </div>
+
             </div>
           </div>
 
           <div style={{maxWidth:820,margin:"0 auto",padding:"0 16px"}}>
 
-          {/* Error */}
-          {error && (
-            <div className="no-print wfa-error" style={{marginBottom:16}}>
-              {error}
-            </div>
-          )}
+            {/* Error */}
+            {error && (
+              <div className="no-print wfa-error" style={{marginBottom:16}}>{error}</div>
+            )}
 
-          {/* Loading */}
-          {loading && (
-            <div className="wfa-card" style={{textAlign:"center",padding:"60px 52px",color:"#888",fontSize:"1rem"}}>
-              Generating questions…
-            </div>
-          )}
-
-          {/* Paper */}
-          {!loading && questions.length>0 && (
-            <div>
-              <div className="no-print" style={{display:"flex",gap:10,justifyContent:"flex-end",marginBottom:14}}>
-                <button onClick={()=>window.print()} className="wfa-btn-ghost">Print / Save PDF</button>
-                <button onClick={()=>setShowMS(s=>!s)}
-                  className={`wfa-btn-secondary${showMS?" active":""}`}>
-                  {showMS?"Hide Mark Scheme":"Show Mark Scheme"}
-                </button>
-                <button onClick={generate} className="wfa-btn-ghost">Regenerate</button>
+            {/* Loading */}
+            {loading && (
+              <div className="wfa-card" style={{textAlign:"center",padding:"60px 52px",color:"#888",fontSize:"1rem"}}>
+                Generating questions…
               </div>
+            )}
 
-              <div style={{background:"white",boxShadow:"0 2px 14px rgba(0,0,0,0.12)",padding:"40px 52px 52px 52px"}}>
-                <div style={{borderBottom:"2.5px solid #222",paddingBottom:12,marginBottom:4}}>
-                  <div style={{fontSize:13,color:"#444",marginBottom:3}}>Key Stage 2 Mathematics — Reasoning &nbsp;|&nbsp; {CURRICULUM[yearGroup]?.label}</div>
-                  <div style={{fontSize:22,fontWeight:"bold",color:"#1a1a8c"}}>{topicDisplay} Practice Questions</div>
+            {/* Paper */}
+            {!loading && questions.length>0 && (
+              <div>
+                <div className="no-print" style={{display:"flex",gap:10,justifyContent:"flex-end",marginBottom:14}}>
+                  <button onClick={()=>window.print()} className="wfa-btn-ghost">Print / Save PDF</button>
+                  <button onClick={()=>setShowMS(s=>!s)}
+                    className={`wfa-btn-secondary${showMS?" active":""}`}>
+                    {showMS?"Hide Mark Scheme":"Show Mark Scheme"}
+                  </button>
+                  <button onClick={generate} className="wfa-btn-ghost">Regenerate all</button>
                 </div>
-                {questions.map((q,i)=><QuestionCard key={q.id||i} q={q} num={i+1}/>)}
-                <div style={{textAlign:"center",marginTop:30,paddingTop:14,borderTop:"1px solid #eee",
-                  fontSize:12,color:"#bbb"}}>[END OF QUESTIONS]</div>
-              </div>
 
-              {showMS && <MarkScheme questions={questions}/>}
-            </div>
-          )}
+                <div style={{background:"white",boxShadow:"0 2px 14px rgba(0,0,0,0.12)",padding:"40px 52px 52px 52px"}}>
+                  <div style={{borderBottom:"2.5px solid #222",paddingBottom:12,marginBottom:4}}>
+                    <div style={{fontSize:13,color:"#444",marginBottom:3}}>Key Stage 2 Mathematics — Reasoning</div>
+                    <div style={{fontSize:22,fontWeight:"bold",color:"#1a1a8c"}}>{paperHeading}</div>
+                  </div>
+                  {questions.map((q,i)=>(
+                    <QuestionCard
+                      key={q.id||i}
+                      q={q}
+                      num={i+1}
+                      onRegen={()=>regenerateOne(i)}
+                      regenLoading={regenIdx===i}
+                    />
+                  ))}
+                  <div style={{textAlign:"center",marginTop:30,paddingTop:14,borderTop:"1px solid #eee",fontSize:12,color:"#bbb"}}>[END OF QUESTIONS]</div>
+                </div>
 
-          {/* Empty state */}
-          {!loading && questions.length===0 && !error && (
-            <div style={{textAlign:"center",padding:"50px 0",color:"#aaa"}}>
-              <div style={{fontSize:48,marginBottom:10}}>✏️</div>
-              <div style={{fontSize:"1rem",color:"#888",marginBottom:6}}>Enter a topic above to generate practice questions</div>
-              <div style={{fontSize:"0.85rem"}}>
-                Try: coordinates · fractions · time · percentages · place value · area and perimeter · angles · statistics
+                {showMS && <MarkScheme questions={questions}/>}
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Empty state */}
+            {!loading && questions.length===0 && !error && (
+              <div style={{textAlign:"center",padding:"50px 0",color:"#aaa"}}>
+                <div style={{fontSize:48,marginBottom:10}}>✏️</div>
+                <div style={{fontSize:"1rem",color:"#888",marginBottom:6}}>Select a year group and topic above, then click Generate</div>
+                <div style={{fontSize:"0.85rem"}}>
+                  Try: Fractions · Place value · Measurement · Angles · Statistics · Mixed
+                </div>
+              </div>
+            )}
+
           </div>{/* end maxWidth wrapper */}
         </div>
       );
@@ -612,6 +878,6 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
 
     ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
   </script>
-  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">20.06.26c</div>
+  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">07.07.26a</div>
 </body>
 </html>
