@@ -248,6 +248,11 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     <button class="tab" id="tab-bk" onclick="showTab('bk')"><span>📖</span>Books</button>
   </div>
 
+  <div id="coverMigrateBanner" class="hidden" style="background:#fff3e0;border-bottom:2px solid #e65100;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px">
+    <span>📸 You have book covers saved locally — upload them so all users see them.</span>
+    <button class="btn btn-sm" style="background:#e65100;color:#fff;white-space:nowrap" onclick="migrateLocalCovers()">Upload to server</button>
+  </div>
+
   <div class="content">
 
     <!-- CHECK OUT TAB -->
@@ -285,7 +290,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 08.07.26j</div>
+  <div class="version">WFA Book Tracker · 08.07.26k</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -392,7 +397,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
 const API_KEY = 'wfa_rc_api_url';
 const HARDCODED_URL = 'https://script.google.com/macros/s/AKfycbyXw7lwvL5O1xJApGdKGM_R-zQDfbC_kWZcAf9yUS0VwOjmVWnigAsDEcfxbwjoAe1B/exec';
 let apiUrl  = localStorage.getItem(API_KEY) || HARDCODED_URL;
-let children = [], books = [];
+let children = [], books = [], serverCoverOverrides = {};
 let phase      = 'LKS2';
 let pickPhase  = 'LKS2'; // phase used inside the book picker (can differ from header phase)
 let yrFilter   = 'all';
@@ -431,8 +436,32 @@ async function loadData() {
     const d = await api({ action: 'getAll' });
     children = d.children || [];
     books    = d.books    || [];
+    serverCoverOverrides = d.coverOverrides || {};
     render();
+    checkLocalCoverMigration();
   } catch(e) { toast('⚠️ ' + e.message, 5000); }
+}
+
+function checkLocalCoverMigration() {
+  const local = getCoverOverrides();
+  if (!Object.keys(local).length) return;
+  const banner = document.getElementById('coverMigrateBanner');
+  if (banner) banner.classList.remove('hidden');
+}
+
+async function migrateLocalCovers() {
+  const local = getCoverOverrides();
+  const count = Object.keys(local).length;
+  if (!count) return;
+  try {
+    toast('Uploading covers…');
+    await api({ action: 'bulkSetCoverOverrides', overrides: local });
+    serverCoverOverrides = { ...serverCoverOverrides, ...local };
+    localStorage.removeItem('coverOverrides');
+    document.getElementById('coverMigrateBanner').classList.add('hidden');
+    toast(`✓ ${count} cover${count===1?'':'s'} saved to server`);
+    if (curTab === 'bk') renderBooks();
+  } catch(e) { toast('Error: ' + e.message); }
 }
 
 // ════════════════════════════════════════════════
@@ -981,14 +1010,8 @@ async function setCopyLost(bookId, copyNum, lost) {
 function getCoverOverrides() {
   try { return JSON.parse(localStorage.getItem('coverOverrides') || '{}'); } catch { return {}; }
 }
-function setCoverOverride(bookId, url) {
-  const o = getCoverOverrides();
-  if (url) o[bookId] = url; else delete o[bookId];
-  localStorage.setItem('coverOverrides', JSON.stringify(o));
-}
 function coverSrc(bookId, title) {
-  const o = getCoverOverrides();
-  return o[bookId] || `https://covers.openlibrary.org/b/title/${encodeURIComponent(title)}-M.jpg`;
+  return serverCoverOverrides[bookId] || `https://covers.openlibrary.org/b/title/${encodeURIComponent(title)}-M.jpg`;
 }
 function coverImg(bookId, title, editable) {
   const src = coverSrc(bookId, title);
@@ -1000,18 +1023,20 @@ function coverImg(bookId, title, editable) {
     ${editBtn}
   </div>`;
 }
-function editCover(bookId) {
+async function editCover(bookId) {
   const book = books.find(b => b.id === bookId);
-  const cur = getCoverOverrides()[bookId] || '';
+  const cur = serverCoverOverrides[bookId] || '';
   const url = prompt(`Cover image URL for "${book?.title}"\n\nPaste any image URL, or leave blank to use Open Library auto-detect:`, cur);
-  if (url === null) return; // cancelled
-  setCoverOverride(bookId, url.trim());
-  // Update the image in-place
-  const img = document.getElementById('cov-' + bookId);
-  if (img) {
-    if (url.trim()) { img.src = url.trim(); img.style.display = ''; }
-    else { img.src = coverSrc(bookId, book?.title || ''); img.style.display = ''; }
-  }
+  if (url === null) return;
+  const trimmed = url.trim();
+  try {
+    await api({ action: 'setCoverOverride', bookId, url: trimmed });
+    if (trimmed) serverCoverOverrides[bookId] = trimmed;
+    else delete serverCoverOverrides[bookId];
+    const img = document.getElementById('cov-' + bookId);
+    if (img) { img.src = trimmed || coverSrc(bookId, book?.title || ''); img.style.display = ''; }
+    toast('✓ Cover saved');
+  } catch(e) { toast('Error: ' + e.message); }
 }
 
 function bookTitle(id) { return books.find(b => b.id === id)?.title || ''; }
