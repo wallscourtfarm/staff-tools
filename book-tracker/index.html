@@ -270,7 +270,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 08.07.26b</div>
+  <div class="version">WFA Book Tracker · 08.07.26c</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -498,17 +498,26 @@ async function importCSV(type) {
   const hasHeader = lines[0].toLowerCase().match(/name|title|year/);
   const data = lines.slice(hasHeader ? 1 : 0);
 
+  function parseCSVLine(line) {
+    const out = []; let field = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') { inQ = !inQ; }
+      else if (line[i] === ',' && !inQ) { out.push(field.trim()); field = ''; }
+      else { field += line[i]; }
+    }
+    out.push(field.trim()); return out;
+  }
   let payload = {};
   if (type === 'children') {
     const list = data.map(l => {
-      const [name, yearGroup, cls] = l.split(',').map(s => s.trim());
+      const [name, yearGroup, cls] = parseCSVLine(l);
       return { name, yearGroup: yearGroup || 'Y4', class: cls || '' };
     }).filter(c => c.name);
     if (!list.length) return toast('No valid rows found');
     payload = { action: 'importData', children: list };
   } else {
     const list = data.map(l => {
-      const [title, author, ph, copies] = l.split(',').map(s => s.trim());
+      const [title, author, ph, copies] = parseCSVLine(l);
       return { title, author: author || '', phase: ph || phase, copies: parseInt(copies) || 1 };
     }).filter(b => b.title);
     if (!list.length) return toast('No valid rows found');
