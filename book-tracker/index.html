@@ -65,7 +65,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .content{padding:14px;max-width:1100px;margin:0 auto;padding-bottom:30px}
 
 /* ── CARD GRIDS ── */
-#childList,#chList,#bkList{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;align-items:start}
+#childList,#chList,#bkList{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
 #childList .c-card,#chList .ch-card,#bkList .book-card{margin-bottom:0}
 
 /* ── LETTER BAR ── */
@@ -250,7 +250,8 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
 
     <!-- CHECK OUT TAB -->
     <div id="view-co">
-      <input class="inp" id="childSearch" type="text" placeholder="🔍  Search by name…" oninput="filterChildren()" autocomplete="off" style="margin-bottom:12px">
+      <input class="inp" id="childSearch" type="text" placeholder="🔍  Search by name…" oninput="filterChildren()" autocomplete="off" style="margin-bottom:8px">
+      <div class="letter-bar" id="coLetters" style="margin-bottom:10px"></div>
       <div id="selPanel" class="hidden"></div>
       <div id="childList"></div>
       <div id="bookPicker" class="hidden"></div>
@@ -282,7 +283,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 08.07.26g</div>
+  <div class="version">WFA Book Tracker · 08.07.26h</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -395,6 +396,7 @@ let pickPhase  = 'LKS2'; // phase used inside the book picker (can differ from h
 let yrFilter   = 'all';
 let chLetterFilter = 'all';
 let bkLetterFilter = 'all';
+let coLetterFilter = 'all';
 let curTab  = 'co';
 let selChild = null;
 let pendingCert = null;
@@ -567,6 +569,7 @@ function setPhase(p) {
   selChild = null;
   chLetterFilter = 'all';
   bkLetterFilter = 'all';
+  coLetterFilter = 'all';
   render();
 }
 
@@ -589,15 +592,28 @@ function renderCheckout() {
   document.getElementById('selPanel').classList.add('hidden');
   document.getElementById('bookPicker').classList.add('hidden');
   document.getElementById('childSearch').classList.remove('hidden');
+  document.getElementById('coLetters').classList.remove('hidden');
   document.getElementById('childList').classList.remove('hidden');
   renderChildList(phaseChildren());
+}
+
+function setCoLetter(l) {
+  coLetterFilter = l;
+  filterChildren();
+}
+
+function buildCoLetterBar(list) {
+  const letters = [...new Set(list.map(c => c.name.trim()[0]?.toUpperCase()).filter(Boolean))].sort();
+  buildLetterBar('coLetters', letters, coLetterFilter, 'setCoLetter');
 }
 
 function renderChildList(list) {
   const el = document.getElementById('childList');
   const sorted = [...list].sort((a,b) => a.name.localeCompare(b.name));
-  if (!sorted.length) { el.innerHTML = empty('👦','No children in this phase yet'); return; }
-  el.innerHTML = sorted.map(c => {
+  buildCoLetterBar(sorted);
+  const filtered = coLetterFilter === 'all' ? sorted : sorted.filter(c => c.name.trim()[0]?.toUpperCase() === coLetterFilter);
+  if (!filtered.length) { el.innerHTML = empty('👦','No children in this phase yet'); return; }
+  el.innerHTML = filtered.map(c => {
     const bk = c.activeCheckouts[0] ? bookTitle(c.activeCheckouts[0].bookId) : null;
     return `<div class="c-card" onclick="selectChild('${c.id}')">
       <div>
@@ -626,6 +642,7 @@ function selectChild(id) {
   pickPhase = ['Y3','Y4'].includes(selChild.yearGroup) ? 'LKS2' : 'UKS2';
   document.getElementById('childList').classList.add('hidden');
   document.getElementById('childSearch').classList.add('hidden');
+  document.getElementById('coLetters').classList.add('hidden');
 
   const hasBook = selChild.activeCheckouts.length > 0;
   const panel = document.getElementById('selPanel');
@@ -653,6 +670,7 @@ function deselect() {
   selChild = null;
   document.getElementById('childList').classList.remove('hidden');
   document.getElementById('childSearch').classList.remove('hidden');
+  document.getElementById('coLetters').classList.remove('hidden');
   document.getElementById('selPanel').classList.add('hidden');
   document.getElementById('bookPicker').classList.add('hidden');
 }
