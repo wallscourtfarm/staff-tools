@@ -33,7 +33,10 @@ function doGet(e) {
       case 'addChild':       result = addChild(payload); break;
       case 'addBook':        result = addBook(payload); break;
       case 'importData':     result = importData(payload); break;
-      case 'setCopyStatus':  result = setCopyStatus(payload); break;
+      case 'importCheckouts':       result = importCheckouts(payload); break;
+      case 'setCopyStatus':         result = setCopyStatus(payload); break;
+      case 'setCoverOverride':      result = setCoverOverride(payload); break;
+      case 'bulkSetCoverOverrides': result = bulkSetCoverOverrides(payload); break;
       default:           result = { error: 'Unknown action: ' + action };
     }
 
@@ -58,7 +61,8 @@ function setup() {
   const defs = [
     { name: 'Children',  headers: ['ChildID', 'Name', 'YearGroup', 'Class'] },
     { name: 'Books',     headers: ['BookID', 'Title', 'Author', 'Phase', 'TotalCopies', 'LostCopies'] },
-    { name: 'Checkouts', headers: ['CheckoutID', 'ChildID', 'BookID', 'CopyNum', 'CheckoutDate', 'ReturnDate', 'Completed'] },
+    { name: 'Checkouts',      headers: ['CheckoutID', 'ChildID', 'BookID', 'CopyNum', 'CheckoutDate', 'ReturnDate', 'Completed'] },
+    { name: 'CoverOverrides', headers: ['BookID', 'CoverURL'] },
   ];
 
   defs.forEach(def => {
@@ -81,6 +85,15 @@ function getAllData() {
   const childRows    = getSheet('Children').getDataRange().getValues();
   const bookRows     = getSheet('Books').getDataRange().getValues();
   const checkoutRows = getSheet('Checkouts').getDataRange().getValues();
+
+  // Cover overrides
+  const coverSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('CoverOverrides');
+  const coverOverrides = {};
+  if (coverSheet) {
+    coverSheet.getDataRange().getValues().slice(1).forEach(r => {
+      if (r[0] && r[1]) coverOverrides[String(r[0])] = String(r[1]);
+    });
+  }
 
   // Build lookup maps from checkout history
   const readsByChild   = {};  // childId → completed count
@@ -147,7 +160,7 @@ function getAllData() {
     };
   });
 
-  return { children, books };
+  return { children, books, coverOverrides };
 }
 
 // ============================================================
@@ -243,4 +256,41 @@ function importData(data) {
   }
 
   return { ok: true, children: childCount, books: bookCount };
+}
+
+function importCheckouts(data) {
+  if (!data.rows || !data.rows.length) return { ok: true, count: 0 };
+  const sheet = getSheet('Checkouts');
+  sheet.getRange(sheet.getLastRow() + 1, 1, data.rows.length, 7).setValues(data.rows);
+  return { ok: true, count: data.rows.length };
+}
+
+function setCoverOverride(data) {
+  const { bookId, url } = data;
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName('CoverOverrides');
+  if (!sheet) {
+    sheet = ss.insertSheet('CoverOverrides');
+    sheet.appendRow(['BookID', 'CoverURL']);
+    sheet.getRange(1,1,1,2).setFontWeight('bold').setBackground('#1798d3').setFontColor('white');
+    sheet.setFrozenRows(1);
+  }
+  const rows = sheet.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(bookId)) {
+      if (url) { sheet.getRange(i + 1, 2).setValue(url); }
+      else { sheet.deleteRow(i + 1); }
+      return { ok: true };
+    }
+  }
+  if (url) sheet.appendRow([bookId, url]);
+  return { ok: true };
+}
+
+function bulkSetCoverOverrides(data) {
+  const overrides = data.overrides || {};
+  const keys = Object.keys(overrides);
+  if (!keys.length) return { ok: true, count: 0 };
+  keys.forEach(bookId => setCoverOverride({ bookId, url: overrides[bookId] }));
+  return { ok: true, count: keys.length };
 }
