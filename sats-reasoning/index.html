@@ -99,7 +99,8 @@ TYPES (use exact string):
 - "match"           — draw lines; options = {"left":["A","B","C"],"right":["X","Y","Z"]}
 - "order"           — arrange in order; options = ["3.2","0.7","1.05","2.8"]
 - "explain"         — write an explanation (no answer box needed)
-- "complete-table"  — table with blanks; table = {"headers":["col1","col2"],"rows":[[1,null],[null,4]]}
+- "complete-table"  — table with blanks for pupil to fill in; table = {"headers":["col1","col2"],"rows":[[1,null],[null,4]]}
+- "table-stimulus"  — read-only table shown as context, then a question below it; table = {"headers":["City","Temperature"],"rows":[["London","3°C"],["Moscow","-12°C"]]}; use this whenever the question says "The table shows…" or gives data in tabular form. NEVER embed table data as pipe-separated text in questionText.
 - "sequence"        — fill missing terms; options = [100,null,300,null,500]  (null = blank)
 - "draw-on-grid"    — coordinate grid; hasGrid:true, gridType:"coordinate", gridConfig:{...}
 - "number-line"     — number line; hasGrid:true, gridType:"number-line", gridConfig:{...}
@@ -579,6 +580,25 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
       </>);
     }
 
+    function TableStimulusQ({q}){
+      const {headers=[],rows=[]}=q.table||{};
+      return(<>
+        {headers.length>0 && (
+          <table style={{borderCollapse:"collapse",margin:"0 0 14px 0",fontSize:14,fontFamily:"Arial"}}>
+            <thead><tr>{headers.map((h,i)=><th key={i} style={{border:"1.5px solid #555",padding:"6px 14px",background:"#f4f4f4",fontWeight:"bold"}}>{h}</th>)}</tr></thead>
+            <tbody>{rows.map((row,ri)=>(
+              <tr key={ri}>{row.map((cell,ci)=>(
+                <td key={ci} style={{border:"1.5px solid #555",padding:"6px 14px",minWidth:80,textAlign:"center"}}>{cell===null?"":cell}</td>
+              ))}</tr>
+            ))}</tbody>
+          </table>
+        )}
+        <QText t={q.questionText}/>
+        {q.showMethod && <MethodBox/>}
+        <ALine label={q.answerLabel}/>
+      </>);
+    }
+
     function WriteQ({q}){
       return(<><QText t={q.questionText}/>
         {q.hasGrid && q.gridType==="coordinate" && q.gridConfig && <CoordGrid cfg={q.gridConfig}/>}
@@ -595,7 +615,8 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
         case "order":          return <OrderQ q={q}/>;
         case "sequence":       return <SeqQ q={q}/>;
         case "explain":        return <ExplainQ q={q}/>;
-        case "complete-table": return <TableQ q={q}/>;
+        case "complete-table":   return <TableQ q={q}/>;
+        case "table-stimulus":   return <TableStimulusQ q={q}/>;
         case "draw-on-grid":   return <GridQ q={q}/>;
         case "number-line":    return <NumLineQ q={q}/>;
         case "multi-part":     return <MultiPartQ q={q}/>;
@@ -902,6 +923,6 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
 
     ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
   </script>
-  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">08.07.26b</div>
+  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">08.07.26c</div>
 </body>
 </html>
