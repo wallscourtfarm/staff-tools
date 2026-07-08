@@ -285,7 +285,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 08.07.26i</div>
+  <div class="version">WFA Book Tracker · 08.07.26j</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -697,7 +697,7 @@ function renderBookPicker() {
   const bookHtml = b => `
     <div class="book-card">
       <div class="book-cover-wrap">
-        ${coverImg(b.title, b.author)}
+        ${coverImg(b.id, b.title, false)}
         <div style="flex:1;min-width:0">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div>
@@ -895,7 +895,7 @@ function renderBooks() {
     ${list.map(b => `
     <div class="book-card">
       <div class="book-cover-wrap" style="margin-bottom:10px">
-        ${coverImg(b.title, b.author)}
+        ${coverImg(b.id, b.title, true)}
         <div style="flex:1;min-width:0">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px">
             <div>
@@ -978,13 +978,40 @@ async function setCopyLost(bookId, copyNum, lost) {
   } catch(e) { toast('Error: ' + e.message); }
 }
 
-function coverUrl(title, author) {
-  const q = encodeURIComponent(title + (author ? ' ' + author : ''));
-  return `https://covers.openlibrary.org/b/olid/OL-M.jpg?default=https://covers.openlibrary.org/b/title/${encodeURIComponent(title)}-M.jpg`;
+function getCoverOverrides() {
+  try { return JSON.parse(localStorage.getItem('coverOverrides') || '{}'); } catch { return {}; }
 }
-function coverImg(title, author) {
-  const src = `https://covers.openlibrary.org/b/title/${encodeURIComponent(title)}-M.jpg`;
-  return `<img class="book-cover" src="${src}" alt="" onerror="this.style.display='none'">`;
+function setCoverOverride(bookId, url) {
+  const o = getCoverOverrides();
+  if (url) o[bookId] = url; else delete o[bookId];
+  localStorage.setItem('coverOverrides', JSON.stringify(o));
+}
+function coverSrc(bookId, title) {
+  const o = getCoverOverrides();
+  return o[bookId] || `https://covers.openlibrary.org/b/title/${encodeURIComponent(title)}-M.jpg`;
+}
+function coverImg(bookId, title, editable) {
+  const src = coverSrc(bookId, title);
+  const editBtn = editable
+    ? `<button onclick="editCover('${bookId}')" title="Edit cover image" style="position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:4px;padding:2px 5px;font-size:10px;cursor:pointer;font-family:inherit">✏️</button>`
+    : '';
+  return `<div style="position:relative;flex-shrink:0">
+    <img class="book-cover" id="cov-${bookId}" src="${src}" alt="" onerror="this.style.display='none'">
+    ${editBtn}
+  </div>`;
+}
+function editCover(bookId) {
+  const book = books.find(b => b.id === bookId);
+  const cur = getCoverOverrides()[bookId] || '';
+  const url = prompt(`Cover image URL for "${book?.title}"\n\nPaste any image URL, or leave blank to use Open Library auto-detect:`, cur);
+  if (url === null) return; // cancelled
+  setCoverOverride(bookId, url.trim());
+  // Update the image in-place
+  const img = document.getElementById('cov-' + bookId);
+  if (img) {
+    if (url.trim()) { img.src = url.trim(); img.style.display = ''; }
+    else { img.src = coverSrc(bookId, book?.title || ''); img.style.display = ''; }
+  }
 }
 
 function bookTitle(id) { return books.find(b => b.id === id)?.title || ''; }
