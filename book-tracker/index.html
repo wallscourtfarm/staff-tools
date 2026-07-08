@@ -62,7 +62,13 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .tab.on{color:var(--blue);border-bottom-color:var(--blue)}
 
 /* ── CONTENT ── */
-.content{padding:14px;max-width:760px;margin:0 auto;padding-bottom:30px}
+.content{padding:14px;max-width:540px;margin:0 auto;padding-bottom:30px}
+
+/* ── LETTER BAR ── */
+.letter-bar{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:10px}
+.letter-bar button{min-width:28px;padding:4px 3px;border-radius:6px;border:1px solid var(--border);background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:var(--muted);font-family:inherit;transition:all .12s}
+.letter-bar button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.letter-bar button:hover:not(.on){background:var(--blue-lt);border-color:var(--blue)}
 
 /* ── CARDS ── */
 .card{background:#fff;border-radius:var(--r);padding:15px;margin-bottom:10px;box-shadow:var(--sh)}
@@ -261,16 +267,18 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
         <button class="chip" onclick="setYrFilter('Y5',this)">Y5</button>
         <button class="chip" onclick="setYrFilter('Y6',this)">Y6</button>
       </div>
+      <div class="letter-bar" id="chLetters"></div>
       <div id="chList"></div>
     </div>
 
     <!-- BOOKS TAB -->
     <div id="view-bk" class="hidden">
+      <div class="letter-bar" id="bkLetters"></div>
       <div id="bkList"></div>
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 08.07.26c</div>
+  <div class="version">WFA Book Tracker · 08.07.26d</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -381,6 +389,8 @@ let children = [], books = [];
 let phase      = 'LKS2';
 let pickPhase  = 'LKS2'; // phase used inside the book picker (can differ from header phase)
 let yrFilter   = 'all';
+let chLetterFilter = 'all';
+let bkLetterFilter = 'all';
 let curTab  = 'co';
 let selChild = null;
 let pendingCert = null;
@@ -551,6 +561,8 @@ function setPhase(p) {
     b.classList.toggle('on', (i === 0 && p === 'LKS2') || (i === 1 && p === 'UKS2'))
   );
   selChild = null;
+  chLetterFilter = 'all';
+  bkLetterFilter = 'all';
   render();
 }
 
@@ -768,9 +780,29 @@ async function doReturn(checkoutId, completed, childName, childId) {
 // ════════════════════════════════════════════════
 function setYrFilter(yr, btn) {
   yrFilter = yr;
+  chLetterFilter = 'all';
   document.querySelectorAll('#yrChips .chip').forEach(c => c.classList.remove('on'));
   btn.classList.add('on');
   renderChildren();
+}
+
+function setChLetter(l) {
+  chLetterFilter = l;
+  renderChildren();
+}
+
+function setBkLetter(l) {
+  bkLetterFilter = l;
+  renderBooks();
+}
+
+function buildLetterBar(elId, letters, active, onclickFn) {
+  const el = document.getElementById(elId);
+  if (!letters.length) { el.innerHTML = ''; return; }
+  const all = ['all', ...letters];
+  el.innerHTML = all.map(l =>
+    `<button class="${l === active ? 'on' : ''}" onclick="${onclickFn}('${l}')">${l === 'all' ? 'All' : l}</button>`
+  ).join('');
 }
 
 function renderChildren() {
@@ -778,6 +810,10 @@ function renderChildren() {
   let list = children.filter(c => phYrs.includes(c.yearGroup));
   if (yrFilter !== 'all') list = list.filter(c => c.yearGroup === yrFilter);
   list.sort((a,b) => a.name.localeCompare(b.name));
+
+  const letters = [...new Set(list.map(c => c.name.trim()[0]?.toUpperCase()).filter(Boolean))].sort();
+  buildLetterBar('chLetters', letters, chLetterFilter, 'setChLetter');
+  if (chLetterFilter !== 'all') list = list.filter(c => c.name.trim()[0]?.toUpperCase() === chLetterFilter);
 
   const el = document.getElementById('chList');
   if (!list.length) { el.innerHTML = empty('👦','No children in this group yet'); return; }
@@ -812,7 +848,20 @@ function renderChildren() {
 // BOOKS TAB
 // ════════════════════════════════════════════════
 function renderBooks() {
-  const list = books.filter(b => b.phase === phase).sort((a,b) => a.title.localeCompare(b.title));
+  let list = books.filter(b => b.phase === phase).sort((a,b) => a.title.localeCompare(b.title));
+
+  const letters = [...new Set(list.map(b => {
+    const t = b.title.replace(/^(the |a |an )/i, '').trim();
+    return t[0]?.toUpperCase();
+  }).filter(Boolean))].sort();
+  buildLetterBar('bkLetters', letters, bkLetterFilter, 'setBkLetter');
+  if (bkLetterFilter !== 'all') {
+    list = list.filter(b => {
+      const t = b.title.replace(/^(the |a |an )/i, '').trim();
+      return t[0]?.toUpperCase() === bkLetterFilter;
+    });
+  }
+
   const el = document.getElementById('bkList');
   if (!list.length) { el.innerHTML = empty('📖','No books in this phase yet'); return; }
 
