@@ -114,14 +114,18 @@ gridConfig for number-line:
 {"min":0,"max":1,"marked":[0,0.5,1],"labels":["0","0.5","1"]}
 
 VISUAL RULE — CRITICAL:
-RENDERABLE visuals (include hasGrid:true + gridType + gridConfig):
-  • Number lines → gridType:"number-line" — use ONLY when the pupil must read a value OFF the line (e.g. an arrow pointing to an unlabelled position and the pupil writes the value). Do NOT use when all values are already stated in the question text — a number line that adds no new information is redundant and confusing. Do NOT use for plotting multiple data values. The gridConfig min/max must extend slightly beyond all marked values (e.g. marks at -7,0,4 → set min:-10, max:6).
-  • Coordinate grids → gridType:"coordinate"
+Every question that refers to a visual ("The bar chart shows…", "The line graph below…", "Here is a shape…") MUST include hasGrid:true and a matching gridType. Never reference a visual and then omit it.
 
-NOT RENDERABLE (line graphs, bar charts, pie charts, pictograms, Carroll diagrams, Venn diagrams, shape diagrams, clocks, rulers, measuring jugs, etc.):
-  → You MUST NOT write any question that says "Here is a line graph", "Look at the bar chart", "Here is a shape", or any similar reference to one of these visuals.
-  → Rewrite such questions so they state all necessary information in words/numbers only, with no reference to a diagram.
-  → If you find yourself writing "Here is a…" or "Use the…" or "Look at the…", STOP and rewrite without the visual reference.
+RENDERABLE — set hasGrid:true, gridType, gridConfig:
+  • Number line   → gridType:"number-line"   — ONLY when the pupil reads a value off the line. gridConfig: {"min":-10,"max":10,"marked":[-7,0],"labels":["-7","0"]}. min/max must extend beyond all marked values.
+  • Coordinate    → gridType:"coordinate"    — gridConfig: {"xMin":0,"xMax":10,"yMin":0,"yMax":10,"points":[],"mirrorLine":null}
+  • Bar chart     → gridType:"bar-chart"     — gridConfig: {"labels":["Mon","Tue","Wed"],"values":[5,8,3],"yMax":10,"yStep":2,"xLabel":"Day","yLabel":"Number of pupils","title":"Pupils absent"}
+  • Line graph    → gridType:"line-graph"    — gridConfig: {"xLabels":["Jan","Feb","Mar"],"values":[4,7,5],"yMax":10,"yStep":2,"xLabel":"Month","yLabel":"Temperature (°C)","title":"Monthly temperature"}
+
+NOT DIRECTLY RENDERABLE (pie charts, pictograms, Carroll/Venn diagrams, clocks, rulers, measuring jugs, shapes):
+  → Set hasGrid:true, gridType:"pie-chart" (or "pictogram", "clock", "shape", etc.) and gridConfig:null.
+  → A labelled placeholder box will be shown automatically — the question is still usable.
+  → Do NOT embed the missing visual's data as prose in questionText.
 
 ACCURACY CHECK — MANDATORY before outputting any question:
 1. Compute the correct answer yourself step by step.
@@ -417,6 +421,83 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
 
     // ── SVG: Number Line ─────────────────────────────────────────────────────
 
+    // ── SVG: Bar Chart ───────────────────────────────────────────────────────
+    function BarChart({ cfg }) {
+      const { labels=[], values=[], yMax=10, yStep=2, xLabel="", yLabel="", title="" } = cfg;
+      const barW=44, gap=16, padL=52, padB=48, padT=title?36:16, padR=16;
+      const chartH=180;
+      const W = padL + labels.length*(barW+gap) + padR;
+      const H = padT + chartH + padB;
+      const toY = v => padT + chartH - (v/yMax)*chartH;
+      const steps = [];
+      for(let v=0; v<=yMax; v+=yStep) steps.push(v);
+      return (
+        <svg width={W} height={H} style={{display:"block",margin:"10px 0",maxWidth:"100%"}}>
+          {title && <text x={W/2} y={padT-12} textAnchor="middle" fontSize="13" fontWeight="bold" fontFamily="Arial" fill="#333">{title}</text>}
+          {/* y-axis gridlines + labels */}
+          {steps.map(v=><g key={v}>
+            <line x1={padL} y1={toY(v)} x2={W-padR} y2={toY(v)} stroke="#ddd" strokeWidth="1"/>
+            <text x={padL-6} y={toY(v)+4} textAnchor="end" fontSize="11" fontFamily="Arial" fill="#555">{v}</text>
+          </g>)}
+          {/* y-axis */}
+          <line x1={padL} y1={padT} x2={padL} y2={padT+chartH} stroke="#555" strokeWidth="1.5"/>
+          {/* x-axis */}
+          <line x1={padL} y1={padT+chartH} x2={W-padR} y2={padT+chartH} stroke="#555" strokeWidth="1.5"/>
+          {/* bars */}
+          {labels.map((lbl,i)=>{
+            const bx = padL + i*(barW+gap) + gap/2;
+            const bh = (values[i]/yMax)*chartH;
+            return <g key={i}>
+              <rect x={bx} y={toY(values[i])} width={barW} height={bh} fill="#1798d3" opacity="0.85"/>
+              <text x={bx+barW/2} y={padT+chartH+14} textAnchor="middle" fontSize="11" fontFamily="Arial" fill="#333">{lbl}</text>
+            </g>;
+          })}
+          {xLabel && <text x={W/2} y={H-4} textAnchor="middle" fontSize="12" fontFamily="Arial" fill="#555">{xLabel}</text>}
+          {yLabel && <text x={10} y={padT+chartH/2} textAnchor="middle" fontSize="12" fontFamily="Arial" fill="#555" transform={`rotate(-90,10,${padT+chartH/2})`}>{yLabel}</text>}
+        </svg>
+      );
+    }
+
+    // ── SVG: Line Graph ──────────────────────────────────────────────────────
+    function LineGraph({ cfg }) {
+      const { xLabels=[], values=[], yMax=10, yStep=2, xLabel="", yLabel="", title="" } = cfg;
+      const padL=52, padB=48, padT=title?36:16, padR=24;
+      const chartW=300, chartH=180;
+      const W = padL + chartW + padR;
+      const H = padT + chartH + padB;
+      const n = xLabels.length;
+      const toX = i => padL + (n>1 ? (i/(n-1))*chartW : chartW/2);
+      const toY = v => padT + chartH - (v/yMax)*chartH;
+      const steps = [];
+      for(let v=0; v<=yMax; v+=yStep) steps.push(v);
+      const pts = values.map((v,i)=>`${toX(i)},${toY(v)}`).join(" ");
+      return (
+        <svg width={W} height={H} style={{display:"block",margin:"10px 0",maxWidth:"100%"}}>
+          {title && <text x={W/2} y={padT-12} textAnchor="middle" fontSize="13" fontWeight="bold" fontFamily="Arial" fill="#333">{title}</text>}
+          {steps.map(v=><g key={v}>
+            <line x1={padL} y1={toY(v)} x2={padL+chartW} y2={toY(v)} stroke="#ddd" strokeWidth="1"/>
+            <text x={padL-6} y={toY(v)+4} textAnchor="end" fontSize="11" fontFamily="Arial" fill="#555">{v}</text>
+          </g>)}
+          <line x1={padL} y1={padT} x2={padL} y2={padT+chartH} stroke="#555" strokeWidth="1.5"/>
+          <line x1={padL} y1={padT+chartH} x2={padL+chartW} y2={padT+chartH} stroke="#555" strokeWidth="1.5"/>
+          {xLabels.map((lbl,i)=><text key={i} x={toX(i)} y={padT+chartH+14} textAnchor="middle" fontSize="11" fontFamily="Arial" fill="#333">{lbl}</text>)}
+          <polyline points={pts} fill="none" stroke="#1798d3" strokeWidth="2"/>
+          {values.map((v,i)=><circle key={i} cx={toX(i)} cy={toY(v)} r={4} fill="#1798d3"/>)}
+          {xLabel && <text x={W/2} y={H-4} textAnchor="middle" fontSize="12" fontFamily="Arial" fill="#555">{xLabel}</text>}
+          {yLabel && <text x={10} y={padT+chartH/2} textAnchor="middle" fontSize="12" fontFamily="Arial" fill="#555" transform={`rotate(-90,10,${padT+chartH/2})`}>{yLabel}</text>}
+        </svg>
+      );
+    }
+
+    // ── Fallback placeholder for unrenderable visuals ────────────────────────
+    function VisualPlaceholder({ label }) {
+      return (
+        <div style={{border:"1.5px dashed #bbb",background:"#f9f9f9",borderRadius:6,padding:"18px 24px",margin:"12px 0",color:"#999",fontStyle:"italic",fontSize:13,fontFamily:"Arial",textAlign:"center"}}>
+          [{label || "diagram — see question paper"}]
+        </div>
+      );
+    }
+
     function NumLine({ cfg }) {
       const { min=0, max=10, marked=[], labels } = cfg;
       const labs = labels || marked.map(String);
@@ -562,11 +643,19 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
       </>);
     }
 
+    function AnyVisual({q}){
+      if(!q.hasGrid) return null;
+      if(q.gridType==="coordinate"  && q.gridConfig) return <CoordGrid cfg={q.gridConfig}/>;
+      if(q.gridType==="number-line" && q.gridConfig) return <NumLine cfg={q.gridConfig}/>;
+      if(q.gridType==="bar-chart"   && q.gridConfig) return <BarChart cfg={q.gridConfig}/>;
+      if(q.gridType==="line-graph"  && q.gridConfig) return <LineGraph cfg={q.gridConfig}/>;
+      return <VisualPlaceholder label={q.gridType||"diagram"}/>;
+    }
+
     function MultiPartQ({q}){
       return(<>
         <QText t={q.questionText}/>
-        {q.hasGrid && q.gridType==="number-line" && q.gridConfig && <NumLine cfg={q.gridConfig}/>}
-        {q.hasGrid && q.gridType==="coordinate" && q.gridConfig && <CoordGrid cfg={q.gridConfig}/>}
+        <AnyVisual q={q}/>
         {(q.parts||[]).map((p,i)=>(
           <div key={i} style={{marginBottom:16}}>
             <p style={{fontSize:15,fontFamily:"Arial",margin:"0 0 8px 0"}}><strong>{p.letter}</strong>{"  "}{p.questionText}</p>
@@ -601,7 +690,7 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
 
     function WriteQ({q}){
       return(<><QText t={q.questionText}/>
-        {q.hasGrid && q.gridType==="coordinate" && q.gridConfig && <CoordGrid cfg={q.gridConfig}/>}
+        <AnyVisual q={q}/>
         {q.showMethod && <MethodBox/>}
         <ALine label={q.answerLabel}/>
       </>);
@@ -923,6 +1012,6 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
 
     ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
   </script>
-  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">08.07.26c</div>
+  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">08.07.26d</div>
 </body>
 </html>
