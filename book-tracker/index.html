@@ -65,8 +65,8 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .content{padding:14px;max-width:1100px;margin:0 auto;padding-bottom:30px}
 
 /* ── CARD GRIDS ── */
-#chList,#bkList{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;align-items:start}
-#chList .ch-card,#bkList .book-card{margin-bottom:0}
+#childList,#chList,#bkList{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;align-items:start}
+#childList .c-card,#chList .ch-card,#bkList .book-card{margin-bottom:0}
 
 /* ── LETTER BAR ── */
 .letter-bar{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:10px}
@@ -277,12 +277,12 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
 
     <!-- BOOKS TAB -->
     <div id="view-bk" class="hidden">
-      <div class="letter-bar" id="bkLetters"></div>
+      <input class="inp" id="bookSearch" type="text" placeholder="🔍  Search by title or author…" oninput="filterBooks()" autocomplete="off" style="margin-bottom:10px">
       <div id="bkList"></div>
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 08.07.26f</div>
+  <div class="version">WFA Book Tracker · 08.07.26g</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -795,8 +795,7 @@ function setChLetter(l) {
   renderChildren();
 }
 
-function setBkLetter(l) {
-  bkLetterFilter = l;
+function filterBooks() {
   renderBooks();
 }
 
@@ -854,17 +853,8 @@ function renderChildren() {
 function renderBooks() {
   let list = books.filter(b => b.phase === phase).sort((a,b) => a.title.localeCompare(b.title));
 
-  const letters = [...new Set(list.map(b => {
-    const t = b.title.replace(/^(the |a |an )/i, '').trim();
-    return t[0]?.toUpperCase();
-  }).filter(Boolean))].sort();
-  buildLetterBar('bkLetters', letters, bkLetterFilter, 'setBkLetter');
-  if (bkLetterFilter !== 'all') {
-    list = list.filter(b => {
-      const t = b.title.replace(/^(the |a |an )/i, '').trim();
-      return t[0]?.toUpperCase() === bkLetterFilter;
-    });
-  }
+  const q = (document.getElementById('bookSearch')?.value || '').toLowerCase().trim();
+  if (q) list = list.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
 
   const el = document.getElementById('bkList');
   if (!list.length) { el.innerHTML = empty('📖','No books in this phase yet'); return; }
