@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>WFA Reading Challenge Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --blue:#1798d3; --blue-dk:#1280b5; --blue-lt:#e8f4fb;
+  --dark:#0a0101; --text:#1a1a1a; --muted:#666; --bg:#f0f4f8;
+  --white:#fff; --border:#dde3ea;
+  --green:#2e7d32; --green-lt:#e8f5e9;
+  --amber:#e65100; --amber-lt:#fff3e0;
+  --red:#c62828;
+  --r:12px; --sh:0 2px 8px rgba(0,0,0,.09);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── SETUP SCREEN ── */
+#setup{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#1798d3 0%,#0a5c8a 100%)}
+.setup-card{background:var(--white);border-radius:20px;padding:32px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.setup-card h1{font-size:22px;font-weight:800;margin-bottom:6px}
+.setup-card .sub{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:24px}
+.setup-steps{background:#f8f9fa;border-radius:10px;padding:16px;margin-bottom:20px;font-size:13px;line-height:1.8}
+.setup-steps ol{padding-left:18px;color:var(--text)}
+.setup-steps code{background:#e9ecef;padding:1px 5px;border-radius:4px;font-size:12px}
+
+/* ── FORM ELEMENTS ── */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.inp{width:100%;padding:11px 14px;border:2px solid var(--border);border-radius:9px;font-size:15px;font-family:inherit;outline:none;transition:border-color .2s;background:var(--white)}
+.inp:focus{border-color:var(--blue)}
+.inp[type=number]{-moz-appearance:textfield}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 18px;border-radius:9px;border:none;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit;transition:all .15s;white-space:nowrap}
+.btn:active{transform:scale(.97)}
+.btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{background:var(--blue-dk)}
+.btn-green{background:var(--green);color:#fff}
+.btn-ghost{background:var(--border);color:var(--text)}
+.btn-red{background:var(--red);color:#fff}
+.btn-sm{padding:8px 14px;font-size:13px}
+.btn-full{width:100%}
+
+/* ── HEADER ── */
+.hdr{background:var(--blue);color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:90;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.hdr-left h1{font-size:17px;font-weight:800;line-height:1.1}
+.hdr-left .ys{font-size:11px;opacity:.8}
+.phase-tog{display:flex;background:rgba(255,255,255,.2);border-radius:8px;padding:3px;gap:2px}
+.phase-btn{padding:6px 14px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:700;color:#fff;background:transparent;transition:all .2s}
+.phase-btn.on{background:#fff;color:var(--blue)}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.icon-btn{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:4px;line-height:1}
+
+/* ── TABS ── */
+.tabs{display:flex;background:#fff;border-bottom:2px solid var(--border);overflow-x:auto}
+.tab{flex:1;min-width:72px;padding:10px 6px 8px;text-align:center;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:color .15s}
+.tab span{font-size:19px;display:block;margin-bottom:2px}
+.tab.on{color:var(--blue);border-bottom-color:var(--blue)}
+
+/* ── CONTENT ── */
+.content{padding:14px;max-width:760px;margin:0 auto;padding-bottom:30px}
+
+/* ── CARDS ── */
+.card{background:#fff;border-radius:var(--r);padding:15px;margin-bottom:10px;box-shadow:var(--sh)}
+
+/* ── CHILD CARD (checkout list) ── */
+.c-card{background:#fff;border-radius:var(--r);padding:13px 15px;margin-bottom:8px;box-shadow:var(--sh);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;transition:transform .1s,box-shadow .1s}
+.c-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.14)}
+.c-card:active{transform:scale(.98)}
+.c-name{font-weight:700;font-size:15px}
+.c-meta{font-size:12px;color:var(--muted);margin-top:2px}
+.c-book-warn{font-size:11px;color:var(--amber);margin-top:3px}
+.c-reads{text-align:right;min-width:56px}
+.c-reads .num{font-size:18px;font-weight:800;color:var(--blue);line-height:1}
+.c-reads .lbl{font-size:10px;color:var(--muted)}
+
+/* ── SELECTED CHILD PANEL ── */
+.sel-panel{border-left:4px solid var(--blue)}
+.reads-dots{display:flex;gap:3px;flex-wrap:wrap;margin:8px 0 5px}
+.dot{width:11px;height:11px;border-radius:50%;background:var(--border);flex-shrink:0}
+.dot.f{background:var(--blue)}
+.dot.m{background:#f5a623}
+.gap{width:5px;flex-shrink:0}
+
+/* ── BOOK CARDS ── */
+.book-card{background:#fff;border-radius:var(--r);padding:13px 15px;margin-bottom:8px;box-shadow:var(--sh)}
+.book-title{font-weight:700;font-size:15px}
+.book-author{font-size:12px;color:var(--muted);margin-top:1px}
+.book-avail{font-size:12px;font-weight:700}
+.book-avail.has{color:var(--green)}
+.book-avail.out{color:var(--red)}
+.copies-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.copy-btn{padding:8px 14px;border-radius:8px;border:none;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s}
+.copy-btn:active{transform:scale(.96)}
+.copy-btn.avail{background:var(--blue);color:#fff}
+.copy-btn.avail:hover{background:var(--blue-dk)}
+.copy-btn.taken{background:var(--border);color:var(--muted);cursor:default;font-size:11px}
+
+/* ── CHECKOUT RECORDS (returns) ── */
+.co-card{background:#fff;border-radius:var(--r);padding:14px 15px;margin-bottom:8px;box-shadow:var(--sh)}
+.co-child{font-weight:700;font-size:15px}
+.co-book{font-size:13px;color:var(--muted);margin-top:2px}
+.co-date{font-size:11px;color:var(--muted);margin-top:2px}
+.ret-btns{display:flex;gap:8px;margin-top:11px}
+.ret-btns .btn{flex:1;font-size:13px;padding:10px 12px;text-align:center}
+
+/* ── CHILDREN TAB ── */
+.ch-card{background:#fff;border-radius:var(--r);padding:13px 15px;margin-bottom:8px;box-shadow:var(--sh)}
+.ch-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.ch-info .name{font-weight:700;font-size:15px}
+.ch-info .meta{font-size:12px;color:var(--muted);margin-top:2px}
+.ch-right{text-align:right;min-width:56px}
+.ch-right .num{font-size:20px;font-weight:800;color:var(--blue);line-height:1}
+.ch-right .lbl{font-size:10px;color:var(--muted)}
+.progress-bar{height:6px;background:var(--border);border-radius:3px;margin-top:10px;overflow:hidden}
+.progress-fill{height:100%;background:var(--blue);border-radius:3px;transition:width .3s}
+.progress-lbl{font-size:11px;color:var(--muted);margin-top:4px}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-top:4px;background:#fff8e1;color:#c66c00;border:1px solid #ffe082}
+
+/* ── STATS ROW ── */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.stat{background:#fff;border-radius:var(--r);padding:12px;text-align:center;box-shadow:var(--sh)}
+.stat .n{font-size:26px;font-weight:800;color:var(--blue)}
+.stat .l{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ── FILTER CHIPS ── */
+.chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px}
+.chip{padding:7px 16px;border-radius:20px;border:2px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;transition:all .15s;font-family:inherit}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+
+/* ── ALERTS ── */
+.alert{padding:10px 14px;border-radius:8px;margin-bottom:10px;font-size:13px;line-height:1.5}
+.alert-warn{background:var(--amber-lt);color:var(--amber);border-left:4px solid var(--amber)}
+.alert-ok{background:var(--green-lt);color:var(--green);border-left:4px solid var(--green)}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1a1a;color:#fff;padding:11px 20px;border-radius:10px;font-size:14px;font-weight:500;z-index:999;transition:transform .25s;max-width:88vw;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ── MODAL ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:#fff;border-radius:18px;padding:24px;width:100%;max-width:500px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 72px rgba(0,0,0,.35)}
+.modal h2{font-size:19px;margin-bottom:6px}
+.modal .m-sub{color:var(--muted);font-size:13px;margin-bottom:18px;line-height:1.5}
+.modal-btns{display:flex;gap:10px;margin-top:16px}
+hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
+
+/* ── CERTIFICATE MODAL ── */
+.cert-preview{text-align:center;padding:20px 0}
+.cert-preview .trophy{font-size:52px;margin-bottom:8px}
+.cert-preview .cname{font-size:22px;font-weight:800;color:var(--dark)}
+.cert-preview .cmsg{font-size:15px;color:var(--blue);margin-top:6px;font-weight:600}
+
+/* ── PRINT / PDF CERTIFICATE ── */
+.print-cert{display:none}
+@media print {
+  body>*:not(.print-cert){display:none!important}
+  .print-cert{display:block!important}
+  @page{size:A4 landscape;margin:0}
+}
+.cert-page{
+  width:297mm;height:210mm;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:#fff;font-family:'Inter',Georgia,serif;position:relative;padding:18mm;
+}
+.cert-border{position:absolute;inset:7mm;border:6px solid var(--blue);border-radius:7mm;pointer-events:none}
+.cert-inner{position:absolute;inset:10.5mm;border:2px solid var(--blue);border-radius:5mm;pointer-events:none}
+.cert-school{font-size:13pt;color:var(--blue);font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:5mm}
+.cert-pres{font-size:11pt;color:#888;margin-bottom:7mm}
+.cert-stars{font-size:22pt;margin-bottom:6mm}
+.cert-this{font-size:11pt;color:#666;margin-bottom:3mm}
+.cert-name{font-size:34pt;font-weight:800;color:var(--dark);margin-bottom:7mm;text-align:center}
+.cert-ms{font-size:15pt;font-weight:700;color:var(--blue);margin-bottom:4mm;text-align:center}
+.cert-txt{font-size:11pt;color:#444;margin-bottom:9mm;text-align:center}
+.cert-foot{font-size:9pt;color:#aaa}
+
+/* ── EMPTY / LOADING ── */
+.empty{text-align:center;padding:44px 20px;color:var(--muted)}
+.empty .ei{font-size:40px;margin-bottom:10px}
+
+/* ── SECTION HEADER ── */
+.sec-hdr{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px}
+
+.hidden{display:none!important}
+.version{text-align:center;padding:10px;color:#aaa;font-size:11px}
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP SCREEN ══ -->
+<div id="setup">
+  <div class="setup-card">
+    <h1>📚 WFA Reading Challenge</h1>
+    <p class="sub">Connect this tracker to your Google Spreadsheet to get started.</p>
+    <div class="setup-steps">
+      <ol>
+        <li>Open <strong>script.google.com</strong> → New project</li>
+        <li>Paste the contents of <code>Code.gs</code> and set your Spreadsheet ID</li>
+        <li>Deploy → <em>New deployment</em> → Web app<br>Execute as: <strong>Me</strong> · Access: <strong>Anyone</strong></li>
+        <li>Copy the <strong>Web app URL</strong> and paste it below</li>
+        <li>Click Connect, then use <strong>⚙ Settings → Run Setup</strong> to create the sheets</li>
+      </ol>
+    </div>
+    <div class="field">
+      <label>Apps Script Web App URL</label>
+      <input class="inp" id="apiUrlInp" type="url" placeholder="https://script.google.com/macros/s/.../exec">
+    </div>
+    <button class="btn btn-blue btn-full" style="padding:14px" onclick="connectApi()">Connect →</button>
+  </div>
+</div>
+
+<!-- ══ MAIN APP ══ -->
+<div id="app" class="hidden">
+  <div class="hdr">
+    <div class="hdr-left">
+      <h1>📚 Reading Challenge</h1>
+      <div class="ys">Wallscourt Farm Academy</div>
+    </div>
+    <div class="hdr-right">
+      <div class="phase-tog">
+        <button class="phase-btn on" onclick="setPhase('LKS2')">LKS2</button>
+        <button class="phase-btn" onclick="setPhase('UKS2')">UKS2</button>
+      </div>
+      <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" id="tab-co" onclick="showTab('co')"><span>📤</span>Check Out</button>
+    <button class="tab" id="tab-ret" onclick="showTab('ret')"><span>📥</span>Returns</button>
+    <button class="tab" id="tab-ch" onclick="showTab('ch')"><span>👧</span>Children</button>
+    <button class="tab" id="tab-bk" onclick="showTab('bk')"><span>📖</span>Books</button>
+  </div>
+
+  <div class="content">
+
+    <!-- CHECK OUT TAB -->
+    <div id="view-co">
+      <input class="inp" id="childSearch" type="text" placeholder="🔍  Search by name…" oninput="filterChildren()" autocomplete="off" style="margin-bottom:12px">
+      <div id="selPanel" class="hidden"></div>
+      <div id="childList"></div>
+      <div id="bookPicker" class="hidden"></div>
+    </div>
+
+    <!-- RETURNS TAB -->
+    <div id="view-ret" class="hidden">
+      <div id="retStats"></div>
+      <div id="retList"></div>
+    </div>
+
+    <!-- CHILDREN TAB -->
+    <div id="view-ch" class="hidden">
+      <div class="chips" id="yrChips">
+        <button class="chip on" onclick="setYrFilter('all',this)">All</button>
+        <button class="chip" onclick="setYrFilter('Y3',this)">Y3</button>
+        <button class="chip" onclick="setYrFilter('Y4',this)">Y4</button>
+        <button class="chip" onclick="setYrFilter('Y5',this)">Y5</button>
+        <button class="chip" onclick="setYrFilter('Y6',this)">Y6</button>
+      </div>
+      <div id="chList"></div>
+    </div>
+
+    <!-- BOOKS TAB -->
+    <div id="view-bk" class="hidden">
+      <div id="bkList"></div>
+    </div>
+
+  </div>
+  <div class="version">WFA Book Tracker · 08.07.26b</div>
+</div>
+
+<!-- ══ SETTINGS MODAL ══ -->
+<div class="overlay hidden" id="settingsOverlay">
+  <div class="modal">
+    <h2>⚙️ Settings</h2>
+
+    <div class="field">
+      <label>API URL</label>
+      <input class="inp" id="settApiUrl" type="url" style="font-size:12px">
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-blue btn-sm" onclick="saveApiUrl()">Save URL</button>
+      <button class="btn btn-ghost btn-sm" onclick="runSetup()">Run Setup (first time)</button>
+    </div>
+
+    <hr class="div">
+    <h3 style="font-size:16px;margin-bottom:12px">Add a Child</h3>
+    <div style="display:grid;gap:9px">
+      <input class="inp" id="nCName" placeholder="Full name">
+      <select class="inp" id="nCYear">
+        <option value="Y3">Year 3</option><option value="Y4" selected>Year 4</option>
+        <option value="Y5">Year 5</option><option value="Y6">Year 6</option>
+      </select>
+      <input class="inp" id="nCClass" placeholder="Class (e.g. 4A)">
+      <button class="btn btn-blue btn-sm" onclick="addChild()">Add Child</button>
+    </div>
+
+    <hr class="div">
+    <h3 style="font-size:16px;margin-bottom:12px">Add a Book</h3>
+    <div style="display:grid;gap:9px">
+      <input class="inp" id="nBTitle" placeholder="Title">
+      <input class="inp" id="nBAuthor" placeholder="Author (optional)">
+      <select class="inp" id="nBPhase">
+        <option value="LKS2">LKS2 (Y3/Y4)</option>
+        <option value="UKS2">UKS2 (Y5/Y6)</option>
+      </select>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input class="inp" id="nBCopies" type="number" min="1" max="5" value="1" style="width:80px">
+        <span style="font-size:13px;color:var(--muted)">copies</span>
+      </div>
+      <button class="btn btn-blue btn-sm" onclick="addBook()">Add Book</button>
+    </div>
+
+    <hr class="div">
+    <h3 style="font-size:16px;margin-bottom:6px">Bulk Import (CSV)</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+      <strong>Children:</strong> <code style="background:#f0f0f0;padding:1px 4px;border-radius:3px">name,yearGroup,class</code> e.g. <em>John Smith,Y4,4A</em><br>
+      <strong>Books:</strong> <code style="background:#f0f0f0;padding:1px 4px;border-radius:3px">title,author,phase,copies</code> e.g. <em>The Worst Witch,Jill Murphy,LKS2,2</em>
+    </p>
+    <textarea class="inp" id="importCsv" rows="5" placeholder="Paste CSV here…" style="resize:vertical"></textarea>
+    <div class="modal-btns" style="margin-top:8px">
+      <button class="btn btn-ghost btn-sm" onclick="importCSV('children')">Import Children</button>
+      <button class="btn btn-ghost btn-sm" onclick="importCSV('books')">Import Books</button>
+    </div>
+
+    <hr class="div">
+    <div class="modal-btns">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeSettings()">Close</button>
+      <button class="btn btn-red btn-sm" onclick="disconnectApi()">Disconnect</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MILESTONE / CERTIFICATE MODAL ══ -->
+<div class="overlay hidden" id="certOverlay">
+  <div class="modal" style="max-width:420px">
+    <div class="cert-preview">
+      <div class="trophy">🏆</div>
+      <div class="cname" id="certName"></div>
+      <div class="cmsg" id="certMsg"></div>
+    </div>
+    <p style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:4px">Print or save as PDF to produce a certificate.</p>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeCert()">Close</button>
+      <button class="btn btn-blue" style="flex:1" onclick="printCert()">🖨️ Print / PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PRINT CERTIFICATE ══ -->
+<div class="print-cert">
+<div class="cert-page">
+  <div class="cert-border"></div>
+  <div class="cert-inner"></div>
+  <div class="cert-school">Wallscourt Farm Academy</div>
+  <div class="cert-pres">Reading Challenge — Certificate of Achievement</div>
+  <div class="cert-stars">⭐ &nbsp; ⭐ &nbsp; ⭐</div>
+  <div class="cert-this">This is to certify that</div>
+  <div class="cert-name" id="pCertName">—</div>
+  <div class="cert-ms" id="pCertMs">—</div>
+  <div class="cert-txt" id="pCertTxt">—</div>
+  <div class="cert-foot" id="pCertDate">—</div>
+</div>
+</div>
+
+<!-- ══ TOAST ══ -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════
+const API_KEY = 'wfa_rc_api_url';
+let apiUrl  = localStorage.getItem(API_KEY) || '';
+let children = [], books = [];
+let phase      = 'LKS2';
+let pickPhase  = 'LKS2'; // phase used inside the book picker (can differ from header phase)
+let yrFilter   = 'all';
+let curTab  = 'co';
+let selChild = null;
+let pendingCert = null;
+
+// ════════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════════
+if (apiUrl) { show('app'); loadData(); }
+else        { show('setup'); }
+
+function show(id) {
+  document.getElementById('setup').classList.toggle('hidden', id !== 'setup');
+  document.getElementById('app').classList.toggle('hidden', id !== 'app');
+}
+
+// ════════════════════════════════════════════════
+// API
+// ════════════════════════════════════════════════
+async function api(payload) {
+  const url = `${apiUrl}?payload=${encodeURIComponent(JSON.stringify(payload))}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+async function loadData() {
+  try {
+    const d = await api({ action: 'getAll' });
+    children = d.children || [];
+    books    = d.books    || [];
+    render();
+  } catch(e) { toast('⚠️ ' + e.message, 5000); }
+}
+
+// ════════════════════════════════════════════════
+// SETUP & SETTINGS
+// ════════════════════════════════════════════════
+async function connectApi() {
+  const url = document.getElementById('apiUrlInp').value.trim();
+  if (!url) return toast('Enter a URL first');
+  try {
+    apiUrl = url;
+    const r = await api({ action: 'ping' });
+    if (r.ok) {
+      localStorage.setItem(API_KEY, url);
+      show('app');
+      toast('✓ Connected! Open Settings → Run Setup to create sheets.');
+      loadData();
+    }
+  } catch(e) { toast('Could not connect: ' + e.message, 5000); }
+}
+
+function openSettings() {
+  document.getElementById('settApiUrl').value = apiUrl;
+  document.getElementById('settingsOverlay').classList.remove('hidden');
+}
+function closeSettings() { document.getElementById('settingsOverlay').classList.add('hidden'); }
+
+function saveApiUrl() {
+  const url = document.getElementById('settApiUrl').value.trim();
+  if (!url) return;
+  apiUrl = url;
+  localStorage.setItem(API_KEY, url);
+  toast('✓ URL saved');
+}
+
+async function runSetup() {
+  try {
+    const r = await api({ action: 'setup' });
+    if (r.ok) toast('✓ Sheets created — you\'re ready to import data!');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+function disconnectApi() {
+  if (!confirm('Disconnect? Your data in Google Sheets is kept.')) return;
+  localStorage.removeItem(API_KEY);
+  location.reload();
+}
+
+async function addChild() {
+  const name = document.getElementById('nCName').value.trim();
+  const yr   = document.getElementById('nCYear').value;
+  const cls  = document.getElementById('nCClass').value.trim();
+  if (!name) return toast('Enter a name');
+  try {
+    await api({ action: 'addChild', name, yearGroup: yr, class: cls });
+    toast(`✓ ${name} added`);
+    document.getElementById('nCName').value = '';
+    document.getElementById('nCClass').value = '';
+    await loadData();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function addBook() {
+  const title  = document.getElementById('nBTitle').value.trim();
+  const author = document.getElementById('nBAuthor').value.trim();
+  const ph     = document.getElementById('nBPhase').value;
+  const copies = parseInt(document.getElementById('nBCopies').value) || 1;
+  if (!title) return toast('Enter a title');
+  try {
+    await api({ action: 'addBook', title, author, phase: ph, copies });
+    toast(`✓ "${title}" added`);
+    document.getElementById('nBTitle').value = '';
+    document.getElementById('nBAuthor').value = '';
+    await loadData();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function importCSV(type) {
+  const raw = document.getElementById('importCsv').value.trim();
+  if (!raw) return toast('Paste CSV data first');
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  const hasHeader = lines[0].toLowerCase().match(/name|title|year/);
+  const data = lines.slice(hasHeader ? 1 : 0);
+
+  let payload = {};
+  if (type === 'children') {
+    const list = data.map(l => {
+      const [name, yearGroup, cls] = l.split(',').map(s => s.trim());
+      return { name, yearGroup: yearGroup || 'Y4', class: cls || '' };
+    }).filter(c => c.name);
+    if (!list.length) return toast('No valid rows found');
+    payload = { action: 'importData', children: list };
+  } else {
+    const list = data.map(l => {
+      const [title, author, ph, copies] = l.split(',').map(s => s.trim());
+      return { title, author: author || '', phase: ph || phase, copies: parseInt(copies) || 1 };
+    }).filter(b => b.title);
+    if (!list.length) return toast('No valid rows found');
+    payload = { action: 'importData', books: list };
+  }
+
+  try {
+    const r = await api(payload);
+    toast(`✓ Imported ${r.children || r.books} ${type}`);
+    document.getElementById('importCsv').value = '';
+    await loadData();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ════════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════════
+function showTab(t) {
+  curTab = t;
+  ['co','ret','ch','bk'].forEach(id => {
+    document.getElementById(`tab-${id}`).classList.toggle('on', id === t);
+    document.getElementById(`view-${id}`).classList.toggle('hidden', id !== t);
+  });
+  selChild = null;
+  render();
+}
+
+function setPhase(p) {
+  phase = p;
+  document.querySelectorAll('.phase-btn').forEach((b, i) =>
+    b.classList.toggle('on', (i === 0 && p === 'LKS2') || (i === 1 && p === 'UKS2'))
+  );
+  selChild = null;
+  render();
+}
+
+function render() {
+  if (curTab === 'co')  renderCheckout();
+  if (curTab === 'ret') renderReturns();
+  if (curTab === 'ch')  renderChildren();
+  if (curTab === 'bk')  renderBooks();
+}
+
+// ════════════════════════════════════════════════
+// CHECK OUT TAB
+// ════════════════════════════════════════════════
+function phaseChildren() {
+  const yrs = phase === 'LKS2' ? ['Y3','Y4'] : ['Y5','Y6'];
+  return children.filter(c => yrs.includes(c.yearGroup));
+}
+
+function renderCheckout() {
+  document.getElementById('selPanel').classList.add('hidden');
+  document.getElementById('bookPicker').classList.add('hidden');
+  document.getElementById('childSearch').classList.remove('hidden');
+  document.getElementById('childList').classList.remove('hidden');
+  renderChildList(phaseChildren());
+}
+
+function renderChildList(list) {
+  const el = document.getElementById('childList');
+  const sorted = [...list].sort((a,b) => a.name.localeCompare(b.name));
+  if (!sorted.length) { el.innerHTML = empty('👦','No children in this phase yet'); return; }
+  el.innerHTML = sorted.map(c => {
+    const bk = c.activeCheckouts[0] ? bookTitle(c.activeCheckouts[0].bookId) : null;
+    return `<div class="c-card" onclick="selectChild('${c.id}')">
+      <div>
+        <div class="c-name">${esc(c.name)}</div>
+        <div class="c-meta">${c.yearGroup}${c.class ? ' · '+c.class : ''}</div>
+        ${bk ? `<div class="c-book-warn">📖 Has: ${esc(bk)}</div>` : ''}
+      </div>
+      <div class="c-reads">
+        <div class="num">${c.totalReads}</div>
+        <div class="lbl">reads</div>
+        ${milestoneBadge(c.totalReads)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterChildren() {
+  const q = document.getElementById('childSearch').value.toLowerCase();
+  renderChildList(phaseChildren().filter(c => c.name.toLowerCase().includes(q)));
+}
+
+function selectChild(id) {
+  selChild = children.find(c => c.id === id);
+  if (!selChild) return;
+  // Default book picker to the child's natural phase
+  pickPhase = ['Y3','Y4'].includes(selChild.yearGroup) ? 'LKS2' : 'UKS2';
+  document.getElementById('childList').classList.add('hidden');
+  document.getElementById('childSearch').classList.add('hidden');
+
+  const hasBook = selChild.activeCheckouts.length > 0;
+  const panel = document.getElementById('selPanel');
+  panel.classList.remove('hidden');
+  panel.className = 'card sel-panel';
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div>
+        <div style="font-weight:800;font-size:18px">${esc(selChild.name)}</div>
+        <div style="font-size:13px;color:var(--muted)">${selChild.yearGroup}${selChild.class ? ' · '+selChild.class : ''}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="deselect()">✕ Back</button>
+    </div>
+    <div style="margin-top:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Reading Progress</div>
+      <div class="reads-dots">${readDots(selChild.totalReads)}</div>
+      <div style="font-size:14px;font-weight:700;color:var(--blue)">${selChild.totalReads} / 25 reads</div>
+    </div>
+    ${hasBook ? `<div class="alert alert-warn" style="margin-top:12px">⚠️ Currently has: <strong>${esc(bookTitle(selChild.activeCheckouts[0].bookId))}</strong> (Copy ${selChild.activeCheckouts[0].copyNum})</div>` : ''}
+  `;
+  renderBookPicker();
+}
+
+function deselect() {
+  selChild = null;
+  document.getElementById('childList').classList.remove('hidden');
+  document.getElementById('childSearch').classList.remove('hidden');
+  document.getElementById('selPanel').classList.add('hidden');
+  document.getElementById('bookPicker').classList.add('hidden');
+}
+
+function renderBookPicker() {
+  const phBooks = books.filter(b => b.phase === pickPhase).sort((a,b) => a.title.localeCompare(b.title));
+  const avail   = phBooks.filter(b => b.available > 0);
+  const out     = phBooks.filter(b => b.available === 0);
+  const picker  = document.getElementById('bookPicker');
+  picker.classList.remove('hidden');
+
+  const otherPhase = pickPhase === 'LKS2' ? 'UKS2' : 'LKS2';
+  const childPhase = ['Y3','Y4'].includes(selChild?.yearGroup) ? 'LKS2' : 'UKS2';
+  const crossPhase = pickPhase !== childPhase;
+
+  const copyLabel = c => {
+    if (c.lost) return `Copy ${c.copyNum}: ❌ Lost`;
+    if (c.available) return `Copy ${c.copyNum} ✓`;
+    return `Copy ${c.copyNum}: ${esc(childName(c.childId)||'Out')}`;
+  };
+
+  const bookHtml = b => `
+    <div class="book-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div>
+          <div class="book-title">${esc(b.title)}</div>
+          ${b.author ? `<div class="book-author">${esc(b.author)}</div>` : ''}
+        </div>
+        <div class="book-avail ${b.available > 0 ? 'has' : 'out'}">${b.available}/${b.totalCopies} avail.</div>
+      </div>
+      <div class="copies-row">
+        ${b.copies.map(c => `
+          <button class="copy-btn ${c.available ? 'avail' : 'taken'}"
+            ${c.available ? `onclick="doCheckout('${b.id}',${c.copyNum},'${esc(b.title)}')"` : ''}
+            title="${c.lost ? 'Marked as lost' : c.available ? '' : 'Out to '+childName(c.childId)}">
+            ${copyLabel(c)}
+          </button>`).join('')}
+      </div>
+    </div>`;
+
+  picker.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px">
+      <div class="sec-hdr" style="margin:0">Select a book</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${crossPhase ? `<span style="font-size:11px;font-weight:700;color:var(--amber);background:var(--amber-lt);padding:3px 8px;border-radius:6px">Showing ${pickPhase}</span>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="switchPickPhase('${otherPhase}')" style="font-size:12px">
+          Switch to ${otherPhase}
+        </button>
+      </div>
+    </div>
+    ${avail.length ? avail.map(bookHtml).join('') : '<div style="color:var(--muted);font-size:13px;margin-bottom:8px">No copies currently available.</div>'}
+    ${out.length ? `<div class="sec-hdr" style="margin-top:16px">All copies out</div>${out.map(bookHtml).join('')}` : ''}
+  `;
+}
+
+function switchPickPhase(p) {
+  pickPhase = p;
+  renderBookPicker();
+}
+
+async function doCheckout(bookId, copyNum, title) {
+  if (!selChild) return;
+  if (!confirm(`Check out "${title}" (Copy ${copyNum}) to ${selChild.name}?`)) return;
+  try {
+    const r = await api({ action:'checkout', childId:selChild.id, bookId, copyNum });
+    if (r.ok) { toast(`✓ Checked out to ${selChild.name}`); await loadData(); deselect(); }
+  } catch(e) { toast('Error: '+e.message); }
+}
+
+// ════════════════════════════════════════════════
+// RETURNS TAB
+// ════════════════════════════════════════════════
+function renderReturns() {
+  const phYrs = phase === 'LKS2' ? ['Y3','Y4'] : ['Y5','Y6'];
+  const cos = [];
+  children.forEach(c => {
+    if (!phYrs.includes(c.yearGroup)) return;
+    c.activeCheckouts.forEach(co => {
+      const bk = books.find(b => b.id === co.bookId);
+      cos.push({ ...co, child: c, book: bk });
+    });
+  });
+  cos.sort((a,b) => a.child.name.localeCompare(b.child.name));
+
+  const totalAvail = books.filter(b => b.phase === phase).reduce((s,b) => s+b.available, 0);
+  const totalCh    = children.filter(c => phYrs.includes(c.yearGroup)).length;
+
+  document.getElementById('retStats').innerHTML = `
+    <div class="stats">
+      <div class="stat"><div class="n">${cos.length}</div><div class="l">Books Out</div></div>
+      <div class="stat"><div class="n">${totalAvail}</div><div class="l">Available</div></div>
+      <div class="stat"><div class="n">${totalCh}</div><div class="l">Children</div></div>
+    </div>`;
+
+  const el = document.getElementById('retList');
+  if (!cos.length) { el.innerHTML = empty('📚','No books currently checked out'); return; }
+  el.innerHTML = cos.map(co => `
+    <div class="co-card">
+      <div class="co-child">${esc(co.child.name)}</div>
+      <div class="co-book">${esc(co.book?.title||'Unknown')} · Copy ${co.copyNum}</div>
+      <div class="co-date">Since ${fmtDate(co.checkoutDate)}</div>
+      <div class="ret-btns">
+        <button class="btn btn-green" onclick="doReturn('${co.checkoutId}',true,'${esc(co.child.name)}','${co.child.id}')">✓ Completed &amp; Returned</button>
+        <button class="btn btn-ghost" onclick="doReturn('${co.checkoutId}',false,'${esc(co.child.name)}','${co.child.id}')">↩ Returned</button>
+      </div>
+    </div>`).join('');
+}
+
+async function doReturn(checkoutId, completed, childName, childId) {
+  const msg = completed
+    ? `Mark as completed and returned by ${childName}?`
+    : `Mark as returned (not finished) by ${childName}?`;
+  if (!confirm(msg)) return;
+  try {
+    const r = await api({ action:'returnBook', checkoutId, completed });
+    if (!r.ok) return;
+    await loadData();
+    if (completed && r.milestone) {
+      showMilestone(childId, r.milestone);
+    } else {
+      toast(completed ? `✓ Great reading, ${childName}!` : `↩ Book returned`);
+      renderReturns();
+    }
+  } catch(e) { toast('Error: '+e.message); }
+}
+
+// ════════════════════════════════════════════════
+// CHILDREN TAB
+// ════════════════════════════════════════════════
+function setYrFilter(yr, btn) {
+  yrFilter = yr;
+  document.querySelectorAll('#yrChips .chip').forEach(c => c.classList.remove('on'));
+  btn.classList.add('on');
+  renderChildren();
+}
+
+function renderChildren() {
+  const phYrs = phase === 'LKS2' ? ['Y3','Y4'] : ['Y5','Y6'];
+  let list = children.filter(c => phYrs.includes(c.yearGroup));
+  if (yrFilter !== 'all') list = list.filter(c => c.yearGroup === yrFilter);
+  list.sort((a,b) => a.name.localeCompare(b.name));
+
+  const el = document.getElementById('chList');
+  if (!list.length) { el.innerHTML = empty('👦','No children in this group yet'); return; }
+  el.innerHTML = list.map(c => {
+    const next = [5,10,15,20,25].find(m => m > c.totalReads) || 25;
+    const pct  = Math.min((c.totalReads / 25) * 100, 100);
+    const cur  = c.activeCheckouts[0] ? bookTitle(c.activeCheckouts[0].bookId) : null;
+    return `<div class="ch-card">
+      <div class="ch-row">
+        <div class="ch-info">
+          <div class="name">${esc(c.name)}</div>
+          <div class="meta">${c.yearGroup}${c.class ? ' · '+c.class : ''}</div>
+          ${milestoneBadge(c.totalReads)}
+        </div>
+        <div class="ch-right">
+          <div class="num">${c.totalReads}</div>
+          <div class="lbl">reads</div>
+        </div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-lbl">
+        ${c.totalReads >= 25
+          ? '🏆 Challenge complete!'
+          : `${next - c.totalReads} more to next milestone (${next})`}
+      </div>
+      ${cur ? `<div style="font-size:12px;color:var(--amber);margin-top:6px">📖 Currently reading: ${esc(cur)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════
+// BOOKS TAB
+// ════════════════════════════════════════════════
+function renderBooks() {
+  const list = books.filter(b => b.phase === phase).sort((a,b) => a.title.localeCompare(b.title));
+  const el = document.getElementById('bkList');
+  if (!list.length) { el.innerHTML = empty('📖','No books in this phase yet'); return; }
+
+  const totalAvail = list.reduce((s,b) => s+b.available, 0);
+  const totalCop   = list.reduce((s,b) => s+b.totalCopies, 0);
+
+  const lostCount = list.reduce((s,b) => s + b.copies.filter(c => c.lost).length, 0);
+
+  el.innerHTML = `
+    <div class="card" style="text-align:center;margin-bottom:14px">
+      <span style="font-size:15px;font-weight:700">${totalAvail} / ${totalCop} copies available</span>
+      ${lostCount ? `<div style="font-size:12px;color:var(--red);margin-top:4px">⚠️ ${lostCount} cop${lostCount===1?'y':'ies'} marked lost</div>` : ''}
+    </div>
+    ${list.map(b => `
+    <div class="book-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
+        <div>
+          <div class="book-title">${esc(b.title)}</div>
+          ${b.author ? `<div class="book-author">${esc(b.author)}</div>` : ''}
+        </div>
+        <div class="book-avail ${b.available > 0 ? 'has' : 'out'}">${b.available}/${b.totalCopies}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        ${b.copies.map(c => {
+          let bg, col, label;
+          if (c.lost) {
+            bg='#fce4e4'; col='var(--red)'; label='❌ Lost / Missing';
+          } else if (!c.available) {
+            bg='var(--amber-lt)'; col='var(--amber)'; label='📤 Out: '+esc(childName(c.childId)||'?');
+          } else {
+            bg='var(--green-lt)'; col='var(--green)'; label='✓ Available';
+          }
+          const toggleLabel = c.lost ? 'Mark Found' : 'Mark Lost';
+          const toggleAction = c.lost
+            ? `setCopyLost('${b.id}',${c.copyNum},false)`
+            : `setCopyLost('${b.id}',${c.copyNum},true)`;
+          return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:${bg};border-radius:8px;padding:7px 10px">
+            <span style="font-size:13px;font-weight:600;color:${col}">Copy ${c.copyNum} — ${label}</span>
+            <button onclick="${toggleAction}" style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;font-weight:600;font-family:inherit;background:rgba(0,0,0,.1);color:${col}">${toggleLabel}</button>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`).join('')}`;
+}
+
+// ════════════════════════════════════════════════
+// CERTIFICATE
+// ════════════════════════════════════════════════
+function showMilestone(childId, ms) {
+  const child = children.find(c => c.id === childId);
+  pendingCert = { child, ms };
+  document.getElementById('certName').textContent = child?.name || '';
+  document.getElementById('certMsg').textContent = ms === 25
+    ? 'has completed the Reading Challenge! 🎉'
+    : `has reached ${ms} reads! 🎉`;
+  document.getElementById('certOverlay').classList.remove('hidden');
+}
+
+function closeCert() {
+  document.getElementById('certOverlay').classList.add('hidden');
+  pendingCert = null;
+  renderReturns();
+}
+
+function printCert() {
+  if (!pendingCert) return;
+  const { child, ms } = pendingCert;
+  const msgs = { 5:'has read 5 books', 10:'has read 10 books', 15:'has read 15 books', 20:'has read 20 books', 25:'has completed the Reading Challenge!' };
+  const txts = { 5:'in the WFA KS2 Reading Challenge', 10:'in the WFA KS2 Reading Challenge', 15:'in the WFA KS2 Reading Challenge', 20:'in the WFA KS2 Reading Challenge', 25:'Well done on an outstanding reading achievement — Wallscourt Farm Academy is proud of you!' };
+  document.getElementById('pCertName').textContent = child?.name || '';
+  document.getElementById('pCertMs').textContent = msgs[ms] || `has reached ${ms} reads`;
+  document.getElementById('pCertTxt').textContent = txts[ms] || 'in the WFA KS2 Reading Challenge';
+  document.getElementById('pCertDate').textContent = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
+  window.print();
+}
+
+// ════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════
+async function setCopyLost(bookId, copyNum, lost) {
+  const book = books.find(b => b.id === bookId);
+  const msg  = lost
+    ? `Mark Copy ${copyNum} of "${book?.title}" as lost/missing?`
+    : `Mark Copy ${copyNum} of "${book?.title}" as found/available again?`;
+  if (!confirm(msg)) return;
+  try {
+    const r = await api({ action: 'setCopyStatus', bookId, copyNum, lost });
+    if (r.ok) {
+      toast(lost ? `❌ Copy ${copyNum} marked as lost` : `✓ Copy ${copyNum} restored`);
+      await loadData();
+      renderBooks();
+    }
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+function bookTitle(id) { return books.find(b => b.id === id)?.title || ''; }
+function childName(id) { return children.find(c => c.id === id)?.name || null; }
+
+function milestoneBadge(reads) {
+  const achieved = [5,10,15,20,25].filter(m => reads >= m);
+  if (!achieved.length) return '';
+  const hi = achieved[achieved.length-1];
+  const icons = {5:'⭐',10:'⭐⭐',15:'🏅',20:'🥇',25:'🏆'};
+  return `<div class="badge">${icons[hi]} ${hi} reads</div>`;
+}
+
+function readDots(reads) {
+  const milestones = new Set([5,10,15,20,25]);
+  let h = '';
+  for (let i = 1; i <= 25; i++) {
+    const filled = i <= reads;
+    const ms = milestones.has(i) && filled;
+    h += `<span class="dot ${ms ? 'm' : filled ? 'f' : ''}"></span>`;
+    if (milestones.has(i)) h += '<span class="gap"></span>';
+  }
+  return h;
+}
+
+function fmtDate(str) {
+  if (!str) return '?';
+  // Handle dd/MM/yyyy format from Apps Script
+  let d;
+  if (str.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+    const [dd,mm,yyyy] = str.split('/');
+    d = new Date(`${yyyy}-${mm}-${dd}`);
+  } else {
+    d = new Date(str);
+  }
+  if (isNaN(d)) return str;
+  const diff = Math.floor((Date.now() - d) / 86400000);
+  if (diff === 0) return 'today';
+  if (diff === 1) return 'yesterday';
+  return `${diff} days ago`;
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function empty(icon, msg) {
+  return `<div class="empty"><div class="ei">${icon}</div><p>${msg}</p></div>`;
+}
+
+let toastTimer;
+function toast(msg, ms = 3000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+</script>
+</body>
+</html>
