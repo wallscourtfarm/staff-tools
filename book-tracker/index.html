@@ -293,7 +293,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 09.07.26v</div>
+  <div class="version">WFA Book Tracker · 09.07.26w</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -1442,27 +1442,31 @@ function showCertConfirmPanel(){
     </div>`);
 }
 
+let _bannerItems = [];
+
 function showCertConfirmBanner(items) {
+  _bannerItems = items;
   document.getElementById('certConfirmBanner')?.remove();
   const banner = document.createElement('div');
   banner.id = 'certConfirmBanner';
   banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#1b5e20;color:white;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:9999;box-shadow:0 -4px 16px rgba(0,0,0,.3)';
   banner.innerHTML = `<span style="font-size:.93rem">Did the certificate print correctly?</span>
     <div style="display:flex;gap:10px">
-      <button style="background:white;color:#1b5e20;border:none;border-radius:6px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit" onclick="confirmBannerPrinted(${JSON.stringify(items)})">✓ Yes, mark as printed</button>
+      <button style="background:white;color:#1b5e20;border:none;border-radius:6px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit" onclick="confirmBannerPrinted()">✓ Yes, mark as printed</button>
       <button style="background:rgba(255,255,255,.2);color:white;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-family:inherit" onclick="document.getElementById('certConfirmBanner').remove()">✕ Dismiss</button>
     </div>`;
   document.body.appendChild(banner);
 }
 
-function confirmBannerPrinted(items) {
+function confirmBannerPrinted() {
   const issued = getCertIssued();
   const today = new Date().toLocaleDateString('en-GB');
-  items.forEach(it => {
+  _bannerItems.forEach(it => {
     if (!issued[it.child.id]) issued[it.child.id] = {};
     issued[it.child.id][it.ms] = today;
   });
   setCertIssued(issued);
+  _bannerItems = [];
   document.getElementById('certConfirmBanner')?.remove();
   toast('✓ Certificate marked as issued');
 }
