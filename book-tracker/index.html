@@ -290,7 +290,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 08.07.26k</div>
+  <div class="version">WFA Book Tracker · 09.07.26a</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -334,6 +334,12 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
       </div>
       <button class="btn btn-blue btn-sm" onclick="addBook()">Add Book</button>
     </div>
+
+    <hr class="div">
+    <h3 style="font-size:16px;margin-bottom:4px">Copy Counts</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Edit the number of physical copies for each book, then click Save.</p>
+    <div id="copyCountTable" style="display:grid;grid-template-columns:1fr auto auto;gap:6px 10px;align-items:center;font-size:13px;margin-bottom:10px"></div>
+    <button class="btn btn-blue btn-sm" onclick="saveCopyCounts()">Save Copy Counts</button>
 
     <hr class="div">
     <h3 style="font-size:16px;margin-bottom:6px">Bulk Import (CSV)</h3>
@@ -485,6 +491,35 @@ async function connectApi() {
 function openSettings() {
   document.getElementById('settApiUrl').value = apiUrl;
   document.getElementById('settingsOverlay').classList.remove('hidden');
+  renderCopyCountTable();
+}
+
+function renderCopyCountTable() {
+  const el = document.getElementById('copyCountTable');
+  const sorted = [...books].sort((a,b) => a.phase.localeCompare(b.phase) || a.title.localeCompare(b.title));
+  if (!sorted.length) { el.innerHTML = '<span style="color:var(--muted);font-size:13px">No books loaded yet.</span>'; return; }
+  el.innerHTML = sorted.map(b => `
+    <span style="font-weight:600">${esc(b.title)}</span>
+    <span style="color:var(--muted);font-size:11px;padding:2px 6px;background:var(--border);border-radius:4px">${b.phase}</span>
+    <input type="number" min="1" max="20" value="${b.totalCopies}"
+      data-book-id="${b.id}" data-orig="${b.totalCopies}"
+      style="width:56px;padding:5px 8px;border:2px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit;text-align:center">
+  `).join('');
+}
+
+async function saveCopyCounts() {
+  const inputs = document.querySelectorAll('#copyCountTable input[data-book-id]');
+  const changes = [...inputs].filter(inp => Number(inp.value) !== Number(inp.dataset.orig) && inp.value >= 1);
+  if (!changes.length) { toast('No changes to save'); return; }
+  try {
+    toast(`Saving ${changes.length} change${changes.length===1?'':'s'}…`);
+    await Promise.all(changes.map(inp =>
+      api({ action: 'setCopyCount', bookId: inp.dataset.bookId, count: Number(inp.value) })
+    ));
+    toast(`✓ Saved`);
+    await loadData();
+    renderCopyCountTable();
+  } catch(e) { toast('Error: ' + e.message); }
 }
 function closeSettings() { document.getElementById('settingsOverlay').classList.add('hidden'); }
 
