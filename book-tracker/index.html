@@ -291,7 +291,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 09.07.26d</div>
+  <div class="version">WFA Book Tracker · 09.07.26e</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -823,7 +823,20 @@ async function doCheckout(bookId, copyNum, title) {
   if (!confirm(`Check out "${title}" (Copy ${copyNum}) to ${selChild.name}?`)) return;
   try {
     const r = await api({ action:'checkout', childId:selChild.id, bookId, copyNum });
-    if (r.ok) { toast(`✓ Checked out to ${selChild.name}`); await loadData(); deselect(); }
+    if (!r.ok) return;
+    // Optimistic local update — no loadData() wait
+    const book = books.find(b => b.id === bookId);
+    if (book) {
+      const copy = book.copies.find(c => c.copyNum === copyNum);
+      if (copy) { copy.available = false; copy.childId = selChild.id; copy.checkoutId = r.checkoutId; copy.checkoutDate = new Date().toLocaleDateString('en-GB'); }
+      book.available = book.copies.filter(c => c.available).length;
+    }
+    const child = children.find(c => c.id === selChild.id);
+    if (child) child.activeCheckouts.push({ checkoutId: r.checkoutId, bookId, copyNum, checkoutDate: new Date().toLocaleDateString('en-GB') });
+    toast(`✓ Checked out to ${selChild.name}`);
+    deselect();
+    renderChildList(phaseChildren());
+    loadData(); // background sync
   } catch(e) { toast('Error: '+e.message); }
 }
 
@@ -874,13 +887,28 @@ async function doReturn(checkoutId, completed, childName, childId) {
   try {
     const r = await api({ action:'returnBook', checkoutId, completed });
     if (!r.ok) return;
-    await loadData();
+    // Optimistic local update — no loadData() wait
+    const child = children.find(c => c.id === childId);
+    if (child) {
+      const co = child.activeCheckouts.find(c => c.checkoutId === checkoutId);
+      if (co) {
+        const book = books.find(b => b.id === co.bookId);
+        if (book) {
+          const copy = book.copies.find(c => c.copyNum === co.copyNum);
+          if (copy) { copy.available = true; copy.childId = null; copy.checkoutId = null; copy.checkoutDate = null; }
+          book.available = book.copies.filter(c => c.available).length;
+        }
+      }
+      child.activeCheckouts = child.activeCheckouts.filter(c => c.checkoutId !== checkoutId);
+      if (completed) child.totalReads = (child.totalReads || 0) + 1;
+    }
     if (completed && r.milestone) {
       showMilestone(childId, r.milestone);
     } else {
       toast(completed ? `✓ Great reading, ${childName}!` : `↩ Book returned`);
-      renderReturns();
     }
+    renderReturns();
+    loadData(); // background sync
   } catch(e) { toast('Error: '+e.message); }
 }
 
