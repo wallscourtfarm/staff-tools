@@ -117,7 +117,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#0a0101}
   </div>
   <div class="warn" id="print-tip" style="display:none;margin-top:10px">&#128161; In the print dialog, select <strong>Save as PDF</strong> as the destination to download the certificates as a PDF file.</div>
 
-  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 09.07.26e &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
+  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 09.07.26f &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
 </div>
 
 <div id="prt"></div>
@@ -141,13 +141,24 @@ function loadXlsx(input) {
       var ws = wb.Sheets[wb.SheetNames[0]];
       var rows = XLSX.utils.sheet_to_json(ws, {header:1});
       xlsxData = [];
+      // Detect columns from header row
+      var hdr = (rows[0] || []).map(function(h){ return String(h||'').toLowerCase(); });
+      var ptsCol = hdr.findIndex(function(h){ return h.indexOf('total') !== -1; });
+      var lastCol = hdr.findIndex(function(h){ return h.indexOf('last') !== -1; });
+      var firstCol = hdr.findIndex(function(h){ return h.indexOf('first') !== -1; });
+      var yearCol = hdr.findIndex(function(h){ return h.indexOf('year') !== -1; });
+      // Fall back to fixed positions if headers not found
+      if (lastCol  === -1) lastCol  = 0;
+      if (firstCol === -1) firstCol = 1;
+      if (yearCol  === -1) yearCol  = 3;
+      if (ptsCol   === -1) ptsCol   = 6;
       for (var i = 1; i < rows.length; i++) {
         var r = rows[i];
         if (!r || r.length < 4) continue;
-        var last  = String(r[0] || '').trim();
-        var first = String(r[1] || '').trim();
-        var year  = String(r[3] || '').trim();
-        var pts   = parseInt(r[6]);
+        var last  = String(r[lastCol]  || '').trim();
+        var first = String(r[firstCol] || '').trim();
+        var year  = String(r[yearCol]  || '').trim();
+        var pts   = parseInt(r[ptsCol]);
         if (!last || !first || isNaN(pts)) continue;
         if (last.toLowerCase().indexOf('count') === 0) continue;
         xlsxData.push({last:last, first:first, year:year, pts:pts});
