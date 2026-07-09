@@ -291,7 +291,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 09.07.26b</div>
+  <div class="version">WFA Book Tracker · 09.07.26c</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -766,22 +766,24 @@ function renderBookPicker() {
       <div class="book-cover-wrap">
         ${coverImg(b.id, b.title, false)}
         <div style="flex:1;min-width:0">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-          <div>
-            <div class="book-title">${esc(b.title)}</div>
-            ${b.author ? `<div class="book-author">${esc(b.author)}</div>` : ''}
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div>
+              <div class="book-title">${esc(b.title)}</div>
+              ${b.author ? `<div class="book-author">${esc(b.author)}</div>` : ''}
+            </div>
+            <div class="book-avail ${b.available > 0 ? 'has' : 'out'}">${b.available}/${b.totalCopies} avail.</div>
           </div>
-          <div class="book-avail ${b.available > 0 ? 'has' : 'out'}">${b.available}/${b.totalCopies} avail.</div>
+          <div class="copies-row">
+            ${b.copies.map(c => `
+              <button class="copy-btn ${c.available ? 'avail' : 'taken'}"
+                ${c.available ? `onclick="doCheckout('${b.id}',${c.copyNum},'${esc(b.title)}')"` : ''}
+                title="${c.lost ? 'Marked as lost' : c.available ? '' : 'Out to '+childName(c.childId)}">
+                ${copyLabel(c)}
+              </button>`).join('')}
+          </div>
         </div>
-      <div class="copies-row">
-        ${b.copies.map(c => `
-          <button class="copy-btn ${c.available ? 'avail' : 'taken'}"
-            ${c.available ? `onclick="doCheckout('${b.id}',${c.copyNum},'${esc(b.title)}')"` : ''}
-            title="${c.lost ? 'Marked as lost' : c.available ? '' : 'Out to '+childName(c.childId)}">
-            ${copyLabel(c)}
-          </button>`).join('')}
       </div>
-      </div></div>`;
+    </div>`;
 
   const q = bookPickerSearch.toLowerCase();
   const filterBooks = list => q ? list.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)) : list;
