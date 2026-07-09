@@ -35,6 +35,7 @@ function doGet(e) {
       case 'importData':     result = importData(payload); break;
       case 'importCheckouts':       result = importCheckouts(payload); break;
       case 'setCopyStatus':         result = setCopyStatus(payload); break;
+      case 'setCopyCount':          result = setCopyCount(payload); break;
       case 'setCoverOverride':      result = setCoverOverride(payload); break;
       case 'bulkSetCoverOverrides': result = bulkSetCoverOverrides(payload); break;
       default:           result = { error: 'Unknown action: ' + action };
@@ -263,6 +264,19 @@ function importCheckouts(data) {
   const sheet = getSheet('Checkouts');
   sheet.getRange(sheet.getLastRow() + 1, 1, data.rows.length, 7).setValues(data.rows);
   return { ok: true, count: data.rows.length };
+}
+
+function setCopyCount(data) {
+  const { bookId, count } = data;
+  const sheet = getSheet('Books');
+  const rows = sheet.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(bookId)) {
+      sheet.getRange(i + 1, 5).setValue(Number(count));
+      return { ok: true };
+    }
+  }
+  return { error: 'Book not found' };
 }
 
 function setCoverOverride(data) {
