@@ -293,13 +293,16 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 09.07.26j</div>
+  <div class="version">WFA Book Tracker · 09.07.26k</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
-<div class="overlay hidden" id="settingsOverlay">
+<div class="overlay hidden" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
   <div class="modal">
-    <h2>⚙️ Settings</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <h2 style="margin:0">⚙️ Settings</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeSettings()" style="font-size:18px;line-height:1;padding:4px 10px">✕</button>
+    </div>
 
     <div class="field">
       <label>API URL</label>
@@ -308,6 +311,9 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     <div class="modal-btns">
       <button class="btn btn-blue btn-sm" onclick="saveApiUrl()">Save URL</button>
       <button class="btn btn-ghost btn-sm" onclick="runSetup()">Run Setup (first time)</button>
+    </div>
+    <div style="margin-top:8px">
+      <a id="sheetLink" href="#" target="_blank" style="font-size:13px;color:var(--blue)">📊 Open Google Sheet ↗</a>
     </div>
 
     <hr class="div">
@@ -365,8 +371,11 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
 </div>
 
 <!-- ══ MILESTONE / CERTIFICATE MODAL ══ -->
-<div class="overlay hidden" id="certOverlay">
+<div class="overlay hidden" id="certOverlay" onclick="if(event.target===this)closeCert()">
   <div class="modal" style="max-width:420px">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
+      <button class="btn btn-ghost btn-sm" onclick="closeCert()" style="font-size:18px;line-height:1;padding:4px 10px">✕</button>
+    </div>
     <div class="cert-preview">
       <div class="trophy">🏆</div>
       <div class="cname" id="certName"></div>
@@ -481,6 +490,15 @@ async function connectApi() {
 
 function openSettings() {
   document.getElementById('settApiUrl').value = apiUrl;
+  // Derive sheet URL from the Apps Script URL (best-effort)
+  const m = apiUrl.match(/\/macros\/s\/([^\/]+)\//);
+  const sheetLink = document.getElementById('sheetLink');
+  if (m) {
+    sheetLink.href = `https://script.google.com/home/projects`;
+    sheetLink.style.display = '';
+  } else {
+    sheetLink.style.display = 'none';
+  }
   document.getElementById('settingsOverlay').classList.remove('hidden');
   renderCopyCountTable();
 }
@@ -513,6 +531,12 @@ async function saveCopyCounts() {
   } catch(e) { toast('Error: ' + e.message); }
 }
 function closeSettings() { document.getElementById('settingsOverlay').classList.add('hidden'); }
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!document.getElementById('settingsOverlay').classList.contains('hidden')) closeSettings();
+  if (!document.getElementById('certOverlay').classList.contains('hidden')) closeCert();
+});
 
 function saveApiUrl() {
   const url = document.getElementById('settApiUrl').value.trim();
