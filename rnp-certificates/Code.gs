@@ -9,6 +9,7 @@ function getSheet() {
     sheet = ss.insertSheet(SHEET_NAME);
     sheet.appendRow(['Key', 'Last Name', 'First Name', 'Milestones Issued', 'Last Updated']);
     sheet.getRange(1,1,1,5).setFontWeight('bold');
+    sheet.getRange(1, 4, sheet.getMaxRows(), 1).setNumberFormat('@');
   }
   return sheet;
 }
@@ -35,10 +36,15 @@ function doGet(e) {
       var rowMap = getRowMap(sheet);
       var now = new Date().toISOString().slice(0, 10);
       if (rowMap[key]) {
-        sheet.getRange(rowMap[key], 4).setValue(msStr);
+        var msCell = sheet.getRange(rowMap[key], 4);
+        msCell.setNumberFormat('@');
+        msCell.setValue(msStr);
         sheet.getRange(rowMap[key], 5).setValue(now);
       } else {
         sheet.appendRow([key, parts[0] || '', parts[1] || '', msStr, now]);
+        // Force text on the milestones cell in the new row
+        var newRow = sheet.getLastRow();
+        sheet.getRange(newRow, 4).setNumberFormat('@');
       }
       return ContentService
         .createTextOutput(JSON.stringify({ok: true}))
@@ -62,6 +68,37 @@ function doGet(e) {
       .createTextOutput(JSON.stringify({ok: false, error: err.message}))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+// Cleans up any rows where milestones were stored as a number (e.g. 50100 instead of "50,100")
+// Run once manually from the Apps Script editor after deploying this fix
+function fixBadData() {
+  var sheet = getSheet();
+  var data = sheet.getDataRange().getValues();
+  var validMilestones = [50, 100, 150, 200, 250, 300];
+  for (var i = 1; i < data.length; i++) {
+    var raw = data[i][3];
+    if (raw === '' || raw === null) continue;
+    var str = String(raw);
+    // If no comma and it's a big number, it was stored numerically — reconstruct
+    if (str.indexOf(',') === -1 && str.length > 3) {
+      // e.g. "50100" → find which valid milestones are substrings
+      var found = validMilestones.filter(function(m) {
+        return str.indexOf(String(m)) !== -1;
+      });
+      if (found.length) {
+        var fixed = found.sort(function(a,b){return a-b;}).join(',');
+        var cell = sheet.getRange(i + 1, 4);
+        cell.setNumberFormat('@');
+        cell.setValue(fixed);
+        Logger.log('Fixed row ' + (i+1) + ': ' + str + ' → ' + fixed);
+      }
+    } else {
+      // Ensure existing text cells are also forced to text format
+      sheet.getRange(i + 1, 4).setNumberFormat('@');
+    }
+  }
+  Logger.log('fixBadData complete');
 }
 
 // doPost kept for reference but not used by the frontend (redirect converts POST to GET)
