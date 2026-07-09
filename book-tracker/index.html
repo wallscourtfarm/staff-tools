@@ -252,6 +252,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     <button class="tab" id="tab-ret" onclick="showTab('ret')"><span>📥</span>Returns</button>
     <button class="tab" id="tab-ch" onclick="showTab('ch')"><span>👧</span>Children</button>
     <button class="tab" id="tab-bk" onclick="showTab('bk')"><span>📖</span>Books</button>
+    <button class="tab" id="tab-dash" onclick="showTab('dash')"><span>📊</span>Dashboard</button>
   </div>
 
   <div id="coverMigrateBanner" class="hidden" style="background:#fff3e0;border-bottom:2px solid #e65100;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px">
@@ -295,8 +296,13 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
       <div id="bkList"></div>
     </div>
 
+    <!-- DASHBOARD TAB -->
+    <div id="view-dash" class="hidden">
+      <div id="dashContent"></div>
+    </div>
+
   </div>
-  <div class="version">WFA Book Tracker · 09.07.26g</div>
+  <div class="version">WFA Book Tracker · 09.07.26h</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -626,7 +632,7 @@ async function importCSV(type) {
 // ════════════════════════════════════════════════
 function showTab(t) {
   curTab = t;
-  ['co','ret','ch','bk'].forEach(id => {
+  ['co','ret','ch','bk','dash'].forEach(id => {
     document.getElementById(`tab-${id}`).classList.toggle('on', id === t);
     document.getElementById(`view-${id}`).classList.toggle('hidden', id !== t);
   });
@@ -647,10 +653,11 @@ function setPhase(p) {
 }
 
 function render() {
-  if (curTab === 'co')  renderCheckout();
-  if (curTab === 'ret') renderReturns();
-  if (curTab === 'ch')  renderChildren();
-  if (curTab === 'bk')  renderBooks();
+  if (curTab === 'co')   renderCheckout();
+  if (curTab === 'ret')  renderReturns();
+  if (curTab === 'ch')   renderChildren();
+  if (curTab === 'bk')   renderBooks();
+  if (curTab === 'dash') renderDashboard();
 }
 
 // ════════════════════════════════════════════════
@@ -918,6 +925,126 @@ async function doReturn(checkoutId, completed, childName, childId) {
 }
 
 // ════════════════════════════════════════════════
+// DASHBOARD TAB
+// ════════════════════════════════════════════════
+function renderDashboard() {
+  const el = document.getElementById('dashContent');
+
+  // All children across both phases
+  const allCh = children;
+  const lksCh = allCh.filter(c => ['Y3','Y4'].includes(c.yearGroup));
+  const uksCh = allCh.filter(c => ['Y5','Y6'].includes(c.yearGroup));
+
+  // Milestone bands
+  const bands = [
+    { label: '🏆 25 reads', min: 25 },
+    { label: '🥇 20 reads', min: 20, max: 24 },
+    { label: '🏅 15 reads', min: 15, max: 19 },
+    { label: '⭐⭐ 10 reads', min: 10, max: 14 },
+    { label: '⭐ 5 reads',  min: 5,  max: 9  },
+    { label: 'Under 5',     min: 0,  max: 4  },
+  ];
+  const bandRows = bands.map(b => {
+    const count = allCh.filter(c => c.totalReads >= b.min && (b.max == null || c.totalReads <= b.max)).length;
+    return { label: b.label, count };
+  });
+
+  // Top 10 readers
+  const topReaders = [...allCh].sort((a,b) => b.totalReads - a.totalReads).slice(0, 10);
+
+  // Active checkouts per book (proxy for most borrowed)
+  const bookCounts = {};
+  allCh.forEach(c => c.activeCheckouts.forEach(co => {
+    bookCounts[co.bookId] = (bookCounts[co.bookId] || 0) + 1;
+  }));
+  const topBooks = Object.entries(bookCounts)
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([id, count]) => ({ title: bookTitle(id), count }));
+
+  // Overdue: checked out > 14 days ago
+  const now = Date.now();
+  const overdue = [];
+  allCh.forEach(c => c.activeCheckouts.forEach(co => {
+    const age = daysAgo(co.checkoutDate);
+    if (age >= 14) overdue.push({ child: c, co, age, title: bookTitle(co.bookId) });
+  }));
+  overdue.sort((a,b) => b.age - a.age);
+
+  // Total reads
+  const totalReads = allCh.reduce((s,c) => s + c.totalReads, 0);
+
+  el.innerHTML = `
+    <!-- Summary stats -->
+    <div class="stats" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat"><div class="n">${allCh.length}</div><div class="l">Children</div></div>
+      <div class="stat"><div class="n">${totalReads}</div><div class="l">Total Reads</div></div>
+      <div class="stat"><div class="n">${lksCh.length}</div><div class="l">LKS2</div></div>
+      <div class="stat"><div class="n">${uksCh.length}</div><div class="l">UKS2</div></div>
+    </div>
+
+    <!-- Milestone breakdown -->
+    <div class="sec-hdr">Milestone Breakdown</div>
+    <div class="card" style="padding:12px 15px">
+      ${bandRows.map(b => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:14px;font-weight:600">${b.label}</span>
+          <span style="font-size:18px;font-weight:800;color:var(--blue)">${b.count}</span>
+        </div>`).join('')}
+    </div>
+
+    <!-- Top readers -->
+    <div class="sec-hdr">Top Readers</div>
+    <div class="card" style="padding:10px 15px">
+      ${topReaders.length ? topReaders.map((c,i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 0;${i < topReaders.length-1 ? 'border-bottom:1px solid var(--border)' : ''}">
+          <span style="font-size:13px;font-weight:700;color:var(--muted);min-width:20px">#${i+1}</span>
+          <span style="flex:1;font-size:14px;font-weight:600">${esc(c.name)}</span>
+          <span style="font-size:11px;color:var(--muted)">${c.yearGroup}${c.class ? ' · '+c.class : ''}</span>
+          <span style="font-size:18px;font-weight:800;color:var(--blue)">${c.totalReads}</span>
+        </div>`).join('') : '<div style="color:var(--muted);font-size:13px">No data yet</div>'}
+    </div>
+
+    <!-- Most borrowed (active) -->
+    ${topBooks.length ? `
+    <div class="sec-hdr">Currently Most Borrowed</div>
+    <div class="card" style="padding:10px 15px">
+      ${topBooks.map((b,i) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;${i < topBooks.length-1 ? 'border-bottom:1px solid var(--border)' : ''}">
+          <span style="font-size:14px;font-weight:600">${esc(b.title)}</span>
+          <span style="font-size:18px;font-weight:800;color:var(--blue)">${b.count}</span>
+        </div>`).join('')}
+    </div>` : ''}
+
+    <!-- Overdue -->
+    <div class="sec-hdr">Overdue (14+ days) — ${overdue.length}</div>
+    ${overdue.length ? `<div class="card" style="padding:10px 15px">
+      ${overdue.map((o,i) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;${i < overdue.length-1 ? 'border-bottom:1px solid var(--border)' : ''}">
+          <div>
+            <div style="font-size:14px;font-weight:600">${esc(o.child.name)}</div>
+            <div style="font-size:12px;color:var(--muted)">${esc(o.title)}</div>
+          </div>
+          <span style="font-size:13px;font-weight:700;color:var(--amber)">${o.age}d</span>
+        </div>`).join('')}
+    </div>` : `<div class="card" style="padding:12px 15px;color:var(--green);font-weight:600;font-size:14px">✓ No overdue loans</div>`}
+  `;
+}
+
+function daysAgo(str) {
+  if (!str) return 0;
+  let d;
+  if (str.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+    const [dd,mm,yyyy] = str.split('/');
+    d = new Date(`${yyyy}-${mm}-${dd}`);
+  } else {
+    d = new Date(str);
+  }
+  if (isNaN(d)) return 0;
+  return Math.floor((Date.now() - d) / 86400000);
+}
+
+// ════════════════════════════════════════════════
 // CHILDREN TAB
 // ════════════════════════════════════════════════
 function setYrFilter(yr, btn) {
@@ -981,6 +1108,7 @@ function renderChildren() {
           : `${next - c.totalReads} more to next milestone (${next})`}
       </div>
       ${cur ? `<div style="font-size:12px;color:var(--amber);margin-top:6px">📖 Currently reading: ${esc(cur)}</div>` : ''}
+      ${c.totalReads >= 5 ? `<button class="btn btn-ghost btn-sm" style="margin-top:10px;font-size:12px" onclick="printCertForChild('${c.id}')">🖨️ Print certificate</button>` : ''}
     </div>`;
   }).join('');
 }
@@ -1054,6 +1182,14 @@ function showMilestone(childId, ms) {
     ? 'has completed the Reading Challenge! 🎉'
     : `has reached ${ms} reads! 🎉`;
   document.getElementById('certOverlay').classList.remove('hidden');
+}
+
+function printCertForChild(childId) {
+  const child = children.find(c => c.id === childId);
+  if (!child) return;
+  const ms = [25,20,15,10,5].find(m => child.totalReads >= m) || 5;
+  pendingCert = { child, ms };
+  printCert();
 }
 
 function closeCert() {
