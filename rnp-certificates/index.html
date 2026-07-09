@@ -117,7 +117,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#0a0101}
   </div>
   <div class="warn" id="print-tip" style="display:none;margin-top:10px">&#128161; In the print dialog, select <strong>Save as PDF</strong> as the destination to download the certificates as a PDF file.</div>
 
-  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 09.07.26a &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
+  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 09.07.26b &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
 </div>
 
 <div id="prt"></div>
@@ -332,11 +332,27 @@ function doPrint() {
 }
 
 function confirmPrinted() {
-  saveTracking();
   var btn = document.getElementById('confirm-btn');
   btn.disabled = true;
-  btn.innerHTML = '&#10003; &nbsp;Tracking saved';
-  btn.style.background = '#718096';
+  btn.innerHTML = '&#9203; &nbsp;Saving…';
+  if (!newTracking) { btn.innerHTML = '&#10003; &nbsp;Tracking saved'; btn.style.background = '#718096'; return; }
+  fetch(API_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'text/plain'},
+    body: JSON.stringify({issued: newTracking.issued})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data.ok) throw new Error(data.error || 'Save failed');
+    btn.innerHTML = '&#10003; &nbsp;Tracking saved — safe to re-run';
+    btn.style.background = '#718096';
+  })
+  .catch(function(err) {
+    btn.innerHTML = '&#9888; &nbsp;Save failed — try again';
+    btn.style.background = '#e53e3e';
+    btn.disabled = false;
+    console.warn('Tracking save error:', err);
+  });
 }
 
 </script>
