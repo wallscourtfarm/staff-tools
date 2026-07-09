@@ -117,7 +117,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#0a0101}
   </div>
   <div class="warn" id="print-tip" style="display:none;margin-top:10px">&#128161; In the print dialog, select <strong>Save as PDF</strong> as the destination to download the certificates as a PDF file.</div>
 
-  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 09.07.26b &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
+  <div class="ver">RNP Certificate Generator &nbsp;&middot;&nbsp; 09.07.26c &nbsp;&middot;&nbsp; Wallscourt Farm Academy</div>
 </div>
 
 <div id="prt"></div>
@@ -130,7 +130,7 @@ const LOGO      = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAN4AAABlCAYAAAA
 var xlsxData = null;
 var certsToGenerate = [];
 var newTracking = null;
-var API_URL = 'https://script.google.com/macros/s/AKfycbwmtQhXak0wgkrlYyapNMaKv_DsPYItI7p2xM8xLC4Het4uv3UsIgatixBcgvneEN6-/exec';
+var API_URL = 'https://script.google.com/macros/s/AKfycbw8NRDvz_f-7heezIxoQB5b1M3QTsmig69wE5pBc-5qih3PAV1FwH5n-6HPnu803J6o/exec';
 
 function loadXlsx(input) {
   var f = input.files[0]; if (!f) return;
@@ -335,24 +335,36 @@ function confirmPrinted() {
   var btn = document.getElementById('confirm-btn');
   btn.disabled = true;
   btn.innerHTML = '&#9203; &nbsp;Saving…';
-  if (!newTracking) { btn.innerHTML = '&#10003; &nbsp;Tracking saved'; btn.style.background = '#718096'; return; }
-  fetch(API_URL, {
-    method: 'POST',
-    headers: {'Content-Type': 'text/plain'},
-    body: JSON.stringify({issued: newTracking.issued})
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
-    if (!data.ok) throw new Error(data.error || 'Save failed');
+  if (!newTracking || !certsToGenerate.length) {
     btn.innerHTML = '&#10003; &nbsp;Tracking saved — safe to re-run';
     btn.style.background = '#718096';
-  })
-  .catch(function(err) {
-    btn.innerHTML = '&#9888; &nbsp;Save failed — try again';
-    btn.style.background = '#e53e3e';
-    btn.disabled = false;
-    console.warn('Tracking save error:', err);
+    return;
+  }
+  // Build unique key→fullMilestoneList map from certs being confirmed
+  var keysToSave = {};
+  certsToGenerate.forEach(function(c) {
+    var key = pupilKey(c.last, c.first);
+    if (newTracking.issued[key]) keysToSave[key] = newTracking.issued[key];
   });
+  // Save via GET requests (avoids Apps Script POST redirect bug)
+  var saves = Object.keys(keysToSave).map(function(key) {
+    var msStr = keysToSave[key].slice().sort(function(a,b){return a-b;}).join(',');
+    var url = API_URL + '?action=update&key=' + encodeURIComponent(key) + '&ms=' + encodeURIComponent(msStr);
+    return fetch(url).then(function(r){ return r.json(); });
+  });
+  Promise.all(saves)
+    .then(function(results) {
+      var allOk = results.every(function(r){ return r && r.ok; });
+      if (!allOk) throw new Error('One or more saves failed');
+      btn.innerHTML = '&#10003; &nbsp;Tracking saved — safe to re-run';
+      btn.style.background = '#718096';
+    })
+    .catch(function(err) {
+      btn.innerHTML = '&#9888; &nbsp;Save failed — try again';
+      btn.style.background = '#e53e3e';
+      btn.disabled = false;
+      console.warn('Tracking save error:', err);
+    });
 }
 
 </script>
