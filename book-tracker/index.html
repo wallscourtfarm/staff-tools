@@ -293,7 +293,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 09.07.26w</div>
+  <div class="version">WFA Book Tracker · 09.07.26x</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -827,7 +827,7 @@ function switchPickPhase(p) {
 
 async function doCheckout(bookId, copyNum, title) {
   if (!selChild) return;
-  if (!confirm(`Check out "${title}" (Copy ${copyNum}) to ${selChild.name}?`)) return;
+  // checkout — no confirmation needed
   try {
     const r = await api({ action:'checkout', childId:selChild.id, bookId, copyNum });
     if (!r.ok) return;
@@ -924,11 +924,33 @@ async function doReturn(checkoutId, completed, childName, childId) {
 // ════════════════════════════════════════════════
 function renderDashboard() {
   const el = document.getElementById('dashContent');
-
-  // All children across both phases
   const allCh = children;
   const lksCh = allCh.filter(c => ['Y3','Y4'].includes(c.yearGroup));
   const uksCh = allCh.filter(c => ['Y5','Y6'].includes(c.yearGroup));
+
+  // Demographic splits
+  const ppCh    = allCh.filter(c => String(c.pp).toUpperCase()  === 'Y');
+  const ealCh   = allCh.filter(c => String(c.eal).toUpperCase() === 'Y');
+  const girlsCh = allCh.filter(c => String(c.gender).toUpperCase() === 'F');
+  const boysCh  = allCh.filter(c => String(c.gender).toUpperCase() === 'M');
+
+  function avgReads(arr) { return arr.length ? (arr.reduce((s,c) => s + c.totalReads, 0) / arr.length).toFixed(1) : '—'; }
+
+  function demoPair(labelA, a, labelB, b) {
+    return `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:4px">${labelA}</div>
+          <div style="font-size:26px;font-weight:900;color:var(--blue)">${a.length}</div>
+          <div style="font-size:11px;color:var(--muted)">avg ${avgReads(a)} reads</div>
+        </div>
+        <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:4px">${labelB}</div>
+          <div style="font-size:26px;font-weight:900;color:var(--blue)">${b.length}</div>
+          <div style="font-size:11px;color:var(--muted)">avg ${avgReads(b)} reads</div>
+        </div>
+      </div>`;
+  }
 
   // Milestone bands
   const bands = [
@@ -939,26 +961,21 @@ function renderDashboard() {
     { label: '⭐ 5 reads',  min: 5,  max: 9  },
     { label: 'Under 5',     min: 0,  max: 4  },
   ];
-  const bandRows = bands.map(b => {
-    const count = allCh.filter(c => c.totalReads >= b.min && (b.max == null || c.totalReads <= b.max)).length;
-    return { label: b.label, count };
-  });
+  const bandRows = bands.map(b => ({
+    label: b.label,
+    count: allCh.filter(c => c.totalReads >= b.min && (b.max == null || c.totalReads <= b.max)).length
+  }));
 
   // Top 10 readers
   const topReaders = [...allCh].sort((a,b) => b.totalReads - a.totalReads).slice(0, 10);
 
-  // Active checkouts per book (proxy for most borrowed)
-  const bookCounts = {};
-  allCh.forEach(c => c.activeCheckouts.forEach(co => {
-    bookCounts[co.bookId] = (bookCounts[co.bookId] || 0) + 1;
-  }));
-  const topBooks = Object.entries(bookCounts)
-    .sort((a,b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([id, count]) => ({ title: bookTitle(id), count }));
+  // Books sorted by totalBorrows
+  const allBooksSorted = [...books].sort((a,b) => (b.totalBorrows||0) - (a.totalBorrows||0)).filter(b => (b.totalBorrows||0) > 0);
 
-  // Overdue: checked out > 14 days ago
-  const now = Date.now();
+  // Total reads for school year
+  const totalReads = allCh.reduce((s,c) => s + c.totalReads, 0);
+
+  // Overdue
   const overdue = [];
   allCh.forEach(c => c.activeCheckouts.forEach(co => {
     const age = daysAgo(co.checkoutDate);
@@ -966,17 +983,23 @@ function renderDashboard() {
   }));
   overdue.sort((a,b) => b.age - a.age);
 
-  // Total reads
-  const totalReads = allCh.reduce((s,c) => s + c.totalReads, 0);
+  // Children sorted alphabetically with their books read
+  const chByName = [...allCh].sort((a,b) => a.name.localeCompare(b.name));
 
   el.innerHTML = `
     <!-- Summary stats -->
     <div class="stats" style="grid-template-columns:repeat(4,1fr)">
       <div class="stat"><div class="n">${allCh.length}</div><div class="l">Children</div></div>
-      <div class="stat"><div class="n">${totalReads}</div><div class="l">Total Reads</div></div>
-      <div class="stat"><div class="n">${lksCh.length}</div><div class="l">LKS2</div></div>
-      <div class="stat"><div class="n">${uksCh.length}</div><div class="l">UKS2</div></div>
+      <div class="stat"><div class="n">${totalReads}</div><div class="l">Total Reads (School Year)</div></div>
+      <div class="stat"><div class="n">${lksCh.length}</div><div class="l">LKS2 (Y3–4)</div></div>
+      <div class="stat"><div class="n">${uksCh.length}</div><div class="l">UKS2 (Y5–6)</div></div>
     </div>
+
+    <!-- Demographic breakdown -->
+    <div class="sec-hdr">Demographic Breakdown</div>
+    ${demoPair('PP', ppCh, 'Non-PP', allCh.filter(c => String(c.pp).toUpperCase() !== 'Y'))}
+    ${demoPair('Girls', girlsCh, 'Boys', boysCh)}
+    ${demoPair('EAL', ealCh, 'Non-EAL', allCh.filter(c => String(c.eal).toUpperCase() !== 'Y'))}
 
     <!-- Milestone breakdown -->
     <div class="sec-hdr">Milestone Breakdown</div>
@@ -1000,14 +1023,17 @@ function renderDashboard() {
         </div>`).join('') : '<div style="color:var(--muted);font-size:13px">No data yet</div>'}
     </div>
 
-    <!-- Most borrowed (active) -->
-    ${topBooks.length ? `
-    <div class="sec-hdr">Currently Most Borrowed</div>
+    <!-- Borrows per book -->
+    ${allBooksSorted.length ? `
+    <div class="sec-hdr">Borrows per Book</div>
     <div class="card" style="padding:10px 15px">
-      ${topBooks.map((b,i) => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;${i < topBooks.length-1 ? 'border-bottom:1px solid var(--border)' : ''}">
-          <span style="font-size:14px;font-weight:600">${esc(b.title)}</span>
-          <span style="font-size:18px;font-weight:800;color:var(--blue)">${b.count}</span>
+      ${allBooksSorted.map((b,i) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;${i < allBooksSorted.length-1 ? 'border-bottom:1px solid var(--border)' : ''}">
+          <div>
+            <div style="font-size:14px;font-weight:600">${esc(b.title)}</div>
+            <div style="font-size:11px;color:var(--muted)">${esc(b.phase||'')}</div>
+          </div>
+          <span style="font-size:18px;font-weight:800;color:var(--blue)">${b.totalBorrows||0}</span>
         </div>`).join('')}
     </div>` : ''}
 
@@ -1023,6 +1049,19 @@ function renderDashboard() {
           <span style="font-size:13px;font-weight:700;color:var(--amber)">${o.age}d</span>
         </div>`).join('')}
     </div>` : `<div class="card" style="padding:12px 15px;color:var(--green);font-weight:600;font-size:14px">✓ No overdue loans</div>`}
+
+    <!-- Books read per child -->
+    <div class="sec-hdr">Books Read — Each Child</div>
+    <div class="card" style="padding:10px 15px">
+      ${chByName.length ? chByName.map((c,i) => `
+        <div style="padding:8px 0;${i < chByName.length-1 ? 'border-bottom:1px solid var(--border)' : ''}">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${c.booksRead&&c.booksRead.length ? 4 : 0}px">
+            <span style="font-size:14px;font-weight:700">${esc(c.name)}</span>
+            <span style="font-size:12px;color:var(--muted)">${c.yearGroup}${c.class ? ' · '+c.class : ''} · <strong>${c.totalReads}</strong> reads</span>
+          </div>
+          ${c.booksRead && c.booksRead.length ? `<div style="font-size:12px;color:var(--muted);line-height:1.6">${c.booksRead.map(b => esc(b.title)).join(' · ')}</div>` : '<div style="font-size:12px;color:var(--muted);font-style:italic">No reads recorded</div>'}
+        </div>`).join('') : '<div style="color:var(--muted);font-size:13px">No children yet</div>'}
+    </div>
   `;
 }
 
