@@ -1,310 +1,450 @@
-// ============================================================
-// WFA Reading Challenge Tracker — Google Apps Script Backend
-// Paste this entire file into your Apps Script project,
-// then deploy as a Web App (Execute as: Me, Access: Anyone).
-// ============================================================
+// ════════════════════════════════════════════════
+// WFA Reading Challenge — Apps Script Backend
+// Deploy as Web App: Execute as Me, Access Anyone
+// ════════════════════════════════════════════════
 
-// Set this to your Google Spreadsheet ID (from the URL)
-// e.g. https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit
-const SPREADSHEET_ID = '1l8ZNNUd4jdXeVisB7ZEhz7N8ipW7GL4UQh6fWD9_XGY';
+const SS = SpreadsheetApp.getActiveSpreadsheet();
 
-function getSheet(name) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  return ss.getSheetByName(name);
-}
-
-// ============================================================
-// HTTP handler — all requests come in as GET with a ?payload=
-// (avoids CORS preflight issues)
-// ============================================================
 function doGet(e) {
   try {
-    const raw = e.parameter.payload;
-    const payload = raw ? JSON.parse(decodeURIComponent(raw)) : {};
-    const action = payload.action || 'ping';
-    let result;
-
-    switch (action) {
-      case 'ping':           result = { ok: true }; break;
-      case 'setup':          result = setup(); break;
-      case 'getAll':         result = getAllData(); break;
-      case 'checkout':       result = checkout(payload); break;
-      case 'returnBook':     result = returnBook(payload); break;
-      case 'addChild':       result = addChild(payload); break;
-      case 'addBook':        result = addBook(payload); break;
-      case 'importData':     result = importData(payload); break;
-      case 'importCheckouts':       result = importCheckouts(payload); break;
-      case 'setCopyStatus':         result = setCopyStatus(payload); break;
-      case 'setCopyCount':          result = setCopyCount(payload); break;
-      case 'setCoverOverride':      result = setCoverOverride(payload); break;
-      case 'bulkSetCoverOverrides': result = bulkSetCoverOverrides(payload); break;
-      default:           result = { error: 'Unknown action: ' + action };
+    const params = e.parameter;
+    let payload = {};
+    if (params.payload) {
+      payload = JSON.parse(params.payload);
+    } else {
+      payload = { action: params.action || 'getAll' };
     }
-
-    return output(result);
-  } catch (err) {
-    return output({ error: err.toString() });
+    const result = dispatch(payload);
+    return ContentService
+      .createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-function output(data) {
-  return ContentService
-    .createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
+function doPost(e) { return doGet(e); }
+
+function dispatch(p) {
+  switch(p.action) {
+    case 'getAll':           return getAll();
+    case 'checkout':         return checkout(p);
+    case 'returnBook':       return returnBook(p);
+    case 'addChild':         return addChild(p);
+    case 'updateChild':      return updateChild(p);
+    case 'addBook':          return addBook(p);
+    case 'setup':            return setup();
+    case 'setCopyStatus':    return setCopyStatus(p);
+    case 'setCoverOverride': return setCoverOverride(p);
+    case 'saveCopyCounts':   return saveCopyCounts(p);
+    case 'importChildren':   return importChildren(p);
+    case 'importBooks':      return importBooks(p);
+    case 'bulkImportReads':  return bulkImportReads(p);
+    default: return { error: 'Unknown action: ' + p.action };
+  }
 }
 
-// ============================================================
-// Setup — creates the three sheets with headers
-// ============================================================
-function setup() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+// ════════════════════════════════════════════════
+// GET ALL
+// ════════════════════════════════════════════════
+function getAll() {
+  const childSheet    = SS.getSheetByName('Children');
+  const bookSheet     = SS.getSheetByName('Books');
+  const checkoutSheet = SS.getSheetByName('Checkouts');
+  const coverSheet    = SS.getSheetByName('CoverOverrides');
+  const readsSheet    = SS.getSheetByName('Reads');
 
-  const defs = [
-    { name: 'Children',  headers: ['ChildID', 'Name', 'YearGroup', 'Class'] },
-    { name: 'Books',     headers: ['BookID', 'Title', 'Author', 'Phase', 'TotalCopies', 'LostCopies'] },
-    { name: 'Checkouts',      headers: ['CheckoutID', 'ChildID', 'BookID', 'CopyNum', 'CheckoutDate', 'ReturnDate', 'Completed'] },
-    { name: 'CoverOverrides', headers: ['BookID', 'CoverURL'] },
-  ];
+  // ── Children ──
+  const childRows = childSheet.getDataRange().getValues();
+  const childHdr  = childRows[0].map(h => String(h).trim().toLowerCase());
+  const iId  = childHdr.indexOf('id');
+  const iNm  = childHdr.indexOf('name');
+  const iYr  = childHdr.indexOf('yeargroup');
+  const iCl  = childHdr.indexOf('class');
+  const iPP  = childHdr.indexOf('pp');
+  const iEAL = childHdr.indexOf('eal');
+  const iGen = childHdr.indexOf('gender');
+  const iTR  = childHdr.indexOf('totalreads');
 
-  defs.forEach(def => {
-    let sheet = ss.getSheetByName(def.name);
-    if (!sheet) sheet = ss.insertSheet(def.name);
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(def.headers);
-      sheet.getRange(1, 1, 1, def.headers.length).setFontWeight('bold').setBackground('#1798d3').setFontColor('white');
-      sheet.setFrozenRows(1);
+  const children = {};
+  for (let r = 1; r < childRows.length; r++) {
+    const row = childRows[r];
+    if (!row[iId]) continue;
+    const id = String(row[iId]);
+    children[id] = {
+      id,
+      name:            String(row[iNm]  || ''),
+      yearGroup:       String(row[iYr]  || ''),
+      class:           String(row[iCl]  || ''),
+      pp:              String(row[iPP]  || ''),
+      eal:             String(row[iEAL] || ''),
+      gender:          String(row[iGen] || ''),
+      totalReads:      Number(row[iTR]  || 0),
+      booksRead:       [],
+      activeCheckouts: []
+    };
+  }
+
+  // ── Reads (book titles per child) ──
+  if (readsSheet) {
+    const readsRows = readsSheet.getDataRange().getValues();
+    const rHdr = readsRows[0].map(h => String(h).trim().toLowerCase());
+    const rCId = rHdr.indexOf('childid');
+    const rBk  = rHdr.indexOf('booktitle');
+    const rDt  = rHdr.indexOf('dateread');
+    for (let r = 1; r < readsRows.length; r++) {
+      const row = readsRows[r];
+      if (!row[rCId]) continue;
+      const cid = String(row[rCId]);
+      if (children[cid]) {
+        children[cid].booksRead.push({
+          title:    String(row[rBk] || ''),
+          dateRead: String(row[rDt] || '')
+        });
+      }
     }
+  }
+
+  // ── Books ──
+  const bookRows = bookSheet.getDataRange().getValues();
+  const bHdr = bookRows[0].map(h => String(h).trim().toLowerCase());
+  const bId = bHdr.indexOf('id');
+  const bTi = bHdr.indexOf('title');
+  const bAu = bHdr.indexOf('author');
+  const bPh = bHdr.indexOf('phase');
+  const bCo = bHdr.indexOf('copies');
+
+  const books = {};
+  for (let r = 1; r < bookRows.length; r++) {
+    const row = bookRows[r];
+    if (!row[bId]) continue;
+    const id = String(row[bId]);
+    books[id] = {
+      id,
+      title:        String(row[bTi] || ''),
+      author:       String(row[bAu] || ''),
+      phase:        String(row[bPh] || ''),
+      totalCopies:  Number(row[bCo] || 1),
+      copies:       [],
+      available:    0,
+      totalBorrows: 0
+    };
+  }
+
+  Object.values(books).forEach(b => {
+    for (let i = 1; i <= b.totalCopies; i++) {
+      b.copies.push({ copyNum: i, available: true, lost: false, childId: null, checkoutId: null, checkoutDate: null });
+    }
+    b.available = b.totalCopies;
   });
 
-  return { ok: true };
-}
+  // ── Checkouts ──
+  const coRows = checkoutSheet ? checkoutSheet.getDataRange().getValues() : [];
+  const cHdr   = coRows.length ? coRows[0].map(h => String(h).trim().toLowerCase()) : [];
+  const cId  = cHdr.indexOf('id');
+  const cCh  = cHdr.indexOf('childid');
+  const cBk  = cHdr.indexOf('bookid');
+  const cCp  = cHdr.indexOf('copynum');
+  const cDt  = cHdr.indexOf('checkoutdate');
+  const cRt  = cHdr.indexOf('returndate');
+  const cCm  = cHdr.indexOf('completed');
+  const cLst = cHdr.indexOf('lost');
 
-// ============================================================
-// Read all data in one call to minimise round-trips
-// ============================================================
-function getAllData() {
-  const childRows    = getSheet('Children').getDataRange().getValues();
-  const bookRows     = getSheet('Books').getDataRange().getValues();
-  const checkoutRows = getSheet('Checkouts').getDataRange().getValues();
+  for (let r = 1; r < coRows.length; r++) {
+    const row = coRows[r];
+    if (!row[cId]) continue;
+    const checkoutId   = String(row[cId]);
+    const childId      = String(row[cCh]);
+    const bookId       = String(row[cBk]);
+    const copyNum      = Number(row[cCp]);
+    const checkoutDate = String(row[cDt] || '');
+    const returnDate   = String(row[cRt] || '');
+    const completed    = row[cCm] === true || String(row[cCm]).toUpperCase() === 'TRUE';
+    const lost         = row[cLst] === true || String(row[cLst]).toUpperCase() === 'TRUE';
 
-  // Cover overrides
-  const coverSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('CoverOverrides');
+    if (returnDate) {
+      if (books[bookId]) books[bookId].totalBorrows++;
+      continue;
+    }
+
+    const book = books[bookId];
+    if (book) {
+      const copy = book.copies.find(c => c.copyNum === copyNum);
+      if (copy && !lost) {
+        copy.available    = false;
+        copy.childId      = childId;
+        copy.checkoutId   = checkoutId;
+        copy.checkoutDate = checkoutDate;
+        book.available    = Math.max(0, book.available - 1);
+      }
+      if (!lost) book.totalBorrows++;
+    }
+
+    if (children[childId]) {
+      children[childId].activeCheckouts.push({ checkoutId, bookId, copyNum, checkoutDate });
+    }
+  }
+
+  // ── Cover overrides ──
   const coverOverrides = {};
   if (coverSheet) {
-    coverSheet.getDataRange().getValues().slice(1).forEach(r => {
-      if (r[0] && r[1]) coverOverrides[String(r[0])] = String(r[1]);
-    });
+    const cvRows = coverSheet.getDataRange().getValues();
+    for (let r = 1; r < cvRows.length; r++) {
+      if (cvRows[r][0] && cvRows[r][1]) coverOverrides[String(cvRows[r][0])] = String(cvRows[r][1]);
+    }
   }
 
-  // Build lookup maps from checkout history
-  const readsByChild   = {};  // childId → completed count
-  const activeByChild  = {};  // childId → [{checkoutId, bookId, copyNum, checkoutDate}]
-  const activeByBookCopy = {}; // "bookId_copyNum" → {childId, checkoutId, checkoutDate}
-
-  checkoutRows.slice(1).forEach(r => {
-    const [id, childId, bookId, copyNum, checkoutDate, returnDate, completed] = r;
-    if (completed === 'Y') {
-      readsByChild[childId] = (readsByChild[childId] || 0) + 1;
-    }
-    if (!returnDate) {
-      if (!activeByChild[childId]) activeByChild[childId] = [];
-      activeByChild[childId].push({
-        checkoutId: String(id),
-        bookId: String(bookId),
-        copyNum: Number(copyNum),
-        checkoutDate: String(checkoutDate),
-      });
-      activeByBookCopy[`${bookId}_${copyNum}`] = {
-        childId: String(childId),
-        checkoutId: String(id),
-        checkoutDate: String(checkoutDate),
-      };
-    }
-  });
-
-  const children = childRows.slice(1).map(r => ({
-    id:             String(r[0]),
-    name:           String(r[1]),
-    yearGroup:      String(r[2]),
-    class:          String(r[3] || ''),
-    totalReads:     readsByChild[String(r[0])] || 0,
-    activeCheckouts: activeByChild[String(r[0])] || [],
-  }));
-
-  const books = bookRows.slice(1).map(r => {
-    const bookId      = String(r[0]);
-    const totalCopies = Number(r[4]) || 1;
-    // LostCopies column stores comma-separated copy numbers, e.g. "1,3"
-    const lostSet = new Set(String(r[5] || '').split(',').map(s => s.trim()).filter(Boolean).map(Number));
-    const copies = [];
-    for (let i = 1; i <= totalCopies; i++) {
-      const key  = `${bookId}_${i}`;
-      const co   = activeByBookCopy[key];
-      const lost = lostSet.has(i);
-      copies.push({
-        copyNum:      i,
-        available:    !co && !lost,
-        lost,
-        childId:      co ? co.childId : null,
-        checkoutId:   co ? co.checkoutId : null,
-        checkoutDate: co ? co.checkoutDate : null,
-      });
-    }
-    return {
-      id:          bookId,
-      title:       String(r[1]),
-      author:      String(r[2] || ''),
-      phase:       String(r[3]),
-      totalCopies,
-      copies,
-      available:   copies.filter(c => c.available).length,
-    };
-  });
-
-  return { children, books, coverOverrides };
+  return {
+    children: Object.values(children),
+    books:    Object.values(books),
+    coverOverrides
+  };
 }
 
-// ============================================================
-// Mutations
-// ============================================================
-function checkout(data) {
-  const { childId, bookId, copyNum } = data;
-  const id  = 'CO' + new Date().getTime();
-  const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
-  getSheet('Checkouts').appendRow([id, childId, bookId, Number(copyNum), now, '', '']);
+// ════════════════════════════════════════════════
+// CHECKOUT
+// ════════════════════════════════════════════════
+function checkout(p) {
+  const sheet = SS.getSheetByName('Checkouts');
+  const id    = 'CO' + Date.now();
+  const date  = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  sheet.appendRow([id, p.childId, p.bookId, p.copyNum, date, '', false, false]);
   return { ok: true, checkoutId: id };
 }
 
-function returnBook(data) {
-  const { checkoutId, completed } = data;
-  const sheet = getSheet('Checkouts');
-  const rows  = sheet.getDataRange().getValues();
-  const now   = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
+// ════════════════════════════════════════════════
+// RETURN
+// ════════════════════════════════════════════════
+function returnBook(p) {
+  const coSheet = SS.getSheetByName('Checkouts');
+  const chSheet = SS.getSheetByName('Children');
+  const rows    = coSheet.getDataRange().getValues();
+  const hdr     = rows[0].map(h => String(h).trim().toLowerCase());
+  const iId     = hdr.indexOf('id');
+  const iRt     = hdr.indexOf('returndate');
+  const iCm     = hdr.indexOf('completed');
+  const iCh     = hdr.indexOf('childid');
 
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]) !== String(checkoutId)) continue;
+  for (let r = 1; r < rows.length; r++) {
+    if (String(rows[r][iId]) === String(p.checkoutId)) {
+      const date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
+      coSheet.getRange(r + 1, iRt + 1).setValue(date);
+      coSheet.getRange(r + 1, iCm + 1).setValue(p.completed === true);
 
-    sheet.getRange(i + 1, 6).setValue(now);
-    sheet.getRange(i + 1, 7).setValue(completed ? 'Y' : 'N');
-
-    if (!completed) return { ok: true, milestone: null };
-
-    // Count reads for this child (include this one)
-    const childId    = String(rows[i][1]);
-    const totalReads = rows.slice(1).filter(r => String(r[1]) === childId && r[6] === 'Y').length + 1;
-    const milestone  = [5, 10, 15, 20, 25].includes(totalReads) ? totalReads : null;
-    return { ok: true, milestone };
+      if (p.completed) {
+        const childId = String(rows[r][iCh]);
+        const chRows  = chSheet.getDataRange().getValues();
+        const chHdr   = chRows[0].map(h => String(h).trim().toLowerCase());
+        const ciId    = chHdr.indexOf('id');
+        const ciTR    = chHdr.indexOf('totalreads');
+        for (let cr = 1; cr < chRows.length; cr++) {
+          if (String(chRows[cr][ciId]) === childId) {
+            chSheet.getRange(cr + 1, ciTR + 1).setValue(Number(chRows[cr][ciTR] || 0) + 1);
+            break;
+          }
+        }
+      }
+      return { ok: true };
+    }
   }
-
   return { error: 'Checkout not found' };
 }
 
-function addChild(data) {
-  const id = 'CH' + new Date().getTime();
-  getSheet('Children').appendRow([id, data.name, data.yearGroup, data.class || '']);
+// ════════════════════════════════════════════════
+// ADD CHILD
+// ════════════════════════════════════════════════
+function addChild(p) {
+  const sheet = SS.getSheetByName('Children');
+  const id    = 'CH' + Date.now();
+  sheet.appendRow([id, p.name, p.yearGroup, p.class || '', p.pp || '', p.eal || '', p.gender || '', 0]);
   return { ok: true, id };
 }
 
-function addBook(data) {
-  const id = 'BK' + new Date().getTime();
-  getSheet('Books').appendRow([id, data.title, data.author || '', data.phase, Number(data.copies) || 1]);
-  return { ok: true, id };
-}
-
-// Toggle a copy's lost/found status
-function setCopyStatus(data) {
-  const { bookId, copyNum, lost } = data;
-  const sheet = getSheet('Books');
+// ════════════════════════════════════════════════
+// UPDATE CHILD
+// ════════════════════════════════════════════════
+function updateChild(p) {
+  const sheet = SS.getSheetByName('Children');
   const rows  = sheet.getDataRange().getValues();
-
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]) !== String(bookId)) continue;
-
-    const current = String(rows[i][5] || '').split(',').map(s => s.trim()).filter(Boolean).map(Number);
-    let updated;
-    if (lost) {
-      updated = [...new Set([...current, Number(copyNum)])];
-    } else {
-      updated = current.filter(n => n !== Number(copyNum));
-    }
-    sheet.getRange(i + 1, 6).setValue(updated.join(','));
-    return { ok: true };
-  }
-  return { error: 'Book not found' };
-}
-
-function importData(data) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  let childCount = 0;
-  let bookCount  = 0;
-
-  if (data.children && data.children.length) {
-    const sheet = ss.getSheetByName('Children');
-    data.children.forEach((c, i) => {
-      const id = 'CH' + new Date().getTime() + i;
-      sheet.appendRow([id, c.name, c.yearGroup, c.class || '']);
-    });
-    childCount = data.children.length;
-  }
-
-  if (data.books && data.books.length) {
-    const sheet = ss.getSheetByName('Books');
-    data.books.forEach((b, i) => {
-      const id = 'BK' + new Date().getTime() + i;
-      sheet.appendRow([id, b.title, b.author || '', b.phase, Number(b.copies) || 1]);
-    });
-    bookCount = data.books.length;
-  }
-
-  return { ok: true, children: childCount, books: bookCount };
-}
-
-function importCheckouts(data) {
-  if (!data.rows || !data.rows.length) return { ok: true, count: 0 };
-  const sheet = getSheet('Checkouts');
-  sheet.getRange(sheet.getLastRow() + 1, 1, data.rows.length, 7).setValues(data.rows);
-  return { ok: true, count: data.rows.length };
-}
-
-function setCopyCount(data) {
-  const { bookId, count } = data;
-  const sheet = getSheet('Books');
-  const rows = sheet.getDataRange().getValues();
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]) === String(bookId)) {
-      sheet.getRange(i + 1, 5).setValue(Number(count));
+  const hdr   = rows[0].map(h => String(h).trim().toLowerCase());
+  const iId   = hdr.indexOf('id');
+  const iNm   = hdr.indexOf('name');
+  const iYr   = hdr.indexOf('yeargroup');
+  const iCl   = hdr.indexOf('class');
+  const iPP   = hdr.indexOf('pp');
+  const iEAL  = hdr.indexOf('eal');
+  const iGen  = hdr.indexOf('gender');
+  for (let r = 1; r < rows.length; r++) {
+    if (String(rows[r][iId]) === String(p.id)) {
+      if (p.name      !== undefined) sheet.getRange(r+1, iNm+1).setValue(p.name);
+      if (p.yearGroup !== undefined) sheet.getRange(r+1, iYr+1).setValue(p.yearGroup);
+      if (p.class     !== undefined) sheet.getRange(r+1, iCl+1).setValue(p.class);
+      if (p.pp        !== undefined) sheet.getRange(r+1, iPP+1).setValue(p.pp);
+      if (p.eal       !== undefined) sheet.getRange(r+1, iEAL+1).setValue(p.eal);
+      if (p.gender    !== undefined) sheet.getRange(r+1, iGen+1).setValue(p.gender);
       return { ok: true };
     }
   }
-  return { error: 'Book not found' };
+  return { error: 'Child not found' };
 }
 
-function setCoverOverride(data) {
-  const { bookId, url } = data;
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  let sheet = ss.getSheetByName('CoverOverrides');
-  if (!sheet) {
-    sheet = ss.insertSheet('CoverOverrides');
-    sheet.appendRow(['BookID', 'CoverURL']);
-    sheet.getRange(1,1,1,2).setFontWeight('bold').setBackground('#1798d3').setFontColor('white');
-    sheet.setFrozenRows(1);
-  }
-  const rows = sheet.getDataRange().getValues();
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]) === String(bookId)) {
-      if (url) { sheet.getRange(i + 1, 2).setValue(url); }
-      else { sheet.deleteRow(i + 1); }
+// ════════════════════════════════════════════════
+// ADD BOOK
+// ════════════════════════════════════════════════
+function addBook(p) {
+  const sheet = SS.getSheetByName('Books');
+  const id    = 'BK' + Date.now();
+  sheet.appendRow([id, p.title, p.author || '', p.phase || 'LKS2', p.copies || 1]);
+  return { ok: true, id };
+}
+
+// ════════════════════════════════════════════════
+// SET COPY STATUS
+// ════════════════════════════════════════════════
+function setCopyStatus(p) {
+  const coSheet = SS.getSheetByName('Checkouts');
+  const rows    = coSheet.getDataRange().getValues();
+  const hdr     = rows[0].map(h => String(h).trim().toLowerCase());
+  const iBk     = hdr.indexOf('bookid');
+  const iCp     = hdr.indexOf('copynum');
+  const iLst    = hdr.indexOf('lost');
+  const iRt     = hdr.indexOf('returndate');
+  for (let r = 1; r < rows.length; r++) {
+    if (String(rows[r][iBk]) === String(p.bookId) && Number(rows[r][iCp]) === Number(p.copyNum) && !rows[r][iRt]) {
+      coSheet.getRange(r + 1, iLst + 1).setValue(p.lost === true);
       return { ok: true };
     }
   }
-  if (url) sheet.appendRow([bookId, url]);
+  if (p.lost) {
+    const date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
+    coSheet.appendRow(['CO' + Date.now(), '', p.bookId, p.copyNum, date, '', false, true]);
+  }
   return { ok: true };
 }
 
-function bulkSetCoverOverrides(data) {
-  const overrides = data.overrides || {};
-  const keys = Object.keys(overrides);
-  if (!keys.length) return { ok: true, count: 0 };
-  keys.forEach(bookId => setCoverOverride({ bookId, url: overrides[bookId] }));
-  return { ok: true, count: keys.length };
+// ════════════════════════════════════════════════
+// COVER OVERRIDE
+// ════════════════════════════════════════════════
+function setCoverOverride(p) {
+  const sheet = SS.getSheetByName('CoverOverrides');
+  const rows  = sheet.getDataRange().getValues();
+  for (let r = 1; r < rows.length; r++) {
+    if (String(rows[r][0]) === String(p.bookId)) {
+      if (p.url) sheet.getRange(r + 1, 2).setValue(p.url);
+      else sheet.deleteRow(r + 1);
+      return { ok: true };
+    }
+  }
+  if (p.url) sheet.appendRow([p.bookId, p.url]);
+  return { ok: true };
+}
+
+// ════════════════════════════════════════════════
+// SAVE COPY COUNTS
+// ════════════════════════════════════════════════
+function saveCopyCounts(p) {
+  const sheet  = SS.getSheetByName('Books');
+  const rows   = sheet.getDataRange().getValues();
+  const hdr    = rows[0].map(h => String(h).trim().toLowerCase());
+  const iId    = hdr.indexOf('id');
+  const iCo    = hdr.indexOf('copies');
+  const counts = p.counts || {};
+  for (let r = 1; r < rows.length; r++) {
+    const id = String(rows[r][iId]);
+    if (counts[id] !== undefined) sheet.getRange(r + 1, iCo + 1).setValue(Number(counts[id]));
+  }
+  return { ok: true };
+}
+
+// ════════════════════════════════════════════════
+// IMPORT CHILDREN (bulk)
+// ════════════════════════════════════════════════
+function importChildren(p) {
+  const sheet = SS.getSheetByName('Children');
+  let added = 0;
+  (p.children || []).forEach(c => {
+    const id = 'CH' + Date.now() + Math.floor(Math.random() * 9999);
+    sheet.appendRow([id, c.name, c.yearGroup, c.class || '', c.pp || '', c.eal || '', c.gender || '', c.totalReads || 0]);
+    added++;
+    Utilities.sleep(10);
+  });
+  return { ok: true, added };
+}
+
+// ════════════════════════════════════════════════
+// IMPORT BOOKS (bulk)
+// ════════════════════════════════════════════════
+function importBooks(p) {
+  const sheet = SS.getSheetByName('Books');
+  let added = 0;
+  (p.books || []).forEach(b => {
+    const id = 'BK' + Date.now() + Math.floor(Math.random() * 9999);
+    sheet.appendRow([id, b.title, b.author || '', b.phase || 'LKS2', b.copies || 1]);
+    added++;
+    Utilities.sleep(10);
+  });
+  return { ok: true, added };
+}
+
+// ════════════════════════════════════════════════
+// BULK IMPORT READS
+// p.reads = [{childId, bookTitle, dateRead}]
+// p.updateTotals = {childId: count}
+// ════════════════════════════════════════════════
+function bulkImportReads(p) {
+  let readsSheet = SS.getSheetByName('Reads');
+  if (!readsSheet) {
+    readsSheet = SS.insertSheet('Reads');
+    readsSheet.appendRow(['childId', 'bookTitle', 'dateRead']);
+  }
+  const items = p.reads || [];
+  items.forEach(item => {
+    readsSheet.appendRow([item.childId, item.bookTitle, item.dateRead || '']);
+  });
+
+  if (p.updateTotals) {
+    const chSheet = SS.getSheetByName('Children');
+    const chRows  = chSheet.getDataRange().getValues();
+    const chHdr   = chRows[0].map(h => String(h).trim().toLowerCase());
+    const ciId    = chHdr.indexOf('id');
+    const ciTR    = chHdr.indexOf('totalreads');
+    const totals  = p.updateTotals;
+    for (let r = 1; r < chRows.length; r++) {
+      const cid = String(chRows[r][ciId]);
+      if (totals[cid] !== undefined) chSheet.getRange(r + 1, ciTR + 1).setValue(totals[cid]);
+    }
+  }
+  return { ok: true, added: items.length };
+}
+
+// ════════════════════════════════════════════════
+// SETUP (first time)
+// ════════════════════════════════════════════════
+function setup() {
+  const schemas = {
+    'Children':       ['id','name','yearGroup','class','pp','eal','gender','totalReads'],
+    'Books':          ['id','title','author','phase','copies'],
+    'Checkouts':      ['id','childId','bookId','copyNum','checkoutDate','returnDate','completed','lost'],
+    'CoverOverrides': ['bookId','url'],
+    'Reads':          ['childId','bookTitle','dateRead']
+  };
+  Object.entries(schemas).forEach(([name, headers]) => {
+    let s = SS.getSheetByName(name);
+    if (!s) {
+      s = SS.insertSheet(name);
+      s.appendRow(headers);
+    } else {
+      // Add any missing columns to existing sheets
+      const existing = s.getRange(1, 1, 1, Math.max(s.getLastColumn(), 1)).getValues()[0]
+        .map(h => String(h).trim().toLowerCase());
+      headers.forEach(h => {
+        if (!existing.includes(h.toLowerCase())) {
+          s.getRange(1, s.getLastColumn() + 1).setValue(h);
+        }
+      });
+    }
+  });
+  return { ok: true, message: 'Setup complete — sheets ready' };
 }
