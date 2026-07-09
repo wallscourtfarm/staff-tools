@@ -291,7 +291,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 09.07.26c</div>
+  <div class="version">WFA Book Tracker · 09.07.26d</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -431,8 +431,8 @@ function show(id) {
 // API
 // ════════════════════════════════════════════════
 async function api(payload) {
-  const url = `${apiUrl}?payload=${encodeURIComponent(JSON.stringify(payload))}`;
-  const r = await fetch(url);
+  const url = `${apiUrl}?payload=${encodeURIComponent(JSON.stringify(payload))}&_t=${Date.now()}`;
+  const r = await fetch(url, { cache: 'no-store' });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const data = await r.json();
   if (data.error) throw new Error(data.error);
