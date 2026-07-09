@@ -67,6 +67,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 /* ── CARD GRIDS ── */
 #childList,#chList,#bkList{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
 #childList .c-card,#chList .ch-card,#bkList .book-card{margin-bottom:0}
+.book-picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
 
 /* ── LETTER BAR ── */
 .letter-bar{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:10px}
@@ -290,7 +291,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 09.07.26a</div>
+  <div class="version">WFA Book Tracker · 09.07.26b</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -410,6 +411,7 @@ let yrFilter   = 'all';
 let chLetterFilter = 'all';
 let bkLetterFilter = 'all';
 let coLetterFilter = 'all';
+let bookPickerSearch = '';
 let curTab  = 'co';
 let selChild = null;
 let pendingCert = null;
@@ -706,6 +708,7 @@ function selectChild(id) {
   if (!selChild) return;
   // Default book picker to the child's natural phase
   pickPhase = ['Y3','Y4'].includes(selChild.yearGroup) ? 'LKS2' : 'UKS2';
+  bookPickerSearch = '';
   document.getElementById('childList').classList.add('hidden');
   document.getElementById('childSearch').classList.add('hidden');
   document.getElementById('coLetters').classList.add('hidden');
@@ -780,6 +783,11 @@ function renderBookPicker() {
       </div>
       </div></div>`;
 
+  const q = bookPickerSearch.toLowerCase();
+  const filterBooks = list => q ? list.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)) : list;
+  const filtAvail = filterBooks(avail);
+  const filtOut   = filterBooks(out);
+
   picker.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px">
       <div class="sec-hdr" style="margin:0">Select a book</div>
@@ -790,9 +798,17 @@ function renderBookPicker() {
         </button>
       </div>
     </div>
-    ${avail.length ? avail.map(bookHtml).join('') : '<div style="color:var(--muted);font-size:13px;margin-bottom:8px">No copies currently available.</div>'}
-    ${out.length ? `<div class="sec-hdr" style="margin-top:16px">All copies out</div>${out.map(bookHtml).join('')}` : ''}
+    <input id="bookPickerSearchInput" type="text" placeholder="Search books…" value="${esc(bookPickerSearch)}"
+      oninput="bookPickerSearch=this.value;renderBookPicker()"
+      style="width:100%;box-sizing:border-box;padding:8px 12px;border:2px solid var(--border);border-radius:9px;font-size:14px;font-family:inherit;margin-bottom:12px">
+    <div class="book-picker-grid">
+      ${filtAvail.length ? filtAvail.map(bookHtml).join('') : '<div style="color:var(--muted);font-size:13px;margin-bottom:8px">No copies currently available.</div>'}
+    </div>
+    ${filtOut.length ? `<div class="sec-hdr" style="margin-top:16px">All copies out</div><div class="book-picker-grid">${filtOut.map(bookHtml).join('')}</div>` : ''}
   `;
+  // Restore focus and cursor position in search input
+  const inp = document.getElementById('bookPickerSearchInput');
+  if (inp && bookPickerSearch) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
 }
 
 function switchPickPhase(p) {
