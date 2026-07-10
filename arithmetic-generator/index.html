@@ -71,8 +71,15 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <h2>📅 Session Setup</h2>
     <div class="row">
       <div>
-        <label class="lbl">Week reference (e.g. T5W2)</label>
-        <input type="text" id="weekRef" value="T5W2" maxlength="10">
+        <label class="lbl">Week</label>
+        <select id="weekRef">
+          <option>T1W1</option><option>T1W2</option><option>T1W3</option><option>T1W4</option><option>T1W5</option><option>T1W6</option><option>T1W7</option><option>T1W8</option>
+          <option>T2W1</option><option>T2W2</option><option>T2W3</option><option>T2W4</option><option>T2W5</option><option>T2W6</option><option>T2W7</option><option>T2W8</option>
+          <option>T3W1</option><option>T3W2</option><option>T3W3</option><option>T3W4</option><option>T3W5</option><option>T3W6</option><option>T3W7</option><option>T3W8</option>
+          <option>T4W1</option><option>T4W2</option><option>T4W3</option><option>T4W4</option><option>T4W5</option><option>T4W6</option><option>T4W7</option><option>T4W8</option>
+          <option>T5W1</option><option>T5W2</option><option selected>T5W3</option><option>T5W4</option><option>T5W5</option><option>T5W6</option><option>T5W7</option><option>T5W8</option>
+          <option>T6W1</option><option>T6W2</option><option>T6W3</option><option>T6W4</option><option>T6W5</option><option>T6W6</option><option>T6W7</option><option>T6W8</option>
+        </select>
       </div>
       <div>
         <label class="lbl">Class year group</label>
@@ -188,7 +195,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">10.07.26b</div>
+  <div class="version">10.07.26c</div>
 </div>
 
 <script>
@@ -259,6 +266,72 @@ document.getElementById('classYear').addEventListener('change', updateTopicCards
 document.getElementById('includeReasoning').addEventListener('change', e => {
   document.getElementById('reasoningTopics').style.display = e.target.checked ? '' : 'none';
 });
+
+// ─── SETUP PERSISTENCE ───────────────────────────────────────────────────────
+const SETUP_KEY = 'wfa-arith-setup';
+
+function saveSetup() {
+  const groups = [];
+  document.querySelectorAll('.adapted-group').forEach(g => {
+    const id = g.id.replace('group_', '');
+    groups.push({
+      level: document.getElementById(`groupLevel_${id}`)?.value || 'Y2',
+      names: document.getElementById(`groupNames_${id}`)?.value || ''
+    });
+  });
+  const topics = {};
+  document.querySelectorAll('#topicsY4 input, #topicsY4R input, #topicsY2 input').forEach(cb => {
+    topics[cb.dataset.topic] = cb.checked;
+  });
+  localStorage.setItem(SETUP_KEY, JSON.stringify({
+    weekRef: document.getElementById('weekRef').value,
+    classYear: document.getElementById('classYear').value,
+    standardLevel: document.getElementById('standardLevel').value,
+    standardCount: document.getElementById('standardCount').value,
+    includeReasoning: document.getElementById('includeReasoning').checked,
+    topics,
+    groups
+  }));
+}
+
+function loadSetup() {
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(SETUP_KEY)); } catch(e) {}
+  if (!saved) return;
+
+  if (saved.weekRef) document.getElementById('weekRef').value = saved.weekRef;
+  if (saved.classYear) document.getElementById('classYear').value = saved.classYear;
+  if (saved.standardLevel) document.getElementById('standardLevel').value = saved.standardLevel;
+  if (saved.standardCount) document.getElementById('standardCount').value = saved.standardCount;
+  if (saved.includeReasoning != null) {
+    document.getElementById('includeReasoning').checked = saved.includeReasoning;
+    document.getElementById('reasoningTopics').style.display = saved.includeReasoning ? '' : 'none';
+  }
+  if (saved.topics) {
+    document.querySelectorAll('#topicsY4 input, #topicsY4R input, #topicsY2 input').forEach(cb => {
+      if (cb.dataset.topic in saved.topics) cb.checked = saved.topics[cb.dataset.topic];
+    });
+  }
+  if (saved.groups && saved.groups.length) {
+    // Clear any existing groups first
+    document.getElementById('adaptedGroups').innerHTML = '';
+    groupCount = 0;
+    saved.groups.forEach(g => {
+      addAdaptedGroup();
+      const id = groupCount;
+      const lvlEl = document.getElementById(`groupLevel_${id}`);
+      const namesEl = document.getElementById(`groupNames_${id}`);
+      if (lvlEl) lvlEl.value = g.level;
+      if (namesEl) namesEl.value = g.names;
+    });
+  }
+}
+
+// Auto-save on any change within the container
+document.querySelector('.container').addEventListener('change', saveSetup);
+document.querySelector('.container').addEventListener('input', saveSetup);
+
+loadSetup();
 updateTopicCards();
 
 // ─── Y4 ARITHMETIC GENERATOR ─────────────────────────────────────────────────
