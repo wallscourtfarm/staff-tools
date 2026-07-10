@@ -245,7 +245,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">10.07.26f</div>
+  <div class="version">11.07.26a</div>
 </div>
 
 <script>
@@ -930,7 +930,7 @@ function renderFracsInText(str) {
 function qToHTML(q, qNum) {
   const isLongCalc = !!(q.longMult || q.longDiv);
   const isWork = q.work || q.col;
-  const boxH = isLongCalc ? 'calc(12*6.5mm)' : isWork ? 'calc(10*6.5mm)' : 'calc(8*6.5mm)';
+  const boxH = isLongCalc ? 'calc(12*6.5mm)' : isWork ? 'calc(12*6.5mm)' : 'calc(10*6.5mm)';
   const marks = q.marks || 1;
 
   let mainContent = '';
@@ -968,7 +968,7 @@ function qToHTML(q, qNum) {
       <span class="q-num">${qNum}</span>
       ${isLongCalc ? '<span class="q-show-method">Show<br>your<br>method</span>' : ''}
     </div>
-    <div class="q-main">${mainContent}<div class="q-ans"></div></div>
+    <div class="q-main"${isLongCalc ? ' style="background-position:0 0"' : ''}>${mainContent}<div class="q-ans"></div></div>
     <div class="q-strip"><div class="mark-box"></div><div class="mark-lbl">${marks} mark${marks>1?'s':''}</div></div>
   </div>`;
 }
@@ -1080,8 +1080,8 @@ function buildPaperHTML(classYear, label, arithQs, reasoningQs, pupilNames) {
     .pb{page-break-after:always;break-after:page}
     /* ── Cover ── */
     .cover{min-height:240mm;position:relative}
-    .cover-top-bar{display:inline-block;background:#2b2b2b;color:white;padding:2.5mm 8mm;font-weight:bold;font-size:10pt;border-radius:0 0 0 5mm;margin-bottom:0}
-    .cover-blue-bar{display:block;background:#1a70b8;color:white;padding:5mm 8mm;font-weight:900;font-size:36pt;border-radius:0 0 8mm 0;width:65%;margin-bottom:14mm}
+    .cover-top-bar{display:inline-block;background:#2b2b2b;color:white;padding:2.5mm 8mm;font-weight:bold;font-size:10pt;border-radius:0;margin-bottom:0}
+    .cover-blue-bar{display:block;background:#1a70b8;color:white;padding:6mm 8mm;font-weight:900;font-size:36pt;border-radius:0 0 28mm 0;width:68%;margin-bottom:14mm}
     .cover-maths{font-weight:bold;font-size:26pt;margin-bottom:4mm}
     .cover-week{font-size:11pt;color:#555;margin-bottom:20mm}
     .cover-name-row{display:flex;align-items:baseline;gap:4mm;font-size:13pt}
@@ -1097,11 +1097,11 @@ function buildPaperHTML(classYear, label, arithQs, reasoningQs, pupilNames) {
     .q-left{width:14mm;border-right:0.8px solid #444;display:flex;flex-direction:column;align-items:center;padding:2.5mm 2mm;flex-shrink:0}
     .q-num{color:#2e6fad;font-weight:900;font-size:14pt;line-height:1}
     .q-show-method{font-size:7.5pt;font-weight:900;text-align:center;flex:1;display:flex;align-items:center;justify-content:center;line-height:1.5}
-    .q-main{flex:1;position:relative;background-image:linear-gradient(#c0cfe0 1px,transparent 1px),linear-gradient(90deg,#c0cfe0 1px,transparent 1px);background-size:6.5mm 6.5mm}
-    .q-header{background:white;border-bottom:0.8px solid #ccc;padding:3mm 4mm;display:flex;align-items:center;gap:3mm;font-size:15pt;font-weight:bold;min-height:6.5mm;position:relative;z-index:2;flex-wrap:wrap}
+    .q-main{flex:1;position:relative;background-image:linear-gradient(#c0cfe0 1px,transparent 1px),linear-gradient(90deg,#c0cfe0 1px,transparent 1px);background-size:6.5mm 6.5mm;background-position:0 calc(2*6.5mm)}
+    .q-header{background:white;border-bottom:0.8px solid #ccc;padding:1.5mm 4mm;display:flex;align-items:center;gap:3mm;font-size:15pt;font-weight:bold;height:calc(2*6.5mm);position:relative;z-index:2;flex-wrap:wrap;overflow:hidden}
     .q-ans{position:absolute;bottom:3mm;right:3mm;width:36mm;height:13mm;border:2.5px solid #2e6fad;background:white;z-index:3}
     .ibox{display:inline-block;width:26mm;height:11mm;border:2.5px solid #2e6fad;background:white;vertical-align:middle}
-    .fh{display:inline-flex;flex-direction:column;align-items:center;font-size:13pt;font-weight:bold;line-height:1;vertical-align:middle;margin:0 1px}
+    .fh{display:inline-flex;flex-direction:column;align-items:center;font-size:11pt;font-weight:bold;line-height:1;vertical-align:middle;margin:0 1px}
     .fh-n{padding:0 3px 2px;border-bottom:1.5px solid black}
     .fh-d{padding:2px 3px 0}
     .eq-op{font-weight:bold;font-size:14pt}
