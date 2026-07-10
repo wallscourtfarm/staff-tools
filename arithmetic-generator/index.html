@@ -523,6 +523,15 @@ function qToHTML(q, qNum) {
     </div>`;
 }
 
+// ─── FRACTION RENDERER (for print HTML strings) ──────────────────────────────
+function renderFracs(str) {
+  if (!str && str !== 0) return str;
+  return String(str).replace(/(\d+\s+)?(\d+)\/(\d+)/g, (_, whole, n, d) => {
+    const w = whole ? `<span class="pf-whole">${whole.trim()}</span>` : '';
+    return `${w}<span class="pf"><span class="pf-n">${n}</span><span class="pf-d">${d}</span></span>`;
+  });
+}
+
 // ─── REASONING → HTML ─────────────────────────────────────────────────────────
 function reasoningQToHTML(q, num) {
   const big = q.showMethod || q.marks >= 2;
@@ -532,34 +541,34 @@ function reasoningQToHTML(q, num) {
   let bodyHTML = '';
 
   if (q.type === 'tick-options' && q.options) {
-    bodyHTML = q.options.map(o => `<div class="r-opt"><span class="r-tick-box"></span>${o}</div>`).join('');
+    bodyHTML = q.options.map(o => `<div class="r-opt"><span class="r-tick-box"></span>${renderFracs(o)}</div>`).join('');
   } else if (q.type === 'circle-options' && q.options) {
-    bodyHTML = `<div class="r-circle-row">${q.options.map(o=>`<span class="r-circle">${o}</span>`).join('')}</div>`;
+    bodyHTML = `<div class="r-circle-row">${q.options.map(o=>`<span class="r-circle">${renderFracs(o)}</span>`).join('')}</div>`;
   } else if (q.type === 'order' && q.options) {
     bodyHTML = `<div class="r-order-row">${q.options.map(()=>`<span class="r-order-box"></span>`).join('')}</div>
-      <div class="r-order-vals">${q.options.join('  &nbsp;  ')}</div>`;
+      <div class="r-order-vals">${q.options.map(o=>renderFracs(o)).join('  &nbsp;  ')}</div>`;
   } else if (q.type === 'sequence' && q.options) {
     bodyHTML = `<div class="r-seq-row">${q.options.map(v => v===null
       ? `<span class="r-seq-box"></span>`
-      : `<span class="r-seq-val">${v}</span>`).join('<span class="r-seq-comma">,</span>')}</div>`;
+      : `<span class="r-seq-val">${renderFracs(v)}</span>`).join('<span class="r-seq-comma">,</span>')}</div>`;
   } else if ((q.type === 'complete-table' || q.type === 'table-stimulus') && q.table) {
     const { headers, rows } = q.table;
-    bodyHTML = `<table class="r-table"><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>${
+    bodyHTML = `<table class="r-table"><tr>${headers.map(h=>`<th>${renderFracs(h)}</th>`).join('')}</tr>${
       rows.map(row=>`<tr>${row.map(cell=>
-        (cell===null&&q.type==='complete-table') ? `<td class="r-table-blank"></td>` : `<td>${cell??''}</td>`
+        (cell===null&&q.type==='complete-table') ? `<td class="r-table-blank"></td>` : `<td>${renderFracs(cell??'')}</td>`
       ).join('')}</tr>`).join('')}</table>`;
     if (q.type === 'table-stimulus') {
-      bodyHTML += `<div class="r-q" style="margin-top:4mm">${q.questionText}</div>`;
+      bodyHTML += `<div class="r-q" style="margin-top:4mm">${renderFracs(q.questionText)}</div>`;
       return buildReasoningRow(num, q.marks, big, h, shade, '', bodyHTML, q.showMethod);
     }
   } else if (q.type === 'match' && q.options) {
     const {left, right} = q.options;
-    bodyHTML = `<div class="r-match">${left.map((l,i)=>`<div class="r-match-row"><span class="r-match-l">${l}</span><span class="r-match-line"></span><span class="r-match-r">${right[i]||''}</span></div>`).join('')}</div>`;
+    bodyHTML = `<div class="r-match">${left.map((l,i)=>`<div class="r-match-row"><span class="r-match-l">${renderFracs(l)}</span><span class="r-match-line"></span><span class="r-match-r">${renderFracs(right[i]||'')}</span></div>`).join('')}</div>`;
   }
 
   if (q.showMethod) bodyHTML += `<div class="r-method-box"></div>`;
   const ansBox = (q.type==='write-answer'||!q.type) ? `<span class="r-ans-box">${q.answerLabel||''}</span>` : '';
-  return buildReasoningRow(num, q.marks, big, h, shade, q.questionText, bodyHTML + ansBox, q.showMethod);
+  return buildReasoningRow(num, q.marks, big, h, shade, renderFracs(q.questionText), bodyHTML + ansBox, q.showMethod);
 }
 
 function buildReasoningRow(num, marks, big, h, shade, qText, bodyHTML, showMethod) {
@@ -669,7 +678,11 @@ function buildPaperHTML(classYear, label, arithQs, reasoningQs, pupilNames) {
     .r-match-row{display:flex;align-items:center;gap:2mm;margin:1.5mm 0;font-size:10pt}
     .r-match-l,.r-match-r{min-width:30mm}
     .r-match-line{flex:1;border-bottom:1px solid #ccc}
-    .r-method-box{margin-top:3mm;height:20mm;border:0.8px solid #ccc;background:white}`;
+    .r-method-box{margin-top:3mm;height:20mm;border:0.8px solid #ccc;background:white}
+    .pf{display:inline-flex;flex-direction:column;align-items:center;line-height:1;vertical-align:middle;margin:0 1px}
+    .pf-n{border-bottom:1.5px solid black;padding:0 3px 1px;text-align:center;font-weight:bold;font-size:9pt}
+    .pf-d{padding:1px 3px 0;text-align:center;font-weight:bold;font-size:9pt}
+    .pf-whole{font-weight:bold;margin-right:2px;vertical-align:middle}`;
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <title>${classYear} Assessment ${label}</title><style>${CSS}</style></head><body>
