@@ -17,31 +17,42 @@ body{background:#f4f6f8;font-family:'Nunito',sans-serif;color:#222;min-height:10
 .container{max-width:860px;margin:0 auto;padding:24px 16px}
 .card{background:white;border-radius:14px;padding:20px 24px;box-shadow:0 1px 8px rgba(0,0,0,.07);margin-bottom:16px}
 .card h2{font-size:1rem;font-weight:900;color:#1798d3;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-.card h2 .icon{font-size:1.2rem}
 label.lbl{font-weight:800;font-size:.85rem;color:#444;display:block;margin-bottom:4px}
 input[type=text],input[type=number],select{border:1.5px solid #ddd;border-radius:8px;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:.9rem;width:100%;margin-bottom:12px}
 input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d3;outline:none}
 .row{display:flex;gap:12px;flex-wrap:wrap}
 .row>*{flex:1;min-width:140px}
-.btn{border:none;border-radius:8px;padding:10px 20px;font-size:.9rem;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;transition:opacity .15s}
-.btn:hover{opacity:.88}
+.btn{border:none;border-radius:8px;padding:10px 20px;font-size:.9rem;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;transition:opacity .15s;white-space:nowrap}
+.btn:hover:not(:disabled){opacity:.85}
+.btn:disabled{opacity:.45;cursor:default}
 .btn-primary{background:#1798d3;color:white}
-.btn-secondary{background:#0a5fa0;color:white}
-.btn-outline{background:white;color:#1798d3;border:1.5px solid #1798d3}
+.btn-navy{background:#1a3a5c;color:white}
+.btn-green{background:#2e7d32;color:white}
+.btn-amber{background:#e65100;color:white}
 .btn-danger{background:white;color:#c0392b;border:1.5px solid #c0392b;padding:6px 12px;font-size:.8rem}
 .btn-add{background:#e8f5e9;color:#2e7d32;border:1.5px dashed #66bb6a;width:100%;padding:8px;font-size:.85rem;font-weight:700;border-radius:8px;cursor:pointer;font-family:'Nunito',sans-serif;margin-top:8px}
-.adapted-group{background:#f8f9fa;border:1.5px solid #e0e0e0;border-radius:10px;padding:14px;margin-bottom:10px;position:relative}
+.adapted-group{background:#f8f9fa;border:1.5px solid #e0e0e0;border-radius:10px;padding:14px;margin-bottom:10px}
 .adapted-group h3{font-size:.88rem;font-weight:900;color:#555;margin-bottom:10px}
 .adapted-group select{margin-bottom:8px}
 .names-area{border:1.5px solid #ddd;border-radius:8px;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:.85rem;width:100%;resize:vertical;min-height:60px}
 .names-area:focus{border-color:#1798d3;outline:none}
-.topic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.topic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
 .topic-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid #e8e8e8;border-radius:8px;cursor:pointer;transition:border-color .15s}
 .topic-item:hover{border-color:#1798d3}
 .topic-item input[type=checkbox]{width:16px;height:16px;accent-color:#1798d3;cursor:pointer;flex-shrink:0;margin:0}
 .topic-item span{font-size:.85rem;font-weight:700;color:#333}
-.actions{display:flex;gap:12px;flex-wrap:wrap;padding:4px 0}
-.hint{font-size:.8rem;color:#888;font-weight:600;margin-top:4px}
+.toggle-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0;margin-bottom:12px}
+.toggle-row input[type=checkbox]{width:18px;height:18px;accent-color:#1798d3;cursor:pointer;margin:0}
+.toggle-row label{font-weight:800;font-size:.9rem;color:#333;cursor:pointer}
+.toggle-row small{color:#888;font-size:.8rem;font-weight:600}
+.status-bar{padding:12px 16px;border-radius:10px;font-size:.88rem;font-weight:700;margin-bottom:12px;display:none}
+.status-generating{background:#fff8e1;color:#e65100;border:1.5px solid #ffcc02;display:flex;align-items:center;gap:8px}
+.status-ready{background:#e8f5e9;color:#2e7d32;border:1.5px solid #66bb6a}
+.status-error{background:#fde8e8;color:#9b1c1c;border:1.5px solid #f5a5a5}
+.actions{display:flex;gap:10px;flex-wrap:wrap;padding:4px 0}
+.spinner{display:inline-block;width:16px;height:16px;border:2.5px solid #ffcc02;border-top-color:#e65100;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hint{font-size:.8rem;color:#888;font-weight:600;margin-top:6px}
 .version{text-align:center;color:#bbb;font-size:.75rem;padding:16px 0}
 </style>
 </head>
@@ -55,9 +66,9 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
 
 <div class="container">
 
-  <!-- Week & Class -->
+  <!-- Session Setup -->
   <div class="card">
-    <h2><span class="icon">📅</span> Session Setup</h2>
+    <h2>📅 Session Setup</h2>
     <div class="row">
       <div>
         <label class="lbl">Week reference (e.g. T5W2)</label>
@@ -78,7 +89,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
 
   <!-- Standard paper -->
   <div class="card">
-    <h2><span class="icon">📄</span> Standard Paper</h2>
+    <h2>📄 Standard Paper</h2>
     <div class="row">
       <div>
         <label class="lbl">Paper level</label>
@@ -93,22 +104,22 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
       <div>
         <label class="lbl">Number of copies needed</label>
         <input type="number" id="standardCount" value="57" min="1" max="120">
-        <p class="hint">For info only — print that many copies from the PDF.</p>
+        <p class="hint">For reference — print this many copies from the PDF.</p>
       </div>
     </div>
   </div>
 
   <!-- Adapted groups -->
   <div class="card">
-    <h2><span class="icon">🎯</span> Adapted Papers</h2>
+    <h2>🎯 Adapted Papers</h2>
     <div id="adaptedGroups"></div>
     <button class="btn-add" onclick="addAdaptedGroup()">+ Add adapted group</button>
-    <p class="hint" style="margin-top:8px">Each group gets its own PDF. Names appear on the cover — no stigma from the cover page (all say "<span id="classYearHint">Year 4</span>").</p>
+    <p class="hint" style="margin-top:8px">Each group gets its own PDF. Names appear on the cover — all covers say "<span id="classYearHint">Year 4</span>", so adapted learners are not identified.</p>
   </div>
 
   <!-- Y4 topics -->
   <div class="card" id="topicCardY4">
-    <h2><span class="icon">✅</span> Y4 Arithmetic Topics</h2>
+    <h2>✅ Y4 Arithmetic Topics</h2>
     <div class="topic-grid" id="topicsY4">
       <label class="topic-item"><input type="checkbox" checked data-topic="placeValue"><span>Place value (×÷ 10/100/1000)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="mentalCalc"><span>Mental addition &amp; subtraction</span></label>
@@ -119,24 +130,35 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
       <label class="topic-item"><input type="checkbox" checked data-topic="fractions"><span>Fractions (same denominator)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="missingNumbers"><span>Missing numbers</span></label>
     </div>
-    <div style="margin-top:12px">
-      <h2 style="margin-bottom:10px"><span class="icon">💡</span> Y4 Reasoning Topics</h2>
-      <div class="topic-grid" id="topicsY4R">
-        <label class="topic-item"><input type="checkbox" checked data-topic="r_placeValue"><span>Place value &amp; ordering</span></label>
-        <label class="topic-item"><input type="checkbox" checked data-topic="r_sequences"><span>Sequences</span></label>
-        <label class="topic-item"><input type="checkbox" checked data-topic="r_multiplication"><span>Multiplication &amp; division</span></label>
-        <label class="topic-item"><input type="checkbox" checked data-topic="r_fractions"><span>Fractions of amounts</span></label>
-        <label class="topic-item"><input type="checkbox" checked data-topic="r_measurement"><span>Measurement &amp; perimeter</span></label>
-        <label class="topic-item"><input type="checkbox" checked data-topic="r_money"><span>Money (2-mark)</span></label>
-        <label class="topic-item"><input type="checkbox" checked data-topic="r_time"><span>Time</span></label>
-        <label class="topic-item"><input type="checkbox" checked data-topic="r_stats"><span>Statistics</span></label>
+
+    <!-- Reasoning toggle -->
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #eee">
+      <h2 style="margin-bottom:10px">💡 Paper 2 — Reasoning</h2>
+      <div class="toggle-row">
+        <input type="checkbox" id="includeReasoning" checked>
+        <label for="includeReasoning">Include reasoning paper</label>
+        <small>(generated via AI — takes ~5 seconds)</small>
+      </div>
+      <div id="reasoningTopics">
+        <div class="topic-grid" id="topicsY4R">
+          <label class="topic-item"><input type="checkbox" checked data-topic="r_placeValue"><span>Place value &amp; ordering</span></label>
+          <label class="topic-item"><input type="checkbox" checked data-topic="r_sequences"><span>Sequences</span></label>
+          <label class="topic-item"><input type="checkbox" checked data-topic="r_multDiv"><span>Multiplication &amp; division</span></label>
+          <label class="topic-item"><input type="checkbox" checked data-topic="r_fractions"><span>Fractions of amounts</span></label>
+          <label class="topic-item"><input type="checkbox" checked data-topic="r_measurement"><span>Measurement &amp; perimeter</span></label>
+          <label class="topic-item"><input type="checkbox" checked data-topic="r_money"><span>Money (include 2-mark)</span></label>
+          <label class="topic-item"><input type="checkbox" checked data-topic="r_time"><span>Time</span></label>
+          <label class="topic-item"><input type="checkbox" checked data-topic="r_stats"><span>Statistics / data</span></label>
+          <label class="topic-item"><input type="checkbox" checked data-topic="r_geometry"><span>Geometry &amp; symmetry</span></label>
+          <label class="topic-item"><input type="checkbox" checked data-topic="r_decimals"><span>Decimals &amp; number lines</span></label>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Y2 topics -->
   <div class="card" id="topicCardY2" style="display:none">
-    <h2><span class="icon">✅</span> Y2 Arithmetic Topics</h2>
+    <h2>✅ Y2 Arithmetic Topics</h2>
     <div class="topic-grid" id="topicsY2">
       <label class="topic-item"><input type="checkbox" checked data-topic="numberBonds"><span>Number bonds (10 &amp; 20)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="countOnOff"><span>Counting on &amp; back</span></label>
@@ -152,36 +174,50 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
 
   <!-- Generate -->
   <div class="card">
-    <h2><span class="icon">🖨️</span> Generate Papers</h2>
+    <h2>🖨️ Generate &amp; Print</h2>
+    <div id="statusBar" class="status-bar"></div>
     <div class="actions">
-      <button class="btn btn-primary" onclick="generatePaper('standard')">Print Standard Paper</button>
-      <div id="adaptedBtns"></div>
+      <button class="btn btn-primary" id="btnGenerate" onclick="generateAll()">Generate Papers</button>
     </div>
-    <p class="hint" style="margin-top:10px">Each button opens a print-ready page. Choose "Save as PDF" in the print dialog.</p>
+    <div id="printButtons" style="display:none;margin-top:14px;border-top:1px solid #eee;padding-top:14px">
+      <div class="actions" id="paperBtns"></div>
+      <div style="margin-top:10px">
+        <button class="btn btn-amber" onclick="printAnswers()">🗒 Print Answer Sheet (all papers)</button>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">10.07.26a</div>
+  <div class="version">10.07.26b</div>
 </div>
 
 <script>
-// ─── HELPERS ────────────────────────────────────────────────────────────────
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+const API_URL = 'https://app.wallscourt-farm-academy.co.uk/api/claude';
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
-
-function digits4(n) {
-  return [n % 10, Math.floor(n/10)%10, Math.floor(n/100)%10, Math.floor(n/1000)%10];
-}
+function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+function digits4(n) { return [n%10, Math.floor(n/10)%10, Math.floor(n/100)%10, Math.floor(n/1000)%10]; }
 function hasRegroup(a, b, op) {
   const da = digits4(a), db = digits4(b);
   for (let i = 0; i < 4; i++) {
-    if (op === 'add' && (da[i]||0) + (db[i]||0) >= 10) return true;
-    if (op === 'sub' && (da[i]||0) < (db[i]||0)) return true;
+    if (op==='add' && (da[i]||0)+(db[i]||0)>=10) return true;
+    if (op==='sub' && (da[i]||0)<(db[i]||0)) return true;
   }
   return false;
 }
-function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+function getTopics(id) {
+  const t = {};
+  document.querySelectorAll(`#${id} input[type=checkbox]`).forEach(cb => { t[cb.dataset.topic] = cb.checked; });
+  return t;
+}
 
-// ─── ADAPTED GROUP UI ───────────────────────────────────────────────────────
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let generatedPapers = null; // { standard, adapted: [{level, names, arithQs}], reasoningQs }
+
+// ─── ADAPTED GROUP UI ────────────────────────────────────────────────────────
 let groupCount = 0;
 function addAdaptedGroup() {
   groupCount++;
@@ -197,7 +233,7 @@ function addAdaptedGroup() {
     <div class="row">
       <div>
         <label class="lbl">Paper level</label>
-        <select id="groupLevel_${id}">
+        <select id="groupLevel_${id}" onchange="updateTopicCards()">
           <option value="Y2" selected>Year 2</option>
           <option value="Y3">Year 3</option>
           <option value="Y4">Year 4</option>
@@ -205,419 +241,258 @@ function addAdaptedGroup() {
         </select>
       </div>
     </div>
-    <label class="lbl">Pupil names (one per line — will appear on cover)</label>
-    <textarea class="names-area" id="groupNames_${id}" placeholder="Pupil Name&#10;Another Pupil"></textarea>
-  `;
+    <label class="lbl">Pupil names (one per line — printed on cover)</label>
+    <textarea class="names-area" id="groupNames_${id}" placeholder="Pupil Name&#10;Another Pupil"></textarea>`;
   document.getElementById('adaptedGroups').appendChild(div);
-  updateUI();
+  updateTopicCards();
 }
-
 function removeGroup(id) {
   document.getElementById(`group_${id}`).remove();
-  updateAdaptedBtns();
   updateTopicCards();
 }
-
-function updateUI() {
-  updateAdaptedBtns();
-  updateTopicCards();
-  document.getElementById('classYearHint').textContent = document.getElementById('classYear').value;
-}
-
-function updateAdaptedBtns() {
-  const container = document.getElementById('adaptedBtns');
-  container.innerHTML = '';
-  document.querySelectorAll('.adapted-group').forEach(g => {
-    const id = g.id.replace('group_', '');
-    const level = document.getElementById(`groupLevel_${id}`)?.value || 'Y2';
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-secondary';
-    btn.style.marginTop = '8px';
-    btn.textContent = `Print Adapted (${level}) Paper`;
-    btn.onclick = () => generatePaper('adapted', id);
-    container.appendChild(btn);
-  });
-}
-
 function updateTopicCards() {
-  // Show Y2 topic card if any group is Y2
   const hasY2 = [...document.querySelectorAll('[id^=groupLevel_]')].some(s => s.value === 'Y2');
   document.getElementById('topicCardY2').style.display = hasY2 ? '' : 'none';
+  document.getElementById('classYearHint').textContent = document.getElementById('classYear').value;
 }
+document.getElementById('classYear').addEventListener('change', updateTopicCards);
+document.getElementById('includeReasoning').addEventListener('change', e => {
+  document.getElementById('reasoningTopics').style.display = e.target.checked ? '' : 'none';
+});
+updateTopicCards();
 
-document.getElementById('classYear').addEventListener('change', updateUI);
-updateUI(); // set hint on load
-
-// ─── TOPIC READERS ──────────────────────────────────────────────────────────
-function getTopics(containerSelector) {
-  const t = {};
-  document.querySelectorAll(`${containerSelector} input[type=checkbox]`).forEach(cb => {
-    t[cb.dataset.topic] = cb.checked;
-  });
-  return t;
-}
-
-// ─── Y4 ARITHMETIC GENERATOR ────────────────────────────────────────────────
-// Each q: { text, frac, answer, col, work, box, marks }
-
+// ─── Y4 ARITHMETIC GENERATOR ─────────────────────────────────────────────────
 function genY4Arith(t) {
   const qs = [];
   const tt = () => { const a=rand(2,12),b=rand(2,12); return {text:`${a} × ${b} =`,answer:a*b,marks:1}; };
 
-  // Q1 ×1000
-  if (t.placeValue) { const a=pick([2,3,4,5,6,7,8,9,12,15,20,25]); qs.push({text:`${a} × 1000 =`,answer:a*1000,marks:1}); }
+  if (t.placeValue) { const a=pick([2,3,4,5,6,7,8,9,12,15,20,25]); qs.push({text:`${a} × 1000 =`,answer:a*1000,marks:1}); } else qs.push(tt());
+  if (t.placeValue) { const b=pick([30,40,50,60,70,80,90,120,150,200,350,700]); qs.push({text:`${b} ÷ 10 =`,answer:b/10,marks:1}); } else qs.push(tt());
+  if (t.placeValue) { const c=rand(2,99); qs.push({text:`${c} × 100 =`,answer:c*100,marks:1}); } else qs.push(tt());
+  if (t.mentalCalc) { const a=rand(10,40),b=rand(10,40),c=rand(10,40); qs.push({text:`${a} + ${b} + ${c} =`,answer:a+b+c,marks:1}); } else qs.push(tt());
+  if (t.mentalCalc) { const g=rand(1001,8999); qs.push({text:`${g} + 1000 =`,answer:g+1000,marks:1}); } else qs.push(tt());
+  if (t.mentalCalc) { const h=pick([500,600,700,800,900,1000,1200]),j=pick([100,200,300,400]); qs.push({text:`${h} - ${j} =`,answer:h-j,marks:1}); } else qs.push(tt());
+  if (t.mentalCalc) { const k=rand(20,90),l=rand(3,Math.floor(k/3)); qs.push({text:`${k} - ${l} - ${l} =`,answer:k-2*l,marks:1}); } else qs.push(tt());
+  if (t.mentalCalc) { const m=rand(1,8)*100,n=rand(1,8)*100; qs.push({text:`${m} + ${n} =`,answer:m+n,marks:1}); } else qs.push(tt());
+  if (t.missingNumbers) { const p=rand(10,100),q=rand(p+10,p+200); qs.push({text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1}); } else qs.push(tt());
+  if (t.missingNumbers && t.columnCalc) { const r=rand(200,999),s=rand(50,r-50); qs.push({text:`${r} - [BOX] = ${s}`,answer:r-s,box:true,col:true,marks:1}); }
+  else if (t.columnCalc) { let a,b; do{a=rand(1000,8999);b=rand(1000,9999-a);}while(!hasRegroup(a,b,'add')); qs.push({text:`${a} + ${b} =`,answer:a+b,col:true,marks:1}); }
   else qs.push(tt());
-
-  // Q2 ÷10
-  if (t.placeValue) { const b=pick([30,40,50,60,70,80,90,120,150,200,350,700]); qs.push({text:`${b} ÷ 10 =`,answer:b/10,marks:1}); }
-  else qs.push(tt());
-
-  // Q3 ×100
-  if (t.placeValue) { const c=rand(2,99); qs.push({text:`${c} × 100 =`,answer:c*100,marks:1}); }
-  else qs.push(tt());
-
-  // Q4 mental add three numbers
-  if (t.mentalCalc) { const a=rand(10,40),b=rand(10,40),c=rand(10,40); qs.push({text:`${a} + ${b} + ${c} =`,answer:a+b+c,marks:1}); }
-  else qs.push(tt());
-
-  // Q5 4-digit + 1000
-  if (t.mentalCalc) { const g=rand(1001,8999); qs.push({text:`${g} + 1000 =`,answer:g+1000,marks:1}); }
-  else qs.push(tt());
-
-  // Q6 subtract hundreds
-  if (t.mentalCalc) {
-    const h=pick([500,600,700,800,900,1000,1200,1500]),j=pick([100,200,300,400]);
-    qs.push({text:`${h} - ${j} =`,answer:h-j,marks:1});
-  } else qs.push(tt());
-
-  // Q7 double subtraction K - L - L
-  if (t.mentalCalc) { const k=rand(20,90),l=rand(3,Math.floor(k/3)); qs.push({text:`${k} - ${l} - ${l} =`,answer:k-2*l,marks:1}); }
-  else qs.push(tt());
-
-  // Q8 add hundreds
-  if (t.mentalCalc) { const m=rand(1,8)*100,n=rand(1,8)*100; qs.push({text:`${m} + ${n} =`,answer:m+n,marks:1}); }
-  else qs.push(tt());
-
-  // Q9 missing number [BOX] + p = q
-  if (t.missingNumbers) {
-    const p=rand(10,100),q=rand(p+10,p+200);
-    qs.push({text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1});
-  } else qs.push(tt());
-
-  // Q10 missing number column R - [BOX] = S
-  if (t.missingNumbers && t.columnCalc) {
-    const r=rand(200,999),s=rand(50,r-50);
-    qs.push({text:`${r} - [BOX] = ${s}`,answer:r-s,box:true,col:true,marks:1});
-  } else if (t.columnCalc) {
-    let a,b; do { a=rand(1000,8999); b=rand(1000,9999-a); } while (!hasRegroup(a,b,'add'));
-    qs.push({text:`${a} + ${b} =`,answer:a+b,col:true,marks:1});
-  } else qs.push(tt());
-
-  // Q11 column addition 4-digit
-  if (t.columnCalc) {
-    let a,b; do { a=rand(1000,8999); b=rand(1000,9999-a); } while (!hasRegroup(a,b,'add'));
-    qs.push({text:`${a} + ${b} =`,answer:a+b,col:true,marks:1});
-  } else qs.push(tt());
-
-  // Q12 column subtraction 4-digit
-  if (t.columnCalc) {
-    let a,b; do { a=rand(2000,9999); b=rand(1000,a-500); } while (!hasRegroup(a,b,'sub'));
-    qs.push({text:`${a} - ${b} =`,answer:a-b,col:true,marks:1});
-  } else qs.push(tt());
-
-  // Q13 ×12
-  if (t.timesTables) { const a=rand(2,12); qs.push({text:`${a} × 12 =`,answer:a*12,marks:1}); }
-  else qs.push(tt());
-
-  // Q14 ×1 small
+  if (t.columnCalc) { let a,b; do{a=rand(1000,8999);b=rand(1000,9999-a);}while(!hasRegroup(a,b,'add')); qs.push({text:`${a} + ${b} =`,answer:a+b,col:true,marks:1}); } else qs.push(tt());
+  if (t.columnCalc) { let a,b; do{a=rand(2000,9999);b=rand(1000,a-500);}while(!hasRegroup(a,b,'sub')); qs.push({text:`${a} - ${b} =`,answer:a-b,col:true,marks:1}); } else qs.push(tt());
+  if (t.timesTables) { const a=rand(2,12); qs.push({text:`${a} × 12 =`,answer:a*12,marks:1}); } else qs.push(tt());
   { const a=rand(3,20); qs.push({text:`${a} × 1 =`,answer:a,marks:1}); }
-
-  // Q15 ×1 larger
   { const a=rand(21,99); qs.push({text:`${a} × 1 =`,answer:a,marks:1}); }
-
-  // Q16 ×11 or ×12
-  if (t.timesTables) { const f=pick([11,12]),a=rand(2,12); qs.push({text:`${a} × ${f} =`,answer:a*f,marks:1}); }
-  else qs.push(tt());
-
-  // Q17 ×10
-  if (t.placeValue) { const a=rand(2,99); qs.push({text:`${a} × 10 =`,answer:a*10,marks:1}); }
-  else qs.push(tt());
-
-  // Q18 table fact
+  if (t.timesTables) { const f=pick([11,12]),a=rand(2,12); qs.push({text:`${a} × ${f} =`,answer:a*f,marks:1}); } else qs.push(tt());
+  if (t.placeValue) { const a=rand(2,99); qs.push({text:`${a} × 10 =`,answer:a*10,marks:1}); } else qs.push(tt());
   qs.push(tt());
-
-  // Q19 three-factor
-  if (t.timesTables) {
-    let a,b,c; do { a=rand(2,5);b=rand(2,5);c=rand(2,4); } while (a*b*c>=100);
-    qs.push({text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1});
-  } else qs.push(tt());
-
-  // Q20 three-factor
-  if (t.timesTables) {
-    let a,b,c; do { a=rand(2,4);b=rand(2,4);c=rand(2,4); } while (a*b*c>=100||a*b*c<8);
-    qs.push({text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1});
-  } else qs.push(tt());
-
-  // Q21 short × 2-digit × single digit (show working)
-  if (t.shortMult) {
-    const ab=rand(11,49),f=pick([3,4,5,6,7,8]);
-    qs.push({text:`${ab} × ${f} =`,answer:ab*f,work:true,marks:1});
-  } else qs.push({...tt(),work:true});
-
-  // Q22 short × 3-digit × single digit (show working)
-  if (t.shortMult) {
-    let abc,f; do { abc=rand(101,499);f=pick([3,4,5,6]); } while (abc*f>=1000);
-    qs.push({text:`${abc} × ${f} =`,answer:abc*f,work:true,marks:1});
-  } else qs.push({...tt(),work:true});
-
-  // Q23 division fact
-  if (t.division) { const b=rand(2,12),q=rand(2,12); qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1}); }
-  else qs.push(tt());
-
-  // Q24 division fact
-  if (t.division) { const b=rand(3,12),q=rand(3,12); qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1}); }
-  else qs.push(tt());
-
-  // Q25 division show working (2-digit answer)
-  if (t.division) {
-    const d=rand(2,9),q=rand(11,30);
-    qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});
-  } else qs.push({...tt(),work:true});
-
-  // Q26 division show working (larger)
-  if (t.division) {
-    const d=rand(2,9),q=rand(11,99);
-    qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});
-  } else qs.push({...tt(),work:true});
-
-  // Q27 fraction addition same denominator
+  if (t.timesTables) { let a,b,c; do{a=rand(2,5);b=rand(2,5);c=rand(2,4);}while(a*b*c>=100); qs.push({text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1}); } else qs.push(tt());
+  if (t.timesTables) { let a,b,c; do{a=rand(2,4);b=rand(2,4);c=rand(2,4);}while(a*b*c>=100||a*b*c<8); qs.push({text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1}); } else qs.push(tt());
+  if (t.shortMult) { const ab=rand(11,49),f=pick([3,4,5,6,7,8]); qs.push({text:`${ab} × ${f} =`,answer:ab*f,work:true,marks:1}); } else qs.push({...tt(),work:true});
+  if (t.shortMult) { let abc,f; do{abc=rand(101,499);f=pick([3,4,5,6]);}while(abc*f>=1000); qs.push({text:`${abc} × ${f} =`,answer:abc*f,work:true,marks:1}); } else qs.push({...tt(),work:true});
+  if (t.division) { const b=rand(2,12),q=rand(2,12); qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1}); } else qs.push(tt());
+  if (t.division) { const b=rand(3,12),q=rand(3,12); qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1}); } else qs.push(tt());
+  if (t.division) { const d=rand(2,9),q=rand(11,30); qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1}); } else qs.push({...tt(),work:true});
+  if (t.division) { const d=rand(2,9),q=rand(11,99); qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1}); } else qs.push({...tt(),work:true});
   if (t.fractions) {
     const denoms=[2,3,4,5,6,8,10],d=pick(denoms);
     const n1=rand(1,d-2),n2=rand(1,d-n1-1);
-    const sum=n1+n2, g=gcd(sum,d);
-    const ansStr = sum/g===1 ? '1' : (d/g===1 ? `${sum/g}` : `${sum/g}/${d/g}`);
-    qs.push({frac:[[n1,d],[n2,d]],answer:ansStr,marks:1});
+    const sum=n1+n2,g=gcd(sum,d);
+    const ans=sum===d?'1':(d/g===1?`${sum/g}`:`${sum/g}/${d/g}`);
+    qs.push({frac:[[n1,d],[n2,d]],answer:ans,marks:1});
   } else qs.push(tt());
-
-  // Q28 missing number [BOX] + p = q (different range)
-  if (t.missingNumbers) {
-    const p=rand(100,500),q=rand(p+10,p+1000);
-    qs.push({text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1});
-  } else qs.push(tt());
-
-  // Q29 subtract thousands
-  if (t.mentalCalc) {
-    const a=rand(3,9)*1000,b=rand(1,a/1000-1)*1000;
-    qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1});
-  } else qs.push(tt());
-
-  // Q30 table fact
+  if (t.missingNumbers) { const p=rand(100,500),q=rand(p+10,p+1000); qs.push({text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1}); } else qs.push(tt());
+  if (t.mentalCalc) { const a=rand(3,9)*1000,b=rand(1,a/1000-1)*1000; qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1}); } else qs.push(tt());
   qs.push(tt());
-
   return qs;
 }
 
-// ─── Y2 ARITHMETIC GENERATOR ────────────────────────────────────────────────
+// ─── Y2 ARITHMETIC GENERATOR ─────────────────────────────────────────────────
 function genY2Arith(t) {
   const qs = [];
   const simple = () => { const a=rand(1,5),b=rand(1,5); return {text:`${a} + ${b} =`,answer:a+b,marks:1}; };
 
-  // Q1 bond to 10
-  if (t.numberBonds) { const a=rand(1,9); qs.push({text:`${a} + ${10-a} =`,answer:10,marks:1}); }
-  else qs.push(simple());
-  // Q2 10 - ?
-  if (t.numberBonds) { const a=rand(1,9); qs.push({text:`10 - ${a} =`,answer:10-a,marks:1}); }
-  else qs.push(simple());
-  // Q3 bond to 20
-  if (t.numberBonds) { const a=rand(1,19); qs.push({text:`${a} + ${20-a} =`,answer:20,marks:1}); }
-  else qs.push(simple());
-  // Q4 count on single digit
-  if (t.countOnOff) { const a=rand(10,25),b=rand(1,5); qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1}); }
-  else qs.push(simple());
-  // Q5 count back single digit
-  if (t.countOnOff) { const a=rand(12,30),b=rand(1,5); qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1}); }
-  else qs.push(simple());
-  // Q6 add 2-digit no exchange
-  if (t.twoDigitAdd) {
-    let a,b; do { a=rand(11,49);b=rand(11,49); } while ((a%10)+(b%10)>=10);
-    qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1});
-  } else qs.push(simple());
-  // Q7 sub 2-digit no exchange
-  if (t.twoDigitSub) {
-    let a,b; do { a=rand(22,79);b=rand(11,a-10); } while ((a%10)<(b%10));
-    qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1});
-  } else qs.push(simple());
-  // Q8 double
-  if (t.doublesHalves) { const a=rand(2,10); qs.push({text:`double ${a} =`,answer:a*2,marks:1}); }
-  else qs.push(simple());
-  // Q9 half
-  if (t.doublesHalves) { const a=rand(1,10)*2; qs.push({text:`half of ${a} =`,answer:a/2,marks:1}); }
-  else qs.push(simple());
-  // Q10 add three single digits
-  { const a=rand(2,6),b=rand(2,6),c=rand(2,6); qs.push({text:`${a} + ${b} + ${c} =`,answer:a+b+c,marks:1}); }
-  // Q11 missing bond to 10
-  if (t.y2Missing) { const a=rand(1,8); qs.push({text:`${a} + [BOX] = 10`,answer:10-a,box:true,marks:1}); }
-  else qs.push(simple());
-  // Q12 missing bond to 20
-  if (t.y2Missing) { const a=rand(1,18); qs.push({text:`${a} + [BOX] = 20`,answer:20-a,box:true,marks:1}); }
-  else qs.push(simple());
-  // Q13-15 sequences
-  if (t.sequences) {
-    qs.push({text:`2, 4, 6, [BOX]`,answer:8,box:true,marks:1});
-    qs.push({text:`5, 10, 15, [BOX]`,answer:20,box:true,marks:1});
-    const start=rand(1,5)*10; qs.push({text:`${start}, ${start+10}, ${start+20}, [BOX]`,answer:start+30,box:true,marks:1});
-  } else { qs.push(simple()); qs.push(simple()); qs.push(simple()); }
-  // Q16 ×2
-  if (t.y2Tables) { const a=rand(1,10); qs.push({text:`${a} × 2 =`,answer:a*2,marks:1}); }
-  else qs.push(simple());
-  // Q17 ×5
-  if (t.y2Tables) { const a=rand(1,10); qs.push({text:`${a} × 5 =`,answer:a*5,marks:1}); }
-  else qs.push(simple());
-  // Q18 ×10
-  if (t.y2Tables) { const a=rand(1,10); qs.push({text:`${a} × 10 =`,answer:a*10,marks:1}); }
-  else qs.push(simple());
-  // Q19 ÷2
-  if (t.y2Tables) { const a=rand(1,10); qs.push({text:`${a*2} ÷ 2 =`,answer:a,marks:1}); }
-  else qs.push(simple());
-  // Q20 ÷5
-  if (t.y2Tables) { const a=rand(1,10); qs.push({text:`${a*5} ÷ 5 =`,answer:a,marks:1}); }
-  else qs.push(simple());
-  // Q21 ÷10
-  if (t.y2Tables) { const a=rand(1,10); qs.push({text:`${a*10} ÷ 10 =`,answer:a,marks:1}); }
-  else qs.push(simple());
-  // Q22 add 2-digit + tens
-  if (t.twoDigitAdd) { const a=rand(20,70),b=pick([10,20,30]); qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1}); }
-  else qs.push(simple());
-  // Q23 sub tens
-  if (t.twoDigitSub) { const a=rand(40,99),b=pick([10,20,30]); qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1}); }
-  else qs.push(simple());
-  // Q24 10 more
-  if (t.countOnOff) { const a=rand(10,89); qs.push({text:`10 more than ${a} =`,answer:a+10,marks:1}); }
-  else qs.push(simple());
-  // Q25 10 less
-  if (t.countOnOff) { const a=rand(20,99); qs.push({text:`10 less than ${a} =`,answer:a-10,marks:1}); }
-  else qs.push(simple());
-  // Q26 ½ of amount
-  if (t.y2Fractions) { const a=rand(2,20)*2; qs.push({text:`½ of ${a} =`,answer:a/2,marks:1}); }
-  else qs.push(simple());
-  // Q27 ¼ of amount
-  if (t.y2Fractions) { const a=rand(1,8)*4; qs.push({text:`¼ of ${a} =`,answer:a/4,marks:1}); }
-  else qs.push(simple());
-  // Q28 add 2-digit with exchange (show working)
-  if (t.twoDigitAdd) {
-    let a,b; do { a=rand(15,69);b=rand(15,69); } while ((a%10)+(b%10)<10||a+b>99);
-    qs.push({text:`${a} + ${b} =`,answer:a+b,work:true,marks:1});
-  } else qs.push({...simple(),work:true});
-  // Q29 sub 2-digit with exchange (show working)
-  if (t.twoDigitSub) {
-    let a,b; do { a=rand(32,90);b=rand(14,a-10); } while ((a%10)>=(b%10));
-    qs.push({text:`${a} - ${b} =`,answer:a-b,work:true,marks:1});
-  } else qs.push({...simple(),work:true});
-  // Q30 missing subtraction
-  if (t.y2Missing) { const a=rand(15,30),b=rand(5,a-5); qs.push({text:`${a} - [BOX] = ${a-b}`,answer:b,box:true,marks:1}); }
-  else qs.push(simple());
-
+  if (t.numberBonds){const a=rand(1,9);qs.push({text:`${a} + ${10-a} =`,answer:10,marks:1});}else qs.push(simple());
+  if (t.numberBonds){const a=rand(1,9);qs.push({text:`10 - ${a} =`,answer:10-a,marks:1});}else qs.push(simple());
+  if (t.numberBonds){const a=rand(1,19);qs.push({text:`${a} + ${20-a} =`,answer:20,marks:1});}else qs.push(simple());
+  if (t.countOnOff){const a=rand(10,25),b=rand(1,5);qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1});}else qs.push(simple());
+  if (t.countOnOff){const a=rand(12,30),b=rand(1,5);qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1});}else qs.push(simple());
+  if (t.twoDigitAdd){let a,b;do{a=rand(11,49);b=rand(11,49);}while((a%10)+(b%10)>=10);qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1});}else qs.push(simple());
+  if (t.twoDigitSub){let a,b;do{a=rand(22,79);b=rand(11,a-10);}while((a%10)<(b%10));qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1});}else qs.push(simple());
+  if (t.doublesHalves){const a=rand(2,10);qs.push({text:`double ${a} =`,answer:a*2,marks:1});}else qs.push(simple());
+  if (t.doublesHalves){const a=rand(1,10)*2;qs.push({text:`half of ${a} =`,answer:a/2,marks:1});}else qs.push(simple());
+  {const a=rand(2,6),b=rand(2,6),c=rand(2,6);qs.push({text:`${a} + ${b} + ${c} =`,answer:a+b+c,marks:1});}
+  if (t.y2Missing){const a=rand(1,8);qs.push({text:`${a} + [BOX] = 10`,answer:10-a,box:true,marks:1});}else qs.push(simple());
+  if (t.y2Missing){const a=rand(1,18);qs.push({text:`${a} + [BOX] = 20`,answer:20-a,box:true,marks:1});}else qs.push(simple());
+  if (t.sequences){qs.push({text:`2, 4, 6, [BOX]`,answer:8,box:true,marks:1});}else qs.push(simple());
+  if (t.sequences){const s=rand(1,4)*5;qs.push({text:`${s}, ${s+5}, ${s+10}, [BOX]`,answer:s+15,box:true,marks:1});}else qs.push(simple());
+  if (t.sequences){const s=rand(1,5)*10;qs.push({text:`${s}, ${s+10}, ${s+20}, [BOX]`,answer:s+30,box:true,marks:1});}else qs.push(simple());
+  if (t.y2Tables){const a=rand(1,10);qs.push({text:`${a} × 2 =`,answer:a*2,marks:1});}else qs.push(simple());
+  if (t.y2Tables){const a=rand(1,10);qs.push({text:`${a} × 5 =`,answer:a*5,marks:1});}else qs.push(simple());
+  if (t.y2Tables){const a=rand(1,10);qs.push({text:`${a} × 10 =`,answer:a*10,marks:1});}else qs.push(simple());
+  if (t.y2Tables){const a=rand(1,10);qs.push({text:`${a*2} ÷ 2 =`,answer:a,marks:1});}else qs.push(simple());
+  if (t.y2Tables){const a=rand(1,10);qs.push({text:`${a*5} ÷ 5 =`,answer:a,marks:1});}else qs.push(simple());
+  if (t.y2Tables){const a=rand(1,10);qs.push({text:`${a*10} ÷ 10 =`,answer:a,marks:1});}else qs.push(simple());
+  if (t.twoDigitAdd){const a=rand(20,70),b=pick([10,20,30]);qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1});}else qs.push(simple());
+  if (t.twoDigitSub){const a=rand(40,99),b=pick([10,20,30]);qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1});}else qs.push(simple());
+  if (t.countOnOff){const a=rand(10,89);qs.push({text:`10 more than ${a} =`,answer:a+10,marks:1});}else qs.push(simple());
+  if (t.countOnOff){const a=rand(20,99);qs.push({text:`10 less than ${a} =`,answer:a-10,marks:1});}else qs.push(simple());
+  if (t.y2Fractions){const a=rand(2,20)*2;qs.push({text:`½ of ${a} =`,answer:a/2,marks:1});}else qs.push(simple());
+  if (t.y2Fractions){const a=rand(1,8)*4;qs.push({text:`¼ of ${a} =`,answer:a/4,marks:1});}else qs.push(simple());
+  if (t.twoDigitAdd){let a,b;do{a=rand(15,69);b=rand(15,69);}while((a%10)+(b%10)<10||a+b>99);qs.push({text:`${a} + ${b} =`,answer:a+b,work:true,marks:1});}else qs.push({...simple(),work:true});
+  if (t.twoDigitSub){let a,b;do{a=rand(32,90);b=rand(14,a-10);}while((a%10)>=(b%10));qs.push({text:`${a} - ${b} =`,answer:a-b,work:true,marks:1});}else qs.push({...simple(),work:true});
+  if (t.y2Missing){const a=rand(15,30),b=rand(5,a-5);qs.push({text:`${a} - [BOX] = ${a-b}`,answer:b,box:true,marks:1});}else qs.push(simple());
   return qs;
 }
 
-// ─── Y4 REASONING GENERATOR ─────────────────────────────────────────────────
-function genY4Reasoning(t) {
-  const pool = [];
+// ─── REASONING — API CALL ────────────────────────────────────────────────────
+const Y4_SCOPE = `Year 4 maths curriculum (pitch all questions here):
+- Number & Place Value: 4-digit numbers, round to 10/100/1000, negative numbers in context, Roman numerals to 100
+- Addition & Subtraction: column methods with 4-digit numbers
+- Multiplication & Division: all tables to 12×12, factor pairs, ×÷ by 10/100, short multiplication/division
+- Fractions: mixed numbers, improper fractions, add/subtract fractions, fractions of amounts
+- Decimals: tenths, hundredths, order decimals, place decimals on number lines
+- Coordinates: first quadrant only (no negatives)
+- Geometry: classify triangles, lines of symmetry, reflections, properties of shapes
+- Measurement: unit conversion (×1000), perimeter of polygons, area (count squares), money
+- Statistics: bar charts, line graphs — read and interpret scales
+- Time: 12/24-hour clock, durations, intervals`;
 
-  if (t.r_placeValue) {
-    const n=rand(2000,9999);
-    pool.push({marks:1,boldQ:`What is the value of the digit ${Math.floor(n/100)%10} in the number ${n}?`,body:'',big:false,answer:`${Math.floor(n/100)%10 * 100}`});
+async function fetchReasoningQs(topicKeys) {
+  const topicNames = {
+    r_placeValue: 'Number and place value (rounding, digit value, negative numbers, Roman numerals)',
+    r_sequences: 'Number sequences (counting patterns, missing terms, rules)',
+    r_multDiv: 'Multiplication and division (times tables in context, factor pairs, grouping, sharing, remainders)',
+    r_fractions: 'Fractions and decimals (fractions of amounts, mixed numbers, ordering decimals)',
+    r_measurement: 'Measurement (perimeter, area, unit conversion, length/mass/capacity)',
+    r_money: 'Money (multi-step: totals, change, comparing costs) — make one of these worth 2 marks',
+    r_time: 'Time (durations, start/end times, 12/24-hour conversion)',
+    r_stats: 'Statistics (reading bar charts, line graphs, tables — most/least, differences, totals)',
+    r_geometry: 'Geometry (lines of symmetry, shape properties, acute/obtuse angles, coordinates)',
+    r_decimals: 'Decimals and number lines (place value, ordering, locating on a number line)',
+  };
+  const enabled = topicKeys.filter(k => topicNames[k]).map(k => topicNames[k]);
 
-    const start=rand(100,800)*10;
-    pool.push({marks:1,boldQ:`What is 1000 less than ${start+1000}?`,body:'',big:false,answer:`${start}`});
+  const prompt = `Generate exactly 10 reasoning questions for a Year 4 weekly assessment paper (Paper 2).
 
-    const nums=[rand(1000,4999),rand(5000,6999),rand(2000,3999),rand(6000,9999)];
-    pool.push({marks:1,boldQ:`Put these numbers in order from smallest to largest.\n${nums.join('    ')}`,body:'',big:true,answer:nums.sort((a,b)=>a-b).join(', ')});
-  }
+CURRICULUM SCOPE:
+${Y4_SCOPE}
 
-  if (t.r_sequences) {
-    const step=pick([3,4,5,6,7,8,9,11,25,50,100]);
-    const start=rand(1,20)*step;
-    const s=[start,start+step,start+2*step,'?',start+4*step];
-    pool.push({marks:1,boldQ:`Find the missing number in the sequence.\n${s.join('  ')}`,body:'',big:false,answer:`${start+3*step}`});
+ENABLED TOPIC AREAS (draw from these — spread questions across at least 5 different topics):
+${enabled.map((t,i)=>`${i+1}. ${t}`).join('\n')}
 
-    const d=pick([3,4,5,6,7]);
-    const n=rand(5,20)*d;
-    pool.push({marks:1,boldQ:`${n}, ${n-d}, ${n-2*d}, [?]\nWhat is the missing term?`,body:'',big:false,answer:`${n-3*d}`});
-  }
+RULES:
+- Exactly ONE question must be worth 2 marks (a multi-step money or measurement problem). Set showMethod:true for it.
+- All others are 1 mark.
+- Mix question TYPES — use write-answer, tick-options, circle-options, sequence, order, complete-table, and table-stimulus where appropriate. Do NOT make them all write-answer.
+- Word problems should feel like real SATs questions: short, clear context, one or two steps.
+- Every answer must be mathematically correct. Verify each answer before including it.
+- For tick-options and circle-options: ensure EXACTLY ONE option is correct.
+- For sequence questions: use options array with null for blanks, e.g. [100,null,300,null,500]
 
-  if (t.r_multiplication) {
-    const a=rand(3,9),b=rand(3,9);
-    pool.push({marks:1,boldQ:`There are ${a} boxes. Each box holds ${b} eggs.\nHow many eggs are there altogether?`,body:'',big:false,answer:`${a*b}`});
+Return ONLY a valid JSON array — no markdown, no explanation. Each element:
+{
+  "marks": 1,
+  "type": "write-answer",
+  "questionText": "Question text here.",
+  "answerLabel": "",
+  "showMethod": false,
+  "options": null,
+  "table": null,
+  "answer": "correct answer"
+}`;
 
-    const total=rand(3,9)*pick([4,5,6,8]);
-    const d=pick([4,5,6,8]);
-    pool.push({marks:1,boldQ:`${total} children share some stickers equally.\nEach child gets ${total/d} stickers.\nHow many stickers were there altogether?`,body:'',big:false,answer:`${total}`});
-  }
+  const resp = await fetch(API_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ model: 'claude-opus-4-8', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
+  });
+  const data = await resp.json();
+  if (!data.ok) throw new Error(data.error || 'API error');
+  const text = data.text.replace(/```json\n?|\n?```/g, '').trim();
+  return JSON.parse(text);
+}
 
-  if (t.r_fractions) {
-    const d=pick([4,5,8,10]);
-    const total=rand(2,8)*d;
-    pool.push({marks:1,boldQ:`What is 1/${d} of ${total}?`,body:'',big:false,answer:`${total/d}`});
+// ─── STATUS HELPERS ──────────────────────────────────────────────────────────
+function setStatus(type, msg) {
+  const bar = document.getElementById('statusBar');
+  bar.className = `status-bar status-${type}`;
+  bar.style.display = 'flex';
+  bar.innerHTML = type === 'generating'
+    ? `<span class="spinner"></span><span>${msg}</span>`
+    : msg;
+}
+function clearStatus() { document.getElementById('statusBar').style.display = 'none'; }
 
-    const total2=pick([12,16,20,24,30]);
-    const d2=pick([3,4,5,6]);
-    if (total2 % d2 === 0) {
-      pool.push({marks:1,boldQ:`A bag has ${total2} marbles. ¾ of them are blue.\nHow many marbles are blue?`,body:'',big:false,answer:`${Math.round(total2*3/4)}`});
+// ─── GENERATE ALL ────────────────────────────────────────────────────────────
+async function generateAll() {
+  const btn = document.getElementById('btnGenerate');
+  btn.disabled = true;
+  document.getElementById('printButtons').style.display = 'none';
+  generatedPapers = null;
+
+  const label = document.getElementById('weekRef').value.trim() || 'T?W?';
+  const classYear = document.getElementById('classYear').value;
+  const standardLevel = document.getElementById('standardLevel').value;
+  const includeReasoning = document.getElementById('includeReasoning').checked;
+
+  // Generate arithmetic (instant)
+  setStatus('generating', 'Generating arithmetic questions…');
+  const tY4 = getTopics('topicsY4');
+  const standardArith = standardLevel === 'Y2' ? genY2Arith(getTopics('topicsY2')) : genY4Arith(tY4);
+
+  const adapted = [];
+  document.querySelectorAll('.adapted-group').forEach(g => {
+    const id = g.id.replace('group_', '');
+    const level = document.getElementById(`groupLevel_${id}`)?.value || 'Y2';
+    const names = document.getElementById(`groupNames_${id}`)?.value || '';
+    const arithQs = level === 'Y2' ? genY2Arith(getTopics('topicsY2')) : genY4Arith(tY4);
+    adapted.push({ level, names: names.trim().split('\n').filter(Boolean), arithQs });
+  });
+
+  // Generate reasoning (API call)
+  let reasoningQs = null;
+  if (includeReasoning && standardLevel !== 'Y2') {
+    try {
+      setStatus('generating', 'Generating reasoning questions via AI (takes ~5–10 seconds)…');
+      const tR = getTopics('topicsY4R');
+      const enabledTopics = Object.keys(tR).filter(k => tR[k]);
+      reasoningQs = await fetchReasoningQs(enabledTopics);
+    } catch (err) {
+      setStatus('error', `⚠️ Reasoning generation failed: ${err.message}. Arithmetic papers are still ready.`);
     }
   }
 
-  if (t.r_measurement) {
-    const l=rand(3,20),w=rand(2,l-1);
-    pool.push({marks:1,boldQ:`What is the perimeter of a rectangle that is ${l} cm long and ${w} cm wide?`,body:'',big:false,answer:`${2*(l+w)} cm`});
+  generatedPapers = { label, classYear, standardLevel, standardArith, adapted, reasoningQs };
 
-    const km=rand(2,9),m=rand(100,900);
-    pool.push({marks:1,boldQ:`A road is ${km} km and ${m} m long.\nWrite the total length in metres.`,body:'',big:false,answer:`${km*1000+m} m`});
-  }
+  // Build print buttons
+  const paperBtns = document.getElementById('paperBtns');
+  paperBtns.innerHTML = '';
+  const stdBtn = document.createElement('button');
+  stdBtn.className = 'btn btn-primary';
+  stdBtn.textContent = `🖨 Print Standard Paper (${standardLevel})`;
+  stdBtn.onclick = () => printPaper('standard');
+  paperBtns.appendChild(stdBtn);
 
-  if (t.r_money) {
-    const p1=pick([1.50,1.25,2.00,0.75,1.99,3.50]),p2=pick([0.80,1.20,2.50,0.65,1.40]);
-    const total=(p1+p2).toFixed(2);
-    const paid=Math.ceil((p1+p2)/5)*5;
-    const change=(paid-p1-p2).toFixed(2);
-    pool.push({marks:2,boldQ:`Amira buys a drink for £${p1.toFixed(2)} and a snack for £${p2.toFixed(2)}.\nShe pays with a £${paid.toFixed(2)} note.\nHow much change does she get?`,body:'Show your method',big:true,answer:`£${change}`});
-  }
+  adapted.forEach((g, i) => {
+    const btn2 = document.createElement('button');
+    btn2.className = 'btn btn-navy';
+    btn2.textContent = `🖨 Print Adapted Paper (${g.level}) — ${g.names.length || 1} pupil${g.names.length !== 1 ? 's' : ''}`;
+    btn2.onclick = () => printPaper('adapted', i);
+    paperBtns.appendChild(btn2);
+  });
 
-  if (t.r_time) {
-    const startH=rand(8,13),startM=pick([0,15,30,45]);
-    const durH=rand(0,2),durM=pick([15,20,30,45]);
-    let endM=startM+durM,endH=startH+durH+(endM>=60?1:0);
-    endM=endM%60;
-    pool.push({marks:1,boldQ:`A film starts at ${startH}:${String(startM).padStart(2,'0')}.\nIt lasts ${durH > 0 ? durH+'h ' : ''}${durM} minutes.\nWhat time does it end?`,body:'',big:false,answer:`${endH}:${String(endM).padStart(2,'0')}`});
-  }
-
-  if (t.r_stats) {
-    const items=['apples','pears','bananas','oranges'];
-    const vals=[rand(4,12),rand(2,10),rand(6,14),rand(3,11)];
-    const maxVal=Math.max(...vals),maxItem=items[vals.indexOf(maxVal)];
-    const diff=Math.abs(vals[0]-vals[1]);
-    pool.push({marks:1,boldQ:`A bar chart shows the number of pieces of fruit.\n${items.map((it,i)=>it+': '+vals[i]).join('    ')}\nWhich fruit has the most? How many more ${items[0]} than ${items[1]}?`,body:'',big:true,answer:`${maxItem}; ${diff} more`});
-  }
-
-  // Shuffle pool and pick 10 questions
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i+1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-
-  // Ensure exactly one 2-mark question
-  const twoMark = pool.find(q => q.marks === 2);
-  const oneMark = pool.filter(q => q.marks === 1);
-  const selected = twoMark ? [twoMark, ...oneMark.slice(0, 9)] : oneMark.slice(0, 10);
-  selected.sort((a,b) => a.marks - b.marks); // 1-mark first, 2-mark last
-
-  return selected.map((q, i) => ({...q, num: i+1}));
+  document.getElementById('printButtons').style.display = '';
+  setStatus('ready', reasoningQs
+    ? `✅ Ready — 30 arithmetic + ${reasoningQs.length} reasoning questions generated.`
+    : `✅ Ready — 30 arithmetic questions generated${includeReasoning && standardLevel !== 'Y2' ? ' (no reasoning)' : ''}.`);
+  btn.disabled = false;
 }
 
 // ─── QUESTION → HTML ─────────────────────────────────────────────────────────
 function qToHTML(q, qNum) {
-  const isTall = q.col || q.work;
-  const boxH = isTall ? '80mm' : '52mm';
+  const tall = q.col || q.work;
+  const boxH = tall ? '80mm' : '52mm';
   let label = '';
   if (q.col) label = 'You must use column method to record your calculation';
   if (q.work) label = 'You must show your working on this question';
@@ -625,211 +500,260 @@ function qToHTML(q, qNum) {
   let eqHTML = '';
   if (q.frac) {
     const [[n1,d1],[n2,d2]] = q.frac;
-    eqHTML = `
-      <span class="frac-wrap"><span class="frac-n">${n1}</span><span class="frac-b"></span><span class="frac-d">${d1}</span></span>
+    eqHTML = `<span class="frac-wrap"><span class="frac-n">${n1}</span><span class="frac-b"></span><span class="frac-d">${d1}</span></span>
       <span class="eq-op">+</span>
       <span class="frac-wrap"><span class="frac-n">${n2}</span><span class="frac-b"></span><span class="frac-d">${d2}</span></span>
-      <span class="eq-op">=</span>
-      <span class="ans-box"></span>`;
+      <span class="eq-op">=</span><span class="ans-box"></span>`;
   } else if (q.box) {
     const parts = q.text.split('[BOX]');
-    eqHTML = (parts[0] ? `<span class="eq-text">${parts[0].trim()}</span> ` : '') +
+    eqHTML = (parts[0]?`<span class="eq-text">${parts[0].trim()}</span> `:'') +
              `<span class="inline-box"></span>` +
-             (parts[1] ? ` <span class="eq-text">${parts[1].trim()}</span>` : '');
+             (parts[1]?` <span class="eq-text">${parts[1].trim()}</span>`:'');
   } else {
     eqHTML = `<span class="eq-text">${q.text}</span><span class="ans-box"></span>`;
   }
 
-  return `
-    ${label ? `<div class="q-label">${label}</div>` : ''}
+  return `${label ? `<div class="q-label">${label}</div>` : ''}
     <div class="q-box" style="height:${boxH}">
       <div class="q-main">
-        <div class="q-header">
-          <span class="q-num">${qNum}</span>
-          <span class="q-eq">${eqHTML}</span>
-        </div>
+        <div class="q-header"><span class="q-num">${qNum}</span><span class="q-eq">${eqHTML}</span></div>
         <div class="q-grid"></div>
       </div>
-      <div class="q-strip">
-        <div class="mark-box"></div>
-        <div class="mark-lbl">${q.marks} mark</div>
-      </div>
+      <div class="q-strip"><div class="mark-box"></div><div class="mark-lbl">${q.marks} mark</div></div>
     </div>`;
 }
 
-// ─── BUILD PAPER HTML ────────────────────────────────────────────────────────
-function buildPaperHTML({ label, classYear, paperLevel, pupilName, arithmeticQs, reasoningQs }) {
-  const totalArith = arithmeticQs.length;
-  const arithHTML = arithmeticQs.map((q, i) => qToHTML(q, i+1)).join('');
+// ─── REASONING → HTML ─────────────────────────────────────────────────────────
+function reasoningQToHTML(q, num) {
+  const big = q.showMethod || q.marks >= 2;
+  const h = big ? '52mm' : '28mm';
+  const shade = num % 2 === 0 ? '#e8eef5' : 'white';
 
-  let reasoningHTML = '';
-  if (reasoningQs) {
-    const totalMarks = reasoningQs.reduce((s,q) => s+q.marks, 0);
-    const rRows = reasoningQs.map(q => {
-      const h = q.big ? '52mm' : '26mm';
-      const shade = q.num % 2 === 0 ? 'background:#e8eef5' : 'background:white';
-      return `<div class="r-row" style="height:${h};${shade}">
-        <span class="r-marks">${q.marks} mark${q.marks>1?'s':''}</span>
-        <div class="r-num">${q.num}.</div>
-        <div class="r-body">
-          <div class="r-q">${q.boldQ.replace(/\n/g,'<br>')}</div>
-          ${q.body ? `<div class="r-hint">${q.body}</div>` : ''}
-        </div>
-      </div>`;
-    }).join('');
+  let bodyHTML = '';
 
-    reasoningHTML = `
-      <div class="page-break"></div>
-      <div class="r-header">
-        <span class="r-year">${classYear}</span>
-        <span class="r-sub">Reasoning and Problem Solving</span>
-      </div>
-      <div class="r-name-row">Name <span class="name-line"></span></div>
-      <div class="r-rows">${rRows}</div>
-    `;
+  if (q.type === 'tick-options' && q.options) {
+    bodyHTML = q.options.map(o => `<div class="r-opt"><span class="r-tick-box"></span>${o}</div>`).join('');
+  } else if (q.type === 'circle-options' && q.options) {
+    bodyHTML = `<div class="r-circle-row">${q.options.map(o=>`<span class="r-circle">${o}</span>`).join('')}</div>`;
+  } else if (q.type === 'order' && q.options) {
+    bodyHTML = `<div class="r-order-row">${q.options.map(()=>`<span class="r-order-box"></span>`).join('')}</div>
+      <div class="r-order-vals">${q.options.join('  &nbsp;  ')}</div>`;
+  } else if (q.type === 'sequence' && q.options) {
+    bodyHTML = `<div class="r-seq-row">${q.options.map(v => v===null
+      ? `<span class="r-seq-box"></span>`
+      : `<span class="r-seq-val">${v}</span>`).join('<span class="r-seq-comma">,</span>')}</div>`;
+  } else if ((q.type === 'complete-table' || q.type === 'table-stimulus') && q.table) {
+    const { headers, rows } = q.table;
+    bodyHTML = `<table class="r-table"><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>${
+      rows.map(row=>`<tr>${row.map(cell=>
+        (cell===null&&q.type==='complete-table') ? `<td class="r-table-blank"></td>` : `<td>${cell??''}</td>`
+      ).join('')}</tr>`).join('')}</table>`;
+    if (q.type === 'table-stimulus') {
+      bodyHTML += `<div class="r-q" style="margin-top:4mm">${q.questionText}</div>`;
+      return buildReasoningRow(num, q.marks, big, h, shade, '', bodyHTML, q.showMethod);
+    }
+  } else if (q.type === 'match' && q.options) {
+    const {left, right} = q.options;
+    bodyHTML = `<div class="r-match">${left.map((l,i)=>`<div class="r-match-row"><span class="r-match-l">${l}</span><span class="r-match-line"></span><span class="r-match-r">${right[i]||''}</span></div>`).join('')}</div>`;
   }
 
-  // Answer sheet
-  const arithAns = arithmeticQs.map((q, i) =>
-    `<div class="ans-row"><span class="ans-qnum">${i+1}</span><span class="ans-val">${q.answer}</span></div>`
-  ).join('');
-
-  const reasonAns = reasoningQs ? reasoningQs.map(q =>
-    `<div class="ans-row"><span class="ans-qnum">${q.num}</span><span class="ans-val">${q.answer}</span></div>`
-  ).join('') : '';
-
-  const nameCovers = pupilName
-    ? pupilName.trim().split('\n').filter(Boolean).map(name => buildCoverHTML(classYear, label, paperLevel, name, !!reasoningQs)).join('<div class="page-break"></div>')
-    : buildCoverHTML(classYear, label, paperLevel, null, !!reasoningQs);
-
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-<title>${classYear} Arithmetic ${label}</title>
-<style>
-  @page { size: A4; margin: 14mm 18mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Helvetica, Arial, sans-serif; background: white; }
-  .page-break { page-break-after: always; break-after: page; }
-  /* Cover */
-  .cover-top { background: #111; color: white; padding: 5mm 6mm; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0; }
-  .cover-top .ct-title { font-weight: bold; font-size: 14pt; }
-  .cover-top .ct-ref { font-size: 9pt; }
-  .cover-band { background: #2e6fad; color: white; padding: 5mm 6mm; margin-bottom: 4mm; }
-  .cover-band .cb-year { font-weight: bold; font-size: 30pt; }
-  .cover-maths { font-weight: bold; font-size: 24pt; margin: 4mm 0 2mm; }
-  .cover-paper { font-size: 16pt; margin: 2mm 0; }
-  .cover-paper b { font-weight: 900; }
-  .cover-name { display: flex; align-items: baseline; gap: 4mm; margin-top: 16mm; font-size: 11pt; }
-  .cover-name-line { flex: 1; border-bottom: 1px solid #333; height: 6mm; }
-  .cover-prefilled { font-size: 14pt; font-weight: bold; color: #1a3a5c; border-bottom: 1.5px solid #333; flex: 1; }
-  /* Arith header */
-  .arith-hdr { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3mm; }
-  .arith-hdr-left { font-weight: bold; font-size: 10pt; color: #1a3a5c; }
-  .arith-marks { font-size: 10pt; }
-  /* Q box */
-  .q-label { font-size: 8pt; font-weight: bold; text-align: center; margin-bottom: 1mm; }
-  .q-box { display: flex; border: 0.8px solid #444; margin-bottom: 4mm; page-break-inside: avoid; break-inside: avoid; }
-  .q-main { flex: 1; position: relative; overflow: hidden; }
-  .q-header { position: absolute; top: 0; left: 0; right: 0; height: 16mm; border-bottom: 1px solid #444; background: white; display: flex; align-items: center; padding: 0 3mm; gap: 3mm; z-index: 2; }
-  .q-grid { position: absolute; top: 16mm; left: 0; right: 0; bottom: 0;
-    background-image: linear-gradient(#c0cfe0 1px, transparent 1px), linear-gradient(90deg, #c0cfe0 1px, transparent 1px);
-    background-size: 7mm 7mm; }
-  .q-num { color: #2e6fad; font-weight: bold; font-size: 13pt; min-width: 8mm; }
-  .q-eq { display: flex; align-items: center; gap: 3mm; flex: 1; }
-  .eq-text { font-weight: bold; font-size: 15pt; white-space: nowrap; }
-  .eq-op { font-weight: bold; font-size: 14pt; }
-  .ans-box { width: 40mm; height: 10mm; border: 2px solid #2e6fad; background: white; margin-left: auto; flex-shrink: 0; }
-  .inline-box { display: inline-block; width: 28mm; height: 10mm; border: 2px solid #2e6fad; background: white; vertical-align: middle; }
-  /* Fractions */
-  .frac-wrap { display: inline-flex; flex-direction: column; align-items: center; font-size: 12pt; font-weight: bold; line-height: 1.1; }
-  .frac-b { width: 100%; border-top: 1.5px solid black; margin: 1px 0; }
-  /* Strip */
-  .q-strip { width: 18mm; background: #c8dcf0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 5mm; flex-shrink: 0; }
-  .mark-box { width: 10mm; height: 10mm; border: 0.8px solid black; background: white; }
-  .mark-lbl { font-size: 7pt; text-align: center; margin-top: 1mm; }
-  /* Reasoning */
-  .r-header { background: #1a3a5c; color: white; padding: 3mm 4mm; display: flex; justify-content: space-between; align-items: center; margin-bottom: 3mm; }
-  .r-year { font-weight: bold; font-size: 11pt; }
-  .r-sub { font-size: 10pt; }
-  .r-name-row { font-size: 10pt; display: flex; align-items: baseline; gap: 3mm; margin-bottom: 2mm; }
-  .name-line { display: inline-block; width: 80mm; border-bottom: 0.8px solid #333; }
-  .r-row { display: flex; position: relative; border: 0.6px solid #aaa; margin-bottom: 1mm; page-break-inside: avoid; break-inside: avoid; padding: 3mm; gap: 3mm; }
-  .r-num { font-weight: bold; font-size: 10pt; min-width: 6mm; }
-  .r-body { flex: 1; }
-  .r-q { font-weight: bold; font-size: 10pt; line-height: 1.4; }
-  .r-hint { font-size: 9pt; margin-top: 2mm; color: #555; font-style: italic; }
-  .r-marks { position: absolute; top: 3mm; right: 3mm; font-size: 8pt; color: #555; }
-  /* Answer sheet */
-  .ans-header { background: #1a3a5c; color: white; padding: 3mm 4mm; margin-bottom: 4mm; }
-  .ans-header h2 { font-size: 12pt; font-weight: bold; }
-  .ans-header p { font-size: 9pt; }
-  .ans-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3mm; }
-  .ans-row { display: flex; align-items: center; border: 0.8px solid #ccc; border-radius: 4px; padding: 2mm 3mm; }
-  .ans-qnum { font-weight: bold; font-size: 9pt; color: #2e6fad; min-width: 6mm; }
-  .ans-val { font-size: 9pt; color: #222; }
-  .ans-section { margin-bottom: 6mm; }
-  .ans-section h3 { font-size: 10pt; font-weight: bold; color: #1a3a5c; margin-bottom: 3mm; }
-</style></head><body>
-${nameCovers}
-<div class="page-break"></div>
-<div class="arith-hdr">
-  <span class="arith-hdr-left">${classYear} — Mathematics — Paper 1: Arithmetic</span>
-  <span class="arith-marks">.......... / ${totalArith} marks</span>
-</div>
-${arithHTML}
-${reasoningHTML}
-<div class="page-break"></div>
-<div class="ans-header"><h2>Answer Sheet — ${classYear} ${label}</h2><p>For teacher/marker use only</p></div>
-<div class="ans-section"><h3>Arithmetic</h3><div class="ans-grid">${arithAns}</div></div>
-${reasonAns ? `<div class="ans-section"><h3>Reasoning</h3><div class="ans-grid">${reasonAns}</div></div>` : ''}
-</body></html>`;
+  if (q.showMethod) bodyHTML += `<div class="r-method-box"></div>`;
+  const ansBox = (q.type==='write-answer'||!q.type) ? `<span class="r-ans-box">${q.answerLabel||''}</span>` : '';
+  return buildReasoningRow(num, q.marks, big, h, shade, q.questionText, bodyHTML + ansBox, q.showMethod);
 }
 
-function buildCoverHTML(classYear, label, paperLevel, pupilName, hasPaper2) {
+function buildReasoningRow(num, marks, big, h, shade, qText, bodyHTML, showMethod) {
+  return `<div class="r-row" style="min-height:${h};background:${shade}">
+    <span class="r-marks">${marks} mark${marks>1?'s':''}</span>
+    <div class="r-body">
+      ${qText ? `<div class="r-q"><strong>${num}.</strong> ${qText}</div>` : `<div class="r-q"><strong>${num}.</strong></div>`}
+      ${bodyHTML}
+    </div>
+  </div>`;
+}
+
+// ─── BUILD COVER ─────────────────────────────────────────────────────────────
+function buildCoverHTML(classYear, label, hasPaper2, pupilName) {
   const nameEl = pupilName
     ? `<span class="cover-prefilled">${pupilName}</span>`
     : `<span class="cover-name-line"></span>`;
-
-  return `<div>
+  return `<div class="cover">
     <div class="cover-top"><span class="ct-title">2026 Assessments</span><span class="ct-ref">${label}</span></div>
     <div class="cover-band"><span class="cb-year">${classYear}</span></div>
     <div class="cover-maths">Mathematics</div>
     <div class="cover-paper"><b>Paper 1:</b> arithmetic</div>
     ${hasPaper2 ? `<div class="cover-paper"><b>Paper 2:</b> reasoning</div>` : ''}
-    <div class="cover-name">Name ${nameEl}</div>
+    <div class="cover-name-row">Name ${nameEl}</div>
   </div>`;
 }
 
-// ─── GENERATE & PRINT ────────────────────────────────────────────────────────
-function generatePaper(type, groupId) {
-  const label = document.getElementById('weekRef').value.trim() || 'T?W?';
-  const classYear = document.getElementById('classYear').value;
+// ─── BUILD PAPER HTML ─────────────────────────────────────────────────────────
+function buildPaperHTML(classYear, label, arithQs, reasoningQs, pupilNames) {
+  const hasPaper2 = !!reasoningQs;
 
-  let level, pupilName, arithQs, reasoningQs = null;
+  const covers = (pupilNames && pupilNames.length > 0)
+    ? pupilNames.map(name => buildCoverHTML(classYear, label, hasPaper2, name)).join('<div class="pb"></div>')
+    : buildCoverHTML(classYear, label, hasPaper2, null);
 
-  if (type === 'standard') {
-    level = document.getElementById('standardLevel').value;
-    pupilName = null;
-    const t4 = getTopics('#topicsY4');
-    const tr = getTopics('#topicsY4R');
-    arithQs = level === 'Y2' ? genY2Arith(getTopics('#topicsY2')) : genY4Arith(t4);
-    if (level !== 'Y2') reasoningQs = genY4Reasoning(tr);
-  } else {
-    level = document.getElementById(`groupLevel_${groupId}`).value;
-    pupilName = document.getElementById(`groupNames_${groupId}`).value;
-    if (level === 'Y2') {
-      arithQs = genY2Arith(getTopics('#topicsY2'));
-    } else {
-      arithQs = genY4Arith(getTopics('#topicsY4'));
-      reasoningQs = genY4Reasoning(getTopics('#topicsY4R'));
-    }
+  const arithHTML = arithQs.map((q, i) => qToHTML(q, i+1)).join('');
+
+  let reasoningHTML = '';
+  if (reasoningQs) {
+    const totalMarks = reasoningQs.reduce((s,q) => s + (q.marks||1), 0);
+    reasoningHTML = `<div class="pb"></div>
+      <div class="r-header"><span class="r-year">${classYear}</span><span class="r-sub">Reasoning and Problem Solving</span></div>
+      <div class="r-name-row">Name <span class="name-line"></span> &nbsp;&nbsp;&nbsp; .......... / ${totalMarks} marks</div>
+      ${reasoningQs.map((q,i) => reasoningQToHTML(q, i+1)).join('')}`;
   }
 
-  const html = buildPaperHTML({ label, classYear, paperLevel: level, pupilName, arithmeticQs: arithQs, reasoningQs });
+  const CSS = `
+    @page{size:A4;margin:14mm 18mm}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Helvetica,Arial,sans-serif;background:white}
+    .pb{page-break-after:always;break-after:page}
+    .cover{margin-bottom:0}
+    .cover-top{background:#111;color:white;padding:5mm 6mm;display:flex;justify-content:space-between;align-items:center}
+    .ct-title{font-weight:bold;font-size:13pt}
+    .ct-ref{font-size:9pt}
+    .cover-band{background:#2e6fad;color:white;padding:5mm 6mm}
+    .cb-year{font-weight:bold;font-size:28pt}
+    .cover-maths{font-weight:bold;font-size:22pt;margin:4mm 0 2mm}
+    .cover-paper{font-size:15pt;margin:2mm 0}
+    .cover-name-row{display:flex;align-items:baseline;gap:4mm;margin-top:14mm;font-size:11pt}
+    .cover-name-line{flex:1;border-bottom:1px solid #333;height:6mm}
+    .cover-prefilled{font-size:14pt;font-weight:bold;color:#1a3a5c;border-bottom:1.5px solid #333;flex:1}
+    .arith-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3mm;font-size:10pt}
+    .arith-hdr-l{font-weight:bold;color:#1a3a5c}
+    .q-label{font-size:8pt;font-weight:bold;text-align:center;margin-bottom:1mm}
+    .q-box{display:flex;border:0.8px solid #444;margin-bottom:4mm;page-break-inside:avoid;break-inside:avoid}
+    .q-main{flex:1;position:relative;overflow:hidden}
+    .q-header{position:absolute;top:0;left:0;right:0;height:16mm;border-bottom:1px solid #444;background:white;display:flex;align-items:center;padding:0 3mm;gap:3mm;z-index:2}
+    .q-grid{position:absolute;top:16mm;left:0;right:0;bottom:0;background-image:linear-gradient(#c0cfe0 1px,transparent 1px),linear-gradient(90deg,#c0cfe0 1px,transparent 1px);background-size:7mm 7mm}
+    .q-num{color:#2e6fad;font-weight:bold;font-size:13pt;min-width:8mm}
+    .q-eq{display:flex;align-items:center;gap:3mm;flex:1}
+    .eq-text{font-weight:bold;font-size:15pt;white-space:nowrap}
+    .eq-op{font-weight:bold;font-size:14pt}
+    .ans-box{width:40mm;height:10mm;border:2px solid #2e6fad;background:white;margin-left:auto;flex-shrink:0}
+    .inline-box{display:inline-block;width:28mm;height:10mm;border:2px solid #2e6fad;background:white;vertical-align:middle}
+    .frac-wrap{display:inline-flex;flex-direction:column;align-items:center;font-size:12pt;font-weight:bold;line-height:1.1}
+    .frac-b{width:100%;border-top:1.5px solid black;margin:1px 0}
+    .q-strip{width:18mm;background:#c8dcf0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:5mm;flex-shrink:0}
+    .mark-box{width:10mm;height:10mm;border:0.8px solid black;background:white}
+    .mark-lbl{font-size:7pt;text-align:center;margin-top:1mm}
+    .r-header{background:#1a3a5c;color:white;padding:3mm 4mm;display:flex;justify-content:space-between;align-items:center;margin-bottom:3mm}
+    .r-year{font-weight:bold;font-size:11pt}
+    .r-sub{font-size:10pt}
+    .r-name-row{font-size:10pt;display:flex;align-items:baseline;gap:3mm;margin-bottom:2mm}
+    .name-line{display:inline-block;width:70mm;border-bottom:0.8px solid #333}
+    .r-row{display:flex;position:relative;border:0.6px solid #bbb;margin-bottom:1mm;page-break-inside:avoid;break-inside:avoid;padding:3mm 3mm 3mm 3mm}
+    .r-marks{position:absolute;top:3mm;right:3mm;font-size:8pt;color:#666}
+    .r-body{flex:1;padding-right:14mm}
+    .r-q{font-weight:bold;font-size:10pt;line-height:1.4;margin-bottom:2mm}
+    .r-ans-box{display:inline-block;width:40mm;height:10mm;border:1.5px solid #2e6fad;background:white;vertical-align:middle;margin-top:2mm}
+    .r-opt{display:flex;align-items:center;gap:4mm;font-size:10pt;margin:1.5mm 0}
+    .r-tick-box{display:inline-block;width:5mm;height:5mm;border:1px solid #333;flex-shrink:0}
+    .r-circle-row{display:flex;gap:8mm;flex-wrap:wrap;margin-top:2mm;font-size:10pt;font-weight:bold}
+    .r-circle{padding:1mm 4mm;border:1px solid #333;border-radius:3mm}
+    .r-order-row{display:flex;gap:4mm;margin-top:2mm}
+    .r-order-box{width:20mm;height:10mm;border:1px solid #333;display:inline-block}
+    .r-order-vals{font-size:10pt;margin-top:2mm}
+    .r-seq-row{display:flex;align-items:center;gap:2mm;font-size:11pt;font-weight:bold;margin-top:2mm;flex-wrap:wrap}
+    .r-seq-val{padding:1mm 3mm}
+    .r-seq-box{display:inline-block;width:18mm;height:9mm;border:1.5px solid #2e6fad;background:white}
+    .r-seq-comma{font-size:11pt}
+    .r-table{border-collapse:collapse;font-size:9.5pt;margin-top:2mm}
+    .r-table th,.r-table td{border:0.8px solid #555;padding:2mm 3mm}
+    .r-table th{background:#d0d8e8;font-weight:bold}
+    .r-table-blank{background:white;min-width:20mm}
+    .r-match{margin-top:2mm}
+    .r-match-row{display:flex;align-items:center;gap:2mm;margin:1.5mm 0;font-size:10pt}
+    .r-match-l,.r-match-r{min-width:30mm}
+    .r-match-line{flex:1;border-bottom:1px solid #ccc}
+    .r-method-box{margin-top:3mm;height:20mm;border:0.8px solid #ccc;background:white}`;
 
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<title>${classYear} Assessment ${label}</title><style>${CSS}</style></head><body>
+${covers}
+<div class="pb"></div>
+<div class="arith-hdr"><span class="arith-hdr-l">${classYear} — Mathematics — Paper 1: Arithmetic</span><span>.......... / 30 marks</span></div>
+${arithHTML}
+${reasoningHTML}
+</body></html>`;
+}
+
+// ─── BUILD ANSWER SHEET ───────────────────────────────────────────────────────
+function buildAnswerSheetHTML() {
+  const { label, classYear, standardLevel, standardArith, adapted, reasoningQs } = generatedPapers;
+
+  const CSS = `
+    @page{size:A4;margin:14mm 18mm}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Helvetica,Arial,sans-serif;font-size:10pt}
+    .hdr{background:#1a3a5c;color:white;padding:4mm 6mm;margin-bottom:5mm}
+    .hdr h1{font-size:14pt;font-weight:bold}
+    .hdr p{font-size:9pt;opacity:.8;margin-top:1mm}
+    .section{margin-bottom:8mm}
+    .section h2{font-size:11pt;font-weight:bold;color:#1a3a5c;border-bottom:1.5px solid #2e6fad;padding-bottom:2mm;margin-bottom:4mm}
+    .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:3mm}
+    .ans{display:flex;align-items:center;border:0.8px solid #ccc;border-radius:4px;padding:2mm 3mm;gap:3mm}
+    .qn{font-weight:bold;color:#2e6fad;min-width:6mm;font-size:9pt}
+    .av{font-size:9pt}`;
+
+  function ansGrid(qs) {
+    return `<div class="grid">${qs.map((q,i)=>`<div class="ans"><span class="qn">${i+1}</span><span class="av">${q.answer}</span></div>`).join('')}</div>`;
+  }
+
+  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Answer Sheet ${label}</title><style>${CSS}</style></head><body>
+<div class="hdr"><h1>Answer Sheet — ${classYear} ${label}</h1><p>For teacher/marker use only</p></div>
+<div class="section"><h2>Paper 1: Arithmetic — Standard (${standardLevel})</h2>${ansGrid(standardArith)}</div>`;
+
+  adapted.forEach((g, i) => {
+    const names = g.names.length ? g.names.join(', ') : `Group ${i+1}`;
+    html += `<div class="section"><h2>Paper 1: Arithmetic — Adapted (${g.level}) — ${names}</h2>${ansGrid(g.arithQs)}</div>`;
+  });
+
+  if (reasoningQs) {
+    html += `<div class="section"><h2>Paper 2: Reasoning</h2><div class="grid">${
+      reasoningQs.map((q,i)=>`<div class="ans"><span class="qn">${i+1}</span><span class="av">${q.answer}</span></div>`).join('')
+    }</div></div>`;
+  }
+
+  html += '</body></html>';
+  return html;
+}
+
+// ─── PRINT ────────────────────────────────────────────────────────────────────
+function printPaper(type, adaptedIdx) {
+  const { label, classYear, standardLevel, standardArith, adapted, reasoningQs } = generatedPapers;
+  let arithQs, pupilNames, levelLabel;
+
+  if (type === 'standard') {
+    arithQs = standardArith;
+    pupilNames = null;
+    levelLabel = standardLevel;
+  } else {
+    const g = adapted[adaptedIdx];
+    arithQs = g.arithQs;
+    pupilNames = g.names;
+    levelLabel = g.level;
+  }
+
+  // Adapted papers don't get reasoning
+  const rQs = type === 'standard' ? reasoningQs : null;
+  const html = buildPaperHTML(classYear, label, arithQs, rQs, pupilNames);
   const win = window.open('', '_blank');
   win.document.write(html);
   win.document.close();
-  win.onload = () => win.print();
+  win.onload = () => { setTimeout(() => win.print(), 300); };
+}
+
+function printAnswers() {
+  if (!generatedPapers) return;
+  const html = buildAnswerSheetHTML();
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => { setTimeout(() => win.print(), 300); };
 }
 </script>
 </body>
