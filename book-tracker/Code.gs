@@ -463,15 +463,23 @@ function setup() {
 // p.sheets = ['Children','Reads'] etc., default = both
 // ════════════════════════════════════════════════
 function fixSchema() {
-  const s = SS.getSheetByName('Children');
-  if (!s) return { error: 'Children sheet not found' };
-  // Overwrite row 1 with correct 8-column header
-  const hdr = ['id','name','yearGroup','class','pp','eal','gender','totalReads'];
-  s.getRange(1, 1, 1, hdr.length).setValues([hdr]);
-  // Delete any extra columns beyond 8
-  const lastCol = s.getLastColumn();
-  if (lastCol > 8) s.deleteColumns(9, lastCol - 8);
-  return { ok: true, message: 'Schema fixed', lastRow: s.getLastRow() };
+  const fixes = {
+    'Children': ['id','name','yearGroup','class','pp','eal','gender','totalReads'],
+    'Books':    ['id','title','author','phase','copies'],
+    'Reads':    ['childId','bookTitle','dateRead'],
+    'Checkouts':['id','childId','bookId','copyNum','checkoutDate','returnDate','completed','lost'],
+    'CoverOverrides': ['bookId','url']
+  };
+  const result = {};
+  Object.entries(fixes).forEach(([name, hdr]) => {
+    const s = SS.getSheetByName(name);
+    if (!s) { result[name] = 'not found'; return; }
+    s.getRange(1, 1, 1, hdr.length).setValues([hdr]);
+    const lastCol = s.getLastColumn();
+    if (lastCol > hdr.length) s.deleteColumns(hdr.length + 1, lastCol - hdr.length);
+    result[name] = { ok: true, lastRow: s.getLastRow() };
+  });
+  return { ok: true, result };
 }
 
 function testWrite(p) {
