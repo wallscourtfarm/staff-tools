@@ -245,7 +245,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">10.07.26e</div>
+  <div class="version">10.07.26f</div>
 </div>
 
 <script>
@@ -618,26 +618,26 @@ function genY6Arith(t, sortByYear) {
 
   // ── Y3 slots (7 questions, 7 marks) ──────────────────────────────────────
   if (t.y6Y3content) {
-    const a=rand(100,499),b=rand(100,499); slots.push({text:`${a} + ${b} + ${pick([10,20,30,40,50])} =`,answer:a+b+pick([10,20,30,40,50]),marks:1,yg:'Y3'});
+    const a=rand(200,899),b=rand(11,89); slots.push({text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'});
   } else slots.push(tf('Y3'));
   if (t.y6Y3content) {
-    const a=rand(200,799),b=rand(10,99); slots.push({text:`${a+b} - ${b} =`,answer:a,marks:1,yg:'Y3'});
+    const d=pick([2,3,4,5,6,7,8,9]),q=rand(2,12); slots.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1,yg:'Y3'});
   } else slots.push(tf('Y3'));
   if (t.y6Y3content) {
-    const a=rand(10,99); slots.push({text:`${a} × 0 =`,answer:0,marks:1,yg:'Y3'});
+    const a=rand(3,9),b=rand(100,799); slots.push({text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y3'});
   } else slots.push(tf('Y3'));
   if (t.y6Y3content) {
-    const b=pick([2,3,4,5,6,7,8]),q=rand(2,12); slots.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1,yg:'Y3'});
+    const a=rand(1001,9999),b=rand(3,99); slots.push({text:`${a.toLocaleString()} − ${b} =`,answer:a-b,marks:1,yg:'Y3'});
   } else slots.push(tf('Y3'));
   if (t.y6Y3content) {
-    const p=rand(10,50),q=rand(p+10,p+150); slots.push({text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1,yg:'Y3'});
+    const b=rand(10,200),total=rand(b+100,b+600); slots.push({text:`[BOX] + ${b} = ${total}`,answer:total-b,box:true,marks:1,yg:'Y3'});
   } else slots.push(tf('Y3'));
   if (t.y6Y3content) {
-    let a,b;do{a=rand(100,499);b=rand(100,499);}while(!hasRegroup(a,b,'add')||a+b>999);
-    slots.push({text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'});
+    const a=rand(10,9999); slots.push({text:`${a} × 0 =`,answer:0,marks:1,yg:'Y3'});
   } else slots.push(tf('Y3'));
   if (t.y6Y3content) {
-    const a=rand(10,99); slots.push({text:`${a} ÷ 1 =`,answer:a,marks:1,yg:'Y3'});
+    const d=pick([2,3,4,5,6,7,8,9]),mult=pick([10,20,30,40,50,60,70,80,90,100]),q=rand(2,12);
+    slots.push({text:`${d*q*mult} ÷ ${d} =`,answer:q*mult,marks:1,yg:'Y3'});
   } else slots.push(tf('Y3'));
 
   // ── Y4 slots (10 questions, 10 marks) ────────────────────────────────────
@@ -920,54 +920,57 @@ async function generateAll() {
 }
 
 // ─── QUESTION → HTML ─────────────────────────────────────────────────────────
-function qToHTML(q, qNum) {
-  const tall = q.col || q.work || q.longMult || q.longDiv;
-  const boxH = tall ? '80mm' : '52mm';
-  let label = '';
-  if (q.col) label = 'You must use column method to record your calculation';
-  if (q.work) label = 'You must show your working on this question';
-  if (q.longMult || q.longDiv) label = 'Show your method';
+function renderFracsInText(str) {
+  if (!str) return '';
+  return str.replace(/(\d+)\/(\d+)/g, (_, n, d) =>
+    `<span class="fh"><span class="fh-n">${n}</span><span class="fh-d">${d}</span></span>`
+  );
+}
 
-  let eqHTML = '';
+function qToHTML(q, qNum) {
+  const isLongCalc = !!(q.longMult || q.longDiv);
+  const isWork = q.work || q.col;
+  const boxH = isLongCalc ? 'calc(12*6.5mm)' : isWork ? 'calc(10*6.5mm)' : 'calc(8*6.5mm)';
+  const marks = q.marks || 1;
+
+  let mainContent = '';
   if (q.longMult) {
     const {a, b} = q.longMult;
-    eqHTML = `<div class="lm">
-      <div class="lm-r">${a}</div>
-      <div class="lm-r lm-op">× ${b}</div>
-      <div class="lm-rule"></div>
-    </div>`;
+    const aStr = String(a), bStr = String(b);
+    const pad = aStr.length - bStr.length;
+    const topCells = ['', ...aStr.split('')].map(d => `<span class="lm-cell">${d}</span>`).join('');
+    const botCells = ['×', ...Array(pad).fill(''), ...bStr.split('')].map(d => `<span class="lm-cell">${d}</span>`).join('');
+    mainContent = `<div class="lm"><div class="lm-row">${topCells}</div><div class="lm-row rule">${botCells}</div></div>`;
   } else if (q.longDiv) {
     const {divisor, dividend} = q.longDiv;
-    eqHTML = `<div class="ld">
-      <span class="ld-divisor">${divisor}</span><span class="ld-bracket">)</span><span class="ld-dividend" style="border-top:1.5px solid black;padding-top:0.5mm">${dividend}</span>
-    </div>`;
-  } else if (q.frac) {
-    const [[n1,d1],[n2,d2]] = q.frac;
-    const op = q.fracOp || '+';
-    eqHTML = `<span class="frac-wrap"><span class="frac-n">${n1}</span><span class="frac-b"></span><span class="frac-d">${d1}</span></span>
-      <span class="eq-op">${op}</span>
-      <span class="frac-wrap"><span class="frac-n">${n2}</span><span class="frac-b"></span><span class="frac-d">${d2}</span></span>
-      <span class="eq-op">=</span><span class="ans-box"></span>`;
-  } else if (q.box) {
-    const parts = q.text.split('[BOX]');
-    eqHTML = (parts[0]?`<span class="eq-text">${parts[0].trim()}</span> `:'') +
-             `<span class="inline-box"></span>` +
-             (parts[1]?` <span class="eq-text">${parts[1].trim()}</span>`:'');
+    const dvsCells = String(divisor).split('').map(d => `<span class="ld-cell">${d}</span>`).join('');
+    const dvdCells = String(dividend).split('').map(d => `<span class="ld-dvd">${d}</span>`).join('');
+    mainContent = `<div class="ld"><div class="ld-divisor">${dvsCells}</div><div class="ld-bracket">${dvdCells}</div></div>`;
   } else {
-    eqHTML = `<span class="eq-text">${q.text}</span><span class="ans-box"></span>`;
+    let eqHTML = '';
+    if (q.frac) {
+      const [[n1,d1],[n2,d2]] = q.frac;
+      const op = q.fracOp || '+';
+      eqHTML = `<span class="fh"><span class="fh-n">${n1}</span><span class="fh-d">${d1}</span></span><span class="eq-op"> ${op} </span><span class="fh"><span class="fh-n">${n2}</span><span class="fh-d">${d2}</span></span><span class="eq-op"> = </span>`;
+    } else if (q.box) {
+      const parts = (q.text||'').split('[BOX]');
+      eqHTML = (parts[0] ? renderFracsInText(parts[0].trim())+' ' : '') +
+               `<span class="ibox"></span>` +
+               (parts[1] ? ' '+renderFracsInText(parts[1].trim()) : '');
+    } else {
+      eqHTML = renderFracsInText(q.text || '');
+    }
+    mainContent = `<div class="q-header">${eqHTML}</div>`;
   }
 
-  const headerH = (q.longMult || q.longDiv) ? '30mm' : '16mm';
-  const gridTop = (q.longMult || q.longDiv) ? '30mm' : '16mm';
-
-  return `${label ? `<div class="q-label">${label}</div>` : ''}
-    <div class="q-box" style="height:${boxH}">
-      <div class="q-main">
-        <div class="q-header" style="height:${headerH}"><span class="q-num">${qNum}</span><span class="q-eq">${eqHTML}</span></div>
-        <div class="q-grid" style="top:${gridTop}"></div>
-      </div>
-      <div class="q-strip"><div class="mark-box"></div><div class="mark-lbl">${q.marks||1} mark${(q.marks||1)>1?'s':''}</div></div>
-    </div>`;
+  return `<div class="q-box" style="height:${boxH}">
+    <div class="q-left">
+      <span class="q-num">${qNum}</span>
+      ${isLongCalc ? '<span class="q-show-method">Show<br>your<br>method</span>' : ''}
+    </div>
+    <div class="q-main">${mainContent}<div class="q-ans"></div></div>
+    <div class="q-strip"><div class="mark-box"></div><div class="mark-lbl">${marks} mark${marks>1?'s':''}</div></div>
+  </div>`;
 }
 
 // ─── FRACTION RENDERER (for reasoning print HTML) ────────────────────────────
@@ -1090,32 +1093,32 @@ function buildPaperHTML(classYear, label, arithQs, reasoningQs, pupilNames) {
     .arith-y6-scores{display:flex;gap:12mm;margin-bottom:3mm;font-size:10pt;font-weight:bold}
     .y6-score-box{background:#f0f4f8;border:0.8px solid #aaa;padding:2mm 4mm}
     /* ── Question boxes ── */
-    .q-label{font-size:8pt;font-weight:bold;text-align:center;margin-bottom:1mm}
-    .q-box{display:flex;border:0.8px solid #444;margin-bottom:4mm;page-break-inside:avoid;break-inside:avoid}
-    .q-main{flex:1;position:relative;overflow:hidden}
-    .q-header{position:absolute;top:0;left:0;right:0;border-bottom:1px solid #444;background:white;display:flex;align-items:center;padding:0 3mm;gap:3mm;z-index:2}
-    .q-grid{position:absolute;left:0;right:0;bottom:0;background-image:linear-gradient(#c0cfe0 1px,transparent 1px),linear-gradient(90deg,#c0cfe0 1px,transparent 1px);background-size:7mm 7mm}
-    .q-num{color:#2e6fad;font-weight:bold;font-size:13pt;min-width:8mm;flex-shrink:0}
-    .q-eq{display:flex;align-items:center;gap:3mm;flex:1;flex-wrap:wrap}
-    .eq-text{font-weight:bold;font-size:15pt;white-space:nowrap}
+    .q-box{display:flex;border:0.8px solid #444;margin-bottom:3mm;page-break-inside:avoid;break-inside:avoid}
+    .q-left{width:14mm;border-right:0.8px solid #444;display:flex;flex-direction:column;align-items:center;padding:2.5mm 2mm;flex-shrink:0}
+    .q-num{color:#2e6fad;font-weight:900;font-size:14pt;line-height:1}
+    .q-show-method{font-size:7.5pt;font-weight:900;text-align:center;flex:1;display:flex;align-items:center;justify-content:center;line-height:1.5}
+    .q-main{flex:1;position:relative;background-image:linear-gradient(#c0cfe0 1px,transparent 1px),linear-gradient(90deg,#c0cfe0 1px,transparent 1px);background-size:6.5mm 6.5mm}
+    .q-header{background:white;border-bottom:0.8px solid #ccc;padding:3mm 4mm;display:flex;align-items:center;gap:3mm;font-size:15pt;font-weight:bold;min-height:6.5mm;position:relative;z-index:2;flex-wrap:wrap}
+    .q-ans{position:absolute;bottom:3mm;right:3mm;width:36mm;height:13mm;border:2.5px solid #2e6fad;background:white;z-index:3}
+    .ibox{display:inline-block;width:26mm;height:11mm;border:2.5px solid #2e6fad;background:white;vertical-align:middle}
+    .fh{display:inline-flex;flex-direction:column;align-items:center;font-size:13pt;font-weight:bold;line-height:1;vertical-align:middle;margin:0 1px}
+    .fh-n{padding:0 3px 2px;border-bottom:1.5px solid black}
+    .fh-d{padding:2px 3px 0}
     .eq-op{font-weight:bold;font-size:14pt}
-    .ans-box{width:40mm;height:10mm;border:2px solid #2e6fad;background:white;margin-left:auto;flex-shrink:0}
-    .inline-box{display:inline-block;width:28mm;height:10mm;border:2px solid #2e6fad;background:white;vertical-align:middle}
-    .frac-wrap{display:inline-flex;flex-direction:column;align-items:center;font-size:12pt;font-weight:bold;line-height:1.1}
-    .frac-b{width:100%;border-top:1.5px solid black;margin:1px 0}
-    .q-strip{width:18mm;background:#c8dcf0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:5mm;flex-shrink:0}
-    .mark-box{width:10mm;height:10mm;border:0.8px solid black;background:white}
-    .mark-lbl{font-size:7pt;text-align:center;margin-top:1mm}
+    .q-strip{width:19mm;border-left:0.8px solid #444;background:#c8dcf0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:4mm;flex-shrink:0}
+    .mark-box{width:11mm;height:11mm;border:0.8px solid #555;background:white}
+    .mark-lbl{font-size:7pt;text-align:center;margin-top:1.5mm;font-weight:bold}
     /* ── Long multiplication ── */
-    .lm{display:inline-flex;flex-direction:column;align-items:flex-end;font-size:15pt;font-weight:bold;letter-spacing:1mm;margin:2mm 0}
-    .lm-r{padding:0 1mm}
-    .lm-op{padding-bottom:1mm}
-    .lm-rule{width:100%;border-top:2px solid black;margin-top:1mm}
+    .lm{position:absolute;top:calc(2*6.5mm);left:calc(2*6.5mm);display:inline-flex;flex-direction:column;font-size:13pt;font-weight:bold}
+    .lm-row{display:flex}
+    .lm-row.rule{border-bottom:2.5px solid black}
+    .lm-cell{width:6.5mm;height:6.5mm;display:flex;align-items:center;justify-content:center;flex-shrink:0}
     /* ── Long division ── */
-    .ld{display:inline-flex;align-items:flex-end;font-size:15pt;font-weight:bold;margin:2mm 0}
-    .ld-divisor{padding-right:1mm}
-    .ld-bracket{font-size:20pt;line-height:1;padding-right:1mm}
-    .ld-dividend{padding:0 2mm;border-top:1.5px solid black}
+    .ld{position:absolute;top:calc(2*6.5mm);left:calc(1*6.5mm);display:flex;align-items:flex-start;font-size:13pt;font-weight:bold}
+    .ld-divisor{display:flex}
+    .ld-bracket{border-left:2.5px solid black;display:flex}
+    .ld-cell{width:6.5mm;height:6.5mm;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .ld-dvd{width:6.5mm;height:6.5mm;display:flex;align-items:center;justify-content:center;border-top:2.5px solid black;flex-shrink:0}
     /* ── Reasoning ── */
     .r-header{background:#1a3a5c;color:white;padding:3mm 4mm;display:flex;justify-content:space-between;align-items:center;margin-bottom:3mm}
     .r-year{font-weight:bold;font-size:11pt}
