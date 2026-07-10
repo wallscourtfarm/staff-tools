@@ -35,6 +35,7 @@ function dispatch(p) {
     case 'returnBook':       return returnBook(p);
     case 'addChild':         return addChild(p);
     case 'updateChild':      return updateChild(p);
+    case 'deleteChild':      return deleteChild(p);
     case 'addBook':          return addBook(p);
     case 'setup':            return setup();
     case 'setCopyStatus':    return setCopyStatus(p);
@@ -291,6 +292,22 @@ function updateChild(p) {
       if (p.eal        !== undefined) sheet.getRange(r+1, iEAL+1).setValue(p.eal);
       if (p.gender     !== undefined) sheet.getRange(r+1, iGen+1).setValue(p.gender);
       if (p.totalReads !== undefined) sheet.getRange(r+1, iTR+1).setValue(Number(p.totalReads));
+      return { ok: true };
+    }
+  }
+  return { error: 'Child not found' };
+}
+
+// ════════════════════════════════════════════════
+// DELETE CHILD
+// ════════════════════════════════════════════════
+function deleteChild(p) {
+  const sheet = SS.getSheetByName('Children');
+  const rows  = sheet.getDataRange().getValues();
+  const iId   = rows[0].map(h => String(h).trim().toLowerCase()).indexOf('id');
+  for (let r = 1; r < rows.length; r++) {
+    if (String(rows[r][iId]) === String(p.id)) {
+      sheet.deleteRow(r + 1);
       return { ok: true };
     }
   }
