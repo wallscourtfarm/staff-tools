@@ -535,7 +535,33 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
       </div>
     );
 
-    const QText = ({t}) => <p style={{fontSize:15,fontFamily:"Arial",lineHeight:1.5,margin:"0 0 4px 0"}}>{t}</p>;
+    // Converts "3/4" or "2 3/4" in text to proper stacked fraction elements
+    function renderFracs(text) {
+      if (!text) return text;
+      const re = /(\d+\s+)?(\d+)\/(\d+)/g;
+      const parts = [];
+      let last = 0, m;
+      while ((m = re.exec(text)) !== null) {
+        if (m.index > last) parts.push(text.slice(last, m.index));
+        const whole = m[1] ? m[1].trim() : null;
+        parts.push(
+          <span key={m.index} style={{display:'inline-flex',alignItems:'center',gap:3,verticalAlign:'middle',margin:'0 1px'}}>
+            {whole && <span style={{fontFamily:'Arial',fontWeight:'bold',fontSize:15}}>{whole}</span>}
+            <span style={{display:'inline-flex',flexDirection:'column',alignItems:'center',lineHeight:1,fontSize:13}}>
+              <span style={{borderBottom:'1.5px solid black',padding:'0 3px 1px',textAlign:'center',fontWeight:'bold',fontFamily:'Arial'}}>{m[2]}</span>
+              <span style={{padding:'1px 3px 0',textAlign:'center',fontWeight:'bold',fontFamily:'Arial'}}>{m[3]}</span>
+            </span>
+          </span>
+        );
+        last = m.index + m[0].length;
+      }
+      if (last < text.length) parts.push(text.slice(last));
+      return parts.length > 1 ? parts : text;
+    }
+
+    // Wrap text or option strings — applies fraction rendering
+    const FT = ({t}) => <span>{renderFracs(String(t))}</span>;
+    const QText = ({t}) => <p style={{fontSize:15,fontFamily:"Arial",lineHeight:1.5,margin:"0 0 4px 0"}}><FT t={t}/></p>;
 
     function TickQ({q}){
       return(<><QText t={q.questionText}/>
@@ -543,7 +569,7 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
           {(q.options||[]).map((o,i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
               <div style={{width:18,height:18,border:"1.5px solid #333",flexShrink:0}}/>
-              <span style={{fontSize:15,fontFamily:"Arial"}}>{o}</span>
+              <span style={{fontSize:15,fontFamily:"Arial"}}><FT t={o}/></span>
             </div>
           ))}
         </div>
@@ -554,7 +580,7 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
       return(<><QText t={q.questionText}/>
         <div style={{display:"flex",gap:20,flexWrap:"wrap",margin:"12px 0 6px",alignItems:"center"}}>
           {(q.options||[]).map((o,i)=>(
-            <span key={i} style={{fontSize:16,fontFamily:"Arial",border:"1.5px solid #333",borderRadius:40,padding:"4px 14px"}}>{o}</span>
+            <span key={i} style={{fontSize:16,fontFamily:"Arial",border:"1.5px solid #333",borderRadius:40,padding:"4px 14px"}}><FT t={o}/></span>
           ))}
         </div>
       </>);
@@ -565,11 +591,11 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
       return(<><QText t={q.questionText}/>
         <div style={{display:"flex",gap:50,margin:"14px 0",alignItems:"flex-start"}}>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {left.map((l,i)=><div key={i} style={{border:"1.5px solid #333",padding:"6px 16px",fontSize:15,fontFamily:"Arial",minWidth:110,textAlign:"center"}}>{l}</div>)}
+            {left.map((l,i)=><div key={i} style={{border:"1.5px solid #333",padding:"6px 16px",fontSize:15,fontFamily:"Arial",minWidth:110,textAlign:"center"}}><FT t={String(l)}/></div>)}
           </div>
           <div style={{paddingTop:10,fontSize:12,color:"#999",fontFamily:"Arial"}}>draw lines to match</div>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {right.map((r,i)=><div key={i} style={{border:"1.5px solid #333",padding:"6px 16px",fontSize:15,fontFamily:"Arial",minWidth:110,textAlign:"center"}}>{r}</div>)}
+            {right.map((r,i)=><div key={i} style={{border:"1.5px solid #333",padding:"6px 16px",fontSize:15,fontFamily:"Arial",minWidth:110,textAlign:"center"}}><FT t={String(r)}/></div>)}
           </div>
         </div>
       </>);
@@ -580,7 +606,7 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
       return(<><QText t={q.questionText}/>
         <div style={{margin:"14px 0"}}>
           <div style={{display:"flex",gap:18,flexWrap:"wrap",marginBottom:16}}>
-            {opts.map((o,i)=><span key={i} style={{fontSize:16,fontFamily:"Arial",fontWeight:500}}>{o}</span>)}
+            {opts.map((o,i)=><span key={i} style={{fontSize:16,fontFamily:"Arial",fontWeight:500}}><FT t={String(o)}/></span>)}
           </div>
           <div style={{display:"flex",gap:14,alignItems:"center"}}>
             <span style={{fontSize:13,fontFamily:"Arial",color:"#555"}}>smallest</span>
@@ -599,7 +625,7 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
             <span key={i} style={{display:"flex",alignItems:"center",gap:4}}>
               {v===null
                 ? <span style={{display:"inline-block",width:58,borderBottom:"2px solid #1a1a8c",height:24}}/>
-                : <span style={{fontSize:18,fontWeight:"bold",fontFamily:"Arial"}}>{v}</span>}
+                : <span style={{fontSize:18,fontWeight:"bold",fontFamily:"Arial"}}><FT t={String(v)}/></span>}
               {i<opts.length-1 && <span style={{color:"#888",fontSize:13}}>→</span>}
             </span>
           ))}
@@ -658,7 +684,7 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
         <AnyVisual q={q}/>
         {(q.parts||[]).map((p,i)=>(
           <div key={i} style={{marginBottom:16}}>
-            <p style={{fontSize:15,fontFamily:"Arial",margin:"0 0 8px 0"}}><strong>{p.letter}</strong>{"  "}{p.questionText}</p>
+            <p style={{fontSize:15,fontFamily:"Arial",margin:"0 0 8px 0"}}><strong>{p.letter}</strong>{"  "}<FT t={p.questionText}/></p>
             {p.showMethod && <MethodBox/>}
             <ALine label={p.answerLabel}/>
             <div style={{fontSize:13,fontFamily:"Arial",color:"#333",textAlign:"right",marginTop:6}}>
@@ -1012,6 +1038,6 @@ IMPORTANT: Use all four quadrants for coordinates. Include BODMAS, ratio, algebr
 
     ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
   </script>
-  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">08.07.26d</div>
+  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#bbb;pointer-events:none;font-family:Arial">10.07.26a</div>
 </body>
 </html>
