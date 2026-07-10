@@ -3,7 +3,7 @@
 // Deploy as Web App: Execute as Me, Access Anyone
 // ════════════════════════════════════════════════
 
-const SS = SpreadsheetApp.getActiveSpreadsheet();
+const SS = SpreadsheetApp.openById('1l8ZNNUd4jdXeVisB7ZEhz7N8ipW7GL4UQh6fWD9_XGY');
 
 function doGet(e) {
   try {
@@ -12,7 +12,8 @@ function doGet(e) {
     if (params.payload) {
       payload = JSON.parse(params.payload);
     } else {
-      payload = { action: params.action || 'getAll' };
+      payload = Object.assign({}, params);
+      if (!payload.action) payload.action = 'getAll';
     }
     const result = dispatch(payload);
     return ContentService
@@ -42,6 +43,10 @@ function dispatch(p) {
     case 'importChildren':   return importChildren(p);
     case 'importBooks':      return importBooks(p);
     case 'bulkImportReads':  return bulkImportReads(p);
+    case 'clearData':        return clearData(p);
+    case 'rawSheet':         return rawSheet(p);
+    case 'fixSchema':        return fixSchema();
+    case 'testWrite':        return testWrite(p);
     default: return { error: 'Unknown action: ' + p.action };
   }
 }
@@ -276,14 +281,16 @@ function updateChild(p) {
   const iPP   = hdr.indexOf('pp');
   const iEAL  = hdr.indexOf('eal');
   const iGen  = hdr.indexOf('gender');
+  const iTR   = hdr.indexOf('totalreads');
   for (let r = 1; r < rows.length; r++) {
     if (String(rows[r][iId]) === String(p.id)) {
-      if (p.name      !== undefined) sheet.getRange(r+1, iNm+1).setValue(p.name);
-      if (p.yearGroup !== undefined) sheet.getRange(r+1, iYr+1).setValue(p.yearGroup);
-      if (p.class     !== undefined) sheet.getRange(r+1, iCl+1).setValue(p.class);
-      if (p.pp        !== undefined) sheet.getRange(r+1, iPP+1).setValue(p.pp);
-      if (p.eal       !== undefined) sheet.getRange(r+1, iEAL+1).setValue(p.eal);
-      if (p.gender    !== undefined) sheet.getRange(r+1, iGen+1).setValue(p.gender);
+      if (p.name       !== undefined) sheet.getRange(r+1, iNm+1).setValue(p.name);
+      if (p.yearGroup  !== undefined) sheet.getRange(r+1, iYr+1).setValue(p.yearGroup);
+      if (p.class      !== undefined) sheet.getRange(r+1, iCl+1).setValue(p.class);
+      if (p.pp         !== undefined) sheet.getRange(r+1, iPP+1).setValue(p.pp);
+      if (p.eal        !== undefined) sheet.getRange(r+1, iEAL+1).setValue(p.eal);
+      if (p.gender     !== undefined) sheet.getRange(r+1, iGen+1).setValue(p.gender);
+      if (p.totalReads !== undefined) sheet.getRange(r+1, iTR+1).setValue(Number(p.totalReads));
       return { ok: true };
     }
   }
@@ -432,19 +439,70 @@ function setup() {
   };
   Object.entries(schemas).forEach(([name, headers]) => {
     let s = SS.getSheetByName(name);
-    if (!s) {
-      s = SS.insertSheet(name);
+    if (!s) s = SS.insertSheet(name);
+    const lastCol = s.getLastColumn();
+    if (lastCol === 0) {
       s.appendRow(headers);
     } else {
-      // Add any missing columns to existing sheets
-      const existing = s.getRange(1, 1, 1, Math.max(s.getLastColumn(), 1)).getValues()[0]
+      const existing = s.getRange(1, 1, 1, lastCol).getValues()[0]
         .map(h => String(h).trim().toLowerCase());
       headers.forEach(h => {
         if (!existing.includes(h.toLowerCase())) {
-          s.getRange(1, s.getLastColumn() + 1).setValue(h);
+          const nc = s.getLastColumn();
+          s.getRange(1, nc + 1).setValue(h);
+          SpreadsheetApp.flush();
         }
       });
     }
   });
   return { ok: true, message: 'Setup complete — sheets ready' };
+}
+
+// ════════════════════════════════════════════════
+// CLEAR DATA — wipe data rows (keep headers) from sheets
+// p.sheets = ['Children','Reads'] etc., default = both
+// ════════════════════════════════════════════════
+function fixSchema() {
+  const s = SS.getSheetByName('Children');
+  if (!s) return { error: 'Children sheet not found' };
+  // Overwrite row 1 with correct 8-column header
+  const hdr = ['id','name','yearGroup','class','pp','eal','gender','totalReads'];
+  s.getRange(1, 1, 1, hdr.length).setValues([hdr]);
+  // Delete any extra columns beyond 8
+  const lastCol = s.getLastColumn();
+  if (lastCol > 8) s.deleteColumns(9, lastCol - 8);
+  return { ok: true, message: 'Schema fixed', lastRow: s.getLastRow() };
+}
+
+function testWrite(p) {
+  const s = SS.getSheetByName('Children');
+  const cell = s.getRange(2, 8);
+  const before = cell.getValue();
+  cell.setValue(99);
+  SpreadsheetApp.flush();
+  const after = cell.getValue();
+  return { before, after, ssId: SS.getId() };
+}
+
+function rawSheet(p) {
+  const s = SS.getSheetByName(p.sheet || 'Children');
+  if (!s) return { error: 'sheet not found' };
+  const lastRow = s.getLastRow(), lastCol = s.getLastColumn();
+  const rows = lastRow > 0 ? s.getRange(1, 1, Math.min(lastRow, 5), lastCol).getValues() : [];
+  return { lastRow, lastCol, rows };
+}
+
+function clearData(p) {
+  const targets = (p.sheets && p.sheets.length) ? p.sheets : ['Children', 'Reads'];
+  const cleared = {};
+  targets.forEach(name => {
+    const s = SS.getSheetByName(name);
+    if (!s) return;
+    const lastRow = s.getLastRow();
+    if (lastRow > 1) {
+      s.deleteRows(2, lastRow - 1);
+    }
+    cleared[name] = lastRow - 1;
+  });
+  return { ok: true, cleared };
 }
