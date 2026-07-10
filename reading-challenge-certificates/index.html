@@ -379,7 +379,7 @@ footer {
       <span class="count-badge" id="printCount"></span>
     </div>
     <div class="btn-row" style="margin:0">
-      <button class="btn btn-primary" onclick="window.print()">🖨️ Print / Save PDF</button>
+      <button class="btn btn-primary" onclick="printWhenReady()">🖨️ Print / Save PDF</button>
       <button class="btn btn-success" id="confirmBtn" onclick="confirmPrinted()">✓ Confirm Printed</button>
       <button class="btn btn-secondary" onclick="backToList()">← Back</button>
     </div>
@@ -387,7 +387,7 @@ footer {
   <div class="cert-preview-wrap" id="certPreviewWrap"></div>
 </div>
 
-<footer>WFA Reading Challenge Certificates · 09.07.26i</footer>
+<footer>WFA Reading Challenge Certificates · 10.07.26a</footer>
 
 <script>
 'use strict';
@@ -543,6 +543,11 @@ function toggleSelectAll(cb) {
 }
 
 /* ── Generate / Print ── */
+async function printWhenReady() {
+  await document.fonts.ready;
+  window.print();
+}
+
 function generateCerts() {
   const checked = [...document.querySelectorAll('.pi-check:checked')];
   if (!checked.length) return;
