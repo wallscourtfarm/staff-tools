@@ -286,7 +286,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 11.07.26a</div>
+  <div class="version">WFA Book Tracker · 11.07.26b</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -695,8 +695,9 @@ function renderChildList(list) {
       </div>
       <div class="c-reads">
         <div class="num">${c.totalReads}</div>
-        <div class="lbl">reads</div>
+        <div class="lbl">${c.lks2Reads > 0 ? 'UKS2 reads' : 'reads'}</div>
         ${milestoneBadge(c.totalReads)}
+        ${c.lks2Reads > 0 ? `<div style="font-size:10px;color:var(--muted);margin-top:3px">LKS2: ${c.lks2Reads}</div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -732,7 +733,8 @@ function selectChild(id) {
     <div style="margin-top:14px">
       <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Reading Progress</div>
       <div class="reads-dots">${readDots(selChild.totalReads)}</div>
-      <div style="font-size:14px;font-weight:700;color:var(--blue)">${selChild.totalReads} / 25 reads</div>
+      <div style="font-size:14px;font-weight:700;color:var(--blue)">${selChild.totalReads} / 25 ${selChild.lks2Reads > 0 ? 'UKS2 reads' : 'reads'}</div>
+      ${selChild.lks2Reads > 0 ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">LKS2 challenge: ${selChild.lks2Reads} reads</div>` : ''}
     </div>
     ${hasBook ? `<div class="alert alert-warn" style="margin-top:12px">⚠️ Currently has: <strong>${esc(bookTitle(selChild.activeCheckouts[0].bookId))}</strong> (Copy ${selChild.activeCheckouts[0].copyNum})</div>` : ''}
   `;

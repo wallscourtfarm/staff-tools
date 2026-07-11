@@ -73,6 +73,7 @@ function getAll() {
   const iEAL = childHdr.indexOf('eal');
   const iGen = childHdr.indexOf('gender');
   const iTR  = childHdr.indexOf('totalreads');
+  const iLR  = childHdr.indexOf('lks2reads');
 
   const children = {};
   for (let r = 1; r < childRows.length; r++) {
@@ -88,6 +89,7 @@ function getAll() {
       eal:             String(row[iEAL] || ''),
       gender:          String(row[iGen] || ''),
       totalReads:      Number(row[iTR]  || 0),
+      lks2Reads:       iLR >= 0 ? Number(row[iLR] || 0) : 0,
       booksRead:       [],
       activeCheckouts: []
     };
@@ -264,7 +266,7 @@ function returnBook(p) {
 function addChild(p) {
   const sheet = SS.getSheetByName('Children');
   const id    = 'CH' + Date.now();
-  sheet.appendRow([id, p.name, p.yearGroup, p.class || '', p.pp || '', p.eal || '', p.gender || '', 0]);
+  sheet.appendRow([id, p.name, p.yearGroup, p.class || '', p.pp || '', p.eal || '', p.gender || '', 0, 0]);
   return { ok: true, id };
 }
 
@@ -283,6 +285,7 @@ function updateChild(p) {
   const iEAL  = hdr.indexOf('eal');
   const iGen  = hdr.indexOf('gender');
   const iTR   = hdr.indexOf('totalreads');
+  const iLR   = hdr.indexOf('lks2reads');
   for (let r = 1; r < rows.length; r++) {
     if (String(rows[r][iId]) === String(p.id)) {
       if (p.name       !== undefined) sheet.getRange(r+1, iNm+1).setValue(p.name);
@@ -292,6 +295,7 @@ function updateChild(p) {
       if (p.eal        !== undefined) sheet.getRange(r+1, iEAL+1).setValue(p.eal);
       if (p.gender     !== undefined) sheet.getRange(r+1, iGen+1).setValue(p.gender);
       if (p.totalReads !== undefined) sheet.getRange(r+1, iTR+1).setValue(Number(p.totalReads));
+      if (p.lks2Reads  !== undefined && iLR >= 0) sheet.getRange(r+1, iLR+1).setValue(Number(p.lks2Reads));
       return { ok: true };
     }
   }
@@ -448,7 +452,7 @@ function bulkImportReads(p) {
 // ════════════════════════════════════════════════
 function setup() {
   const schemas = {
-    'Children':       ['id','name','yearGroup','class','pp','eal','gender','totalReads'],
+    'Children':       ['id','name','yearGroup','class','pp','eal','gender','totalReads','lks2Reads'],
     'Books':          ['id','title','author','phase','copies'],
     'Checkouts':      ['id','childId','bookId','copyNum','checkoutDate','returnDate','completed','lost'],
     'CoverOverrides': ['bookId','url'],
@@ -481,7 +485,7 @@ function setup() {
 // ════════════════════════════════════════════════
 function fixSchema() {
   const fixes = {
-    'Children': ['id','name','yearGroup','class','pp','eal','gender','totalReads'],
+    'Children': ['id','name','yearGroup','class','pp','eal','gender','totalReads','lks2Reads'],
     'Books':    ['id','title','author','phase','copies'],
     'Reads':    ['childId','bookTitle','dateRead'],
     'Checkouts':['id','childId','bookId','copyNum','checkoutDate','returnDate','completed','lost'],
