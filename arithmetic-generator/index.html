@@ -273,7 +273,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26z</div>
+  <div class="version">11.07.26aa</div>
 </div>
 
 <script>
@@ -534,7 +534,7 @@ function genY3Arith(t) {
   return qs;
 }
 
-// ─── Y4 ARITHMETIC GENERATOR (30 questions, /30) ──────────────────────────────
+// ─── Y4 ARITHMETIC GENERATOR (31 questions, /31) ──────────────────────────────
 function genY4Arith(t) {
   const qs = [];
   const tt = () => { const a=rand(2,12),b=rand(2,12); return {text:`${a} × ${b} =`,answer:a*b,marks:1}; };
@@ -575,7 +575,8 @@ function genY4Arith(t) {
   } else qs.push(tt());
   if (t.missingNumbers){const p=rand(100,500),q=rand(p+10,p+1000);qs.push({text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1});}else qs.push(tt());
   if (t.mentalCalc){const a=rand(3,9)*1000,b=rand(1,a/1000-1)*1000;qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1});}else qs.push(tt());
-  qs.push(tt());
+  // Place value decomposition: 4-digit number with missing hundreds (matches Y6 Y4-band slot)
+  if (t.placeValue){const th=rand(1,9),h=rand(1,9),t_=rand(10,99);const total=th*1000+h*100+t_;qs.push({text:`${total.toLocaleString()} = ${th},000 + [BOX] + ${t_}`,answer:h*100,box:true,marks:1});}else qs.push(tt());
   return qs;
 }
 
@@ -606,8 +607,8 @@ function genY5Arith(t) {
   if (t.y5Division){const d=pick([6,7,8,9]),q=rand(12,99);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1});}else qs.push(tt());
   if (t.y5Division){const d=pick([6,7,8,9]),q=rand(100,400);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
   // Decimals
-  if (t.y5Decimals){const a=rand(10,99)/10,b=rand(10,99)/100;qs.push({text:`${a.toFixed(1)} + ${b.toFixed(2)} =`,answer:parseFloat((a+b).toFixed(2)),marks:1});}else qs.push(tt());
-  if (t.y5Decimals){const a=(rand(10,90)/10+rand(1,9)/100);const b=rand(10,99)/100;qs.push({text:`${a.toFixed(2)} - ${b.toFixed(2)} =`,answer:parseFloat((a-b).toFixed(2)),marks:1});}else qs.push(tt());
+  if (t.y5Decimals){const a=rand(10,99)/10,b=rand(100,999)/1000;qs.push({text:`${a.toFixed(1)} + ${b.toFixed(3)} =`,answer:parseFloat((a+b).toFixed(3)),marks:1});}else qs.push(tt());
+  if (t.y5Decimals){const a=rand(10,50),b=rand(100,999)/1000;qs.push({text:`${a} - ${b.toFixed(3)} =`,answer:parseFloat((a-b).toFixed(3)),marks:1});}else qs.push(tt());
   if (t.y5Decimals){const a=rand(2,9),b=rand(11,99)/10;qs.push({text:`${a} × ${b.toFixed(1)} =`,answer:parseFloat((a*b).toFixed(1)),marks:1});}else qs.push(tt());
   if (t.y5Decimals){const a=pick([3.2,4.5,6.1,7.8,9.6,12.5]);qs.push({text:`${a} ÷ 10 =`,answer:parseFloat((a/10).toFixed(3)),marks:1});}else qs.push(tt());
   // Fractions (different denominators)
