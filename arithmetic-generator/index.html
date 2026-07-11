@@ -273,7 +273,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26ab</div>
+  <div class="version">11.07.26ac</div>
 </div>
 
 <script>
@@ -1033,7 +1033,7 @@ function renderFracsInText(str) {
   );
 }
 
-function qToHTML(q, qNum) {
+function qToHTML(q, qNum, defaultYg) {
   const isLongCalc = !!(q.longMult || q.longDiv);
   const isWork = q.work || q.col;
   const boxH = isLongCalc ? 'calc(12*6.5mm)' : isWork ? 'calc(12*6.5mm)' : 'calc(10*6.5mm)';
@@ -1073,7 +1073,7 @@ function qToHTML(q, qNum) {
     <div class="q-left">
       <span class="q-num">${qNum}</span>
       ${isLongCalc ? '<span class="q-show-method">Show<br>your<br>method</span>' : ''}
-      ${q.yg ? `<span class="q-yg q-yg-${q.yg}">${q.yg}</span>` : ''}
+      ${(q.yg || defaultYg) ? `<span class="q-yg q-yg-${q.yg||defaultYg}">${q.yg||defaultYg}</span>` : ''}
     </div>
     <div class="q-main"${isLongCalc ? ' style="background-position:0 0"' : ''}>${mainContent}${q.box ? '' : '<div class="q-ans"></div>'}</div>
     <div class="q-strip"><div class="mark-box"></div><div class="mark-lbl">${marks} mark${marks>1?'s':''}</div></div>
@@ -1168,7 +1168,7 @@ function buildPaperHTML(classYear, label, arithQs, reasoningQs, pupilNames) {
     ? pupilNames.map(name => buildCoverHTML(classYear, label, hasPaper2, name)).join('<div class="pb"></div>')
     : buildCoverHTML(classYear, label, hasPaper2, null);
 
-  const arithHTML = arithQs.map((q, i) => qToHTML(q, i+1)).join('');
+  const arithHTML = arithQs.map((q, i) => qToHTML(q, i+1, isY6 ? null : classYear)).join('');
 
   let reasoningHTML = '';
   if (reasoningQs) {
