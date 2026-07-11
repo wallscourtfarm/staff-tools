@@ -286,7 +286,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 11.07.26b</div>
+  <div class="version">WFA Book Tracker · 11.07.26c</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -697,7 +697,7 @@ function renderChildList(list) {
         <div class="num">${c.totalReads}</div>
         <div class="lbl">${c.lks2Reads > 0 ? 'UKS2 reads' : 'reads'}</div>
         ${milestoneBadge(c.totalReads)}
-        ${c.lks2Reads > 0 ? `<div style="font-size:10px;color:var(--muted);margin-top:3px">LKS2: ${c.lks2Reads}</div>` : ''}
+        ${c.lks2Reads > 0 ? `<div style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-top:4px;background:var(--border);color:var(--muted);border:1px solid var(--border)">${milestoneBadgeIcon(c.lks2Reads)} LKS2: ${c.lks2Reads}</div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1300,6 +1300,13 @@ function milestoneBadge(reads) {
   const hi = achieved[achieved.length-1];
   const icons = {5:'⭐',10:'⭐⭐',15:'🏅',20:'🥇',25:'🏆'};
   return `<div class="badge">${icons[hi]} ${hi} reads</div>`;
+}
+
+function milestoneBadgeIcon(reads) {
+  const achieved = [5,10,15,20,25].filter(m => reads >= m);
+  if (!achieved.length) return '';
+  const icons = {5:'⭐',10:'⭐⭐',15:'🏅',20:'🥇',25:'🏆'};
+  return icons[achieved[achieved.length-1]];
 }
 
 function readDots(reads) {
