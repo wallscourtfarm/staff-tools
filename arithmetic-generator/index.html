@@ -1437,8 +1437,10 @@ async function downloadAdaptedPapers(adaptedIdx, btn) {
     }
     btn.textContent = `✅ ${names.length} PDF${names.length!==1?'s':''} downloaded`;
   } catch(e) {
-    btn.textContent = '❌ PDF generation failed';
-    console.error(e);
+    const msg = e.message || String(e);
+    btn.textContent = '❌ Failed — see console';
+    console.error('PDF generation error:', msg, e);
+    alert('PDF error: ' + msg);
   }
   setTimeout(() => { btn.disabled = false; btn.textContent = originalLabel; }, 4000);
 }
