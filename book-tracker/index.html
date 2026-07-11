@@ -223,8 +223,10 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
     <div class="hdr-right">
       <div class="phase-tog">
-        <button class="phase-btn on" onclick="setPhase('LKS2')">LKS2</button>
-        <button class="phase-btn" onclick="setPhase('UKS2')">UKS2</button>
+        <button class="phase-btn on" onclick="setPhase('Y3')">Y3</button>
+        <button class="phase-btn" onclick="setPhase('Y4')">Y4</button>
+        <button class="phase-btn" onclick="setPhase('Y5')">Y5</button>
+        <button class="phase-btn" onclick="setPhase('Y6')">Y6</button>
       </div>
       <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
     </div>
@@ -263,13 +265,6 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
 
     <!-- CHILDREN TAB -->
     <div id="view-ch" class="hidden">
-      <div class="chips" id="yrChips">
-        <button class="chip on" onclick="setYrFilter('all',this)">All</button>
-        <button class="chip" onclick="setYrFilter('Y3',this)">Y3</button>
-        <button class="chip" onclick="setYrFilter('Y4',this)">Y4</button>
-        <button class="chip" onclick="setYrFilter('Y5',this)">Y5</button>
-        <button class="chip" onclick="setYrFilter('Y6',this)">Y6</button>
-      </div>
       <div class="letter-bar" id="chLetters"></div>
       <div id="chList"></div>
     </div>
@@ -291,7 +286,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 10.07.26b</div>
+  <div class="version">WFA Book Tracker · 11.07.26a</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -401,7 +396,7 @@ const API_KEY = 'wfa_rc_api_url';
 const HARDCODED_URL = 'https://script.google.com/macros/s/AKfycbyXw7lwvL5O1xJApGdKGM_R-zQDfbC_kWZcAf9yUS0VwOjmVWnigAsDEcfxbwjoAe1B/exec';
 let apiUrl  = localStorage.getItem(API_KEY) || HARDCODED_URL;
 let children = [], books = [], serverCoverOverrides = {};
-let phase      = 'LKS2';
+let phase      = 'Y3';
 let pickPhase  = 'LKS2'; // phase used inside the book picker (can differ from header phase)
 let yrFilter   = 'all';
 let chLetterFilter = 'all';
@@ -632,10 +627,14 @@ function showTab(t) {
   render();
 }
 
+function phaseToBookPhase(p) {
+  return ['Y3','Y4'].includes(p) ? 'LKS2' : 'UKS2';
+}
+
 function setPhase(p) {
   phase = p;
-  document.querySelectorAll('.phase-btn').forEach((b, i) =>
-    b.classList.toggle('on', (i === 0 && p === 'LKS2') || (i === 1 && p === 'UKS2'))
+  document.querySelectorAll('.phase-btn').forEach(b =>
+    b.classList.toggle('on', b.textContent.trim() === p)
   );
   selChild = null;
   chLetterFilter = 'all';
@@ -657,7 +656,7 @@ function render() {
 // CHECK OUT TAB
 // ════════════════════════════════════════════════
 function phaseChildren() {
-  const yrs = phase === 'LKS2' ? ['Y3','Y4'] : ['Y5','Y6'];
+  const yrs = [phase];
   return children.filter(c => yrs.includes(c.yearGroup));
 }
 
@@ -849,10 +848,9 @@ async function doCheckout(bookId, copyNum, title) {
 // RETURNS TAB
 // ════════════════════════════════════════════════
 function renderReturns() {
-  const phYrs = phase === 'LKS2' ? ['Y3','Y4'] : ['Y5','Y6'];
   const cos = [];
   children.forEach(c => {
-    if (!phYrs.includes(c.yearGroup)) return;
+    if (c.yearGroup !== phase) return;
     c.activeCheckouts.forEach(co => {
       const bk = books.find(b => b.id === co.bookId);
       cos.push({ ...co, child: c, book: bk });
@@ -860,8 +858,8 @@ function renderReturns() {
   });
   cos.sort((a,b) => a.child.name.localeCompare(b.child.name));
 
-  const totalAvail = books.filter(b => b.phase === phase).reduce((s,b) => s+b.available, 0);
-  const totalCh    = children.filter(c => phYrs.includes(c.yearGroup)).length;
+  const totalAvail = books.filter(b => b.phase === phaseToBookPhase(phase)).reduce((s,b) => s+b.available, 0);
+  const totalCh    = children.filter(c => c.yearGroup === phase).length;
 
   document.getElementById('retStats').innerHTML = `
     <div class="stats">
@@ -1106,8 +1104,7 @@ function buildLetterBar(elId, letters, active, onclickFn) {
 }
 
 function renderChildren() {
-  const phYrs = phase === 'LKS2' ? ['Y3','Y4'] : ['Y5','Y6'];
-  let list = children.filter(c => phYrs.includes(c.yearGroup));
+  let list = children.filter(c => c.yearGroup === phase);
   if (yrFilter !== 'all') list = list.filter(c => c.yearGroup === yrFilter);
   list.sort((a,b) => a.name.localeCompare(b.name));
 
@@ -1149,7 +1146,7 @@ function renderChildren() {
 // BOOKS TAB
 // ════════════════════════════════════════════════
 function renderBooks() {
-  let list = books.filter(b => b.phase === phase).sort((a,b) => a.title.localeCompare(b.title));
+  let list = books.filter(b => b.phase === phaseToBookPhase(phase)).sort((a,b) => a.title.localeCompare(b.title));
 
   const q = (document.getElementById('bookSearch')?.value || '').toLowerCase().trim();
   if (q) list = list.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
