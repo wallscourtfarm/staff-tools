@@ -273,7 +273,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26r</div>
+  <div class="version">11.07.26s</div>
 </div>
 
 <script>
@@ -629,8 +629,8 @@ function genY5Arith(t) {
   if (t.y5Percentages){const a=rand(2,20)*4;qs.push({text:`25% of ${a} =`,answer:a/4,marks:1});}else qs.push(tt());
   if (t.y5Percentages){const a=rand(2,20)*10;qs.push({text:`10% of ${a} =`,answer:a/10,marks:1});}else qs.push(tt());
   if (t.y5Percentages){const a=rand(2,20)*4;qs.push({text:`75% of ${a} =`,answer:a*3/4,marks:1});}else qs.push(tt());
-  // Fraction of amount
-  if (t.y5Fractions){const d=pick([3,4,5,6,8,10]),n=rand(1,d-1),a=d*rand(2,12);qs.push({text:`${n}/${d} of ${a} =`,answer:n*a/d,marks:1});}else qs.push(tt());
+  // Fraction of amount — non-unit fractions with substantial amounts (Y5 level)
+  if (t.y5Fractions){const d=pick([3,4,5,6,8,10]),n=rand(2,d-1),a=d*rand(5,15);qs.push({text:`${n}/${d} of ${a} =`,answer:n*a/d,marks:1});}else qs.push(tt());
   // Missing numbers
   if (t.y5Missing){const p=rand(100,999),q=rand(p+100,p+5000);qs.push({text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1});}else qs.push(tt());
   // Times tables extended
@@ -713,10 +713,10 @@ function genY6Arith(t, sortByYear) {
     const a=rand(2,12),b=rand(8,12); slots.push({text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y4'});
   } else slots.push(tf('Y4'));
   if (t.y6Y4content) {
-    // Place value: large number with missing part
-    const millions=rand(1,9),thousands=rand(0,999),ones=rand(10,999);
-    const total=millions*1000000+thousands*1000+ones;
-    slots.push({text:`${total.toLocaleString()} = ${millions},000,000 + [BOX] + ${ones}`,answer:thousands*1000,box:true,marks:1,yg:'Y4'});
+    // Place value: 4-digit number decomposition (Y4 = numbers to 10,000)
+    const th=rand(1,9),h=rand(1,9),t_=rand(10,99);
+    const total=th*1000+h*100+t_;
+    slots.push({text:`${total.toLocaleString()} = ${th},000 + [BOX] + ${t_}`,answer:h*100,box:true,marks:1,yg:'Y4'});
   } else slots.push(tf('Y4'));
   if (t.y6Y4content) {
     const d=rand(3,9),q=rand(11,50); slots.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1,yg:'Y4'});
@@ -748,7 +748,7 @@ function genY6Arith(t, sortByYear) {
     slots.push({frac:[[n1,d1],[n2,d2]],fracOp:'-',answer:fracStr(an,lcd),marks:1,yg:'Y5'});
   } else slots.push(tf('Y5'));
   if (t.y6Y5fractions) {
-    const d=pick([3,4,5,6,8,10]),n=rand(1,d-1),a=d*rand(2,10);
+    const d=pick([3,4,5,6,8,10]),n=rand(2,d-1),a=d*rand(5,15);
     slots.push({text:`${n}/${d} of ${a} =`,answer:n*a/d,marks:1,yg:'Y5'});
   } else slots.push(tf('Y5'));
   if (t.y6Y5percentages) {
@@ -764,13 +764,14 @@ function genY6Arith(t, sortByYear) {
     slots[slots.length-1]={text:`${big.toLocaleString()} - ${small.toLocaleString()} =`,answer:big-small,marks:1,yg:'Y5'};
   } else slots.push(tf('Y5'));
 
-  // ── Y6 slots (11 questions: 4×2m + 7×1m = 15 marks) ─────────────────────
+  // ── Y6 slots (long div + BODMAS + dividing fractions = true Y6 content) ────
+  // Long multiplication is Y5 curriculum — tagged Y5
   if (t.y6LongMult) {
-    const a=rand(100,999),b=rand(11,99); slots.push({longMult:{a,b},answer:a*b,marks:2,yg:'Y6'});
-  } else slots.push({...tf('Y6'),work:true,marks:1});
+    const a=rand(100,999),b=rand(11,99); slots.push({longMult:{a,b},answer:a*b,marks:2,yg:'Y5'});
+  } else slots.push({...tf('Y5'),work:true,marks:1});
   if (t.y6LongMult) {
-    const a=rand(1000,9999),b=rand(12,79); slots.push({longMult:{a,b},answer:a*b,marks:2,yg:'Y6'});
-  } else slots.push({...tf('Y6'),work:true,marks:1});
+    const a=rand(1000,9999),b=rand(12,79); slots.push({longMult:{a,b},answer:a*b,marks:2,yg:'Y5'});
+  } else slots.push({...tf('Y5'),work:true,marks:1});
   if (t.y6LongDiv) {
     let d,q;do{d=rand(11,49);q=rand(12,99);}while(d*q>9999||d*q<300);
     slots.push({longDiv:{divisor:d,dividend:d*q},answer:q,marks:2,yg:'Y6'});
