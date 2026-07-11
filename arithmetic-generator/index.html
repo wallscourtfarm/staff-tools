@@ -170,7 +170,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
 
   <!-- Reasoning (Y4 only) -->
   <div class="card" id="topicCardReasoning" style="display:none">
-    <h2>💡 Paper 2 — Reasoning <small style="font-weight:normal;font-size:.8em;color:#666">(Y4 only — AI generated)</small></h2>
+    <h2>💡 Paper 2 — Reasoning <small style="font-weight:normal;font-size:.8em;color:#666">(AI generated)</small></h2>
     <div class="toggle-row" style="margin-bottom:10px">
       <input type="checkbox" id="includeReasoning" checked>
       <label for="includeReasoning">Include reasoning paper</label>
@@ -247,7 +247,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26i</div>
+  <div class="version">11.07.26j</div>
 </div>
 
 <script>
@@ -336,7 +336,7 @@ function updateTopicCards() {
   document.getElementById('topicCardY4').style.display = levelsInUse.has('Y4') ? '' : 'none';
   document.getElementById('topicCardY5').style.display = levelsInUse.has('Y5') ? '' : 'none';
   document.getElementById('topicCardY6').style.display = levelsInUse.has('Y6') ? '' : 'none';
-  document.getElementById('topicCardReasoning').style.display = standardLevel === 'Y4' ? '' : 'none';
+  document.getElementById('topicCardReasoning').style.display = ['Y4','Y5','Y6'].includes(standardLevel) ? '' : 'none';
 
   document.getElementById('classYearHint').textContent = classYear;
 }
@@ -791,6 +791,28 @@ function genArith(level) {
 }
 
 // ─── REASONING — API CALL ────────────────────────────────────────────────────
+const Y5_SCOPE = `Year 5 maths curriculum (pitch all questions here):
+- Number & Place Value: numbers to 1,000,000; round to nearest 10/100/1000/10000/100000; negative numbers; Roman numerals to 1000
+- Addition & Subtraction: multi-digit column addition/subtraction including more than 4 digits
+- Multiplication & Division: multiples, factors, prime numbers, prime factors, composite numbers; square/cube numbers; multiply/divide by 10/100/1000 (integers and decimals); short multiplication; short division with remainders; long multiplication (up to 4-digit × 2-digit)
+- Fractions: equivalent fractions; compare/order fractions (different denominators); convert improper/mixed; add/subtract fractions (different denominators, related denominators); multiply fractions by integers/whole numbers; fractions of amounts
+- Decimals: 3 decimal places; multiply/divide decimals by 10/100/1000; round decimals; percentages as fractions/decimals; equivalent fractions/decimals/percentages (key facts: 50%=½, 25%=¼, 10%=1/10)
+- Geometry: properties of rectangles/regular shapes; 3D shapes; reflection/translation; angles (sum of triangle=180°, on a line=180°, at a point=360°); measuring angles
+- Measurement: converting units (metric); area of rectangles/compound shapes; volume of cuboids; perimeter problems
+- Statistics: line graphs; tables; timetables`;
+
+const Y6_SCOPE = `Year 6 maths curriculum (pitch all questions here):
+- Number & Place Value: numbers to 10,000,000; negative numbers; rounding
+- Addition & Subtraction: multi-step problems; mental strategies
+- Multiplication & Division: long multiplication and division; order of operations (BODMAS); factors, multiples, primes; common factors and multiples
+- Fractions: simplify fractions; common denominators; add/subtract/multiply/divide fractions; fractions ÷ integers; fractions of amounts; fraction/decimal/percentage equivalence
+- Ratio & Proportion: scale factors; ratio notation; unequal sharing; percentage of an amount (inc. non-calculator methods); percentage increase/decrease
+- Algebra: simple formulae; number sequences; 1- and 2-step equations; pairs of values; enumerate possibilities
+- Geometry: angles in triangles/quadrilaterals/polygons; circles (radius/diameter); reflection/translation in all four quadrants; 3D nets; volume
+- Measurement: convert metric/imperial; area of parallelograms/triangles; perimeter; volume of cuboids
+- Statistics: pie charts; line graphs; mean; interpret and construct charts/tables
+- Coordinates: all four quadrants`;
+
 const Y4_SCOPE = `Year 4 maths curriculum (pitch all questions here):
 - Number & Place Value: 4-digit numbers, round to 10/100/1000, negative numbers in context, Roman numerals to 100
 - Addition & Subtraction: column methods with 4-digit numbers
@@ -803,7 +825,7 @@ const Y4_SCOPE = `Year 4 maths curriculum (pitch all questions here):
 - Statistics: bar charts, line graphs — read and interpret scales
 - Time: 12/24-hour clock, durations, intervals`;
 
-async function fetchReasoningQs(topicKeys) {
+async function fetchReasoningQs(topicKeys, yearGroup) {
   const topicNames = {
     r_placeValue:'Number and place value (rounding, digit value, negative numbers, Roman numerals)',
     r_sequences:'Number sequences (counting patterns, missing terms, rules)',
@@ -817,10 +839,11 @@ async function fetchReasoningQs(topicKeys) {
     r_decimals:'Decimals and number lines (place value, ordering, locating on a number line)',
   };
   const enabled = topicKeys.filter(k => topicNames[k]).map(k => topicNames[k]);
-  const prompt = `Generate exactly 10 reasoning questions for a Year 4 weekly assessment paper (Paper 2).
+  const scope = yearGroup === 'Y6' ? Y6_SCOPE : yearGroup === 'Y5' ? Y5_SCOPE : Y4_SCOPE;
+  const prompt = `Generate exactly 10 reasoning questions for a ${yearGroup} weekly assessment paper (Paper 2).
 
 CURRICULUM SCOPE:
-${Y4_SCOPE}
+${scope}
 
 ENABLED TOPIC AREAS (draw from these — spread questions across at least 5 different topics):
 ${enabled.map((t,i)=>`${i+1}. ${t}`).join('\n')}
@@ -884,12 +907,12 @@ async function generateAll() {
   });
 
   let reasoningQs = null;
-  if (includeReasoning && standardLevel === 'Y4') {
+  if (includeReasoning && ['Y4','Y5','Y6'].includes(standardLevel)) {
     try {
       setStatus('generating', 'Generating reasoning questions via AI (takes ~5–10 seconds)…');
       const tR = getTopics('topicsY4R');
       const enabledTopics = Object.keys(tR).filter(k => tR[k]);
-      reasoningQs = await fetchReasoningQs(enabledTopics);
+      reasoningQs = await fetchReasoningQs(enabledTopics, standardLevel);
     } catch (err) {
       setStatus('error', `⚠️ Reasoning generation failed: ${err.message}. Arithmetic papers are still ready.`);
     }
