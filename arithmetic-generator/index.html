@@ -278,7 +278,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26aj</div>
+  <div class="version">11.07.26ak</div>
 </div>
 
 <script>
@@ -1054,8 +1054,8 @@ async function generateAll() {
   paperBtns.innerHTML = '';
   const stdBtn = document.createElement('button');
   stdBtn.className = 'btn btn-primary';
-  stdBtn.textContent = `🖨 Print Standard Paper (${standardLevel} — /${totalMarks})`;
-  stdBtn.onclick = () => printPaper('standard');
+  stdBtn.textContent = `💾 Download Standard PDF (${standardLevel} — /${totalMarks})`;
+  stdBtn.onclick = () => downloadStandardPaper(stdBtn);
   paperBtns.appendChild(stdBtn);
 
   adapted.forEach((g, i) => {
@@ -1067,6 +1067,15 @@ async function generateAll() {
     btn2.onclick = () => downloadAdaptedPapers(i, btn2);
     paperBtns.appendChild(btn2);
   });
+
+  if (adapted.length > 0) {
+    const allBtn = document.createElement('button');
+    allBtn.className = 'btn btn-navy';
+    allBtn.style.background = '#27ae60';
+    allBtn.textContent = `📦 Download All Papers (ZIP)`;
+    allBtn.onclick = () => downloadAllPapers(allBtn);
+    paperBtns.appendChild(allBtn);
+  }
 
   document.getElementById('printButtons').style.display = '';
   const qCount = standardArith.length;
@@ -1400,6 +1409,71 @@ function printPaper(type, adaptedIdx) {
   win.onload = () => { setTimeout(() => win.print(), 300); };
 }
 
+const PDF_API = 'https://api.wallscourt-farm-academy.co.uk/pdf';
+
+async function _downloadBlob(url, filename) {
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function _postPDF(endpoint, body) {
+  const res = await fetch(PDF_API + endpoint, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Server ${res.status}: ${await res.text().catch(()=>'')}`);
+  return res.blob();
+}
+
+async function downloadStandardPaper(btn) {
+  const {label, classYear, standardArith, reasoningQs, standardLevel} = generatedPapers;
+  const origLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating PDF…';
+  try {
+    const html = buildPaperHTML(classYear, label, standardArith, reasoningQs, null);
+    const filename = `${classYear} ${label} - Standard (${standardLevel}).pdf`;
+    const blob = await _postPDF('/generate', {html, filename});
+    _downloadBlob(URL.createObjectURL(blob), filename);
+    btn.textContent = '✅ Downloaded';
+  } catch(e) {
+    btn.textContent = '❌ Failed'; console.error(e);
+  }
+  setTimeout(() => { btn.disabled = false; btn.textContent = origLabel; }, 3000);
+}
+
+async function downloadAllPapers(btn) {
+  const {label, classYear, standardArith, standardLevel, reasoningQs, adapted} = generatedPapers;
+  const origLabel = btn.textContent;
+  btn.disabled = true;
+  const papers = [];
+  papers.push({
+    html: buildPaperHTML(classYear, label, standardArith, reasoningQs, null),
+    filename: `${classYear} ${label} - Standard (${standardLevel}).pdf`,
+  });
+  adapted.forEach(g => {
+    const names = g.names.length > 0 ? g.names : ['Pupil'];
+    names.forEach(name => papers.push({
+      html: buildPaperHTML(classYear, label, g.arithQs, null, [name]),
+      filename: `${classYear} ${label} - ${name} (${g.level}).pdf`,
+    }));
+  });
+  btn.textContent = `⏳ Generating ${papers.length} PDFs…`;
+  try {
+    const zip_filename = `${classYear} ${label} - All Papers.zip`;
+    const blob = await _postPDF('/generate-zip', {papers, zip_filename});
+    _downloadBlob(URL.createObjectURL(blob), zip_filename);
+    btn.textContent = '✅ ZIP downloaded';
+  } catch(e) {
+    btn.textContent = '❌ Failed'; console.error(e);
+  }
+  setTimeout(() => { btn.disabled = false; btn.textContent = origLabel; }, 3000);
+}
+
 async function downloadAdaptedPapers(adaptedIdx, btn) {
   const {label, classYear, adapted} = generatedPapers;
   const g = adapted[adaptedIdx];
@@ -1411,30 +1485,14 @@ async function downloadAdaptedPapers(adaptedIdx, btn) {
   btn.textContent = `⏳ Generating ${names.length} PDF${names.length!==1?'s':''}…`;
 
   try {
-    for (let ni = 0; ni < names.length; ni++) {
-      const name = names[ni];
-      btn.textContent = `⏳ Generating PDF ${ni+1} of ${names.length} (${name})…`;
-      const html = buildPaperHTML(classYear, label, g.arithQs, null, [name]);
-      const filename = `${classYear} ${label} - ${name}.pdf`;
-      const res = await fetch('https://api.wallscourt-farm-academy.co.uk/pdf/generate', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({html, filename}),
-      });
-      if (!res.ok) {
-        const detail = await res.text().catch(() => res.status);
-        throw new Error(`Server error for ${name}: ${detail}`);
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
+    btn.textContent = `⏳ Generating ${names.length} PDF${names.length!==1?'s':''}…`;
+    const papers = names.map(name => ({
+      html: buildPaperHTML(classYear, label, g.arithQs, null, [name]),
+      filename: `${classYear} ${label} - ${name} (${g.level}).pdf`,
+    }));
+    const zip_filename = `${classYear} ${label} - ${g.level} Group.zip`;
+    const blob = await _postPDF('/generate-zip', {papers, zip_filename});
+    _downloadBlob(URL.createObjectURL(blob), zip_filename);
     btn.textContent = `✅ ${names.length} PDF${names.length!==1?'s':''} downloaded`;
   } catch(e) {
     btn.textContent = '❌ PDF generation failed';
