@@ -272,13 +272,13 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <div id="printButtons" style="display:none;margin-top:14px;border-top:1px solid #eee;padding-top:14px">
       <div class="actions" id="paperBtns"></div>
       <div style="margin-top:10px">
-        <button class="btn btn-amber" onclick="printAnswers()">🗒 Print Answer Sheet (all papers)</button>
+        <button class="btn btn-amber" id="answerSheetBtn" onclick="downloadAnswerSheet(this)">🗒 Download Answer Sheet (PDF)</button>
       </div>
     </div>
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26ak</div>
+  <div class="version">11.07.26al</div>
 </div>
 
 <script>
@@ -1462,9 +1462,13 @@ async function downloadAllPapers(btn) {
       filename: `${classYear} ${label} - ${name} (${g.level}).pdf`,
     }));
   });
+  papers.push({
+    html: buildAnswerSheetHTML(),
+    filename: `${classYear} ${label} - Answers.pdf`,
+  });
   btn.textContent = `⏳ Generating ${papers.length} PDFs…`;
   try {
-    const zip_filename = `${classYear} ${label} - All Papers.zip`;
+    const zip_filename = `Arithmetic ${label}.zip`;
     const blob = await _postPDF('/generate-zip', {papers, zip_filename});
     _downloadBlob(URL.createObjectURL(blob), zip_filename);
     btn.textContent = '✅ ZIP downloaded';
@@ -1490,7 +1494,7 @@ async function downloadAdaptedPapers(adaptedIdx, btn) {
       html: buildPaperHTML(classYear, label, g.arithQs, null, [name]),
       filename: `${classYear} ${label} - ${name} (${g.level}).pdf`,
     }));
-    const zip_filename = `${classYear} ${label} - ${g.level} Group.zip`;
+    const zip_filename = `Arithmetic ${label} - ${g.level} Group.zip`;
     const blob = await _postPDF('/generate-zip', {papers, zip_filename});
     _downloadBlob(URL.createObjectURL(blob), zip_filename);
     btn.textContent = `✅ ${names.length} PDF${names.length!==1?'s':''} downloaded`;
@@ -1501,13 +1505,22 @@ async function downloadAdaptedPapers(adaptedIdx, btn) {
   setTimeout(() => { btn.disabled = false; btn.textContent = originalLabel; }, 4000);
 }
 
-function printAnswers() {
+async function downloadAnswerSheet(btn) {
   if (!generatedPapers) return;
-  const html = buildAnswerSheetHTML();
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
-  win.onload = () => { setTimeout(() => win.print(), 300); };
+  const {label, classYear} = generatedPapers;
+  const origLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating PDF…';
+  try {
+    const html = buildAnswerSheetHTML();
+    const filename = `${classYear} ${label} - Answers.pdf`;
+    const blob = await _postPDF('/generate', {html, filename});
+    _downloadBlob(URL.createObjectURL(blob), filename);
+    btn.textContent = '✅ Downloaded';
+  } catch(e) {
+    btn.textContent = '❌ Failed'; console.error(e);
+  }
+  setTimeout(() => { btn.disabled = false; btn.textContent = origLabel; }, 3000);
 }
 </script>
 </body>
