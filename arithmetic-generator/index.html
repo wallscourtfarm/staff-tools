@@ -166,26 +166,28 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
       <label class="topic-item"><input type="checkbox" checked data-topic="fractions"><span>Fractions (same denominator)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="missingNumbers"><span>Missing numbers</span></label>
     </div>
-    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #eee">
-      <h2 style="margin-bottom:10px">💡 Paper 2 — Reasoning</h2>
-      <div class="toggle-row">
-        <input type="checkbox" id="includeReasoning" checked>
-        <label for="includeReasoning">Include reasoning paper</label>
-        <small>(generated via AI — takes ~5 seconds)</small>
-      </div>
-      <div id="reasoningTopics">
-        <div class="topic-grid" id="topicsY4R">
-          <label class="topic-item"><input type="checkbox" checked data-topic="r_placeValue"><span>Place value &amp; ordering</span></label>
-          <label class="topic-item"><input type="checkbox" checked data-topic="r_sequences"><span>Sequences</span></label>
-          <label class="topic-item"><input type="checkbox" checked data-topic="r_multDiv"><span>Multiplication &amp; division</span></label>
-          <label class="topic-item"><input type="checkbox" checked data-topic="r_fractions"><span>Fractions of amounts</span></label>
-          <label class="topic-item"><input type="checkbox" checked data-topic="r_measurement"><span>Measurement &amp; perimeter</span></label>
-          <label class="topic-item"><input type="checkbox" checked data-topic="r_money"><span>Money (include 2-mark)</span></label>
-          <label class="topic-item"><input type="checkbox" checked data-topic="r_time"><span>Time</span></label>
-          <label class="topic-item"><input type="checkbox" checked data-topic="r_stats"><span>Statistics / data</span></label>
-          <label class="topic-item"><input type="checkbox" checked data-topic="r_geometry"><span>Geometry &amp; symmetry</span></label>
-          <label class="topic-item"><input type="checkbox" checked data-topic="r_decimals"><span>Decimals &amp; number lines</span></label>
-        </div>
+  </div>
+
+  <!-- Reasoning (Y4 only) -->
+  <div class="card" id="topicCardReasoning" style="display:none">
+    <h2>💡 Paper 2 — Reasoning <small style="font-weight:normal;font-size:.8em;color:#666">(Y4 only — AI generated)</small></h2>
+    <div class="toggle-row" style="margin-bottom:10px">
+      <input type="checkbox" id="includeReasoning" checked>
+      <label for="includeReasoning">Include reasoning paper</label>
+      <small>(takes ~5 seconds)</small>
+    </div>
+    <div id="reasoningTopics">
+      <div class="topic-grid" id="topicsY4R">
+        <label class="topic-item"><input type="checkbox" checked data-topic="r_placeValue"><span>Place value &amp; ordering</span></label>
+        <label class="topic-item"><input type="checkbox" checked data-topic="r_sequences"><span>Sequences</span></label>
+        <label class="topic-item"><input type="checkbox" checked data-topic="r_multDiv"><span>Multiplication &amp; division</span></label>
+        <label class="topic-item"><input type="checkbox" checked data-topic="r_fractions"><span>Fractions of amounts</span></label>
+        <label class="topic-item"><input type="checkbox" checked data-topic="r_measurement"><span>Measurement &amp; perimeter</span></label>
+        <label class="topic-item"><input type="checkbox" checked data-topic="r_money"><span>Money (include 2-mark)</span></label>
+        <label class="topic-item"><input type="checkbox" checked data-topic="r_time"><span>Time</span></label>
+        <label class="topic-item"><input type="checkbox" checked data-topic="r_stats"><span>Statistics / data</span></label>
+        <label class="topic-item"><input type="checkbox" checked data-topic="r_geometry"><span>Geometry &amp; symmetry</span></label>
+        <label class="topic-item"><input type="checkbox" checked data-topic="r_decimals"><span>Decimals &amp; number lines</span></label>
       </div>
     </div>
   </div>
@@ -245,7 +247,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26h</div>
+  <div class="version">11.07.26i</div>
 </div>
 
 <script>
@@ -334,6 +336,7 @@ function updateTopicCards() {
   document.getElementById('topicCardY4').style.display = levelsInUse.has('Y4') ? '' : 'none';
   document.getElementById('topicCardY5').style.display = levelsInUse.has('Y5') ? '' : 'none';
   document.getElementById('topicCardY6').style.display = levelsInUse.has('Y6') ? '' : 'none';
+  document.getElementById('topicCardReasoning').style.display = standardLevel === 'Y4' ? '' : 'none';
 
   document.getElementById('classYearHint').textContent = classYear;
 }
@@ -967,6 +970,7 @@ function qToHTML(q, qNum) {
     <div class="q-left">
       <span class="q-num">${qNum}</span>
       ${isLongCalc ? '<span class="q-show-method">Show<br>your<br>method</span>' : ''}
+      ${q.yg ? `<span class="q-yg q-yg-${q.yg}">${q.yg}</span>` : ''}
     </div>
     <div class="q-main"${isLongCalc ? ' style="background-position:0 0"' : ''}>${mainContent}<div class="q-ans"></div></div>
     <div class="q-strip"><div class="mark-box"></div><div class="mark-lbl">${marks} mark${marks>1?'s':''}</div></div>
@@ -1074,7 +1078,7 @@ function buildPaperHTML(classYear, label, arithQs, reasoningQs, pupilNames) {
 
   const y6ScoreRow = subsetMarks !== null
     ? `<div class="arith-y6-scores">
-        <span class="y6-score-box">Y3/4/5 score: _______ / ${subsetMarks}</span>
+        <span class="y6-score-box">Y3/4/5 questions <span style="font-size:8pt;font-weight:normal">(look for coloured tags)</span>: _______ / ${subsetMarks}</span>
         <span class="y6-score-box">Total: _______ / ${totalMarks}</span>
        </div>`
     : '';
@@ -1119,6 +1123,8 @@ function buildPaperHTML(classYear, label, arithQs, reasoningQs, pupilNames) {
     .q-strip{width:19mm;border-left:0.8px solid #444;background:#c8dcf0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:4mm;flex-shrink:0}
     .mark-box{width:11mm;height:11mm;border:0.8px solid #555;background:white}
     .mark-lbl{font-size:7pt;text-align:center;margin-top:1.5mm;font-weight:bold}
+    .q-yg{font-size:6.5pt;font-weight:900;text-align:center;margin-top:auto;padding:1px 2px;border-radius:2px;color:white}
+    .q-yg-Y3{background:#e67e22}.q-yg-Y4{background:#27ae60}.q-yg-Y5{background:#8e44ad}.q-yg-Y6{background:#2e6fad}
     /* ── Long multiplication ── */
     .lm{position:absolute;top:calc(2*6.5mm);left:calc(2*6.5mm);display:inline-flex;flex-direction:column;font-size:13pt;font-weight:bold}
     .lm-row{display:flex}
