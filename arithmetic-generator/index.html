@@ -247,7 +247,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26l</div>
+  <div class="version">11.07.26m</div>
 </div>
 
 <script>
@@ -751,23 +751,22 @@ function genY6Arith(t, sortByYear) {
     const a=pick([120,150,200,240,250,300,360,400,500,600,700,800,900]);
     slots.push({text:`${pct}% of ${a} =`,answer:a*pct/100,marks:1,yg:'Y6'});
   } else slots.push(tf('Y6'));
-  if (t.y6PctComplex) {
-    const pct=pick([38,43,52,65,85,95,97]);
-    const a=pick([200,300,400,500,600,680,750,800,1200,2300]);
-    slots.push({text:`${pct}% of ${a} =`,answer:a*pct/100,marks:1,yg:'Y6'});
-  } else slots.push(tf('Y6'));
-  if (t.y6FracOps) {
-    const n1=rand(1,4),d1=pick([3,4,5,6]),n2=rand(1,4),d2=pick([3,4,5,6]);
-    const lcd=d1*d2/gcd(d1,d2),rn=n1*n2,rd=d1*d2;const g=gcd(rn,rd);
-    slots.push({text:`${n1}/${d1} × ${n2}/${d2} =`,answer:fracStr(rn/g,rd/g),marks:1,yg:'Y6'});
-  } else slots.push(tf('Y6'));
   if (t.y6Bodmas) {
-    const pat=pick(['brk_mult','brk_sq','brk_sub_sq']);
+    const pat=pick(['brk_mult','brk_sq','brk_div_sq']);
     let bt,ba;
     if(pat==='brk_mult'){const a=rand(2,9),b=rand(2,9),c=rand(2,12);bt=`(${a} + ${b}) × ${c} =`;ba=(a+b)*c;}
     else if(pat==='brk_sq'){const a=rand(2,6),b=pick([2,3,4]),c=rand(2,6);bt=`(${a} + ${b}<sup>2</sup>) × ${c} =`;ba=(a+b*b)*c;}
-    else{const a=rand(2,9),b=rand(2,9),c=pick([2,3]);bt=`(${a} + ${b}) × ${c} − ${c*c} =`;ba=(a+b)*c-c*c;}
+    else{const b=pick([2,3,4]),div=pick([3,5,7]);const minQ=Math.ceil((b*b+1)/div);const q=rand(Math.max(2,minQ),Math.min(9,minQ+4));const x=div*q-b*b;bt=`(${b}<sup>2</sup> + ${x}) ÷ ${div} =`;ba=q;}
     slots.push({text:bt,answer:ba,marks:1,yg:'Y6'});
+  } else slots.push(tf('Y6'));
+  if (t.y6FracOps) {
+    const n1=rand(1,4),d1=pick([3,4,5,6]),n2=rand(1,4),d2=pick([3,4,5,6]);
+    const rn=n1*n2,rd=d1*d2,g=gcd(rn,rd);
+    slots.push({text:`${n1}/${d1} × ${n2}/${d2} =`,answer:fracStr(rn/g,rd/g),marks:1,yg:'Y6'});
+  } else slots.push(tf('Y6'));
+  if (t.y6FracOps) {
+    const d=pick([3,4,5,6,8]),n=rand(1,d-1),m=rand(2,6);
+    slots.push({text:`${n}/${d} ÷ ${m} =`,answer:fracStr(n,d*m),marks:1,yg:'Y6'});
   } else slots.push(tf('Y6'));
   if (t.y6MixedNums) {
     const d=pick([4,5,8,10]),n1=rand(1,d-1),n2=rand(1,d-1),w1=rand(2,8),w2=rand(1,3);
