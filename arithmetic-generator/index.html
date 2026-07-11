@@ -270,15 +270,12 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     </div>
     <div id="statusBar" class="status-bar"></div>
     <div id="printButtons" style="display:none;margin-top:14px;border-top:1px solid #eee;padding-top:14px">
-      <div class="actions" id="paperBtns"></div>
-      <div style="margin-top:10px">
-        <button class="btn btn-amber" id="answerSheetBtn" onclick="downloadAnswerSheet(this)">🗒 Download Answer Sheet (PDF)</button>
-      </div>
+      <div id="paperBtns"></div>
     </div>
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26al</div>
+  <div class="version">11.07.26am</div>
 </div>
 
 <script>
@@ -1052,11 +1049,26 @@ async function generateAll() {
 
   const paperBtns = document.getElementById('paperBtns');
   paperBtns.innerHTML = '';
+
+  // ZIP button — full width, only when there are adapted groups
+  if (adapted.length > 0) {
+    const allBtn = document.createElement('button');
+    allBtn.className = 'btn';
+    allBtn.style.cssText = 'background:#27ae60;color:white;width:100%;margin-bottom:10px;font-size:1.05rem';
+    allBtn.textContent = `📦 Download All Papers (ZIP)`;
+    allBtn.onclick = () => downloadAllPapers(allBtn);
+    paperBtns.appendChild(allBtn);
+  }
+
+  // 2-column grid for individual paper buttons + answer sheet
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px';
+
   const stdBtn = document.createElement('button');
   stdBtn.className = 'btn btn-primary';
   stdBtn.textContent = `💾 Download Standard PDF (${standardLevel} — /${totalMarks})`;
   stdBtn.onclick = () => downloadStandardPaper(stdBtn);
-  paperBtns.appendChild(stdBtn);
+  grid.appendChild(stdBtn);
 
   adapted.forEach((g, i) => {
     const gMarks = g.arithQs.reduce((s,q)=>s+(q.marks||1),0);
@@ -1065,17 +1077,16 @@ async function generateAll() {
     const nPupils = g.names.length || 1;
     btn2.textContent = `💾 Download Adapted PDFs (${g.level} /${gMarks}) — ${nPupils} pupil${nPupils!==1?'s':''}`;
     btn2.onclick = () => downloadAdaptedPapers(i, btn2);
-    paperBtns.appendChild(btn2);
+    grid.appendChild(btn2);
   });
 
-  if (adapted.length > 0) {
-    const allBtn = document.createElement('button');
-    allBtn.className = 'btn btn-navy';
-    allBtn.style.background = '#27ae60';
-    allBtn.textContent = `📦 Download All Papers (ZIP)`;
-    allBtn.onclick = () => downloadAllPapers(allBtn);
-    paperBtns.appendChild(allBtn);
-  }
+  const ansBtn = document.createElement('button');
+  ansBtn.className = 'btn btn-amber';
+  ansBtn.textContent = `🗒 Download Answer Sheet (PDF)`;
+  ansBtn.onclick = () => downloadAnswerSheet(ansBtn);
+  grid.appendChild(ansBtn);
+
+  paperBtns.appendChild(grid);
 
   document.getElementById('printButtons').style.display = '';
   const qCount = standardArith.length;
