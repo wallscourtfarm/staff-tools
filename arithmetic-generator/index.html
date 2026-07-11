@@ -247,7 +247,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26k</div>
+  <div class="version">11.07.26l</div>
 </div>
 
 <script>
@@ -739,8 +739,12 @@ function genY6Arith(t, sortByYear) {
     slots.push({longDiv:{divisor:d,dividend:d*q},answer:q,marks:2,yg:'Y6'});
   } else slots.push({...tf('Y6'),work:true,marks:1});
   if (t.y6Bodmas) {
-    const a=rand(2,9),b=rand(2,9),c=rand(2,12),d=rand(2,6);
-    slots.push({text:`${a} + ${b} × ${c} =`,answer:a+b*c,marks:1,yg:'Y6'});
+    const pat=pick(['sq_add','cube_sub','sq_mult']);
+    let bt,ba;
+    if(pat==='sq_add'){const a=rand(2,9),b=rand(2,7),c=rand(2,8);bt=`${a} + ${b}<sup>2</sup> × ${c} =`;ba=a+b*b*c;}
+    else if(pat==='cube_sub'){const a=pick([2,3,4]),b=rand(2,9),c=rand(2,9);bt=`${a}<sup>3</sup> − ${b} × ${c} =`;ba=a*a*a-b*c;}
+    else{const a=rand(2,6),b=pick([2,3,4,5]),c=rand(1,9);bt=`${a} × ${b}<sup>2</sup> − ${c} =`;ba=a*b*b-c;}
+    slots.push({text:bt,answer:ba,marks:1,yg:'Y6'});
   } else slots.push(tf('Y6'));
   if (t.y6PctComplex) {
     const pct=pick([20,30,35,40,45,60,65,70,75,80]);
@@ -757,9 +761,13 @@ function genY6Arith(t, sortByYear) {
     const lcd=d1*d2/gcd(d1,d2),rn=n1*n2,rd=d1*d2;const g=gcd(rn,rd);
     slots.push({text:`${n1}/${d1} × ${n2}/${d2} =`,answer:fracStr(rn/g,rd/g),marks:1,yg:'Y6'});
   } else slots.push(tf('Y6'));
-  if (t.y6FracOps) {
-    const d=pick([3,4,5,6,8]),n=rand(1,d-1),m=rand(2,6);
-    slots.push({text:`${n}/${d} ÷ ${m} =`,answer:fracStr(n,d*m),marks:1,yg:'Y6'});
+  if (t.y6Bodmas) {
+    const pat=pick(['brk_mult','brk_sq','brk_sub_sq']);
+    let bt,ba;
+    if(pat==='brk_mult'){const a=rand(2,9),b=rand(2,9),c=rand(2,12);bt=`(${a} + ${b}) × ${c} =`;ba=(a+b)*c;}
+    else if(pat==='brk_sq'){const a=rand(2,6),b=pick([2,3,4]),c=rand(2,6);bt=`(${a} + ${b}<sup>2</sup>) × ${c} =`;ba=(a+b*b)*c;}
+    else{const a=rand(2,9),b=rand(2,9),c=pick([2,3]);bt=`(${a} + ${b}) × ${c} − ${c*c} =`;ba=(a+b)*c-c*c;}
+    slots.push({text:bt,answer:ba,marks:1,yg:'Y6'});
   } else slots.push(tf('Y6'));
   if (t.y6MixedNums) {
     const d=pick([4,5,8,10]),n1=rand(1,d-1),n2=rand(1,d-1),w1=rand(2,8),w2=rand(1,3);
