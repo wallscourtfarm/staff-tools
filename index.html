@@ -7,43 +7,147 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa.css">
 <style>
-  /* Widen the main container beyond the shared stylesheet's 1100px cap */
-  main { max-width: 1600px; padding: 32px 32px; }
+  main { max-width: 1600px; padding: 28px 32px 56px; }
   .header-content { max-width: 1600px; padding: 0 32px; }
 
-  /* Year-group border accents */
-  .y1 { border-left: 5px solid var(--y1); } .y1:hover { border-color: var(--y1); }
-  .y2 { border-left: 5px solid var(--y2); } .y2:hover { border-color: var(--y2); }
-  .y3 { border-left: 5px solid var(--y3); } .y3:hover { border-color: var(--y3); }
-  .y4 { border-left: 5px solid var(--y4); } .y4:hover { border-color: var(--y4); }
-  .y5 { border-left: 5px solid var(--y5); } .y5:hover { border-color: var(--y5); }
-  .y6 { border-left: 5px solid var(--y6); } .y6:hover { border-color: var(--y6); }
+  /* ── Tab strip ── */
+  .tab-strip {
+    position: sticky;
+    top: 0;
+    z-index: 90;
+    background: #fff;
+    border-bottom: 1px solid #d5e3ed;
+    display: flex;
+    padding: 0 28px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tab-strip::-webkit-scrollbar { display: none; }
 
-  /* Denser grid — up to 5 columns, smaller cards */
+  .tab-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #5b7a8a;
+    font-size: 13.5px;
+    font-weight: 500;
+    font-family: inherit;
+    padding: 0 16px;
+    height: 46px;
+    position: relative;
+    white-space: nowrap;
+    transition: color .15s;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .tab-btn .tab-count {
+    font-size: 11px;
+    font-weight: 600;
+    background: #dceef9;
+    color: #1168a8;
+    padding: 1px 6px;
+    border-radius: 20px;
+    letter-spacing: .3px;
+  }
+  .tab-btn:hover { color: #1798d3; }
+  .tab-btn[aria-selected="true"] {
+    color: #1798d3;
+    font-weight: 650;
+  }
+  .tab-btn[aria-selected="true"]::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 12px; right: 12px;
+    height: 2.5px;
+    background: #1798d3;
+    border-radius: 2px 2px 0 0;
+  }
+
+  /* ── Panel visibility ── */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── Section headers within panels ── */
+  .panel-intro {
+    margin-bottom: 20px;
+  }
+  .panel-intro p {
+    font-size: 13.5px;
+    color: #5b7a8a;
+    margin-top: 2px;
+  }
+
+  /* ── Existing card grid (kept from before) ── */
   .grid-dense {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 12px;
-    margin-bottom: 32px;
+    margin-bottom: 0;
   }
-  .grid-dense .card {
-    padding: 14px 14px 12px;
+  .grid-dense .card { padding: 14px 14px 12px; }
+  .grid-dense .card-icon { font-size: 22px; margin-bottom: 6px; }
+  .grid-dense .card h3 { font-size: 14px; margin-bottom: 4px; }
+  .grid-dense .card p { font-size: 12px; line-height: 1.4; }
+  .grid-dense .card .tag { margin-top: 8px; font-size: 10px; }
+
+  /* Year-group border accents */
+  .y1 { border-left: 4px solid var(--y1); }
+  .y2 { border-left: 4px solid var(--y2); }
+  .y3 { border-left: 4px solid var(--y3); }
+  .y4 { border-left: 4px solid var(--y4); }
+  .y5 { border-left: 4px solid var(--y5); }
+  .y6 { border-left: 4px solid var(--y6); }
+
+  /* ── Morning Learning class launcher ── */
+  .class-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
   }
-  .grid-dense .card-icon {
-    font-size: 22px;
-    margin-bottom: 6px;
+  .class-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    background: #f0f5f9;
+    border: 1.5px solid #ccdde9;
+    border-radius: 10px;
+    padding: 20px 12px 16px;
+    text-decoration: none;
+    color: #12263a;
+    transition: border-color .15s, background .15s, transform .15s;
   }
-  .grid-dense .card h3 {
-    font-size: 14px;
-    margin-bottom: 4px;
+  .class-btn:hover {
+    border-color: #1798d3;
+    background: #e3f3fb;
+    transform: translateY(-2px);
   }
-  .grid-dense .card p {
-    font-size: 12px;
-    line-height: 1.4;
+  .class-btn .class-emoji { font-size: 28px; line-height: 1; }
+  .class-btn .class-year {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    color: #1798d3;
+    margin-top: 4px;
   }
-  .grid-dense .card .tag {
-    margin-top: 8px;
-    font-size: 10px;
+  .class-btn .class-name {
+    font-size: 15px;
+    font-weight: 650;
+    color: #12263a;
+  }
+
+  @media (max-width: 640px) {
+    .tab-strip { padding: 0 12px; }
+    main { padding: 20px 16px 48px; }
+    .grid-dense { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .class-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .class-btn { transition: none; }
   }
 </style>
 </head>
@@ -59,217 +163,284 @@
   </div>
 </header>
 
+<!-- Tab strip -->
+<nav class="tab-strip" role="tablist" aria-label="Tool categories">
+  <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="panel-scheduling" id="tab-scheduling" onclick="switchTab(this)">
+    📅 Scheduling <span class="tab-count">4</span>
+  </button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-printables" id="tab-printables" onclick="switchTab(this)">
+    🏷️ Printables <span class="tab-count">5</span>
+  </button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-assessment" id="tab-assessment" onclick="switchTab(this)">
+    📊 Assessment <span class="tab-count">5</span>
+  </button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-resources"  id="tab-resources"  onclick="switchTab(this)">
+    🧩 Resources <span class="tab-count">8</span>
+  </button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-morning"    id="tab-morning"    onclick="switchTab(this)">
+    🌅 Morning Learning <span class="tab-count">6</span>
+  </button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-admin"      id="tab-admin"      onclick="switchTab(this)">
+    ⚙️ Admin <span class="tab-count">3</span>
+  </button>
+</nav>
+
 <main>
 
-  <h2>Scheduling &amp; Planning</h2>
-  <div class="grid-dense">
-    <a class="card" href="teaching-schedule/index.html">
-      <div class="card-icon">📅</div>
-      <h3>Learning Schedules</h3>
-      <p>Multi-year-group learning schedule with drag-drop planning and split lesson support</p>
-      <span class="tag">Planning</span>
-    </a>
-    <a class="card" href="cover-plan/planner.html">
-      <div class="card-icon">🗓️</div>
-      <h3>Cover &amp; Release Planner</h3>
-      <p>Drag-and-drop planning for teacher releases, cover and PPA time</p>
-      <span class="tag">Cover</span>
-    </a>
-    <a class="card" href="booking/index.html">
-      <div class="card-icon">📚</div>
-      <h3>Resource Booking</h3>
-      <p>Book spaces, rooms and equipment across the school week</p>
-      <span class="tag">Booking</span>
-    </a>
-    <a class="card" href="fab-rota/index.html">
-      <div class="card-icon">🌳</div>
-      <h3>Fresh Air Break Rota</h3>
-      <p>Manage and view the fresh air break duty rota</p>
-      <span class="tag">Rota</span>
-    </a>
-  </div>
+  <!-- Scheduling & Planning -->
+  <section class="tab-panel active" id="panel-scheduling" role="tabpanel" aria-labelledby="tab-scheduling">
+    <div class="panel-intro">
+      <h2>Scheduling &amp; Planning</h2>
+      <p>Timetables, cover, resource booking and duty rotas</p>
+    </div>
+    <div class="grid-dense">
+      <a class="card" href="teaching-schedule/index.html">
+        <div class="card-icon">📅</div>
+        <h3>Learning Schedules</h3>
+        <p>Multi-year-group learning schedule with drag-drop planning and split lesson support</p>
+        <span class="tag">Planning</span>
+      </a>
+      <a class="card" href="cover-plan/planner.html">
+        <div class="card-icon">🗓️</div>
+        <h3>Cover &amp; Release Planner</h3>
+        <p>Drag-and-drop planning for teacher releases, cover and PPA time</p>
+        <span class="tag">Cover</span>
+      </a>
+      <a class="card" href="booking/index.html">
+        <div class="card-icon">📚</div>
+        <h3>Resource Booking</h3>
+        <p>Book spaces, rooms and equipment across the school week</p>
+        <span class="tag">Booking</span>
+      </a>
+      <a class="card" href="fab-rota/index.html">
+        <div class="card-icon">🌳</div>
+        <h3>Fresh Air Break Rota</h3>
+        <p>Manage and view the fresh air break duty rota</p>
+        <span class="tag">Rota</span>
+      </a>
+    </div>
+  </section>
 
-  <h2>Labels &amp; Printables</h2>
-  <div class="grid-dense">
-    <a class="card" href="rnp-certificates/index.html">
-      <div class="card-icon">🏅</div>
-      <h3>RNP Certificates</h3>
-      <p>Upload the weekly Real Nectar Points report and print certificates for new milestones</p>
-      <span class="tag">Printables</span>
-    </a>
-    <a class="card" href="learning-labels/index.html">
-      <div class="card-icon">🏷️</div>
-      <h3>Learning Labels</h3>
-      <p>Generate printable learning labels for books and displays</p>
-      <span class="tag">Printables</span>
-    </a>
-    <a class="card" href="book-labels/index.html">
-      <div class="card-icon">📖</div>
-      <h3>Book Labels</h3>
-      <p>Generate printable book cover labels with year group colours</p>
-      <span class="tag">Printables</span>
-    </a>
-    <a class="card" href="drawer-peg-labels/index.html">
-      <div class="card-icon">🗄️</div>
-      <h3>Drawer, Peg &amp; Other Labels</h3>
-      <p>Generate printable labels with year group colours</p>
-      <span class="tag">Printables</span>
-    </a>
-    <a class="card" href="visual-timetable/index.html">
-      <div class="card-icon">🗓️</div>
-      <h3>Visual Timetable Cards</h3>
-      <p>Build and download printable visual timetable cards for your class. A4, A3 and square formats with year group colours.</p>
-      <span class="tag">Printables</span>
-    </a>
-  </div>
+  <!-- Labels & Printables -->
+  <section class="tab-panel" id="panel-printables" role="tabpanel" aria-labelledby="tab-printables">
+    <div class="panel-intro">
+      <h2>Labels &amp; Printables</h2>
+      <p>Generate and print labels, certificates and timetable cards</p>
+    </div>
+    <div class="grid-dense">
+      <a class="card" href="rnp-certificates/index.html">
+        <div class="card-icon">🏅</div>
+        <h3>RNP Certificates</h3>
+        <p>Upload the weekly Real Nectar Points report and print certificates for new milestones</p>
+        <span class="tag">Printables</span>
+      </a>
+      <a class="card" href="learning-labels/index.html">
+        <div class="card-icon">🏷️</div>
+        <h3>Learning Labels</h3>
+        <p>Generate printable learning labels for books and displays</p>
+        <span class="tag">Printables</span>
+      </a>
+      <a class="card" href="book-labels/index.html">
+        <div class="card-icon">📖</div>
+        <h3>Book Labels</h3>
+        <p>Generate printable book cover labels with year group colours</p>
+        <span class="tag">Printables</span>
+      </a>
+      <a class="card" href="drawer-peg-labels/index.html">
+        <div class="card-icon">🗄️</div>
+        <h3>Drawer, Peg &amp; Other Labels</h3>
+        <p>Generate printable labels with year group colours</p>
+        <span class="tag">Printables</span>
+      </a>
+      <a class="card" href="visual-timetable/index.html">
+        <div class="card-icon">🗓️</div>
+        <h3>Visual Timetable Cards</h3>
+        <p>Build and download printable visual timetable cards for your class. A4, A3 and square formats with year group colours.</p>
+        <span class="tag">Printables</span>
+      </a>
+    </div>
+  </section>
 
-  <h2>Assessment &amp; Intervention</h2>
-  <div class="grid-dense">
-    <a class="card" href="reading-tracker/index.html">
-      <div class="card-icon">📚</div>
-      <h3>Reading Tracker</h3>
-      <p>School-wide reading log. Pupils tap to record reads; staff dashboard shows class, year group and school totals with PP/EAL/SEN breakdowns.</p>
-      <span class="tag">All Years</span>
-    </a>
-    <a class="card" href="book-tracker/index.html">
-      <div class="card-icon">📗</div>
-      <h3>Reading Challenge Tracker</h3>
-      <p>Track KS2 reading challenge books. Check books in and out by copy number, log completed reads, and award milestone certificates at 5, 10, 15, 20 and 25 reads.</p>
-      <span class="tag">KS2</span>
-    </a>
-    <a class="card" href="https://app.wallscourt-farm-academy.co.uk/dashboard" target="_blank">
-      <div class="card-icon">🐝</div>
-      <h3>Spelling Assessment</h3>
-      <p>Manage spelling data, rules and word lists. Track pupil progress across all year groups.</p>
-      <span class="tag">All Years</span>
-    </a>
-    <a class="card" href="https://imcl75.github.io/reading-assessment/home.html" target="_blank">
-      <div class="card-icon">📖</div>
-      <h3>Reading Assessment</h3>
-      <p>Year 4 PiXL diagnostic reading assessment. AI-marked with class analysis and data export.</p>
-      <span class="tag">Year 4</span>
-    </a>
-    <a class="card" href="https://imcl75.github.io/reading-assessment/3in3/home.html" target="_blank">
-      <div class="card-icon">📗</div>
-      <h3>3 in 3 Reading</h3>
-      <p>Reading intervention tool. Children work through texts and questions; AI-assisted marking with teacher review flags.</p>
-      <span class="tag">Intervention</span>
-    </a>
-  </div>
+  <!-- Assessment & Intervention -->
+  <section class="tab-panel" id="panel-assessment" role="tabpanel" aria-labelledby="tab-assessment">
+    <div class="panel-intro">
+      <h2>Assessment &amp; Intervention</h2>
+      <p>Reading logs, spelling data, PiXL assessments and intervention tools</p>
+    </div>
+    <div class="grid-dense">
+      <a class="card" href="reading-tracker/index.html">
+        <div class="card-icon">📚</div>
+        <h3>Reading Tracker</h3>
+        <p>School-wide reading log. Pupils tap to record reads; staff dashboard shows class, year group and school totals with PP/EAL/SEN breakdowns.</p>
+        <span class="tag">All Years</span>
+      </a>
+      <a class="card" href="book-tracker/index.html">
+        <div class="card-icon">📗</div>
+        <h3>Reading Challenge Tracker</h3>
+        <p>Track KS2 reading challenge books. Check books in and out by copy number, log completed reads, and award milestone certificates at 5, 10, 15, 20 and 25 reads.</p>
+        <span class="tag">KS2</span>
+      </a>
+      <a class="card" href="https://app.wallscourt-farm-academy.co.uk/dashboard" target="_blank">
+        <div class="card-icon">🐝</div>
+        <h3>Spelling Assessment</h3>
+        <p>Manage spelling data, rules and word lists. Track pupil progress across all year groups.</p>
+        <span class="tag">All Years</span>
+      </a>
+      <a class="card" href="https://imcl75.github.io/reading-assessment/home.html" target="_blank">
+        <div class="card-icon">📖</div>
+        <h3>Reading Assessment</h3>
+        <p>Year 4 PiXL diagnostic reading assessment. AI-marked with class analysis and data export.</p>
+        <span class="tag">Year 4</span>
+      </a>
+      <a class="card" href="https://imcl75.github.io/reading-assessment/3in3/home.html" target="_blank">
+        <div class="card-icon">📗</div>
+        <h3>3 in 3 Reading</h3>
+        <p>Reading intervention tool. Children work through texts and questions; AI-assisted marking with teacher review flags.</p>
+        <span class="tag">Intervention</span>
+      </a>
+    </div>
+  </section>
 
-  <h2>Resource Generators</h2>
-  <div class="grid-dense">
-    <a class="card" href="https://reader.wallscourt-farm-academy.co.uk" target="_blank">
-      <div class="card-icon">📖</div>
-      <h3>Being a Reader</h3>
-      <p>Generate weekly reading comprehension packs — PPTX teaching slides and class PDFs for vocabulary, retrieval and inference lessons.</p>
-      <span class="tag">All Years</span>
-    </a>
-    <a class="card" href="https://spelling-homelearning.streamlit.app/" target="_blank">
-      <div class="card-icon">📬</div>
-      <h3>Spelling Home Learning</h3>
-      <p>Generate and send weekly spelling home learning packs based on the current spelling rule and class word lists.</p>
-      <span class="tag">All Years</span>
-    </a>
-    <a class="card" href="https://app.wallscourt-farm-academy.co.uk/handwriting" target="_blank">
-      <div class="card-icon">✏️</div>
-      <h3>Handwriting Sheets</h3>
-      <p>Generate dotted practice sheets in Sassoon print, Linkpen pre-cursive or XCCW cursive. Type words or sentences and download a PDF.</p>
-      <span class="tag">All Years</span>
-    </a>
-    <a class="card" href="xccw-renderer/index.html">
-      <div class="card-icon">🖊️</div>
-      <h3>XCCW Text Renderer</h3>
-      <p>Paste any text and get it rendered in correctly joined XCCW cursive. Copy as live font text or download as PDF.</p>
-      <span class="tag">All Years</span>
-    </a>
-    <a class="card" href="https://app.wallscourt-farm-academy.co.uk/puzzles" target="_blank">
-      <div class="card-icon">🧩</div>
-      <h3>Word Puzzle Generator</h3>
-      <p>Generate word searches, nine letters, word ladders, word scrambles and cloze passages from any topic or word list.</p>
-      <span class="tag">All Years</span>
-    </a>
-    <a class="card" href="gps-reasoning/index.html">
-      <div class="card-icon">📝</div>
-      <h3>GPS Reasoning</h3>
-      <p>Grammar, Punctuation and Spelling reasoning questions for SATs preparation and practice</p>
-      <span class="tag">Year 6</span>
-    </a>
-    <a class="card" href="sats-reasoning/index.html">
-      <div class="card-icon">🧠</div>
-      <h3>SATs Reasoning</h3>
-      <p>Maths reasoning questions to develop problem-solving skills for KS2 assessments</p>
-      <span class="tag">Year 6</span>
-    </a>
-    <a class="card" href="arithmetic-generator/index.html">
-      <div class="card-icon">➕</div>
-      <h3>Arithmetic Generator</h3>
-      <p>Generate weekly arithmetic &amp; reasoning papers for any year group with adapted versions for individuals</p>
-      <span class="tag">Y2–Y6</span>
-    </a>
-  </div>
+  <!-- Resource Generators -->
+  <section class="tab-panel" id="panel-resources" role="tabpanel" aria-labelledby="tab-resources">
+    <div class="panel-intro">
+      <h2>Resource Generators</h2>
+      <p>Create teaching materials, worksheets and comprehension packs</p>
+    </div>
+    <div class="grid-dense">
+      <a class="card" href="https://reader.wallscourt-farm-academy.co.uk" target="_blank">
+        <div class="card-icon">📖</div>
+        <h3>Being a Reader</h3>
+        <p>Generate weekly reading comprehension packs — PPTX teaching slides and class PDFs for vocabulary, retrieval and inference lessons.</p>
+        <span class="tag">All Years</span>
+      </a>
+      <a class="card" href="https://spelling-homelearning.streamlit.app/" target="_blank">
+        <div class="card-icon">📬</div>
+        <h3>Spelling Home Learning</h3>
+        <p>Generate and send weekly spelling home learning packs based on the current spelling rule and class word lists.</p>
+        <span class="tag">All Years</span>
+      </a>
+      <a class="card" href="https://app.wallscourt-farm-academy.co.uk/handwriting" target="_blank">
+        <div class="card-icon">✏️</div>
+        <h3>Handwriting Sheets</h3>
+        <p>Generate dotted practice sheets in Sassoon print, Linkpen pre-cursive or XCCW cursive. Type words or sentences and download a PDF.</p>
+        <span class="tag">All Years</span>
+      </a>
+      <a class="card" href="xccw-renderer/index.html">
+        <div class="card-icon">🖊️</div>
+        <h3>XCCW Text Renderer</h3>
+        <p>Paste any text and get it rendered in correctly joined XCCW cursive. Copy as live font text or download as PDF.</p>
+        <span class="tag">All Years</span>
+      </a>
+      <a class="card" href="https://app.wallscourt-farm-academy.co.uk/puzzles" target="_blank">
+        <div class="card-icon">🧩</div>
+        <h3>Word Puzzle Generator</h3>
+        <p>Generate word searches, nine letters, word ladders, word scrambles and cloze passages from any topic or word list.</p>
+        <span class="tag">All Years</span>
+      </a>
+      <a class="card" href="gps-reasoning/index.html">
+        <div class="card-icon">📝</div>
+        <h3>GPS Reasoning</h3>
+        <p>Grammar, Punctuation and Spelling reasoning questions for SATs preparation and practice</p>
+        <span class="tag">Year 6</span>
+      </a>
+      <a class="card" href="sats-reasoning/index.html">
+        <div class="card-icon">🧠</div>
+        <h3>SATs Reasoning</h3>
+        <p>Maths reasoning questions to develop problem-solving skills for KS2 assessments</p>
+        <span class="tag">Year 6</span>
+      </a>
+      <a class="card" href="arithmetic-generator/index.html">
+        <div class="card-icon">➕</div>
+        <h3>Arithmetic Generator</h3>
+        <p>Generate weekly arithmetic &amp; reasoning papers for any year group with adapted versions for individuals</p>
+        <span class="tag">Y2–Y6</span>
+      </a>
+    </div>
+  </section>
 
-  <h2>Morning Learning</h2>
-  <div class="grid-dense">
-    <a class="card y1" href="morning/year1-beech/index.html">
-      <div class="card-icon">🌅</div>
-      <h3>Year 1 Beech</h3>
-      <p>Morning learning display for Year 1</p>
-    </a>
-    <a class="card y2" href="morning/year2-willow/index.html">
-      <div class="card-icon">🌅</div>
-      <h3>Year 2 Willow</h3>
-      <p>Morning learning display for Year 2</p>
-    </a>
-    <a class="card y3" href="morning/year3-acer/index.html">
-      <div class="card-icon">🌅</div>
-      <h3>Year 3 Acer</h3>
-      <p>Morning learning display for Year 3</p>
-    </a>
-    <a class="card y4" href="morning/year4-maple/index.html">
-      <div class="card-icon">🌅</div>
-      <h3>Year 4 Maple</h3>
-      <p>Morning learning display for Year 4</p>
-    </a>
-    <a class="card y5" href="morning/year5-hazel/index.html">
-      <div class="card-icon">🌅</div>
-      <h3>Year 5 Hazel</h3>
-      <p>Morning learning display for Year 5</p>
-    </a>
-    <a class="card y6" href="morning/year6-elm/index.html">
-      <div class="card-icon">🌅</div>
-      <h3>Year 6 Elm</h3>
-      <p>Morning learning display for Year 6</p>
-    </a>
-  </div>
+  <!-- Morning Learning -->
+  <section class="tab-panel" id="panel-morning" role="tabpanel" aria-labelledby="tab-morning">
+    <div class="panel-intro">
+      <h2>Morning Learning</h2>
+      <p>Select your class to open the morning display</p>
+    </div>
+    <div class="class-grid">
+      <a class="class-btn y1" href="morning/year1-beech/index.html">
+        <span class="class-emoji">🌳</span>
+        <span class="class-year">Year 1</span>
+        <span class="class-name">Beech</span>
+      </a>
+      <a class="class-btn y2" href="morning/year2-willow/index.html">
+        <span class="class-emoji">🌿</span>
+        <span class="class-year">Year 2</span>
+        <span class="class-name">Willow</span>
+      </a>
+      <a class="class-btn y3" href="morning/year3-acer/index.html">
+        <span class="class-emoji">🍁</span>
+        <span class="class-year">Year 3</span>
+        <span class="class-name">Acer</span>
+      </a>
+      <a class="class-btn y4" href="morning/year4-maple/index.html">
+        <span class="class-emoji">🍂</span>
+        <span class="class-year">Year 4</span>
+        <span class="class-name">Maple</span>
+      </a>
+      <a class="class-btn y5" href="morning/year5-hazel/index.html">
+        <span class="class-emoji">🌰</span>
+        <span class="class-year">Year 5</span>
+        <span class="class-name">Hazel</span>
+      </a>
+      <a class="class-btn y6" href="morning/year6-elm/index.html">
+        <span class="class-emoji">🌲</span>
+        <span class="class-year">Year 6</span>
+        <span class="class-name">Elm</span>
+      </a>
+    </div>
+  </section>
 
-  <h2>Admin &amp; Guides</h2>
-  <div class="grid-dense">
-    <a class="card" href="https://docs.google.com/spreadsheets/d/1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw/edit" target="_blank">
-      <div class="card-icon">📊</div>
-      <h3>Admin Spreadsheet</h3>
-      <p>Term dates, staff lists, events, and cover planner data</p>
-      <span class="tag">Google Sheets</span>
-    </a>
-    <a class="card" href="guide.html">
-      <div class="card-icon">📖</div>
-      <h3>User Guide</h3>
-      <p>How to use the scheduling tools, cover planner, and FAB rota</p>
-      <span class="tag">Guide</span>
-    </a>
-    <a class="card" href="https://app.wallscourt-farm-academy.co.uk/menu" target="_blank">
-      <div class="card-icon">🍽️</div>
-      <h3>Menu Publisher</h3>
-      <p>Upload a new menu PDF and publish it to all morning learning tools in one click. Password: <strong>wfa-menu</strong></p>
-      <span class="tag">Lunch menu</span>
-    </a>
-  </div>
+  <!-- Admin & Guides -->
+  <section class="tab-panel" id="panel-admin" role="tabpanel" aria-labelledby="tab-admin">
+    <div class="panel-intro">
+      <h2>Admin &amp; Guides</h2>
+      <p>Spreadsheets, documentation and site management</p>
+    </div>
+    <div class="grid-dense">
+      <a class="card" href="https://docs.google.com/spreadsheets/d/1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw/edit" target="_blank">
+        <div class="card-icon">📊</div>
+        <h3>Admin Spreadsheet</h3>
+        <p>Term dates, staff lists, events, and cover planner data</p>
+        <span class="tag">Google Sheets</span>
+      </a>
+      <a class="card" href="guide.html">
+        <div class="card-icon">📖</div>
+        <h3>User Guide</h3>
+        <p>How to use the scheduling tools, cover planner, and FAB rota</p>
+        <span class="tag">Guide</span>
+      </a>
+      <a class="card" href="https://app.wallscourt-farm-academy.co.uk/menu" target="_blank">
+        <div class="card-icon">🍽️</div>
+        <h3>Menu Publisher</h3>
+        <p>Upload a new menu PDF and publish it to all morning learning tools in one click. Password: <strong>wfa-menu</strong></p>
+        <span class="tag">Lunch menu</span>
+      </a>
+    </div>
+  </section>
 
 </main>
 
 <div class="footer">
-  Wallscourt Farm Academy &mdash; Part of Cabot Learning Federation &mdash; 08.07.26a
+  Wallscourt Farm Academy &mdash; Part of Cabot Learning Federation &mdash; 11.07.26a
 </div>
+
+<script>
+  function switchTab(btn) {
+    document.querySelectorAll('.tab-btn').forEach(t => t.setAttribute('aria-selected', 'false'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.setAttribute('aria-selected', 'true');
+    document.getElementById(btn.getAttribute('aria-controls')).classList.add('active');
+  }
+</script>
 
 </body>
 </html>
