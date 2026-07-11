@@ -273,7 +273,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26o</div>
+  <div class="version">11.07.26p</div>
 </div>
 
 <script>
@@ -504,26 +504,26 @@ function genY3Arith(t) {
   // Missing numbers
   if (t.y3Missing){const p=rand(20,100),q=rand(p+50,p+300);qs.push({text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1});}else qs.push(tt());
   if (t.y3Missing){const a=rand(100,400),b=rand(20,80);qs.push({text:`${a} - [BOX] = ${a-b}`,answer:b,box:true,marks:1});}else qs.push(tt());
-  // Times tables ×2–×8
-  if (t.y3Tables){const a=rand(2,12);qs.push({text:`${a} × 3 =`,answer:a*3,marks:1});}else qs.push(tt());
+  // Times tables ×2,4,5,8,10 only (Y3 curriculum — ×3,6,7,9,11,12 reserved for Y4)
   if (t.y3Tables){const a=rand(2,12);qs.push({text:`${a} × 4 =`,answer:a*4,marks:1});}else qs.push(tt());
   if (t.y3Tables){const a=rand(2,12);qs.push({text:`${a} × 8 =`,answer:a*8,marks:1});}else qs.push(tt());
-  if (t.y3Tables){const a=rand(2,10);qs.push({text:`${a} × 6 =`,answer:a*6,marks:1});}else qs.push(tt());
-  if (t.y3Tables){const a=rand(2,10);qs.push({text:`${a} × 7 =`,answer:a*7,marks:1});}else qs.push(tt());
-  if (t.y3Tables){const a=rand(2,10);qs.push({text:`${a} × 2 =`,answer:a*2,marks:1});}else qs.push(tt());
-  if (t.y3Tables){const a=rand(2,10);qs.push({text:`${a} × 5 =`,answer:a*5,marks:1});}else qs.push(tt());
-  // Division from ×3/4/8
-  if (t.y3Division){const b=pick([3,4,8]),q=rand(2,12);qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1});}else qs.push(tt());
-  if (t.y3Division){const b=pick([6,7]),q=rand(2,10);qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1});}else qs.push(tt());
+  if (t.y3Tables){const a=rand(2,12);qs.push({text:`${a} × 2 =`,answer:a*2,marks:1});}else qs.push(tt());
+  if (t.y3Tables){const a=rand(2,12);qs.push({text:`${a} × 5 =`,answer:a*5,marks:1});}else qs.push(tt());
+  if (t.y3Tables){const a=rand(2,12);qs.push({text:`${a} × 10 =`,answer:a*10,marks:1});}else qs.push(tt());
+  if (t.y3Tables){const f=pick([4,8]),a=rand(2,12);qs.push({text:`${a} × ${f} =`,answer:a*f,marks:1});}else qs.push(tt());
+  if (t.y3Tables){const f=pick([2,5,10]),a=rand(2,12);qs.push({text:`${a} × ${f} =`,answer:a*f,marks:1});}else qs.push(tt());
+  // Division — within Y3 table facts only (quotient ≤12, divisors 2/4/5/8/10)
+  if (t.y3Division){const b=pick([2,4,5,8,10]),q=rand(2,10);qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1});}else qs.push(tt());
+  if (t.y3Division){const b=pick([2,4,5,8,10]),q=rand(2,10);qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1});}else qs.push(tt());
   // ×1 and ×0
   {const a=rand(3,20);qs.push({text:`${a} × 1 =`,answer:a,marks:1});}
   {const a=rand(10,99);qs.push({text:`${a} × 0 =`,answer:0,marks:1});}
   // Short multiplication (2-digit × 1-digit)
   if (t.y3ShortMult){const a=rand(12,49),b=rand(3,9);qs.push({text:`${a} × ${b} =`,answer:a*b,marks:1});}else qs.push(tt());
   if (t.y3ShortMult){const a=rand(12,49),b=rand(3,9);qs.push({text:`${a} × ${b} =`,answer:a*b,work:true,marks:1});}else qs.push({...tt(),work:true});
-  // Short division (2-digit ÷ 1-digit, exact)
-  if (t.y3Division){const d=rand(2,9),q=rand(4,12);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1});}else qs.push(tt());
-  if (t.y3Division){const d=rand(2,9),q=rand(11,25);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
+  // Short division — within known table facts only, no 2-digit quotients
+  if (t.y3Division){const d=pick([2,4,5,8,10]),q=rand(2,12);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1});}else qs.push(tt());
+  if (t.y3Division){const d=pick([2,4,5,8,10]),q=rand(2,10);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1});}else qs.push(tt());
   // Fractions
   if (t.y3Fractions){const n=1,d=pick([2,3,4,5,8,10]),a=d*rand(2,10);qs.push({text:`1/${d} of ${a} =`,answer:a/d,marks:1});}else qs.push(tt());
   if (t.y3Fractions){const d=pick([3,4,5,6,8]),n1=rand(1,d-2),n2=rand(1,d-n1-1);qs.push({frac:[[n1,d],[n2,d]],answer:`${n1+n2}/${d}`,marks:1});}else qs.push(tt());
@@ -553,7 +553,7 @@ function genY4Arith(t) {
   if (t.columnCalc){let a,b;do{a=rand(2000,9999);b=rand(1000,a-500);}while(!hasRegroup(a,b,'sub'));qs.push({text:`${a} - ${b} =`,answer:a-b,col:true,marks:1});}else qs.push(tt());
   if (t.timesTables){const a=rand(2,12);qs.push({text:`${a} × 12 =`,answer:a*12,marks:1});}else qs.push(tt());
   {const a=rand(3,20);qs.push({text:`${a} × 1 =`,answer:a,marks:1});}
-  {const a=rand(21,99);qs.push({text:`${a} × 1 =`,answer:a,marks:1});}
+  if (t.fractions){const d=pick([2,3,4,5,8,10]),n=rand(1,d-1),a=d*rand(2,12);qs.push({text:`${n}/${d} of ${a} =`,answer:n*a/d,marks:1});}else qs.push(tt());
   if (t.timesTables){const f=pick([11,12]),a=rand(2,12);qs.push({text:`${a} × ${f} =`,answer:a*f,marks:1});}else qs.push(tt());
   if (t.placeValue){const a=rand(2,99);qs.push({text:`${a} × 10 =`,answer:a*10,marks:1});}else qs.push(tt());
   qs.push(tt());
@@ -636,8 +636,19 @@ function genY5Arith(t) {
   {const a=rand(2,12),b=rand(2,12);qs.push({text:`${a} × ${b} =`,answer:a*b,marks:1});}
   // Three-factor
   {let a,b,c;do{a=rand(2,6);b=rand(2,6);c=rand(2,6);}while(a*b*c>200);qs.push({text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1});}
-  // Multiply integer by decimal (e.g. 99 × 10 × 1)
-  {const a=rand(2,9),b=rand(10,99);qs.push({text:`${a} × ${b} × 1 =`,answer:a*b,marks:1});}
+  // Mixed number subtraction with unlike denominators (e.g. 3 1/4 − 2 4/5)
+  if (t.y5Fractions){
+    const pairs=[[3,4],[4,5],[3,5],[2,3],[2,5]];
+    const [d1,d2]=pick(pairs);
+    const lcd=d1*d2/gcd(d1,d2),n1=rand(1,d1-1),n2=rand(1,d2-1);
+    const w1=rand(3,8),w2=rand(1,w1-1);
+    const fn1=n1*(lcd/d1),fn2=n2*(lcd/d2);
+    let rw,rn;
+    if(fn1>=fn2){rw=w1-w2;rn=fn1-fn2;}else{rw=w1-w2-1;rn=fn1+lcd-fn2;}
+    const g2=gcd(rn,lcd);
+    const ans=rn===0?`${rw}`:`${rw} ${rn/g2}/${lcd/g2}`;
+    qs.push({text:`${w1} ${n1}/${d1} − ${w2} ${n2}/${d2} =`,answer:ans,marks:1});
+  }else qs.push(tt());
   // Equivalent fraction
   if (t.y5Fractions){const d=pick([4,6,8,10]),n=rand(1,d-1),m=pick([2,3]);qs.push({text:`${n*m}/${d*m} = [BOX]/${d}`,answer:n,box:true,marks:1});}else qs.push(tt());
   return qs;
