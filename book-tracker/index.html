@@ -286,7 +286,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · 11.07.26d</div>
+  <div class="version">WFA Book Tracker · 11.07.26e</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -952,11 +952,11 @@ function renderDashboard() {
 
   // Milestone bands
   const bands = [
-    { label: '🏆 25 reads', min: 25 },
-    { label: '🥇 20 reads', min: 20, max: 24 },
-    { label: '🏅 15 reads', min: 15, max: 19 },
-    { label: '⭐⭐ 10 reads', min: 10, max: 14 },
-    { label: '⭐ 5 reads',  min: 5,  max: 9  },
+    { label: '💎 Diamond',  min: 25 },
+    { label: '🔷 Platinum', min: 20, max: 24 },
+    { label: '🥇 Gold',     min: 15, max: 19 },
+    { label: '🥈 Silver',   min: 10, max: 14 },
+    { label: '🥉 Bronze',   min: 5,  max: 9  },
     { label: 'Under 5',     min: 0,  max: 4  },
   ];
   const bandRows = bands.map(b => ({
@@ -1298,15 +1298,15 @@ function milestoneBadge(reads) {
   const achieved = [5,10,15,20,25].filter(m => reads >= m);
   if (!achieved.length) return '';
   const hi = achieved[achieved.length-1];
-  const icons = {5:'⭐',10:'⭐⭐',15:'🏅',20:'🥇',25:'🏆'};
-  return `<div class="badge">${icons[hi]} ${hi} reads</div>`;
+  const tiers = {5:['🥉','Bronze'],10:['🥈','Silver'],15:['🥇','Gold'],20:['🔷','Platinum'],25:['💎','Diamond']};
+  return `<div class="badge">${tiers[hi][0]} ${tiers[hi][1]}</div>`;
 }
 
 function milestoneBadgeIcon(reads) {
   const achieved = [5,10,15,20,25].filter(m => reads >= m);
   if (!achieved.length) return '';
-  const icons = {5:'⭐',10:'⭐⭐',15:'🏅',20:'🥇',25:'🏆'};
-  return icons[achieved[achieved.length-1]];
+  const tiers = {5:['🥉','Bronze'],10:['🥈','Silver'],15:['🥇','Gold'],20:['🔷','Platinum'],25:['💎','Diamond']};
+  return tiers[achieved[achieved.length-1]][0];
 }
 
 function readDots(reads) {
