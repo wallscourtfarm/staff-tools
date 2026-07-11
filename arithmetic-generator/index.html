@@ -179,7 +179,6 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Division"><span>Division</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Decimals"><span>Decimals (add, subtract, ×÷)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Fractions"><span>Fractions (different denominators)</span></label>
-      <label class="topic-item"><input type="checkbox" checked data-topic="y5Percentages"><span>Percentages (10/25/50/75%)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Missing"><span>Missing numbers</span></label>
     </div>
   </div>
@@ -273,7 +272,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26t</div>
+  <div class="version">11.07.26u</div>
 </div>
 
 <script>
@@ -754,8 +753,8 @@ function genY6Arith(t, sortByYear) {
   if (t.y6Y5percentages) {
     const pct=pick([5,15,20,30,35,40]);
     const a=pick([120,160,180,200,240,250,280,300,320,360,400,450,480,500,600,720,860,900]);
-    slots.push({text:`${pct}% of ${a} =`,answer:a*pct/100,marks:1,yg:'Y5'});
-  } else slots.push(tf('Y5'));
+    slots.push({text:`${pct}% of ${a} =`,answer:a*pct/100,marks:1,yg:'Y6'});
+  } else slots.push(tf('Y6'));
   if (t.y6Y5percentages) {
     const a=rand(10000,99999);
     slots.push({text:`${a.toLocaleString()} - ${rand(10,999).toString().padStart(3,'0')} =`,answer:null,marks:1,yg:'Y5'});
@@ -1056,11 +1055,11 @@ function qToHTML(q, qNum) {
       eqHTML = `<span class="fh"><span class="fh-n">${n1}</span><span class="fh-d">${d1}</span></span><span class="eq-op"> ${op} </span><span class="fh"><span class="fh-n">${n2}</span><span class="fh-d">${d2}</span></span><span class="eq-op"> = </span>`;
     } else if (q.box) {
       const parts = (q.text||'').split('[BOX]');
-      eqHTML = (parts[0] ? renderFracsInText(parts[0].trim())+' ' : '') +
+      eqHTML = `<span>${(parts[0] ? renderFracsInText(parts[0].trim())+' ' : '') +
                `<span class="ibox"></span>` +
-               (parts[1] ? ' '+renderFracsInText(parts[1].trim()) : '');
+               (parts[1] ? ' '+renderFracsInText(parts[1].trim()) : '')}</span>`;
     } else {
-      eqHTML = renderFracsInText(q.text || '');
+      eqHTML = `<span>${renderFracsInText(q.text || '')}</span>`;
     }
     mainContent = `<div class="q-header">${eqHTML}</div>`;
   }
