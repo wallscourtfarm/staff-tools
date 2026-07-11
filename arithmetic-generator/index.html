@@ -176,6 +176,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Mental"><span>Mental calculation (large numbers)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Column"><span>Column methods (5-digit)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5ShortMult"><span>Short multiplication (4-digit)</span></label>
+      <label class="topic-item"><input type="checkbox" checked data-topic="y5LongMult"><span>Long multiplication (2-mark ×2)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Division"><span>Division</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Decimals"><span>Decimals (add, subtract, ×÷)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Fractions"><span>Fractions (different denominators)</span></label>
@@ -272,7 +273,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26y</div>
+  <div class="version">11.07.26z</div>
 </div>
 
 <script>
@@ -578,7 +579,7 @@ function genY4Arith(t) {
   return qs;
 }
 
-// ─── Y5 ARITHMETIC GENERATOR (36 questions, /36) ──────────────────────────────
+// ─── Y5 ARITHMETIC GENERATOR (38 questions, /40) ──────────────────────────────
 function genY5Arith(t) {
   const qs = [];
   const tt = () => { const a=rand(2,12),b=rand(2,12); return {text:`${a} × ${b} =`,answer:a*b,marks:1}; };
@@ -598,6 +599,9 @@ function genY5Arith(t) {
   // Short multiplication (4-digit × 1-digit)
   if (t.y5ShortMult){const a=rand(1002,3999),b=rand(3,9);qs.push({text:`${a} × ${b} =`,answer:a*b,work:true,marks:1});}else qs.push({...tt(),work:true});
   if (t.y5ShortMult){const a=rand(1002,2499),b=rand(3,4);qs.push({text:`${a} × ${b} =`,answer:a*b,work:true,marks:1});}else qs.push({...tt(),work:true});
+  // Long multiplication (2D×3D and 2D×4D, 2 marks each)
+  if (t.y5LongMult){const a=rand(100,999),b=rand(11,99);qs.push({longMult:{a,b},answer:a*b,marks:2});}else qs.push({...tt(),work:true});
+  if (t.y5LongMult){const a=rand(1000,9999),b=rand(12,79);qs.push({longMult:{a,b},answer:a*b,marks:2});}else qs.push({...tt(),work:true});
   // Division
   if (t.y5Division){const d=pick([6,7,8,9]),q=rand(12,99);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1});}else qs.push(tt());
   if (t.y5Division){const d=pick([6,7,8,9]),q=rand(100,400);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
