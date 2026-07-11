@@ -273,7 +273,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26p</div>
+  <div class="version">11.07.26q</div>
 </div>
 
 <script>
@@ -521,9 +521,10 @@ function genY3Arith(t) {
   // Short multiplication (2-digit × 1-digit)
   if (t.y3ShortMult){const a=rand(12,49),b=rand(3,9);qs.push({text:`${a} × ${b} =`,answer:a*b,marks:1});}else qs.push(tt());
   if (t.y3ShortMult){const a=rand(12,49),b=rand(3,9);qs.push({text:`${a} × ${b} =`,answer:a*b,work:true,marks:1});}else qs.push({...tt(),work:true});
-  // Short division — within known table facts only, no 2-digit quotients
+  // Short division — within known facts
   if (t.y3Division){const d=pick([2,4,5,8,10]),q=rand(2,12);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1});}else qs.push(tt());
-  if (t.y3Division){const d=pick([2,4,5,8,10]),q=rand(2,10);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1});}else qs.push(tt());
+  // Partition-friendly division (e.g. 64÷4: 40÷4 + 24÷4) — quotient 12–20, dividend ≤200
+  if (t.y3Division){const d=pick([2,4,5,8,10]),q=rand(12,20);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
   // Fractions
   if (t.y3Fractions){const n=1,d=pick([2,3,4,5,8,10]),a=d*rand(2,10);qs.push({text:`1/${d} of ${a} =`,answer:a/d,marks:1});}else qs.push(tt());
   if (t.y3Fractions){const d=pick([3,4,5,6,8]),n1=rand(1,d-2),n2=rand(1,d-n1-1);qs.push({frac:[[n1,d],[n2,d]],answer:`${n1+n2}/${d}`,marks:1});}else qs.push(tt());
@@ -670,7 +671,7 @@ function genY6Arith(t, sortByYear) {
     const a=pick([2,3,4,5,6,7,8,9]),b=rand(11,49); slots.push({text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y3'});
   } else slots.push(tf('Y3'));
   if (t.y6Y3content) {
-    const a=rand(1001,9999),b=rand(3,99); slots.push({text:`${a.toLocaleString()} − ${b} =`,answer:a-b,marks:1,yg:'Y3'});
+    const a=rand(200,999),b=rand(3,99); slots.push({text:`${a} − ${b} =`,answer:a-b,marks:1,yg:'Y3'});
   } else slots.push(tf('Y3'));
   if (t.y6Y3content) {
     const b=rand(10,200),total=rand(b+100,b+600); slots.push({text:`[BOX] + ${b} = ${total}`,answer:total-b,box:true,marks:1,yg:'Y3'});
@@ -679,13 +680,13 @@ function genY6Arith(t, sortByYear) {
     const a=rand(10,9999); slots.push({text:`${a} × 0 =`,answer:0,marks:1,yg:'Y3'});
   } else slots.push(tf('Y3'));
   if (t.y6Y3content) {
-    const d=pick([2,3,4,5,6,7,8,9]),mult=pick([10,20,30,40,50,60,70,80,90,100]),q=rand(2,12);
-    slots.push({text:`${d*q*mult} ÷ ${d} =`,answer:q*mult,marks:1,yg:'Y3'});
+    const d=pick([2,3,4,5,6,7,8,9]),q=rand(2,9);
+    slots.push({text:`${d*q*10} ÷ ${d} =`,answer:q*10,marks:1,yg:'Y3'});
   } else slots.push(tf('Y3'));
 
   // ── Y4 slots (10 questions, 10 marks) ────────────────────────────────────
   if (t.y6Y4content) {
-    const a=rand(10000,999999),b=rand(10,9999); slots.push({text:`${a.toLocaleString()} + ${b.toLocaleString()} =`,answer:a+b,marks:1,yg:'Y4'});
+    const a=rand(1000,9999),b=rand(1000,9999); slots.push({text:`${a.toLocaleString()} + ${b.toLocaleString()} =`,answer:a+b,marks:1,yg:'Y4'});
   } else slots.push(tf('Y4'));
   if (t.y6Y4content) {
     const a=rand(1001,9999),b=rand(1000,a-100); let aa,bb;do{aa=rand(1000,9999);bb=rand(1000,aa-100);}while(!hasRegroup(aa,bb,'sub'));
