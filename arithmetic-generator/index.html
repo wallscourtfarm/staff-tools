@@ -159,6 +159,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
   <div class="card" id="topicCardY4" style="display:none">
     <h2>✅ Y4 Arithmetic Topics</h2>
     <div class="topic-grid" id="topicsY4">
+      <label class="topic-item"><input type="checkbox" checked data-topic="y4Y3content"><span class="topic-yg topic-yg-Y3">Y3</span><span>Prior Y3 content (revision)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="placeValue"><span class="topic-yg topic-yg-Y4">Y4</span><span>Place value (×÷ 10/100/1000)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="mentalCalc"><span class="topic-yg topic-yg-Y4">Y4</span><span>Mental addition &amp; subtraction</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="columnCalc"><span class="topic-yg topic-yg-Y4">Y4</span><span>Column addition &amp; subtraction</span></label>
@@ -174,6 +175,8 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
   <div class="card" id="topicCardY5" style="display:none">
     <h2>✅ Y5 Arithmetic Topics</h2>
     <div class="topic-grid" id="topicsY5">
+      <label class="topic-item"><input type="checkbox" checked data-topic="y5Y3content"><span class="topic-yg topic-yg-Y3">Y3</span><span>Prior Y3 content (revision)</span></label>
+      <label class="topic-item"><input type="checkbox" checked data-topic="y5Y4content"><span class="topic-yg topic-yg-Y4">Y4</span><span>Prior Y4 content (revision)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5PlaceValue"><span class="topic-yg topic-yg-Y5">Y5</span><span>Place value &amp; powers of 10</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Mental"><span class="topic-yg topic-yg-Y5">Y5</span><span>Mental calculation (large numbers)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Column"><span class="topic-yg topic-yg-Y5">Y5</span><span>Column methods (5-digit)</span></label>
@@ -275,7 +278,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26ad</div>
+  <div class="version">11.07.26ae</div>
 </div>
 
 <script>
@@ -536,10 +539,23 @@ function genY3Arith(t) {
   return qs;
 }
 
-// ─── Y4 ARITHMETIC GENERATOR (31 questions, /31) ──────────────────────────────
+// ─── Y4 ARITHMETIC GENERATOR (31–38 questions depending on prior content) ─────
 function genY4Arith(t) {
   const qs = [];
   const tt = () => { const a=rand(2,12),b=rand(2,12); return {text:`${a} × ${b} =`,answer:a*b,marks:1}; };
+
+  // ── Y3 prior content (7 questions) ──────────────────────────────────────────
+  if (t.y4Y3content) {
+    const a=rand(200,899),b=rand(11,89); qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'});
+    const d1=pick([2,4,5,8,10]),q1=rand(2,12); qs.push({text:`${d1*q1} ÷ ${d1} =`,answer:q1,marks:1,yg:'Y3'});
+    const ax=pick([2,4,5,8,10]),bx=rand(11,49); qs.push({text:`${ax} × ${bx} =`,answer:ax*bx,marks:1,yg:'Y3'});
+    const s=rand(200,999),r=rand(3,99); qs.push({text:`${s} − ${r} =`,answer:s-r,marks:1,yg:'Y3'});
+    const bt=rand(10,200),tot=rand(bt+100,bt+600); qs.push({text:`[BOX] + ${bt} = ${tot}`,answer:tot-bt,box:true,marks:1,yg:'Y3'});
+    const az=rand(10,999); qs.push({text:`${az} × 0 =`,answer:0,marks:1,yg:'Y3'});
+    const d2=pick([2,4,5,8,10]),q2=rand(2,10); qs.push({text:`${d2*q2} ÷ ${d2} =`,answer:q2,marks:1,yg:'Y3'});
+  }
+
+  // ── Y4 content ──────────────────────────────────────────────────────────────
   if (t.placeValue){const a=pick([2,3,4,5,6,7,8,9,12,15,20,25]);qs.push({text:`${a} × 1000 =`,answer:a*1000,marks:1});}else qs.push(tt());
   if (t.placeValue){const b=pick([30,40,50,60,70,80,90,120,150,200,350,700]);qs.push({text:`${b} ÷ 10 =`,answer:b/10,marks:1});}else qs.push(tt());
   if (t.placeValue){const c=rand(2,99);qs.push({text:`${c} × 100 =`,answer:c*100,marks:1});}else qs.push(tt());
@@ -579,13 +595,44 @@ function genY4Arith(t) {
   if (t.mentalCalc){const a=rand(3,9)*1000,b=rand(1,a/1000-1)*1000;qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1});}else qs.push(tt());
   // Place value decomposition: 4-digit number with missing hundreds (matches Y6 Y4-band slot)
   if (t.placeValue){const th=rand(1,9),h=rand(1,9),t_=rand(10,99);const total=th*1000+h*100+t_;qs.push({text:`${total.toLocaleString()} = ${th},000 + [BOX] + ${t_}`,answer:h*100,box:true,marks:1});}else qs.push(tt());
+  if (t.y4Y3content) return qs.map(q => q.yg ? q : {...q, yg:'Y4'});
   return qs;
 }
 
-// ─── Y5 ARITHMETIC GENERATOR (38 questions, /40) ──────────────────────────────
+// ─── Y5 ARITHMETIC GENERATOR (38–55 questions depending on prior content) ─────
 function genY5Arith(t) {
   const qs = [];
   const tt = () => { const a=rand(2,12),b=rand(2,12); return {text:`${a} × ${b} =`,answer:a*b,marks:1}; };
+
+  // ── Y3 prior content (7 questions) ──────────────────────────────────────────
+  if (t.y5Y3content) {
+    const a=rand(200,899),b=rand(11,89); qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'});
+    const d1=pick([2,4,5,8,10]),q1=rand(2,12); qs.push({text:`${d1*q1} ÷ ${d1} =`,answer:q1,marks:1,yg:'Y3'});
+    const ax=pick([2,4,5,8,10]),bx=rand(11,49); qs.push({text:`${ax} × ${bx} =`,answer:ax*bx,marks:1,yg:'Y3'});
+    const s=rand(200,999),r=rand(3,99); qs.push({text:`${s} − ${r} =`,answer:s-r,marks:1,yg:'Y3'});
+    const bt=rand(10,200),tot=rand(bt+100,bt+600); qs.push({text:`[BOX] + ${bt} = ${tot}`,answer:tot-bt,box:true,marks:1,yg:'Y3'});
+    const az=rand(10,999); qs.push({text:`${az} × 0 =`,answer:0,marks:1,yg:'Y3'});
+    const d2=pick([2,4,5,8,10]),q2=rand(2,10); qs.push({text:`${d2*q2} ÷ ${d2} =`,answer:q2,marks:1,yg:'Y3'});
+  }
+
+  // ── Y4 prior content (10 questions) ─────────────────────────────────────────
+  if (t.y5Y4content) {
+    const a=rand(1000,9999),b=rand(1000,9999); qs.push({text:`${a.toLocaleString()} + ${b.toLocaleString()} =`,answer:a+b,marks:1,yg:'Y4'});
+    let aa,bb; do{aa=rand(1000,9999);bb=rand(1000,aa-100);}while(!hasRegroup(aa,bb,'sub'));
+    qs.push({text:`${aa} - ${bb} =`,answer:aa-bb,marks:1,yg:'Y4'});
+    const m=rand(12,99),n=pick([10,100,1000]); qs.push({text:`${m} × ${n} =`,answer:m*n,marks:1,yg:'Y4'});
+    let fa,fb,fc; do{fa=rand(2,5);fb=rand(2,5);fc=rand(2,5);}while(fa*fb*fc>=100);
+    qs.push({text:`${fa} × ${fb} × ${fc} =`,answer:fa*fb*fc,marks:1,yg:'Y4'});
+    const sa=rand(100,499),sb=rand(3,9); qs.push({text:`${sa} × ${sb} =`,answer:sa*sb,marks:1,yg:'Y4'});
+    const db=rand(3,12),dq=rand(10,99); qs.push({text:`${db*dq} ÷ ${db} =`,answer:dq,marks:1,yg:'Y4'});
+    const p=rand(50,500),qv=rand(p+10,p+500); qs.push({text:`[BOX] + ${p} = ${qv}`,answer:qv-p,box:true,marks:1,yg:'Y4'});
+    const ta=rand(2,12),tb=rand(8,12); qs.push({text:`${ta} × ${tb} =`,answer:ta*tb,marks:1,yg:'Y4'});
+    const th=rand(1,9),h=rand(1,9),t_=rand(10,99),ptot=th*1000+h*100+t_;
+    qs.push({text:`${ptot.toLocaleString()} = ${th},000 + [BOX] + ${t_}`,answer:h*100,box:true,marks:1,yg:'Y4'});
+    const dd=rand(3,9),dqq=rand(11,50); qs.push({text:`${dd*dqq} ÷ ${dd} =`,answer:dqq,marks:1,yg:'Y4'});
+  }
+
+  // ── Y5 content ──────────────────────────────────────────────────────────────
   // Place value & powers of 10
   if (t.y5PlaceValue){const a=rand(2,99);qs.push({text:`${a} × 10 =`,answer:a*10,marks:1});}else qs.push(tt());
   if (t.y5PlaceValue){const a=pick([3,4,5,6,7,8,12,15,20,25,50]);qs.push({text:`${a} × 1000 =`,answer:a*1000,marks:1});}else qs.push(tt());
@@ -658,6 +705,7 @@ function genY5Arith(t) {
   }else qs.push(tt());
   // Equivalent fractions removed — belongs in reasoning, not arithmetic
   qs.push(tt());
+  if (t.y5Y3content || t.y5Y4content) return qs.map(q => q.yg ? q : {...q, yg:'Y5'});
   return qs;
 }
 
@@ -1162,15 +1210,15 @@ function buildPaperHTML(classYear, label, arithQs, reasoningQs, pupilNames) {
   const hasPaper2 = !!reasoningQs;
   const totalMarks = arithQs.reduce((s,q)=>s+(q.marks||1),0);
 
-  // Y6: calculate Y3/4/5 subtotal marks
-  const isY6 = arithQs.some(q => q.yg);
-  const subsetMarks = isY6 ? arithQs.filter(q=>q.yg!=='Y6').reduce((s,q)=>s+(q.marks||1),0) : null;
+  // Mixed-year paper detection
+  const isMixed = arithQs.some(q => q.yg);
+  const subsetMarks = (classYear === 'Y6' && isMixed) ? arithQs.filter(q=>q.yg!=='Y6').reduce((s,q)=>s+(q.marks||1),0) : null;
 
   const covers = (pupilNames && pupilNames.length > 0)
     ? pupilNames.map(name => buildCoverHTML(classYear, label, hasPaper2, name)).join('<div class="pb"></div>')
     : buildCoverHTML(classYear, label, hasPaper2, null);
 
-  const arithHTML = arithQs.map((q, i) => qToHTML(q, i+1, isY6 ? null : classYear)).join('');
+  const arithHTML = arithQs.map((q, i) => qToHTML(q, i+1, isMixed ? null : classYear)).join('');
 
   let reasoningHTML = '';
   if (reasoningQs) {
