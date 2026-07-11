@@ -273,7 +273,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     <p class="hint" style="margin-top:10px">Generate once, then print each paper separately. Answer sheet combines all levels in one document.</p>
   </div>
 
-  <div class="version">11.07.26n</div>
+  <div class="version">11.07.26o</div>
 </div>
 
 <script>
@@ -417,10 +417,7 @@ function loadSetup() {
   if (saved.classYear) document.getElementById('classYear').value = saved.classYear;
   if (saved.standardLevel) document.getElementById('standardLevel').value = saved.standardLevel;
   if (saved.standardCount) document.getElementById('standardCount').value = saved.standardCount;
-  if (saved.includeReasoning != null) {
-    document.getElementById('includeReasoning').checked = saved.includeReasoning;
-    document.getElementById('reasoningTopics').style.display = saved.includeReasoning ? '' : 'none';
-  }
+  // Always default includeReasoning to checked — don't restore from saved state
   if (saved.y6SortByYear != null) {
     document.getElementById('y6SortByYear').checked = saved.y6SortByYear;
   }
@@ -564,10 +561,10 @@ function genY4Arith(t) {
   if (t.timesTables){let a,b,c;do{a=rand(2,4);b=rand(2,4);c=rand(2,4);}while(a*b*c>=100||a*b*c<8);qs.push({text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1});}else qs.push(tt());
   if (t.shortMult){const ab=rand(11,49),f=pick([3,4,5,6,7,8]);qs.push({text:`${ab} × ${f} =`,answer:ab*f,work:true,marks:1});}else qs.push({...tt(),work:true});
   if (t.shortMult){let abc,f;do{abc=rand(101,499);f=pick([3,4,5,6]);}while(abc*f>=1000);qs.push({text:`${abc} × ${f} =`,answer:abc*f,work:true,marks:1});}else qs.push({...tt(),work:true});
-  if (t.division){const b=rand(2,12),q=rand(2,12);qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1});}else qs.push(tt());
-  if (t.division){const b=rand(3,12),q=rand(3,12);qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1});}else qs.push(tt());
-  if (t.division){const d=rand(2,9),q=rand(11,30);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
-  if (t.division){const d=rand(2,9),q=rand(11,99);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
+  if (t.division){const b=pick([6,7,8,9]),q=rand(2,12);qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1});}else qs.push(tt());
+  if (t.division){const b=pick([6,7,8,9]),q=rand(2,12);qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1});}else qs.push(tt());
+  if (t.division){const d=pick([6,7,8,9]),q=rand(11,30);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
+  if (t.division){const d=pick([6,7,8,9]),q=rand(11,99);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
   if (t.fractions){
     const denoms=[2,3,4,5,6,8,10],d=pick(denoms);
     const n1=rand(1,d-2),n2=rand(1,d-n1-1);
@@ -602,8 +599,8 @@ function genY5Arith(t) {
   if (t.y5ShortMult){const a=rand(1002,3999),b=rand(3,9);qs.push({text:`${a} × ${b} =`,answer:a*b,work:true,marks:1});}else qs.push({...tt(),work:true});
   if (t.y5ShortMult){const a=rand(1002,2499),b=rand(3,4);qs.push({text:`${a} × ${b} =`,answer:a*b,work:true,marks:1});}else qs.push({...tt(),work:true});
   // Division
-  if (t.y5Division){const d=rand(3,9),q=rand(12,99);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1});}else qs.push(tt());
-  if (t.y5Division){const d=rand(3,9),q=rand(100,400);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
+  if (t.y5Division){const d=pick([6,7,8,9]),q=rand(12,99);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1});}else qs.push(tt());
+  if (t.y5Division){const d=pick([6,7,8,9]),q=rand(100,400);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
   // Decimals
   if (t.y5Decimals){const a=rand(10,99)/10,b=rand(10,99)/100;qs.push({text:`${a.toFixed(1)} + ${b.toFixed(2)} =`,answer:parseFloat((a+b).toFixed(2)),marks:1});}else qs.push(tt());
   if (t.y5Decimals){const a=(rand(10,90)/10+rand(1,9)/100);const b=rand(10,99)/100;qs.push({text:`${a.toFixed(2)} - ${b.toFixed(2)} =`,answer:parseFloat((a-b).toFixed(2)),marks:1});}else qs.push(tt());
@@ -1185,7 +1182,7 @@ function buildPaperHTML(classYear, label, arithQs, reasoningQs, pupilNames) {
     .cover-img-wrap{position:relative;width:85%;margin-bottom:14mm}
     .cover-img-wrap::before{content:'';display:block;width:100%;padding-top:calc(240/720*100%);background:url('data:image/png;base64,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ECAwFBCghyL2CRAgQIAAAQIECIwICNAjOIYIECBAgAABAgQIDAUE6KGIfQIECBAgQIAAAQIjAgL0CI4hAgQIECBAgAABAkMBAXooYp8AAQIECBAgQIDAiIAAPYJjiAABAgQIECBAgMBQQIAeitgnQIAAAQIECBAgMCIgQI/gGCJAgAABAgQIECAwFBCghyL2CRAgQIAAAQIECIwICNAjOIYIECBAgAABAgQIDAUE6KGIfQIECBAgQIAAAQIjAgL0CI4hAgQIECBAgAABAkMBAXooYp8AAQIECBAgQIDAiIAAPYJjiAABAgQIECBAgMBQQIAeitgnQIAAAQIECBAgMCIgQI/gGCJAgAABAgQIECAwFBCghyL2CRAgQIAAAQIECIwICNAjOIYIECBAgAABAgQIDAUE6KGIfQIECBAgQIAAAQIjAgL0CI4hAgQIECBAgAABAkMBAXooYp8AAQIECBAgQIDAiIAAPYJjiAABAgQIECBAgMBQQIAeitgnQIAAAQIECBAgMCIgQI/gGCJAgAABAgQIECAwFBCghyL2CRAgQIAAAQIECIwICNAjOIYIECBAgAABAgQIDAUE6KGIfQIECBAgQIAAAQIjAkt1rF1/e6TEEAECBAgQIECAAIHcAm1Xrjt38wXCIkCfffjTuUV0T4AAAQIECBAgQGBEYLJyW9Ndutg0X/loswjQ/XRlpNwQAQIECBAgQIAAgdwC/dItTTebLRCsgc79b0H3BAgQIECAAAECQQEBOgimnAABAgQIECBAILeAAJ17/nVPgAABAgQIECAQFBCgg2DKCRAgQIAAAQIEcgsI0LnnX/cECBAgQIAAAQJBAQE6CKacAAECBAgQIEAgt4AAnXv+dU+AAAECBAgQIBAUEKCDYMoJECBAgAABAgRyCwjQuedf9wQIECBAgAABAkEBAToIppwAAQIECBAgQCC3gACde/51T4AAAQIECBAgEBQQoINgygkQIECAAAECBHILCNC551/3BAgQIECAAAECQQEBOgimnAABAgQIECBAILeAAJ17/nVPgAABAgQIECAQFBCgg2DKCRAgQIAAAQIEcgsI0LnnX/cECBAgQIAAAQJBAQE6CKacAAECBAgQIEAgt4AAnXv+dU+AAAECBAgQIBAUEKCDYMoJECBAgAABAgRyCwjQuedf9wQIECBAgAABAkEBAToIppwAAQIECBAgQCC3gACde/51T4AAAQIECBAgEBQQoINgygkQIECAAAECBHILCNC551/3BAgQIECAAAECQQEBOgimnAABAgQIECBAILeAAJ17/nVPgAABAgQIECAQFBCgg2DKCRAgQIAAAQIEcgsI0LnnX/cECBAgQIAAAQJBAQE6CKacAAECBAgQIEAgt4AAnXv+dU+AAAECBAgQIBAUEKCDYMoJECBAgAABAgRyCwjQuedf9wQIECBAgAABAkEBAToIppwAAQIECBAgQCC3gACde/51T4AAAQIECBAgEBQQoINgygkQIECAAAECBHILCNC551/3BAgQIECAAAECQQEBOgimnAABAgQIECBAILeAAJ17/nVPgAABAgQIECAQFBCgg2DKCRAgQIAAAQIEcgsI0LnnX/cECBAgQIAAAQJBAQE6CKacAAECBAgQIEAgt4AAnXv+dU+AAAECBAgQIBAUEKCDYMoJECBAgAABAgRyCwjQuedf9wQIECBAgAABAkEBAToIppwAAQIECBAgQCC3gACde/51T4AAAQIECBAgEBQQoINgygkQIECAAAECBHILCNC551/3BAgQIECAAAECQQEBOgimnAABAgQIECBAILeAAJ17/nVPgAABAgQIECAQFBCgg2DKCRAgQIAAAQIEcgsI0LnnX/cECBAgQIAAAQJBAQE6CKacAAECBAgQIEAgt4AAnXv+dU+AAAECBAgQIBAUEKCDYMoJECBAgAABAgRyCwjQuedf9wQIECBAgAABAkEBAToIppwAAQIECBAgQCC3gACde/51T4AAAQIECBAgEBQQoINgygkQIECAAAECBHILCNC551/3BAgQIECAAAECQQEBOgimnAABAgQIECBAILeAAJ17/nVPgAABAgQIECAQFBCgg2DKCRAgQIAAAQIEcgsI0LnnX/cECBAgQIAAAQJBAQE6CKacAAECBAgQIEAgt4AAnXv+dU+AAAECBAgQIBAUEKCDYMoJECBAgAABAgRyCwjQuedf9wQIECBAgAABAkEBAToIppwAAQIECBAgQCC3gACde/51T4AAAQIECBAgEBQQoINgygkQIECAAAECBHILCNC551/3BAgQIECAAAECQQEBOgimnAABAgQIECBAILeAAJ17/nVPgAABAgQIECAQFBCgg2DKCRAgQIAAAQIEcgsI0LnnX/cECBAgQIAAAQJBAQE6CKacAAECBAgQIEAgt4AAnXv+dU+AAAECBAgQIBAUEKCDYMoJECBAgAABAgRyCwjQuedf9wQIECBAgAABAkEBAToIppwAAQIECBAgQCC3gACde/51T4AAAQIECBAgEBQQoINgygkQIECAAAECBHILCNC551/3BAgQIECAAAECQQEBOgimnAABAgQIECBAILeAAJ17/nVPgAABAgQIECAQFBCgg2DKCRAgQIAAAQIEcgsI0LnnX/cECBAgQIAAAQJBAQE6CKacAAECBAgQIEAgt4AAnXv+dU+AAAECBAgQIBAUEKCDYMoJECBAgAABAgRyCwjQuedf9wQIECBAgAABAkEBAToIppwAAQIECBAgQCC3gACde/51T4AAAQIECBAgEBQQoINgygkQIECAAAECBHILCNC551/3BAgQIECAAAECQQEBOgimnAABAgQIECBAILeAAJ17/nVPgAABAgQIECAQFBCgg2DKCRAgQIAAAQIEcgsI0LnnX/cECBAgQIAAAQJBAQE6CKacAAECBAgQIEAgt4AAnXv+dU+AAAECBAgQIBAUEKCDYMoJECBAgAABAgRyCwjQuedf9wQIECBAgAABAkEBAToIppwAAQIECBAgQCC3gACde/51T4AAAQIECBAgEBQQoINgygkQIECAAAECBHILCNC551/3BAgQIECAAAECQQEBOgimnAABAgQIECBAILeAAJ17/nVPgAABAgQIECAQFBCgg2DKCRAgQIAAAQIEcgsI0LnnX/cECBAgQIAAAQJBAQE6CKacAAECBAgQIEAgt4AAnXv+dU+AAAECBAgQIBAUEKCDYMoJECBAgAABAgRyCwjQuedf9wQIECBAgAABAkEBAToIppwAAQIECBAgQCC3gACde/51T4AAAQIECBAgEBQQoINgygkQIECAAAECBHILCNC551/3BAgQIECAAAECQQEBOgimnAABAgQIECBAILeAAJ17/nVPgAABAgQIECCwQ4GN4Lyx3eFpyggQIECAAAECBAjkE+j7vunKf/UhQOebfx0TIECAAAECBAhEBbpZ0/bNrJ4mQEfx1BMgQIAAAQIECOQSaNumn683fduv18YF6FzTr1sCBAgQIECAAIGwQNs03Xy17ycX66kCdBjQCQQIECBAgAABAqkE2knTN80bbTs/X/sWoFPNvmYJECBAgAABAgSiAm1ZwlGuQb/az6dn67kCdFRQPQECBAgQIECAQC6BybQpN+F4qZ/1p2vjS7m61y0BAgQIECBAgACBoEA7bZq+e3Fl5a1X6pmuQAf9lBMgQIAAAQIECCQSWNyBY61cgW5Pvnzk8GrtXIBONP9aJUCAAAECBAgQiAm0dfnGbP35pm1f2DhTgN6QsCVAgAABAgQIECAwFJgulyvO/X8vd/MTG0PWQG9I2BIgQIAAAQIECBDYLFCXb8zqD6g0//mNox95eWPIFegNCVsCBAgQIECAAAECmwTaSbnW3K3/T9/3/7XpsDXQmzG8JkCAAAECBAgQIPAtgaUD9cuDT59+5S0B+lsoXhAgQIAAAQIECBDYQqBefe4vXXypLOL4t+apw/PNJZZwbNbwmgABAgQIECBAgEAVKHffKJefn5qvnf+XIYgAPRSxT4AAAQIECBAgkFqgrUs31i+dKN8h/Nsznz18YYghQA9F7BMgQIAAAQIECOQVqHfe6Lqmb+Z/8Y0jD//rVhAC9FYqjhEgQIAAAQIECKQUaA/c2vTz9b9rZrO/LAD9VggC9FYqjhEgQIAAAQIECKQTaKeLLw5+tW3aP3rtiZ99cTsAAXo7GccJECBAgAABAgTyCGws3ej7o68+/tA/jjUuQI/pGCNAgAABAgQIENj/AiU8N01d+zw7uto2T16pYQH6SkLGCRAgQIAAAQIE9q9ACc9tuWVd+eLgX69PJn9w/sjDb1ypWQH6SkLGCRAgQIAAAQIE9q1Au3RL+dLg7J/mk9lvv/HYQy/tpFEBeidKaggQIECAAAECBPadQL3jRrd28e9n7ew3X3/sp0/utEEBeqdS6ggQIECAAAECBPaNQLv8gfJT3Re+UFY//0YkPFcAAXrf/DPQCAECBAgQIECAwJUFSmQua57nl95+cr2dfeLVxx/5vyuf896Kpffu2iNAgAABAgQIECCwTwUWXxacnW+67vcPTG4/8vKRD69eTacC9NWoOYcAAQIECBAgQOD9I1CCc71RXTefH+ub/tHTjz/yxWv58AL0teg5lwABAgQIECBA4KYWaJfLXTbW37nQNc2fdl37xJnPPPL8tX5gAfpaBZ1PgAABAgQIECBw8wnUq85LK/UuG//ezZvfPfPB8//cPHp4bTc+qAC9G4regwABAgQIECBA4KYRePeq8+rX+tX132nOTb5w5vMPXdzNDydA76am9yJAgAABAgQIELiBAn3XN83p/tLq0fnKpaOvH/m5t/biwwjQe6HqPQkQIECAAAECBPZWoC13Y67PblYyc3u2afoTTd/+VffKm58/89ThC3v5xwXovdT13gQIECBAgAABArsj0LZN206bZjotP709b5r57Ot9M/9y37bPtk339GuH/qOscX60fFdw7x/vBuia3psS3vvy9CBAgAABAgQIECBw3QXKjebqveZqUK6/9Ve2zaRuS2guj37t7dW+W3+uPL/U9u2zk747dnFtfvzNz/3MuUXBdfzfIkD3XXe+nbS31wXX9ZdZ2kWgvo6fwp8iQIAAAQIECBBIKVDuy1yWYZQLx/P1cmV5ba3v2nPlyvJrbdu+3Mz6F/um+0oz705MpiuvTObrb81Wpude/cPd/VJgFP7dK9BLzYfmb3+zxPw7mv62uvUgQIAAAQIECBAgcH0E2gu313XMzeTWtp+eX+snB1f7W2a3dacu3dk1577aNU8dLms2bp7H/wPpjlZaG1W4nAAAAABJRU5ErkJggg==') no-repeat left top/100% 100%}
     .cover-nc-text{position:absolute;top:9%;left:0;right:0;padding:0 5%;color:white;font-family:'AHG',Helvetica,Arial,sans-serif;font-weight:bold;font-size:20pt}
-    .cover-year-text{position:absolute;top:34%;left:0;padding:0 5%;color:white;font-family:'AHG',Helvetica,Arial,sans-serif;font-weight:bold;font-size:44pt;line-height:1}
+    .cover-year-text{position:absolute;top:50%;left:0;padding:0 5%;color:white;font-family:'AHG',Helvetica,Arial,sans-serif;font-weight:bold;font-size:44pt;line-height:1;transform:translateY(-30%)}
     .cover-maths{font-weight:bold;font-size:26pt;margin-bottom:4mm;font-family:'AHG',Helvetica,Arial,sans-serif}
     .cover-week{font-size:11pt;color:#555;margin-bottom:20mm}
     .cover-name-row{display:flex;align-items:baseline;gap:4mm;font-size:13pt}
@@ -1202,7 +1199,8 @@ function buildPaperHTML(classYear, label, arithQs, reasoningQs, pupilNames) {
     .q-num{color:#2e6fad;font-weight:900;font-size:14pt;line-height:1}
     .q-show-method{font-size:7.5pt;font-weight:900;text-align:center;flex:1;display:flex;align-items:center;justify-content:center;line-height:1.5}
     .q-main{flex:1;position:relative;background-image:linear-gradient(#c0cfe0 1px,transparent 1px),linear-gradient(90deg,#c0cfe0 1px,transparent 1px);background-size:6.5mm 6.5mm;background-position:0 calc(2*6.5mm)}
-    .q-header{background:white;border-bottom:0.8px solid #ccc;padding:1.5mm 4mm;display:flex;align-items:center;gap:3mm;font-size:15pt;font-weight:bold;height:calc(2*6.5mm);position:relative;z-index:2;flex-wrap:wrap;overflow:hidden}
+    .q-header{background:white;border-bottom:0.8px solid #ccc;padding:1.5mm 4mm;display:flex;align-items:center;gap:3mm;font-size:15pt;font-weight:bold;height:calc(2*6.5mm);position:relative;z-index:2;flex-wrap:wrap}
+    sup{font-size:0.6em;vertical-align:0.45em;line-height:0;font-weight:bold}
     .q-ans{position:absolute;bottom:3mm;right:3mm;width:36mm;height:13mm;border:2.5px solid #2e6fad;background:white;z-index:3}
     .ibox{display:inline-block;width:26mm;height:11mm;border:2.5px solid #2e6fad;background:white;vertical-align:middle}
     .fh{display:inline-flex;flex-direction:column;align-items:center;font-size:11pt;font-weight:bold;line-height:1;vertical-align:middle;margin:0 1px}
@@ -1267,7 +1265,7 @@ ${covers}
 <div class="pb"></div>
 <div class="arith-hdr">
   <span class="arith-hdr-l">${classYear} — Mathematics — Arithmetic</span>
-  <span>.......... / ${totalMarks} marks</span>
+  ${subsetMarks === null ? `<span>.......... / ${totalMarks} marks</span>` : ''}
 </div>
 ${y6ScoreRow}
 ${arithHTML}
