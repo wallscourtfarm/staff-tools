@@ -504,7 +504,7 @@ function publishAndNotify() {
   GmailApp.sendEmail(NOTIFICATION_EMAILS.join(','),
     subject,
     `Release schedule updated at ${timeStr}. View it here: ${VIEWER_URL}`,
-    { htmlBody: htmlBody }
+    { htmlBody: htmlBody, from: 'wallscourt.scheduling@gmail.com' }
   );
 
   SpreadsheetApp.getUi().alert(
