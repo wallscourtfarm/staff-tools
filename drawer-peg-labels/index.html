@@ -162,7 +162,13 @@
     <div class="card" id="namesCard">
       <div class="card-header"><h2>Children's Names</h2></div>
       <div class="card-body">
-        <textarea id="namesInput" placeholder="Enter names, one per line"></textarea>
+        <textarea id="namesInput" placeholder="Enter names, one per line&#10;Add ,BG / ,HD / ,UWE for community group dot (optional)&#10;e.g. Alice Smith,BG"></textarea>
+        <div style="margin-top:8px;font-size:0.75rem;color:var(--muted);">
+          <strong style="color:var(--text);">Community groups (optional):</strong> add a suffix after each name —
+          <span style="display:inline-flex;align-items:center;gap:3px;margin:0 4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1a56d6;vertical-align:middle;"></span><strong>,BG</strong> Beaufort Grange</span>
+          <span style="display:inline-flex;align-items:center;gap:3px;margin:0 4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d4a000;vertical-align:middle;"></span><strong>,HD</strong> Happy Days</span>
+          <span style="display:inline-flex;align-items:center;gap:3px;margin:0 4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d42020;vertical-align:middle;"></span><strong>,UWE</strong> UWE</span>
+        </div>
         <label class="upload-area">
           <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt">
           <div>📄 Click to upload class list (Excel, CSV, or TXT)</div>
@@ -215,7 +221,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>06.07.26e</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>21.07.26a</strong></footer>
 
 <script>
 // Year group colours
@@ -332,6 +338,13 @@ let currentLabelType = 'drawer';
 let isImageMode = false;
 let currentYear = null;
 let names = [];
+let communityGroups = [];
+const GROUP_COLOURS = { BG: '#1a56d6', HD: '#d4a000', UWE: '#d42020' };
+function parseNameLine(line) {
+  const m = line.match(/^(.+?)\s*,\s*(BG|HD|UWE)\s*$/i);
+  if (m) return { name: m[1].trim(), group: m[2].toUpperCase() };
+  return { name: line.trim(), group: null };
+}
 let fieldData = []; // array of arrays for multi-field labels
 let imgDataUrl = null;
 
@@ -464,7 +477,9 @@ function onYearClick(e) {
 
 function onNamesInput() {
   const text = namesInput.value.trim();
-  names = text ? text.split('\n').map(n => n.trim()).filter(n => n) : [];
+  const parsed = text ? text.split('\n').map(l => parseNameLine(l)).filter(p => p.name) : [];
+  names = parsed.map(p => p.name);
+  communityGroups = parsed.map(p => p.group);
   updatePreview();
 }
 
@@ -480,16 +495,21 @@ async function onFileUpload(e) {
       const workbook = XLSX.read(data, { type: 'array' });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-      names = rows.flat().filter(cell => {
+      const raw = rows.flat().filter(cell => {
         if (typeof cell !== 'string') return false;
         const c = cell.trim().toLowerCase();
         return c && !['first name', 'firstname', 'name', 'names'].includes(c);
       });
+      const parsed = raw.map(parseNameLine);
+      names = parsed.map(p => p.name);
+      communityGroups = parsed.map(p => p.group);
     } else {
       const text = await file.text();
-      names = text.split(/[\n\r,]+/).map(n => n.trim()).filter(n => n);
+      const parsed = text.split(/[\n\r]+/).map(l => parseNameLine(l.trim())).filter(p => p.name);
+      names = parsed.map(p => p.name);
+      communityGroups = parsed.map(p => p.group);
     }
-    namesInput.value = names.join('\n');
+    namesInput.value = names.map((n, i) => communityGroups[i] ? `${n},${communityGroups[i]}` : n).join('\n');
     updatePreview();
   } catch (err) {
     statusEl.className = 'status error';
@@ -571,6 +591,7 @@ function updatePreview() {
   const config = LABEL_CONFIG[currentLabelType];
   const yearData = currentYear ? YEAR_COLOURS[currentYear] : null;
   const previewName = names.length > 0 ? names[0] : '[Name]';
+  const previewGroup = communityGroups.length > 0 ? communityGroups[0] : null;
   const bgColour = yearData?.hex || '#ccc';
 
   // Fixed preview size for both label types
@@ -595,8 +616,12 @@ function updatePreview() {
   labelPreview.style.width = previewW + 'px';
   labelPreview.style.height = previewH + 'px';
 
+  const dotSizePx = Math.max(8, Math.round(innerH * 0.32));
+  const dotHtml = previewGroup ? `<span style="position:absolute;top:${previewBorder+3}px;right:${previewBorder+3}px;width:${dotSizePx}px;height:${dotSizePx}px;border-radius:50%;background:${GROUP_COLOURS[previewGroup]};flex-shrink:0;"></span>` : '';
+
   let html = `
     <div style="position:absolute;inset:0;background:${bgColour};">
+      ${dotHtml}
       <div style="position:absolute;top:${previewBorder}px;left:${previewBorder}px;width:${innerW}px;height:${innerH}px;background:white;display:flex;align-items:center;justify-content:flex-start;padding:0 12px 0 4px;">
         <img src="${logoData}" style="height:${logoHpx}px;width:${logoHpx}px;object-fit:contain;margin-right:12px;flex-shrink:0;">
         ${(() => {
@@ -873,6 +898,18 @@ async function generatePdf() {
           // Draw white inner
           doc.setFillColor(255, 255, 255);
           doc.rect(lx + config.border, ly + config.border, liW, liH, 'F');
+
+          // Community group dot (top-right of white area)
+          const nameIdx = sheetIdx * config.perSheet + idx;
+          const grp = communityGroups[nameIdx];
+          if (grp && GROUP_COLOURS[grp]) {
+            const [dr, dg, db] = GROUP_COLOURS[grp].slice(1).match(/../g).map(h => parseInt(h, 16));
+            doc.setFillColor(dr, dg, db);
+            const dotR = Math.min(liH * 0.18, 2.2);
+            const dotX = lx + config.border + liW - dotR - 1;
+            const dotY = ly + config.border + dotR + 1;
+            doc.circle(dotX, dotY, dotR, 'F');
+          }
 
           // Logo on left, vertically centred
           const logoX = lx + config.border + (config.logoInset || 1);
