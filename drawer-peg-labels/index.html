@@ -221,7 +221,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>21.07.26a</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>21.07.26b</strong></footer>
 
 <script>
 // Year group colours
@@ -340,6 +340,7 @@ let currentYear = null;
 let names = [];
 let communityGroups = [];
 const GROUP_COLOURS = { BG: '#1a56d6', HD: '#d4a000', UWE: '#d42020' };
+const GROUP_LETTERS = { BG: 'B', HD: 'H', UWE: 'U' };
 function parseNameLine(line) {
   const m = line.match(/^(.+?)\s*,\s*(BG|HD|UWE)\s*$/i);
   if (m) return { name: m[1].trim(), group: m[2].toUpperCase() };
@@ -616,8 +617,8 @@ function updatePreview() {
   labelPreview.style.width = previewW + 'px';
   labelPreview.style.height = previewH + 'px';
 
-  const dotSizePx = Math.max(8, Math.round(innerH * 0.32));
-  const dotHtml = previewGroup ? `<span style="position:absolute;top:${previewBorder+3}px;right:${previewBorder+3}px;width:${dotSizePx}px;height:${dotSizePx}px;border-radius:50%;background:${GROUP_COLOURS[previewGroup]};flex-shrink:0;"></span>` : '';
+  const dotSizePx = Math.max(8, Math.round(innerH * 0.38));
+  const dotHtml = previewGroup ? `<span style="position:absolute;top:${previewBorder+2}px;right:${previewBorder+3}px;width:${dotSizePx}px;height:${dotSizePx}px;border-radius:50%;background:${GROUP_COLOURS[previewGroup]};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:${Math.round(dotSizePx*0.6)}px;font-family:Arial,sans-serif;line-height:1;">${GROUP_LETTERS[previewGroup]}</span>` : '';
 
   let html = `
     <div style="position:absolute;inset:0;background:${bgColour};">
@@ -904,11 +905,18 @@ async function generatePdf() {
           const grp = communityGroups[nameIdx];
           if (grp && GROUP_COLOURS[grp]) {
             const [dr, dg, db] = GROUP_COLOURS[grp].slice(1).match(/../g).map(h => parseInt(h, 16));
-            doc.setFillColor(dr, dg, db);
             const dotR = Math.min(liH * 0.18, 2.2);
             const dotX = lx + config.border + liW - dotR - 1;
             const dotY = ly + config.border + dotR + 1;
+            doc.setFillColor(dr, dg, db);
             doc.circle(dotX, dotY, dotR, 'F');
+            const letter = GROUP_LETTERS[grp];
+            const letterSize = Math.max(4, dotR * 3.5);
+            doc.setFontSize(letterSize);
+            doc.setFont(fontName, 'bold');
+            doc.setTextColor(255, 255, 255);
+            doc.text(letter, dotX, dotY + dotR * 0.38, { align: 'center' });
+            doc.setTextColor(30, 45, 61);
           }
 
           // Logo on left, vertically centred
