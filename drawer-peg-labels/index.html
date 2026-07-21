@@ -221,7 +221,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>21.07.26b</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>21.07.26c</strong></footer>
 
 <script>
 // Year group colours
@@ -342,8 +342,14 @@ let communityGroups = [];
 const GROUP_COLOURS = { BG: '#1a56d6', HD: '#d4a000', UWE: '#d42020' };
 const GROUP_LETTERS = { BG: 'B', HD: 'H', UWE: 'U' };
 function parseNameLine(line) {
-  const m = line.match(/^(.+?)\s*,\s*(BG|HD|UWE)\s*$/i);
-  if (m) return { name: m[1].trim(), group: m[2].toUpperCase() };
+  const m = line.match(/^(.+?)\s*,\s*(BG|Beaufort\s+Grange|HD|Happy\s+Days|UWE)\s*$/i);
+  if (m) {
+    const raw = m[2].trim().toLowerCase();
+    const group = raw === 'bg' || raw.startsWith('beaufort') ? 'BG'
+                : raw === 'hd' || raw.startsWith('happy')   ? 'HD'
+                : 'UWE';
+    return { name: m[1].trim(), group };
+  }
   return { name: line.trim(), group: null };
 }
 let fieldData = []; // array of arrays for multi-field labels
