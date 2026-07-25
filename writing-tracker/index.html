@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>WFA Writing Tracker</title>
+<style>
+:root {
+  --blue: #1798d3;
+  --blue-dark: #0f6a9b;
+  --dark: #0a0101;
+  --c-unreviewed: #f0f0f0;
+  --c-x:  #dbeafe; --ct-x:  #1e40af;
+  --c-tilde: #ede9fe; --ct-tilde: #5b21b6;
+  --c-0:  #fef9c3; --ct-0:  #7a4f00;
+  --c-1:  #fef08a; --ct-1:  #713f12;
+  --c-2:  #fed7aa; --ct-2:  #9a3412;
+  --c-3:  #fca5a5; --ct-3:  #7f1d1d;
+  --c-4:  #86efac; --ct-4:  #14532d;
+  --radius: 8px;
+  --shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  background: #f8fafc;
+  color: var(--dark);
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Setup screen ────────────────────────────────────────────── */
+#setup-screen {
+  position: fixed; inset: 0; background: white;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+#setup-screen.hidden { display: none; }
+.setup-card {
+  background: white; border-radius: 16px; box-shadow: var(--shadow);
+  padding: 40px; max-width: 480px; width: 90%; text-align: center;
+}
+.setup-card h1 { color: var(--blue); font-size: 22px; margin-bottom: 8px; }
+.setup-card p { color: #666; margin-bottom: 24px; font-size: 13px; }
+.setup-card input {
+  width: 100%; padding: 10px 14px; border: 2px solid #e2e8f0;
+  border-radius: var(--radius); font-size: 13px; margin-bottom: 12px;
+  font-family: monospace;
+}
+.setup-card input:focus { outline: none; border-color: var(--blue); }
+
+/* ── Main layout ─────────────────────────────────────────────── */
+#app { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+#app.hidden { display: none; }
+
+/* ── Header ──────────────────────────────────────────────────── */
+header {
+  background: var(--blue);
+  color: white;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.header-logo { font-weight: 800; font-size: 16px; letter-spacing: -0.5px; }
+.header-logo span { color: #a5d8f5; font-size: 11px; font-weight: 400; display: block; }
+.header-selects { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.header-selects select {
+  background: rgba(255,255,255,0.2); color: white;
+  border: 1px solid rgba(255,255,255,0.3); border-radius: 6px;
+  padding: 6px 10px; font-size: 13px; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+  padding-right: 28px;
+}
+.header-selects select:focus { outline: none; background-color: rgba(255,255,255,0.3); }
+.header-selects select option { background: white; color: var(--dark); }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.save-indicator {
+  font-size: 12px; opacity: 0; transition: opacity .3s;
+  background: rgba(0,0,0,.2); padding: 4px 10px; border-radius: 20px;
+}
+.save-indicator.visible { opacity: 1; }
+
+/* ── Tab bar ─────────────────────────────────────────────────── */
+nav.tabs {
+  display: flex; gap: 0; background: white;
+  border-bottom: 2px solid #e2e8f0; flex-shrink: 0;
+}
+nav.tabs button {
+  flex: 1; padding: 10px; border: none; background: none;
+  font-size: 13px; font-weight: 500; color: #94a3b8;
+  cursor: pointer; border-bottom: 3px solid transparent;
+  transition: all .15s; margin-bottom: -2px;
+}
+nav.tabs button.active { color: var(--blue); border-bottom-color: var(--blue); }
+nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
+
+/* ── Tab content ─────────────────────────────────────────────── */
+.tab-content { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+.tab-content.active { display: flex; }
+
+/* ── Grid controls ───────────────────────────────────────────── */
+.grid-controls {
+  display: flex; gap: 8px; padding: 8px 12px; background: white;
+  border-bottom: 1px solid #e2e8f0; align-items: center; flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.filter-btn {
+  padding: 4px 12px; border-radius: 20px; border: 1.5px solid #cbd5e1;
+  background: white; font-size: 12px; cursor: pointer; color: #64748b;
+  transition: all .15s;
+}
+.filter-btn.active { background: var(--blue); color: white; border-color: var(--blue); }
+.filter-label { font-size: 12px; color: #94a3b8; margin-left: 4px; }
+.controls-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+/* ── Grid wrapper ────────────────────────────────────────────── */
+.grid-wrapper {
+  flex: 1;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Grid table ──────────────────────────────────────────────── */
+.grid-table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  min-width: 100%;
+}
+
+/* Skill name column */
+.grid-table .skill-col {
+  min-width: 260px; max-width: 260px; width: 260px;
+  position: sticky; left: 0; z-index: 5;
+  background: white;
+  border-right: 2px solid #e2e8f0;
+}
+
+/* Pupil columns */
+.grid-table th.pupil-th {
+  min-width: 56px; max-width: 56px; width: 56px;
+  position: sticky; top: 0; z-index: 3;
+  background: white; border-bottom: 2px solid #e2e8f0;
+  padding: 4px 2px; vertical-align: bottom;
+}
+.pupil-name-wrap {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  height: 80px; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; color: var(--dark);
+  padding: 4px 2px; cursor: default;
+}
+.pupil-name-wrap .level-badge {
+  display: block; font-size: 9px; font-weight: 700;
+  background: #fbbf24; color: white; border-radius: 3px;
+  padding: 1px 3px; margin-top: 4px; writing-mode: horizontal-tb;
+  transform: none;
+}
+
+/* Corner cell */
+.grid-table .corner-th {
+  position: sticky; top: 0; left: 0; z-index: 10;
+  background: white; border-right: 2px solid #e2e8f0; border-bottom: 2px solid #e2e8f0;
+}
+
+/* Section header rows */
+.section-row td {
+  background: #f8fafc; font-weight: 700; font-size: 11px;
+  letter-spacing: .05em; text-transform: uppercase; color: #64748b;
+  padding: 6px 10px; border-top: 2px solid #e2e8f0;
+}
+.tier-gd { background: #f0fdf4; }
+.tier-gd td { color: #166534; }
+
+/* Skill row */
+.skill-row td.skill-col {
+  padding: 6px 10px; font-size: 12px; line-height: 1.3;
+  border-bottom: 1px solid #f1f5f9; white-space: normal; word-break: break-word;
+  background: white;
+}
+.skill-row:hover td.skill-col { background: #f8fafc; }
+.skill-row td.skill-col .skill-text { display: block; }
+.skill-row td.skill-col .skill-example { display: block; font-size: 10px; color: #94a3b8; margin-top: 2px; }
+
+/* Score cells */
+.score-cell {
+  text-align: center; vertical-align: middle;
+  cursor: pointer; border-bottom: 1px solid #f1f5f9;
+  border-right: 1px solid #f1f5f9;
+  transition: filter .1s;
+  user-select: none; -webkit-user-select: none;
+}
+.score-cell:hover { filter: brightness(.92); }
+.score-cell.saving { opacity: .5; }
+.score-cell .score-label {
+  font-size: 12px; font-weight: 700; line-height: 1;
+}
+.score-cell.disabled {
+  background: #f8fafc !important; cursor: not-allowed;
+  border-bottom: 1px solid #f1f5f9;
+}
+.score-cell.disabled .score-label { color: #cbd5e1; }
+
+/* ── Score picker ─────────────────────────────────────────────── */
+#score-picker {
+  position: fixed; z-index: 200;
+  background: white; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,.2);
+  padding: 12px; min-width: 220px;
+  display: grid; gap: 6px;
+}
+#score-picker.hidden { display: none; }
+#picker-skill-name {
+  font-size: 11px; color: #64748b; grid-column: 1/-1;
+  padding-bottom: 6px; border-bottom: 1px solid #f1f5f9; margin-bottom: 2px;
+  line-height: 1.3;
+}
+.picker-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px; border: 1.5px solid transparent;
+  cursor: pointer; font-size: 12px; font-weight: 600; text-align: left;
+  transition: filter .1s;
+}
+.picker-btn:hover { filter: brightness(.92); }
+.picker-btn .pbadge {
+  min-width: 22px; height: 22px; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; flex-shrink: 0;
+}
+.picker-btn.current { border-color: #334155; }
+#picker-close {
+  grid-column: 1/-1; margin-top: 4px; padding: 6px;
+  background: none; border: none; color: #94a3b8; cursor: pointer;
+  font-size: 12px; text-align: center;
+}
+
+/* ── Legend bar ──────────────────────────────────────────────── */
+.legend-bar {
+  display: flex; gap: 6px; padding: 6px 12px; background: white;
+  border-top: 1px solid #e2e8f0; flex-shrink: 0; flex-wrap: wrap;
+}
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #64748b; }
+.legend-swatch {
+  width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.1);
+}
+
+/* ── Interventions view ──────────────────────────────────────── */
+.interventions-wrapper {
+  flex: 1; overflow-y: auto; padding: 16px;
+}
+.int-section { margin-bottom: 24px; }
+.int-section h2 {
+  font-size: 14px; font-weight: 700; color: var(--dark);
+  margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0;
+}
+.int-card {
+  background: white; border-radius: 10px; padding: 12px 16px;
+  margin-bottom: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+.int-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.int-card p { font-size: 12px; color: #64748b; }
+.int-pupil-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.int-pupil-chip {
+  background: #fca5a5; color: #7f1d1d; font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 12px;
+}
+.int-skill-stat { font-size: 11px; color: #64748b; }
+.no-interventions {
+  text-align: center; padding: 40px; color: #94a3b8;
+  font-size: 14px;
+}
+
+/* ── Pupil profile view ──────────────────────────────────────── */
+.pupil-wrapper { flex: 1; overflow-y: auto; padding: 16px; }
+.pupil-select-bar {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 16px;
+}
+.pupil-select-bar select {
+  padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px;
+  font-size: 13px; flex: 1; background: white;
+}
+.pupil-select-bar select:focus { outline: none; border-color: var(--blue); }
+.pupil-profile-card {
+  background: white; border-radius: 12px; padding: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 16px;
+}
+.pupil-profile-card h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.pupil-profile-card .meta { font-size: 12px; color: #64748b; }
+.history-grid { display: grid; gap: 2px; margin-top: 12px; }
+.history-row {
+  display: grid; grid-template-columns: 180px repeat(6, 1fr);
+  gap: 2px; align-items: center;
+}
+.history-skill { font-size: 11px; color: #475569; padding: 4px 6px; }
+.history-cell {
+  height: 28px; border-radius: 4px; font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.history-header {
+  font-size: 10px; font-weight: 700; color: #94a3b8;
+  text-align: center; padding: 2px;
+}
+
+/* ── Admin view ──────────────────────────────────────────────── */
+.admin-wrapper { flex: 1; overflow-y: auto; padding: 16px; }
+.admin-section { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.admin-section h2 { font-size: 14px; font-weight: 700; margin-bottom: 12px; color: var(--dark); }
+.form-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.form-row input, .form-row select {
+  flex: 1; min-width: 140px; padding: 8px 12px;
+  border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px;
+}
+.form-row input:focus, .form-row select:focus { outline: none; border-color: var(--blue); }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.admin-table th { text-align: left; padding: 6px 8px; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+.admin-table td { padding: 8px 8px; border-bottom: 1px solid #f1f5f9; }
+.admin-table tr:hover td { background: #f8fafc; }
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.btn {
+  padding: 8px 16px; border-radius: 8px; border: none;
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: filter .15s;
+}
+.btn:hover { filter: brightness(.92); }
+.btn-primary { background: var(--blue); color: white; }
+.btn-secondary { background: #f1f5f9; color: var(--dark); }
+.btn-danger { background: #fee2e2; color: #991b1b; }
+.btn-sm { padding: 4px 10px; font-size: 11px; }
+
+/* ── Loading / empty states ──────────────────────────────────── */
+.loading-state { padding: 40px; text-align: center; color: #94a3b8; }
+.empty-state { padding: 40px; text-align: center; color: #94a3b8; font-size: 14px; }
+
+/* ── Version ─────────────────────────────────────────────────── */
+.version { font-size: 10px; color: rgba(255,255,255,.5); white-space: nowrap; }
+
+/* ── Backdrop ────────────────────────────────────────────────── */
+#picker-backdrop {
+  position: fixed; inset: 0; z-index: 190;
+  display: none;
+}
+#picker-backdrop.visible { display: block; }
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .grid-table .skill-col { min-width: 180px; max-width: 180px; width: 180px; }
+  .filter-label { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Setup screen (shown when no API URL saved) -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <h1>WFA Writing Tracker</h1>
+    <p>Paste the Google Apps Script Web App URL to connect to the database.</p>
+    <input type="url" id="setup-url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:8px">
+      <button class="btn btn-primary" onclick="connectApi()">Connect</button>
+    </div>
+    <p style="margin-top:16px;font-size:11px;color:#94a3b8">
+      Deploy Code.gs as a Web App from Google Apps Script, then paste the URL above.
+    </p>
+  </div>
+</div>
+
+<!-- Main app -->
+<div id="app" class="hidden">
+  <header>
+    <div class="header-logo">
+      WFA
+      <span>Writing Tracker</span>
+    </div>
+    <div class="header-selects">
+      <select id="class-select" onchange="onClassChange()">
+        <option value="">— Select class —</option>
+      </select>
+      <select id="term-select" onchange="onTermChange()">
+        <option value="T1">Term 1</option>
+        <option value="T2">Term 2</option>
+        <option value="T3">Term 3</option>
+        <option value="T4">Term 4</option>
+        <option value="T5">Term 5</option>
+        <option value="T6">Term 6</option>
+      </select>
+      <select id="year-select" onchange="onYearChange()">
+        <option value="2025-26">2025–26</option>
+        <option value="2026-27">2026–27</option>
+        <option value="2024-25">2024–25</option>
+      </select>
+    </div>
+    <div class="header-right">
+      <div class="save-indicator" id="save-indicator">Saving…</div>
+      <span class="version">25.07.26a</span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="active" onclick="showTab('grid', this)">Grid</button>
+    <button onclick="showTab('interventions', this)">Interventions</button>
+    <button onclick="showTab('pupil', this)">Pupil</button>
+    <button onclick="showTab('admin', this)">Admin</button>
+  </nav>
+
+  <!-- GRID TAB -->
+  <div id="tab-grid" class="tab-content active">
+    <div class="grid-controls">
+      <span class="filter-label">Show:</span>
+      <button class="filter-btn active" id="filt-expected" onclick="toggleTierFilter('expected', this)">Expected</button>
+      <button class="filter-btn active" id="filt-gd" onclick="toggleTierFilter('greater_depth', this)">Greater Depth</button>
+      <button class="filter-btn active" id="filt-nonneg" onclick="toggleTierFilter('non_neg', this)">Non-Negotiatables</button>
+      <div class="controls-right">
+        <button class="btn btn-sm btn-secondary" onclick="collapseAll()">Collapse all</button>
+        <button class="btn btn-sm btn-secondary" onclick="expandAll()">Expand all</button>
+      </div>
+    </div>
+    <div class="grid-wrapper" id="grid-wrapper">
+      <div class="empty-state" id="grid-empty">Select a class to begin.</div>
+      <table class="grid-table hidden" id="grid-table">
+        <thead><tr id="grid-header-row"></tr></thead>
+        <tbody id="grid-body"></tbody>
+      </table>
+    </div>
+    <div class="legend-bar">
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--c-unreviewed)"></div>Unreviewed</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--c-x)"></div>x Not taught</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--c-tilde)"></div>~ Genre not covered</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--c-0)"></div>0 Taught, not used</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--c-1)"></div>1 Incorrect (1+)</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--c-2)"></div>2 Incorrect (2+)</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--c-3)"></div>3 Revisited, still incorrect ⚠</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--c-4)"></div>4 Secure</div>
+    </div>
+  </div>
+
+  <!-- INTERVENTIONS TAB -->
+  <div id="tab-interventions" class="tab-content">
+    <div class="interventions-wrapper" id="int-wrapper">
+      <div class="empty-state">Select a class on the Grid tab first.</div>
+    </div>
+  </div>
+
+  <!-- PUPIL TAB -->
+  <div id="tab-pupil" class="tab-content">
+    <div class="pupil-wrapper" id="pupil-wrapper">
+      <div class="pupil-select-bar">
+        <select id="pupil-select" onchange="renderPupilProfile()">
+          <option value="">— Select pupil —</option>
+        </select>
+      </div>
+      <div id="pupil-profile-content">
+        <div class="empty-state">Select a class and then a pupil to view their history.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN TAB -->
+  <div id="tab-admin" class="tab-content">
+    <div class="admin-wrapper">
+
+      <div class="admin-section">
+        <h2>Classes</h2>
+        <div class="form-row" id="add-class-form">
+          <select id="new-class-yg">
+            <option value="Y1">Y1 · Beech</option>
+            <option value="Y2">Y2 · Willow</option>
+            <option value="Y3">Y3 · Acer</option>
+            <option value="Y4" selected>Y4 · Maple</option>
+            <option value="Y5">Y5 · Hazel</option>
+            <option value="Y6">Y6 · Elm</option>
+          </select>
+          <input type="text" id="new-class-name" placeholder="Class name (e.g. Clifton)" maxlength="40">
+          <input type="text" id="new-class-teacher" placeholder="Teacher name" maxlength="60">
+          <button class="btn btn-primary" onclick="addClassFromForm()">Add class</button>
+        </div>
+        <table class="admin-table" id="classes-table">
+          <thead><tr><th>Year</th><th>Class</th><th>Teacher</th><th></th></tr></thead>
+          <tbody id="classes-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="admin-section">
+        <h2>Pupils <span id="pupils-class-label" style="font-weight:400;color:#94a3b8"></span></h2>
+        <div class="form-row" id="add-pupil-form">
+          <input type="text" id="new-pupil-name" placeholder="Pupil name" maxlength="60">
+          <select id="new-pupil-level">
+            <option value="">Working at (same as class)</option>
+            <option value="Y1">Y1</option>
+            <option value="Y2">Y2</option>
+            <option value="Y3">Y3</option>
+            <option value="Y4">Y4</option>
+            <option value="Y5">Y5</option>
+          </select>
+          <button class="btn btn-primary" onclick="addPupilFromForm()">Add pupil</button>
+        </div>
+        <table class="admin-table" id="pupils-table">
+          <thead><tr><th>Name</th><th>Working at</th><th>Class</th><th></th></tr></thead>
+          <tbody id="pupils-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="admin-section">
+        <h2>Settings</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:13px;">Academic year:</span>
+          <select id="setting-year" onchange="saveSettingYear()">
+            <option value="2024-25">2024–25</option>
+            <option value="2025-26">2025–26</option>
+            <option value="2026-27">2026–27</option>
+          </select>
+          <button class="btn btn-sm btn-secondary" onclick="showSetup()">Change API URL</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Score picker -->
+<div id="picker-backdrop" onclick="closePicker()"></div>
+<div id="score-picker" class="hidden">
+  <div id="picker-skill-name"></div>
+  <!-- buttons injected by JS -->
+  <button id="picker-close" onclick="closePicker()">✕ Close</button>
+</div>
+
+<script>
+// ================================================================
+// SKILLS DATA
+// ================================================================
+const SKILLS = {"Y1":[{"id":"Y1_001","tier":"expected","category":"Composition","skill":"Write for a range of purposes and audiences, including to entertain, inform, argue and explain across the curriculum. Writing should be based on personal experiences and on those of others as well as through the use of high quality texts.","example":""},{"id":"Y1_002","tier":"expected","category":"Composition","skill":"Write to convey information.","example":""},{"id":"Y1_003","tier":"expected","category":"Composition","skill":"Compose a sentence orally before writing it","example":""},{"id":"Y1_004","tier":"expected","category":"Composition","skill":"Use simple narrative language features","example":"story language e.g. once upon a time/one day/happily ever after"},{"id":"Y1_005","tier":"expected","category":"Sentence Structure","skill":"Use 'and' to join words e.g. The dragon was huge and angry and scary.","example":""},{"id":"Y1_006","tier":"expected","category":"Sentence Structure","skill":"Use 'and' to join clauses e.g. The dragon was huge and it breathed fire.","example":""},{"id":"Y1_007","tier":"expected","category":"Tense & Verb Form","skill":"Use present tense with some accuracy e.g. I walk to school.","example":""},{"id":"Y1_008","tier":"expected","category":"Tense & Verb Form","skill":"Use past tense with some accuracy e.g. I walked to school.","example":""},{"id":"Y1_009","tier":"expected","category":"Cohesion","skill":"Write linked sentences after discussion with teacher","example":""},{"id":"Y1_010","tier":"expected","category":"Punctuation","skill":"Use many capital letters accurately at the start of sentences.","example":""},{"id":"Y1_011","tier":"expected","category":"Punctuation","skill":"Use many full stops accurately at the end of sentences.","example":""},{"id":"Y1_012","tier":"expected","category":"Punctuation","skill":"Consistently use capital letter for 'I' and their own name.","example":""},{"id":"Y1_013","tier":"expected","category":"Punctuation","skill":"Some use of capital letters for proper nouns e.g. He saw Peter.","example":""},{"id":"Y1_014","tier":"expected","category":"Punctuation","skill":"Begin to punctuate sentences using question marks e.g. Where did he go?","example":""},{"id":"Y1_015","tier":"expected","category":"Punctuation","skill":"Begin to punctuate sentences using exclamation marks e.g. Zoom! The rocket flew.","example":""},{"id":"Y1_016","tier":"expected","category":"Spelling","skill":"Make phonetically plausible spelling choices in line with school's phonics progression and the phonemes taught so far.","example":""},{"id":"Y1_017","tier":"expected","category":"Spelling","skill":"Spell many Y1 common exception words.","example":""},{"id":"Y1_018","tier":"expected","category":"Spelling","skill":"Apply Year 1 spelling rules e.g. tch usually spelt as tch if it comes straight after a single vowel letter","example":""},{"id":"Y1_019","tier":"expected","category":"Spelling","skill":"Spell the days of the week","example":""},{"id":"Y1_020","tier":"expected","category":"Handwriting","skill":"Form most lower-case letters in the correct direction, starting and finishing in the right place.","example":""},{"id":"Y1_021","tier":"expected","category":"Handwriting","skill":"Form most capital letters correctly.","example":""},{"id":"Y1_022","tier":"expected","category":"Handwriting","skill":"Use finger spaces consistently.","example":""},{"id":"Y1_023","tier":"expected","category":"Editing & Revising","skill":"Re-read what they have written to check that it makes sense edit to correct errors.","example":""},{"id":"Y1_024","tier":"greater_depth","category":"Composition","skill":"Manipulate the language and grammar taught within Year 1 in a range of independent writing, drawing on shared reading.","example":""},{"id":"Y1_025","tier":"greater_depth","category":"Composition","skill":"Consistently use vocabulary from across the curriculum in their writing","example":""},{"id":"Y1_026","tier":"greater_depth","category":"Composition","skill":"Maintain the quality and accuracy of their writing when writing at greater length","example":""},{"id":"Y1_027","tier":"greater_depth","category":"Composition","skill":"Use simple noun phrases","example":""},{"id":"Y1_028","tier":"greater_depth","category":"Spelling","skill":"Add -ing and -ed where there is no change to the root word e.g. jumped, jumping, played, playing.","example":""},{"id":"Y1_029","tier":"greater_depth","category":"Spelling","skill":"Spell words with the prefix -un","example":""},{"id":"Y1_030","tier":"greater_depth","category":"Spelling","skill":"Add the suffix -er and -est where no change is needed to the spelling of the root word e.g. low, lowest","example":""},{"id":"Y1_031","tier":"greater_depth","category":"Spelling","skill":"Add -s to nouns and verbs e.g. flowers, plants, grows, likes.","example":""},{"id":"Y1_032","tier":"greater_depth","category":"Spelling","skill":"Consistently apply year 1 spelling expectations in their writing across the curriculum.","example":""},{"id":"Y1_033","tier":"greater_depth","category":"Editing & Revising","skill":"Some use of editing strategies to improve the accuracy of spelling, punctuation and grammar","example":""}],"Y2":[{"id":"Y2_001","tier":"expected","category":"Composition","skill":"Write for a range of purposes and audiences including to entertain, inform, argue and explain across the curriculum. Writing should be based on personal experiences and of those of others as well as through the use of high quality texts.","example":""},{"id":"Y2_002","tier":"expected","category":"Composition","skill":"Use the main language features of narrative e.g. story language, powerful verbs, tense, third person, power of 3","example":""},{"id":"Y2_003","tier":"expected","category":"Composition","skill":"Write about real events, recording these simply and clearly","example":""},{"id":"Y2_004","tier":"expected","category":"Composition","skill":"Use the main language features of non-fiction e.g. imperative verbs for instructions, adverbs such as firstly, next, then, third person for reports","example":""},{"id":"Y2_005","tier":"expected","category":"Composition","skill":"Use sentences with all different forms","example":"Statement e.g. John was cold. / Question / Exclamation / Command"},{"id":"Y2_006","tier":"expected","category":"Composition","skill":"Create simple settings in narratives e.g. the woods, under the sea, space","example":""},{"id":"Y2_007","tier":"expected","category":"Composition","skill":"Use a variety of simple pronouns e.g. she, her, the girl, John","example":""},{"id":"Y2_008","tier":"expected","category":"Composition","skill":"Use expanded noun phrases to describe and specify e.g. A huge, scary monster.","example":""},{"id":"Y2_009","tier":"expected","category":"Sentence Structure","skill":"Simple sentences e.g. John sneezed.","example":""},{"id":"Y2_010","tier":"expected","category":"Sentence Structure","skill":"Co-ordination e.g. It was cold but we still had to go outside. (and, or, but, so)","example":""},{"id":"Y2_011","tier":"expected","category":"Sentence Structure","skill":"Subordination e.g. Joan was fed up because she couldn't get to sleep. (When, if, that, because)","example":""},{"id":"Y2_012","tier":"expected","category":"Tense & Verb Form","skill":"Use the present and past tenses mostly correctly and consistently","example":"Simple past e.g. Birds flew in the sky. / Continuous past e.g Birds were flying in the sky."},{"id":"Y2_013","tier":"expected","category":"Cohesion","skill":"Start to use paragraphs to group related information","example":""},{"id":"Y2_014","tier":"expected","category":"Cohesion","skill":"Use simple organisational devices e.g. headings, sub-headings, captions","example":""},{"id":"Y2_015","tier":"expected","category":"Punctuation","skill":"Demarcate most sentences with capital letters and full stops; use question marks correctly","example":""},{"id":"Y2_016","tier":"expected","category":"Punctuation","skill":"Use apostrophes for contractions correctly e.g. can't, won't, shouldn't","example":""},{"id":"Y2_017","tier":"expected","category":"Spelling","skill":"Segment spoken words into phonemes and represent these by graphemes, spelling many correctly and making phonically-plausible attempts at others","example":""},{"id":"Y2_018","tier":"expected","category":"Spelling","skill":"Some evidence of year two spelling rules applied independently once taught e.g. the u sound spelt with an o","example":""},{"id":"Y2_019","tier":"expected","category":"Spelling","skill":"Spell many Y2 common exception words.","example":""},{"id":"Y2_020","tier":"expected","category":"Handwriting","skill":"Form capital letters and digits of the correct size, orientation, and relationship to one another and to lowercase letters.","example":""},{"id":"Y2_021","tier":"expected","category":"Handwriting","skill":"Ascenders and descenders are of the correct relative size.","example":""},{"id":"Y2_022","tier":"expected","category":"Handwriting","skill":"Use spacing between words that reflects the size of the letters.","example":""},{"id":"Y2_023","tier":"expected","category":"Editing & Revising","skill":"Re-read what they have written to check that it makes sense; edit to correct errors.","example":""},{"id":"Y2_024","tier":"expected","category":"Editing & Revising","skill":"Use a dictionary, finding the word using the initial letter","example":""},{"id":"Y2_025","tier":"greater_depth","category":"Composition","skill":"Write effectively and coherently for different purposes, drawing on their reading to inform the vocabulary and grammar of their writing","example":""},{"id":"Y2_026","tier":"greater_depth","category":"Punctuation","skill":"Use the punctuation taught at KS1 mostly correctly","example":""},{"id":"Y2_027","tier":"greater_depth","category":"Punctuation","skill":"Use commas in lists e.g. The dragon was big, scary and dangerous.","example":""},{"id":"Y2_028","tier":"greater_depth","category":"Punctuation","skill":"Use apostrophes for contraction and possession correctly","example":"contraction e.g. won't / don't / didn't / can't"},{"id":"Y2_029","tier":"greater_depth","category":"Spelling","skill":"Add suffixes to spell most words correctly (e.g. –ment, –ness, –ful, –less, –ly)","example":"Excitement, sadness, hopeless, suddenly, joyful"},{"id":"Y2_030","tier":"greater_depth","category":"Spelling","skill":"Spell most common exception words.","example":""},{"id":"Y2_031","tier":"greater_depth","category":"Handwriting","skill":"Use the diagonal and horizontal strokes needed to join some letters","example":""},{"id":"Y2_032","tier":"greater_depth","category":"Editing & Revising","skill":"Consistently use both editing and revising strategies independently to improve the quality and accuracy of their writing.","example":""}],"Y3":[{"id":"Y3_001","tier":"expected","category":"Composition","skill":"Write for a range of purposes and audiences, including to entertain, inform, argue and explain","example":""},{"id":"Y3_002","tier":"expected","category":"Composition","skill":"Describe settings and characters in narratives e.g. describing characters' appearance, feelings, through the use of dialogue","example":""},{"id":"Y3_003","tier":"expected","category":"Composition","skill":"Consistently use the language features of non-fiction","example":"technical language e.g. The magnets repelled each other."},{"id":"Y3_004","tier":"expected","category":"Composition","skill":"Consistently use the language features of a narrative","example":"use of speech e.g. \"Can you reach it?\" asked Paul."},{"id":"Y3_005","tier":"expected","category":"Composition","skill":"Use figurative language","example":"similes e.g. He was like an angry dragon."},{"id":"Y3_006","tier":"expected","category":"Sentence Structure","skill":"Use conjunctions, prepositions and adverbs for time e.g. when, before, next, then, later","example":""},{"id":"Y3_007","tier":"expected","category":"Sentence Structure","skill":"Use conjunctions, prepositions and adverbs for cause e.g. because, since, as, so","example":""},{"id":"Y3_008","tier":"expected","category":"Sentence Structure","skill":"Use conjunctions, prepositions and adverbs for place e.g. when, in, above, under, next to","example":""},{"id":"Y3_009","tier":"expected","category":"Sentence Structure","skill":"Extend the range of sentences with more than one clause using co-ordinating conjunctions (e.g. yet, so)","example":""},{"id":"Y3_010","tier":"expected","category":"Sentence Structure","skill":"Use noun phrases expanded with adjectives and adverbs e.g. extremely hot flames / a brave and dangerous mission","example":""},{"id":"Y3_011","tier":"expected","category":"Tense & Verb Form","skill":"Use present and past tense correctly and consistently","example":"Past perfect e.g. He had not finished his meal. / They had not seen him before."},{"id":"Y3_012","tier":"expected","category":"Cohesion","skill":"Start to use paragraphs to group related information (based on time, place, topic)","example":""},{"id":"Y3_013","tier":"expected","category":"Cohesion","skill":"Use simple organisational devices e.g. headings, subheadings, captions","example":""},{"id":"Y3_014","tier":"expected","category":"Cohesion","skill":"Use nouns and pronouns to aid cohesion within sentences e.g. Tom ran…he felt…the lad was exhausted","example":""},{"id":"Y3_015","tier":"expected","category":"Punctuation","skill":"Punctuate sentences accurately — KS1 expectations: full stops and capital letters","example":""},{"id":"Y3_016","tier":"expected","category":"Punctuation","skill":"Use apostrophes for contractions correctly e.g. can't, won't, shouldn't","example":""},{"id":"Y3_017","tier":"expected","category":"Punctuation","skill":"Use apostrophes for singular possession correctly e.g. the dragon's teeth","example":""},{"id":"Y3_018","tier":"expected","category":"Punctuation","skill":"Punctuate speech using inverted commas (speech marks) with some accuracy","example":""},{"id":"Y3_019","tier":"expected","category":"Spelling","skill":"Apply Y3 spelling rules.","example":""},{"id":"Y3_020","tier":"expected","category":"Spelling","skill":"Spell some words from the Y3/4 spelling list correctly","example":""},{"id":"Y3_021","tier":"expected","category":"Handwriting","skill":"Maintain a legible and consistent handwriting style","example":""},{"id":"Y3_022","tier":"expected","category":"Handwriting","skill":"Secure using cursive handwriting.","example":""},{"id":"Y3_023","tier":"expected","category":"Handwriting","skill":"Use the diagonal and horizontal strokes needed to join letters; understand which letters are best left unjoined","example":""},{"id":"Y3_024","tier":"expected","category":"Editing & Revising","skill":"Edit writing in relation to Year 3 grammar, punctuation and spelling expectations (Editing = technical accuracy)","example":""},{"id":"Y3_025","tier":"expected","category":"Editing & Revising","skill":"Revise writing using Year 3 skills e.g. adding in, or more effectively using, the skills outlined in composition, sentence structure and cohesion (Revising = uplevelling)","example":""},{"id":"Y3_026","tier":"greater_depth","category":"Composition","skill":"Maintain the quality and accuracy of their writing when writing at greater length.","example":""},{"id":"Y3_027","tier":"greater_depth","category":"Composition","skill":"Manipulate the language and grammar taught in Year 3 in a range of independent writing.","example":""},{"id":"Y3_028","tier":"greater_depth","category":"Composition","skill":"Consistently use vocabulary from across the curriculum in their writing.","example":""},{"id":"Y3_029","tier":"greater_depth","category":"Sentence Structure","skill":"Understand the concept of a main and subordinate clause","example":"main: She decided to rescue the prince… sub: …although the dragon was dangerous"},{"id":"Y3_030","tier":"greater_depth","category":"Sentence Structure","skill":"Begin to use commas to separate main and subordinate clauses","example":"Although the dragon was dangerous, she decided to rescue the prince."},{"id":"Y3_031","tier":"greater_depth","category":"Punctuation","skill":"Begin to demarcate speech with all necessary punctuation (punctuating at the end of speech inside the inverted comma, new speaker new line)","example":""},{"id":"Y3_032","tier":"greater_depth","category":"Editing & Revising","skill":"Consistently use both editing and revising strategies independently to improve the quality and accuracy of their writing.","example":""}],"Y4":[{"id":"Y4_001","tier":"expected","category":"Composition","skill":"Write for a range of purposes and audiences, including to entertain, inform, argue and explain across the curriculum","example":""},{"id":"Y4_002","tier":"expected","category":"Composition","skill":"Describe settings and characters in narratives e.g. describing characters' behaviour, thoughts, reactions to events","example":"e.g. As Varjak cautiously crept into the room, he thought this could be it."},{"id":"Y4_003","tier":"expected","category":"Composition","skill":"Develop the use of figurative language","example":"similes e.g. Like a statue, he stood still hoping not to be noticed."},{"id":"Y4_004","tier":"expected","category":"Composition","skill":"Power of three (three sentences, three adjectives, three verbs etc)","example":"e.g. The cottage was almost invisible, hiding under a thick layer of snow and glistening in the sunlight."},{"id":"Y4_005","tier":"expected","category":"Composition","skill":"Expand their use of non-fiction language features","example":"Precise nouns and pronouns e.g. oak tree instead of tree, sparrow instead of bird"},{"id":"Y4_006","tier":"expected","category":"Sentence Structure","skill":"Use a range of subordinating conjunctions to form complex sentences e.g. as, while, before, after, until, although, since, even though","example":""},{"id":"Y4_007","tier":"expected","category":"Sentence Structure","skill":"Show some variety in complex sentence structure, positioning the subordinate clause at the start","example":"e.g. Although it was dangerous, Alex was determined to face the dragon."},{"id":"Y4_008","tier":"expected","category":"Sentence Structure","skill":"Use fronted adverbials with a comma","example":"… for time (when) e.g. Many years ago,… After a while,…"},{"id":"Y4_009","tier":"expected","category":"Sentence Structure","skill":"Extend the range of sentences with more than one clause using co-ordinating conjunctions (e.g. yet, so)","example":""},{"id":"Y4_010","tier":"expected","category":"Sentence Structure","skill":"Use noun phrases expanded with prepositional phrases","example":"e.g. the dragon with a fire-breathing mouth; with razor-sharp talons at the end of its arms"},{"id":"Y4_011","tier":"expected","category":"Tense & Verb Form","skill":"Maintain the use of present and past tenses correctly and consistently throughout an extended piece of writing","example":"e.g. a story written in the past tense with present tense for speech"},{"id":"Y4_012","tier":"expected","category":"Tense & Verb Form","skill":"Use the present perfect form of verbs (describes completed actions/consequences)","example":"e.g. The team has won. They have eaten their dinner."},{"id":"Y4_013","tier":"expected","category":"Cohesion","skill":"Organise content into relevant paragraphs across the text (awareness of new paragraph for a change in time, place or topic)","example":""},{"id":"Y4_014","tier":"expected","category":"Cohesion","skill":"Use appropriate headings and sub-headings in non-fiction writing","example":"e.g. newspaper report — headline to hook, non-chronological report — formal to introduce"},{"id":"Y4_015","tier":"expected","category":"Cohesion","skill":"Maintain cohesion across a piece of writing through the use of a variety of nouns and pronouns","example":"e.g. the dragon, the monster, the beast, it, Alex, she, the girl"},{"id":"Y4_016","tier":"expected","category":"Punctuation","skill":"Use inverted commas and other punctuation to accurately indicate direct speech","example":"e.g. Alex screamed, \"Help me!\" or \"This dragon's going to burn me!\" cried Josh."},{"id":"Y4_017","tier":"expected","category":"Punctuation","skill":"Use apostrophes for singular and plural possession","example":""},{"id":"Y4_018","tier":"expected","category":"Spelling","skill":"Apply Y4 spelling rules.","example":""},{"id":"Y4_019","tier":"expected","category":"Spelling","skill":"Spell most words from the Y3/4 spelling list correctly","example":""},{"id":"Y4_020","tier":"expected","category":"Handwriting","skill":"Use the diagonal and horizontal strokes needed to join letters; understand which letters are best left unjoined.","example":""},{"id":"Y4_021","tier":"expected","category":"Editing & Revising","skill":"Edit writing in relation to Year 4 grammar, punctuation and spelling expectations (technical accuracy)","example":""},{"id":"Y4_022","tier":"expected","category":"Editing & Revising","skill":"Revise their writing in relation to the content e.g. uplevelling vocabulary, adding clauses, adding words etc.","example":""},{"id":"Y4_023","tier":"greater_depth","category":"Composition","skill":"Maintain the quality and accuracy of their writing when writing at greater length.","example":""},{"id":"Y4_024","tier":"greater_depth","category":"Composition","skill":"Manipulate the language and grammar taught in Year 4 in a range of independent writing.","example":""},{"id":"Y4_025","tier":"greater_depth","category":"Composition","skill":"Consistently use vocabulary from across the curriculum in their writing.","example":""},{"id":"Y4_026","tier":"greater_depth","category":"Punctuation","skill":"Use commas to separate subordinate clauses e.g. Because it was cold, we put on our coats.","example":""},{"id":"Y4_027","tier":"greater_depth","category":"Editing & Revising","skill":"Consistently use both editing and revising strategies independently to improve the quality and accuracy of their writing.","example":""}],"Y5":[{"id":"Y5_001","tier":"non_neg","category":"Non-Negotiatables","skill":"Spell most words from the Year 3/4 list correctly.","example":""},{"id":"Y5_002","tier":"non_neg","category":"Non-Negotiatables","skill":"Use co-ordinating and subordinating conjunctions.","example":""},{"id":"Y5_003","tier":"non_neg","category":"Non-Negotiatables","skill":"Identify main and subordinate clauses.","example":""},{"id":"Y5_004","tier":"non_neg","category":"Non-Negotiatables","skill":"Demarcate sentences accurately with full stops, capital letters, question marks and exclamation marks.","example":""},{"id":"Y5_005","tier":"non_neg","category":"Non-Negotiatables","skill":"Use apostrophes for contractions and singular possession accurately.","example":""},{"id":"Y5_006","tier":"non_neg","category":"Non-Negotiatables","skill":"Use speech marks around direct speech with some accuracy.","example":""},{"id":"Y5_007","tier":"non_neg","category":"Non-Negotiatables","skill":"Use commas in lists.","example":""},{"id":"Y5_008","tier":"non_neg","category":"Non-Negotiatables","skill":"Use simple paragraphs.","example":""},{"id":"Y5_009","tier":"non_neg","category":"Non-Negotiatables","skill":"Use the diagonal and horizontal strokes needed to join letters; understand which letters are best left unjoined.","example":""},{"id":"Y5_010","tier":"expected","category":"Composition","skill":"Write for a range of purposes and audiences based on personal experiences and high quality texts","example":"e.g. narratives, newspaper & chronological reports, diaries, letters, recounts, persuasive leaflets"},{"id":"Y5_011","tier":"expected","category":"Composition","skill":"Describe settings and characters through using show-not-tell, reactions to other characters, reactions to the setting.","example":""},{"id":"Y5_012","tier":"expected","category":"Composition","skill":"Use dialogue in narrative to show the relationship between characters and move the action on.","example":""},{"id":"Y5_013","tier":"expected","category":"Composition","skill":"Begin to extend and refine use of narrative language features e.g. reported speech instead of direct, repetition for effect, power of three","example":""},{"id":"Y5_014","tier":"expected","category":"Composition","skill":"Use figurative language","example":"similes e.g. as angry as an erupting volcano"},{"id":"Y5_015","tier":"expected","category":"Sentence Structure","skill":"Use a range of simple, compound and complex sentence structures, moving the position of the subordinate clause","example":""},{"id":"Y5_016","tier":"expected","category":"Tense & Verb Form","skill":"Use verb tenses and verb forms consistently and accurately","example":"Simple tense i.e. past, present, future e.g. They saw it. / They could see it."},{"id":"Y5_017","tier":"expected","category":"Cohesion","skill":"Use organisational and presentational devices to structure text e.g. bullet points, diagrams, pictures, font size and type.","example":""},{"id":"Y5_018","tier":"expected","category":"Cohesion","skill":"Use a range of cohesive devices within and between paragraphs","example":"Conjunctions e.g. In addition (and), Alternatively (but), Meanwhile (when), For this reason (why)"},{"id":"Y5_019","tier":"expected","category":"Punctuation","skill":"Secure in previously taught punctuation & begin to use brackets, dashes and commas to mark parenthesis","example":""},{"id":"Y5_020","tier":"expected","category":"Spelling","skill":"Apply Year 5 spelling rules","example":""},{"id":"Y5_021","tier":"expected","category":"Spelling","skill":"Spell some words from the Y5/6 spelling list correctly e.g. homophones","example":""},{"id":"Y5_022","tier":"expected","category":"Handwriting","skill":"Write in a consistent and joined style, with increased quality and speed","example":""},{"id":"Y5_023","tier":"expected","category":"Editing & Revising","skill":"Edit writing in relation to Year 5 grammar, punctuation and spelling expectations.","example":""},{"id":"Y5_024","tier":"expected","category":"Editing & Revising","skill":"Revise writing using Year 5 skills e.g. adding in, or more effectively using, the skills outlined in composition, sentence structure and cohesion.","example":""},{"id":"Y5_025","tier":"greater_depth","category":"Composition","skill":"Maintain the quality and accuracy of their writing when writing at greater length.","example":""},{"id":"Y5_026","tier":"greater_depth","category":"Composition","skill":"Manipulate the language and grammar taught in Year 5 in a range of independent writing.","example":""},{"id":"Y5_027","tier":"greater_depth","category":"Composition","skill":"Consistently use vocabulary from across the curriculum in their writing.","example":""},{"id":"Y5_028","tier":"greater_depth","category":"Sentence Structure","skill":"Use expanded noun phrases to convey complicated information concisely","example":"e.g. several species of dragon inhabit the forests of China."},{"id":"Y5_029","tier":"greater_depth","category":"Punctuation","skill":"Use commas to clarify meaning or avoid ambiguity","example":"e.g. The dragon, who had golden scales, flew across the sky."},{"id":"Y5_030","tier":"greater_depth","category":"Editing & Revising","skill":"Consistently use editing strategies to improve the accuracy of their writing.","example":""},{"id":"Y5_031","tier":"greater_depth","category":"Editing & Revising","skill":"Revise writing effectively with a good awareness of their writing's impact upon their reader.","example":""}]};
+
+// ================================================================
+// SCORE CONFIG
+// ================================================================
+const SCORE_OPTIONS = [
+  { value: null,  label: 'Unreviewed', bg: '#f0f0f0', fg: '#9ca3af' },
+  { value: 'x',   label: 'Not taught (x)', bg: '#dbeafe', fg: '#1e40af' },
+  { value: '~',   label: 'Genre not covered (~)', bg: '#ede9fe', fg: '#5b21b6' },
+  { value: '0',   label: '0 — Taught, not used', bg: '#fef9c3', fg: '#7a4f00' },
+  { value: '1',   label: '1 — Used incorrectly (1+ pieces)', bg: '#fef08a', fg: '#713f12' },
+  { value: '2',   label: '2 — Used incorrectly (2+ pieces)', bg: '#fed7aa', fg: '#9a3412' },
+  { value: '3',   label: '3 — Revisited, still incorrect ⚠', bg: '#fca5a5', fg: '#7f1d1d' },
+  { value: '4',   label: '4 — Secure (3+ pieces, >75%)', bg: '#86efac', fg: '#14532d' },
+];
+
+function scoreMeta(v) {
+  const s = String(v);
+  return SCORE_OPTIONS.find(o => String(o.value) === s) || SCORE_OPTIONS[0];
+}
+
+// ================================================================
+// STATE
+// ================================================================
+const state = {
+  apiUrl: localStorage.getItem('wfa_api_url') || 'https://script.google.com/macros/s/AKfycbzkr27LBT4SLJ2TsJzqXSN3sWHXIJE0YCqbLqp8tUJgRiBG0AycNUPvD9cWfblaNDaU/exec',
+  classes: [],
+  currentClassId: '',
+  currentClass: null,
+  currentTerm: 'T1',
+  currentYear: '2025-26',
+  pupils: [],
+  assessments: {},   // {pupil_id: {skill_id: {term: score}}}
+  activeTiers: new Set(['expected','greater_depth','non_neg']),
+  saving: 0,
+  pickerTarget: null, // {pupilId, skillId, cellEl}
+};
+
+// ================================================================
+// SETUP / API
+// ================================================================
+function connectApi() {
+  const url = document.getElementById('setup-url').value.trim();
+  if (!url || !url.startsWith('https://')) {
+    alert('Please enter a valid Apps Script URL.');
+    return;
+  }
+  state.apiUrl = url;
+  localStorage.setItem('wfa_api_url', url);
+  bootstrap();
+}
+
+function showSetup() {
+  document.getElementById('setup-url').value = state.apiUrl;
+  document.getElementById('setup-screen').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+}
+
+async function apiGet(action, params = {}) {
+  const qs = new URLSearchParams({ action, ...params }).toString();
+  const res = await fetch(`${state.apiUrl}?${qs}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+async function apiPost(data) {
+  const res = await fetch(state.apiUrl, {
+    method: 'POST',
+    body: JSON.stringify(data)
+    // No Content-Type — avoids CORS preflight for Apps Script
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const result = await res.json();
+  if (result.error) throw new Error(result.error);
+  return result;
+}
+
+// ================================================================
+// BOOTSTRAP
+// ================================================================
+async function bootstrap() {
+  if (!state.apiUrl) {
+    document.getElementById('setup-screen').classList.remove('hidden');
+    document.getElementById('app').classList.add('hidden');
+    return;
+  }
+
+  document.getElementById('setup-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+
+  try {
+    // Load config and classes
+    const [cfg, classes] = await Promise.all([
+      apiGet('getConfig'),
+      apiGet('getClasses', { academic_year: state.currentYear })
+    ]);
+
+    if (cfg.academic_year) {
+      state.currentYear = cfg.academic_year;
+      document.getElementById('year-select').value = cfg.academic_year;
+    }
+    if (cfg.current_term) {
+      state.currentTerm = cfg.current_term;
+      document.getElementById('term-select').value = cfg.current_term;
+    }
+
+    state.classes = classes;
+    populateClassSelect();
+    renderAdminClasses();
+    renderAdminPupils();
+
+  } catch (err) {
+    console.error('Bootstrap error:', err);
+    alert('Could not connect to the database. Check the API URL.\n\n' + err.message);
+    showSetup();
+  }
+}
+
+function populateClassSelect() {
+  const sel = document.getElementById('class-select');
+  sel.innerHTML = '<option value="">— Select class —</option>';
+  state.classes.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.class_id;
+    opt.textContent = `${c.year_group} · ${c.class_name}${c.teacher_name ? ' (' + c.teacher_name + ')' : ''}`;
+    sel.appendChild(opt);
+  });
+}
+
+// ================================================================
+// CLASS / TERM CHANGES
+// ================================================================
+async function onClassChange() {
+  const classId = document.getElementById('class-select').value;
+  state.currentClassId = classId;
+  state.currentClass = state.classes.find(c => c.class_id === classId) || null;
+
+  if (!classId) {
+    document.getElementById('grid-empty').classList.remove('hidden');
+    document.getElementById('grid-table').classList.add('hidden');
+    return;
+  }
+
+  await loadClassData();
+  document.getElementById('pupils-class-label').textContent =
+    state.currentClass ? `(${state.currentClass.class_name})` : '';
+  renderAdminPupils();
+}
+
+function onTermChange() {
+  state.currentTerm = document.getElementById('term-select').value;
+  if (state.currentClassId) renderGrid();
+}
+
+async function onYearChange() {
+  state.currentYear = document.getElementById('year-select').value;
+  if (state.currentClassId) await loadClassData();
+}
+
+async function loadClassData() {
+  document.getElementById('grid-empty').textContent = 'Loading…';
+  document.getElementById('grid-empty').classList.remove('hidden');
+  document.getElementById('grid-table').classList.add('hidden');
+
+  try {
+    const result = await apiGet('getAssessments', {
+      class_id: state.currentClassId,
+      academic_year: state.currentYear
+    });
+    state.pupils = result.pupils || [];
+    state.assessments = result.assessments || {};
+
+    // Populate pupil selector
+    const psel = document.getElementById('pupil-select');
+    psel.innerHTML = '<option value="">— Select pupil —</option>';
+    state.pupils.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.pupil_id;
+      opt.textContent = p.name + (p.working_at_level !== p.year_group ? ` (${p.working_at_level})` : '');
+      psel.appendChild(opt);
+    });
+
+    renderGrid();
+    renderInterventions();
+    renderAdminPupils();
+
+  } catch (err) {
+    document.getElementById('grid-empty').textContent = 'Error loading data: ' + err.message;
+  }
+}
+
+// ================================================================
+// GRID RENDERING
+// ================================================================
+function getSkillsForPupil(pupil) {
+  const level = pupil.working_at_level || state.currentClass?.year_group || 'Y4';
+  return SKILLS[level] || [];
+}
+
+function getClassSkills() {
+  // Main skills = class year group
+  const yg = state.currentClass?.year_group || 'Y4';
+  return SKILLS[yg] || [];
+}
+
+function renderGrid() {
+  if (!state.currentClass || state.pupils.length === 0) {
+    document.getElementById('grid-empty').textContent = state.pupils.length === 0 ?
+      'No pupils in this class. Add pupils in the Admin tab.' : 'Select a class.';
+    document.getElementById('grid-empty').classList.remove('hidden');
+    document.getElementById('grid-table').classList.add('hidden');
+    return;
+  }
+
+  document.getElementById('grid-empty').classList.add('hidden');
+  document.getElementById('grid-table').classList.remove('hidden');
+
+  const mainPupils = state.pupils.filter(p =>
+    !p.working_at_level || p.working_at_level === state.currentClass.year_group);
+  const belowPupils = state.pupils.filter(p =>
+    p.working_at_level && p.working_at_level !== state.currentClass.year_group);
+
+  renderGridHeader(state.pupils);
+  renderGridBody(mainPupils, belowPupils);
+}
+
+function renderGridHeader(pupils) {
+  const row = document.getElementById('grid-header-row');
+  row.innerHTML = '';
+
+  // Corner cell
+  const corner = document.createElement('th');
+  corner.className = 'skill-col corner-th';
+  corner.style.minWidth = '260px';
+  row.appendChild(corner);
+
+  pupils.forEach(p => {
+    const th = document.createElement('th');
+    th.className = 'pupil-th';
+    const wrap = document.createElement('div');
+    wrap.className = 'pupil-name-wrap';
+    wrap.title = p.name;
+    wrap.textContent = p.name;
+    if (p.working_at_level && p.working_at_level !== state.currentClass?.year_group) {
+      const badge = document.createElement('span');
+      badge.className = 'level-badge';
+      badge.textContent = p.working_at_level;
+      wrap.appendChild(badge);
+    }
+    th.appendChild(wrap);
+    row.appendChild(th);
+  });
+}
+
+function renderGridBody(mainPupils, belowPupils) {
+  const tbody = document.getElementById('grid-body');
+  tbody.innerHTML = '';
+
+  const yg = state.currentClass?.year_group || 'Y4';
+  const allSkills = getClassSkills().filter(s => state.activeTiers.has(s.tier));
+
+  // Group by tier + category
+  const tiers = ['non_neg', 'expected', 'greater_depth'];
+  const TIER_LABELS = { non_neg: 'Non-Negotiatables', expected: 'Expected Standards', greater_depth: 'Greater Depth' };
+
+  tiers.forEach(tier => {
+    if (!state.activeTiers.has(tier)) return;
+    const tierSkills = allSkills.filter(s => s.tier === tier);
+    if (!tierSkills.length) return;
+
+    // Tier header row
+    const tierRow = document.createElement('tr');
+    tierRow.className = 'section-row' + (tier === 'greater_depth' ? ' tier-gd' : '');
+    const tierTd = document.createElement('td');
+    tierTd.className = 'skill-col';
+    tierTd.colSpan = state.pupils.length + 1;
+    tierTd.textContent = TIER_LABELS[tier];
+    tierRow.appendChild(tierTd);
+    tbody.appendChild(tierRow);
+
+    // Category subgroups
+    const cats = [...new Set(tierSkills.map(s => s.category))];
+    cats.forEach(cat => {
+      const catSkills = tierSkills.filter(s => s.category === cat);
+
+      // Category sub-header
+      const catRow = document.createElement('tr');
+      catRow.className = 'section-row';
+      const catTd = document.createElement('td');
+      catTd.className = 'skill-col';
+      catTd.colSpan = state.pupils.length + 1;
+      catTd.style.fontWeight = '600';
+      catTd.style.fontSize = '11px';
+      catTd.style.color = '#475569';
+      catTd.style.paddingLeft = '20px';
+      catTd.style.background = tier === 'greater_depth' ? '#f0fdf4' : '#fafafa';
+      catTd.style.borderTop = 'none';
+      catTd.textContent = cat;
+      catRow.appendChild(catTd);
+      tbody.appendChild(catRow);
+
+      catSkills.forEach(skill => {
+        const tr = document.createElement('tr');
+        tr.className = 'skill-row';
+
+        // Skill name cell
+        const skillTd = document.createElement('td');
+        skillTd.className = 'skill-col';
+        const skillText = document.createElement('span');
+        skillText.className = 'skill-text';
+        skillText.textContent = skill.skill;
+        skillTd.appendChild(skillText);
+        if (skill.example) {
+          const ex = document.createElement('span');
+          ex.className = 'skill-example';
+          ex.textContent = skill.example;
+          skillTd.appendChild(ex);
+        }
+        tr.appendChild(skillTd);
+
+        // Score cells — main pupils
+        mainPupils.forEach(pupil => {
+          tr.appendChild(makeScoreCell(pupil, skill, true));
+        });
+
+        // Score cells — below-level pupils (disabled for main framework rows)
+        belowPupils.forEach(pupil => {
+          tr.appendChild(makeScoreCell(pupil, skill, false));
+        });
+
+        tbody.appendChild(tr);
+      });
+    });
+  });
+
+  // Below-level section
+  if (belowPupils.length > 0) {
+    const groups = {};
+    belowPupils.forEach(p => {
+      const lvl = p.working_at_level;
+      if (!groups[lvl]) groups[lvl] = [];
+      groups[lvl].push(p);
+    });
+
+    Object.entries(groups).forEach(([level, pupils]) => {
+      const belowSkills = (SKILLS[level] || []).filter(s => state.activeTiers.has(s.tier));
+
+      // Section header
+      const hRow = document.createElement('tr');
+      hRow.className = 'section-row';
+      const hTd = document.createElement('td');
+      hTd.className = 'skill-col';
+      hTd.colSpan = state.pupils.length + 1;
+      hTd.textContent = `${level} Framework — ${pupils.map(p => p.name).join(', ')}`;
+      hTd.style.background = '#fff7ed';
+      hTd.style.color = '#92400e';
+      hRow.appendChild(hTd);
+      tbody.appendChild(hRow);
+
+      const bTiers = ['non_neg','expected','greater_depth'];
+      bTiers.forEach(tier => {
+        if (!state.activeTiers.has(tier)) return;
+        const tSkills = belowSkills.filter(s => s.tier === tier);
+        if (!tSkills.length) return;
+
+        const cats = [...new Set(tSkills.map(s => s.category))];
+        cats.forEach(cat => {
+          tSkills.filter(s => s.category === cat).forEach(skill => {
+            const tr = document.createElement('tr');
+            tr.className = 'skill-row';
+
+            const skillTd = document.createElement('td');
+            skillTd.className = 'skill-col';
+            skillTd.style.paddingLeft = '20px';
+            skillTd.style.background = '#fff7ed';
+            const skillText = document.createElement('span');
+            skillText.className = 'skill-text';
+            skillText.textContent = `[${level}] ${skill.skill}`;
+            skillTd.appendChild(skillText);
+            tr.appendChild(skillTd);
+
+            // Main pupils — disabled
+            mainPupils.forEach(() => {
+              const td = document.createElement('td');
+              td.className = 'score-cell disabled';
+              td.style.background = '#f8fafc';
+              tr.appendChild(td);
+            });
+
+            // Below pupils — scoreable
+            belowPupils.forEach(pupil => {
+              const enabled = pupils.includes(pupil);
+              tr.appendChild(makeScoreCell(pupil, skill, enabled));
+            });
+
+            tbody.appendChild(tr);
+          });
+        });
+      });
+    });
+  }
+}
+
+function makeScoreCell(pupil, skill, enabled) {
+  const td = document.createElement('td');
+  td.className = 'score-cell' + (enabled ? '' : ' disabled');
+
+  if (!enabled) {
+    td.style.background = '#f8fafc';
+    return td;
+  }
+
+  const score = state.assessments[pupil.pupil_id]?.[skill.id]?.[state.currentTerm];
+  const meta = scoreMeta(score);
+  td.style.background = meta.bg;
+
+  const label = document.createElement('span');
+  label.className = 'score-label';
+  label.style.color = meta.fg;
+  label.textContent = score == null ? '' : String(score);
+  td.appendChild(label);
+
+  td.dataset.pupilId = pupil.pupil_id;
+  td.dataset.skillId = skill.id;
+  td.addEventListener('click', () => openPicker(pupil.pupil_id, skill.id, skill.skill, td));
+
+  return td;
+}
+
+// ================================================================
+// SCORE PICKER
+// ================================================================
+function openPicker(pupilId, skillId, skillName, cellEl) {
+  state.pickerTarget = { pupilId, skillId, cellEl };
+
+  const picker = document.getElementById('score-picker');
+  document.getElementById('picker-skill-name').textContent = skillName;
+  document.getElementById('picker-backdrop').classList.add('visible');
+
+  // Remove old buttons (keep skill name and close)
+  [...picker.querySelectorAll('.picker-btn')].forEach(b => b.remove());
+
+  const currentScore = state.assessments[pupilId]?.[skillId]?.[state.currentTerm];
+  const closeBtn = document.getElementById('picker-close');
+
+  SCORE_OPTIONS.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'picker-btn' + (String(opt.value) === String(currentScore) ? ' current' : '');
+    btn.style.background = opt.bg;
+    btn.style.color = opt.fg;
+    btn.innerHTML = `<span class="pbadge" style="background:${opt.bg};color:${opt.fg};border:1.5px solid ${opt.fg}40">
+      ${opt.value == null ? '·' : opt.value}
+    </span>${opt.label}`;
+    btn.onclick = () => applyScore(opt.value);
+    picker.insertBefore(btn, closeBtn);
+  });
+
+  // Position picker near the cell
+  picker.classList.remove('hidden');
+  const rect = cellEl.getBoundingClientRect();
+  const ph = picker.offsetHeight || 300;
+  const pw = picker.offsetWidth || 240;
+  let top = rect.bottom + 6;
+  let left = rect.left;
+  if (top + ph > window.innerHeight) top = rect.top - ph - 6;
+  if (left + pw > window.innerWidth) left = window.innerWidth - pw - 8;
+  if (left < 8) left = 8;
+  picker.style.top = top + 'px';
+  picker.style.left = left + 'px';
+}
+
+function closePicker() {
+  document.getElementById('score-picker').classList.add('hidden');
+  document.getElementById('picker-backdrop').classList.remove('visible');
+  state.pickerTarget = null;
+}
+
+async function applyScore(value) {
+  const { pupilId, skillId, cellEl } = state.pickerTarget;
+  closePicker();
+
+  // Optimistic UI update
+  if (!state.assessments[pupilId]) state.assessments[pupilId] = {};
+  if (!state.assessments[pupilId][skillId]) state.assessments[pupilId][skillId] = {};
+
+  if (value == null) {
+    delete state.assessments[pupilId][skillId][state.currentTerm];
+  } else {
+    state.assessments[pupilId][skillId][state.currentTerm] = String(value);
+  }
+
+  const meta = scoreMeta(value);
+  cellEl.style.background = meta.bg;
+  cellEl.querySelector('.score-label').style.color = meta.fg;
+  cellEl.querySelector('.score-label').textContent = value == null ? '' : String(value);
+
+  // Save to API
+  showSaving(true);
+  try {
+    await apiPost({
+      action: 'saveScore',
+      pupil_id: pupilId,
+      skill_id: skillId,
+      academic_year: state.currentYear,
+      term: state.currentTerm,
+      score: value == null ? '' : String(value)
+    });
+  } catch (err) {
+    console.error('Save failed:', err);
+    alert('Save failed: ' + err.message);
+  } finally {
+    showSaving(false);
+  }
+}
+
+function showSaving(on) {
+  const el = document.getElementById('save-indicator');
+  if (on) { state.saving++; el.classList.add('visible'); }
+  else { state.saving = Math.max(0, state.saving - 1); if (!state.saving) el.classList.remove('visible'); }
+}
+
+// ================================================================
+// TIER FILTERS
+// ================================================================
+function toggleTierFilter(tier, btn) {
+  if (state.activeTiers.has(tier)) {
+    if (state.activeTiers.size <= 1) return; // keep at least one
+    state.activeTiers.delete(tier);
+    btn.classList.remove('active');
+  } else {
+    state.activeTiers.add(tier);
+    btn.classList.add('active');
+  }
+  if (state.currentClassId) renderGrid();
+}
+
+function collapseAll() {
+  state.activeTiers = new Set(['expected']);
+  ['expected','greater_depth','non_neg'].forEach(t => {
+    const btn = document.getElementById('filt-' + (t === 'non_neg' ? 'nonneg' : t === 'greater_depth' ? 'gd' : t));
+    if (btn) btn.classList.toggle('active', t === 'expected');
+  });
+  if (state.currentClassId) renderGrid();
+}
+
+function expandAll() {
+  ['expected','greater_depth','non_neg'].forEach(t => state.activeTiers.add(t));
+  ['filt-expected','filt-gd','filt-nonneg'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.add('active');
+  });
+  if (state.currentClassId) renderGrid();
+}
+
+// ================================================================
+// INTERVENTIONS
+// ================================================================
+function renderInterventions() {
+  const wrapper = document.getElementById('int-wrapper');
+
+  if (!state.currentClass || state.pupils.length === 0) {
+    wrapper.innerHTML = '<div class="empty-state">Select a class on the Grid tab first.</div>';
+    return;
+  }
+
+  const term = state.currentTerm;
+  const yg = state.currentClass.year_group;
+  const skills = SKILLS[yg] || [];
+  const expectedSkills = skills.filter(s => s.tier === 'expected');
+
+  // --- Individual intervention flags (score = 3) ---
+  const interventionPupils = []; // {pupil, skills[]}
+  state.pupils.forEach(pupil => {
+    const flaggedSkills = [];
+    const level = pupil.working_at_level || yg;
+    const pSkills = SKILLS[level] || [];
+    pSkills.filter(s => s.tier === 'expected').forEach(skill => {
+      const score = state.assessments[pupil.pupil_id]?.[skill.id]?.[term];
+      if (score === '3') flaggedSkills.push(skill);
+    });
+    if (flaggedSkills.length) interventionPupils.push({ pupil, skills: flaggedSkills });
+  });
+
+  // --- Whole-class re-teach (skills where <50% are scored 3 or 4) ---
+  const classFlags = [];
+  expectedSkills.forEach(skill => {
+    const scored = state.pupils.map(p => state.assessments[p.pupil_id]?.[skill.id]?.[term])
+      .filter(v => v !== undefined && v !== null && v !== '' && v !== 'x' && v !== '~');
+    if (scored.length < 3) return; // not enough data
+    const secured = scored.filter(v => v === '4' || v === '3').length;
+    const pct = Math.round((secured / scored.length) * 100);
+    if (pct < 50) {
+      classFlags.push({ skill, pct, n: scored.length, secured });
+    }
+  });
+
+  // --- Below-level pupils ---
+  const belowLevel = state.pupils.filter(p => p.working_at_level && p.working_at_level !== yg);
+
+  let html = '';
+
+  // Whole-class
+  html += `<div class="int-section">
+    <h2>Whole-Class Re-Teach (less than 50% at 3–4)</h2>`;
+  if (classFlags.length === 0) {
+    html += '<div class="int-card"><p>No skills flagged for whole-class re-teach in this term\'s data.</p></div>';
+  } else {
+    classFlags.sort((a, b) => a.pct - b.pct).forEach(f => {
+      html += `<div class="int-card">
+        <h3>${f.skill.category} — ${f.skill.skill.substring(0, 80)}${f.skill.skill.length > 80 ? '…' : ''}</h3>
+        <p class="int-skill-stat">${f.secured} / ${f.n} pupils at 3–4 (${f.pct}%)</p>
+      </div>`;
+    });
+  }
+  html += '</div>';
+
+  // Individual interventions
+  html += `<div class="int-section">
+    <h2>Individual Interventions (score = 3)</h2>`;
+  if (interventionPupils.length === 0) {
+    html += '<div class="int-card"><p>No pupils currently flagged for intervention in this term.</p></div>';
+  } else {
+    interventionPupils.forEach(({ pupil, skills }) => {
+      html += `<div class="int-card">
+        <h3>${pupil.name}</h3>
+        ${skills.map(s => `<p class="int-skill-stat">• ${s.category}: ${s.skill.substring(0, 70)}${s.skill.length > 70 ? '…' : ''}</p>`).join('')}
+      </div>`;
+    });
+  }
+  html += '</div>';
+
+  // Below level
+  if (belowLevel.length > 0) {
+    html += `<div class="int-section">
+      <h2>Pupils Working Below Year Level</h2>`;
+    belowLevel.forEach(p => {
+      html += `<div class="int-card">
+        <h3>${p.name}</h3>
+        <p>Working at ${p.working_at_level} framework (class is ${yg})</p>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  wrapper.innerHTML = html;
+}
+
+// ================================================================
+// PUPIL PROFILE
+// ================================================================
+async function renderPupilProfile() {
+  const pupilId = document.getElementById('pupil-select').value;
+  const content = document.getElementById('pupil-profile-content');
+
+  if (!pupilId) {
+    content.innerHTML = '<div class="empty-state">Select a pupil above.</div>';
+    return;
+  }
+
+  content.innerHTML = '<div class="loading-state">Loading history…</div>';
+
+  try {
+    const { pupil, history } = await apiGet('getPupilHistory', { pupil_id: pupilId });
+    if (!pupil) { content.innerHTML = '<div class="empty-state">Pupil not found.</div>'; return; }
+
+    const level = pupil.working_at_level || state.currentClass?.year_group || 'Y4';
+    const skills = (SKILLS[level] || []).filter(s => s.tier === 'expected');
+    const terms = ['T1','T2','T3','T4','T5','T6'];
+    const years = Object.keys(history).sort().reverse();
+
+    let html = `<div class="pupil-profile-card">
+      <h2>${pupil.name}</h2>
+      <div class="meta">${level} framework${pupil.working_at_level !== state.currentClass?.year_group ? ' (below year level)' : ''}</div>`;
+
+    years.forEach(year => {
+      html += `<h3 style="margin:12px 0 6px;font-size:12px;color:#94a3b8">${year}</h3>`;
+      html += '<div class="history-grid">';
+      // Header
+      html += '<div class="history-row">';
+      html += '<div class="history-skill history-header">Skill</div>';
+      terms.forEach(t => { html += `<div class="history-header">${t}</div>`; });
+      html += '</div>';
+      // Skills
+      skills.forEach(skill => {
+        html += '<div class="history-row">';
+        html += `<div class="history-skill" title="${skill.skill}">${skill.skill.substring(0, 30)}${skill.skill.length > 30 ? '…' : ''}</div>`;
+        terms.forEach(term => {
+          const score = history[year]?.[term]?.[skill.id];
+          const meta = scoreMeta(score);
+          html += `<div class="history-cell" style="background:${meta.bg};color:${meta.fg}">
+            ${score == null ? '' : String(score)}
+          </div>`;
+        });
+        html += '</div>';
+      });
+      html += '</div>';
+    });
+
+    if (years.length === 0) {
+      html += '<p style="color:#94a3b8;font-size:13px;margin-top:12px">No assessment data found for this pupil.</p>';
+    }
+
+    html += '</div>';
+    content.innerHTML = html;
+
+  } catch (err) {
+    content.innerHTML = '<div class="empty-state">Error: ' + err.message + '</div>';
+  }
+}
+
+// ================================================================
+// ADMIN
+// ================================================================
+function renderAdminClasses() {
+  const tbody = document.getElementById('classes-tbody');
+  tbody.innerHTML = '';
+  state.classes.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${c.year_group}</td><td>${c.class_name}</td><td>${c.teacher_name || '—'}</td>
+      <td><button class="btn btn-sm btn-secondary" onclick="editClassTeacher('${c.class_id}','${c.class_name}')">Edit</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderAdminPupils() {
+  const tbody = document.getElementById('pupils-tbody');
+  tbody.innerHTML = '';
+  state.pupils.forEach(p => {
+    const cls = state.classes.find(c => c.class_id === p.class_id);
+    const tr = document.createElement('tr');
+    const level = p.working_at_level || p.year_group;
+    const isBelow = level !== p.year_group;
+    tr.innerHTML = `<td>${p.name}</td>
+      <td style="${isBelow ? 'color:#b45309;font-weight:600' : ''}">${level}</td>
+      <td>${cls ? cls.class_name : '—'}</td>
+      <td>
+        <select onchange="updatePupilLevel('${p.pupil_id}', this.value)" style="padding:2px 4px;font-size:11px;border:1px solid #e2e8f0;border-radius:4px">
+          ${['Y1','Y2','Y3','Y4','Y5'].map(y => `<option value="${y}" ${y === level ? 'selected' : ''}>${y}</option>`).join('')}
+        </select>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function addClassFromForm() {
+  const yg = document.getElementById('new-class-yg').value;
+  const name = document.getElementById('new-class-name').value.trim();
+  const teacher = document.getElementById('new-class-teacher').value.trim();
+  if (!name) { alert('Enter a class name.'); return; }
+
+  try {
+    const result = await apiPost({ action: 'addClass', year_group: yg, class_name: name, teacher_name: teacher, academic_year: state.currentYear });
+    state.classes.push({ class_id: result.class_id, year_group: yg, class_name: name, teacher_name: teacher, academic_year: state.currentYear, active: true });
+    document.getElementById('new-class-name').value = '';
+    document.getElementById('new-class-teacher').value = '';
+    populateClassSelect();
+    renderAdminClasses();
+  } catch (err) { alert('Error: ' + err.message); }
+}
+
+async function addPupilFromForm() {
+  if (!state.currentClassId) { alert('Select a class first (in the header).'); return; }
+  const name = document.getElementById('new-pupil-name').value.trim();
+  const level = document.getElementById('new-pupil-level').value || state.currentClass?.year_group;
+  if (!name) { alert('Enter a pupil name.'); return; }
+
+  try {
+    const yg = state.currentClass?.year_group || 'Y4';
+    const result = await apiPost({ action: 'addPupil', name, year_group: yg, class_id: state.currentClassId, working_at_level: level || yg });
+    state.pupils.push({ pupil_id: result.pupil_id, name, year_group: yg, class_id: state.currentClassId, working_at_level: level || yg, active: true });
+    document.getElementById('new-pupil-name').value = '';
+    renderGrid();
+    renderAdminPupils();
+  } catch (err) { alert('Error: ' + err.message); }
+}
+
+async function updatePupilLevel(pupilId, newLevel) {
+  try {
+    await apiPost({ action: 'updatePupil', pupil_id: pupilId, working_at_level: newLevel });
+    const p = state.pupils.find(x => x.pupil_id === pupilId);
+    if (p) p.working_at_level = newLevel;
+    renderGrid();
+    renderAdminPupils();
+  } catch (err) { alert('Error updating pupil: ' + err.message); }
+}
+
+async function editClassTeacher(classId, className) {
+  const name = prompt(`Teacher name for ${className}:`);
+  if (name === null) return;
+  try {
+    await apiPost({ action: 'updateClass', class_id: classId, teacher_name: name });
+    const c = state.classes.find(x => x.class_id === classId);
+    if (c) c.teacher_name = name;
+    renderAdminClasses();
+    populateClassSelect();
+  } catch (err) { alert('Error: ' + err.message); }
+}
+
+async function saveSettingYear() {
+  const yr = document.getElementById('setting-year').value;
+  state.currentYear = yr;
+  document.getElementById('year-select').value = yr;
+  try {
+    await apiPost({ action: 'setConfig', key: 'academic_year', value: yr });
+  } catch (err) { console.error(err); }
+}
+
+// ================================================================
+// TAB NAVIGATION
+// ================================================================
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+
+  if (name === 'interventions') renderInterventions();
+  if (name === 'admin') { renderAdminClasses(); renderAdminPupils(); }
+}
+
+// ================================================================
+// INIT
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('term-select').value = state.currentTerm;
+  bootstrap();
+});
+</script>
+</body>
+</html>
