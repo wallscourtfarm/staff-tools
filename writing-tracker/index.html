@@ -398,7 +398,7 @@ nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
     </div>
     <div class="header-right">
       <div class="save-indicator" id="save-indicator">Saving…</div>
-      <span class="version">26.07.26a</span>
+      <span class="version">26.07.26b</span>
     </div>
   </header>
 
@@ -493,17 +493,13 @@ nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
 
       <div class="admin-section">
         <h2>Pupils <span id="pupils-class-label" style="font-weight:400;color:#94a3b8"></span></h2>
-        <div class="form-row" id="add-pupil-form">
-          <input type="text" id="new-pupil-name" placeholder="Pupil name" maxlength="60">
-          <select id="new-pupil-level">
-            <option value="">Working at (same as class)</option>
-            <option value="Y1">Y1</option>
-            <option value="Y2">Y2</option>
-            <option value="Y3">Y3</option>
-            <option value="Y4">Y4</option>
-            <option value="Y5">Y5</option>
-          </select>
-          <button class="btn btn-primary" onclick="addPupilFromForm()">Add pupil</button>
+        <div id="add-pupil-form" style="margin-bottom:12px">
+          <p style="font-size:12px;color:#94a3b8;margin-bottom:6px">Class selected in the header above. Paste one name per line.</p>
+          <textarea id="new-pupil-names" rows="6" placeholder="Alice Smith&#10;Ben Jones&#10;Cara Brown&#10;…" oninput="onPupilNamesInput()" style="width:100%;box-sizing:border-box;border:1px solid #d5e3ed;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;line-height:1.5"></textarea>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <button class="btn btn-primary" id="pupil-submit-btn" onclick="addPupilsFromForm()">Add pupils</button>
+            <span id="pupil-parse-count" style="font-size:12px;color:#94a3b8"></span>
+          </div>
         </div>
         <table class="admin-table" id="pupils-table">
           <thead><tr><th>Name</th><th>Working at</th><th>Class</th><th></th></tr></thead>
@@ -1344,20 +1340,39 @@ async function addCohortFromForm() {
   finally { btn.disabled = false; updateCohortSubmitLabel(); }
 }
 
-async function addPupilFromForm() {
-  if (!state.currentClassId) { alert('Select a class first (in the header).'); return; }
-  const name = document.getElementById('new-pupil-name').value.trim();
-  const level = document.getElementById('new-pupil-level').value || state.currentClass?.year_group;
-  if (!name) { alert('Enter a pupil name.'); return; }
+function parsePupilNames() {
+  const raw = document.getElementById('new-pupil-names').value;
+  return raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+}
+
+function onPupilNamesInput() {
+  const names = parsePupilNames();
+  const n = names.length;
+  const btn = document.getElementById('pupil-submit-btn');
+  const lbl = document.getElementById('pupil-parse-count');
+  if (btn) btn.textContent = n === 1 ? 'Add 1 pupil' : `Add ${n} pupils`;
+  if (lbl) lbl.textContent = n > 0 ? `${n} name${n === 1 ? '' : 's'} detected` : '';
+}
+
+async function addPupilsFromForm() {
+  if (!state.currentClassId) { alert('Select a class in the header first.'); return; }
+  const names = parsePupilNames();
+  if (!names.length) { alert('Paste at least one pupil name.'); return; }
+
+  const btn = document.getElementById('pupil-submit-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const yg = state.currentClass?.year_group || 'Y4';
 
   try {
-    const yg = state.currentClass?.year_group || 'Y4';
-    const result = await apiPost({ action: 'addPupil', name, year_group: yg, class_id: state.currentClassId, working_at_level: level || yg });
-    state.pupils.push({ pupil_id: result.pupil_id, name, year_group: yg, class_id: state.currentClassId, working_at_level: level || yg, active: true });
-    document.getElementById('new-pupil-name').value = '';
+    for (const name of names) {
+      const result = await apiPost({ action: 'addPupil', name, year_group: yg, class_id: state.currentClassId, working_at_level: yg });
+      state.pupils.push({ pupil_id: result.pupil_id, name, year_group: yg, class_id: state.currentClassId, working_at_level: yg, active: true });
+    }
+    document.getElementById('new-pupil-names').value = '';
     renderGrid();
     renderAdminPupils();
   } catch (err) { alert('Error: ' + err.message); }
+  finally { btn.disabled = false; onPupilNamesInput(); }
 }
 
 async function updatePupilLevel(pupilId, newLevel) {
