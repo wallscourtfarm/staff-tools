@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Times Tables Practice - Wallscourt Farm Academy</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #1a1a1a;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            border-top: 5px solid #1798d3;
+        }
+        .school-header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .school-logo {
+            max-width: 120px;
+            height: auto;
+        }
+        h1 {
+            text-align: center;
+            color: #0a0101;
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 1.1em;
+        }
+
+        /* Setup screen */
+        .table-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .table-btn {
+            padding: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border: 3px solid #ddd;
+            border-radius: 8px;
+            background: #f8f8f8;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #333;
+        }
+        .table-btn:hover { border-color: #1798d3; background: #e8f4fa; }
+        .table-btn.selected {
+            background: #1798d3;
+            color: white;
+            border-color: #1798d3;
+        }
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .action-btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-select-all {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .btn-select-all:hover { background: #d0d0d0; }
+        .btn-start {
+            background: #1798d3;
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.3em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            transition: all 0.2s;
+        }
+        .btn-start:hover { background: #1280b3; }
+        .btn-start:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #999;
+        }
+
+        /* Settings selectors */
+        .settings-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 10px 0;
+            font-size: 1.1em;
+            color: #333;
+        }
+        .settings-row select {
+            padding: 8px 15px;
+            font-size: 1.1em;
+            border-radius: 6px;
+            border: 2px solid #ddd;
+            background: white;
+        }
+        .settings-row select:focus { border-color: #1798d3; outline: none; }
+
+        /* Quiz screen */
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        .progress-bar {
+            background: #eee;
+            border-radius: 8px;
+            height: 16px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #1798d3;
+            border-radius: 8px;
+            transition: width 0.4s ease;
+        }
+        .progress-text {
+            text-align: center;
+            color: #666;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        /* Countdown timer bar */
+        .countdown-bar {
+            background: #eee;
+            border-radius: 8px;
+            height: 12px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .countdown-fill {
+            height: 100%;
+            border-radius: 8px;
+            width: 100%;
+            background: #1798d3;
+            transition: none;
+        }
+        .countdown-fill.warning { background: #FF9800; }
+        .countdown-fill.danger { background: #d32f2f; }
+
+        .question-display {
+            text-align: center;
+            font-size: 3em;
+            font-weight: bold;
+            color: #0a0101;
+            margin: 20px 0;
+        }
+        .answer-section {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+        .answer-input {
+            width: 150px;
+            padding: 15px;
+            font-size: 2em;
+            text-align: center;
+            border: 3px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s;
+            -moz-appearance: textfield;
+        }
+        .answer-input::-webkit-outer-spin-button,
+        .answer-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .answer-input:focus { border-color: #1798d3; }
+        .answer-input.correct { border-color: #1798d3; background: #e8f4fa; }
+        .answer-input.wrong { border-color: #d32f2f; background: #ffebee; }
+        .answer-input.timeout { border-color: #FF9800; background: #fff3e0; }
+
+        .btn-submit {
+            padding: 15px 30px;
+            font-size: 1.3em;
+            font-weight: bold;
+            background: #1798d3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-submit:hover { background: #1280b3; }
+
+        .feedback {
+            text-align: center;
+            font-size: 1.4em;
+            font-weight: bold;
+            margin: 10px 0;
+            min-height: 40px;
+        }
+        .feedback.correct-feedback { color: #1798d3; }
+        .feedback.wrong-feedback { color: #d32f2f; }
+        .feedback.timeout-feedback { color: #FF9800; }
+
+        .score-display {
+            text-align: center;
+            font-size: 1.1em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        /* Next question button */
+        .btn-next {
+            display: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            background: #0a0101;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+            transition: all 0.2s;
+        }
+        .btn-next:hover { background: #292929; }
+        .btn-next.visible { display: block; }
+
+        /* Keypad */
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            max-width: 280px;
+            margin: 15px auto 0;
+        }
+        .key-btn {
+            padding: 18px;
+            font-size: 1.5em;
+            font-weight: bold;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: #f8f8f8;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: #333;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .key-btn:hover { background: #e8f4fa; border-color: #1798d3; }
+        .key-btn:active { background: #1798d3; color: white; transform: scale(0.95); }
+        .key-btn.key-clear {
+            background: #ffebee;
+            border-color: #d32f2f;
+            color: #d32f2f;
+            font-size: 1.1em;
+        }
+        .key-btn.key-clear:active { background: #d32f2f; color: white; }
+        .key-btn.key-go {
+            background: #1798d3;
+            color: white;
+            border-color: #1798d3;
+        }
+        .key-btn.key-go:hover { background: #1280b3; }
+        .key-btn.key-go:active { transform: scale(0.95); }
+
+        /* Results screen */
+        .results-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .results-header .emoji {
+            font-size: 4em;
+            display: block;
+            margin-bottom: 10px;
+        }
+        .results-header .score-big {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #0a0101;
+        }
+        .results-header .score-label {
+            font-size: 1.2em;
+            color: #666;
+        }
+        .results-message {
+            text-align: center;
+            font-size: 1.3em;
+            color: #555;
+            margin: 15px 0;
+        }
+        .all-answers {
+            margin: 20px 0;
+        }
+        .all-answers h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        .summary-item {
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin: 4px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.05em;
+        }
+        .summary-item.correct-item {
+            background: #e8f4fa;
+            border-left: 4px solid #1798d3;
+        }
+        .summary-item.wrong-item {
+            background: #ffebee;
+            border-left: 4px solid #d32f2f;
+        }
+        .summary-item .question-text { color: #333; }
+        .summary-item .answer-detail { font-weight: bold; }
+        .summary-item.correct-item .answer-detail { color: #1798d3; }
+        .summary-item.wrong-item .answer-detail { color: #d32f2f; }
+        .summary-item .correct-answer-small {
+            color: #1798d3;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .btn-again {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            background: #1798d3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 15px;
+            transition: all 0.2s;
+        }
+        .btn-again:hover { background: #1280b3; }
+        .btn-home {
+            padding: 12px 30px;
+            font-size: 1em;
+            background: #0a0101;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            transition: all 0.2s;
+        }
+        .btn-home:hover { background: #292929; }
+
+        /* Responsive - tablets (iPad) */
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .container { padding: 20px; }
+            h1 { font-size: 1.7em; }
+            .question-display { font-size: 2.5em; margin: 15px 0; }
+            .answer-input { width: 130px; padding: 12px; font-size: 1.8em; }
+            .btn-submit { padding: 12px 20px; font-size: 1.1em; }
+            .table-grid { gap: 8px; }
+            .table-btn { padding: 12px; font-size: 1.1em; }
+            .keypad { max-width: 260px; }
+            .key-btn { padding: 15px; font-size: 1.4em; }
+            .settings-row { flex-direction: column; gap: 5px; }
+        }
+
+        /* Responsive - phones (iPhone) */
+        @media (max-width: 480px) {
+            body { padding: 5px; align-items: flex-start; }
+            .container { padding: 15px; border-radius: 8px; }
+            h1 { font-size: 1.4em; }
+            .subtitle { font-size: 0.95em; margin-bottom: 15px; }
+            .school-logo { max-width: 80px; }
+            .question-display { font-size: 2em; margin: 10px 0; }
+            .answer-input { width: 110px; padding: 10px; font-size: 1.5em; }
+            .btn-submit { padding: 10px 15px; font-size: 1em; }
+            .table-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+            .table-btn { padding: 10px; font-size: 1em; }
+            .keypad { max-width: 240px; gap: 6px; }
+            .key-btn { padding: 14px; font-size: 1.3em; }
+            .feedback { font-size: 1.1em; }
+            .btn-start { font-size: 1.1em; padding: 12px 20px; }
+            .btn-next { font-size: 1em; padding: 12px 20px; }
+            .btn-again { font-size: 1em; padding: 12px 20px; }
+            .summary-item { font-size: 0.95em; padding: 6px 10px; }
+            .results-header .score-big { font-size: 2em; }
+            .results-header .emoji { font-size: 3em; }
+        }
+
+        /* Prevent zoom on input focus on iOS */
+        @media (max-width: 768px) {
+            .answer-input { font-size: 16px; }
+            .settings-row select { font-size: 16px; }
+        }
+
+        .timer {
+            text-align: center;
+            color: #999;
+            font-size: 1em;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Setup Screen -->
+        <div id="setup-screen" class="screen active">
+            <div class="school-header">
+                <img src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy" class="school-logo">
+            </div>
+            <h1>Times Tables</h1>
+            <p class="subtitle">Select which times tables to practise</p>
+
+            <div class="btn-row">
+                <button class="action-btn btn-select-all" onclick="selectAll()">Select All</button>
+                <button class="action-btn btn-select-all" onclick="selectNone()">Clear All</button>
+            </div>
+
+            <div class="table-grid" id="table-grid"></div>
+
+            <div class="settings-row">
+                <label for="num-questions">Questions:</label>
+                <select id="num-questions">
+                    <option value="10">10</option>
+                    <option value="15">15</option>
+                    <option value="20" selected>20</option>
+                    <option value="30">30</option>
+                    <option value="50">50</option>
+                </select>
+            </div>
+
+            <div class="settings-row">
+                <label for="time-limit">Time per question:</label>
+                <select id="time-limit">
+                    <option value="0">No limit</option>
+                    <option value="3">3 seconds</option>
+                    <option value="4.5" selected>4.5 seconds</option>
+                    <option value="6">6 seconds</option>
+                    <option value="8">8 seconds</option>
+                    <option value="10">10 seconds</option>
+                </select>
+            </div>
+
+            <div class="settings-row">
+                <label for="wait-between">Between questions:</label>
+                <select id="wait-between">
+                    <option value="auto" selected>Auto (2 second delay)</option>
+                    <option value="wait">Wait for "Next Question"</option>
+                </select>
+            </div>
+
+            <button class="btn-start" id="btn-start" onclick="startQuiz()" disabled>
+                Choose at least one table
+            </button>
+        </div>
+
+        <!-- Quiz Screen -->
+        <div id="quiz-screen" class="screen">
+            <div class="school-header">
+                <img src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy" class="school-logo">
+            </div>
+            <h1>Times Tables</h1>
+            <div class="progress-text" id="progress-text"></div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="countdown-bar" id="countdown-bar">
+                <div class="countdown-fill" id="countdown-fill"></div>
+            </div>
+            <div class="question-display" id="question-display"></div>
+            <div class="answer-section">
+                <input type="number" class="answer-input" id="answer-input"
+                       autocomplete="off" inputmode="none">
+                <button class="btn-submit" id="btn-submit" onclick="submitAnswer()">Go!</button>
+            </div>
+            <div class="feedback" id="feedback"></div>
+            <div class="score-display" id="score-display"></div>
+            <div class="timer" id="timer"></div>
+
+            <button class="btn-next" id="btn-next" onclick="nextQuestion()">Next Question</button>
+
+            <div class="keypad" id="keypad">
+                <button class="key-btn" onclick="keyPress('1')">1</button>
+                <button class="key-btn" onclick="keyPress('2')">2</button>
+                <button class="key-btn" onclick="keyPress('3')">3</button>
+                <button class="key-btn" onclick="keyPress('4')">4</button>
+                <button class="key-btn" onclick="keyPress('5')">5</button>
+                <button class="key-btn" onclick="keyPress('6')">6</button>
+                <button class="key-btn" onclick="keyPress('7')">7</button>
+                <button class="key-btn" onclick="keyPress('8')">8</button>
+                <button class="key-btn" onclick="keyPress('9')">9</button>
+                <button class="key-btn key-clear" onclick="keyClear()">Clear</button>
+                <button class="key-btn" onclick="keyPress('0')">0</button>
+                <button class="key-btn key-go" onclick="submitAnswer()">Go!</button>
+            </div>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="results-screen" class="screen">
+            <div class="results-header">
+                <span class="emoji" id="results-emoji"></span>
+                <span class="score-big" id="results-score"></span>
+                <div class="score-label" id="results-label"></div>
+            </div>
+            <div class="results-message" id="results-message"></div>
+            <div class="timer" id="results-time"></div>
+            <div class="all-answers" id="all-answers"></div>
+            <button class="btn-again" onclick="startQuiz()">Try Again</button>
+            <button class="btn-home" onclick="showScreen('setup-screen')">Change Tables</button>
+        </div>
+    </div>
+
+    <script>
+        let selectedTables = new Set();
+        let questions = [];
+        let currentQuestion = 0;
+        let score = 0;
+        let allAnswers = [];
+        let startTime = null;
+        let questionTimeLimit = 4.5;
+        let questionStartTime = null;
+        let countdownInterval = null;
+        let questionTimeout = null;
+        let answering = false;
+        let waitBetween = false;
+
+        // Build table selection grid
+        const grid = document.getElementById('table-grid');
+        for (let i = 1; i <= 12; i++) {
+            const btn = document.createElement('button');
+            btn.className = 'table-btn';
+            btn.textContent = i + '\u00d7';
+            btn.dataset.table = i;
+            btn.onclick = () => toggleTable(i, btn);
+            grid.appendChild(btn);
+        }
+
+        function toggleTable(n, btn) {
+            if (selectedTables.has(n)) {
+                selectedTables.delete(n);
+                btn.classList.remove('selected');
+            } else {
+                selectedTables.add(n);
+                btn.classList.add('selected');
+            }
+            updateStartButton();
+        }
+
+        function selectAll() {
+            document.querySelectorAll('.table-btn').forEach(btn => {
+                const n = parseInt(btn.dataset.table);
+                selectedTables.add(n);
+                btn.classList.add('selected');
+            });
+            updateStartButton();
+        }
+
+        function selectNone() {
+            document.querySelectorAll('.table-btn').forEach(btn => {
+                selectedTables.delete(parseInt(btn.dataset.table));
+                btn.classList.remove('selected');
+            });
+            updateStartButton();
+        }
+
+        function updateStartButton() {
+            const btn = document.getElementById('btn-start');
+            if (selectedTables.size > 0) {
+                btn.disabled = false;
+                btn.textContent = 'Start! (' + selectedTables.size + ' table' +
+                    (selectedTables.size > 1 ? 's' : '') + ')';
+            } else {
+                btn.disabled = true;
+                btn.textContent = 'Choose at least one table';
+            }
+        }
+
+        function generateQuestions() {
+            const numQuestions = parseInt(document.getElementById('num-questions').value);
+            const pool = [];
+            selectedTables.forEach(table => {
+                for (let i = 1; i <= 12; i++) {
+                    pool.push({ a: table, b: i });
+                }
+            });
+
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+
+            questions = pool.slice(0, numQuestions);
+
+            while (questions.length < numQuestions) {
+                for (let i = pool.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pool[i], pool[j]] = [pool[j], pool[i]];
+                }
+                questions = questions.concat(pool.slice(0, numQuestions - questions.length));
+            }
+
+            questions = questions.map(q => {
+                if (Math.random() > 0.5) return { a: q.b, b: q.a };
+                return q;
+            });
+        }
+
+        function startQuiz() {
+            generateQuestions();
+            currentQuestion = 0;
+            score = 0;
+            allAnswers = [];
+            startTime = Date.now();
+            questionTimeLimit = parseFloat(document.getElementById('time-limit').value);
+            waitBetween = document.getElementById('wait-between').value === 'wait';
+
+            const countdownBar = document.getElementById('countdown-bar');
+            countdownBar.style.display = questionTimeLimit > 0 ? 'block' : 'none';
+
+            document.getElementById('btn-next').classList.remove('visible');
+            showScreen('quiz-screen');
+            showQuestion();
+        }
+
+        function showQuestion() {
+            answering = true;
+            document.getElementById('btn-next').classList.remove('visible');
+            const q = questions[currentQuestion];
+            document.getElementById('question-display').textContent = q.a + ' \u00d7 ' + q.b + ' = ?';
+            document.getElementById('progress-text').textContent =
+                'Question ' + (currentQuestion + 1) + ' of ' + questions.length;
+            document.getElementById('progress-fill').style.width =
+                ((currentQuestion) / questions.length * 100) + '%';
+            document.getElementById('score-display').textContent =
+                'Score: ' + score + ' / ' + currentQuestion;
+            document.getElementById('feedback').textContent = '';
+            document.getElementById('feedback').className = 'feedback';
+
+            const input = document.getElementById('answer-input');
+            input.value = '';
+            input.className = 'answer-input';
+            input.focus();
+
+            updateTimer();
+            startCountdown();
+        }
+
+        function startCountdown() {
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (questionTimeout) clearTimeout(questionTimeout);
+
+            if (questionTimeLimit <= 0) return;
+
+            questionStartTime = Date.now();
+            const fill = document.getElementById('countdown-fill');
+            fill.style.width = '100%';
+            fill.className = 'countdown-fill';
+
+            countdownInterval = setInterval(() => {
+                const elapsed = (Date.now() - questionStartTime) / 1000;
+                const remaining = Math.max(0, questionTimeLimit - elapsed);
+                const pct = (remaining / questionTimeLimit) * 100;
+                fill.style.width = pct + '%';
+
+                if (pct <= 20) fill.className = 'countdown-fill danger';
+                else if (pct <= 50) fill.className = 'countdown-fill warning';
+                else fill.className = 'countdown-fill';
+            }, 50);
+
+            questionTimeout = setTimeout(() => {
+                if (answering) handleTimeout();
+            }, questionTimeLimit * 1000);
+        }
+
+        function handleTimeout() {
+            answering = false;
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (questionTimeout) clearTimeout(questionTimeout);
+
+            const fill = document.getElementById('countdown-fill');
+            fill.style.width = '0%';
+            fill.className = 'countdown-fill danger';
+
+            const input = document.getElementById('answer-input');
+            const q = questions[currentQuestion];
+            const correct = q.a * q.b;
+            const feedback = document.getElementById('feedback');
+
+            input.className = 'answer-input timeout';
+            feedback.textContent = 'Time\u2019s up! ' + q.a + ' \u00d7 ' + q.b + ' = ' + correct;
+            feedback.className = 'feedback timeout-feedback';
+
+            const given = parseInt(input.value);
+            allAnswers.push({
+                a: q.a, b: q.b, correct: correct,
+                given: isNaN(given) ? '\u2014' : given,
+                timedOut: true, isCorrect: false
+            });
+
+            document.getElementById('score-display').textContent =
+                'Score: ' + score + ' / ' + (currentQuestion + 1);
+
+            currentQuestion++;
+            advanceQuestion();
+        }
+
+        function advanceQuestion() {
+            if (waitBetween) {
+                if (currentQuestion >= questions.length) {
+                    document.getElementById('btn-next').classList.remove('visible');
+                    setTimeout(showResults, 1000);
+                } else {
+                    document.getElementById('btn-next').classList.add('visible');
+                }
+            } else {
+                const delay = 2000;
+                if (currentQuestion >= questions.length) {
+                    setTimeout(showResults, delay);
+                } else {
+                    setTimeout(showQuestion, delay);
+                }
+            }
+        }
+
+        function nextQuestion() {
+            if (currentQuestion >= questions.length) {
+                showResults();
+            } else {
+                showQuestion();
+            }
+        }
+
+        function updateTimer() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = Math.floor(elapsed / 60);
+            const secs = elapsed % 60;
+            document.getElementById('timer').textContent =
+                mins + ':' + (secs < 10 ? '0' : '') + secs;
+        }
+
+        let timerInterval = null;
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+
+            if (timerInterval) clearInterval(timerInterval);
+            if (id === 'quiz-screen') {
+                timerInterval = setInterval(updateTimer, 1000);
+            }
+        }
+
+        function submitAnswer() {
+            if (!answering) return;
+
+            const input = document.getElementById('answer-input');
+            const answer = parseInt(input.value);
+            const q = questions[currentQuestion];
+            const correct = q.a * q.b;
+            const feedback = document.getElementById('feedback');
+
+            if (isNaN(answer)) {
+                input.focus();
+                return;
+            }
+
+            answering = false;
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (questionTimeout) clearTimeout(questionTimeout);
+
+            if (answer === correct) {
+                score++;
+                input.className = 'answer-input correct';
+                feedback.textContent = 'Correct!';
+                feedback.className = 'feedback correct-feedback';
+                allAnswers.push({ a: q.a, b: q.b, correct: correct, given: answer, isCorrect: true });
+            } else {
+                input.className = 'answer-input wrong';
+                feedback.textContent = q.a + ' \u00d7 ' + q.b + ' = ' + correct;
+                feedback.className = 'feedback wrong-feedback';
+                allAnswers.push({ a: q.a, b: q.b, correct: correct, given: answer, isCorrect: false });
+            }
+
+            document.getElementById('score-display').textContent =
+                'Score: ' + score + ' / ' + (currentQuestion + 1);
+
+            currentQuestion++;
+            advanceQuestion();
+        }
+
+        // Keyboard support
+        document.getElementById('answer-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') submitAnswer();
+        });
+
+        // Keypad functions
+        function keyPress(digit) {
+            if (!answering) return;
+            const input = document.getElementById('answer-input');
+            if (input.value.length < 3) {
+                input.value += digit;
+            }
+        }
+
+        function keyClear() {
+            const input = document.getElementById('answer-input');
+            input.value = '';
+            input.focus();
+        }
+
+        function showResults() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = Math.floor(elapsed / 60);
+            const secs = elapsed % 60;
+            const pct = Math.round((score / questions.length) * 100);
+
+            let emoji, message;
+            if (pct === 100) { emoji = '\ud83c\udf1f'; message = 'Perfect score! Amazing work!'; }
+            else if (pct >= 90) { emoji = '\ud83c\udf89'; message = 'Brilliant! Nearly perfect!'; }
+            else if (pct >= 70) { emoji = '\ud83d\udc4f'; message = 'Great effort! Keep practising!'; }
+            else if (pct >= 50) { emoji = '\ud83d\udcaa'; message = 'Good try! You\'re getting there!'; }
+            else { emoji = '\ud83d\udcda'; message = 'Keep practising, you\'ll get better!'; }
+
+            document.getElementById('results-emoji').textContent = emoji;
+            document.getElementById('results-score').textContent = score + ' / ' + questions.length;
+            document.getElementById('results-label').textContent = pct + '% correct';
+            document.getElementById('results-message').textContent = message;
+            document.getElementById('results-time').textContent =
+                'Time: ' + mins + ':' + (secs < 10 ? '0' : '') + secs;
+
+            const summaryDiv = document.getElementById('all-answers');
+            let html = '<h3>Question Summary</h3>';
+            allAnswers.forEach((a, i) => {
+                const cls = a.isCorrect ? 'correct-item' : 'wrong-item';
+                const num = i + 1;
+                const question = a.a + ' \u00d7 ' + a.b + ' = ' + a.correct;
+                if (a.isCorrect) {
+                    html += '<div class="summary-item ' + cls + '">' +
+                        '<span class="question-text">' + num + '. ' + question + '</span>' +
+                        '<span class="answer-detail">\u2713</span>' +
+                        '</div>';
+                } else {
+                    const label = a.timedOut ? 'Timed out' : 'Answered ' + a.given;
+                    html += '<div class="summary-item ' + cls + '">' +
+                        '<span class="question-text">' + num + '. ' + a.a + ' \u00d7 ' + a.b + '</span>' +
+                        '<span>' +
+                        '<span class="answer-detail">' + label + '</span>' +
+                        '<span class="correct-answer-small">\u2192 ' + a.correct + '</span>' +
+                        '</span>' +
+                        '</div>';
+                }
+            });
+            summaryDiv.innerHTML = html;
+
+            showScreen('results-screen');
+        }
+    </script>
+<div style="text-align:center;font-size:11px;color:#aaa;padding:8px 0 4px;font-family:sans-serif;">26.07.26a</div>
+</body>
+</html>
