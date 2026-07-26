@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Phonics Alien Word Generator</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#E8DAEF;font-family:'Nunito',sans-serif;}
+    button{font-family:'Nunito',sans-serif;}
+
+    /* Mobile sidebar toggle */
+    .sidebar-toggle {
+      display: none;
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      padding: 12px 24px;
+      background: #7B3F9E;
+      color: #fff;
+      border: none;
+      border-radius: 30px;
+      font-weight: 800;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(123,63,158,0.5);
+      font-family: 'Nunito', sans-serif;
+    }
+
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 90;
+    }
+
+    @media (max-width: 768px) {
+      .sidebar-toggle { display: block; }
+      .sidebar-overlay.visible { display: block; }
+
+      .app-sidebar {
+        position: fixed !important;
+        top: 0; left: -300px;
+        width: 280px !important;
+        min-width: 280px !important;
+        height: 100vh !important;
+        z-index: 95;
+        transition: left 0.3s ease;
+        box-shadow: 4px 0 20px rgba(0,0,0,0.3);
+      }
+      .app-sidebar.open {
+        left: 0;
+      }
+      .app-main {
+        width: 100% !important;
+        padding: 10px !important;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .app-main {
+        padding: 8px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+    const {useState,useEffect,useCallback}=React;
+
+    const PALETTES=[
+      {body:"#7DC968",dark:"#5AA048",eye:"#fff",pupil:"#1a1a1a",tooth:"#fff",accent:"#4A90D9"},
+      {body:"#E05C8A",dark:"#B8376B",eye:"#fff",pupil:"#1a1a1a",tooth:"#fff",accent:"#F7C948"},
+      {body:"#9B59B6",dark:"#7D3C98",eye:"#fff",pupil:"#1a1a1a",tooth:"#fff",accent:"#F1C40F"},
+      {body:"#F4A935",dark:"#D4881A",eye:"#fff",pupil:"#1a1a1a",tooth:"#fff",accent:"#7B3F9E"},
+      {body:"#2ECC9A",dark:"#1A9970",eye:"#fff",pupil:"#1a1a1a",tooth:"#fff",accent:"#E74C3C"},
+      {body:"#3498DB",dark:"#1F6DA8",eye:"#fff",pupil:"#1a1a1a",tooth:"#fff",accent:"#F39C12"},
+      {body:"#E74C3C",dark:"#B83228",eye:"#fff",pupil:"#1a1a1a",tooth:"#fff",accent:"#2ECC71"},
+      {body:"#1ABC9C",dark:"#0E8A71",eye:"#fff",pupil:"#1a1a1a",tooth:"#fff",accent:"#E67E22"},
+      {body:"#8E44AD",dark:"#6C3483",eye:"#fff",pupil:"#1a1a1a",tooth:"#fff",accent:"#F1C40F"},
+      {body:"#E67E22",dark:"#CA6A10",eye:"#fff",pupil:"#1a1a1a",tooth:"#fff",accent:"#3498DB"},
+    ];
+
+    function M0({p}){return(<svg viewBox="0 0 110 130" width="80" height="96"><ellipse cx="55" cy="72" rx="42" ry="48" fill={p.body}/><circle cx="55" cy="57" r="20" fill={p.eye} stroke="#222" strokeWidth="2.5"/><circle cx="55" cy="57" r="13" fill={p.accent}/><circle cx="55" cy="57" r="7" fill={p.pupil}/><circle cx="60" cy="52" r="3" fill="#fff"/><path d="M 40 80 Q 55 96 70 80" fill={p.dark} stroke="#222" strokeWidth="2"/><rect x="47" y="80" width="6" height="9" rx="2" fill={p.tooth}/><rect x="57" y="80" width="6" height="9" rx="2" fill={p.tooth}/><ellipse cx="13" cy="68" rx="10" ry="6" fill={p.body} transform="rotate(-25 13 68)"/><ellipse cx="97" cy="68" rx="10" ry="6" fill={p.body} transform="rotate(25 97 68)"/><rect x="40" y="115" width="10" height="15" rx="5" fill={p.body}/><rect x="60" y="115" width="10" height="15" rx="5" fill={p.body}/></svg>);}
+    function M1({p}){const spikes=[300,330,0,30,60,90,120,150,180,210,240,270];return(<svg viewBox="0 0 130 130" width="96" height="96">{spikes.map((a,i)=>{const r=a*Math.PI/180,x1=65+36*Math.cos(r),y1=65+36*Math.sin(r),x2=65+58*Math.cos(r),y2=65+58*Math.sin(r);return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={p.accent} strokeWidth="7" strokeLinecap="round"/>;})}<circle cx="65" cy="65" r="36" fill={p.body}/><circle cx="53" cy="58" r="10" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="77" cy="58" r="10" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="53" cy="58" r="6" fill={p.pupil}/><circle cx="77" cy="58" r="6" fill={p.pupil}/><circle cx="55" cy="56" r="2" fill="#fff"/><circle cx="79" cy="56" r="2" fill="#fff"/><path d="M 50 77 Q 65 90 80 77" fill={p.dark} stroke="#222" strokeWidth="2"/><rect x="57" y="77" width="6" height="9" rx="2" fill={p.tooth}/><rect x="67" y="77" width="6" height="9" rx="2" fill={p.tooth}/><rect x="50" y="98" width="10" height="14" rx="5" fill={p.body}/><rect x="70" y="98" width="10" height="14" rx="5" fill={p.body}/></svg>);}
+    function M2({p}){const bumps=[0,40,80,120,160,200,240,280,320];return(<svg viewBox="0 0 110 120" width="80" height="88">{bumps.map((a,i)=>{const r=a*Math.PI/180,cx=55+36*Math.cos(r),cy=58+36*Math.sin(r);return <ellipse key={i} cx={cx} cy={cy} rx="8" ry="13" fill={p.body} transform={`rotate(${a} ${cx} ${cy})`}/>;})}<circle cx="55" cy="58" r="33" fill={p.body}/><circle cx="43" cy="51" r="10" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="67" cy="51" r="10" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="43" cy="51" r="6" fill={p.pupil}/><circle cx="67" cy="51" r="6" fill={p.pupil}/><circle cx="45" cy="49" r="2" fill="#fff"/><circle cx="69" cy="49" r="2" fill="#fff"/><path d="M 40 68 Q 55 82 70 68" fill={p.dark} stroke="#222" strokeWidth="2"/><rect x="48" y="68" width="6" height="8" rx="2" fill={p.tooth}/><rect x="56" y="68" width="6" height="8" rx="2" fill={p.tooth}/><rect x="40" y="88" width="9" height="13" rx="5" fill={p.body}/><rect x="61" y="88" width="9" height="13" rx="5" fill={p.body}/></svg>);}
+    function M3({p}){return(<svg viewBox="0 0 100 145" width="72" height="104"><polygon points="32,28 25,4 44,22" fill={p.accent}/><polygon points="68,28 75,4 56,22" fill={p.accent}/><ellipse cx="50" cy="88" rx="36" ry="52" fill={p.body}/><circle cx="38" cy="72" r="11" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="62" cy="72" r="11" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="38" cy="72" r="7" fill={p.pupil}/><circle cx="62" cy="72" r="7" fill={p.pupil}/><circle cx="40" cy="70" r="2.5" fill="#fff"/><circle cx="64" cy="70" r="2.5" fill="#fff"/><path d="M 34 92 Q 50 108 66 92" fill={p.dark} stroke="#222" strokeWidth="2"/><polygon points="42,92 38,104 46,92" fill={p.tooth}/><polygon points="58,92 62,104 54,92" fill={p.tooth}/><ellipse cx="14" cy="88" rx="11" ry="7" fill={p.body} transform="rotate(-20 14 88)"/><ellipse cx="86" cy="88" rx="11" ry="7" fill={p.body} transform="rotate(20 86 88)"/></svg>);}
+    function M4({p}){return(<svg viewBox="0 0 130 110" width="96" height="80"><ellipse cx="20" cy="48" rx="16" ry="22" fill={p.accent}/><ellipse cx="110" cy="48" rx="16" ry="22" fill={p.accent}/><ellipse cx="20" cy="48" rx="9" ry="14" fill={p.body}/><ellipse cx="110" cy="48" rx="9" ry="14" fill={p.body}/><ellipse cx="65" cy="60" rx="50" ry="42" fill={p.body}/><circle cx="48" cy="50" r="12" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="82" cy="50" r="12" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="48" cy="50" r="8" fill={p.pupil}/><circle cx="82" cy="50" r="8" fill={p.pupil}/><circle cx="50" cy="47" r="3" fill="#fff"/><circle cx="84" cy="47" r="3" fill="#fff"/><path d="M 44 74 Q 65 90 86 74" fill={p.dark} stroke="#222" strokeWidth="2"/><rect x="56" y="74" width="8" height="11" rx="2" fill={p.tooth}/><rect x="66" y="74" width="8" height="11" rx="2" fill={p.tooth}/><rect x="49" y="98" width="10" height="12" rx="5" fill={p.body}/><rect x="71" y="98" width="10" height="12" rx="5" fill={p.body}/></svg>);}
+    function M5({p}){return(<svg viewBox="0 0 80 150" width="60" height="112"><line x1="34" y1="10" x2="26" y2="0" stroke={p.accent} strokeWidth="4" strokeLinecap="round"/><line x1="46" y1="10" x2="54" y2="0" stroke={p.accent} strokeWidth="4" strokeLinecap="round"/><circle cx="26" cy="0" r="5" fill={p.accent}/><circle cx="54" cy="0" r="5" fill={p.accent}/><ellipse cx="40" cy="32" rx="26" ry="24" fill={p.body}/><circle cx="30" cy="28" r="9" fill={p.eye} stroke="#222" strokeWidth="1.5"/><circle cx="50" cy="28" r="9" fill={p.eye} stroke="#222" strokeWidth="1.5"/><circle cx="30" cy="28" r="6" fill={p.pupil}/><circle cx="50" cy="28" r="6" fill={p.pupil}/><circle cx="32" cy="26" r="2" fill="#fff"/><circle cx="52" cy="26" r="2" fill="#fff"/><path d="M 28 41 Q 40 52 52 41" fill={p.dark} stroke="#222" strokeWidth="2"/><rect x="34" y="41" width="6" height="8" rx="2" fill={p.tooth}/><rect x="40" y="41" width="6" height="8" rx="2" fill={p.tooth}/><rect x="25" y="54" width="30" height="58" rx="14" fill={p.body}/><rect x="8" y="62" width="18" height="8" rx="4" fill={p.body}/><rect x="54" y="62" width="18" height="8" rx="4" fill={p.body}/><rect x="27" y="108" width="10" height="24" rx="5" fill={p.body}/><rect x="43" y="108" width="10" height="24" rx="5" fill={p.body}/></svg>);}
+    function M6({p}){return(<svg viewBox="0 0 90 150" width="68" height="112"><ellipse cx="28" cy="20" rx="10" ry="14" fill={p.accent} transform="rotate(-18 28 20)"/><ellipse cx="62" cy="20" rx="10" ry="14" fill={p.accent} transform="rotate(18 62 20)"/><rect x="12" y="22" width="66" height="96" rx="20" fill={p.body}/><circle cx="34" cy="60" r="12" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="56" cy="60" r="12" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="34" cy="60" r="8" fill={p.pupil}/><circle cx="56" cy="60" r="8" fill={p.pupil}/><circle cx="36" cy="57" r="3" fill="#fff"/><circle cx="58" cy="57" r="3" fill="#fff"/><path d="M 30 82 Q 45 96 60 82" fill={p.dark} stroke="#222" strokeWidth="2"/><rect x="38" y="82" width="7" height="10" rx="2" fill={p.tooth}/><rect x="47" y="82" width="7" height="10" rx="2" fill={p.tooth}/><rect x="36" y="116" width="18" height="30" rx="6" fill="#D4A373"/></svg>);}
+    function M7({p}){return(<svg viewBox="0 0 120 130" width="88" height="96">{[0,1,2,3,4].map(i=>(<polygon key={i} points={`${28+i*13},28 ${34+i*13},10 ${40+i*13},28`} fill={p.accent}/>))}<ellipse cx="60" cy="82" rx="40" ry="34" fill={p.body}/><path d="M 95 78 Q 120 85 115 65 Q 110 50 96 62" fill={p.body}/><ellipse cx="44" cy="46" rx="30" ry="26" fill={p.body}/><circle cx="36" cy="40" r="10" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="56" cy="40" r="10" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="36" cy="40" r="6" fill={p.pupil}/><circle cx="56" cy="40" r="6" fill={p.pupil}/><circle cx="38" cy="38" r="2" fill="#fff"/><circle cx="58" cy="38" r="2" fill="#fff"/><path d="M 28 57 Q 44 70 60 57" fill={p.dark} stroke="#222" strokeWidth="2"/><polygon points="35,57 31,68 39,57" fill={p.tooth}/><polygon points="50,57 54,68 46,57" fill={p.tooth}/><ellipse cx="30" cy="112" rx="10" ry="14" fill={p.body}/><ellipse cx="60" cy="112" rx="10" ry="14" fill={p.body}/></svg>);}
+    function M8({p}){const angles=[-70,-42,-14,14,42,70];return(<svg viewBox="0 0 130 100" width="96" height="72">{angles.map((a,i)=>{const r=(a+90)*Math.PI/180,x2=65+50*Math.cos(r),y2=50+50*Math.sin(r);return <line key={i} x1="65" y1="50" x2={x2} y2={y2} stroke={p.accent} strokeWidth="5" strokeLinecap="round"/>;})}<ellipse cx="65" cy="50" rx="32" ry="28" fill={p.body}/><circle cx="53" cy="44" r="9" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="77" cy="44" r="9" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="53" cy="44" r="6" fill={p.pupil}/><circle cx="77" cy="44" r="6" fill={p.pupil}/><circle cx="55" cy="42" r="2.5" fill="#fff"/><circle cx="79" cy="42" r="2.5" fill="#fff"/><path d="M 50 60 Q 65 73 80 60" fill={p.dark} stroke="#222" strokeWidth="2"/><rect x="57" y="60" width="6" height="9" rx="2" fill={p.tooth}/><rect x="67" y="60" width="6" height="9" rx="2" fill={p.tooth}/></svg>);}
+    function M9({p}){return(<svg viewBox="0 0 140 110" width="104" height="80"><circle cx="105" cy="52" r="30" fill={p.accent} opacity="0.35"/><circle cx="105" cy="52" r="21" fill={p.accent} opacity="0.6"/><circle cx="105" cy="52" r="13" fill={p.accent}/><circle cx="105" cy="52" r="5" fill={p.dark}/><ellipse cx="57" cy="76" rx="52" ry="24" fill={p.body}/><ellipse cx="22" cy="60" rx="22" ry="20" fill={p.body}/><line x1="16" y1="46" x2="10" y2="28" stroke={p.body} strokeWidth="5" strokeLinecap="round"/><line x1="26" y1="46" x2="32" y2="28" stroke={p.body} strokeWidth="5" strokeLinecap="round"/><circle cx="10" cy="26" r="7" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="32" cy="26" r="7" fill={p.eye} stroke="#222" strokeWidth="2"/><circle cx="10" cy="26" r="4" fill={p.pupil}/><circle cx="32" cy="26" r="4" fill={p.pupil}/><circle cx="12" cy="24" r="1.5" fill="#fff"/><circle cx="34" cy="24" r="1.5" fill="#fff"/><path d="M 12 66 Q 22 74 32 66" fill="none" stroke="#222" strokeWidth="2.5" strokeLinecap="round"/></svg>);}
+
+    const MONSTERS=[M0,M1,M2,M3,M4,M5,M6,M7,M8,M9];
+    function MonsterDisplay({seed}){const mi=((seed*7)+3)%MONSTERS.length,pi=((seed*3)+5)%PALETTES.length,Monster=MONSTERS[mi];return <Monster p={PALETTES[pi]}/>;}
+
+    const WORD_BANK={
+      "a":["dap","fam","gat","hav","jab","kag","lam","nap","pav","raz","tav","wap","zam","bax","daj","fap","gam","haj",
+           "flamb","granb","skamb","twamd","blaxt","cramt","spland","framp","twand","clant"],
+      "e":["bep","feg","het","jev","keb","lep","mev","nef","pej","reb","sep","tev","wef","zeb","bej","fep","gem","hej",
+           "flemb","grenb","skemb","blext","cremt","splenb","fremp","twendt","clest","drept"],
+      "i":["dip","fig","jiv","kib","lip","miv","nif","pij","siv","tif","wib","ziv","bij","fib","gip","hiv","jig","ril",
+           "flimb","grinb","skimb","blixt","crimt","flimp","twimd","slimb","scrimt","twilt"],
+      "o":["bop","fog","jov","kob","lop","mov","nof","poj","sov","tof","wob","zov","boj","fop","gom","hov","jod","kop",
+           "flomb","gronb","skomb","bloxt","cromt","splong","fromp","twomf","clobt","gromf"],
+      "u":["bup","fug","hut","juv","kub","lup","muv","nuf","puj","suv","tuf","wub","zuv","buj","fub","gup","huv","jud",
+           "flumb","grunb","skumb","bluxt","crumt","splung","twumf","slumb","scrumt","glunb"],
+      "ch":["chab","chep","chig","chob","chup","chav","cheg","chom","chud","chix","ched","chod","chum","chap","chet","chaf",
+            "chelst","chonst","chulft","cholft","chelpt","chonmp","chulst","chonft","chelmb","chonsp"],
+      "sh":["shab","shep","shig","shob","shup","shav","sheg","shom","shud","shix","shef","shod","shum","shax","shelt","shof",
+            "shelst","shonst","shulft","sholft","shelpt","shonmp","shulst","shonft","shelmb","shonsp"],
+      "th":["thab","thep","thig","thob","thup","thav","theg","thid","thom","thun","thix","thed","thod","thum","thet","thelf",
+            "thelst","thonst","thulft","tholft","thelpt","thonmp","thulst","thonft","thelmb","thonsp"],
+      "ng":["frang","preng","stong","twing","bleng","sning","drong","clung","greng","plang","snong","treng","blong","swang","cleng","frong",
+            "tweng","stang","strangs","drongle","blengt","trongle","clengt","frengle","blongst","swangle"],
+      "ck":["dack","feck","gick","hock","juck","zeck","vack","yock","nuck","leck","teck","wock","bock","reck","twock","yeck",
+            "bleckt","gruckt","drackt","smuckt","sweckt","truckt","fleckt","brackt","cleckt","pruckt"],
+      "qu":["quab","quep","quig","quob","quav","queg","quom","quun","quix","quelt","quem","quod","quaf","queld","quap","quet",
+            "quelst","quonst","quilmp","quolst","quonfb","quelpt","quilft","quonft","quelmb","quonsp"],
+      "ph":["phab","phep","phig","phob","phup","phav","pheg","phid","phom","phun","phix","phod","phum","phope","phane","phike",
+            "phelst","phonst","phulft","pholft","phelpt","phonft","phulst","phelmb","phronk","phrelm"],
+      "wh":["whab","whep","whig","whob","whup","whav","wheg","whid","whun","whix","whod","whum","whet","whax","whelt","whof",
+            "whelst","whonst","whulft","wholft","whelpt","whonft","whulst","whelmb","whonsp","whronk"],
+      "ai":["dait","faim","gaip","jaid","kaim","laif","naip","raib","taim","vaip","waid","zaim","baip","faig","haim","raig","jaif","kaid",
+            "brailt","claimp","graips","plaind","snaimt","straid","fraimt","praisp","traimd","swaind"],
+      "ee":["deef","feeg","jeeb","keef","neeb","peef","reeg","teeb","veef","weeg","zeep","beeg","feep","jeef","keeg","leeb","meef","neeg",
+            "bleest","cleems","freeld","preels","sneeft","treelp","streef","gleelb","pleept","sneelm"],
+      "igh":["digh","figh","gigh","jigh","kigh","ligh","migh","pigh","righ","tigh","vigh","wigh","zigh","bigh","cigh","nigh","eigh","yigh",
+             "clighst","frighsp","plighnt","snighlt","strigh","brights","slighmp","trightl","spright","knighst"],
+      "oa":["doam","goap","joag","koap","moag","noap","toam","voap","woag","zoap","boam","coap","doag","joam","loap","poam","roag","toap",
+            "cloamp","groasp","ploams","snoabt","stroam","froabt","ploapt","snoamp","troams","broamt"],
+      "oo":["doop","foom","goog","hool","joom","koop","loog","mool","noom","rool","soom","toog","vool","woom","zoop","boof","coog","feej",
+            "cloomp","groosp","plooms","snoobt","strool","froobt","ploopt","snoomp","trooms","broolt"],
+      "ar":["darb","farb","harb","jarb","karb","larb","marb","narb","parb","rarb","sarb","tarb","varb","warb","zarb","darg","farp","harg",
+            "clarbs","grarbs","plarbs","snarbs","trarps","blarkt","flarbs","strarb","snarmb","plarnt"],
+      "or":["dorb","forb","gorb","horb","jorb","korb","lorb","morb","norb","porb","rorb","torb","vorb","worb","dorf","gorm","horp","jorg",
+            "clorbs","grorbs","plorbs","snorbs","trorps","blorkt","florbs","strorb","snormb","plornt"],
+      "ur":["durb","furb","gurb","hurb","jurb","kurb","lurb","murb","nurb","purb","rurb","turb","vurb","wurb","durf","gurm","hurp","jurf",
+            "clurbs","grurbs","plurbs","snurbs","trurps","blurkt","flurbs","strurb","snurmb","plurnt"],
+      "ow":["bowf","fowg","gowb","jowp","kowm","lowg","nowb","powf","rowg","sowm","towb","vowp","wowf","zowg","bowm","dowp","fowb","gowm",
+            "clowmb","growsp","plowms","snowbt","strowl","frowbt","plowpt","snowmp","trowms","browlt"],
+      "oi":["doib","foig","goim","hoip","joif","koig","loim","noip","poif","roig","soim","toip","voif","woig","zoim","boip","doig","foim",
+            "cloimb","groisp","ploims","snoibt","stroil","froibt","ploipt","snoipm","troims","broilt"],
+      "er":["derb","ferb","gerb","jerb","lerb","merb","nerb","perb","rerb","serb","terb","werb","zerb","berb","cherb","derm","ferg","herp",
+            "clerbs","grerbs","plerbs","snerbs","trerps","blerkt","flerbs","strerb","snermb","plernt"],
+      "ay":["dayb","faym","gayp","hayd","jayb","kaym","layp","mayd","nayb","paym","rayp","sayd","tayb","vaym","wayp","zaym","bayp","dayg",
+            "braylt","claymp","grayps","playnd","snaymt","strayd","fraymt","praysp","traymd","swaynd"],
+      "ou":["doup","foup","goup","houp","joup","koup","loup","moup","noup","poup","toup","voup","woup","zoup","boup","doub","foum","gouf",
+            "broumt","cloumb","grousp","ploumf","snoubt","strouv","froumt","prousp","troumd","swounb"],
+      "ie":["dief","fieg","jief","kieg","mieg","nief","pieg","rief","sieg","tief","vieg","wief","zieg","bief","cieg","drief","frieg","plief",
+            "brielt","cliemp","grieps","pliemd","sniemt","striev","frielt","priesp","triemd","swienb"],
+      "ea":["deab","feag","heam","jeab","keag","leam","meab","neag","peam","reab","seag","veab","weag","zeam","beab","ceag","deam","feab",
+            "brealt","cleamp","greasp","pleamd","sneamt","streav","frealt","preasp","treamd","sweanb"],
+      "oy":["doyb","foyg","goym","hoyp","joyf","koyg","loym","noyp","poyf","royg","soym","toyp","voyf","woyg","zoym","boyf","doyg","foym",
+            "broylt","cloymp","groyps","ploymd","snoymt","stroyd","froylt","proysp","troymd","swoynb"],
+      "ir":["dirp","firp","girp","hirp","jirp","kirp","lirp","mirp","nirp","pirp","sirp","tirp","virp","wirp","birp","cirp","dirb","firb",
+            "brirlt","clirmp","grirps","plirmd","snirmt","strirv","frirlt","prirsp","trirmd","swirnb"],
+      "ue":["duef","fueg","juem","kuef","lueg","muem","nuef","pueg","ruem","suef","tueg","vuem","wuef","zueg","buem","cuef","dueg","fuem",
+            "bruelt","cluemb","gruesp","pluemd","snuemt","struev","fruelt","pruesp","truemd","swuenb"],
+      "aw":["dawb","fawg","gawm","hawp","jawf","kawg","lawm","mawp","nawf","rawg","sawm","tawp","vawf","wawg","zawm","bawp","dawg","fawm",
+            "brawlt","clawmp","grawps","plawmd","snawmt","strawv","frawlt","prawsp","trawmd","swawnb"],
+      "ew":["dewb","fewg","hewm","jewp","kewf","lewg","mewm","newp","pewf","rewg","sewm","tewp","vewf","wewg","zewm","bewp","dewg","fewm",
+            "brewlt","clewmp","grewps","plewmd","snewmt","strewv","frewlt","prewsp","trewmd","swewnb"],
+      "a_e":["dabe","fage","hame","jave","kabe","lage","mame","pabe","tabe","vage","zave","bame","cabe","dage","fave","gabe","hage","jame",
+             "strabe","clabe","drabe","grabe","slabe","frabe","snabe","trabe","blabe","crabe"],
+      "e_e":["debe","fege","heme","jeve","kebe","lege","neve","pebe","rege","sebe","tebe","vege","weve","zebe","bege","cebe","deme","febe",
+             "strebe","clebe","drebe","frebe","slebe","stebe","trebe","skebe","blebe","crebe"],
+      "i_e":["dibe","fige","hime","kibe","lige","nive","pibe","rige","sibe","wige","zibe","bige","cibe","fibe","gige","jife","kige","libe",
+             "snibe","twibe","blibe","grife","snife","clibe","drife","frife","slibe","crife"],
+      "o_e":["dobe","foge","kobe","loge","mobe","nove","pobe","roge","sobe","tobe","voge","wobe","zobe","boge","cobe","doge","fobe","goge",
+             "clobe","drobe","frobe","grobe","slobe","stobe","trobe","snobe","blobe","crobe"],
+      "u_e":["dube","fuge","hume","juve","kube","mube","nuve","ruge","sube","vuge","wube","zube","buge","cume","duve","fube","gume","jube",
+             "clube","drube","frube","grube","slube","stube","trube","snube","blube","crube"],
+      "bl":["blef","blig","blud","blap","bleg","blix","blom","blun","blav","blem","blit","blod","blug","blep","blov","blaf","blib","blof",
+            "blempt","blonst","blunft","blavst","blodft","bligst","blumpt","blants","blonft","bluspt"],
+      "br":["brap","breg","brob","brup","brav","brom","brun","brax","brev","brid","brog","brug","brep","brov","brix","braf","breb","brif",
+            "brempt","bronst","brunft","bravst","brodft","brigst","brumpt","brants","bronft","bruspt"],
+      "cl":["clab","clig","clob","clud","cleg","clix","clom","clun","clav","clem","clef","clex","clep","claf","clib","clof","clug","clap",
+            "clempt","clonst","clunft","clavst","clodft","cligst","clumpt","clants","clonft","cluspt"],
+      "cr":["creg","crig","crob","crug","crix","crom","crun","crav","crem","crit","crod","crep","crov","crax","craf","creb","crif","crog",
+            "crempt","cronst","crunft","cravst","crodft","crigst","crumpt","crants","cronft","cruspt"],
+      "dr":["drig","drob","drud","drap","drix","drom","drun","drav","drem","drit","drod","drep","drov","druf","draf","dreb","drif","drog",
+            "drempt","dronst","drunft","dravst","drodft","drigst","drumpt","drants","dronft","druspt"],
+      "fl":["flef","flig","flob","flud","fleg","flix","flom","flun","flav","flem","flod","flug","flep","flov","flax","flaf","flib","flof",
+            "flempt","flonst","flunft","flavst","flodft","fligst","flumpt","flants","flonft","fluspt"],
+      "fr":["frab","freg","frig","frob","frud","frap","frix","frun","frav","frem","frit","frod","frug","frep","frov","frax","fraf","freb",
+            "frempt","fronst","frunft","fravst","frodft","frigst","frumpt","frants","fronft","fruspt"],
+      "gl":["glab","glef","glig","glud","glap","gleg","glix","glom","glun","glav","glem","glit","glod","glep","glov","glax","glaf","glib",
+            "glempt","glonst","glunft","glavst","glodft","gligst","glumpt","glants","glonft","gluspt"],
+      "gr":["greg","grig","grob","grud","grep","grix","grom","grun","grav","grem","grod","grug","grop","grov","grax","graf","greb","grif",
+            "grempt","gronst","grunft","gravst","grodft","grigst","grumpt","grants","gronft","gruspt"],
+      "pl":["plab","plef","plig","plob","plud","plap","pleg","plix","plom","plun","plav","plem","plit","plod","plep","plaf","plib","plof",
+            "plempt","plonst","plunft","plavst","plodft","pligst","plumpt","plants","plonft","pluspt"],
+      "pr":["prab","preg","prig","prob","prud","prap","prix","prun","prav","prem","prit","prug","prop","prov","prax","praf","preb","prif",
+            "prempt","pronst","prunft","pravst","prodft","prigst","prumpt","prants","pronft","pruspt"],
+      "sk":["skab","skef","skig","skob","skud","skap","skeg","skix","skom","skun","skav","skem","skod","skug","skep","skaf","skeb","skim",
+            "skempt","skonst","skunft","skavst","skodft","skigst","skumpt","skants","skonft","skuspt"],
+      "sl":["slef","slig","slud","sleg","slix","slom","slun","slav","slem","slod","slep","slov","slaf","sleb","slif","slof","slug","slom",
+            "slempt","slonst","slunft","slavst","slodft","sligst","slumpt","slants","slonft","sluspt"],
+      "sm":["smab","smef","smig","smob","smud","smap","smix","smom","smun","smav","smem","smit","smod","smep","smov","smaf","smeb","smif",
+            "smempt","smonst","smunft","smavst","smodft","smigst","smumpt","smants","smonft","smuspt"],
+      "sn":["snab","snef","snig","snud","sneg","snix","snom","snun","snav","snem","snit","snod","snep","snov","snaf","sneb","snif","snog",
+            "snempt","snonst","snunft","snavst","snodft","snigst","snumpt","snants","snonft","snuspt"],
+      "sp":["spab","spef","spig","spob","spap","speg","spix","spom","spav","spem","spod","spug","spep","spov","spaf","speb","spif","spog",
+            "spempt","sponst","spunft","spavst","spodft","spigst","spumpt","sparts","sponft","spuspt"],
+      "st":["stef","stig","stob","stap","steg","stix","stom","stav","stod","stug","stov","staf","steb","stif","stog","stup","stem","steld",
+            "stempt","stonst","stunft","stavst","stodft","stigst","stumpt","stants","stonft","stuspt"],
+      "sw":["swef","swob","swud","sweg","swix","swom","swun","swav","swem","swit","swod","swug","swep","swov","swaf","sweb","swif","swog",
+            "swempt","swonst","swunft","swavst","swodft","swigst","swumpt","swants","swonft","swuspt"],
+      "tr":["trab","treg","trig","trob","trud","trix","trom","trun","trav","trem","trit","trug","trep","trov","trax","traf","treb","trif",
+            "trempt","tronst","trunft","travst","trodft","trigst","trumpt","trants","tronft","truspt"],
+      "tw":["twab","twef","twob","twud","twap","tweg","twom","twun","twav","twem","twod","twug","twep","twov","twaf","tweb","twif","twog",
+            "twempt","twonst","twunft","twavst","twodft","twigst","twumpt","twants","twonft","twuspt"],
+      "str":["strab","streg","strig","strob","strud","strix","strom","strun","strav","strem","strit","strod","strug","strume","strep","straf","streb","strof",
+             "strempt","stronst","strunft","stravst","strodft","strigst","strumpt","strante","stronft","struspt"],
+      "scr":["scrab","screg","scrig","scrob","scrud","scrix","scrom","scrun","scrav","screm","scrit","scrod","scrug","scref","screp","scraf","screb","scrof",
+             "scrempt","scronst","scrunft","scravst","scrodft","scrigst","scrumpt","scrante","scronft","scruspt"],
+      "spl":["splab","spleg","splig","splob","splud","splix","splom","splun","splav","splem","splod","splug","splep","splov","splaf","spleb","splif","splog",
+             "splempt","splonst","splunft","splavst","splodft","spligst","splumpt","splante","splonft","spluspt"],
+      "spr":["sprab","spreg","sprob","sprud","sprix","sprom","sprun","sprav","sprem","sprit","sprod","sprug","sprep","sprov","spraf","spreb","sprif","sprog",
+             "sprempt","spronst","sprunft","spravst","sprodft","sprigst","sprumpt","sprante","spronft","spruspt"],
+      "thr":["thrab","threg","thrig","thrud","thrix","throm","thrun","thrav","threm","thrit","throd","thrug","thresk","threp","thraf","threb","throf","throg",
+             "thrempt","thronst","thrunft","thravst","throdft","thrigst","thrumpt","thrante","thronft","thruspt"],
+      "shr":["shrab","shreg","shrig","shrob","shrud","shrix","shrom","shrun","shrav","shrem","shrit","shrod","shref","shrep","shraf","shreb","shrof","shrog",
+             "shrempt","shronst","shrunft","shravst","shrodft","shrigst","shrumpt","shrante","shronft","shruspt"],
+    };
+
+    const GRAPHEME_GROUPS=[
+      {label:"Short Vowels (Phase 2)",color:"#E8F5E9",border:"#56A85A",graphemes:["a","e","i","o","u"]},
+      {label:"Consonant Digraphs (Phase 2\u20133)",color:"#FFF3E0",border:"#E08A00",graphemes:["ch","sh","th","ng","ck","qu","ph","wh"]},
+      {label:"Vowel Digraphs (Phase 3)",color:"#E3F2FD",border:"#1B88D4",graphemes:["ai","ee","igh","oa","oo","ar","or","ur","ow","oi","er"]},
+      {label:"Phase 5 Vowel Spellings",color:"#FCE4EC",border:"#D63070",graphemes:["ay","ou","ie","ea","oy","ir","ue","aw","ew"]},
+      {label:"Split Digraphs",color:"#F3E5F5",border:"#9B35B5",graphemes:["a_e","e_e","i_e","o_e","u_e"]},
+      {label:"2-Letter Clusters (Phase 4)",color:"#E0F2F1",border:"#1A9A8A",graphemes:["bl","br","cl","cr","dr","fl","fr","gl","gr","pl","pr","sk","sl","sm","sn","sp","st","sw","tr","tw"]},
+      {label:"3-Letter Clusters (Phase 4\u20135)",color:"#FFF8E1",border:"#D09500",graphemes:["str","scr","spl","spr","thr","shr"]},
+    ];
+
+    function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+    function WordCard({word,grapheme,seed}){
+      const display=grapheme.replace("_e","\u2013e");
+      return(
+        <div style={{display:"flex",alignItems:"center",background:"#fff",border:"3.5px solid #1a1a1a",borderRadius:"8px",padding:"12px 14px",position:"relative",minHeight:"108px",gap:"6px"}}>
+          <div style={{position:"absolute",top:"7px",left:"9px",background:"#7B3F9E",color:"#fff",fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:"11px",padding:"2px 8px",borderRadius:"20px",letterSpacing:"0.5px"}}>{display}</div>
+          <div style={{flex:1,fontFamily:"'Fredoka One',cursive",fontSize:"clamp(26px,4vw,48px)",color:"#1a1a1a",letterSpacing:"1px",paddingTop:"18px",paddingLeft:"4px",lineHeight:1.1}}>{word}</div>
+          <div style={{flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}><MonsterDisplay seed={seed}/></div>
+        </div>
+      );
+    }
+
+    function App(){
+      const [selected,setSelected]=useState(new Set());
+      const [count,setCount]=useState(8);
+      const [cards,setCards]=useState([]);
+      const [generated,setGenerated]=useState(false);
+      const [openGroups,setOpenGroups]=useState(new Set(GRAPHEME_GROUPS.map(g=>g.label)));
+      const [sidebarOpen,setSidebarOpen]=useState(false);
+
+      const toggleGrapheme=useCallback(g=>{setSelected(prev=>{const n=new Set(prev);n.has(g)?n.delete(g):n.add(g);return n;});},[]);
+      const toggleGroup=useCallback((group)=>{const gs=group.graphemes,allSel=gs.every(g=>selected.has(g));setSelected(prev=>{const n=new Set(prev);if(allSel)gs.forEach(g=>n.delete(g));else gs.forEach(g=>n.add(g));return n;});},[selected]);
+      const toggleOpen=useCallback(label=>{setOpenGroups(prev=>{const n=new Set(prev);n.has(label)?n.delete(label):n.add(label);return n;});},[]);
+
+      const generate=useCallback(()=>{
+        if(selected.size===0)return;
+        const pool=[];
+        selected.forEach(g=>(WORD_BANK[g]||[]).forEach(w=>pool.push({word:w,grapheme:g})));
+        const result=shuffle(pool).slice(0,count).map((item,i)=>({...item,seed:Math.floor(Math.random()*9999)+i}));
+        setCards(result);setGenerated(true);setSidebarOpen(false);
+      },[selected,count]);
+
+      const totalSel=selected.size;
+
+      return(
+        <div style={{minHeight:"100vh",background:"#E8DAEF",fontFamily:"'Nunito',sans-serif",display:"flex",flexDirection:"column"}}>
+          <div style={{background:"#7B3F9E",padding:"12px 20px",display:"flex",alignItems:"center",gap:"14px",boxShadow:"0 3px 10px rgba(0,0,0,0.25)"}}>
+            <div style={{fontSize:"26px"}}>👾</div>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:"'Fredoka One',cursive",fontSize:"clamp(14px,2.8vw,24px)",color:"#fff",lineHeight:1.1}}>Phonics Alien Word Generator</div>
+              <div style={{color:"#D8B8F0",fontSize:"11px",marginTop:"2px",fontWeight:700}}>Phonics screening check practice · WFA</div>
+            </div>
+          </div>
+
+          {sidebarOpen && <div className="sidebar-overlay visible" onClick={()=>setSidebarOpen(false)}/>}
+
+          <div style={{display:"flex",flex:1,overflow:"hidden",height:"calc(100vh - 58px)"}}>
+            <div className={`app-sidebar${sidebarOpen?' open':''}`} style={{width:"272px",minWidth:"220px",background:"#fff",borderRight:"2px solid #C3A0D8",overflowY:"auto",padding:"10px 0",flexShrink:0}}>
+              <div style={{padding:"8px 14px 10px",borderBottom:"1px solid #E8DAEF"}}>
+                <div style={{fontWeight:900,fontSize:"12px",color:"#7B3F9E",letterSpacing:"0.5px",textTransform:"uppercase"}}>Select Graphemes</div>
+                <div style={{color:"#aaa",fontSize:"11px",marginTop:"2px"}}>{totalSel} selected · {cards.length} words shown</div>
+              </div>
+              {GRAPHEME_GROUPS.map(group=>{
+                const isOpen=openGroups.has(group.label),allSel=group.graphemes.every(g=>selected.has(g)),someSel=group.graphemes.some(g=>selected.has(g));
+                return(
+                  <div key={group.label} style={{borderBottom:"1px solid #EDE5F0"}}>
+                    <div style={{display:"flex",alignItems:"center",padding:"8px 10px",cursor:"pointer",gap:"6px",background:isOpen?group.color:"transparent"}} onClick={()=>toggleOpen(group.label)}>
+                      <span style={{fontSize:"10px",color:"#bbb",userSelect:"none",flexShrink:0}}>{isOpen?"▼":"▶"}</span>
+                      <span style={{flex:1,fontWeight:800,fontSize:"11.5px",color:"#444",lineHeight:1.3}}>{group.label}</span>
+                      <button onClick={e=>{e.stopPropagation();toggleGroup(group);}} style={{fontSize:"10px",padding:"2px 7px",border:`1.5px solid ${group.border}`,borderRadius:"20px",background:allSel?group.border:"transparent",color:allSel?"#fff":group.border,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"'Nunito',sans-serif",flexShrink:0}}>
+                        {allSel?"All \u2713":someSel?"Some":"All"}
+                      </button>
+                    </div>
+                    {isOpen&&(
+                      <div style={{display:"flex",flexWrap:"wrap",gap:"5px",padding:"6px 10px 10px",background:group.color+"99"}}>
+                        {group.graphemes.map(g=>{const isSel=selected.has(g),disp=g.replace("_e","\u2013e");return(<button key={g} onClick={()=>toggleGrapheme(g)} style={{padding:"3px 10px",border:`2px solid ${isSel?group.border:"#ccc"}`,borderRadius:"20px",background:isSel?group.border:"#fff",color:isSel?"#fff":"#555",fontWeight:800,fontSize:"13px",cursor:"pointer",fontFamily:"'Fredoka One',cursive",letterSpacing:"0.5px"}}>{disp}</button>);})}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              <div style={{padding:"10px",display:"none"}} className="mobile-generate">
+                <button onClick={generate} disabled={totalSel===0} style={{width:"100%",padding:"10px",border:"none",borderRadius:"20px",background:totalSel===0?"#ccc":"#7B3F9E",color:"#fff",fontWeight:800,fontSize:"14px",cursor:totalSel===0?"not-allowed":"pointer"}}>✨ Generate!</button>
+              </div>
+            </div>
+
+            <div className="app-main" style={{flex:1,overflowY:"auto",padding:"14px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"8px",background:"#fff",borderRadius:"10px",padding:"10px 14px",marginBottom:"12px",border:"2px solid #C3A0D8",flexWrap:"wrap"}}>
+                <div style={{fontWeight:800,fontSize:"13px",color:"#7B3F9E"}}>Words:</div>
+                {[4,6,8,10,12].map(n=>(<button key={n} onClick={()=>setCount(n)} style={{padding:"4px 13px",border:"2px solid #7B3F9E",borderRadius:"20px",background:count===n?"#7B3F9E":"#fff",color:count===n?"#fff":"#7B3F9E",fontWeight:800,fontSize:"14px",cursor:"pointer"}}>{n}</button>))}
+                <div style={{flex:1}}/>
+                {generated&&(<button onClick={generate} style={{padding:"6px 16px",border:"2px solid #7B3F9E",borderRadius:"20px",background:"#fff",color:"#7B3F9E",fontWeight:800,fontSize:"13px",cursor:"pointer"}}>🔀 New Set</button>)}
+                <button onClick={generate} disabled={totalSel===0} style={{padding:"6px 20px",border:"none",borderRadius:"20px",background:totalSel===0?"#ccc":"#7B3F9E",color:"#fff",fontWeight:800,fontSize:"14px",cursor:totalSel===0?"not-allowed":"pointer",boxShadow:totalSel>0?"0 3px 8px rgba(123,63,158,0.4)":"none"}}>✨ Generate!</button>
+              </div>
+
+              {totalSel>0&&(
+                <div style={{display:"flex",flexWrap:"wrap",gap:"5px",marginBottom:"12px",alignItems:"center"}}>
+                  <span style={{fontSize:"12px",fontWeight:700,color:"#7B3F9E"}}>Practising:</span>
+                  {[...selected].map(g=>(<span key={g} style={{background:"#7B3F9E",color:"#fff",fontFamily:"'Fredoka One',cursive",fontSize:"13px",padding:"2px 11px",borderRadius:"20px"}}>{g.replace("_e","\u2013e")}</span>))}
+                </div>
+              )}
+
+              {cards.length>0?(
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(290px,100%),1fr))",gap:"11px"}}>
+                  {cards.map((card,i)=>(<WordCard key={`${card.word}-${card.seed}`} {...card}/>))}
+                </div>
+              ):(
+                <div style={{border:"3px dashed #C3A0D8",borderRadius:"16px",padding:"clamp(24px,5vw,56px) 24px",textAlign:"center",background:"rgba(255,255,255,0.5)"}}>
+                  <div style={{fontSize:"52px",marginBottom:"10px"}}>👾</div>
+                  <div style={{fontFamily:"'Fredoka One',cursive",fontSize:"clamp(16px,3vw,22px)",color:"#7B3F9E",marginBottom:"6px"}}>Ready to meet some aliens?</div>
+                  <div style={{color:"#9B59B6",fontSize:"13px",fontWeight:600}}>Pick graphemes {window.innerWidth<=768?"using the button below":"from the panel on the left"}, then press Generate!</div>
+                </div>
+              )}
+
+              {cards.length>0&&(
+                <div style={{marginTop:"14px",background:"rgba(255,255,255,0.7)",border:"1.5px solid #C3A0D8",borderRadius:"8px",padding:"9px 13px",fontSize:"12px",color:"#7B3F9E",fontWeight:700,marginBottom:"60px"}}>
+                  💡 These are all alien words — they are not real words! If one looks familiar, press "New Set" to swap it out.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <button className="sidebar-toggle" onClick={()=>setSidebarOpen(!sidebarOpen)}>
+            {sidebarOpen ? "✕ Close" : `👾 Select Graphemes${totalSel>0?` (${totalSel})`:""}`}
+          </button>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+  </script>
+<div style="text-align:center;font-size:11px;color:#9B59B6;padding:6px 0 4px;font-family:'Nunito',sans-serif;opacity:0.7;">26.07.26a</div>
+</body>
+</html>
