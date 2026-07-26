@@ -132,7 +132,7 @@ header {
 .grid-table {
   border-collapse: collapse;
   table-layout: fixed;
-  min-width: 100%;
+  width: max-content;
 }
 
 /* Skill name column */
@@ -221,7 +221,7 @@ header {
   padding: 4px 10px; font-size: 12px; cursor: pointer; }
 .taf-export-btn:hover { background: #334155; }
 .taf-grid-scroll { flex: 1; overflow: auto; }
-.taf-grid { border-collapse: collapse; min-width: 100%; }
+.taf-grid { border-collapse: collapse; width: max-content; }
 .taf-grid th, .taf-grid td { border: 1px solid #e2e8f0; }
 .taf-grid .taf-skill-col { min-width: 260px; max-width: 320px; padding: 5px 10px;
   font-size: 12px; line-height: 1.3; background: #fff; position: sticky; left: 0; z-index: 2; }
@@ -275,6 +275,11 @@ header {
   border-bottom: 1px solid #f1f5f9;
 }
 .score-cell.disabled .score-label { color: #cbd5e1; }
+.score-cell.readonly { cursor: default; }
+.score-cell.readonly:hover { filter: none !important; }
+
+/* ── Class filter bar ────────────────────────────────────────── */
+.class-filter-bar { border-top: 1px solid #e2e8f0; }
 
 /* ── Bulk entry features ──────────────────────────────────────── */
 /* Set-row button (Option A) */
@@ -489,7 +494,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
     </div>
     <div class="header-selects">
       <select id="class-select" onchange="onClassChange()">
-        <option value="">— Select class —</option>
+        <option value="">— Select year group —</option>
       </select>
 <select id="year-select" onchange="onYearChange()">
         <option value="2026-27">2026–27</option>
@@ -504,7 +509,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-interventions" onclick="showTab('interventions')">Interventions</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">26.07.26o</span>
+      <span class="version">26.07.26q</span>
     </div>
   </header>
 
@@ -528,6 +533,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="btn btn-sm btn-secondary" onclick="expandAll()">Expand all</button>
       </div>
     </div>
+    <div class="grid-controls class-filter-bar hidden" id="class-filter-bar"></div>
     <div class="grid-controls profile-filters" id="profile-filter-bar">
       <span class="filter-label">Pupils:</span>
       <button class="filter-btn profile-btn" id="pfilt-pp"   onclick="toggleProfileFilter('pp')">PP</button>
@@ -710,7 +716,10 @@ const state = {
   currentClassId: '',
   currentClass: null,
   currentYear: '2026-27',
-  cohortMode: false,
+  currentYearGroup: '',
+  yearGroupClasses: [],
+  classFilter: null,   // null=all (read-only cohort), class_id=specific class (editable)
+  cohortMode: false,   // derived: true when classFilter===null and yearGroup is set
   config: {},
   pupils: [],
   assessments: {},   // {pupil_id: {skill_id: score}}
@@ -815,9 +824,8 @@ async function bootstrap() {
 
 function populateClassSelect() {
   const sel = document.getElementById('class-select');
-  sel.innerHTML = '<option value="">— Select class —</option>';
+  sel.innerHTML = '<option value="">— Select year group —</option>';
 
-  // Group by year group
   const ORDER = ['Y1','Y2','Y3','Y4','Y5','Y6'];
   const byYG = {};
   state.classes.forEach(c => {
@@ -827,27 +835,15 @@ function populateClassSelect() {
 
   ORDER.filter(yg => byYG[yg]).forEach(yg => {
     const classes = byYG[yg];
-    // Cohort option when 2+ classes in year group
-    if (classes.length >= 2) {
-      const opt = document.createElement('option');
-      opt.value = `cohort:${yg}`;
-      opt.textContent = `📊 All ${yg} — ${classes.map(c => c.class_name).join(', ')}`;
-      sel.appendChild(opt);
-    }
-    classes.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.class_id;
-      opt.textContent = `${c.year_group} · ${c.class_name}${c.teacher_name ? ' (' + c.teacher_name + ')' : ''}`;
-      sel.appendChild(opt);
-    });
+    const opt = document.createElement('option');
+    opt.value = `yg:${yg}`;
+    opt.textContent = `${yg} · ${classes.map(c => c.class_name).join(', ')}`;
+    sel.appendChild(opt);
   });
 
-  const saved = localStorage.getItem('wfa_last_class_id');
-  if (saved) {
-    const valid = saved.startsWith('cohort:')
-      ? sel.querySelector(`option[value="${saved}"]`)
-      : state.classes.find(c => c.class_id === saved);
-    if (valid) sel.value = saved;
+  const saved = localStorage.getItem('wfa_last_yg');
+  if (saved && sel.querySelector(`option[value="${saved}"]`)) {
+    sel.value = saved;
   }
 }
 
@@ -858,45 +854,57 @@ async function onClassChange() {
   const val = document.getElementById('class-select').value;
 
   if (!val) {
-    state.currentClassId = '';
-    state.currentClass = null;
+    state.currentYearGroup = '';
+    state.yearGroupClasses = [];
+    state.classFilter = null;
     state.cohortMode = false;
-    document.getElementById('grid-empty').textContent = 'Select a class to begin.';
+    state.currentClass = null;
+    state.currentClassId = '';
+    document.getElementById('grid-empty').textContent = 'Select a year group to begin.';
     document.getElementById('grid-empty').classList.remove('hidden');
     document.getElementById('grid-table').classList.add('hidden');
+    document.getElementById('class-filter-bar').classList.add('hidden');
     return;
   }
 
-  localStorage.setItem('wfa_last_class_id', val);
+  const yg = val.startsWith('yg:') ? val.slice(3) : val;
+  state.currentYearGroup = yg;
+  state.yearGroupClasses = state.classes.filter(c => c.year_group === yg);
+  localStorage.setItem('wfa_last_yg', `yg:${yg}`);
 
-  if (val.startsWith('cohort:')) {
-    const yg = val.slice(7);
-    state.cohortMode = true;
-    state.currentClassId = val;
-    state.currentClass = { year_group: yg, class_name: `All ${yg}`, class_id: val, cohort: true };
-    await loadClassData();
-    document.getElementById('pupils-class-label').textContent = '';
-    renderAdminPupils();
-    return;
-  }
+  // Restore previously selected class filter for this year group
+  const savedFilter = localStorage.getItem(`wfa_cf_${yg}`);
+  const validFilter = savedFilter && state.yearGroupClasses.find(c => c.class_id === savedFilter);
+  setClassFilterState(validFilter ? savedFilter : null);
 
-  state.cohortMode = false;
-  state.currentClassId = val;
-  state.currentClass = state.classes.find(c => c.class_id === val) || null;
   await loadClassData();
+  renderClassFilterBar();
   document.getElementById('pupils-class-label').textContent =
-    state.currentClass ? `(${state.currentClass.class_name})` : '';
+    state.currentClass?.class_name ? `(${state.currentClass.class_name})` : '';
   renderAdminPupils();
+}
+
+function setClassFilterState(classId) {
+  state.classFilter = classId;
+  if (classId) {
+    state.cohortMode = false;
+    state.currentClass = state.yearGroupClasses.find(c => c.class_id === classId) || null;
+    state.currentClassId = classId;
+  } else {
+    state.cohortMode = true;
+    state.currentClass = { year_group: state.currentYearGroup, class_name: `All ${state.currentYearGroup}`, cohort: true };
+    state.currentClassId = `yg:${state.currentYearGroup}`;
+  }
 }
 
 
 async function onYearChange() {
   state.currentYear = document.getElementById('year-select').value;
-  if (state.currentClassId) await loadClassData();
+  if (state.currentYearGroup) await loadClassData();
 }
 
 async function loadClassData() {
-  if (state.cohortMode) { await loadCohortData(); return; }
+  await loadCohortData(); return;
   const cacheKey = `wfa_grid_${state.currentClassId}_${state.currentYear}`;
 
   // Serve cached data immediately so the grid appears without waiting
@@ -941,8 +949,8 @@ async function loadClassData() {
 }
 
 async function loadCohortData() {
-  const yg = state.currentClass.year_group;
-  const cohortClasses = state.classes.filter(c => c.year_group === yg);
+  const yg = state.currentYearGroup;
+  const cohortClasses = state.yearGroupClasses.length ? state.yearGroupClasses : state.classes.filter(c => c.year_group === yg);
 
   document.getElementById('grid-empty').textContent = 'Loading cohort…';
   document.getElementById('grid-empty').classList.remove('hidden');
@@ -965,6 +973,41 @@ async function loadCohortData() {
     el.innerHTML = `Failed to load cohort. <button class="btn btn-sm btn-secondary" onclick="loadClassData()" style="margin-left:8px">Retry</button><br><small style="color:#94a3b8">${err.message}</small>`;
     el.classList.remove('hidden');
   }
+}
+
+function renderClassFilterBar() {
+  const bar = document.getElementById('class-filter-bar');
+  if (!bar) return;
+  if (state.yearGroupClasses.length <= 1) { bar.classList.add('hidden'); return; }
+
+  bar.classList.remove('hidden');
+  bar.innerHTML = '<span class="filter-label">Class:</span>';
+
+  const allBtn = document.createElement('button');
+  allBtn.className = 'filter-btn' + (state.classFilter === null ? ' active' : '');
+  allBtn.textContent = `All ${state.currentYearGroup} (read-only)`;
+  allBtn.onclick = () => setClassFilter(null);
+  bar.appendChild(allBtn);
+
+  state.yearGroupClasses.forEach(cls => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (state.classFilter === cls.class_id ? ' active' : '');
+    const label = cls.class_name + (cls.teacher_name ? ' — ' + cls.teacher_name.split(' ').slice(-1)[0] : '');
+    btn.textContent = label;
+    btn.onclick = () => setClassFilter(cls.class_id);
+    bar.appendChild(btn);
+  });
+}
+
+async function setClassFilter(classId) {
+  if (classId) localStorage.setItem(`wfa_cf_${state.currentYearGroup}`, classId);
+  else localStorage.removeItem(`wfa_cf_${state.currentYearGroup}`);
+  setClassFilterState(classId);
+  renderClassFilterBar();
+  renderGrid();
+  updateY6TafButton();
+  document.getElementById('pupils-class-label').textContent =
+    state.currentClass?.class_name ? `(${state.currentClass.class_name})` : '';
 }
 
 // ================================================================
@@ -1022,12 +1065,16 @@ function renderGrid() {
   document.getElementById('grid-empty').classList.add('hidden');
   document.getElementById('grid-table').classList.remove('hidden');
 
-  const visiblePupils = applyProfileFilters(state.pupils);
+  // Apply class filter first, then profile filters
+  const classFiltered = state.classFilter
+    ? state.pupils.filter(p => p.class_id === state.classFilter)
+    : state.pupils;
+  const visiblePupils = applyProfileFilters(classFiltered);
 
   // Update filter count label
   const countEl = document.getElementById('profile-filter-count');
   if (state.profileFilters.size > 0) {
-    countEl.textContent = `${visiblePupils.length} of ${state.pupils.length} pupils`;
+    countEl.textContent = `${visiblePupils.length} of ${classFiltered.length} pupils`;
   } else {
     countEl.textContent = '';
   }
@@ -1266,11 +1313,27 @@ function renderGridBody(mainPupils, belowPupils) {
 }
 
 function makeScoreCell(pupil, skill, enabled) {
-  if (state.cohortMode) enabled = false;
+  const isCohort = state.cohortMode;
+  if (isCohort) enabled = false;
   const td = document.createElement('td');
-  td.className = 'score-cell' + (enabled ? '' : ' disabled');
 
   if (!enabled) {
+    if (isCohort) {
+      // Show score with colour but no interaction
+      td.className = 'score-cell readonly';
+      const score = state.assessments[pupil.pupil_id]?.[skill.id];
+      const meta = scoreMeta(score);
+      td.style.background = score == null ? '#f8fafc' : meta.bg;
+      if (score != null) {
+        const label = document.createElement('span');
+        label.className = 'score-label';
+        label.style.color = meta.fg;
+        label.textContent = String(score);
+        td.appendChild(label);
+      }
+      return td;
+    }
+    td.className = 'score-cell disabled';
     td.style.background = '#f8fafc';
     return td;
   }
@@ -2108,7 +2171,7 @@ async function tafCycleScore(skillId, pieceId) {
 
 function tafRenderGrid() {
   const container = document.getElementById('taf-grid-container');
-  const pieces = tafGetPieces();
+  const pieces = tafGetPieces().slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const skills = SKILLS['Y6'] || [];
   const pupilId = tafState.pupilId;
   const scores = pupilId ? tafGetScores(pupilId) : {};
