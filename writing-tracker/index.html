@@ -450,15 +450,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
       <select id="class-select" onchange="onClassChange()">
         <option value="">— Select class —</option>
       </select>
-      <select id="term-select" onchange="onTermChange()">
-        <option value="T1">Term 1</option>
-        <option value="T2">Term 2</option>
-        <option value="T3">Term 3</option>
-        <option value="T4">Term 4</option>
-        <option value="T5">Term 5</option>
-        <option value="T6">Term 6</option>
-      </select>
-      <select id="year-select" onchange="onYearChange()">
+<select id="year-select" onchange="onYearChange()">
         <option value="2025-26">2025–26</option>
         <option value="2026-27">2026–27</option>
         <option value="2024-25">2024–25</option>
@@ -466,7 +458,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
     </div>
     <div class="header-right">
       <div class="save-indicator" id="save-indicator">Saving…</div>
-      <span class="version">26.07.26h</span>
+      <span class="version">26.07.26i</span>
     </div>
   </header>
 
@@ -641,10 +633,9 @@ const state = {
   classes: [],
   currentClassId: '',
   currentClass: null,
-  currentTerm: 'T1',
   currentYear: '2025-26',
   pupils: [],
-  assessments: {},   // {pupil_id: {skill_id: {term: score}}}
+  assessments: {},   // {pupil_id: {skill_id: score}}
   activeTiers: new Set(['expected','greater_depth','non_neg']),
   saving: 0,
   pickerTarget: null, // {pupilId, skillId, cellEl}
@@ -720,11 +711,6 @@ async function bootstrap() {
       state.currentYear = cfg.academic_year;
       document.getElementById('year-select').value = cfg.academic_year;
     }
-    if (cfg.current_term) {
-      state.currentTerm = cfg.current_term;
-      document.getElementById('term-select').value = cfg.current_term;
-    }
-
     state.classes = classes;
     populateClassSelect();
     renderAdminClasses();
@@ -774,10 +760,6 @@ async function onClassChange() {
   renderAdminPupils();
 }
 
-function onTermChange() {
-  state.currentTerm = document.getElementById('term-select').value;
-  if (state.currentClassId) renderGrid();
-}
 
 async function onYearChange() {
   state.currentYear = document.getElementById('year-select').value;
@@ -1051,7 +1033,7 @@ function makeScoreCell(pupil, skill, enabled) {
     return td;
   }
 
-  const score = state.assessments[pupil.pupil_id]?.[skill.id]?.[state.currentTerm];
+  const score = state.assessments[pupil.pupil_id]?.[skill.id];
   const meta = scoreMeta(score);
   td.style.background = meta.bg;
 
@@ -1102,7 +1084,7 @@ function openPicker(pupilId, skillId, skillName, cellEl) {
   // Remove old buttons (keep skill name and close)
   [...picker.querySelectorAll('.picker-btn')].forEach(b => b.remove());
 
-  const currentScore = state.assessments[pupilId]?.[skillId]?.[state.currentTerm];
+  const currentScore = state.assessments[pupilId]?.[skillId];
   const closeBtn = document.getElementById('picker-close');
 
   SCORE_OPTIONS.forEach(opt => {
@@ -1157,11 +1139,10 @@ async function applyScoreToCells(targets, value) {
   // Optimistic UI update
   for (const { pupilId, skillId, cellEl } of targets) {
     if (!state.assessments[pupilId]) state.assessments[pupilId] = {};
-    if (!state.assessments[pupilId][skillId]) state.assessments[pupilId][skillId] = {};
     if (value == null) {
-      delete state.assessments[pupilId][skillId][state.currentTerm];
+      delete state.assessments[pupilId][skillId];
     } else {
-      state.assessments[pupilId][skillId][state.currentTerm] = scoreVal;
+      state.assessments[pupilId][skillId] = scoreVal;
     }
     cellEl.style.background = meta.bg;
     const lbl = cellEl.querySelector('.score-label');
@@ -1173,7 +1154,7 @@ async function applyScoreToCells(targets, value) {
     showSaving(true);
     try {
       await apiPost({ action: 'saveScore', pupil_id: targets[0].pupilId, skill_id: targets[0].skillId,
-        academic_year: state.currentYear, term: state.currentTerm, score: scoreVal });
+        academic_year: state.currentYear, score: scoreVal });
     } catch (err) { console.error('Save failed:', err); alert('Save failed: ' + err.message); }
     finally { showSaving(false); }
   } else {
@@ -1182,7 +1163,7 @@ async function applyScoreToCells(targets, value) {
     try {
       await apiPost({ action: 'saveScores',
         scores: targets.map(t => ({ pupil_id: t.pupilId, skill_id: t.skillId,
-          academic_year: state.currentYear, term: state.currentTerm, score: scoreVal })),
+          academic_year: state.currentYear, score: scoreVal })),
         assessed_by: '' });
     } catch (err) { console.error('Batch save failed:', err); alert('Save failed: ' + err.message); }
     finally { showSaving(false); }
@@ -1441,7 +1422,6 @@ function renderInterventions() {
     return;
   }
 
-  const term = state.currentTerm;
   const yg = state.currentClass.year_group;
   const skills = SKILLS[yg] || [];
   const expectedSkills = skills.filter(s => s.tier === 'expected');
@@ -1453,7 +1433,7 @@ function renderInterventions() {
     const level = pupil.working_at_level || yg;
     const pSkills = SKILLS[level] || [];
     pSkills.filter(s => s.tier === 'expected').forEach(skill => {
-      const score = state.assessments[pupil.pupil_id]?.[skill.id]?.[term];
+      const score = state.assessments[pupil.pupil_id]?.[skill.id];
       if (score === '3') flaggedSkills.push(skill);
     });
     if (flaggedSkills.length) interventionPupils.push({ pupil, skills: flaggedSkills });
@@ -1462,7 +1442,7 @@ function renderInterventions() {
   // --- Whole-class re-teach (skills where <50% are scored 3 or 4) ---
   const classFlags = [];
   expectedSkills.forEach(skill => {
-    const scored = state.pupils.map(p => state.assessments[p.pupil_id]?.[skill.id]?.[term])
+    const scored = state.pupils.map(p => state.assessments[p.pupil_id]?.[skill.id])
       .filter(v => v !== undefined && v !== null && v !== '' && v !== 'x' && v !== '~');
     if (scored.length < 3) return; // not enough data
     const secured = scored.filter(v => v === '4' || v === '3').length;
@@ -1543,7 +1523,6 @@ async function renderPupilProfile() {
 
     const level = pupil.working_at_level || state.currentClass?.year_group || 'Y4';
     const skills = (SKILLS[level] || []).filter(s => s.tier === 'expected');
-    const terms = ['T1','T2','T3','T4','T5','T6'];
     const years = Object.keys(history).sort().reverse();
 
     let html = `<div class="pupil-profile-card">
@@ -1556,19 +1535,17 @@ async function renderPupilProfile() {
       // Header
       html += '<div class="history-row">';
       html += '<div class="history-skill history-header">Skill</div>';
-      terms.forEach(t => { html += `<div class="history-header">${t}</div>`; });
+      html += '<div class="history-header">Score</div>';
       html += '</div>';
       // Skills
       skills.forEach(skill => {
         html += '<div class="history-row">';
         html += `<div class="history-skill" title="${skill.skill}">${skill.skill.substring(0, 30)}${skill.skill.length > 30 ? '…' : ''}</div>`;
-        terms.forEach(term => {
-          const score = history[year]?.[term]?.[skill.id];
-          const meta = scoreMeta(score);
-          html += `<div class="history-cell" style="background:${meta.bg};color:${meta.fg}">
-            ${score == null ? '' : String(score)}
-          </div>`;
-        });
+        const score = history[year]?.[skill.id];
+        const meta = scoreMeta(score);
+        html += `<div class="history-cell" style="background:${meta.bg};color:${meta.fg}">
+          ${score == null ? '' : String(score)}
+        </div>`;
         html += '</div>';
       });
       html += '</div>';
@@ -1790,7 +1767,6 @@ function showTab(name, btn) {
 // INIT
 // ================================================================
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('term-select').value = state.currentTerm;
   addCohortRow(); addCohortRow();
   bootstrap();
 });
