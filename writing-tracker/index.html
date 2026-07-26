@@ -344,36 +344,11 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
   font-size: 14px;
 }
 
-/* ── Pupil profile view ──────────────────────────────────────── */
-.pupil-wrapper { flex: 1; overflow-y: auto; padding: 16px; }
-.pupil-select-bar {
-  display: flex; gap: 8px; align-items: center; margin-bottom: 16px;
-}
-.pupil-select-bar select {
-  padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px;
-  font-size: 13px; flex: 1; background: white;
-}
-.pupil-select-bar select:focus { outline: none; border-color: var(--blue); }
-.pupil-profile-card {
-  background: white; border-radius: 12px; padding: 16px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 16px;
-}
-.pupil-profile-card h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
-.pupil-profile-card .meta { font-size: 12px; color: #64748b; }
-.history-grid { display: grid; gap: 2px; margin-top: 12px; }
-.history-row {
-  display: grid; grid-template-columns: 180px repeat(6, 1fr);
-  gap: 2px; align-items: center;
-}
-.history-skill { font-size: 11px; color: #475569; padding: 4px 6px; }
-.history-cell {
-  height: 28px; border-radius: 4px; font-size: 10px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-}
-.history-header {
-  font-size: 10px; font-weight: 700; color: #94a3b8;
-  text-align: center; padding: 2px;
-}
+/* ── Profile filters ─────────────────────────────────────────── */
+.profile-filters { border-top: 1px solid #f1f5f9; padding-top: 6px; padding-bottom: 6px; }
+.profile-btn { border-color: #e2e8f0; color: #94a3b8; }
+.profile-btn.active { background: #334155; color: white; border-color: #334155; }
+.profile-filter-count { font-size: 11px; color: #94a3b8; margin-left: 4px; }
 
 /* ── Admin view ──────────────────────────────────────────────── */
 .admin-wrapper { flex: 1; overflow-y: auto; padding: 16px; }
@@ -458,14 +433,13 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
     </div>
     <div class="header-right">
       <div class="save-indicator" id="save-indicator">Saving…</div>
-      <span class="version">26.07.26i</span>
+      <span class="version">26.07.26j</span>
     </div>
   </header>
 
   <nav class="tabs">
     <button class="active" onclick="showTab('grid', this)">Grid</button>
     <button onclick="showTab('interventions', this)">Interventions</button>
-    <button onclick="showTab('pupil', this)">Pupil</button>
     <button onclick="showTab('admin', this)">Admin</button>
   </nav>
 
@@ -482,6 +456,15 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="btn btn-sm btn-secondary" onclick="collapseAll()">Collapse all</button>
         <button class="btn btn-sm btn-secondary" onclick="expandAll()">Expand all</button>
       </div>
+    </div>
+    <div class="grid-controls profile-filters" id="profile-filter-bar">
+      <span class="filter-label">Pupils:</span>
+      <button class="filter-btn profile-btn" id="pfilt-pp"   onclick="toggleProfileFilter('pp')">PP</button>
+      <button class="filter-btn profile-btn" id="pfilt-eal"  onclick="toggleProfileFilter('eal')">EAL</button>
+      <button class="filter-btn profile-btn" id="pfilt-sen"  onclick="toggleProfileFilter('sen')">SEN</button>
+      <button class="filter-btn profile-btn" id="pfilt-male" onclick="toggleProfileFilter('male')">Boys</button>
+      <button class="filter-btn profile-btn" id="pfilt-female" onclick="toggleProfileFilter('female')">Girls</button>
+      <span id="profile-filter-count" class="profile-filter-count"></span>
     </div>
     <div id="bulk-toolbar" class="bulk-toolbar">
       <span class="bulk-info" id="bulk-info-text"></span>
@@ -512,20 +495,6 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
   <div id="tab-interventions" class="tab-content">
     <div class="interventions-wrapper" id="int-wrapper">
       <div class="empty-state">Select a class on the Grid tab first.</div>
-    </div>
-  </div>
-
-  <!-- PUPIL TAB -->
-  <div id="tab-pupil" class="tab-content">
-    <div class="pupil-wrapper" id="pupil-wrapper">
-      <div class="pupil-select-bar">
-        <select id="pupil-select" onchange="renderPupilProfile()">
-          <option value="">— Select pupil —</option>
-        </select>
-      </div>
-      <div id="pupil-profile-content">
-        <div class="empty-state">Select a class and then a pupil to view their history.</div>
-      </div>
     </div>
   </div>
 
@@ -637,6 +606,7 @@ const state = {
   pupils: [],
   assessments: {},   // {pupil_id: {skill_id: score}}
   activeTiers: new Set(['expected','greater_depth','non_neg']),
+  profileFilters: new Set(),
   saving: 0,
   pickerTarget: null, // {pupilId, skillId, cellEl}
   selectedPupils: new Set(),
@@ -666,13 +636,22 @@ function showSetup() {
   document.getElementById('app').classList.add('hidden');
 }
 
-async function apiGet(action, params = {}) {
+async function apiGet(action, params = {}, timeoutMs = 20000) {
   const qs = new URLSearchParams({ action, ...params }).toString();
-  const res = await fetch(`${state.apiUrl}?${qs}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${state.apiUrl}?${qs}`, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Request timed out — GAS may be cold-starting. Try again.');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function apiPost(data) {
@@ -767,34 +746,44 @@ async function onYearChange() {
 }
 
 async function loadClassData() {
-  document.getElementById('grid-empty').textContent = 'Loading…';
-  document.getElementById('grid-empty').classList.remove('hidden');
-  document.getElementById('grid-table').classList.add('hidden');
+  const cacheKey = `wfa_grid_${state.currentClassId}_${state.currentYear}`;
 
+  // Serve cached data immediately so the grid appears without waiting
+  const cached = sessionStorage.getItem(cacheKey);
+  if (cached) {
+    try {
+      const { pupils, assessments } = JSON.parse(cached);
+      state.pupils = pupils || [];
+      state.assessments = assessments || {};
+      renderGrid();
+      renderInterventions();
+      renderAdminPupils();
+    } catch (_) {}
+  } else {
+    document.getElementById('grid-empty').textContent = 'Loading…';
+    document.getElementById('grid-empty').classList.remove('hidden');
+    document.getElementById('grid-table').classList.add('hidden');
+  }
+
+  // Refresh from server (silently if cache was shown, blocking if not)
   try {
     const result = await apiGet('getAssessments', {
       class_id: state.currentClassId,
       academic_year: state.currentYear
     });
+    sessionStorage.setItem(cacheKey, JSON.stringify(result));
     state.pupils = result.pupils || [];
     state.assessments = result.assessments || {};
-
-    // Populate pupil selector
-    const psel = document.getElementById('pupil-select');
-    psel.innerHTML = '<option value="">— Select pupil —</option>';
-    state.pupils.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.pupil_id;
-      opt.textContent = p.name + (p.working_at_level !== p.year_group ? ` (${p.working_at_level})` : '');
-      psel.appendChild(opt);
-    });
-
     renderGrid();
     renderInterventions();
     renderAdminPupils();
-
   } catch (err) {
-    document.getElementById('grid-empty').textContent = 'Error loading data: ' + err.message;
+    if (!cached) {
+      const emptyEl = document.getElementById('grid-empty');
+      emptyEl.innerHTML = `Failed to load. <button class="btn btn-sm btn-secondary" onclick="loadClassData()" style="margin-left:8px">Retry</button><br><small style="color:#94a3b8">${err.message}</small>`;
+      emptyEl.classList.remove('hidden');
+    }
+    // If cache was already shown, silently ignore — stale data is better than nothing
   }
 }
 
@@ -812,6 +801,24 @@ function getClassSkills() {
   return SKILLS[yg] || [];
 }
 
+function applyProfileFilters(pupils) {
+  if (state.profileFilters.size === 0) return pupils;
+  return pupils.filter(p => {
+    for (const f of state.profileFilters) {
+      if (f === 'pp'     && !truthy(p.pp))  return false;
+      if (f === 'eal'    && !truthy(p.eal)) return false;
+      if (f === 'sen'    && !truthy(p.sen)) return false;
+      if (f === 'male'   && String(p.sex).toLowerCase() !== 'm') return false;
+      if (f === 'female' && String(p.sex).toLowerCase() !== 'f') return false;
+    }
+    return true;
+  });
+}
+
+function truthy(v) {
+  return v && v !== 'FALSE' && v !== 'false' && v !== '0' && v !== 'No' && v !== 'no' && v !== '';
+}
+
 function renderGrid() {
   if (!state.currentClass || state.pupils.length === 0) {
     document.getElementById('grid-empty').textContent = state.pupils.length === 0 ?
@@ -824,12 +831,22 @@ function renderGrid() {
   document.getElementById('grid-empty').classList.add('hidden');
   document.getElementById('grid-table').classList.remove('hidden');
 
-  const mainPupils = state.pupils.filter(p =>
+  const visiblePupils = applyProfileFilters(state.pupils);
+
+  // Update filter count label
+  const countEl = document.getElementById('profile-filter-count');
+  if (state.profileFilters.size > 0) {
+    countEl.textContent = `${visiblePupils.length} of ${state.pupils.length} pupils`;
+  } else {
+    countEl.textContent = '';
+  }
+
+  const mainPupils = visiblePupils.filter(p =>
     !p.working_at_level || p.working_at_level === state.currentClass.year_group);
-  const belowPupils = state.pupils.filter(p =>
+  const belowPupils = visiblePupils.filter(p =>
     p.working_at_level && p.working_at_level !== state.currentClass.year_group);
 
-  renderGridHeader(state.pupils);
+  renderGridHeader(visiblePupils);
   renderGridBody(mainPupils, belowPupils);
 }
 
@@ -890,7 +907,7 @@ function renderGridBody(mainPupils, belowPupils) {
     tierRow.className = 'section-row' + (tier === 'greater_depth' ? ' tier-gd' : '');
     const tierTd = document.createElement('td');
     tierTd.className = 'skill-col';
-    tierTd.colSpan = state.pupils.length + 1;
+    tierTd.colSpan = mainPupils.length + belowPupils.length + 1;
     tierTd.textContent = TIER_LABELS[tier];
     tierRow.appendChild(tierTd);
     tbody.appendChild(tierRow);
@@ -905,7 +922,7 @@ function renderGridBody(mainPupils, belowPupils) {
       catRow.className = 'section-row';
       const catTd = document.createElement('td');
       catTd.className = 'skill-col';
-      catTd.colSpan = state.pupils.length + 1;
+      catTd.colSpan = mainPupils.length + belowPupils.length + 1;
       catTd.style.fontWeight = '600';
       catTd.style.fontSize = '11px';
       catTd.style.color = '#475569';
@@ -973,7 +990,7 @@ function renderGridBody(mainPupils, belowPupils) {
       hRow.className = 'section-row';
       const hTd = document.createElement('td');
       hTd.className = 'skill-col';
-      hTd.colSpan = state.pupils.length + 1;
+      hTd.colSpan = mainPupils.length + belowPupils.length + 1;
       hTd.textContent = `${level} Framework — ${pupils.map(p => p.name).join(', ')}`;
       hTd.style.background = '#fff7ed';
       hTd.style.color = '#92400e';
@@ -1393,6 +1410,18 @@ function toggleTierFilter(tier, btn) {
   if (state.currentClassId) renderGrid();
 }
 
+function toggleProfileFilter(filter) {
+  const btn = document.getElementById(`pfilt-${filter}`);
+  if (state.profileFilters.has(filter)) {
+    state.profileFilters.delete(filter);
+    btn.classList.remove('active');
+  } else {
+    state.profileFilters.add(filter);
+    btn.classList.add('active');
+  }
+  if (state.currentClassId) renderGrid();
+}
+
 function collapseAll() {
   state.activeTiers = new Set(['expected']);
   ['expected','greater_depth','non_neg'].forEach(t => {
@@ -1506,63 +1535,6 @@ function renderInterventions() {
 // ================================================================
 // PUPIL PROFILE
 // ================================================================
-async function renderPupilProfile() {
-  const pupilId = document.getElementById('pupil-select').value;
-  const content = document.getElementById('pupil-profile-content');
-
-  if (!pupilId) {
-    content.innerHTML = '<div class="empty-state">Select a pupil above.</div>';
-    return;
-  }
-
-  content.innerHTML = '<div class="loading-state">Loading history…</div>';
-
-  try {
-    const { pupil, history } = await apiGet('getPupilHistory', { pupil_id: pupilId });
-    if (!pupil) { content.innerHTML = '<div class="empty-state">Pupil not found.</div>'; return; }
-
-    const level = pupil.working_at_level || state.currentClass?.year_group || 'Y4';
-    const skills = (SKILLS[level] || []).filter(s => s.tier === 'expected');
-    const years = Object.keys(history).sort().reverse();
-
-    let html = `<div class="pupil-profile-card">
-      <h2>${pupil.name}</h2>
-      <div class="meta">${level} framework${pupil.working_at_level !== state.currentClass?.year_group ? ' (below year level)' : ''}</div>`;
-
-    years.forEach(year => {
-      html += `<h3 style="margin:12px 0 6px;font-size:12px;color:#94a3b8">${year}</h3>`;
-      html += '<div class="history-grid">';
-      // Header
-      html += '<div class="history-row">';
-      html += '<div class="history-skill history-header">Skill</div>';
-      html += '<div class="history-header">Score</div>';
-      html += '</div>';
-      // Skills
-      skills.forEach(skill => {
-        html += '<div class="history-row">';
-        html += `<div class="history-skill" title="${skill.skill}">${skill.skill.substring(0, 30)}${skill.skill.length > 30 ? '…' : ''}</div>`;
-        const score = history[year]?.[skill.id];
-        const meta = scoreMeta(score);
-        html += `<div class="history-cell" style="background:${meta.bg};color:${meta.fg}">
-          ${score == null ? '' : String(score)}
-        </div>`;
-        html += '</div>';
-      });
-      html += '</div>';
-    });
-
-    if (years.length === 0) {
-      html += '<p style="color:#94a3b8;font-size:13px;margin-top:12px">No assessment data found for this pupil.</p>';
-    }
-
-    html += '</div>';
-    content.innerHTML = html;
-
-  } catch (err) {
-    content.innerHTML = '<div class="empty-state">Error: ' + err.message + '</div>';
-  }
-}
-
 // ================================================================
 // ADMIN
 // ================================================================
