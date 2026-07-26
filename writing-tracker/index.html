@@ -789,12 +789,8 @@ async function bootstrap() {
   document.getElementById('app').classList.remove('hidden');
 
   try {
-    // Load config and classes
-    const [cfg, classes] = await Promise.all([
-      apiGet('getConfig'),
-      apiGet('getClasses', { academic_year: state.currentYear })
-    ]);
-
+    // Get config first so we know the right academic year before fetching classes
+    const cfg = await apiGet('getConfig');
     state.config = cfg || {};
     if (cfg.academic_year) {
       state.currentYear = cfg.academic_year;
@@ -802,6 +798,8 @@ async function bootstrap() {
     } else {
       document.getElementById('year-select').value = state.currentYear;
     }
+
+    const classes = await apiGet('getClasses', { academic_year: state.currentYear });
     state.classes = classes;
     populateClassSelect();
     renderAdminClasses();
