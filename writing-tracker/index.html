@@ -90,19 +90,17 @@ header {
 }
 .save-indicator.visible { opacity: 1; }
 
-/* ── Tab bar ─────────────────────────────────────────────────── */
-nav.tabs {
-  display: flex; gap: 0; background: white;
-  border-bottom: 2px solid #e2e8f0; flex-shrink: 0;
+/* ── Header nav links (small, in header-right) ───────────────── */
+.header-nav { display: flex; gap: 4px; align-items: center; }
+.header-nav-link {
+  background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.8);
+  border: 1px solid rgba(255,255,255,0.22); border-radius: 4px;
+  padding: 3px 9px; font-size: 11px; cursor: pointer; font-weight: 500;
+  transition: all .15s; white-space: nowrap;
 }
-nav.tabs button {
-  flex: 1; padding: 10px; border: none; background: none;
-  font-size: 13px; font-weight: 500; color: #94a3b8;
-  cursor: pointer; border-bottom: 3px solid transparent;
-  transition: all .15s; margin-bottom: -2px;
-}
-nav.tabs button.active { color: var(--blue); border-bottom-color: var(--blue); }
-nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
+.header-nav-link:hover { background: rgba(255,255,255,0.22); color: white; }
+.header-nav-link.active { background: rgba(255,255,255,0.28); color: white; font-weight: 700;
+  border-color: rgba(255,255,255,0.4); }
 
 /* ── Tab content ─────────────────────────────────────────────── */
 .tab-content { display: none; flex: 1; overflow: hidden; flex-direction: column; position: relative; }
@@ -181,8 +179,8 @@ nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
 }
 .tier-nn { background: #fff7ed; }
 .tier-nn td { color: #9a3412; }
-.tier-gd { background: #f0fdf4; }
-.tier-gd td { color: #166534; }
+.tier-gd { background: #eff6ff; }
+.tier-gd td { color: #1d4ed8; }
 
 /* Tier badges & key essential marker */
 .tier-badge {
@@ -191,8 +189,8 @@ nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
   vertical-align: middle; letter-spacing: .04em; line-height: 14px;
 }
 .tier-badge-nn { background: #ea580c; color: #fff; }
-.tier-badge-gd { background: #6366f1; color: #fff; }
-.tier-badge-ex { background: #1798d3; color: #fff; }
+.tier-badge-gd { background: #2563eb; color: #fff; }
+.tier-badge-ex { background: #16a34a; color: #fff; }
 .ke-star { color: #ca8a04; font-size: 11px; margin-right: 3px; }
 
 /* ── Y6 TAF Tracker ──────────────────────────────────────────── */
@@ -244,8 +242,8 @@ nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
 .taf-level-chip { display: inline-block; font-size: 11px; font-weight: 800; padding: 2px 7px;
   border-radius: 4px; margin-left: 6px; letter-spacing: .04em; }
 .taf-level-WTS { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
-.taf-level-EXS { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
-.taf-level-GDS { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+.taf-level-EXS { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+.taf-level-GDS { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
 .taf-local-note { font-size: 10px; color: #94a3b8; padding: 4px 14px; background: #fffbeb;
   border-bottom: 1px solid #fde68a; flex-shrink: 0; }
 
@@ -494,22 +492,21 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <option value="">— Select class —</option>
       </select>
 <select id="year-select" onchange="onYearChange()">
-        <option value="2025-26">2025–26</option>
         <option value="2026-27">2026–27</option>
+        <option value="2025-26">2025–26</option>
         <option value="2024-25">2024–25</option>
       </select>
     </div>
     <div class="header-right">
       <div class="save-indicator" id="save-indicator">Saving…</div>
-      <span class="version">26.07.26n</span>
+      <div class="header-nav">
+        <button class="header-nav-link active" id="nav-grid" onclick="showTab('grid')">Grid</button>
+        <button class="header-nav-link" id="nav-interventions" onclick="showTab('interventions')">Interventions</button>
+        <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
+      </div>
+      <span class="version">26.07.26o</span>
     </div>
   </header>
-
-  <nav class="tabs">
-    <button class="active" onclick="showTab('grid', this)">Grid</button>
-    <button onclick="showTab('interventions', this)">Interventions</button>
-    <button onclick="showTab('admin', this)">Admin</button>
-  </nav>
 
   <!-- GRID TAB -->
   <div id="tab-grid" class="tab-content active">
@@ -518,7 +515,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
       <button class="filter-btn active" id="filt-expected" onclick="toggleTierFilter('expected', this)">Expected</button>
       <button class="filter-btn active" id="filt-gd" onclick="toggleTierFilter('greater_depth', this)">Greater Depth</button>
       <button class="filter-btn active" id="filt-nonneg" onclick="toggleTierFilter('non_neg', this)">Non-Negotiatables</button>
-      <span style="margin-left:12px;font-size:11px;color:#94a3b8;">
+      <span id="tier-legend" style="margin-left:12px;font-size:11px;color:#94a3b8;">
         <span class="tier-badge tier-badge-nn" style="opacity:.85">NN</span> Non-Negotiatable &nbsp;
         <span class="tier-badge tier-badge-gd" style="opacity:.85">GD</span> Greater Depth &nbsp;
         <span class="ke-star">★</span> Key Skill
@@ -586,8 +583,8 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
       </label>
       <button class="taf-close-btn" onclick="closeTafTracker()">✕ Close</button>
     </div>
-    <div class="taf-local-note">
-      ⚠ TAF data is stored locally in this browser. Use Export JSON regularly to back up. Data is not shared between devices.
+    <div class="taf-local-note" id="taf-status-note" style="background:#f0fdf4;border-bottom-color:#86efac;">
+      ✓ TAF data is saved centrally and shared between devices.
     </div>
     <div class="taf-add-piece-row">
       <strong style="font-size:12px;color:#475569">Add writing piece:</strong>
@@ -712,7 +709,9 @@ const state = {
   classes: [],
   currentClassId: '',
   currentClass: null,
-  currentYear: '2025-26',
+  currentYear: '2026-27',
+  cohortMode: false,
+  config: {},
   pupils: [],
   assessments: {},   // {pupil_id: {skill_id: score}}
   activeTiers: new Set(['expected','greater_depth','non_neg']),
@@ -796,9 +795,12 @@ async function bootstrap() {
       apiGet('getClasses', { academic_year: state.currentYear })
     ]);
 
+    state.config = cfg || {};
     if (cfg.academic_year) {
       state.currentYear = cfg.academic_year;
       document.getElementById('year-select').value = cfg.academic_year;
+    } else {
+      document.getElementById('year-select').value = state.currentYear;
     }
     state.classes = classes;
     populateClassSelect();
@@ -816,15 +818,38 @@ async function bootstrap() {
 function populateClassSelect() {
   const sel = document.getElementById('class-select');
   sel.innerHTML = '<option value="">— Select class —</option>';
+
+  // Group by year group
+  const ORDER = ['Y1','Y2','Y3','Y4','Y5','Y6'];
+  const byYG = {};
   state.classes.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c.class_id;
-    opt.textContent = `${c.year_group} · ${c.class_name}${c.teacher_name ? ' (' + c.teacher_name + ')' : ''}`;
-    sel.appendChild(opt);
+    if (!byYG[c.year_group]) byYG[c.year_group] = [];
+    byYG[c.year_group].push(c);
   });
+
+  ORDER.filter(yg => byYG[yg]).forEach(yg => {
+    const classes = byYG[yg];
+    // Cohort option when 2+ classes in year group
+    if (classes.length >= 2) {
+      const opt = document.createElement('option');
+      opt.value = `cohort:${yg}`;
+      opt.textContent = `📊 All ${yg} — ${classes.map(c => c.class_name).join(', ')}`;
+      sel.appendChild(opt);
+    }
+    classes.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.class_id;
+      opt.textContent = `${c.year_group} · ${c.class_name}${c.teacher_name ? ' (' + c.teacher_name + ')' : ''}`;
+      sel.appendChild(opt);
+    });
+  });
+
   const saved = localStorage.getItem('wfa_last_class_id');
-  if (saved && state.classes.find(c => c.class_id === saved)) {
-    sel.value = saved;
+  if (saved) {
+    const valid = saved.startsWith('cohort:')
+      ? sel.querySelector(`option[value="${saved}"]`)
+      : state.classes.find(c => c.class_id === saved);
+    if (valid) sel.value = saved;
   }
 }
 
@@ -832,17 +857,34 @@ function populateClassSelect() {
 // CLASS / TERM CHANGES
 // ================================================================
 async function onClassChange() {
-  const classId = document.getElementById('class-select').value;
-  state.currentClassId = classId;
-  state.currentClass = state.classes.find(c => c.class_id === classId) || null;
-  if (classId) localStorage.setItem('wfa_last_class_id', classId);
+  const val = document.getElementById('class-select').value;
 
-  if (!classId) {
+  if (!val) {
+    state.currentClassId = '';
+    state.currentClass = null;
+    state.cohortMode = false;
+    document.getElementById('grid-empty').textContent = 'Select a class to begin.';
     document.getElementById('grid-empty').classList.remove('hidden');
     document.getElementById('grid-table').classList.add('hidden');
     return;
   }
 
+  localStorage.setItem('wfa_last_class_id', val);
+
+  if (val.startsWith('cohort:')) {
+    const yg = val.slice(7);
+    state.cohortMode = true;
+    state.currentClassId = val;
+    state.currentClass = { year_group: yg, class_name: `All ${yg}`, class_id: val, cohort: true };
+    await loadClassData();
+    document.getElementById('pupils-class-label').textContent = '';
+    renderAdminPupils();
+    return;
+  }
+
+  state.cohortMode = false;
+  state.currentClassId = val;
+  state.currentClass = state.classes.find(c => c.class_id === val) || null;
   await loadClassData();
   document.getElementById('pupils-class-label').textContent =
     state.currentClass ? `(${state.currentClass.class_name})` : '';
@@ -856,6 +898,7 @@ async function onYearChange() {
 }
 
 async function loadClassData() {
+  if (state.cohortMode) { await loadCohortData(); return; }
   const cacheKey = `wfa_grid_${state.currentClassId}_${state.currentYear}`;
 
   // Serve cached data immediately so the grid appears without waiting
@@ -896,6 +939,33 @@ async function loadClassData() {
       emptyEl.classList.remove('hidden');
     }
     // If cache was already shown, silently ignore — stale data is better than nothing
+  }
+}
+
+async function loadCohortData() {
+  const yg = state.currentClass.year_group;
+  const cohortClasses = state.classes.filter(c => c.year_group === yg);
+
+  document.getElementById('grid-empty').textContent = 'Loading cohort…';
+  document.getElementById('grid-empty').classList.remove('hidden');
+  document.getElementById('grid-table').classList.add('hidden');
+
+  try {
+    const results = await Promise.all(
+      cohortClasses.map(c => apiGet('getAssessments', { class_id: c.class_id, academic_year: state.currentYear }))
+    );
+    state.pupils = [];
+    state.assessments = {};
+    results.forEach(r => {
+      state.pupils.push(...(r.pupils || []));
+      Object.assign(state.assessments, r.assessments || {});
+    });
+    renderGrid();
+    updateY6TafButton();
+  } catch (err) {
+    const el = document.getElementById('grid-empty');
+    el.innerHTML = `Failed to load cohort. <button class="btn btn-sm btn-secondary" onclick="loadClassData()" style="margin-left:8px">Retry</button><br><small style="color:#94a3b8">${err.message}</small>`;
+    el.classList.remove('hidden');
   }
 }
 
@@ -942,8 +1012,10 @@ function truthy(v) {
 
 function renderGrid() {
   if (!state.currentClass || state.pupils.length === 0) {
-    document.getElementById('grid-empty').textContent = state.pupils.length === 0 ?
-      'No pupils in this class. Add pupils in the Admin tab.' : 'Select a class.';
+    const msg = !state.currentClass ? 'Select a class to begin.'
+      : state.cohortMode ? 'No pupils found in this cohort.'
+      : 'No pupils in this class. Add pupils in the Admin tab.';
+    document.getElementById('grid-empty').textContent = msg;
     document.getElementById('grid-empty').classList.remove('hidden');
     document.getElementById('grid-table').classList.add('hidden');
     return;
@@ -985,11 +1057,13 @@ function renderGridHeader(pupils) {
     const th = document.createElement('th');
     th.className = 'pupil-th';
     th.dataset.pupilId = p.pupil_id;
-    if (state.selectedPupils.has(p.pupil_id)) th.classList.add('sel-active');
+    if (!state.cohortMode && state.selectedPupils.has(p.pupil_id)) th.classList.add('sel-active');
 
-    const check = document.createElement('span');
-    check.className = 'pupil-sel-check';
-    th.appendChild(check);
+    if (!state.cohortMode) {
+      const check = document.createElement('span');
+      check.className = 'pupil-sel-check';
+      th.appendChild(check);
+    }
 
     const wrap = document.createElement('div');
     wrap.className = 'pupil-name-wrap';
@@ -1001,8 +1075,18 @@ function renderGridHeader(pupils) {
       badge.textContent = p.working_at_level;
       wrap.appendChild(badge);
     }
+    if (state.cohortMode) {
+      const cls = state.classes.find(c => c.class_id === p.class_id);
+      if (cls) {
+        const badge = document.createElement('span');
+        badge.className = 'level-badge';
+        badge.style.background = '#94a3b8';
+        badge.textContent = cls.class_name;
+        wrap.appendChild(badge);
+      }
+    }
     th.appendChild(wrap);
-    th.addEventListener('click', () => togglePupilSelect(p.pupil_id));
+    if (!state.cohortMode) th.addEventListener('click', () => togglePupilSelect(p.pupil_id));
     row.appendChild(th);
   });
 }
@@ -1184,6 +1268,7 @@ function renderGridBody(mainPupils, belowPupils) {
 }
 
 function makeScoreCell(pupil, skill, enabled) {
+  if (state.cohortMode) enabled = false;
   const td = document.createElement('td');
   td.className = 'score-cell' + (enabled ? '' : ' disabled');
 
@@ -1865,43 +1950,66 @@ async function saveSettingYear() {
 }
 
 // ================================================================
-// Y6 TAF TRACKER
+// Y6 TAF TRACKER — central storage via setConfig/getConfig
 // ================================================================
 const tafState = { pupilId: null };
 
-function tafKey(suffix) {
-  return 'wfa_y6taf_' + suffix + '_' + (state.currentClassId || 'default');
+function tafConfigKey() {
+  return `y6taf_${state.currentClassId}_${state.currentYear}`;
 }
 
-function tafGetPieces() {
-  try { return JSON.parse(localStorage.getItem(tafKey('pieces')) || '[]'); } catch { return []; }
+function tafGetData() {
+  try {
+    const raw = state.config?.[tafConfigKey()];
+    return raw ? JSON.parse(raw) : { pieces: [], pupils: {} };
+  } catch { return { pieces: [], pupils: {} }; }
 }
-function tafSetPieces(pieces) {
-  localStorage.setItem(tafKey('pieces'), JSON.stringify(pieces));
+
+async function tafPersistData(data) {
+  const key = tafConfigKey();
+  const value = JSON.stringify(data);
+  state.config[key] = value;
+  const note = document.getElementById('taf-status-note');
+  if (note) { note.style.background = '#fffbeb'; note.style.borderBottomColor = '#fde68a'; note.textContent = '⏳ Saving…'; }
+  try {
+    await apiPost({ action: 'setConfig', key, value });
+    if (note) { note.style.background = '#f0fdf4'; note.style.borderBottomColor = '#86efac'; note.textContent = '✓ Saved centrally.'; }
+  } catch (err) {
+    console.error('TAF save failed:', err);
+    if (note) { note.style.background = '#fef2f2'; note.style.borderBottomColor = '#fca5a5'; note.textContent = '⚠ Save failed — changes may not persist.'; }
+  }
 }
-function tafGetScores(pupilId) {
-  try { return JSON.parse(localStorage.getItem(tafKey('scores_' + pupilId)) || '{}'); } catch { return {}; }
-}
-function tafSetScores(pupilId, scores) {
-  localStorage.setItem(tafKey('scores_' + pupilId), JSON.stringify(scores));
-}
-function tafGetLevel(pupilId) {
-  return localStorage.getItem(tafKey('level_' + pupilId)) || '';
-}
-function tafSetLevel(pupilId, level) {
-  if (level) localStorage.setItem(tafKey('level_' + pupilId), level);
-  else localStorage.removeItem(tafKey('level_' + pupilId));
+
+function tafGetPieces() { return tafGetData().pieces || []; }
+function tafGetScores(pupilId) { return tafGetData().pupils?.[pupilId]?.scores || {}; }
+function tafGetLevel(pupilId) { return tafGetData().pupils?.[pupilId]?.level || ''; }
+
+function updateFilterLabels(yg) {
+  const isY6 = yg === 'Y6';
+  document.getElementById('filt-nonneg').textContent  = isY6 ? 'WTS'            : 'Non-Negotiatables';
+  document.getElementById('filt-expected').textContent = isY6 ? 'EXS'            : 'Expected';
+  document.getElementById('filt-gd').textContent       = isY6 ? 'GDS'            : 'Greater Depth';
+  document.getElementById('tier-legend').innerHTML = isY6
+    ? `<span class="tier-badge tier-badge-nn" style="opacity:.85">WTS</span> Working Towards &nbsp;
+       <span class="tier-badge tier-badge-ex" style="opacity:.85">EXS</span> Expected Standard &nbsp;
+       <span class="tier-badge tier-badge-gd" style="opacity:.85">GDS</span> Greater Depth &nbsp;
+       <span class="ke-star">★</span> Key Skill`
+    : `<span class="tier-badge tier-badge-nn" style="opacity:.85">NN</span> Non-Negotiatable &nbsp;
+       <span class="tier-badge tier-badge-gd" style="opacity:.85">GD</span> Greater Depth &nbsp;
+       <span class="ke-star">★</span> Key Skill`;
 }
 
 function updateY6TafButton() {
   const btn = document.getElementById('y6-taf-btn');
   const isY6 = state.currentClass?.year_group === 'Y6';
-  btn.classList.toggle('hidden', !isY6);
+  btn.classList.toggle('hidden', !isY6 || state.cohortMode);
+  updateFilterLabels(state.currentClass?.year_group || 'Y4');
 }
 
-function openTafTracker() {
+async function openTafTracker() {
   const panel = document.getElementById('taf-panel');
   panel.classList.remove('hidden');
+
   // Populate pupil selector
   const sel = document.getElementById('taf-pupil-sel');
   sel.innerHTML = '';
@@ -1911,9 +2019,20 @@ function openTafTracker() {
     opt.textContent = p.name;
     sel.appendChild(opt);
   });
-  // Default to first pupil
   tafState.pupilId = state.pupils[0]?.pupil_id || null;
   if (tafState.pupilId) sel.value = tafState.pupilId;
+
+  // Fetch fresh TAF data from server before rendering
+  const note = document.getElementById('taf-status-note');
+  if (note) { note.style.background = '#eff6ff'; note.style.borderBottomColor = '#93c5fd'; note.textContent = '⏳ Loading TAF data…'; }
+  try {
+    const cfg = await apiGet('getConfig');
+    state.config = { ...state.config, ...cfg };
+    if (note) { note.style.background = '#f0fdf4'; note.style.borderBottomColor = '#86efac'; note.textContent = '✓ TAF data is saved centrally and shared between devices.'; }
+  } catch (err) {
+    console.error('Could not fetch TAF data:', err);
+    if (note) { note.style.background = '#fef2f2'; note.style.borderBottomColor = '#fca5a5'; note.textContent = '⚠ Could not fetch latest data — showing cached version.'; }
+  }
   tafRenderGrid();
 }
 
@@ -1926,61 +2045,67 @@ function tafChangePupil() {
   tafRenderGrid();
 }
 
-function tafSaveLevel() {
+async function tafSaveLevel() {
   if (!tafState.pupilId) return;
   const level = document.getElementById('taf-level-sel').value;
-  tafSetLevel(tafState.pupilId, level);
+  const data = tafGetData();
+  if (!data.pupils) data.pupils = {};
+  if (!data.pupils[tafState.pupilId]) data.pupils[tafState.pupilId] = { level: '', scores: {} };
+  data.pupils[tafState.pupilId].level = level;
+  await tafPersistData(data);
 }
 
-function tafAddPiece() {
+async function tafAddPiece() {
   const date = document.getElementById('taf-piece-date').value;
   const genre = document.getElementById('taf-piece-genre').value.trim();
   const title = document.getElementById('taf-piece-title').value.trim();
   if (!date && !genre) { alert('Enter at least a date or genre for the piece.'); return; }
-  const pieces = tafGetPieces();
-  const id = 'p' + Date.now();
-  pieces.push({ id, date, genre, title });
-  tafSetPieces(pieces);
+  const data = tafGetData();
+  if (!data.pieces) data.pieces = [];
+  data.pieces.push({ id: 'p' + Date.now(), date, genre, title });
+  await tafPersistData(data);
   document.getElementById('taf-piece-date').value = '';
   document.getElementById('taf-piece-genre').value = '';
   document.getElementById('taf-piece-title').value = '';
   tafRenderGrid();
 }
 
-function tafDeletePiece(pieceId) {
+async function tafDeletePiece(pieceId) {
   if (!confirm('Remove this writing piece? Scores for this piece will be deleted for all pupils.')) return;
-  let pieces = tafGetPieces().filter(p => p.id !== pieceId);
-  tafSetPieces(pieces);
-  // Remove scores for deleted piece from all pupils
-  state.pupils.forEach(p => {
-    const scores = tafGetScores(p.pupil_id);
-    Object.keys(scores).forEach(skillId => { delete scores[skillId][pieceId]; });
-    tafSetScores(p.pupil_id, scores);
-  });
+  const data = tafGetData();
+  data.pieces = (data.pieces || []).filter(p => p.id !== pieceId);
+  if (data.pupils) {
+    Object.values(data.pupils).forEach(pd => {
+      if (pd.scores) Object.keys(pd.scores).forEach(sid => { delete pd.scores[sid][pieceId]; });
+    });
+  }
+  await tafPersistData(data);
   tafRenderGrid();
 }
 
-function tafCycleScore(skillId, pieceId) {
+async function tafCycleScore(skillId, pieceId) {
   if (!tafState.pupilId) return;
-  const scores = tafGetScores(tafState.pupilId);
-  if (!scores[skillId]) scores[skillId] = {};
-  const cur = scores[skillId][pieceId];
-  // Cycle: blank → 2 → 1 → 0 → blank
-  if (cur === undefined || cur === null) scores[skillId][pieceId] = 2;
-  else if (cur === 2) scores[skillId][pieceId] = 1;
-  else if (cur === 1) scores[skillId][pieceId] = 0;
-  else delete scores[skillId][pieceId];
-  tafSetScores(tafState.pupilId, scores);
-  // Update just the cell
+  const data = tafGetData();
+  if (!data.pupils) data.pupils = {};
+  const pid = tafState.pupilId;
+  if (!data.pupils[pid]) data.pupils[pid] = { level: '', scores: {} };
+  if (!data.pupils[pid].scores) data.pupils[pid].scores = {};
+  const s = data.pupils[pid].scores;
+  if (!s[skillId]) s[skillId] = {};
+  const cur = s[skillId][pieceId];
+  if (cur === undefined) s[skillId][pieceId] = 2;
+  else if (cur === 2) s[skillId][pieceId] = 1;
+  else if (cur === 1) s[skillId][pieceId] = 0;
+  else delete s[skillId][pieceId];
+  // Update cell immediately (optimistic UI)
   const cell = document.querySelector(`.taf-score-cell[data-skill="${skillId}"][data-piece="${pieceId}"]`);
   if (cell) {
-    const val = scores[skillId]?.[pieceId];
+    const val = s[skillId]?.[pieceId];
     const display = val !== undefined ? String(val) : '';
-    const labels = { '0': 'No evidence / error', '1': 'Some evidence — less secure', '2': 'Secure evidence throughout' };
-    cell.dataset.score = display;
-    cell.textContent = display;
-    cell.title = labels[display] || 'Click to score';
+    cell.dataset.score = display; cell.textContent = display;
+    cell.title = { '0': 'No evidence / error', '1': 'Some evidence — less secure', '2': 'Secure throughout' }[display] || 'Click to score';
   }
+  await tafPersistData(data);
 }
 
 function tafRenderGrid() {
@@ -1997,9 +2122,9 @@ function tafRenderGrid() {
   if (!pupilId) { container.innerHTML = '<p style="padding:20px;color:#94a3b8">No pupils in this class.</p>'; return; }
 
   const TIER_INFO = {
-    non_neg: { label: 'Working Towards Standard (WTS)', bg: '#fff7ed', color: '#92400e', badge: 'WTS' },
-    expected: { label: 'Expected Standard (EXS)', bg: '#eff6ff', color: '#1e40af', badge: 'EXS' },
-    greater_depth: { label: 'Greater Depth Standard (GDS)', bg: '#f0fdf4', color: '#166534', badge: 'GDS' }
+    non_neg:       { label: 'Working Towards Standard (WTS)',  bg: '#fff7ed', color: '#92400e', badge: 'WTS' },
+    expected:      { label: 'Expected Standard (EXS)',          bg: '#f0fdf4', color: '#166534', badge: 'EXS' },
+    greater_depth: { label: 'Greater Depth Standard (GDS)',     bg: '#eff6ff', color: '#1e40af', badge: 'GDS' }
   };
 
   const table = document.createElement('table');
@@ -2121,39 +2246,45 @@ function tafRenderGrid() {
 }
 
 function tafExport() {
-  const classId = state.currentClassId || 'default';
-  const pieces = tafGetPieces();
-  const data = { class_id: classId, class_name: state.currentClass?.name || '', pieces, pupils: {} };
+  const raw = tafGetData();
+  const out = {
+    class_id: state.currentClassId,
+    class_name: state.currentClass?.class_name || '',
+    academic_year: state.currentYear,
+    pieces: raw.pieces || [],
+    pupils: {}
+  };
   state.pupils.forEach(p => {
-    data.pupils[p.pupil_id] = {
-      name: p.name,
-      taf_level: tafGetLevel(p.pupil_id),
-      scores: tafGetScores(p.pupil_id)
-    };
+    const pd = raw.pupils?.[p.pupil_id] || {};
+    out.pupils[p.pupil_id] = { name: p.name, taf_level: pd.level || '', scores: pd.scores || {} };
   });
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'y6_taf_' + (state.currentClass?.name || 'class').replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0,10) + '.json';
+  a.download = 'y6_taf_' + (state.currentClass?.class_name || 'class').replace(/\s+/g, '_') + '_' + state.currentYear + '.json';
   a.click();
 }
 
-function tafImport(event) {
+async function tafImport(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
-      const data = JSON.parse(e.target.result);
-      if (data.pieces) tafSetPieces(data.pieces);
-      if (data.pupils) {
-        Object.entries(data.pupils).forEach(([pid, pd]) => {
-          if (pd.scores) tafSetScores(pid, pd.scores);
-          if (pd.taf_level) tafSetLevel(pid, pd.taf_level);
+      const imported = JSON.parse(e.target.result);
+      const data = tafGetData();
+      if (imported.pieces) data.pieces = imported.pieces;
+      if (imported.pupils) {
+        if (!data.pupils) data.pupils = {};
+        Object.entries(imported.pupils).forEach(([pid, pd]) => {
+          if (!data.pupils[pid]) data.pupils[pid] = { level: '', scores: {} };
+          if (pd.scores) data.pupils[pid].scores = pd.scores;
+          if (pd.taf_level) data.pupils[pid].level = pd.taf_level;
         });
       }
+      await tafPersistData(data);
       tafRenderGrid();
-      alert('TAF data imported successfully.');
+      alert('TAF data imported and saved.');
     } catch (err) { alert('Import failed: ' + err.message); }
   };
   reader.readAsText(file);
@@ -2163,11 +2294,12 @@ function tafImport(event) {
 // ================================================================
 // TAB NAVIGATION
 // ================================================================
-function showTab(name, btn) {
+function showTab(name) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.header-nav-link').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
-  btn.classList.add('active');
+  const navBtn = document.getElementById('nav-' + name);
+  if (navBtn) navBtn.classList.add('active');
 
   if (name === 'interventions') renderInterventions();
   if (name === 'admin') { renderAdminClasses(); renderAdminPupils(); }
