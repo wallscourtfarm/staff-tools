@@ -210,7 +210,73 @@ nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
 }
 .score-cell.disabled .score-label { color: #cbd5e1; }
 
-/* ── Score picker ─────────────────────────────────────────────── */
+/* ── Bulk entry features ──────────────────────────────────────── */
+/* Set-row button (Option A) */
+.skill-row td.skill-col { position: relative; }
+.set-row-btn {
+  display: none; position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  font-size: 9px; padding: 2px 5px; background: #e0f2fe; color: #0369a1;
+  border: 1px solid #7dd3fc; border-radius: 3px; cursor: pointer; white-space: nowrap;
+  line-height: 1.4; font-weight: 600; z-index: 2;
+}
+.skill-row:hover .set-row-btn { display: inline-block; }
+
+/* Pupil selection (Option B) */
+.pupil-th { cursor: pointer; }
+.pupil-th.sel-active .pupil-name-wrap {
+  outline: 3px solid #3b82f6; outline-offset: 2px; border-radius: 3px;
+}
+.pupil-sel-check {
+  display: block; width: 14px; height: 14px; border: 2px solid #cbd5e1;
+  border-radius: 3px; margin: 0 auto 2px; background: white;
+  transition: background .1s, border-color .1s;
+}
+.pupil-th.sel-active .pupil-sel-check { background: #3b82f6; border-color: #2563eb; }
+
+/* Bulk toolbar (Option B) */
+.bulk-toolbar {
+  display: none; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 6px 10px; background: #1e3a5f; color: white;
+  border-radius: 8px; margin: 4px 0 6px; font-size: 12px; font-weight: 600;
+}
+.bulk-toolbar.visible { display: flex; }
+.bulk-info { opacity: .85; font-size: 11px; margin-right: 4px; }
+.bulk-score-btn {
+  padding: 3px 9px; border-radius: 4px; border: 2px solid transparent;
+  cursor: pointer; font-size: 11px; font-weight: 700;
+}
+.bulk-score-btn.active { border-color: white; box-shadow: 0 0 0 1px white; }
+.bulk-clear-btn {
+  margin-left: auto; padding: 3px 8px; border-radius: 4px;
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
+  color: white; cursor: pointer; font-size: 11px;
+}
+.bulk-selall-btn {
+  padding: 3px 8px; border-radius: 4px;
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
+  color: white; cursor: pointer; font-size: 11px;
+}
+
+/* Paint mode (Option C) */
+.paint-controls {
+  display: none; align-items: center; gap: 4px; padding: 3px 8px;
+  background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px;
+}
+.paint-controls.visible { display: flex; }
+.paint-score-btn {
+  padding: 2px 7px; border-radius: 4px; border: 2px solid transparent;
+  cursor: pointer; font-size: 11px; font-weight: 700; line-height: 1.4;
+}
+.paint-score-btn.active { border-color: #92400e; box-shadow: 0 0 0 1px #92400e; }
+.paint-toggle-btn {
+  padding: 2px 8px; border-radius: 4px; font-size: 11px;
+  border: 1px solid #d1d5db; background: white; cursor: pointer;
+}
+.paint-toggle-btn.active { background: #fbbf24; border-color: #f59e0b; font-weight: 700; }
+body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
+.score-cell.paint-hover:not(.disabled) { filter: brightness(.85) !important; }
+
+/* Score picker ─────────────────────────────────────────────── */
 #score-picker {
   position: fixed; z-index: 200;
   background: white; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,.2);
@@ -400,7 +466,7 @@ nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
     </div>
     <div class="header-right">
       <div class="save-indicator" id="save-indicator">Saving…</div>
-      <span class="version">26.07.26g</span>
+      <span class="version">26.07.26h</span>
     </div>
   </header>
 
@@ -419,9 +485,17 @@ nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
       <button class="filter-btn active" id="filt-gd" onclick="toggleTierFilter('greater_depth', this)">Greater Depth</button>
       <button class="filter-btn active" id="filt-nonneg" onclick="toggleTierFilter('non_neg', this)">Non-Negotiatables</button>
       <div class="controls-right">
+        <button id="paint-toggle-btn" class="paint-toggle-btn" onclick="togglePaintMode()">🖌 Paint</button>
+        <div id="paint-controls" class="paint-controls"></div>
         <button class="btn btn-sm btn-secondary" onclick="collapseAll()">Collapse all</button>
         <button class="btn btn-sm btn-secondary" onclick="expandAll()">Expand all</button>
       </div>
+    </div>
+    <div id="bulk-toolbar" class="bulk-toolbar">
+      <span class="bulk-info" id="bulk-info-text"></span>
+      <button class="bulk-selall-btn" onclick="selectAllPupils()">Select all</button>
+      <div id="bulk-score-btns" style="display:flex;gap:4px;align-items:center;"></div>
+      <button class="bulk-clear-btn" onclick="clearPupilSelection()">✕ Clear</button>
     </div>
     <div class="grid-wrapper" id="grid-wrapper">
       <div class="empty-state" id="grid-empty">Select a class to begin.</div>
@@ -574,6 +648,11 @@ const state = {
   activeTiers: new Set(['expected','greater_depth','non_neg']),
   saving: 0,
   pickerTarget: null, // {pupilId, skillId, cellEl}
+  selectedPupils: new Set(),
+  bulkScore: undefined,
+  paintMode: false,
+  paintScore: null,
+  isPainting: false,
 };
 
 // ================================================================
@@ -785,6 +864,13 @@ function renderGridHeader(pupils) {
   pupils.forEach(p => {
     const th = document.createElement('th');
     th.className = 'pupil-th';
+    th.dataset.pupilId = p.pupil_id;
+    if (state.selectedPupils.has(p.pupil_id)) th.classList.add('sel-active');
+
+    const check = document.createElement('span');
+    check.className = 'pupil-sel-check';
+    th.appendChild(check);
+
     const wrap = document.createElement('div');
     wrap.className = 'pupil-name-wrap';
     wrap.title = p.name;
@@ -796,6 +882,7 @@ function renderGridHeader(pupils) {
       wrap.appendChild(badge);
     }
     th.appendChild(wrap);
+    th.addEventListener('click', () => togglePupilSelect(p.pupil_id));
     row.appendChild(th);
   });
 }
@@ -864,6 +951,12 @@ function renderGridBody(mainPupils, belowPupils) {
           ex.textContent = skill.example;
           skillTd.appendChild(ex);
         }
+        const setRowBtn = document.createElement('button');
+        setRowBtn.className = 'set-row-btn';
+        setRowBtn.textContent = '⚡ Set all';
+        setRowBtn.title = 'Set this skill for all pupils';
+        setRowBtn.addEventListener('click', e => { e.stopPropagation(); openRowPicker(skill.id, skill.skill, setRowBtn); });
+        skillTd.appendChild(setRowBtn);
         tr.appendChild(skillTd);
 
         // Score cells — main pupils
@@ -970,7 +1063,28 @@ function makeScoreCell(pupil, skill, enabled) {
 
   td.dataset.pupilId = pupil.pupil_id;
   td.dataset.skillId = skill.id;
-  td.addEventListener('click', () => openPicker(pupil.pupil_id, skill.id, skill.skill, td));
+  td.addEventListener('click', () => {
+    // Paint mode: immediate apply, no picker
+    if (state.paintMode) {
+      if (state.paintScore !== undefined) {
+        applyScoreToCells([{ pupilId: pupil.pupil_id, skillId: skill.id, cellEl: td }], state.paintScore);
+      }
+      return;
+    }
+    // Bulk mode with score chosen: apply to all selected pupils for this skill
+    if (state.selectedPupils.size > 0 && state.bulkScore !== undefined) {
+      applyBulkScoreToSkill(skill.id);
+      return;
+    }
+    // Normal picker (also handles bulk-with-no-score-set via applyScore)
+    openPicker(pupil.pupil_id, skill.id, skill.skill, td);
+  });
+  // Paint drag support
+  td.addEventListener('mouseenter', () => {
+    if (state.paintMode && state.isPainting && state.paintScore !== undefined) {
+      applyScoreToCells([{ pupilId: pupil.pupil_id, skillId: skill.id, cellEl: td }], state.paintScore);
+    }
+  });
 
   return td;
 }
@@ -1027,44 +1141,260 @@ async function applyScore(value) {
   const { pupilId, skillId, cellEl } = state.pickerTarget;
   closePicker();
 
-  // Optimistic UI update
-  if (!state.assessments[pupilId]) state.assessments[pupilId] = {};
-  if (!state.assessments[pupilId][skillId]) state.assessments[pupilId][skillId] = {};
-
-  if (value == null) {
-    delete state.assessments[pupilId][skillId][state.currentTerm];
-  } else {
-    state.assessments[pupilId][skillId][state.currentTerm] = String(value);
+  // If pupils are selected, apply to all of them for this skill
+  if (state.selectedPupils.size > 0) {
+    await applyScoreToSelectedPupils(skillId, value);
+    return;
   }
 
+  await applyScoreToCells([{ pupilId, skillId, cellEl }], value);
+}
+
+async function applyScoreToCells(targets, value) {
+  const scoreVal = value == null ? '' : String(value);
   const meta = scoreMeta(value);
-  cellEl.style.background = meta.bg;
-  cellEl.querySelector('.score-label').style.color = meta.fg;
-  cellEl.querySelector('.score-label').textContent = value == null ? '' : String(value);
 
-  // Save to API
-  showSaving(true);
-  try {
-    await apiPost({
-      action: 'saveScore',
-      pupil_id: pupilId,
-      skill_id: skillId,
-      academic_year: state.currentYear,
-      term: state.currentTerm,
-      score: value == null ? '' : String(value)
-    });
-  } catch (err) {
-    console.error('Save failed:', err);
-    alert('Save failed: ' + err.message);
-  } finally {
-    showSaving(false);
+  // Optimistic UI update
+  for (const { pupilId, skillId, cellEl } of targets) {
+    if (!state.assessments[pupilId]) state.assessments[pupilId] = {};
+    if (!state.assessments[pupilId][skillId]) state.assessments[pupilId][skillId] = {};
+    if (value == null) {
+      delete state.assessments[pupilId][skillId][state.currentTerm];
+    } else {
+      state.assessments[pupilId][skillId][state.currentTerm] = scoreVal;
+    }
+    cellEl.style.background = meta.bg;
+    const lbl = cellEl.querySelector('.score-label');
+    if (lbl) { lbl.style.color = meta.fg; lbl.textContent = value == null ? '' : scoreVal; }
   }
+
+  if (targets.length === 1) {
+    // Single save
+    showSaving(true);
+    try {
+      await apiPost({ action: 'saveScore', pupil_id: targets[0].pupilId, skill_id: targets[0].skillId,
+        academic_year: state.currentYear, term: state.currentTerm, score: scoreVal });
+    } catch (err) { console.error('Save failed:', err); alert('Save failed: ' + err.message); }
+    finally { showSaving(false); }
+  } else {
+    // Batch save
+    showSaving(true);
+    try {
+      await apiPost({ action: 'saveScores',
+        scores: targets.map(t => ({ pupil_id: t.pupilId, skill_id: t.skillId,
+          academic_year: state.currentYear, term: state.currentTerm, score: scoreVal })),
+        assessed_by: '' });
+    } catch (err) { console.error('Batch save failed:', err); alert('Save failed: ' + err.message); }
+    finally { showSaving(false); }
+  }
+}
+
+async function applyScoreToSelectedPupils(skillId, value) {
+  const targets = [];
+  state.selectedPupils.forEach(pupilId => {
+    const cellEl = document.querySelector(
+      `td[data-pupil-id="${pupilId}"][data-skill-id="${skillId}"]`);
+    if (cellEl && !cellEl.classList.contains('disabled')) {
+      targets.push({ pupilId, skillId, cellEl });
+    }
+  });
+  if (targets.length) await applyScoreToCells(targets, value);
+}
+
+async function applyBulkScoreToSkill(skillId) {
+  await applyScoreToSelectedPupils(skillId, state.bulkScore);
 }
 
 function showSaving(on) {
   const el = document.getElementById('save-indicator');
   if (on) { state.saving++; el.classList.add('visible'); }
   else { state.saving = Math.max(0, state.saving - 1); if (!state.saving) el.classList.remove('visible'); }
+}
+
+// ================================================================
+// OPTION A — SET WHOLE ROW
+// ================================================================
+function openRowPicker(skillId, skillName, anchorEl) {
+  // Build a small inline popover with score options
+  const existing = document.getElementById('row-picker-popup');
+  if (existing) existing.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'row-picker-popup';
+  popup.style.cssText = `position:fixed;z-index:300;background:white;border-radius:10px;
+    box-shadow:0 6px 24px rgba(0,0,0,.2);padding:10px;min-width:210px;`;
+
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:11px;color:#64748b;margin-bottom:8px;font-weight:600;';
+  title.textContent = `Set all: ${skillName}`;
+  popup.appendChild(title);
+
+  SCORE_OPTIONS.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.style.cssText = `display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;
+      border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;
+      background:${opt.bg};color:${opt.fg};margin-bottom:4px;text-align:left;`;
+    btn.innerHTML = `<span style="display:inline-block;width:18px;height:18px;border-radius:3px;
+      background:${opt.bg};border:1.5px solid ${opt.fg}40;text-align:center;line-height:16px;font-size:10px;">
+      ${opt.value == null ? '·' : opt.value}</span> ${opt.label}`;
+    btn.onclick = () => { popup.remove(); applyRowScore(skillId, opt.value); };
+    popup.appendChild(btn);
+  });
+
+  const closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'width:100%;padding:5px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:11px;background:#f8fafc;margin-top:2px;';
+  closeBtn.textContent = 'Cancel';
+  closeBtn.onclick = () => popup.remove();
+  popup.appendChild(closeBtn);
+
+  document.body.appendChild(popup);
+  const rect = anchorEl.getBoundingClientRect();
+  let top = rect.bottom + 4, left = rect.left;
+  if (top + 320 > window.innerHeight) top = rect.top - 320;
+  if (left + 220 > window.innerWidth) left = window.innerWidth - 224;
+  popup.style.top = top + 'px';
+  popup.style.left = left + 'px';
+
+  const dismiss = e => { if (!popup.contains(e.target) && e.target !== anchorEl) { popup.remove(); document.removeEventListener('click', dismiss); } };
+  setTimeout(() => document.addEventListener('click', dismiss), 10);
+}
+
+async function applyRowScore(skillId, value) {
+  const enabledPupils = state.pupils.filter(p => {
+    const isMain = !p.working_at_level || p.working_at_level === state.currentClass?.year_group;
+    return isMain; // main framework pupils; could extend for below-level skills
+  });
+  const targets = enabledPupils.map(p => ({
+    pupilId: p.pupil_id, skillId,
+    cellEl: document.querySelector(`td[data-pupil-id="${p.pupil_id}"][data-skill-id="${skillId}"]`)
+  })).filter(t => t.cellEl && !t.cellEl.classList.contains('disabled'));
+  if (targets.length) await applyScoreToCells(targets, value);
+}
+
+// ================================================================
+// OPTION B — PUPIL SELECTION + BULK TOOLBAR
+// ================================================================
+function togglePupilSelect(pupilId) {
+  if (state.selectedPupils.has(pupilId)) {
+    state.selectedPupils.delete(pupilId);
+  } else {
+    state.selectedPupils.add(pupilId);
+  }
+  const th = document.querySelector(`th.pupil-th[data-pupil-id="${pupilId}"]`);
+  if (th) th.classList.toggle('sel-active', state.selectedPupils.has(pupilId));
+  updateBulkToolbar();
+}
+
+function selectAllPupils() {
+  state.pupils.forEach(p => {
+    state.selectedPupils.add(p.pupil_id);
+    const th = document.querySelector(`th.pupil-th[data-pupil-id="${p.pupil_id}"]`);
+    if (th) th.classList.add('sel-active');
+  });
+  updateBulkToolbar();
+}
+
+function clearPupilSelection() {
+  state.selectedPupils.forEach(id => {
+    const th = document.querySelector(`th.pupil-th[data-pupil-id="${id}"]`);
+    if (th) th.classList.remove('sel-active');
+  });
+  state.selectedPupils.clear();
+  state.bulkScore = undefined;
+  updateBulkToolbar();
+}
+
+function updateBulkToolbar() {
+  const toolbar = document.getElementById('bulk-toolbar');
+  const infoText = document.getElementById('bulk-info-text');
+  const btnsEl = document.getElementById('bulk-score-btns');
+
+  if (state.selectedPupils.size === 0) {
+    toolbar.classList.remove('visible');
+    return;
+  }
+  toolbar.classList.add('visible');
+  infoText.textContent = `${state.selectedPupils.size} pupil${state.selectedPupils.size > 1 ? 's' : ''} selected — tap a skill row to apply:`;
+
+  btnsEl.innerHTML = '';
+  SCORE_OPTIONS.filter(o => o.value !== null).forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'bulk-score-btn' + (state.bulkScore === opt.value ? ' active' : '');
+    btn.style.background = opt.bg;
+    btn.style.color = opt.fg;
+    btn.textContent = opt.value;
+    btn.title = opt.label;
+    btn.onclick = () => {
+      state.bulkScore = (state.bulkScore === opt.value) ? undefined : opt.value;
+      updateBulkToolbar();
+    };
+    btnsEl.appendChild(btn);
+  });
+  // Add "clear score" option
+  const clrBtn = document.createElement('button');
+  clrBtn.className = 'bulk-score-btn' + (state.bulkScore === null ? ' active' : '');
+  clrBtn.style.background = '#f0f0f0'; clrBtn.style.color = '#9ca3af';
+  clrBtn.textContent = '·'; clrBtn.title = 'Unreviewed (clear)';
+  clrBtn.onclick = () => { state.bulkScore = (state.bulkScore === null) ? undefined : null; updateBulkToolbar(); };
+  btnsEl.appendChild(clrBtn);
+}
+
+// ================================================================
+// OPTION C — PAINT MODE
+// ================================================================
+function togglePaintMode() {
+  state.paintMode = !state.paintMode;
+  state.isPainting = false;
+  document.body.classList.toggle('paint-mode', state.paintMode);
+  document.getElementById('paint-toggle-btn').classList.toggle('active', state.paintMode);
+  renderPaintBar();
+
+  if (state.paintMode) {
+    document.addEventListener('mousedown', onPaintMouseDown);
+    document.addEventListener('mouseup', onPaintMouseUp);
+  } else {
+    document.removeEventListener('mousedown', onPaintMouseDown);
+    document.removeEventListener('mouseup', onPaintMouseUp);
+  }
+}
+
+function onPaintMouseDown(e) {
+  if (state.paintMode && e.target.closest('.score-cell:not(.disabled)')) {
+    state.isPainting = true;
+  }
+}
+function onPaintMouseUp() { state.isPainting = false; }
+
+function renderPaintBar() {
+  const bar = document.getElementById('paint-controls');
+  bar.innerHTML = '';
+  if (!state.paintMode) { bar.classList.remove('visible'); return; }
+  bar.classList.add('visible');
+
+  const lbl = document.createElement('span');
+  lbl.style.cssText = 'font-size:10px;color:#92400e;font-weight:600;white-space:nowrap;';
+  lbl.textContent = 'Paint:';
+  bar.appendChild(lbl);
+
+  SCORE_OPTIONS.filter(o => o.value !== null).forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'paint-score-btn' + (state.paintScore === opt.value ? ' active' : '');
+    btn.style.background = opt.bg;
+    btn.style.color = opt.fg;
+    btn.textContent = opt.value;
+    btn.title = opt.label;
+    btn.onclick = () => {
+      state.paintScore = (state.paintScore === opt.value) ? undefined : opt.value;
+      renderPaintBar();
+    };
+    bar.appendChild(btn);
+  });
+  const clrBtn = document.createElement('button');
+  clrBtn.className = 'paint-score-btn' + (state.paintScore === null ? ' active' : '');
+  clrBtn.style.background = '#f0f0f0'; clrBtn.style.color = '#9ca3af';
+  clrBtn.textContent = '·'; clrBtn.title = 'Unreviewed (clear)';
+  clrBtn.onclick = () => { state.paintScore = (state.paintScore === null) ? undefined : null; renderPaintBar(); };
+  bar.appendChild(clrBtn);
 }
 
 // ================================================================
