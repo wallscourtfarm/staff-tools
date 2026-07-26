@@ -177,10 +177,8 @@ header {
   letter-spacing: .05em; text-transform: uppercase; color: #64748b;
   padding: 6px 10px; border-top: 2px solid #e2e8f0;
 }
-.tier-nn { background: #fff7ed; }
-.tier-nn td { color: #9a3412; }
-.tier-gd { background: #eff6ff; }
-.tier-gd td { color: #1d4ed8; }
+.tier-nn td { background: #fff7ed; color: #9a3412; }
+.tier-gd td { background: #eff6ff; color: #1d4ed8; }
 
 /* Tier badges & key essential marker */
 .tier-badge {
@@ -509,7 +507,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-interventions" onclick="showTab('interventions')">Interventions</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">26.07.26t</span>
+      <span class="version">26.07.26u</span>
     </div>
   </header>
 
@@ -1123,16 +1121,6 @@ function renderGridHeader(pupils) {
       badge.textContent = p.working_at_level;
       wrap.appendChild(badge);
     }
-    if (state.cohortMode) {
-      const cls = state.classes.find(c => c.class_id === p.class_id);
-      if (cls) {
-        const badge = document.createElement('span');
-        badge.className = 'level-badge';
-        badge.style.background = '#94a3b8';
-        badge.textContent = cls.class_name;
-        wrap.appendChild(badge);
-      }
-    }
     th.appendChild(wrap);
     if (!state.cohortMode) th.addEventListener('click', () => togglePupilSelect(p.pupil_id));
     row.appendChild(th);
@@ -1154,7 +1142,7 @@ function renderGridBody(mainPupils, belowPupils) {
     : { non_neg: 'Non-Negotiatables', expected: 'Expected Standards', greater_depth: 'Greater Depth' };
   const BADGE_LABELS = isY6
     ? { non_neg: 'WTS', expected: 'EXS', greater_depth: 'GDS' }
-    : { non_neg: 'NN', expected: null, greater_depth: 'GD' };
+    : { non_neg: 'NN', expected: 'EXS', greater_depth: 'GD' };
 
   tiers.forEach(tier => {
     if (!state.activeTiers.has(tier)) return;
