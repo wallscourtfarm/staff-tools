@@ -400,7 +400,7 @@ nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
     </div>
     <div class="header-right">
       <div class="save-indicator" id="save-indicator">Saving…</div>
-      <span class="version">26.07.26e</span>
+      <span class="version">26.07.26f</span>
     </div>
   </header>
 
@@ -667,6 +667,11 @@ function populateClassSelect() {
     opt.textContent = `${c.year_group} · ${c.class_name}${c.teacher_name ? ' (' + c.teacher_name + ')' : ''}`;
     sel.appendChild(opt);
   });
+  const saved = localStorage.getItem('wfa_last_class_id');
+  if (saved && state.classes.find(c => c.class_id === saved)) {
+    sel.value = saved;
+    onClassChange();
+  }
 }
 
 // ================================================================
@@ -676,6 +681,7 @@ async function onClassChange() {
   const classId = document.getElementById('class-select').value;
   state.currentClassId = classId;
   state.currentClass = state.classes.find(c => c.class_id === classId) || null;
+  if (classId) localStorage.setItem('wfa_last_class_id', classId);
 
   if (!classId) {
     document.getElementById('grid-empty').classList.remove('hidden');
