@@ -398,7 +398,7 @@ nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
     </div>
     <div class="header-right">
       <div class="save-indicator" id="save-indicator">Saving…</div>
-      <span class="version">25.07.26a</span>
+      <span class="version">26.07.26a</span>
     </div>
   </header>
 
@@ -467,18 +467,23 @@ nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
 
       <div class="admin-section">
         <h2>Classes</h2>
-        <div class="form-row" id="add-class-form">
-          <select id="new-class-yg">
-            <option value="Y1">Y1 · Beech</option>
-            <option value="Y2">Y2 · Willow</option>
-            <option value="Y3">Y3 · Acer</option>
-            <option value="Y4" selected>Y4 · Maple</option>
-            <option value="Y5">Y5 · Hazel</option>
-            <option value="Y6">Y6 · Elm</option>
-          </select>
-          <input type="text" id="new-class-name" placeholder="Class name (e.g. Clifton)" maxlength="40">
-          <input type="text" id="new-class-teacher" placeholder="Teacher name" maxlength="60">
-          <button class="btn btn-primary" onclick="addClassFromForm()">Add class</button>
+        <div id="add-cohort-form" style="margin-bottom:12px">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+            <select id="new-cohort-yg" style="flex:0 0 auto">
+              <option value="Y1">Y1 · Beech</option>
+              <option value="Y2">Y2 · Willow</option>
+              <option value="Y3">Y3 · Acer</option>
+              <option value="Y4" selected>Y4 · Maple</option>
+              <option value="Y5">Y5 · Hazel</option>
+              <option value="Y6">Y6 · Elm</option>
+            </select>
+            <span style="font-size:12px;color:#94a3b8">Enter one row per class</span>
+          </div>
+          <div id="cohort-class-rows"></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <button class="btn btn-sm btn-secondary" onclick="addCohortRow()">+ Add row</button>
+            <button class="btn btn-primary" onclick="addCohortFromForm()" id="cohort-submit-btn">Add classes</button>
+          </div>
         </div>
         <table class="admin-table" id="classes-table">
           <thead><tr><th>Year</th><th>Class</th><th>Teacher</th><th></th></tr></thead>
@@ -1281,20 +1286,62 @@ function renderAdminPupils() {
   });
 }
 
-async function addClassFromForm() {
-  const yg = document.getElementById('new-class-yg').value;
-  const name = document.getElementById('new-class-name').value.trim();
-  const teacher = document.getElementById('new-class-teacher').value.trim();
-  if (!name) { alert('Enter a class name.'); return; }
+let cohortRowId = 0;
+function addCohortRow(name = '', teacher = '') {
+  const id = ++cohortRowId;
+  const container = document.getElementById('cohort-class-rows');
+  const row = document.createElement('div');
+  row.className = 'form-row';
+  row.dataset.rowId = id;
+  row.style.marginBottom = '4px';
+  row.innerHTML = `
+    <input type="text" placeholder="Class name (e.g. Clifton)" maxlength="40" value="${name}" data-field="name" style="flex:1;min-width:120px">
+    <input type="text" placeholder="Teacher name" maxlength="60" value="${teacher}" data-field="teacher" style="flex:1.5;min-width:140px">
+    <button class="btn btn-sm btn-secondary" onclick="removeCohortRow(${id})" title="Remove" style="flex:0 0 auto;padding:0 8px">✕</button>
+  `;
+  container.appendChild(row);
+  updateCohortSubmitLabel();
+}
 
+function removeCohortRow(id) {
+  const row = document.querySelector(`[data-row-id="${id}"]`);
+  if (row) row.remove();
+  updateCohortSubmitLabel();
+}
+
+function updateCohortSubmitLabel() {
+  const n = document.querySelectorAll('#cohort-class-rows .form-row').length;
+  const btn = document.getElementById('cohort-submit-btn');
+  if (btn) btn.textContent = n === 1 ? 'Add 1 class' : `Add ${n} classes`;
+}
+
+async function addCohortFromForm() {
+  const yg = document.getElementById('new-cohort-yg').value;
+  const rows = document.querySelectorAll('#cohort-class-rows .form-row');
+  const toAdd = [];
+  for (const row of rows) {
+    const name = row.querySelector('[data-field="name"]').value.trim();
+    const teacher = row.querySelector('[data-field="teacher"]').value.trim();
+    if (name) toAdd.push({ name, teacher });
+  }
+  if (!toAdd.length) { alert('Enter at least one class name.'); return; }
+
+  const btn = document.getElementById('cohort-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
   try {
-    const result = await apiPost({ action: 'addClass', year_group: yg, class_name: name, teacher_name: teacher, academic_year: state.currentYear });
-    state.classes.push({ class_id: result.class_id, year_group: yg, class_name: name, teacher_name: teacher, academic_year: state.currentYear, active: true });
-    document.getElementById('new-class-name').value = '';
-    document.getElementById('new-class-teacher').value = '';
+    for (const cls of toAdd) {
+      const result = await apiPost({ action: 'addClass', year_group: yg, class_name: cls.name, teacher_name: cls.teacher, academic_year: state.currentYear });
+      state.classes.push({ class_id: result.class_id, year_group: yg, class_name: cls.name, teacher_name: cls.teacher, academic_year: state.currentYear, active: true });
+    }
+    // Reset form: clear all rows, add 2 fresh ones
+    document.getElementById('cohort-class-rows').innerHTML = '';
+    cohortRowId = 0;
+    addCohortRow(); addCohortRow();
     populateClassSelect();
     renderAdminClasses();
   } catch (err) { alert('Error: ' + err.message); }
+  finally { btn.disabled = false; updateCohortSubmitLabel(); }
 }
 
 async function addPupilFromForm() {
@@ -1362,6 +1409,7 @@ function showTab(name, btn) {
 // ================================================================
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('term-select').value = state.currentTerm;
+  addCohortRow(); addCohortRow();
   bootstrap();
 });
 </script>
