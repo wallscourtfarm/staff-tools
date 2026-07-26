@@ -398,7 +398,7 @@ nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
     </div>
     <div class="header-right">
       <div class="save-indicator" id="save-indicator">Saving…</div>
-      <span class="version">26.07.26b</span>
+      <span class="version">26.07.26c</span>
     </div>
   </header>
 
@@ -502,7 +502,7 @@ nav.tabs button:hover:not(.active) { color: var(--dark); background: #f8fafc; }
           </div>
         </div>
         <table class="admin-table" id="pupils-table">
-          <thead><tr><th>Name</th><th>Working at</th><th>Class</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Working at</th><th>Class</th><th></th><th></th></tr></thead>
           <tbody id="pupils-tbody"></tbody>
         </table>
       </div>
@@ -1257,7 +1257,8 @@ function renderAdminClasses() {
   state.classes.forEach(c => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${c.year_group}</td><td>${c.class_name}</td><td>${c.teacher_name || '—'}</td>
-      <td><button class="btn btn-sm btn-secondary" onclick="editClassTeacher('${c.class_id}','${c.class_name}')">Edit</button></td>`;
+      <td><button class="btn btn-sm btn-secondary" onclick="editClassTeacher('${c.class_id}','${c.class_name}')">Edit</button></td>
+      <td><button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5" onclick="deleteClass('${c.class_id}','${c.class_name}')">Delete</button></td>`;
     tbody.appendChild(tr);
   });
 }
@@ -1275,9 +1276,10 @@ function renderAdminPupils() {
       <td>${cls ? cls.class_name : '—'}</td>
       <td>
         <select onchange="updatePupilLevel('${p.pupil_id}', this.value)" style="padding:2px 4px;font-size:11px;border:1px solid #e2e8f0;border-radius:4px">
-          ${['Y1','Y2','Y3','Y4','Y5'].map(y => `<option value="${y}" ${y === level ? 'selected' : ''}>${y}</option>`).join('')}
+          ${['Y1','Y2','Y3','Y4','Y5','Y6'].map(y => `<option value="${y}" ${y === level ? 'selected' : ''}>${y}</option>`).join('')}
         </select>
-      </td>`;
+      </td>
+      <td><button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5" onclick="removePupil('${p.pupil_id}','${p.name}')">Remove</button></td>`;
     tbody.appendChild(tr);
   });
 }
@@ -1383,6 +1385,33 @@ async function updatePupilLevel(pupilId, newLevel) {
     renderGrid();
     renderAdminPupils();
   } catch (err) { alert('Error updating pupil: ' + err.message); }
+}
+
+async function deleteClass(classId, className) {
+  const pupils = state.pupils.filter(p => p.class_id === classId);
+  const msg = pupils.length
+    ? `Delete class "${className}"? It has ${pupils.length} pupil${pupils.length === 1 ? '' : 's'} who will be hidden from all views.`
+    : `Delete class "${className}"?`;
+  if (!confirm(msg)) return;
+  try {
+    await apiPost({ action: 'updateClass', class_id: classId, active: false });
+    state.classes = state.classes.filter(c => c.class_id !== classId);
+    state.pupils = state.pupils.filter(p => p.class_id !== classId);
+    populateClassSelect();
+    renderAdminClasses();
+    renderAdminPupils();
+    renderGrid();
+  } catch (err) { alert('Error: ' + err.message); }
+}
+
+async function removePupil(pupilId, name) {
+  if (!confirm(`Remove ${name}? They will be hidden from all views.`)) return;
+  try {
+    await apiPost({ action: 'updatePupil', pupil_id: pupilId, active: false });
+    state.pupils = state.pupils.filter(p => p.pupil_id !== pupilId);
+    renderGrid();
+    renderAdminPupils();
+  } catch (err) { alert('Error: ' + err.message); }
 }
 
 async function editClassTeacher(classId, className) {
