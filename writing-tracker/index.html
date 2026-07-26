@@ -41,6 +41,7 @@ body {
   z-index: 1000;
 }
 #setup-screen.hidden { display: none; }
+.hidden { display: none !important; }
 .setup-card {
   background: white; border-radius: 16px; box-shadow: var(--shadow);
   padding: 40px; max-width: 480px; width: 90%; text-align: center;
@@ -433,7 +434,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
     </div>
     <div class="header-right">
       <div class="save-indicator" id="save-indicator">Saving…</div>
-      <span class="version">26.07.26j</span>
+      <span class="version">26.07.26k</span>
     </div>
   </header>
 
@@ -801,15 +802,24 @@ function getClassSkills() {
   return SKILLS[yg] || [];
 }
 
+function pupilField(p, ...keys) {
+  for (const k of keys) {
+    if (p[k] !== undefined && p[k] !== null && p[k] !== '') return p[k];
+    if (p[k.toUpperCase()] !== undefined && p[k.toUpperCase()] !== null && p[k.toUpperCase()] !== '') return p[k.toUpperCase()];
+  }
+  return '';
+}
+
 function applyProfileFilters(pupils) {
   if (state.profileFilters.size === 0) return pupils;
   return pupils.filter(p => {
     for (const f of state.profileFilters) {
-      if (f === 'pp'     && !truthy(p.pp))  return false;
-      if (f === 'eal'    && !truthy(p.eal)) return false;
-      if (f === 'sen'    && !truthy(p.sen)) return false;
-      if (f === 'male'   && String(p.sex).toLowerCase() !== 'm') return false;
-      if (f === 'female' && String(p.sex).toLowerCase() !== 'f') return false;
+      if (f === 'pp'     && !truthy(pupilField(p, 'pp')))  return false;
+      if (f === 'eal'    && !truthy(pupilField(p, 'eal'))) return false;
+      if (f === 'sen'    && !truthy(pupilField(p, 'sen'))) return false;
+      const sex = String(pupilField(p, 'sex', 'gender') || '').toLowerCase();
+      if (f === 'male'   && sex !== 'm' && sex !== 'male' && sex !== 'boy')   return false;
+      if (f === 'female' && sex !== 'f' && sex !== 'female' && sex !== 'girl') return false;
     }
     return true;
   });
