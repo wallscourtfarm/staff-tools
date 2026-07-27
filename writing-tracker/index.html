@@ -190,7 +190,9 @@ header {
 .tier-badge-nn { background: #ea580c; color: #fff; }
 .tier-badge-gd { background: #2563eb; color: #fff; }
 .tier-badge-ex { background: #16a34a; color: #fff; }
-.ke-star { color: #ca8a04; font-size: 11px; margin-right: 3px; }
+.ke-star { color: #d97706; font-size: 12px; margin-right: 4px; font-weight: 700; }
+.skill-row.key-skill td.skill-col { border-left: 3px solid #f59e0b; background: #fffbeb; }
+.skill-row.key-skill:hover td.skill-col { background: #fef3c7; }
 
 /* Group sub-headers (parent skill statement) */
 .group-header {
@@ -518,7 +520,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-interventions" onclick="showTab('interventions')">Interventions</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">27.07.26i</span>
+      <span class="version">27.07.26j</span>
     </div>
   </header>
 
@@ -526,9 +528,8 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
   <div id="tab-grid" class="tab-content active">
     <div class="grid-controls">
       <span class="filter-label">Show:</span>
-      <button class="filter-btn active" id="filt-expected" onclick="toggleTierFilter('expected', this)">Expected</button>
-      <button class="filter-btn active" id="filt-gd" onclick="toggleTierFilter('greater_depth', this)">Greater Depth</button>
-      <button class="filter-btn active" id="filt-nonneg" onclick="toggleTierFilter('non_neg', this)">Non-Negotiatables</button>
+      <button class="filter-btn" id="filt-key" onclick="setSkillFilter('key', this)">★ Key Skills</button>
+      <button class="filter-btn" id="filt-nonneg" onclick="setSkillFilter('non_neg', this)">Non-Negotiatables</button>
       <span id="tier-legend" style="margin-left:12px;font-size:11px;color:#94a3b8;">
         <span class="tier-badge tier-badge-nn" style="opacity:.85">NN</span> Non-Negotiatable &nbsp;
         <span class="tier-badge tier-badge-gd" style="opacity:.85">GD</span> Greater Depth &nbsp;
@@ -732,7 +733,7 @@ const state = {
   config: {},
   pupils: [],
   assessments: {},   // {pupil_id: {skill_id: score}}
-  activeTiers: new Set(['expected','greater_depth','non_neg']),
+  skillFilter: 'all',
   profileFilters: new Set(),
   saving: 0,
   pickerTarget: null, // {pupilId, skillId, cellEl}
@@ -1143,7 +1144,12 @@ function renderGridBody(mainPupils, belowPupils) {
   tbody.innerHTML = '';
 
   const yg = state.currentClass?.year_group || 'Y4';
-  const allSkills = getClassSkills().filter(s => state.activeTiers.has(s.tier));
+  const allSkills = (() => {
+    const skills = getClassSkills();
+    if (state.skillFilter === 'key') return skills.filter(s => s.key_essential);
+    if (state.skillFilter === 'non_neg') return skills.filter(s => s.tier === 'non_neg');
+    return skills;
+  })();
 
   // Group by tier + category
   const tiers = ['non_neg', 'expected', 'greater_depth'];
@@ -1156,7 +1162,6 @@ function renderGridBody(mainPupils, belowPupils) {
     : { non_neg: 'NN', expected: 'EXS', greater_depth: 'GD' };
 
   tiers.forEach(tier => {
-    if (!state.activeTiers.has(tier)) return;
     const tierSkills = allSkills.filter(s => s.tier === tier);
     if (!tierSkills.length) return;
 
@@ -1210,7 +1215,7 @@ function renderGridBody(mainPupils, belowPupils) {
         }
 
         const tr = document.createElement('tr');
-        tr.className = 'skill-row' + (skill.group ? ' grouped-skill' : '');
+        tr.className = 'skill-row' + (skill.group ? ' grouped-skill' : '') + (skill.key_essential ? ' key-skill' : '');
 
         // Skill name cell
         const skillTd = document.createElement('td');
@@ -1272,7 +1277,12 @@ function renderGridBody(mainPupils, belowPupils) {
     });
 
     Object.entries(groups).forEach(([level, pupils]) => {
-      const belowSkills = (SKILLS[level] || []).filter(s => state.activeTiers.has(s.tier));
+      const belowSkills = (() => {
+        const skills = SKILLS[level] || [];
+        if (state.skillFilter === 'key') return skills.filter(s => s.key_essential);
+        if (state.skillFilter === 'non_neg') return skills.filter(s => s.tier === 'non_neg');
+        return skills;
+      })();
 
       // Section header
       const hRow = document.createElement('tr');
@@ -1288,7 +1298,6 @@ function renderGridBody(mainPupils, belowPupils) {
 
       const bTiers = ['non_neg','expected','greater_depth'];
       bTiers.forEach(tier => {
-        if (!state.activeTiers.has(tier)) return;
         const tSkills = belowSkills.filter(s => s.tier === tier);
         if (!tSkills.length) return;
 
@@ -1296,7 +1305,7 @@ function renderGridBody(mainPupils, belowPupils) {
         cats.forEach(cat => {
           tSkills.filter(s => s.category === cat).forEach(skill => {
             const tr = document.createElement('tr');
-            tr.className = 'skill-row';
+            tr.className = 'skill-row' + (skill.key_essential ? ' key-skill' : '');
 
             const skillTd = document.createElement('td');
             skillTd.className = 'skill-col';
@@ -1705,13 +1714,13 @@ function renderPaintBar() {
 // ================================================================
 // TIER FILTERS
 // ================================================================
-function toggleTierFilter(tier, btn) {
-  if (state.activeTiers.has(tier)) {
-    if (state.activeTiers.size <= 1) return; // keep at least one
-    state.activeTiers.delete(tier);
-    btn.classList.remove('active');
+function setSkillFilter(filter, btn) {
+  if (state.skillFilter === filter) {
+    state.skillFilter = 'all';
+    document.querySelectorAll('#filt-key,#filt-nonneg').forEach(b => b.classList.remove('active'));
   } else {
-    state.activeTiers.add(tier);
+    state.skillFilter = filter;
+    document.querySelectorAll('#filt-key,#filt-nonneg').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
   }
   if (state.currentClassId) renderGrid();
@@ -1730,20 +1739,12 @@ function toggleProfileFilter(filter) {
 }
 
 function collapseAll() {
-  state.activeTiers = new Set(['expected']);
-  ['expected','greater_depth','non_neg'].forEach(t => {
-    const btn = document.getElementById('filt-' + (t === 'non_neg' ? 'nonneg' : t === 'greater_depth' ? 'gd' : t));
-    if (btn) btn.classList.toggle('active', t === 'expected');
-  });
-  if (state.currentClassId) renderGrid();
+  setSkillFilter('key', document.getElementById('filt-key'));
 }
 
 function expandAll() {
-  ['expected','greater_depth','non_neg'].forEach(t => state.activeTiers.add(t));
-  ['filt-expected','filt-gd','filt-nonneg'].forEach(id => {
-    const btn = document.getElementById(id);
-    if (btn) btn.classList.add('active');
-  });
+  state.skillFilter = 'all';
+  document.querySelectorAll('#filt-key,#filt-nonneg').forEach(b => b.classList.remove('active'));
   if (state.currentClassId) renderGrid();
 }
 
