@@ -596,6 +596,65 @@
   .clf-stat .clf-green { color:#16a34a; font-weight:700; }
   .clf-strand-block { margin-bottom:6px; }
 
+  /* ── Gantt / Term Planner view ── */
+  .gantt-wrap { padding: 16px 0 40px; }
+  .gantt-header { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; padding: 0 2px; flex-wrap: wrap; }
+  .gantt-title { font-size: 18px; font-weight: 900; }
+  .gantt-hint { font-size: 12px; color: #94a3b8; }
+  .gantt-scroll { overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 10px; }
+  .gantt-inner { display: flex; flex-direction: column; font-size: 12px; }
+  .gantt-row { display: flex; }
+  .gantt-weeks-row { border-bottom: 2px solid #e5e7eb; }
+  .gantt-corner {
+    width: 130px; flex-shrink: 0; padding: 6px 10px;
+    background: #f8fafc; border-right: 2px solid #e5e7eb;
+    display: flex; align-items: center;
+    font-weight: 800; font-size: 10px; color: #64748b;
+    text-transform: uppercase; letter-spacing: .06em;
+  }
+  .gantt-term-band {
+    padding: 5px 8px; display: flex; align-items: center; gap: 6px;
+    border-right: 2px solid rgba(0,0,0,.1); font-weight: 800; flex-shrink: 0; overflow: hidden;
+  }
+  .gantt-term-band:last-child { border-right: none; }
+  .gantt-term-label { font-size: 12px; white-space: nowrap; }
+  .gantt-term-dates { font-size: 10px; opacity: .72; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gantt-wk-cell {
+    width: 28px; flex-shrink: 0; text-align: center;
+    padding: 4px 2px; font-size: 9px; font-weight: 600; color: #94a3b8;
+    border-right: 1px solid #f1f5f9;
+  }
+  .gantt-sob-row { border-bottom: 1px solid #f1f5f9; }
+  .gantt-sob-row:last-child { border-bottom: none; }
+  .gantt-label-cell {
+    width: 130px; flex-shrink: 0; padding: 8px 10px;
+    background: #f8fafc; border-right: 2px solid #e5e7eb;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .gantt-sob-name { font-size: 11px; font-weight: 700; color: #1e293b; }
+  .gantt-bars-area {
+    position: relative; height: 44px;
+    background: repeating-linear-gradient(90deg, transparent, transparent 27px, #f1f5f9 27px, #f1f5f9 28px);
+    flex: 1;
+  }
+  .gantt-bar {
+    position: absolute; top: 6px; bottom: 6px;
+    border-radius: 5px; cursor: pointer;
+    display: flex; align-items: center; overflow: hidden;
+    padding: 0 7px; transition: opacity .12s, box-shadow .12s; min-width: 4px;
+  }
+  .gantt-bar:hover { opacity: .82; box-shadow: 0 2px 8px rgba(0,0,0,.22); }
+  .gantt-bar-label {
+    color: #fff; font-size: 11px; font-weight: 700;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0,0,0,.25);
+  }
+  .gantt-vline {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    background: #cbd5e1; pointer-events: none; z-index: 1;
+  }
+  .gantt-empty { padding: 40px; text-align: center; color: #94a3b8; font-size: 13px; }
+
 </style>
 </head>
 <body>
@@ -616,7 +675,7 @@
   <button class="nav-export-btn" onclick="openImporter()" style="background:#dcfce7;color:#166534;border-color:#bbf7d0">Import Excel</button>
   <button class="nav-export-btn" onclick="openRollover(curYear)" style="background:#fef2f2;color:#dc2626;border-color:#fecaca" title="Prepare this year group for a new school year">↺ Rollover</button>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">27.07.26f</span>
+  <span class="nav-version">27.07.26g</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -628,7 +687,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>27.07.26f</strong>
+  <strong>27.07.26g</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -1408,6 +1467,7 @@ function renderYear(k) {
   });
   h += `<a class="nav-link" href="#" onclick="event.preventDefault();showCoverage('${k}')" style="border-color:#7c3aed;color:#7c3aed;margin-left:auto;min-width:auto;display:flex;align-items:center;gap:5px"><img src="icons/writer.png" style="height:18px;width:18px;object-fit:contain"> Writing Coverage</a>`;
   h += `<a class="nav-link" href="#" onclick="event.preventDefault();showCLFCoverage('${k}')" style="border-color:#0f766e;color:#0f766e;min-width:auto;display:flex;align-items:center;gap:5px"><img src="icons/enquiry-coverage.png" style="height:18px;width:18px;object-fit:contain"> Enquiry Coverage</a>`;
+  h += `<a class="nav-link" href="#" onclick="event.preventDefault();showGantt('${k}')" style="border-color:#f59e0b;color:#b45309;min-width:auto;display:flex;align-items:center;gap:4px">📅 Term Planner</a>`;
   h += `</div>`;
 
   // ── Year at a glance ──
@@ -2739,6 +2799,106 @@ function openRollover(k) {
     saveData(k, d);
     renderYear(k);
   });
+}
+
+// ════════════════════════════════════════════════════════════
+// GANTT / TERM PLANNER VIEW
+// ════════════════════════════════════════════════════════════
+function showGantt(k) {
+  const d = YEAR_DATA[k];
+  const enqs = d.enquiries;
+  const WK = 28; // px per week column
+  const LABEL = 130; // px for subject label column
+
+  const TERM_COLOURS = [
+    { bg:'#dbeafe', fg:'#1e3a8a' }, { bg:'#fef3c7', fg:'#78350f' },
+    { bg:'#dcfce7', fg:'#14532d' }, { bg:'#ffe4e6', fg:'#881337' },
+    { bg:'#f3e8ff', fg:'#4c1d95' }, { bg:'#e0f2fe', fg:'#0369a1' },
+  ];
+
+  const activeSobs = SOB_ORDER.filter(s => enqs.some(e => e.stateOfBeing === s));
+
+  let h = `<div class="gantt-wrap">`;
+
+  // ── Header ──
+  h += `<div class="gantt-header">
+    <button class="cov-back" onclick="renderYear('${k}')">← Back</button>
+    <span class="gantt-title">Term Planner — ${k} · ${d.learningZone.replace(' Learning Zone','')}</span>
+    <span class="gantt-hint">Click any bar to jump to that enquiry card</span>
+  </div>`;
+
+  h += `<div class="gantt-scroll"><div class="gantt-inner">`;
+
+  // ── Term band header row ──
+  h += `<div class="gantt-row">`;
+  h += `<div class="gantt-corner"></div>`;
+  TERM_WK.forEach((wks, ti) => {
+    const tc = TERM_COLOURS[ti];
+    const dr = termDateRange(ti + 1);
+    h += `<div class="gantt-term-band" style="width:${wks * WK}px;background:${tc.bg};color:${tc.fg}">
+      <span class="gantt-term-label">T${ti + 1}</span>
+      <span class="gantt-term-dates">${dr}</span>
+    </div>`;
+  });
+  h += `</div>`;
+
+  // ── Week number header row ──
+  h += `<div class="gantt-row gantt-weeks-row">`;
+  h += `<div class="gantt-corner">Subject</div>`;
+  for (let ti = 0; ti < 6; ti++) {
+    for (let wi = 0; wi < TERM_WK[ti]; wi++) {
+      const gw = TERM_GS[ti] + wi + 1;
+      const dt = (WEEK_DATES[ti] || [])[wi] || '';
+      h += `<div class="gantt-wk-cell" title="W${gw}${dt ? ' · w/c ' + dt : ''}">${gw}</div>`;
+    }
+  }
+  h += `</div>`;
+
+  // ── Subject rows ──
+  if (activeSobs.length === 0) {
+    h += `<div class="gantt-empty">No enquiries found for ${k}.</div>`;
+  } else {
+    activeSobs.forEach(sob => {
+      const sobEnqs = enqs.filter(e => e.stateOfBeing === sob);
+      const colour = SOB_BG[sob] || '#6b7280';
+
+      h += `<div class="gantt-row gantt-sob-row">`;
+      h += `<div class="gantt-label-cell" style="border-left:3px solid ${colour}">
+        ${sobImg(sob, 15)}
+        <span class="gantt-sob-name">${sob}</span>
+      </div>`;
+
+      h += `<div class="gantt-bars-area">`;
+
+      // Term boundary vertical lines
+      [7, 14, 20, 25, 32].forEach(offset => {
+        h += `<div class="gantt-vline" style="left:${offset * WK}px"></div>`;
+      });
+
+      // Enquiry bars
+      sobEnqs.forEach(e => {
+        const gs = TERM_GS[e.term - 1] + e.weekStart - 1; // 0-based week offset
+        const ge = TERM_GS[e.term - 1] + e.weekEnd - 1;
+        const left = gs * WK;
+        const width = Math.max((ge - gs + 1) * WK - 3, 4);
+        const q = e.keyQuestion || '—';
+        const label = q.length > 60 ? q.slice(0, 60) + '…' : q;
+        const wkLabel = wkRange(e);
+        h += `<div class="gantt-bar" style="left:${left}px;width:${width}px;background:${colour}"
+                title="${wkLabel} · ${q.replace(/"/g, '&quot;')}"
+                onclick="renderYear('${k}');setTimeout(()=>{ const el=document.getElementById('enq-${e.id}'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },130)">
+          <span class="gantt-bar-label">${label}</span>
+        </div>`;
+      });
+
+      h += `</div></div>`; // .gantt-bars-area .gantt-sob-row
+    });
+  }
+
+  h += `</div></div></div>`; // .gantt-inner .gantt-scroll .gantt-wrap
+
+  document.getElementById('main').innerHTML = h;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // ════════════════════════════════════════════════════════════
