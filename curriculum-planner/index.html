@@ -694,7 +694,7 @@
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">27.07.26i</span>
+  <span class="nav-version">27.07.26j</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -706,7 +706,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>27.07.26i</strong>
+  <strong>27.07.26j</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -2891,29 +2891,47 @@ function showGantt(k) {
   h += `</div>`;
 
   // ── Subject rows ──
-  if (activeSobs.length === 0) {
-    h += `<div class="gantt-empty">No enquiries found for ${k}.</div>`;
-  } else {
-    activeSobs.forEach(sob => {
-      const sobEnqs = enqs.filter(e => e.stateOfBeing === sob);
-      const colour = SOB_BG[sob] || '#6b7280';
+  activeSobs.forEach(sob => {
+    const sobEnqs = enqs.filter(e => e.stateOfBeing === sob);
+    const colour = SOB_BG[sob] || '#6b7280';
+    // Wider-curriculum fallback: subjects with no enquiries pull from WIDER_DEF
+    const widerEntry = sobEnqs.length === 0 ? WIDER_DEF.find(w => w.name === sob) : null;
 
-      h += `<div class="gantt-row gantt-sob-row">`;
-      h += `<div class="gantt-label-cell" style="border-left:3px solid ${colour}">
-        ${sobImg(sob, 15)}
-        <span class="gantt-sob-name">${sob}</span>
-      </div>`;
+    h += `<div class="gantt-row gantt-sob-row">`;
+    h += `<div class="gantt-label-cell" style="border-left:3px solid ${colour}">
+      ${sobImg(sob, 15)}
+      <span class="gantt-sob-name">${sob}</span>
+    </div>`;
+    h += `<div class="gantt-bars-area">`;
 
-      h += `<div class="gantt-bars-area">`;
+    // Term boundary vertical lines
+    [7, 14, 20, 25, 32].forEach(offset => {
+      h += `<div class="gantt-vline" style="left:${offset * WK}px"></div>`;
+    });
 
-      // Term boundary vertical lines
-      [7, 14, 20, 25, 32].forEach(offset => {
-        h += `<div class="gantt-vline" style="left:${offset * WK}px"></div>`;
-      });
-
-      // Enquiry bars
+    if (widerEntry) {
+      // Wider curriculum — one full-term bar per term that has content
+      const rowLabel = widerEntry.rows[0].label;
+      const wKey = widerEntry.key;
+      for (let ti = 0; ti < 6; ti++) {
+        const val = getWiderCell(k, wKey, rowLabel, ti);
+        if (!val) continue;
+        const left = TERM_GS[ti] * WK;
+        const width = Math.max(TERM_WK[ti] * WK - 3, 4);
+        const stripped = val.replace(/^Oak National Academy[:\s]*/i, '').trim();
+        // Take only the part before " — " to drop subtitles; full text stays in tooltip
+        const shortened = stripped.includes(' — ') ? stripped.split(' — ')[0].trim() : stripped;
+        const label = shortened.length > 44 ? shortened.slice(0, 44) + '…' : shortened;
+        h += `<div class="gantt-bar" style="left:${left}px;width:${width}px;background:${colour}"
+                title="${val.replace(/"/g, '&quot;')}"
+                onclick="renderYear('${k}');setTimeout(()=>{ const el=document.getElementById('s-wider-${wKey}'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },130)">
+          <span class="gantt-bar-label">${label}</span>
+        </div>`;
+      }
+    } else {
+      // Enquiry-based subject
       sobEnqs.forEach(e => {
-        const gs = TERM_GS[e.term - 1] + e.weekStart - 1; // 0-based week offset
+        const gs = TERM_GS[e.term - 1] + e.weekStart - 1;
         const ge = TERM_GS[e.term - 1] + e.weekEnd - 1;
         const left = gs * WK;
         const width = Math.max((ge - gs + 1) * WK - 3, 4);
@@ -2926,10 +2944,10 @@ function showGantt(k) {
           <span class="gantt-bar-label">${label}</span>
         </div>`;
       });
+    }
 
-      h += `</div></div>`; // .gantt-bars-area .gantt-sob-row
-    });
-  }
+    h += `</div></div>`; // .gantt-bars-area .gantt-sob-row
+  });
 
   h += `</div></div></div>`; // .gantt-inner .gantt-scroll .gantt-wrap
 
