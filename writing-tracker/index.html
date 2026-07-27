@@ -521,7 +521,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-interventions" onclick="showTab('interventions')">Interventions</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">27.07.26l</span>
+      <span class="version">27.07.26m</span>
     </div>
   </header>
 
@@ -913,7 +913,15 @@ function setClassFilterState(classId) {
 
 async function onYearChange() {
   state.currentYear = document.getElementById('year-select').value;
-  if (state.currentYearGroup) await loadClassData();
+  state.currentClassId = null;
+  state.currentClass = null;
+  try {
+    const classes = await apiGet('getClasses', { academic_year: state.currentYear });
+    state.classes = classes;
+  } catch (err) { console.error(err); }
+  populateClassSelect();
+  renderAdminClasses();
+  renderAdminPupils();
 }
 
 async function loadClassData() {
