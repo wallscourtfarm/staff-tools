@@ -540,6 +540,35 @@
   .cov-sec-row td { background:#f8fafc; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:#94a3b8; padding:6px 6px 3px; }
   .cov-hint { font-size:11px; color:#94a3b8; margin-bottom:14px; }
 
+  /* ── CLF curriculum coverage view ── */
+  .clf-tabs { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .clf-tab { padding:6px 16px; border-radius:20px; border:2px solid #e2e8f0; background:#fff; font-size:12px; font-weight:700; cursor:pointer; color:#64748b; transition:all .15s; }
+  .clf-tab.active { border-color:currentColor; }
+  .clf-tab[data-subj="science"].active   { color:#0891b2; background:#f0fdfa; border-color:#0891b2; }
+  .clf-tab[data-subj="geography"].active { color:#059669; background:#f0fdf4; border-color:#059669; }
+  .clf-tab[data-subj="history"].active   { color:#d97706; background:#fffbeb; border-color:#d97706; }
+  .clf-tab .clf-gap-pill { display:inline-block; background:#ef4444; color:#fff; border-radius:8px; padding:0 5px; font-size:9px; font-weight:800; margin-left:5px; vertical-align:middle; }
+  .clf-panel { display:none; }
+  .clf-panel.clf-active { display:block; }
+  .clf-strand-hdr { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:#94a3b8; padding:10px 0 4px; border-bottom:1px solid #e2e8f0; margin-bottom:2px; }
+  .clf-item-row { display:flex; align-items:center; gap:10px; padding:5px 4px; border-radius:5px; font-size:12px; line-height:1.4; }
+  .clf-item-row:hover { background:#f8fafc; }
+  .clf-item-row.clf-covered { }
+  .clf-item-row.clf-gap { color:#94a3b8; }
+  .clf-status-icon { flex-shrink:0; width:18px; text-align:center; font-size:13px; }
+  .clf-item-text { flex:1; }
+  .clf-item-row.clf-covered .clf-item-text { color:#1e293b; }
+  .clf-item-row.clf-gap .clf-item-text { color:#94a3b8; }
+  .clf-term-pills { display:flex; gap:4px; flex-wrap:wrap; flex-shrink:0; }
+  .clf-term-pill { display:inline-block; background:#e0f2fe; color:#0369a1; border-radius:4px; padding:1px 6px; font-size:10px; font-weight:700; cursor:default; white-space:nowrap; }
+  .clf-gap-row-bg { background:#fef9f0 !important; }
+  .clf-stats-bar { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
+  .clf-stat { font-size:12px; color:#64748b; }
+  .clf-stat strong { color:#1e293b; }
+  .clf-stat .clf-red { color:#ef4444; font-weight:700; }
+  .clf-stat .clf-green { color:#16a34a; font-weight:700; }
+  .clf-strand-block { margin-bottom:6px; }
+
 </style>
 </head>
 <body>
@@ -559,7 +588,7 @@
   <button class="nav-export-btn" onclick="openImporter()" style="background:#dcfce7;color:#166534;border-color:#bbf7d0">Import Excel</button>
   <button class="nav-export-btn" onclick="openRollover(curYear)" style="background:#fef2f2;color:#dc2626;border-color:#fecaca" title="Prepare this year group for a new school year">↺ Rollover</button>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">27.07.26b</span>
+  <span class="nav-version">27.07.26c</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -1350,6 +1379,7 @@ function renderYear(k) {
     }
   });
   h += `<a class="nav-link" href="#" onclick="event.preventDefault();showCoverage('${k}')" style="border-color:#7c3aed;color:#7c3aed;margin-left:auto;min-width:auto">📊 Writing Coverage</a>`;
+  h += `<a class="nav-link" href="#" onclick="event.preventDefault();showCLFCoverage('${k}')" style="border-color:#0f766e;color:#0f766e;min-width:auto">🗺 CLF Gaps</a>`;
   h += `</div>`;
 
   // ── Year at a glance ──
@@ -2458,6 +2488,167 @@ function covFilter(k, mode) {
   document.getElementById('cov-rows').innerHTML = buildRows(mode === 'gaps');
   document.getElementById('cfb-all').classList.toggle('active', mode === 'all');
   document.getElementById('cfb-gaps').classList.toggle('active', mode === 'gaps');
+}
+
+// ════════════════════════════════════════════════════════════
+// CLF CURRICULUM COVERAGE VIEW
+// ════════════════════════════════════════════════════════════
+function showCLFCoverage(k) {
+  const allEnqs = YEAR_DATA[k]?.enquiries || [];
+  const d = loadData(k);
+
+  // Which subjects are active for this year group?
+  const SUBJ_META = {
+    science:   { label:'Science',   icon:'🔬', sob:'Scientist',  colour:'#0891b2' },
+    geography: { label:'Geography', icon:'🌍', sob:'Geographer', colour:'#059669' },
+    history:   { label:'History',   icon:'📜', sob:'Historian',  colour:'#d97706' },
+  };
+  const activeSubjects = Object.keys(SUBJ_META).filter(subj =>
+    allEnqs.some(e => e.stateOfBeing === SUBJ_META[subj].sob)
+  );
+  if (!activeSubjects.length) {
+    document.getElementById('main').innerHTML = `<div class="cov-wrap">
+      <div class="cov-header"><button class="cov-back" onclick="renderYear('${k}')">← Back</button>
+      <span class="cov-title">CLF Curriculum Coverage</span></div>
+      <p style="color:#94a3b8;padding:20px 0">No Scientist, Geographer or Historian enquiries in this year group.</p>
+    </div>`;
+    return;
+  }
+
+  // Build coverage map: covMap[subj]['si:ii'] = [{term, kq}]
+  const covMap = { science:{}, geography:{}, history:{} };
+  allEnqs.forEach(e => {
+    const subj = COV_SUBJECT[e.stateOfBeing];
+    if (!subj) return;
+    const ov = (d.enquiries||{})[e.id] || {};
+    const items = ov.coverage || [];
+    const term = ov.term ?? e.term;
+    const kq = (ov.keyQuestion || e.keyQuestion || '').slice(0, 55);
+    items.forEach(key => {
+      if (!covMap[subj][key]) covMap[subj][key] = [];
+      covMap[subj][key].push({ term, kq });
+    });
+  });
+
+  // Compute gap counts per subject for tab badges
+  function gapCount(subj) {
+    const strands = COVERAGE_DATA[subj]?.[k] || [];
+    let gaps = 0;
+    strands.forEach((st, si) => st.items.forEach((_, ii) => {
+      if (!covMap[subj][`${si}:${ii}`]) gaps++;
+    }));
+    return gaps;
+  }
+
+  // Build item rows HTML for one subject
+  function buildSubjectRows(subj, gapsOnly) {
+    const strands = COVERAGE_DATA[subj]?.[k] || [];
+    if (!strands.length) return '<p style="color:#94a3b8;font-size:12px;padding:12px 0">No CLF content data for this year group.</p>';
+    let html = '';
+    strands.forEach((st, si) => {
+      const items = st.items.map((item, ii) => {
+        const key = `${si}:${ii}`;
+        const hits = covMap[subj][key] || [];
+        const covered = hits.length > 0;
+        if (gapsOnly && covered) return '';
+        const pills = hits.map(h =>
+          `<span class="clf-term-pill" title="${esc(h.kq)}">T${h.term}</span>`
+        ).join('');
+        return `<div class="clf-item-row ${covered ? 'clf-covered' : 'clf-gap'}${!covered ? ' clf-gap-row-bg' : ''}">
+          <span class="clf-status-icon">${covered ? '✓' : '○'}</span>
+          <span class="clf-item-text">${esc(item)}</span>
+          <span class="clf-term-pills">${pills}</span>
+        </div>`;
+      }).join('');
+      if (gapsOnly && !items.trim()) return;
+      html += `<div class="clf-strand-block">
+        <div class="clf-strand-hdr">${esc(st.strand)}</div>
+        ${items || '<div style="font-size:11px;color:#94a3b8;padding:4px">All items covered ✓</div>'}
+      </div>`;
+    });
+    return html || '<p style="color:#94a3b8;font-size:12px">Nothing to show.</p>';
+  }
+
+  // Overall stats
+  let totalItems = 0, coveredItems = 0;
+  activeSubjects.forEach(subj => {
+    const strands = COVERAGE_DATA[subj]?.[k] || [];
+    strands.forEach((st, si) => st.items.forEach((_, ii) => {
+      totalItems++;
+      if (covMap[subj][`${si}:${ii}`]) coveredItems++;
+    }));
+  });
+  const totalGaps = totalItems - coveredItems;
+
+  // Tabs HTML
+  const firstSubj = activeSubjects[0];
+  const tabsHtml = activeSubjects.map(subj => {
+    const m = SUBJ_META[subj];
+    const gaps = gapCount(subj);
+    return `<button class="clf-tab${subj===firstSubj?' active':''}" data-subj="${subj}"
+      style="color:${subj===firstSubj?m.colour:'#64748b'}"
+      onclick="clfSwitchTab('${k}',this,'${subj}')">
+      ${m.icon} ${m.label}${gaps ? `<span class="clf-gap-pill">${gaps}</span>` : ''}
+    </button>`;
+  }).join('');
+
+  // Subject panels HTML
+  const panelsHtml = activeSubjects.map(subj =>
+    `<div class="clf-panel${subj===firstSubj?' clf-active':''}" id="clf-panel-${subj}" data-subj="${subj}">
+      ${buildSubjectRows(subj, false)}
+    </div>`
+  ).join('');
+
+  document.getElementById('main').innerHTML = `<div class="cov-wrap">
+    <div class="cov-header">
+      <button class="cov-back" onclick="renderYear('${k}')">← Back</button>
+      <span class="cov-title">${k} CLF Curriculum Coverage</span>
+      <span class="clf-stats-bar">
+        <span class="clf-stat"><strong>${coveredItems}</strong> of <strong>${totalItems}</strong> objectives covered</span>
+        ${totalGaps ? `<span class="clf-stat"><span class="clf-red">▲ ${totalGaps} gap${totalGaps>1?'s':''} remaining</span></span>` : `<span class="clf-stat"><span class="clf-green">✓ All objectives covered</span></span>`}
+      </span>
+    </div>
+    <div class="clf-tabs">${tabsHtml}</div>
+    <div class="cov-filter-bar">
+      <span style="font-size:11px;color:#94a3b8;font-weight:600">Show:</span>
+      <button class="cov-filter-btn active" id="clf-btn-all" onclick="clfCovFilter('${k}','all')">All objectives</button>
+      <button class="cov-filter-btn" id="clf-btn-gaps" onclick="clfCovFilter('${k}','gaps')">Gaps only</button>
+    </div>
+    <p class="cov-hint">Hover a <strong>T1–T6</strong> pill to see which enquiry covered that objective. Tick objectives from within each enquiry card.</p>
+    ${panelsHtml}
+  </div>`;
+
+  // Store build function on element for filter switching
+  document.getElementById('main')._clfBuild = buildSubjectRows;
+  document.getElementById('main')._clfK = k;
+  document.getElementById('main')._clfActive = firstSubj;
+}
+
+function clfSwitchTab(k, btn, subj) {
+  // Update tab buttons
+  btn.closest('.clf-tabs').querySelectorAll('.clf-tab').forEach(t => {
+    const ts = t.dataset.subj;
+    const active = ts === subj;
+    t.classList.toggle('active', active);
+    const meta = { science:'#0891b2', geography:'#059669', history:'#d97706' };
+    t.style.color = active ? (meta[ts]||'#64748b') : '#64748b';
+  });
+  // Show/hide panels
+  document.querySelectorAll('.clf-panel').forEach(p => p.classList.toggle('clf-active', p.dataset.subj === subj));
+  document.getElementById('main')._clfActive = subj;
+  // Reset filter to "All" on tab switch
+  clfCovFilter(k, 'all');
+}
+
+function clfCovFilter(k, mode) {
+  const main = document.getElementById('main');
+  const buildRows = main._clfBuild;
+  if (!buildRows) return;
+  const activeSubj = main._clfActive;
+  const panel = document.getElementById(`clf-panel-${activeSubj}`);
+  if (panel) panel.innerHTML = buildRows(activeSubj, mode === 'gaps');
+  document.getElementById('clf-btn-all').classList.toggle('active', mode === 'all');
+  document.getElementById('clf-btn-gaps').classList.toggle('active', mode === 'gaps');
 }
 
 // ════════════════════════════════════════════════════════════
