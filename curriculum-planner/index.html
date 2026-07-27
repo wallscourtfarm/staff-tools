@@ -694,7 +694,7 @@
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">27.07.26j</span>
+  <span class="nav-version">27.07.26k</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -706,7 +706,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>27.07.26j</strong>
+  <strong>27.07.26k</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -2852,7 +2852,15 @@ function showGantt(k) {
     { bg:'#f3e8ff', fg:'#5b21b6' }, { bg:'#fefce8', fg:'#854d0e' },
   ];
 
-  const activeSobs = SOB_ORDER; // show all subjects, empty rows make gaps visible
+  // Build row list from MASTER_ORDER; skip grouped sub-items (Handwriting, Spelling)
+  const ganttRows = MASTER_ORDER.map(item => {
+    if (item.type === 'sob') {
+      return { isSob: true, name: item.key, colour: SOB_BG[item.key] || '#6b7280', icon: sobImg(item.key, 15) };
+    }
+    const wd = WIDER_DEF.find(w => w.key === item.key);
+    if (!wd || wd.group) return null;
+    return { isSob: false, name: wd.name, colour: wd.colour, icon: wd.icon + ' ', widerEntry: wd };
+  }).filter(Boolean);
 
   let h = `<div class="gantt-wrap">`;
 
@@ -2891,59 +2899,54 @@ function showGantt(k) {
   h += `</div>`;
 
   // ── Subject rows ──
-  activeSobs.forEach(sob => {
-    const sobEnqs = enqs.filter(e => e.stateOfBeing === sob);
-    const colour = SOB_BG[sob] || '#6b7280';
-    // Wider-curriculum fallback: subjects with no enquiries pull from WIDER_DEF
-    const widerEntry = sobEnqs.length === 0 ? WIDER_DEF.find(w => w.name === sob) : null;
+  ganttRows.forEach(row => {
+    const { isSob, name, colour, icon, widerEntry } = row;
 
     h += `<div class="gantt-row gantt-sob-row">`;
     h += `<div class="gantt-label-cell" style="border-left:3px solid ${colour}">
-      ${sobImg(sob, 15)}
-      <span class="gantt-sob-name">${sob}</span>
+      ${icon}<span class="gantt-sob-name">${name}</span>
     </div>`;
     h += `<div class="gantt-bars-area">`;
 
-    // Term boundary vertical lines
     [7, 14, 20, 25, 32].forEach(offset => {
       h += `<div class="gantt-vline" style="left:${offset * WK}px"></div>`;
     });
 
-    if (widerEntry) {
-      // Wider curriculum — one full-term bar per term that has content
-      const rowLabel = widerEntry.rows[0].label;
-      const wKey = widerEntry.key;
-      for (let ti = 0; ti < 6; ti++) {
-        const val = getWiderCell(k, wKey, rowLabel, ti);
-        if (!val) continue;
-        const left = TERM_GS[ti] * WK;
-        const width = Math.max(TERM_WK[ti] * WK - 3, 4);
-        const stripped = val.replace(/^Oak National Academy[:\s]*/i, '').trim();
-        // Take only the part before " — " to drop subtitles; full text stays in tooltip
-        const shortened = stripped.includes(' — ') ? stripped.split(' — ')[0].trim() : stripped;
-        const label = shortened.length > 44 ? shortened.slice(0, 44) + '…' : shortened;
-        h += `<div class="gantt-bar" style="left:${left}px;width:${width}px;background:${colour}"
-                title="${val.replace(/"/g, '&quot;')}"
-                onclick="renderYear('${k}');setTimeout(()=>{ const el=document.getElementById('s-wider-${wKey}'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },130)">
-          <span class="gantt-bar-label">${label}</span>
-        </div>`;
-      }
-    } else {
+    if (isSob) {
       // Enquiry-based subject
-      sobEnqs.forEach(e => {
+      enqs.filter(e => e.stateOfBeing === name).forEach(e => {
         const gs = TERM_GS[e.term - 1] + e.weekStart - 1;
         const ge = TERM_GS[e.term - 1] + e.weekEnd - 1;
         const left = gs * WK;
         const width = Math.max((ge - gs + 1) * WK - 3, 4);
         const q = e.keyQuestion || '—';
         const label = q.length > 60 ? q.slice(0, 60) + '…' : q;
-        const wkLabel = wkRange(e);
         h += `<div class="gantt-bar" style="left:${left}px;width:${width}px;background:${colour}"
-                title="${wkLabel} · ${q.replace(/"/g, '&quot;')}"
+                title="${wkRange(e)} · ${q.replace(/"/g, '&quot;')}"
                 onclick="renderYear('${k}');setTimeout(()=>{ const el=document.getElementById('enq-${e.id}'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },130)">
           <span class="gantt-bar-label">${label}</span>
         </div>`;
       });
+    } else {
+      // Wider-curriculum subject — one full-term bar per term with content
+      const wKey = widerEntry.key;
+      const rowLabel = widerEntry.rows[0].label;
+      for (let ti = 0; ti < 6; ti++) {
+        const val = getWiderCell(k, wKey, rowLabel, ti);
+        if (!val) continue;
+        const left = TERM_GS[ti] * WK;
+        const width = Math.max(TERM_WK[ti] * WK - 3, 4);
+        // Strip provider prefix then subtitle after " — "; take first segment for Maths weekly lists
+        const stripped = val.replace(/^(Oak National Academy|White Rose|Jigsaw)[:\s]*/i, '').trim();
+        const noSub = stripped.includes(' — ') ? stripped.split(' — ')[0].trim() : stripped;
+        const noComma = noSub.includes(',') ? noSub.split(',')[0].trim() : noSub;
+        const label = noComma.length > 44 ? noComma.slice(0, 44) + '…' : noComma;
+        h += `<div class="gantt-bar" style="left:${left}px;width:${width}px;background:${colour}"
+                title="${val.replace(/"/g, '&quot;')}"
+                onclick="renderYear('${k}');setTimeout(()=>{ const el=document.getElementById('s-wider-${wKey}'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },130)">
+          <span class="gantt-bar-label">${label}</span>
+        </div>`;
+      }
     }
 
     h += `</div></div>`; // .gantt-bars-area .gantt-sob-row
