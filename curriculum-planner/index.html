@@ -485,6 +485,18 @@
   .sc-Greater { background:#fdf4ff; color:#581c87; border:1px dashed #a855f7; }
   .sc-Framework { background:#ede9fe; color:#4c1d95; }
 
+  /* ── CLF Coverage panel ── */
+  .cov-toggle { display:flex; align-items:center; gap:8px; background:none; border:1px solid #e2e8f0; border-radius:6px; padding:5px 10px; font-size:11px; font-weight:700; color:#64748b; cursor:pointer; width:100%; text-align:left; }
+  .cov-toggle:hover { background:#f8fafc; border-color:#94a3b8; }
+  .cov-badge { background:#7c3aed; color:#fff; border-radius:10px; padding:1px 7px; font-size:10px; font-weight:700; margin-left:auto; }
+  .cov-panel { display:none; margin-top:8px; }
+  .cov-panel.cov-open { display:block; }
+  .cov-strand { margin-bottom:10px; }
+  .cov-strand-label { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:#94a3b8; margin-bottom:4px; }
+  .cov-item { display:flex; align-items:flex-start; gap:6px; padding:3px 0; font-size:12px; color:#475569; cursor:pointer; line-height:1.4; }
+  .cov-item input[type=checkbox] { margin-top:2px; accent-color:#7c3aed; flex-shrink:0; }
+  .cov-item.cov-checked { color:#3730a3; font-weight:600; }
+
   /* ── Skill picker in modal ── */
   .skill-picker { border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; margin-top:4px; width:100%; box-sizing:border-box; }
   .sp-search { padding:8px 10px; border-bottom:1px solid #e5e7eb; background:#fff; }
@@ -547,7 +559,7 @@
   <button class="nav-export-btn" onclick="openImporter()" style="background:#dcfce7;color:#166534;border-color:#bbf7d0">Import Excel</button>
   <button class="nav-export-btn" onclick="openRollover(curYear)" style="background:#fef2f2;color:#dc2626;border-color:#fecaca" title="Prepare this year group for a new school year">↺ Rollover</button>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">26.07.26b</span>
+  <span class="nav-version">27.07.26b</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -1008,6 +1020,122 @@ const MASTER_ORDER = [
   {type:'wider', key:'dt'},
   {type:'wider', key:'mfl'},
 ];
+const COVERAGE_DATA = {
+  science: {
+    Y1: [
+      { strand:"Everyday Materials", items:["Name common materials (wood, metal, plastic, glass, rock, paper)","Compare materials by properties (hard/soft, rough/smooth, bendy/rigid)","Distinguish natural from man-made materials","Explain why materials are chosen for specific purposes"] },
+      { strand:"Animals", items:["Identify vertebrate groups: fish, amphibians, reptiles, birds, mammals","Sort animals as carnivores, herbivores and omnivores","Understand offspring resemble but are not identical to their parents"] },
+      { strand:"Seasonal Changes", items:["Identify and describe the four seasons","Describe characteristic weather patterns in each season","Recognise the sun as a source of light and warmth","Understand daily weather changes and measure temperature/rainfall"] },
+      { strand:"Plants", items:["Name parts of a plant: root, stem, leaf, flower, seed","Understand basic functions of each plant part","Know what plants need to grow (light, water, warmth)","Distinguish deciduous and evergreen plants"] },
+      { strand:"Human Body", items:["Label basic parts of the human body","Identify the five senses and their associated body parts","Understand the importance of exercise, diet and rest"] },
+      { strand:"Magnetism", items:["Identify everyday uses of magnets","Classify materials as magnetic or non-magnetic","Understand magnets attract/repel and have north/south poles"] }
+    ],
+    Y2: [
+      { strand:"Properties of Matter", items:["Classify materials as solids, liquids or gases","Understand water changes state (freezing, melting, evaporating)","Measure length, volume and temperature using appropriate units","Explain how solid objects change shape (squashing, bending, twisting, stretching)"] },
+      { strand:"Living Things and Habitats", items:["Distinguish living, dead and never-alive things","Describe habitats and microhabitats","Construct and interpret food chains (producer, predator, prey)","Understand how habitat changes can threaten living things"] },
+      { strand:"Human Body: Health", items:["Explain basic needs for survival: food, water, air","Describe the importance of exercise, rest and a balanced diet","Understand hygiene in preventing disease and the role of vaccinations"] },
+      { strand:"Human Body: Systems", items:["Identify the skeletal, muscular, digestive and circulatory systems","Understand that muscles are attached to bones and enable movement","Describe the digestive journey","Understand the heart pumps blood around the body"] }
+    ],
+    Y3: [
+      { strand:"Forces and Magnets", items:["Compare how things move on different surfaces due to friction","Understand magnetic forces can act at a distance without contact","Group materials as magnetic or non-magnetic","Know magnetic poles — attraction and repulsion","Understand how a compass uses Earth's magnetic field"] },
+      { strand:"Rocks and Earth", items:["Describe the layers of the Earth (crust, mantle, core)","Compare the three types of rock: igneous, sedimentary, metamorphic","Explain how fossils are formed","Understand soils are made from rocks and organic matter","Know about volcanoes and geysers"] },
+      { strand:"Plants", items:["Describe functions of roots, stem, leaves and flowers","Understand the life cycle of a flowering plant","Explore pollination, seed formation and seed dispersal","Investigate how water is transported within plants"] },
+      { strand:"Human Body: Digestion and Health", items:["Label and describe parts of the digestive system","Explain the role of different teeth types","Understand the food groups and importance of a healthy diet"] },
+      { strand:"Water Cycle", items:["Explain the water cycle: evaporation, condensation and precipitation","Know the role of clouds; describe cloud types"] },
+      { strand:"Light", items:["Understand objects are seen because light enters the eye","Explain how shadows form when light is blocked","Understand reflection from mirrors and shiny surfaces"] },
+      { strand:"Insects", items:["Identify insect features (six legs, three body parts)","Describe insect life cycles including metamorphosis","Give examples of helpful and harmful insects"] }
+    ],
+    Y4: [
+      { strand:"Electricity", items:["Construct a simple series circuit and name its components","Understand electricity only flows in a complete circuit","Classify materials as conductors or insulators","Understand the role of switches","Represent circuits using symbols in a diagram"] },
+      { strand:"Sound", items:["Understand sound is caused by vibrations","Sound travels through solids, liquids and gases","Understand pitch (frequency) and volume (amplitude)","Understand how ears detect sound and can be damaged by loud sounds"] },
+      { strand:"Classification of Animals", items:["Classify animals as vertebrates or invertebrates","Describe characteristics of the five vertebrate groups","Distinguish cold-blooded from warm-blooded animals"] },
+      { strand:"Muscular and Skeletal System", items:["Name major bones of the human skeleton","Understand muscles are attached to bones by tendons","Distinguish voluntary and involuntary muscle movement"] },
+      { strand:"States of Matter", items:["Compare and group materials as solids, liquids or gases","Understand materials change state when heated or cooled","Measure temperature of state changes in °C","Distinguish melting and boiling; understand reversible changes"] }
+    ],
+    Y5: [
+      { strand:"Life Cycles", items:["Describe the life cycle: birth, growth, reproduction, death","Compare life cycles of mammals, amphibians, insects and birds","Explain metamorphosis in insects"] },
+      { strand:"Human Body: Reproduction", items:["Describe physical changes during puberty","Identify glands and hormones involved","Describe the male and female reproductive systems","Understand fertilisation, pregnancy and birth"] },
+      { strand:"Forces", items:["Identify forces: gravity, air resistance, water resistance, friction","Explain why unsupported objects fall due to gravity","Measure forces using a Newton meter","Understand how levers, pulleys and gears reduce force needed"] },
+      { strand:"Astronomy", items:["Know the Big Bang theory and scale of the universe","Name the eight planets and their position","Explain day and night through Earth's rotation","Understand seasons: Earth's orbit and axial tilt","Explain lunar eclipses and name common constellations"] },
+      { strand:"Atoms, Properties and Changes", items:["Understand all matter is made of atoms","Describe material properties: mass, volume, density, hardness, conductivity","Understand solutions: dissolving, solute, solvent","Describe methods to separate mixtures: filtering, sieving, evaporating","Distinguish reversible (physical) and irreversible (chemical) changes"] }
+    ],
+    Y6: [
+      { strand:"Classifying Living Things", items:["Know the five kingdoms of living things","Use the classification system: Kingdom, Phylum, Class, Order, Family, Genus, Species","Understand cells, tissues, organs and organ systems","Use classification keys to identify vertebrates and invertebrates"] },
+      { strand:"Evolution and Inheritance", items:["Understand how fossils provide evidence of past life","Explain adaptation and how it can lead to evolution","Understand natural selection (survival of the fittest)","Understand that offspring vary from their parents (genetic variation)","Know the work of Charles Darwin"] },
+      { strand:"Circulatory and Respiratory System", items:["Explain the structure and function of the heart (four chambers)","Identify components of blood and the role of each","Know the difference between arteries, veins and capillaries","Describe the respiratory system and how breathing works","Understand how exercise, diet and smoking affect health"] },
+      { strand:"Light", items:["Understand light travels in straight lines","Explain how shadows form and how their size changes","Understand reflection and how mirrors work","Know white light can be split into a spectrum using a prism"] },
+      { strand:"Electricity", items:["Name parts of a series circuit and trace current flow","Associate bulb brightness and buzzer volume with voltage","Compare conductors and non-conductors","Use symbols to represent circuits in a diagram"] }
+    ]
+  },
+  geography: {
+    Y1: [
+      { strand:"UK Locational Knowledge", items:["Know location of school, home, road name and area","Identify the four countries of the UK and their capital cities","Understand the UK as a group of islands; name surrounding seas","Distinguish rural and urban areas"] },
+      { strand:"Seasons and Weather", items:["Identify the four seasons and describe their weather patterns","Understand daily weather changes and how weather is measured","Use fieldwork tools: thermometer, rain gauge, anemometer","Distinguish between weather and climate"] }
+    ],
+    Y2: [
+      { strand:"My Region — South-west England", items:["Know school and home are in the South-west region","Know major waterways in the region (Avon, Severn Estuary, River Parrett)","Know UK regions and use compass points to describe locations"] },
+      { strand:"Continents and Oceans", items:["Name the seven continents and five oceans","Locate hot and cold areas in relation to the Equator and the Poles","Know the shape of the Earth; identify North and South Poles"] },
+      { strand:"Contrasting Study: SW England and Guizhou, China", items:["Compare physical features (mountains, rivers, coast, vegetation)","Compare human features (land use, settlements, trade)","Understand the difference between weather and climate"] },
+      { strand:"Changing Environments", items:["Understand how human behaviour damages environments","Know effects of deforestation, pollution and litter on habitats","Suggest ways to help and protect the environment"] }
+    ],
+    Y3: [
+      { strand:"Exploring My Region — South-west Counties", items:["Know the counties of the South-west (Bristol, Somerset, Gloucestershire, etc.)","Identify significant towns and cities within the South-west","Know physical and human landmarks of the region","Use 4-figure grid references and 8-point compass"] },
+      { strand:"Europe", items:["Locate the UK within Europe on a world map","Name countries in Western, Northern, Southern and Eastern Europe","Know major European capital cities and their countries"] },
+      { strand:"Contrasting Study: England and the Mediterranean", items:["Compare biomes, vegetation belts and climate zones","Understand the temperate and Mediterranean climate zones","Compare topography of England and East Spain","Compare land use, economic activity and trade links"] }
+    ],
+    Y4: [
+      { strand:"Our Capital City — London and SE England", items:["Know counties of the South-east region","Know significant cities in England and their landmarks","Case study of London: national and global significance","Understand latitude, longitude, hemisphere and GMT time zones"] },
+      { strand:"South America", items:["Name countries in South America and locate using maps","Locate using hemispheres, latitude, longitude, Equator and Tropics","Understand time zones and how they differ across South America","Identify physical and human features of South American countries"] },
+      { strand:"Contrasting Study: England and Peru/Brazil", items:["Compare biomes: tropical rainforest, desert, tundra vs temperate","Compare vegetation belts and climate zones","Compare topography (coastal, highland, rainforest)","Compare land use, economic activity and natural resources"] }
+    ],
+    Y5: [
+      { strand:"Waterways — UK Locational Knowledge", items:["Know significant waterways in England (Thames, Avon, Trent, Mersey, etc.)","Understand why waterways are located where they are","Case study: significance of a waterway to a city or region","Use 6-figure grid references and OS maps"] },
+      { strand:"Continents, Biomes and Climate Zones", items:["Name and locate all seven continents and compare their sizes","Describe and compare biomes, vegetation belts and climate zones globally","Know major world cities and their continents"] },
+      { strand:"Water Cycle and Rivers", items:["Explain the water cycle: evaporation, condensation, precipitation, run-off","Know river features: source, mouth, bank, bed, upper/middle/lower course","Understand erosion and deposition","Fieldwork: measure river velocity and cross-section depth"] },
+      { strand:"Natural Resources", items:["Distinguish renewable and non-renewable resources","Know how natural resources are extracted and used","Understand the impact of extraction on the physical landscape","Explain how burning fossil fuels contributes to climate change"] }
+    ],
+    Y6: [
+      { strand:"Highlands — UK Locational Knowledge", items:["Know significant highland areas in the UK","Use 6-figure grid references, directional language and scale bars","Interpret contour lines on OS maps","Case study of a highland area: physical and human features"] },
+      { strand:"Mountains, Volcanoes and Earthquakes", items:["Know Earth's layers: crust, mantle, outer core, inner core","Explain continental drift and tectonic plate movement","Understand how earthquakes form: faults, seismograph, Richter scale, tsunamis","Understand volcanoes: magma, lava, active/dormant/extinct","Know how different mountain types are formed","Know world mountain ranges: Alps, Himalayas, Andes, Appalachians"] },
+      { strand:"Climate Change", items:["Know the Earth's climate has always changed (glacial/interglacial cycles)","Explain how human activity contributes to global warming","Know effects of climate change: rising sea levels, extreme weather, habitat loss","Suggest ways to reduce the impact of climate change"] }
+    ]
+  },
+  history: {
+    Y1: [
+      { strand:"Changes in Locality — Living Memory", items:["Sequence events in the lives of family members chronologically","Create a three-generation family tree","Identify local landmarks and understand their significance","Use 'old', 'new', 'older' to compare photos of school, transport, technology"] },
+      { strand:"Information and Communication Technology", items:["Sequence communication tools from oldest to newest (TV, phone, computer, internet)","Know significant people who revolutionised technology (Baird, Berners-Lee, Gates)","Understand how changes in technology have changed everyday life"] }
+    ],
+    Y2: [
+      { strand:"Victorian Bristol and the Industrial Revolution (1837–1901)", items:["Identify significant Bristol Victorian landmarks (SS Great Britain, Temple Meads, etc.)","Understand the impact of the industrial revolution on Bristol","Know the significance of Isambard Kingdom Brunel","Understand social issues: child labour, workhouses, voting rights, poverty"] },
+      { strand:"Victorian Empire and Global Change", items:["Understand the rise of the British Empire through naval power","Know key events: abolition of slavery (UK 1807, USA 1865)","Understand the Crimean War and the roles of Nightingale and Seacole"] },
+      { strand:"The Restoration and Great Fire of London (1660–1714)", items:["Identify the Restoration era and King Charles II","Understand causes and consequences of the Great Fire of London 1666","Know the significance of Samuel Pepys' diary as a historical source","Understand how the fire changed building regulations"] }
+    ],
+    Y3: [
+      { strand:"The Tudors (1485–1603)", items:["Identify significant Tudor monarchs: Henry VIII, Elizabeth I, Mary Queen of Scots","Understand the Reformation and creation of the Church of England","Know key events: Dissolution of the monasteries, Union of the Crowns","Create a family tree of Tudor monarchs and discuss succession"] },
+      { strand:"The Stuarts (1603–1649)", items:["Discuss the significance of the Gunpowder Plot 1605","Understand the causes and consequences of the English Civil War 1642–1649","Evaluate the reliability of evidence about these events"] },
+      { strand:"European Explorers (1400–1500s)", items:["Identify significant explorers: Drake, Cabot, Columbus, Magellan, Cortez","Understand how technology (ships, navigation) enabled exploration","Know economic and social impact: trading routes, tobacco, chocolate, slave trade","Understand clash of cultures between Europeans and indigenous peoples"] },
+      { strand:"Tudor Civilisation and Culture", items:["Understand Tudor food, entertainment and theatres (Shakespeare)","Compare life for the rich and poor in Tudor society","Understand the importance of trade (Silk Road, trading routes)"] }
+    ],
+    Y4: [
+      { strand:"Anglo-Saxons and Scots (410–1066)", items:["Create a timeline of Anglo-Saxon kingdoms from Roman departure to Normans","Know the seven Anglo-Saxon kingdoms and key rulers (Alfred the Great, Athelston)","Understand the Viking raids and Danelaw","Understand the Battle of Hastings 1066 and its significance","Identify features of Anglo-Saxon culture (Beowulf, Christianity, town names)"] },
+      { strand:"Viking and Anglo-Saxon Struggle for England (789–1066)", items:["Understand how Vikings established Danelaw in East Anglia and Northumbria","Know the significance of Edward the Confessor and William of Normandy","Create a map of Britain showing Anglo-Saxon kingdoms"] },
+      { strand:"Mayan Civilisation (c.250 BC – AD 900)", items:["Identify significant Mayan rulers and gods","Know features of Mayan culture: astronomy, mathematics, calendar, writing","Understand Mayan social structure, farming and city planning","Compare Mayan and Anglo-Saxon civilisations"] },
+      { strand:"Golden Age of Islam (570–1100)", items:["Know key events: birth of Islam, spread of empire, Golden Age (Abbasid)","Understand advances in science, medicine and mathematics","Know significant landmarks: Mecca, House of Wisdom in Baghdad","Understand the Muslim conquest and expansion of the empire"] }
+    ],
+    Y5: [
+      { strand:"Roman Empire — Rise and Culture (43 BC – AD 410)", items:["Know the rise of the Roman Republic; significance of Caesar and Augustus","Understand Roman religion and later shift to Christianity","Understand Roman culture: baths, gladiatorial games, roads, architecture","Know the zenith of the Roman Empire and its reach across continents"] },
+      { strand:"Roman Invasion of Britain", items:["Know the invasion under Claudius (AD 43)","Understand Boudicca and the Iceni revolt (AD 61)","Know Hadrian's Wall and its significance","Understand the Roman legacy in Britain: roads, baths, language, religion"] },
+      { strand:"Ancient Egypt — New Kingdom (1520 BC – 1075 BC)", items:["Know significant pharaohs: Hatshepsut, Akhenaten, Tutankhamun, Rameses II","Understand Egyptian polytheism and burial beliefs","Understand Egyptian culture: art, tombs, obelisks, Valley of the Kings","Know Egyptian technology: Nile use, irrigation, papyrus, trade ships"] },
+      { strand:"Ancient Egypt — Old Kingdom (2575 BC – 2150 BC)", items:["Understand the significance of King Djoser and the first pyramid","Know the development of Egyptian writing and significance of the Rosetta Stone","Place Egypt on a timeline alongside other civilisations studied"] }
+    ],
+    Y6: [
+      { strand:"Stone Age to Iron Age (2.5 million – 800 BC)", items:["Know the three periods: Palaeolithic, Mesolithic, Neolithic","Understand the shift from hunter-gatherers to farming communities","Know technological developments: flint tools, bronze alloy, iron","Identify significant landmarks: Stonehenge, Avebury, Skara Brae","Analyse artefacts and make inferences about prehistoric life"] },
+      { strand:"Ancient Greece (800 BC – 146 AD)", items:["Understand the structure of ancient Greek city-states (Athens, Sparta)","Explain the origins of democracy and compare with modern democracy","Know the Greek gods and compare with other religions studied","Know significant people: Homer, Alexander the Great, Leonidas","Understand the history and legacy of the Olympic Games (776 BC)","Know Greek contributions: philosophy, architecture, mathematics (Archimedes, Pythagoras)"] }
+    ]
+  }
+};
+const COV_SUBJECT = { Scientist:'science', Geographer:'geography', Historian:'history' };
+
 const SDOT = { new:'#dc2626', some:'#d97706', existing:'#16a34a', unknown:'#cbd5e1' };
 const SPILL_TEXT = { new:'New — needs building', some:'Some resources exist', existing:'Existing resources', unknown:'Unknown' };
 
@@ -1138,6 +1266,51 @@ function selectYear(k) {
 // ════════════════════════════════════════════════════════════
 // MAIN RENDER
 // ════════════════════════════════════════════════════════════
+function renderCoveragePanel(k, enq, state) {
+  const subj = COV_SUBJECT[state];
+  if (!subj) return '';
+  const strands = COVERAGE_DATA[subj]?.[k];
+  if (!strands?.length) return '';
+  const selected = new Set(enq.coverage || []);
+  const count = selected.size;
+  const strandHtml = strands.map((st, si) =>
+    `<div class="cov-strand">
+      <div class="cov-strand-label">${esc(st.strand)}</div>
+      ${st.items.map((item, ii) => {
+        const key = `${si}:${ii}`;
+        const checked = selected.has(key);
+        return `<label class="cov-item${checked?' cov-checked':''}">
+          <input type="checkbox" ${checked?'checked':''} onchange="toggleCoverage('${k}','${esc(enq.id)}',this,'${key}')">
+          ${esc(item)}
+        </label>`;
+      }).join('')}
+    </div>`
+  ).join('');
+  return `<div class="enquiry-section cov-section">
+    <button class="cov-toggle" onclick="this.nextElementSibling.classList.toggle('cov-open')">
+      📋 CLF Content &amp; Skills
+      ${count ? `<span class="cov-badge">${count} selected</span>` : ''}
+    </button>
+    <div class="cov-panel">${strandHtml}</div>
+  </div>`;
+}
+
+function toggleCoverage(k, id, el, key) {
+  const enq = getEnq(k, id);
+  const sel = new Set(enq.coverage || []);
+  if (el.checked) sel.add(key); else sel.delete(key);
+  saveEnqField(k, id, { coverage: [...sel] });
+  el.closest('.cov-item').classList.toggle('cov-checked', el.checked);
+  const btn = el.closest('.cov-section')?.querySelector('.cov-toggle');
+  if (!btn) return;
+  const count = sel.size;
+  let badge = btn.querySelector('.cov-badge');
+  if (count) {
+    if (!badge) { badge = document.createElement('span'); badge.className = 'cov-badge'; btn.appendChild(badge); }
+    badge.textContent = count + ' selected';
+  } else if (badge) { badge.remove(); }
+}
+
 function renderYear(k) {
   const d = YEAR_DATA[k];
   const enqs = d.enquiries;
@@ -1274,6 +1447,7 @@ function renderYear(k) {
               : `<p class="placeholder">Click ✏️ to assign writing skills…</p>`}
             ${enq.contentSkills ? `<div class="content-lines" style="margin-top:8px">${esc(enq.contentSkills).split('\n').map(l=>l.trim()).filter(Boolean).map(l=>`<div style="padding:2px 0;border-bottom:1px solid #f3f4f6;font-size:12px;color:#64748b">${l}</div>`).join('')}</div>` : ''}
           </div>
+          ${renderCoveragePanel(k, enq, state)}
         </div>
         <div class="links-row">
           <strong>Cross-curricular links:</strong>
