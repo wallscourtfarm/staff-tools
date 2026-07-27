@@ -38,6 +38,20 @@
   }
   .nav-export-btn:hover { background: #e2e8f0; }
   .nav-version { font-size: 11px; color: #94a3b8; font-weight: 700; letter-spacing: .5px; white-space: nowrap; }
+  .nav-admin-wrap { position: relative; }
+  .nav-admin-menu {
+    display: none; position: absolute; right: 0; top: calc(100% + 6px);
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.12); min-width: 170px; z-index: 500; overflow: hidden;
+  }
+  .nav-admin-menu.open { display: block; }
+  .nav-admin-item {
+    display: block; width: 100%; text-align: left; padding: 10px 16px;
+    font-size: 13px; font-weight: 700; color: #374151;
+    background: none; border: none; cursor: pointer; border-bottom: 1px solid #f1f5f9;
+  }
+  .nav-admin-item:last-child { border-bottom: none; }
+  .nav-admin-item:hover { background: #f8fafc; }
   #back-to-top {
     position: fixed; bottom: 24px; right: 24px; z-index: 999;
     width: 36px; height: 36px; border-radius: 50%;
@@ -671,11 +685,16 @@
   <div id="year-bar-inline" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"></div>
   <div class="nav-spacer"></div>
   <button class="nav-export-btn" onclick="window.print()" style="background:#f0fdf4;color:#166534;border-color:#bbf7d0">🖨 Print / PDF</button>
-  <button class="nav-export-btn" onclick="exportJSON()">Export JSON</button>
-  <button class="nav-export-btn" onclick="openImporter()" style="background:#dcfce7;color:#166534;border-color:#bbf7d0">Import Excel</button>
-  <button class="nav-export-btn" onclick="openRollover(curYear)" style="background:#fef2f2;color:#dc2626;border-color:#fecaca" title="Prepare this year group for a new school year">↺ Rollover</button>
+  <div class="nav-admin-wrap">
+    <button class="nav-export-btn" onclick="toggleAdminMenu()">⚙ Admin ▾</button>
+    <div class="nav-admin-menu" id="admin-menu">
+      <button class="nav-admin-item" onclick="exportJSON();toggleAdminMenu()">Export JSON</button>
+      <button class="nav-admin-item" onclick="openImporter();toggleAdminMenu()">Import Excel</button>
+      <button class="nav-admin-item" onclick="openRollover(curYear);toggleAdminMenu()" style="color:#dc2626">↺ Rollover</button>
+    </div>
+  </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">27.07.26g</span>
+  <span class="nav-version">27.07.26h</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -687,7 +706,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>27.07.26g</strong>
+  <strong>27.07.26h</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -1311,6 +1330,11 @@ function getEnq(k, id, stateOfBeing) {
   const ov = (loadData(k).enquiries||{})[id] || {};
   return {...base, ...ov};
 }
+function getMergedEnqs(k) {
+  const base = YEAR_DATA[k]?.enquiries || [];
+  const ovs = loadData(k).enquiries || {};
+  return base.map(e => ({...e, ...(ovs[e.id] || {})}));
+}
 function saveEnqField(k, id, fields) {
   const d = loadData(k);
   d.enquiries = d.enquiries || {};
@@ -1429,7 +1453,7 @@ function toggleCoverage(k, id, el, key) {
 
 function renderYear(k) {
   const d = YEAR_DATA[k];
-  const enqs = d.enquiries;
+  const enqs = getMergedEnqs(k);
   const yc = d.colour;
   const yd = d.colourDark;
   const yl = d.colourLight;
@@ -2802,21 +2826,33 @@ function openRollover(k) {
 }
 
 // ════════════════════════════════════════════════════════════
+// ADMIN DROPDOWN
+// ════════════════════════════════════════════════════════════
+function toggleAdminMenu() {
+  document.getElementById('admin-menu').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  const wrap = document.querySelector('.nav-admin-wrap');
+  if (wrap && !wrap.contains(e.target)) document.getElementById('admin-menu')?.classList.remove('open');
+});
+
+// ════════════════════════════════════════════════════════════
 // GANTT / TERM PLANNER VIEW
 // ════════════════════════════════════════════════════════════
 function showGantt(k) {
   const d = YEAR_DATA[k];
-  const enqs = d.enquiries;
+  const enqs = getMergedEnqs(k);
   const WK = 28; // px per week column
   const LABEL = 130; // px for subject label column
 
+  // T1=Blue, T2=Green, T3=Orange, T4=Pink, T5=Purple, T6=Yellow
   const TERM_COLOURS = [
-    { bg:'#dbeafe', fg:'#1e3a8a' }, { bg:'#fef3c7', fg:'#78350f' },
-    { bg:'#dcfce7', fg:'#14532d' }, { bg:'#ffe4e6', fg:'#881337' },
-    { bg:'#f3e8ff', fg:'#4c1d95' }, { bg:'#e0f2fe', fg:'#0369a1' },
+    { bg:'#dbeafe', fg:'#1e40af' }, { bg:'#dcfce7', fg:'#14532d' },
+    { bg:'#fff7ed', fg:'#c2410c' }, { bg:'#fce7f3', fg:'#9d174d' },
+    { bg:'#f3e8ff', fg:'#5b21b6' }, { bg:'#fefce8', fg:'#854d0e' },
   ];
 
-  const activeSobs = SOB_ORDER.filter(s => enqs.some(e => e.stateOfBeing === s));
+  const activeSobs = SOB_ORDER; // show all subjects, empty rows make gaps visible
 
   let h = `<div class="gantt-wrap">`;
 
