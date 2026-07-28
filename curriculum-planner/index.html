@@ -723,7 +723,7 @@
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">28.07.26c</span>
+  <span class="nav-version">28.07.26d</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -735,7 +735,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>28.07.26c</strong>
+  <strong>28.07.26d</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -1313,17 +1313,19 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbwgkJGVeJHQu1SAlXeoL_Rt
 function loadData(k) { try { return JSON.parse(localStorage.getItem('wfa_cp_'+k)||'{}'); } catch { return {}; } }
 
 function saveData(k, d) {
+  d._ts = Date.now(); // timestamp every save for conflict resolution
   localStorage.setItem('wfa_cp_'+k, JSON.stringify(d));
   if (!GAS_URL) return;
   _setSyncStatus('saving');
+  // no-cors avoids CORS preflight issues with GAS; response is opaque but request reaches server
   fetch(GAS_URL, {
     method: 'POST',
+    mode: 'no-cors',
     headers: {'Content-Type': 'text/plain'},
-    body: JSON.stringify({key: 'wfa_cp_'+k, data: d}),
-    redirect: 'follow'
-  }).then(r => r.json())
-    .then(r => _setSyncStatus(r.ok ? 'saved' : 'error'))
-    .catch(() => _setSyncStatus('offline'));
+    body: JSON.stringify({key: 'wfa_cp_'+k, data: d})
+  })
+  .then(() => _setSyncStatus('saved'))
+  .catch(() => _setSyncStatus('offline'));
 }
 
 function _setSyncStatus(s) {
@@ -1348,7 +1350,23 @@ async function syncFromRemote() {
     const res = await fetch(GAS_URL + '?action=load', {redirect: 'follow'});
     const json = await res.json();
     if (json.ok && json.data) {
-      Object.entries(json.data).forEach(([k, v]) => localStorage.setItem(k, JSON.stringify(v)));
+      Object.entries(json.data).forEach(([k, remote]) => {
+        try {
+          const localStr = localStorage.getItem(k);
+          if (!localStr) {
+            // Nothing local — always take GAS data
+            localStorage.setItem(k, JSON.stringify(remote));
+            return;
+          }
+          const local = JSON.parse(localStr);
+          const localHasContent = local.enquiries && Object.keys(local.enquiries).length > 0;
+          // Only overwrite local if GAS has a newer timestamp
+          // If local has content but no timestamp (legacy), keep it — we can't tell which is newer
+          if ((remote._ts || 0) > (local._ts || (localHasContent ? Infinity : 0))) {
+            localStorage.setItem(k, JSON.stringify(remote));
+          }
+        } catch {}
+      });
     }
     _setSyncStatus('saved');
   } catch { _setSyncStatus('offline'); }
