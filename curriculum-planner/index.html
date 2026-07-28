@@ -225,10 +225,26 @@
   }
   .enquiry-card:hover .card-edit-btn { opacity: 1; }
   .card-edit-btn:hover { background: var(--light-grey); }
-  .card-btns { position: absolute; top: 12px; right: 14px; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
+  .card-btns { position: absolute; top: 12px; right: 14px; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; z-index: 2; }
   .enquiry-card:hover .card-btns { opacity: 1; }
   .card-btn { background: none; border: none; font-size: 16px; cursor: pointer; color: var(--grey); padding: 4px; border-radius: 4px; }
   .card-btn:hover { background: var(--light-grey); }
+  .enq-sob-icon { margin-left: auto; flex-shrink: 0; opacity: 0.18; align-self: center; pointer-events: none; }
+  .enq-sob-icon img { display: block; }
+  .enq-comment-row {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 7px 18px; border-top: 1px solid var(--border); background: #fafbff;
+  }
+  .enq-comment-label { font-size: 13px; flex-shrink: 0; line-height: 1.6; color: #94a3b8; }
+  .enq-comment-edit {
+    flex: 1; font-size: 12px; color: #374151; line-height: 1.55; min-height: 20px;
+    outline: none; border-radius: 4px; padding: 1px 4px;
+  }
+  .enq-comment-edit:empty::before {
+    content: "Add a comment or question for subject leaders…";
+    color: #cbd5e1; font-style: italic; pointer-events: none; display: block;
+  }
+  .enq-comment-edit:focus { background: #eef4ff; box-shadow: inset 0 0 0 1.5px #1798d3; }
 
   /* ── Term dividers ── */
   .term-divider { display: flex; align-items: center; gap: 10px; padding: 14px 0 6px; }
@@ -703,7 +719,7 @@
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">27.07.26q</span>
+  <span class="nav-version">28.07.26a</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -715,7 +731,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>27.07.26q</strong>
+  <strong>28.07.26a</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -1352,6 +1368,9 @@ function saveEnqField(k, id, fields) {
   d.enquiries[id] = {...(d.enquiries[id]||{}), ...fields};
   saveData(k, d);
 }
+function saveComment(el) {
+  saveEnqField(el.dataset.k, el.dataset.id, { comment: el.innerText.trim() });
+}
 function getWiderCell(k, wkey, rowLabel, termIdx) {
   const d = loadData(k);
   const saved = ((d.wider||{})[wkey]||{})[rowLabel]?.[termIdx];
@@ -1556,6 +1575,7 @@ function renderYear(k) {
               ${statusCls ? `<span class="tag ${statusCls}">${SPILL_TEXT[enq.planningStatus]||''}</span>` : ''}
             </div>
           </div>
+          <div class="enq-sob-icon">${sobImg(state, 30)}</div>
         </div>
         <div class="enquiry-body">
           ${(() => {
@@ -1601,6 +1621,12 @@ function renderYear(k) {
             ${enq.contentSkills ? `<div class="content-lines" style="margin-top:8px">${esc(enq.contentSkills).split('\n').map(l=>l.trim()).filter(Boolean).map(l=>`<div style="padding:2px 0;border-bottom:1px solid #f3f4f6;font-size:12px;color:#64748b">${l}</div>`).join('')}</div>` : ''}
           </div>
           ${renderCoveragePanel(k, enq, state)}
+        </div>
+        <div class="enq-comment-row">
+          <span class="enq-comment-label">💬</span>
+          <div class="enq-comment-edit" contenteditable="true"
+            data-k="${k}" data-id="${e.id}"
+            onblur="saveComment(this)">${esc(enq.comment||'')}</div>
         </div>
         <div class="links-row">
           <strong>Cross-curricular links:</strong>
