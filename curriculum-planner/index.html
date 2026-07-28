@@ -352,13 +352,15 @@
   .cross-close:hover { background: var(--border); }
   .cross-body { padding: 20px; overflow-x: auto; }
   .cross-grid { min-width: 900px; }
-  .cross-hdr-row { display: grid; padding-bottom: 10px; border-bottom: 2px solid var(--border); margin-bottom: 12px; }
-  .cross-row { display: grid; margin-bottom: 10px; align-items: start; }
-  .cross-sob-label { display: flex; align-items: flex-start; padding-top: 6px; }
-  .cross-sob-pill { display: inline-flex; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 800; color: #fff; }
-  .cross-cell { background: #fff; border-radius: 8px; border: 2px solid var(--border); padding: 8px 10px; min-height: 60px; cursor: pointer; transition: border-color .1s; }
-  .cross-cell:hover { border-color: #94a3b8; }
-  .cross-cell-empty { background: #f8fafc; border-radius: 8px; border: 2px solid transparent; min-height: 60px; }
+  .cross-hdr-row { display: grid; padding-bottom: 10px; border-bottom: 2px solid #cbd5e1; margin-bottom: 0; }
+  .cross-row { display: grid; align-items: start; border-bottom: 1px solid #e2e8f0; padding: 10px 0; }
+  .cross-row:last-child { border-bottom: none; }
+  .cross-sob-label { display: flex; align-items: center; gap: 6px; padding: 4px 0 4px 8px; }
+  .cross-sob-name { font-size: 11px; font-weight: 800; color: #1e293b; text-transform: uppercase; letter-spacing: .05em; }
+  .cross-cell { background: #fff; border-radius: 8px; border: 1px solid #cbd5e1; padding: 8px 10px; min-height: 60px; cursor: pointer; transition: border-color .1s; }
+  .cross-cell:hover { border-color: #64748b; }
+  .cross-cell-empty { background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; min-height: 60px; }
+  .cross-cell .c-term { font-size: 10px; font-weight: 800; color: #1798d3; margin-bottom: 3px; }
   .cross-cell .c-id { font-size: 11px; font-weight: 800; color: #94a3b8; }
   .cross-cell .c-q { font-size: 12px; font-weight: 600; color: #1e293b; line-height: 1.3; margin-top: 3px; }
   .cross-cell .c-text { font-size: 11px; color: #94a3b8; margin-top: 4px; }
@@ -701,7 +703,7 @@
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">27.07.26p</span>
+  <span class="nav-version">27.07.26q</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -713,7 +715,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>27.07.26p</strong>
+  <strong>27.07.26q</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -1370,7 +1372,7 @@ function saveWiderCell(k, wkey, rowLabel, termIdx, value) {
 // APP STATE
 // ════════════════════════════════════════════════════════════
 let curYear = 'Y1';
-let crossTerm = 1;
+let crossTerm = 0;
 
 // ════════════════════════════════════════════════════════════
 // HELPERS
@@ -2003,9 +2005,11 @@ function closeCross() {
 
 function buildCrossTermChips() {
   const el = document.getElementById('cross-term-chips');
-  el.innerHTML = TERM_NM.map((nm,i) =>
+  let html = `<button class="cross-term-chip${crossTerm===0?' active':''}" onclick="setCrossTerm(0)">All Terms</button>`;
+  html += TERM_NM.map((nm,i) =>
     `<button class="cross-term-chip${crossTerm===i+1?' active':''}" onclick="setCrossTerm(${i+1})">${nm}</button>`
   ).join('');
+  el.innerHTML = html;
 }
 
 function setCrossTerm(t) {
@@ -2016,12 +2020,12 @@ function setCrossTerm(t) {
 
 function renderCross() {
   const t = crossTerm;
-  const allE = YR_KEYS.flatMap(k => (YEAR_DATA[k]?.enquiries||[]).filter(e => e.term === t));
+  const allE = YR_KEYS.flatMap(k => getMergedEnqs(k).filter(e => t === 0 || e.term === t));
   const states = SOB_ORDER.filter(s => allE.some(e => e.stateOfBeing === s));
   const grid = document.getElementById('cross-grid');
-  if (!states.length) { grid.innerHTML = '<p style="color:#94a3b8;padding:20px">No enquiries for this term.</p>'; return; }
+  if (!states.length) { grid.innerHTML = '<p style="color:#94a3b8;padding:20px">No enquiries found.</p>'; return; }
 
-  const cols = `140px ${YR_KEYS.map(()=>'1fr').join(' ')}`;
+  const cols = `150px ${YR_KEYS.map(()=>'1fr').join(' ')}`;
   let h = '';
 
   // Header row
@@ -2029,24 +2033,29 @@ function renderCross() {
   h += '<div></div>';
   YR_KEYS.forEach(k => {
     const d = YEAR_DATA[k];
-    h += `<div style="text-align:center;font-size:12px;font-weight:800;color:${d.colour};padding:6px 0">${k}<br><span style="font-weight:600;color:#64748b;font-size:11px">${d.learningZone.replace(' Learning Zone','')}</span></div>`;
+    h += `<div style="text-align:center;font-size:12px;font-weight:800;color:${d.colour};padding:6px 4px;border-bottom:3px solid ${d.colour}">${k}<br><span style="font-weight:600;color:#64748b;font-size:11px">${d.learningZone.replace(' Learning Zone','')}</span></div>`;
   });
   h += '</div>';
 
   states.forEach(state => {
     const bg = sobBg(state);
-    h += `<div class="cross-row" style="display:grid;grid-template-columns:${cols};gap:8px;margin-bottom:10px">`;
-    h += `<div class="cross-sob-label"><span class="cross-sob-pill" style="background:${bg}">${state}</span></div>`;
+    h += `<div class="cross-row" style="display:grid;grid-template-columns:${cols};gap:8px">`;
+    h += `<div class="cross-sob-label" style="border-left:3px solid ${bg}">
+      ${sobImg(state, 14)}<span class="cross-sob-name">${state}</span>
+    </div>`;
     YR_KEYS.forEach(k => {
-      const enqs = (YEAR_DATA[k]?.enquiries||[]).filter(e => e.term === t && e.stateOfBeing === state);
+      const enqs = getMergedEnqs(k).filter(e => (t === 0 || e.term === t) && e.stateOfBeing === state);
       if (!enqs.length) { h += '<div class="cross-cell-empty"></div>'; return; }
       h += '<div style="display:flex;flex-direction:column;gap:6px">';
       enqs.forEach(e => {
-        const enq = getEnq(k, e.id, e.stateOfBeing);
+        const wkLabel = e.weekEnd > e.weekStart ? `W${e.weekStart}–${e.weekEnd}` : `W${e.weekStart}`;
+        const termBadge = t === 0
+          ? `<div class="c-term">T${e.term} · ${wkLabel}</div>`
+          : `<div class="c-id">${wkLabel}</div>`;
         h += `<div class="cross-cell" onclick="crossNav('${k}','${e.id}')">
-          <div class="c-id">${e.id}</div>
-          <div class="c-q">${esc(enq.keyQuestion)}</div>
-          ${enq.linkedText ? `<div class="c-text">${esc(enq.linkedText.split('·')[0].trim())}</div>` : ''}
+          ${termBadge}
+          <div class="c-q">${esc(e.keyQuestion)}</div>
+          ${e.linkedText ? `<div class="c-text">${esc(e.linkedText.split('·')[0].trim())}</div>` : ''}
         </div>`;
       });
       h += '</div>';
