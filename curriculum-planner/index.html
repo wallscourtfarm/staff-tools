@@ -719,7 +719,7 @@
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">28.07.26a</span>
+  <span class="nav-version">28.07.26b</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -731,7 +731,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>28.07.26a</strong>
+  <strong>28.07.26b</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -1362,6 +1362,19 @@ function getMergedEnqs(k) {
   const ovs = loadData(k).enquiries || {};
   return base.map(e => ({...e, ...(ovs[e.id] || {})}));
 }
+function linkify(text) {
+  if (!text) return '';
+  const pat = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)|https?:\/\/[^\s<"']+/g;
+  const parts = []; let last = 0, m;
+  while ((m = pat.exec(text)) !== null) {
+    parts.push(esc(text.slice(last, m.index)));
+    const url = m[2] || m[0], label = m[1] || m[0];
+    parts.push(`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="color:#1798d3;text-decoration:underline">${esc(label)}</a>`);
+    last = m.index + m[0].length;
+  }
+  parts.push(esc(text.slice(last)));
+  return parts.join('');
+}
 function saveEnqField(k, id, fields) {
   const d = loadData(k);
   d.enquiries = d.enquiries || {};
@@ -1538,7 +1551,7 @@ function renderYear(k) {
 
     h += `<div id="s-${state.toLowerCase().replace(/ /g,'-')}" class="subject-header" style="border-color:${bg};color:${bg}">
       ${sobImg(state, 28)}
-      <h2>${m.heading} — I am a ${m.state}</h2>
+      <h2>Being a ${m.state}</h2>
     </div>`;
 
     let lastTerm = null;
@@ -1652,7 +1665,7 @@ function renderGlanceGrid(k, enqs, yc, yd, yl, activeStates) {
     arr.length ? `${arr[0]} – ${arr[arr.length-1]}` : `T${ti+1}`
   );
   let h = `<div class="overview-card">
-    <h2>Year at a Glance — All Subjects</h2>
+    <h2>Year at a Glance — All States of Being</h2>
     <div class="overview-grid">
       <div class="grid-cell grid-subject" style="background:${yl}">Subject</div>`;
 
@@ -1693,9 +1706,8 @@ function renderGlanceGrid(k, enqs, yc, yd, yl, activeStates) {
           const firstRow = w.rows[0];
           const val = getWiderCell(k, w.key, firstRow.label, t);
           const last = t === 5 ? ' no-right' : '';
-          h += `<div class="grid-cell cell-wider${last}" onclick="openWiderEdit('${k}','${w.key}','${firstRow.label}',${t})">
-            <button class="cell-edit-btn" onclick="event.stopPropagation();openWiderEdit('${k}','${w.key}','${firstRow.label}',${t})">✏️</button>
-            ${val ? `<div class="cell-text">${esc(val)}</div>` : `<div class="edit-hint">Add content…</div>`}
+          h += `<div class="grid-cell cell-wider${last}" onclick="document.getElementById('s-wider-${w.key}').scrollIntoView({behavior:'smooth',block:'start'})">
+            ${val ? `<div class="cell-text">${linkify(val)}</div>` : `<div class="edit-hint">↓ Click to view section</div>`}
           </div>`;
         }
       });
@@ -1712,15 +1724,13 @@ function renderGlanceGrid(k, enqs, yc, yd, yl, activeStates) {
           const v = fmtReaderVal(getWiderCell(k, w.key, row.label, t));
           return v ? `<span style="display:block;font-size:10px;line-height:1.3">${esc(v)}</span>` : '';
         }).filter(Boolean).join('');
-        h += `<div class="grid-cell cell-wider${last}" onclick="openWiderEdit('${k}','reader','Writing linked texts',${t})">
-          <button class="cell-edit-btn" onclick="event.stopPropagation();openWiderEdit('${k}','reader','Writing linked texts',${t})">✏️</button>
-          ${lines || `<div class="edit-hint">Add texts…</div>`}
+        h += `<div class="grid-cell cell-wider${last}" onclick="document.getElementById('s-wider-reader').scrollIntoView({behavior:'smooth',block:'start'})">
+          ${lines || `<div class="edit-hint">↓ Click to view section</div>`}
         </div>`;
       } else {
         const val = getWiderCell(k, w.key, firstRow.label, t);
-        h += `<div class="grid-cell cell-wider${last}" onclick="openWiderEdit('${k}','${w.key}','${firstRow.label}',${t})">
-          <button class="cell-edit-btn" onclick="event.stopPropagation();openWiderEdit('${k}','${w.key}','${firstRow.label}',${t})">✏️</button>
-          ${val ? `<div class="cell-text">${esc(val)}</div>` : `<div class="edit-hint">Add content…</div>`}
+        h += `<div class="grid-cell cell-wider${last}" onclick="document.getElementById('s-wider-${w.key}').scrollIntoView({behavior:'smooth',block:'start'})">
+          ${val ? `<div class="cell-text">${linkify(val)}</div>` : `<div class="edit-hint">↓ Click to view section</div>`}
         </div>`;
       }
     }
@@ -1756,7 +1766,7 @@ function renderWiderSection(k, w, yc, yd) {
       h += `<div class="wt-cell${nr}${nb}" onclick="openWiderEdit('${k}','${w.key}','${esc(row.label)}',${t})">
         <button class="wt-edit-btn" onclick="event.stopPropagation();openWiderEdit('${k}','${w.key}','${esc(row.label)}',${t})">✏️</button>
         ${displayVal
-          ? `<div class="wt-content">${esc(displayVal)}</div>`
+          ? `<div class="wt-content">${linkify(displayVal)}</div>`
           : `<span class="wt-placeholder">Click to add…</span>`}
       </div>`;
     }
