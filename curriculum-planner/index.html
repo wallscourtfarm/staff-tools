@@ -721,7 +721,7 @@
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">28.07.26f</span>
+  <span class="nav-version">28.07.26g</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -733,7 +733,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>28.07.26f</strong>
+  <strong>28.07.26g</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -1395,6 +1395,10 @@ function linkify(text) {
   parts.push(esc(text.slice(last)));
   return parts.join('');
 }
+function linkifyLines(text) {
+  if (!text) return '';
+  return text.split(' · ').map(linkify).join('<br>');
+}
 function saveEnqField(k, id, fields) {
   const d = loadData(k);
   d.enquiries = d.enquiries || {};
@@ -1786,7 +1790,7 @@ function renderWiderSection(k, w, yc, yd) {
       h += `<div class="wt-cell${nr}${nb}" onclick="openWiderEdit('${k}','${w.key}','${esc(row.label)}',${t})">
         <button class="wt-edit-btn" onclick="event.stopPropagation();openWiderEdit('${k}','${w.key}','${esc(row.label)}',${t})">✏️</button>
         ${displayVal
-          ? `<div class="wt-content">${linkify(displayVal)}</div>`
+          ? `<div class="wt-content">${linkifyLines(displayVal)}</div>`
           : `<span class="wt-placeholder">Click to add…</span>`}
       </div>`;
     }
