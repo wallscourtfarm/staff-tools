@@ -58,6 +58,8 @@
     .sess-td { padding: 4px 5px; font-size: 10px; font-weight: 700; text-align: center; background: #fafafa; white-space: nowrap; vertical-align: top !important; padding-top: 8px !important; }
     .am-row .sess-td { color: #1798d3; }
     .pm-row .sess-td { color: #7c3aed; }
+    .am-row .slot-cell { background: #e8f4fb; }
+    .pm-row .slot-cell { background: #f0ecff; }
 
     .slot-cell { padding: 5px; min-height: 40px; }
 
@@ -66,6 +68,8 @@
     .slot-item { display: block; }
     .slot-item.clickable { cursor: pointer; }
     .slot-item.clickable:hover .act-badge { filter: brightness(.93); }
+    .slot-item.planner-item .act-badge { border: 2px dashed rgba(0,0,0,.25); opacity: .82; }
+    .planner-tag { font-size: 8px; font-weight: 600; opacity: .65; margin-left: 4px; vertical-align: top; letter-spacing: .03em; }
     .act-badge { display: block; width: 100%; padding: 4px 7px; border-radius: 5px; font-size: 11px; font-weight: 700; white-space: normal; word-break: break-word; line-height: 1.4; }
     .act-label { }
     .note-icon { font-size: 9px; margin-left: 3px; opacity: .75; }
@@ -249,7 +253,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · 29.07.26j</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · 29.07.26k</footer>
 
 <script>
 // ── Activity types ─────────────────────────────────────────────────────────────
@@ -283,6 +287,9 @@ const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
 const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec?key=wfa_slt';
 
+const PLANNER_REASON_MAP = { 'PPA': 'ppa', 'SENCO': 'senco', 'Phase Lead': 'phase_lead' };
+const PLANNER_SESS_MAP   = { 'AM': 'am', 'PM': 'pm' };
+
 // ── Runtime state ─────────────────────────────────────────────────────────────
 let ACTIVITIES   = [];  // rebuilt from BUILTIN_ACTIVITIES + customActs
 let customActs   = [];  // { id, label, colour } — user-defined additions
@@ -293,6 +300,7 @@ let WEEKS    = [];
 let termTemplate = null;
 let state    = { weekIdx: 0, slots: {} };
 let editMode = false;
+let PLANNER_SLOTS = {}; // weekIdx → tid → di → sess → [{actId, label}]
 
 // ── Activity helpers ──────────────────────────────────────────────────────────
 function rebuildActivities() {
@@ -362,6 +370,41 @@ function parseDate(s) {
   if (p.length !== 3) return null;
   const [d,m,y] = p.map(Number);
   return new Date(y < 100 ? 2000+y : y, m-1, d);
+}
+
+// ── Planner sync helpers ──────────────────────────────────────────────────────
+function buildPlannerLookup(csvText) {
+  const raw = csvText.replace(/^﻿/, '').trim();
+  const start = raw.indexOf('{'), end = raw.lastIndexOf('}');
+  if (start < 0 || end <= start) return {};
+  let json;
+  try {
+    const candidate = raw.slice(start, end + 1);
+    try { json = JSON.parse(candidate); } catch(_) { json = JSON.parse(candidate.replace(/""/g, '"')); }
+  } catch(e) { console.warn('PlannerState parse error', e); return {}; }
+  const lookup = {};
+  for (const [wkStr, slots] of Object.entries(json.weekSlots || {})) {
+    const wk = parseInt(wkStr, 10);
+    lookup[wk] = {};
+    for (const slot of (slots || [])) {
+      const actId = PLANNER_REASON_MAP[slot.reason];
+      if (!actId) continue;
+      const sess = PLANNER_SESS_MAP[slot.session];
+      if (!sess) continue;
+      const { tid } = slot;
+      const di = slot.day;
+      if (!lookup[wk][tid]) lookup[wk][tid] = {};
+      if (!lookup[wk][tid][di]) lookup[wk][tid][di] = {};
+      if (!lookup[wk][tid][di][sess]) lookup[wk][tid][di][sess] = [];
+      const label = slot.reason + (slot.reasonNote ? ' – ' + slot.reasonNote : '');
+      lookup[wk][tid][di][sess].push({ actId, label });
+    }
+  }
+  return lookup;
+}
+
+function getPlannerItems(pid, di, sess) {
+  return (((PLANNER_SLOTS[state.weekIdx] || {})[pid] || {})[di] || {})[sess] || [];
 }
 
 // ── SLT helpers ───────────────────────────────────────────────────────────────
@@ -752,10 +795,20 @@ function renderGrid() {
               <span class="act-badge" style="background:${act.colour};color:${fg};opacity:.7">${act.label}</span>
             </div></td>`;
           }
+          const plannerItems = getPlannerItems(p.id, di, sess);
+          const plannerHtml = plannerItems.map(item => {
+            const act = actById(item.actId);
+            if (!act) return '';
+            const fg = contrastColor(act.colour);
+            return `<div class="slot-item planner-item">
+              <span class="act-badge" style="background:${act.colour};color:${fg}">
+                <span class="act-label">${item.label}</span><span class="planner-tag">RS</span>
+              </span></div>`;
+          }).join('');
           const items = getSlot(p.id, di, sess);
           const itemsHtml = items.map((item, idx) => slotItemHtml(p.id, di, sess, item, idx)).join('');
           const addBtn = `<button class="slot-add-btn" onclick="openItemEditor('${p.id}',${di},'${sess}',-1)">＋ add</button>`;
-          return `<td class="slot-cell"><div class="cell-items">${itemsHtml}${addBtn}</div></td>`;
+          return `<td class="slot-cell"><div class="cell-items">${plannerHtml}${itemsHtml}${addBtn}</div></td>`;
         }).join('');
         return `
           <tr class="am-row">
@@ -787,10 +840,15 @@ async function init() {
     const fetches = [
       fetch(SHEET_BASE+'Staff').then(r=>{if(!r.ok)throw new Error('Staff');return r.text();}),
       fetch(SHEET_BASE+'TermDates').then(r=>{if(!r.ok)throw new Error('Terms');return r.text();}),
+      fetch(SHEET_BASE+'PlannerState').then(r=>r.ok?r.text():null).catch(()=>null),
     ];
     if (SYNC_URL) fetches.push(fetch(SYNC_URL).then(r=>r.text()).catch(()=>null));
 
-    const [staffCsv, termsCsv, remoteRaw] = await Promise.all(fetches);
+    const results = await Promise.all(fetches);
+    const staffCsv   = results[0];
+    const termsCsv   = results[1];
+    const plannerCsv = results[2];
+    const remoteRaw  = results[3] ?? null;
     const sheetSLT   = buildSLT(csvToObjects(staffCsv));
     const sheetWeeks = buildWeeks(csvToObjects(termsCsv));
     if (sheetSLT.length)   SLT   = sheetSLT;
@@ -799,6 +857,7 @@ async function init() {
       if (state.weekIdx === 0) state.weekIdx = currentWeekIdx();
       state.weekIdx = Math.max(0, Math.min(WEEKS.length-1, state.weekIdx));
     }
+    if (plannerCsv) PLANNER_SLOTS = buildPlannerLookup(plannerCsv);
     if (remoteRaw && remoteRaw !== '{}') {
       try {
         const remote = JSON.parse(remoteRaw);
@@ -809,7 +868,8 @@ async function init() {
     localStorage.setItem('wfa_slt_state', JSON.stringify(state));
     localStorage.setItem('wfa_slt_slt',   JSON.stringify(SLT));
     localStorage.setItem('wfa_slt_term',  JSON.stringify(termTemplate));
-    status.textContent = `Sheet loaded · ${SLT.length} SLT members · ${WEEKS.length} weeks`;
+    const plannerWeeks = Object.keys(PLANNER_SLOTS).length;
+    status.textContent = `Sheet loaded · ${SLT.length} SLT members · ${WEEKS.length} weeks${plannerWeeks ? ' · release schedule linked' : ''}`;
     status.className = 'sheet-status ok';
   } catch(e) {
     console.warn('Sheet load failed, using cached data', e);
