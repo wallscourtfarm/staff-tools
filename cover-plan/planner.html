@@ -392,7 +392,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(29.07.26c)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(29.07.26d)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -1687,41 +1687,52 @@ function removeSlot(slotId) {
 function unassignCover(slotId) { const s = slots().find(x => x.id === slotId); if (s) { logChange('unassign_cover', s); s.cover = null; stateSave(); render(); } }
 function changeReason(slotId, reason) { const s = slots().find(x => x.id === slotId); if (s) { logChange('change_reason', s); s.reason = reason; if (reason !== 'Other') s.reasonNote = ''; stateSave(); render(); } }
 function changeReasonNote(slotId, note) { const s = slots().find(x => x.id === slotId); if (s) { s.reasonNote = note; stateSave(); render(); } }
+
+// ── Inline note editor popup ───────────────────────────────────────────────
+function _noteEditorAway(ev) {
+  const popup = document.getElementById('noteEditPopup');
+  if (!popup) { document.removeEventListener('click', _noteEditorAway); return; }
+  if (!popup.contains(ev.target)) commitNoteEditor();
+}
+function closeNoteEditor() {
+  document.getElementById('noteEditPopup')?.remove();
+  document.removeEventListener('click', _noteEditorAway);
+}
+function commitNoteEditor() {
+  const popup = document.getElementById('noteEditPopup');
+  if (!popup) return;
+  const slotId = parseInt(popup.dataset.slotId);
+  const note = (popup.querySelector('input')?.value || '').trim();
+  const s = slots().find(x => x.id === slotId);
+  if (s) { s.reasonNote = note; stateSave(); }
+  closeNoteEditor();
+  render();
+}
 function openNoteEditor(e, slotId) {
   e.stopPropagation();
   e.preventDefault();
   if (document.body.classList.contains('edit-locked')) return;
-  document.getElementById('noteEditPopup')?.remove();
+  closeNoteEditor();
   const s = slots().find(x => x.id === slotId);
   if (!s) return;
   const popup = document.createElement('div');
   popup.id = 'noteEditPopup';
   popup.className = 'note-edit-popup';
-  // Keep popup inside viewport
+  popup.dataset.slotId = String(slotId);
   const px = Math.min(e.clientX + 6, window.innerWidth - 220);
   const py = Math.max(e.clientY - 18, 8);
   popup.style.cssText = `left:${px}px;top:${py}px;`;
-  popup.innerHTML = `<input type="text" placeholder="e.g. Training" value="${s.reasonNote||''}" maxlength="25"><button title="Close" onclick="document.getElementById('noteEditPopup').remove()">✕</button>`;
+  popup.innerHTML = `<input type="text" placeholder="e.g. Training" value="${s.reasonNote||''}" maxlength="25"><button title="Close" onclick="closeNoteEditor()">✕</button>`;
   document.body.appendChild(popup);
   const input = popup.querySelector('input');
   input.focus();
   input.select();
-  function commit() {
-    const note = input.value.trim();
-    const s2 = slots().find(x => x.id === slotId);
-    if (s2) { s2.reasonNote = note; stateSave(); }
-    popup.remove();
-    render();
-  }
   input.addEventListener('keydown', ev => {
-    if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
-    if (ev.key === 'Escape') { popup.remove(); }
+    if (ev.key === 'Enter') { ev.preventDefault(); commitNoteEditor(); }
+    if (ev.key === 'Escape') { closeNoteEditor(); }
   });
-  setTimeout(() => {
-    document.addEventListener('pointerdown', function away(ev) {
-      if (!popup.contains(ev.target)) { commit(); document.removeEventListener('pointerdown', away); }
-    }, { once: false, capture: true });
-  }, 0);
+  // Use 'click' (not pointerdown capture) so delete-button clicks complete first
+  setTimeout(() => document.addEventListener('click', _noteEditorAway), 0);
 }
 function changeEndSession(slotId, endSession) {
   const s = slots().find(x => x.id === slotId);
