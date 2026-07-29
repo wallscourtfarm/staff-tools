@@ -383,7 +383,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(12.07.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(29.07.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -1246,7 +1246,7 @@ function renderGrid() {
                     ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</span> ${s.cover} <span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span><span class="slot-gap"></span>` : ''}
                     <span class="slot-name">${t ? t.name : s.tid}</span>
                     <span class="slot-gap"></span>
-                    <span class="slot-reason">${s.reason}</span>
+                    <span class="slot-reason">${s.reason === 'Other' && s.reasonNote ? s.reasonNote : s.reason}</span>
                   </div>
                   ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
                   <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
@@ -1381,7 +1381,7 @@ function positionSpanStrips(spans) {
           ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</span> ${s.cover} <span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span><span class="slot-gap"></span>` : ''}
           <span class="slot-name">${t ? t.name : s.tid}</span>
           <span class="slot-gap"></span>
-          <span class="slot-reason">${s.reason}</span>
+          <span class="slot-reason">${s.reason === 'Other' && s.reasonNote ? s.reasonNote : s.reason}</span>
         </div>
         ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
         <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
@@ -1434,7 +1434,7 @@ function renderMyView() {
           <span class="my-badge out">OUT</span>
           <div class="my-entry-detail">
             <div class="my-entry-when">${DAYS[s.day]} · ${s.session}</div>
-            <div class="my-entry-info"><select class="reason-sel ${rbCls(s.reason)}" style="padding:1px 5px;border-radius:3px;font-size:11px;border:1px solid #e2e8f0;cursor:pointer" onchange="changeReason(${s.id},this.value)">${reasonOptions(s.tid,s.reason)}</select></div>
+            <div class="my-entry-info"><select class="reason-sel ${rbCls(s.reason)}" style="padding:1px 5px;border-radius:3px;font-size:11px;border:1px solid #e2e8f0;cursor:pointer" onchange="changeReason(${s.id},this.value)">${reasonOptions(s.tid,s.reason)}</select>${s.reason === 'Other' ? `<input class="reason-note" type="text" placeholder="e.g. training" value="${s.reasonNote||''}" onchange="changeReasonNote(${s.id},this.value)" onclick="event.stopPropagation()">` : ''}</div>
             <div class="my-entry-cover">${s.cover ? `Covered by: <strong>${s.cover}</strong>` : s.nocover ? `` : `<span style="color:#c00;font-style:italic">Cover TBC</span>`}</div>
           </div>
         </div>`;
@@ -1449,7 +1449,7 @@ function renderMyView() {
           <div class="my-entry-detail">
             <div class="my-entry-when">${DAYS[s.day]} · ${s.session}</div>
             <div class="my-entry-info">Covering: <strong>${t ? t.name : s.tid}</strong>
-              <select class="reason-sel ${rbCls(s.reason)}" style="padding:1px 5px;border-radius:3px;font-size:11px;border:1px solid #e2e8f0;cursor:pointer;margin-left:6px" onchange="changeReason(${s.id},this.value)">${reasonOptions(s.tid,s.reason)}</select>
+              <select class="reason-sel ${rbCls(s.reason)}" style="padding:1px 5px;border-radius:3px;font-size:11px;border:1px solid #e2e8f0;cursor:pointer;margin-left:6px" onchange="changeReason(${s.id},this.value)">${reasonOptions(s.tid,s.reason)}</select>${s.reason === 'Other' ? `<input class="reason-note" type="text" placeholder="e.g. training" value="${s.reasonNote||''}" onchange="changeReasonNote(${s.id},this.value)" onclick="event.stopPropagation()">` : ''}
             </div>
           </div>
         </div>`;
@@ -1675,7 +1675,7 @@ function removeSlot(slotId) {
 }
 function unassignCover(slotId) { const s = slots().find(x => x.id === slotId); if (s) { logChange('unassign_cover', s); s.cover = null; stateSave(); render(); } }
 function changeReason(slotId, reason) { const s = slots().find(x => x.id === slotId); if (s) { logChange('change_reason', s); s.reason = reason; if (reason !== 'Other') s.reasonNote = ''; stateSave(); render(); } }
-function changeReasonNote(slotId, note) { const s = slots().find(x => x.id === slotId); if (s) { s.reasonNote = note; stateSave(); } }
+function changeReasonNote(slotId, note) { const s = slots().find(x => x.id === slotId); if (s) { s.reasonNote = note; stateSave(); render(); } }
 function changeEndSession(slotId, endSession) {
   const s = slots().find(x => x.id === slotId);
   if (s) {
