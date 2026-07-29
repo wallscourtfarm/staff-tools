@@ -221,10 +221,11 @@
     .action-btn:disabled { opacity:.4; cursor:default; }
 
     /* Whole-school events manager modal */
-    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:200; display:flex; align-items:center; justify-content:center; }
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px 0; }
     .modal-overlay.hidden { display:none; }
-    .modal { background:white; border-radius:10px; padding:22px 24px; width:460px; max-width:94vw; box-shadow:0 12px 40px rgba(0,0,0,.25); }
-    .modal-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    .modal { background:white; border-radius:10px; width:460px; max-width:94vw; max-height:calc(100vh - 40px); box-shadow:0 12px 40px rgba(0,0,0,.25); display:flex; flex-direction:column; overflow:hidden; }
+    .modal-hd { display:flex; align-items:center; justify-content:space-between; padding:22px 24px 16px; flex-shrink:0; }
+    .modal-body { overflow-y:auto; flex:1; padding:0 24px 22px; }
     .modal-hd h2 { font-family:'Nunito',sans-serif; font-size:16px; font-weight:900; color:#1e3a8a; margin:0; }
     .modal-hd button { background:none; border:none; cursor:pointer; font-size:20px; color:#94a3b8; line-height:1; padding:0; }
     .modal-hd button:hover { color:#1e293b; }
@@ -383,7 +384,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(29.07.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(29.07.26b)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -446,25 +447,27 @@ body.edit-locked .notify-btn   { display:none; }
       <h2>School events</h2>
       <button onclick="closeWsModal()">×</button>
     </div>
-    <!-- Sports section -->
-    <div class="ws-section-hd">Sports <small style="font-weight:normal;color:#94a3b8;text-transform:none;letter-spacing:0">— every year group, every term</small></div>
-    <table class="sport-table" id="sportTable"></table>
-    <!-- Other events section -->
-    <div class="ws-section-hd">Other events</div>
-    <div class="ws-list" id="wsEventList"></div>
-    <div class="ws-add-form">
-      <div class="ws-add-row">
-        <label>Day<select id="ws-day">
-          <option value="0">Monday</option><option value="1">Tuesday</option>
-          <option value="2" selected>Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option>
-        </select></label>
-        <label>Session<select id="ws-session">
-          <option>Before School</option><option>AM</option><option>Lunch</option>
-          <option>PM</option><option selected>After School</option>
-        </select></label>
-        <label>Label<input type="text" id="ws-label" placeholder="e.g. Staff Meeting" style="width:130px"></label>
-        <label>Colour<input type="color" id="ws-bg" value="#1e3a8a"></label>
-        <button class="ws-save-btn" onclick="addWsEvent()">Add</button>
+    <div class="modal-body">
+      <!-- Sports section -->
+      <div class="ws-section-hd">Sports <small style="font-weight:normal;color:#94a3b8;text-transform:none;letter-spacing:0">— every year group, every term</small></div>
+      <table class="sport-table" id="sportTable"></table>
+      <!-- Other events section -->
+      <div class="ws-section-hd">Other events</div>
+      <div class="ws-list" id="wsEventList"></div>
+      <div class="ws-add-form">
+        <div class="ws-add-row">
+          <label>Day<select id="ws-day">
+            <option value="0">Monday</option><option value="1">Tuesday</option>
+            <option value="2" selected>Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option>
+          </select></label>
+          <label>Session<select id="ws-session">
+            <option>Before School</option><option>AM</option><option>Lunch</option>
+            <option>PM</option><option selected>After School</option>
+          </select></label>
+          <label>Label<input type="text" id="ws-label" placeholder="e.g. Staff Meeting" style="width:130px"></label>
+          <label>Colour<input type="color" id="ws-bg" value="#1e3a8a"></label>
+          <button class="ws-save-btn" onclick="addWsEvent()">Add</button>
+        </div>
       </div>
     </div>
   </div>
