@@ -376,6 +376,14 @@ body.edit-locked .notify-btn   { display:none; }
     /* Other reason free-text input */
     .reason-note { font-size:10px; border:1px solid #e2e8f0; border-radius:3px; padding:1px 4px; width:68px; color:#374151; background:#fff; margin-left:2px; vertical-align:middle; }
     .reason-note:focus { outline:none; border-color:#1798d3; }
+    /* Clickable "Other" label in slot bar */
+    .slot-reason-other { cursor:pointer; text-decoration:underline dotted; text-decoration-color:#94a3b8; }
+    /* Floating note editor popup */
+    .note-edit-popup { position:fixed; background:white; border:2px solid #1798d3; border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,.18); z-index:10001; padding:6px 8px; display:flex; align-items:center; gap:6px; }
+    .note-edit-popup input { border:1px solid #e2e8f0; border-radius:4px; padding:5px 9px; font-size:13px; width:140px; outline:none; color:#111; }
+    .note-edit-popup input:focus { border-color:#1798d3; }
+    .note-edit-popup button { background:none; border:none; cursor:pointer; color:#94a3b8; font-size:16px; line-height:1; padding:0 2px; }
+    .note-edit-popup button:hover { color:#dc2626; }
   </style>
 </head>
 <body>
@@ -384,7 +392,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(29.07.26b)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(29.07.26c)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -1249,7 +1257,7 @@ function renderGrid() {
                     ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</span> ${s.cover} <span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span><span class="slot-gap"></span>` : ''}
                     <span class="slot-name">${t ? t.name : s.tid}</span>
                     <span class="slot-gap"></span>
-                    <span class="slot-reason">${s.reason === 'Other' && s.reasonNote ? s.reasonNote : s.reason}</span>
+                    ${s.reason === 'Other' ? `<span class="slot-reason slot-reason-other" onpointerdown="event.stopPropagation()" onclick="openNoteEditor(event,${s.id})">${s.reasonNote || 'Other'}</span>` : `<span class="slot-reason">${s.reason}</span>`}
                   </div>
                   ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
                   <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
@@ -1679,6 +1687,42 @@ function removeSlot(slotId) {
 function unassignCover(slotId) { const s = slots().find(x => x.id === slotId); if (s) { logChange('unassign_cover', s); s.cover = null; stateSave(); render(); } }
 function changeReason(slotId, reason) { const s = slots().find(x => x.id === slotId); if (s) { logChange('change_reason', s); s.reason = reason; if (reason !== 'Other') s.reasonNote = ''; stateSave(); render(); } }
 function changeReasonNote(slotId, note) { const s = slots().find(x => x.id === slotId); if (s) { s.reasonNote = note; stateSave(); render(); } }
+function openNoteEditor(e, slotId) {
+  e.stopPropagation();
+  e.preventDefault();
+  if (document.body.classList.contains('edit-locked')) return;
+  document.getElementById('noteEditPopup')?.remove();
+  const s = slots().find(x => x.id === slotId);
+  if (!s) return;
+  const popup = document.createElement('div');
+  popup.id = 'noteEditPopup';
+  popup.className = 'note-edit-popup';
+  // Keep popup inside viewport
+  const px = Math.min(e.clientX + 6, window.innerWidth - 220);
+  const py = Math.max(e.clientY - 18, 8);
+  popup.style.cssText = `left:${px}px;top:${py}px;`;
+  popup.innerHTML = `<input type="text" placeholder="e.g. Training" value="${s.reasonNote||''}" maxlength="25"><button title="Close" onclick="document.getElementById('noteEditPopup').remove()">✕</button>`;
+  document.body.appendChild(popup);
+  const input = popup.querySelector('input');
+  input.focus();
+  input.select();
+  function commit() {
+    const note = input.value.trim();
+    const s2 = slots().find(x => x.id === slotId);
+    if (s2) { s2.reasonNote = note; stateSave(); }
+    popup.remove();
+    render();
+  }
+  input.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+    if (ev.key === 'Escape') { popup.remove(); }
+  });
+  setTimeout(() => {
+    document.addEventListener('pointerdown', function away(ev) {
+      if (!popup.contains(ev.target)) { commit(); document.removeEventListener('pointerdown', away); }
+    }, { once: false, capture: true });
+  }, 0);
+}
 function changeEndSession(slotId, endSession) {
   const s = slots().find(x => x.id === slotId);
   if (s) {
