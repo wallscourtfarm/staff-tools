@@ -249,7 +249,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · 29.07.26f</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · 29.07.26g</footer>
 
 <script>
 // ── Activity types ─────────────────────────────────────────────────────────────
@@ -381,7 +381,10 @@ function buildSLT(rows) {
       const col   = (r.Colour||'').trim() || colourById[id] || PALETTE[i%PALETTE.length];
       const role  = (r.Role||'').trim();
       const order = parseInt((r.SLTorder||'').trim(), 10);
-      return { id, name, init, col, role, order: isNaN(order) ? 999 : order };
+      const workingDays = new Set(
+        (r.WorkingDays||'').split(',').map(d=>parseInt(d.trim(),10)).filter(n=>!isNaN(n))
+      );
+      return { id, name, init, col, role, order: isNaN(order) ? 999 : order, workingDays };
     })
     .sort((a, b) => a.order - b.order);
 }
@@ -741,6 +744,15 @@ function renderGrid() {
   document.getElementById('tableBody').innerHTML = SLT.length
     ? SLT.map(p => {
         const makeCell = (sess) => DAYS.map((_,di) => {
+          const dayNum = di + 1; // 1=Mon … 5=Fri
+          const isWorking = p.workingDays.size === 0 || p.workingDays.has(dayNum);
+          if (!isWorking) {
+            const act = actById('non_working');
+            const fg  = contrastColor(act.colour);
+            return `<td class="slot-cell" style="background:#f1f5f9"><div class="cell-items">
+              <span class="act-badge" style="background:${act.colour};color:${fg};opacity:.7">${act.label}</span>
+            </div></td>`;
+          }
           const items = getSlot(p.id, di, sess);
           const itemsHtml = items.map((item, idx) => slotItemHtml(p.id, di, sess, item, idx)).join('');
           const addBtn = `<button class="slot-add-btn" onclick="openItemEditor('${p.id}',${di},'${sess}',-1)">＋ add</button>`;
