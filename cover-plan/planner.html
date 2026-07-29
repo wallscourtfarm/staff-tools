@@ -94,12 +94,12 @@
     body.present-mode .week-grid th, body.present-mode .week-grid td { font-size:12px; }
     body.present-mode .slot-item { font-size:12px; }
     body.present-mode .slot-name { font-size:12.5px; }
-    /* Row heights - taller for AM/PM teaching sessions */
+    /* Row heights */
     .srow-before, .srow-after { height:40px; }
     .srow-lunch { height:50px; }
-    .srow-am, .srow-pm { height:250px; }
-    .grid-cell { vertical-align:top; padding:5px; border-right:1px solid #d1d5db; border-bottom:1px solid #d1d5db; min-width:115px; transition:background .1s; position:relative; }
-    .slots-row { position:absolute; top:5px; bottom:5px; left:5px; right:5px; display:flex; gap:3px; align-items:stretch; }
+    .srow-am, .srow-pm { height:260px; }
+    .grid-cell { vertical-align:top; padding:5px; border-right:1px solid #d1d5db; border-bottom:1px solid #d1d5db; min-width:130px; transition:background .1s; position:relative; }
+    .slots-row { position:absolute; top:5px; bottom:5px; left:5px; right:5px; display:flex; flex-direction:column; gap:3px; align-items:stretch; }
     .grid-cell.teacher-ready { background:#f8faff; }
     .grid-cell.teacher-over  { background:#dbeafe !important; outline:2px dashed #1798d3; outline-offset:-2px; }
     .grid-cell.slot-over     { background:#eff6ff !important; outline:2px dashed #60a5fa; outline-offset:-2px; }
@@ -109,30 +109,32 @@
     .empty-hint { display:flex; align-items:center; justify-content:center; min-height:40px; color:#e2e8f0; font-size:20px; border-radius:4px; border:1.5px dashed transparent; transition:all .1s; }
     .grid-cell.teacher-over .empty-hint,.grid-cell.slot-over .empty-hint { color:#1798d3; border-color:#1798d3; }
 
-    /* Slot items — vertical text layout for narrow columns */
-    .slots-row { display:flex; gap:3px; align-items:stretch; }
-    .slots-row > .slot-item { display:flex; flex-direction:column; width:32px; flex-shrink:0; }
-    .slots-row > .slot-item > .slot-content { flex:1; width:32px; }
-    .span-strips .slot-item { min-width:32px; width:32px; }
-    .span-strips .slot-content { height:100%; width:32px; }
-    .slot-item { position:relative; min-width:32px; font-size:12px; }
+    /* Slot items — horizontal card layout */
+    .slots-row { display:flex; flex-direction:column; gap:3px; align-items:stretch; }
+    .slots-row > .slot-item { display:flex; flex-direction:column; width:auto; flex-shrink:0; }
+    .slots-row > .slot-item > .slot-content { flex:1; width:auto; }
+    .span-strips .slot-item { min-width:0; width:auto; }
+    .span-strips .slot-content { height:100%; width:auto; }
+    .slot-item { position:relative; font-size:12px; }
     .slot-item.slot-dragging { opacity:.3; }
-    .slot-strip { display:none; } /* No longer used - color is now on content border-left */
-    .slot-content { position:relative; z-index:2; border:1.5px solid #e2e8f0; border-left-width:4px; border-left-style:solid; border-radius:4px; overflow:hidden; background:white; cursor:grab; touch-action:none; user-select:none; min-height:50px; display:flex; flex-direction:column; }
+    .slot-strip { display:none; }
+    .slot-content { position:relative; z-index:2; border:1.5px solid #e2e8f0; border-left-width:4px; border-left-style:solid; border-radius:4px; overflow:hidden; background:white; cursor:grab; touch-action:none; user-select:none; height:42px; display:flex; flex-direction:column; }
     .slot-content:active { cursor:grabbing; }
-    .slot-text { writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg); padding:6px 3px; flex:1; white-space:nowrap; overflow:hidden; text-align:center; }
-    .slot-text > * { display:inline; }
-    .slot-gap { display:inline-block; height:12px; }
-    .slot-name { font-weight:700; color:#111; font-size:14px; white-space:nowrap; }
-    .slot-reason { font-size:11px; color:#334155; font-weight:600; white-space:nowrap; }
-    .slot-cover-name { font-size:11px; color:#166534; font-weight:700; white-space:nowrap; }
-    .slot-cover-x { font-size:11px; color:#94a3b8; cursor:pointer; margin-left:3px; }
+    .slot-text { display:flex; align-items:center; gap:5px; padding:4px 20px 4px 8px; flex:1; overflow:hidden; }
+    .slot-text > * { flex-shrink:0; }
+    .slot-gap { display:none; }
+    .slot-fill { flex:1; min-width:0; }
+    .slot-span .slot-text { flex:0 0 38px; }
+    .slot-name { font-weight:700; color:#111; font-size:12px; white-space:nowrap; }
+    .slot-reason { font-size:10px; color:#334155; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:80px; }
+    .slot-cover-name { display:inline-flex; align-items:center; gap:2px; }
+    .slot-cover-x { font-size:11px; color:#94a3b8; cursor:pointer; }
     .slot-cover-x:hover { color:#dc2626; }
-    .slot-avatar { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; color:white; font-size:6px; font-weight:bold; vertical-align:middle; margin-right:4px; }
+    .slot-avatar { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; color:white; font-size:7px; font-weight:bold; flex-shrink:0; }
     .slot-controls { display:flex; flex-direction:column; gap:2px; padding:3px 2px; border-top:1px solid rgba(0,0,0,.07); }
     .slot-del { position:absolute; top:2px; right:2px; background:white; border:1px solid #e2e8f0; border-radius:2px; cursor:pointer; color:#cbd5e1; font-size:10px; width:14px; height:14px; display:flex; align-items:center; justify-content:center; z-index:10; }
     .slot-del:hover { color:#dc2626; border-color:#dc2626; }
-    .slot-cover-zone { padding:3px; font-size:8px; color:#94a3b8; text-align:center; cursor:default; border-top:1px dashed #e2e8f0; }
+    .slot-cover-zone { padding:1px 6px 2px; font-size:9px; color:#94a3b8; text-align:right; cursor:default; border-top:1px dashed #e2e8f0; }
     .slot-cover-zone.over { border-color:#1798d3 !important; background:#bfdbfe !important; }
     .nocover-slot .slot-content { border-color:#cbd5e1 !important; background:#f8fafc; }
 
@@ -392,7 +394,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(29.07.26d)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(29.07.26e)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -516,6 +518,7 @@ const OFF_ALLOC     = new Set(['Before School','Lunch','After School']);
 const SESSION_SHORT = {'Before School':'Before School',AM:'AM',Lunch:'Lunch',PM:'PM','After School':'After School'};
 const DAYS          = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const DAY_IDX       = {Monday:0,Tuesday:1,Wednesday:2,Thursday:3,Friday:4};
+function initials(name) { if (!name) return ''; const p = name.trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : name.slice(0,2).toUpperCase(); }
 const REASONS       = ['PPA','Phase Lead','Leadership','Training','ECT','ECT1','ECT2','RA','SENCO','Sports','Illness','Other'];
 const REASON_CLS    = {'PPA':'PPA','Phase Lead':'Phase','Leadership':'Leadership','Training':'Training',
                        'ECT':'ECT1','ECT1':'ECT1','ECT2':'ECT2','RA':'RA','SENCO':'SENCO','Sports':'Sports','Illness':'Illness','Other':'Other'};
@@ -1254,10 +1257,10 @@ function renderGrid() {
                 <div class="slot-content" style="border-left-color:${col}" onpointerdown="onSlotPointerDown(event,${s.id})">
                   <button class="slot-del" onclick="removeSlot(${s.id});event.stopPropagation()" title="Delete bar">✕</button>
                   <div class="slot-text">
-                    ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</span> ${s.cover} <span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span><span class="slot-gap"></span>` : ''}
-                    <span class="slot-name">${t ? t.name : s.tid}</span>
-                    <span class="slot-gap"></span>
+                    <span class="slot-name">${t ? initials(t.name) : s.tid.slice(0,2).toUpperCase()}</span>
                     ${s.reason === 'Other' ? `<span class="slot-reason slot-reason-other" onpointerdown="event.stopPropagation()" onclick="openNoteEditor(event,${s.id})">${s.reasonNote || 'Other'}</span>` : `<span class="slot-reason">${s.reason}</span>`}
+                    <span class="slot-fill"></span>
+                    ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
                   </div>
                   ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
                   <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
@@ -1366,33 +1369,24 @@ function positionSpanStrips(spans) {
 
     const containerRect = container.getBoundingClientRect();
     const baseSlotItemRect = baseSlotItem.getBoundingClientRect();
-    const slotWidth = baseSlotItemRect.width;
-    const gap = 3; // gap between slot items
+    const width = baseSlotItemRect.width;
+    const CARD_H = 42, gap = 3;
 
-    // Calculate left position: base + (index * (width + gap)) + event offset if needed
-    // Event offset = difference between slots-row left with event (25px) and without (5px) = 20px
-    const firstSession = SESSIONS[startIdx];
-    const firstRowHasEvent = wsEvents.some(e => e.day === s.day && e.session === firstSession) ||
-                              getSessionInfoEvents(state.weekIdx, s.day, firstSession).length > 0;
-    const eventOffset = (!firstRowHasEvent && anyCellHasEvent) ? 20 : 0;
-
-    // Use the first cell's left as base, then add offset for maxSlotIndex
-    const baseLeft = baseSlotItemRect.left - containerRect.left + eventOffset;
-    const left = baseLeft + maxSlotIndex * (slotWidth + gap);
-    const top = rowTops[startIdx];
+    // Horizontal stacking: slots stack vertically, so offset downward by index
+    const left = baseSlotItemRect.left - containerRect.left;
+    const spanRowTop = rowTops[startIdx];
+    const top = spanRowTop + maxSlotIndex * (CARD_H + gap);
     const bottom = rowBottoms[endIdx];
     const height = bottom - top;
 
-    console.log('Creating overlay slot at left:', left, 'top:', top, 'height:', height, 'width:', slotWidth, 'maxSlotIndex:', maxSlotIndex);
-
-    const slotHtml = `<div class="slot-item ${sygCls(yg)} ${s.nocover?'nocover-slot':''}" style="position:absolute;left:${left}px;top:${top}px;width:${slotWidth}px;height:${height}px;">
+    const slotHtml = `<div class="slot-item slot-span ${sygCls(yg)} ${s.nocover?'nocover-slot':''}" style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;">
       <div class="slot-content" style="height:${height}px;border-left-color:${col}" onpointerdown="onSlotPointerDown(event,${s.id})">
         <button class="slot-del" onclick="removeSlot(${s.id});event.stopPropagation()" title="Delete bar">✕</button>
         <div class="slot-text">
-          ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||s.cover.slice(0,2).toUpperCase()}</span> ${s.cover} <span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span><span class="slot-gap"></span>` : ''}
-          <span class="slot-name">${t ? t.name : s.tid}</span>
-          <span class="slot-gap"></span>
+          <span class="slot-name">${t ? initials(t.name) : s.tid.slice(0,2).toUpperCase()}</span>
           <span class="slot-reason">${s.reason === 'Other' && s.reasonNote ? s.reasonNote : s.reason}</span>
+          <span class="slot-fill"></span>
+          ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
         </div>
         ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
         <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
