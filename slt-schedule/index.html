@@ -249,7 +249,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · 29.07.26h</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · 29.07.26i</footer>
 
 <script>
 // ── Activity types ─────────────────────────────────────────────────────────────
@@ -381,9 +381,7 @@ function buildSLT(rows) {
       const col   = (r.Colour||'').trim() || colourById[id] || PALETTE[i%PALETTE.length];
       const role  = (r.SLTlabel||'').trim() || (r.Role||'').trim();
       const order = parseInt((r.SLTorder||'').trim(), 10);
-      const workingDays = new Set(
-        (r.WorkingDays||'').split(',').map(d=>parseInt(d.trim(),10)).filter(n=>!isNaN(n))
-      );
+      const workingDays = (r.WorkingDays||'').split(',').map(d=>parseInt(d.trim(),10)).filter(n=>!isNaN(n));
       return { id, name, init, col, role, order: isNaN(order) ? 999 : order, workingDays };
     })
     .sort((a, b) => a.order - b.order);
@@ -745,7 +743,7 @@ function renderGrid() {
     ? SLT.map(p => {
         const makeCell = (sess) => DAYS.map((_,di) => {
           const dayNum = di + 1; // 1=Mon … 5=Fri
-          const isWorking = p.workingDays.size === 0 || p.workingDays.has(dayNum);
+          const isWorking = !p.workingDays.length || p.workingDays.includes(dayNum);
           if (!isWorking) {
             const act = actById('non_working');
             const fg  = contrastColor(act.colour);
