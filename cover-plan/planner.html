@@ -394,7 +394,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(29.07.26f)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(29.07.26g)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -1572,20 +1572,10 @@ function ptrCommitDrop(x, y) {
               setSlots([...slots(), newSlot]);
               logChange('add', newSlot);
             } else {
-              // Check available entitlements
+              // Always show reason popup so user can pick Other any time
               const used = teacherReasonUsed(d.id);
-              const available = (t.ent || []).filter(e => (used[e.r]||0) < e.n);
-              if (available.length > 1) {
-                // Show popup for reason selection
-                showReasonPopup(d.id, dayIdx, session, available, used, x, y);
-                return; // Don't clear drag yet - popup is showing
-              } else {
-                // Single or no entitlement - use first available
-                const reason = available[0]?.r || firstAvailableReason(d.id);
-                const newSlot = { id: state.nextId++, day: dayIdx, session, endSession: session, tid: d.id, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false };
-                setSlots([...slots(), newSlot]);
-                logChange('add', newSlot);
-              }
+              showReasonPopup(d.id, dayIdx, session, t.ent || [], used, x, y);
+              return; // Don't clear drag yet - popup is showing
             }
           }
         }
@@ -1768,7 +1758,8 @@ function showReasonPopup(tid, dayIdx, session, available, used, x, y) {
   let html = '<div class="reason-popup" id="reasonPopup" style="left:' + x + 'px;top:' + y + 'px;" onclick="event.stopPropagation()">';
   available.forEach(e => {
     const remaining = e.n - (used[e.r]||0);
-    html += `<div class="reason-popup-item" onclick="selectReason('${e.r}')">${e.r} <span style="color:#94a3b8">${remaining} left</span></div>`;
+    const dim = remaining <= 0 ? 'opacity:.45;' : '';
+    html += `<div class="reason-popup-item" style="${dim}" onclick="selectReason('${e.r}')">${e.r} <span style="color:#94a3b8">${remaining} left</span></div>`;
   });
   html += `<div class="reason-popup-item" onclick="selectReason('Other')">Other</div>`;
   html += '</div>';
