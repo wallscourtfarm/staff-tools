@@ -325,7 +325,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
 .y1cd-pb-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:0.7vh 0.7vw;width:100%;flex:1;min-height:0;padding:0.2vh}
 .y1cd-pb-card{position:relative;background:linear-gradient(135deg,#FFF8EC 0%,#FFFCF5 100%);border:3px solid #F4A935;border-radius:14px;display:flex;align-items:center;justify-content:space-between;padding:2.6vh 1vw 0.6vh 1.2vw;gap:0.6vw;min-height:0;overflow:hidden;box-shadow:0 3px 0 #D4881A,0 6px 14px rgba(0,0,0,0.06)}
 .y1cd-pb-focus-badge{position:absolute;top:6px;left:6px;background:#e67e22;color:#fff;font-family:'Fredoka One',cursive;font-size:clamp(0.7rem,1.6vh,1.05rem);padding:0.12em 0.7em;border-radius:999px;box-shadow:0 2px 0 #c66610;letter-spacing:0.02em;line-height:1.2;z-index:2;display:inline-flex;align-items:center;gap:0.3em}
-.y1cd-pb-word{font-family:'Fredoka One',cursive;font-size:clamp(1.4rem,4.8vh,2.8rem);color:#1a1a1a;letter-spacing:0.02em;line-height:1;flex:1;text-align:left;padding-left:0.4em;white-space:nowrap;overflow:hidden}
+.y1cd-pb-word{font-family:'Fredoka One',cursive;font-size:clamp(1.4rem,4.8vh,2.8rem);color:#1a1a1a;letter-spacing:0.02em;line-height:1.15;flex:1;min-width:0;text-align:left;padding-left:0.4em;white-space:nowrap;overflow:hidden}
 .y1cd-pb-char{font-size:clamp(1.6rem,4.5vh,2.6rem);flex-shrink:0;line-height:1}
 
 /* Rhyme: 3 chunky stacked rows */
@@ -406,7 +406,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Beech</span><span id="version-tag">29.07.26a</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Beech</span><span id="version-tag">29.07.26b</span></div>
   </div>
   <div id="lunch-bar" class="with-imgs">
     <div class="lc lc-r" id="lc0">—</div>
@@ -3371,10 +3371,7 @@ function renderY1Combined(){
       focus=filterMatch||p.sounds.reduce((b,s)=>s.length>b.length?s:b,p.sounds[0]);
     }
 
-    const wLen=p.word.length;
-    const wFsz=wLen>8?'clamp(0.85rem,2.8vh,1.6rem)':wLen>6?'clamp(1.1rem,3.6vh,2.1rem)':'';
-    const wStyle=wFsz?` style="font-size:${wFsz}"`:'';
-    return `<div class="y1cd-pb-card${cardCls}"><div class="y1cd-pb-focus-badge">${badgeIcon} ${focus}</div><div class="y1cd-pb-word"${wStyle}>${p.word}</div><div class="y1cd-pb-char">${charIcon}</div></div>`;
+    return `<div class="y1cd-pb-card${cardCls}"><div class="y1cd-pb-focus-badge">${badgeIcon} ${focus}</div><div class="y1cd-pb-word">${p.word}</div><div class="y1cd-pb-char">${charIcon}</div></div>`;
   }).join('');
 
   const rhHtml=rhs.map(r=>{
@@ -3401,6 +3398,17 @@ function renderY1Combined(){
       <div class="cpanel-hdr"><span class="cpanel-hdr-title">What's the Time?</span><button class="reveal-btn" onclick="revealY1Panel(this)">👁 Reveal</button></div>
       <div class="cpanel-body" style="padding:0.4vh 0.4vw"><div class="y1cd-ck-grid">${ckHtml}</div></div>
     </div>`;
+  requestAnimationFrame(fitY1PbWords);
+}
+
+function fitY1PbWords(){
+  document.querySelectorAll('.y1cd-pb-word').forEach(el=>{
+    el.style.fontSize='';
+    if(el.scrollWidth<=el.clientWidth)return;
+    let fs=parseFloat(getComputedStyle(el).fontSize);
+    const min=11;
+    while(el.scrollWidth>el.clientWidth&&fs>min){fs-=1;el.style.fontSize=fs+'px';}
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
