@@ -43,11 +43,9 @@
     .slt-table { width: 100%; border-collapse: collapse; min-width: 620px; table-layout: fixed; }
     .slt-table thead th { padding: 8px 6px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; border-right: 1px solid #e2e8f0; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 12px; color: #1798d3; text-align: center; white-space: nowrap; overflow: hidden; }
     .slt-table thead th.name-th { text-align: left; padding-left: 12px; width: 118px; }
-    .slt-table thead th.sess-th { width: 28px; color: #94a3b8; font-size: 10px; font-weight: 600; }
     .slt-table thead th.day-th { /* equal share of remaining width via table-layout:fixed */ }
     .slt-table thead th.today { background: #1798d3; color: white; }
     .slt-table tbody td { border-right: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
-    .slt-table tbody tr.pm-row td { border-bottom: 2px solid #e2e8f0; }
 
     .name-cell { padding: 6px 10px; background: #fafafa; vertical-align: middle !important; }
     .person-info { display: flex; align-items: center; gap: 6px; }
@@ -55,9 +53,9 @@
     .person-name { font-size: 11px; font-weight: 700; color: #1e293b; line-height: 1.2; }
     .person-role { font-size: 9px; color: #94a3b8; }
 
-    .sess-td { padding: 4px 5px; font-size: 10px; font-weight: 700; text-align: center; background: #fafafa; white-space: nowrap; vertical-align: top !important; padding-top: 8px !important; }
-    .am-row .sess-td { color: #1798d3; }
-    .pm-row .sess-td { color: #7c3aed; }
+    .section-hdr td { padding: 6px 14px; font-size: 10px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; font-family: 'Nunito', sans-serif; }
+    .section-hdr.am td { background: #dff0f9; color: #0f6fa1; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #b3ddf0; }
+    .section-hdr.pm td { background: #ede9f8; color: #5b3fa8; border-top: 2px solid #d4c8f8; border-bottom: 1px solid #c9bef0; }
     .am-row .slot-cell { background: #e8f4fb; }
     .pm-row .slot-cell { background: #f0ecff; }
 
@@ -253,7 +251,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · 29.07.26k</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · 29.07.26l</footer>
 
 <script>
 // ── Activity types ─────────────────────────────────────────────────────────────
@@ -780,12 +778,12 @@ function renderGrid() {
     `<th class="day-th${isToday(i)?' today':''}">${d}<br><span style="font-size:9px;font-weight:normal;opacity:.7">${dayDate(i)}</span></th>`
   ).join('');
   document.getElementById('tableHead').innerHTML =
-    `<tr><th class="name-th">SLT Member</th><th class="sess-th"></th>${dayHeaders}</tr>`;
+    `<tr><th class="name-th">SLT Member</th>${dayHeaders}</tr>`;
 
   document.getElementById('tableBody').innerHTML = SLT.length
-    ? SLT.map(p => {
-        const makeCell = (sess) => DAYS.map((_,di) => {
-          const dayNum = di + 1; // 1=Mon … 5=Fri
+    ? (() => {
+        const makeCell = (p, sess) => DAYS.map((_,di) => {
+          const dayNum = di + 1;
           const wd = Array.isArray(p.workingDays) ? p.workingDays : [];
           const isWorking = !wd.length || wd.includes(dayNum);
           if (!isWorking) {
@@ -810,21 +808,18 @@ function renderGrid() {
           const addBtn = `<button class="slot-add-btn" onclick="openItemEditor('${p.id}',${di},'${sess}',-1)">＋ add</button>`;
           return `<td class="slot-cell"><div class="cell-items">${plannerHtml}${itemsHtml}${addBtn}</div></td>`;
         }).join('');
-        return `
-          <tr class="am-row">
-            <td class="name-cell" rowspan="2">
-              <div class="person-info">
-                <div class="person-avatar" style="background:${p.col};color:${contrastColor(p.col)}">${p.init}</div>
-                <div><div class="person-name">${p.name}</div><div class="person-role">${p.role}</div></div>
-              </div>
-            </td>
-            <td class="sess-td">AM</td>${makeCell('am')}
-          </tr>
-          <tr class="pm-row">
-            <td class="sess-td">PM</td>${makeCell('pm')}
-          </tr>`;
-      }).join('')
-    : `<tr><td colspan="7" style="padding:24px;text-align:center;font-size:13px;color:#94a3b8">Loading SLT data…</td></tr>`;
+        const nameCell = (p) => `<td class="name-cell">
+          <div class="person-info">
+            <div class="person-avatar" style="background:${p.col};color:${contrastColor(p.col)}">${p.init}</div>
+            <div><div class="person-name">${p.name}</div><div class="person-role">${p.role}</div></div>
+          </div>
+        </td>`;
+        return `<tr class="section-hdr am"><td colspan="6">Morning</td></tr>` +
+          SLT.map(p => `<tr class="am-row">${nameCell(p)}${makeCell(p, 'am')}</tr>`).join('') +
+          `<tr class="section-hdr pm"><td colspan="6">Afternoon</td></tr>` +
+          SLT.map(p => `<tr class="pm-row">${nameCell(p)}${makeCell(p, 'pm')}</tr>`).join('');
+      })()
+    : `<tr><td colspan="6" style="padding:24px;text-align:center;font-size:13px;color:#94a3b8">Loading SLT data…</td></tr>`;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
