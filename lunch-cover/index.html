@@ -192,7 +192,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunch Cover Rota · 30.07.26f</footer>
+<footer>Wallscourt Farm Academy · Lunch Cover Rota · 30.07.26g</footer>
 
 <script>
 // ── Duties config ─────────────────────────────────────────────────────────────
@@ -337,6 +337,18 @@ function parseStartMins(timeStr) {
   return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : 0;
 }
 
+function parseEndMins(timeStr) {
+  if (!timeStr) return 0;
+  const all = [...timeStr.matchAll(/(\d+):(\d+)/g)];
+  if (!all.length) return 0;
+  const last = all[all.length - 1];
+  return parseInt(last[1]) * 60 + parseInt(last[2]);
+}
+
+function dutyEndMins(duty) {
+  return duty.endMins || parseEndMins(duty.time);
+}
+
 function buildPmStartMins(rows) {
   const result = {};
   rows.filter(r => r.ID === 'reg-pm').forEach(r => {
@@ -372,10 +384,19 @@ function buildCoverMap(csvText) {
 
 function coversMatch(coverText, staff) {
   if (!coverText || !staff?.name) return false;
-  const firstName = n => n.trim().split(/\s+/)[0].toLowerCase();
-  const ct = coverText.toLowerCase();
-  const fn = firstName(staff.name);
-  return fn.length >= 2 && new RegExp('\\b' + fn + '\\b').test(ct);
+  const ct = coverText.trim().toLowerCase();
+  const staffParts = staff.name.trim().split(/\s+/);
+  const fn = staffParts[0].toLowerCase();
+  if (fn.length < 2) return false;
+  if (!new RegExp('\\b' + fn + '\\b').test(ct)) return false;
+  // If cover text has multiple words AND staff has a surname, require surname initial to match
+  const coverParts = ct.split(/\s+/);
+  if (coverParts.length >= 2 && staffParts.length >= 2) {
+    const si = staffParts[staffParts.length - 1][0].toLowerCase();
+    const coverExtra = coverParts.filter(p => p !== fn)[0] || '';
+    if (coverExtra && !coverExtra.startsWith(si)) return false;
+  }
+  return true;
 }
 
 function getConflicts(staffId, dutyId, dayIdx) {
@@ -385,7 +406,7 @@ function getConflicts(staffId, dutyId, dayIdx) {
   if (!staff || !duty) return conflicts;
 
   const breakMins   = staff.breakMins || 30;
-  const dutyEnd     = duty.endMins || 0;
+  const dutyEnd     = dutyEndMins(duty);
   const dutyStart   = parseStartMins(duty.time);
   const fmt         = m => `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
 
@@ -395,7 +416,7 @@ function getConflicts(staffId, dutyId, dayIdx) {
     if (other.id === dutyId) return;
     if (!(wk[other.id]?.[dayIdx] || []).includes(staffId)) return;
     const oStart = parseStartMins(other.time);
-    const oEnd   = other.endMins || 0;
+    const oEnd   = dutyEndMins(other);
     if (dutyStart < oEnd && dutyEnd > oStart) {
       conflicts.push({ type:'double', msg:`Double-booked: also on "${other.label}" (${other.time})` });
     }
