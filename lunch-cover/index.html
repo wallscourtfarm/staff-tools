@@ -192,7 +192,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunch Cover Rota · 30.07.26e</footer>
+<footer>Wallscourt Farm Academy · Lunch Cover Rota · 30.07.26f</footer>
 
 <script>
 // ── Duties config ─────────────────────────────────────────────────────────────
@@ -211,10 +211,6 @@ let DUTIES = DEFAULT_DUTIES.map(d => ({...d}));
 
 const DUTY_PALETTE = ['#FCD34D','#86EFAC','#C084FC','#F9A8D4','#93C5FD','#FCA5A5','#6EE7B7','#A5B4FC','#FDE68A','#BAE6FD','#FB923C','#818CF8'];
 
-// Class teachers finishing at or after this time (13:00) have fewer than 15 min
-// before PM session (~13:15) — flag with a ⚠ warning
-const PM_THRESHOLD_MINS = 13 * 60 + 0;
-
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const PALETTE = ['#1798d3','#f97316','#22c55e','#e879f9','#64748b','#ef4444','#8b5cf6'];
 
@@ -228,8 +224,10 @@ let STAFF        = [];
 let WEEKS        = [];
 let termTemplate = null;
 let state        = { weekIdx: 0, slots: {} };
-let myViewId     = '';  // staff id for "my duties" view, '' = everyone
+let myViewId     = '';
 let isDragging   = false;
+let PM_START_MINS = { R:12*60+45, Y1:12*60+45, Y2:12*60+45, Y3:13*60+10, Y4:13*60+10, Y5:13*60+15, Y6:13*60+15, default:13*60+10 };
+let COVER_MAP    = {}; // weekIdx → dayIdx → [{tid, coverName, session}]
 
 // ── CSV helpers ───────────────────────────────────────────────────────────────
 function parseCSV(text) {
@@ -298,9 +296,10 @@ function buildStaff(rows) {
       const name = r.Name.trim();
       const init = (r.Initials || '').trim() || mkInitials(name);
       const id   = name.toLowerCase().replace(/[^a-z0-9]+/g,'_');
-      const col  = (r.Colour || '').trim() || colourById[id] || PALETTE[i % PALETTE.length];
-      const role = (r.Role || '').trim();
-      return { id, name, init, col, role };
+      const col       = (r.Colour || '').trim() || colourById[id] || PALETTE[i % PALETTE.length];
+      const role      = (r.Role || '').trim();
+      const yearGroup = (r.YearGroup || '').trim();
+      return { id, name, init, col, role, yearGroup };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -332,16 +331,91 @@ function contrastColor(hex) {
 }
 
 // ── Conflict detection ────────────────────────────────────────────────────────
-function isClassTeacher(staffId) {
-  const s = staffById(staffId);
-  if (!s) return false;
-  return s.role === 'Class' || s.role === 'Phase Lead';
+function parseStartMins(timeStr) {
+  if (!timeStr) return 0;
+  const m = timeStr.match(/(\d+):(\d+)/);
+  return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : 0;
 }
 
-function dutyConflict(dutyId, staffId) {
-  if (!isClassTeacher(staffId)) return false;
-  const duty = DUTIES.find(d => d.id === dutyId);
-  return duty && duty.endMins >= PM_THRESHOLD_MINS;
+function buildPmStartMins(rows) {
+  const result = {};
+  rows.filter(r => r.ID === 'reg-pm').forEach(r => {
+    const m = (r.Time || '').match(/^(\d+):(\d+)/);
+    if (!m) return;
+    const mins = parseInt(m[1]) * 60 + parseInt(m[2]);
+    (r.YearGroup || '').split(',').map(s => s.trim()).filter(Boolean).forEach(yg => {
+      result[yg === 'R' ? 'R' : 'Y' + yg] = mins;
+    });
+  });
+  return Object.keys(result).length ? result : PM_START_MINS;
+}
+
+function buildCoverMap(csvText) {
+  const raw = csvText.replace(/^﻿/, '').trim();
+  const s = raw.indexOf('{'), e = raw.lastIndexOf('}');
+  if (s < 0 || e <= s) return {};
+  let json;
+  try { const c = raw.slice(s, e+1); try { json=JSON.parse(c); } catch(_) { json=JSON.parse(c.replace(/""/g,'"')); } } catch(_) { return {}; }
+  const result = {};
+  for (const [wk, slots] of Object.entries(json.weekSlots || {})) {
+    const wi = parseInt(wk, 10);
+    result[wi] = {};
+    for (const slot of (slots || [])) {
+      const cover = (slot.cover || '').trim();
+      if (!cover || /^(supply|no cover|tbc)$/i.test(cover)) continue;
+      if (!result[wi][slot.day]) result[wi][slot.day] = [];
+      result[wi][slot.day].push({ tid: slot.tid, coverName: cover, session: slot.session });
+    }
+  }
+  return result;
+}
+
+function coversMatch(coverText, staff) {
+  if (!coverText || !staff?.name) return false;
+  const firstName = n => n.trim().split(/\s+/)[0].toLowerCase();
+  const ct = coverText.toLowerCase();
+  const fn = firstName(staff.name);
+  return fn.length >= 2 && new RegExp('\\b' + fn + '\\b').test(ct);
+}
+
+function getConflicts(staffId, dutyId, dayIdx) {
+  const conflicts = [];
+  const staff = staffById(staffId);
+  const duty  = DUTIES.find(d => d.id === dutyId);
+  if (!staff || !duty) return conflicts;
+
+  const breakMins   = staff.breakMins || 30;
+  const dutyEnd     = duty.endMins || 0;
+  const dutyStart   = parseStartMins(duty.time);
+  const fmt         = m => `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
+
+  // 1. Double-booked within this tool
+  const wk = getWeek();
+  DUTIES.forEach(other => {
+    if (other.id === dutyId) return;
+    if (!(wk[other.id]?.[dayIdx] || []).includes(staffId)) return;
+    const oStart = parseStartMins(other.time);
+    const oEnd   = other.endMins || 0;
+    if (dutyStart < oEnd && dutyEnd > oStart) {
+      conflicts.push({ type:'double', msg:`Double-booked: also on "${other.label}" (${other.time})` });
+    }
+  });
+
+  // 2. PM cover clash via PlannerState
+  const dayCovers = (COVER_MAP[state.weekIdx] || {})[dayIdx] || [];
+  dayCovers.filter(c => c.session === 'PM').forEach(c => {
+    if (!coversMatch(c.coverName, staff)) return;
+    const coveredTeacher = STAFF.find(s => s.id === c.tid);
+    const yg      = coveredTeacher?.yearGroup || '';
+    const pmStart = PM_START_MINS[yg] ?? PM_START_MINS.default;
+    const freeFrom = dutyEnd + breakMins;
+    if (freeFrom > pmStart) {
+      const gap = pmStart - dutyEnd;
+      conflicts.push({ type:'cover', msg:`PM cover${yg ? ' '+yg : ''} starts ${fmt(pmStart)} — duty ends ${fmt(dutyEnd)}, needs ${breakMins} min break (${gap > 0 ? gap+'min gap' : 'no gap'})` });
+    }
+  });
+
+  return conflicts;
 }
 
 // ── State helpers ─────────────────────────────────────────────────────────────
@@ -507,8 +581,8 @@ function buildMySummary() {
     DUTIES.forEach(duty => {
       const ids = w[duty.id]?.[di] || [];
       if (ids.includes(myViewId)) {
-        const conflict = dutyConflict(duty.id, myViewId);
-        items.push({ day: day.slice(0,3), label: duty.label, time: duty.time, conflict });
+        const conflicts = getConflicts(myViewId, duty.id, di);
+        items.push({ day: day.slice(0,3), label: duty.label, time: duty.time, conflicts });
       }
     });
   });
@@ -517,7 +591,7 @@ function buildMySummary() {
     <div class="my-summary-hd">Your duties this week</div>
     ${items.map(it => `<div class="my-duty-item">
       <span class="my-duty-day">${it.day}</span>
-      <span class="my-duty-label">${it.label}${it.conflict ? ' ⚠️' : ''}</span>
+      <span class="my-duty-label">${it.label}${it.conflicts?.length ? ' 🛑' : ''}</span>
       <span class="my-duty-time">${it.time}</span>
     </div>`).join('')}
   </div>`;
@@ -568,16 +642,17 @@ function chipHtml(dutyId, di, sid) {
   const s = staffById(sid);
   if (!s) return '';
   const col = s.col;
-  const conflict = dutyConflict(dutyId, sid);
+  const conflicts = getConflicts(sid, dutyId, di);
   const isMe = myViewId && sid === myViewId;
   const isFaded = myViewId && !isMe;
   const isDraggingThis = ptrDrag && ptrDrag.info.staffId === sid &&
     ptrDrag.srcDutyId === dutyId && ptrDrag.srcDi === di;
-  return `<div class="assign-chip${isDraggingThis?' dragging':''}${isFaded?' faded':''}${isMe?' mine':''}" style="background:${col}22;border:1.5px solid ${col}55" data-duty-id="${dutyId}" data-di="${di}" data-staff-id="${sid}">
+  const tipExtra = conflicts.length ? '\n🛑 ' + conflicts.map(c => c.msg).join('\n🛑 ') : '';
+  return `<div class="assign-chip${isDraggingThis?' dragging':''}${isFaded?' faded':''}${isMe?' mine':''}${conflicts.length?' conflict':''}" style="background:${col}22;border:1.5px solid ${conflicts.length?'#ef4444':col+'55'}" data-duty-id="${dutyId}" data-di="${di}" data-staff-id="${sid}">
     <div class="a-drag-handle" onpointerdown="onChipDown(event,'${sid}','${dutyId}',${di})">≡</div>
     <div class="a-avatar" style="background:${col};color:${contrastColor(col)}">${s.init}</div>
-    <span class="a-name" style="color:#1e293b" title="${s.name}${conflict?' — duty ends late, may not have time for lunch':''}">${s.name}</span>
-    ${conflict ? `<span class="a-conflict" title="Class teacher — duty ends ${DUTIES.find(d=>d.id===dutyId)?.time?.split('–')[1] || ''}, less than 15 min before PM session">⚠️</span>` : ''}
+    <span class="a-name" style="color:#1e293b" title="${s.name}${tipExtra}">${s.name}</span>
+    ${conflicts.length ? `<span class="a-conflict" title="${conflicts.map(c=>c.msg).join('\n')}">🛑</span>` : ''}
     <button class="a-del" onclick="removeFromSlot('${dutyId}',${di},'${sid}')">×</button>
   </div>`;
 }
@@ -590,9 +665,8 @@ function renderGrid() {
   const readyCls = isDragging ? 'drop-ready' : '';
 
   const html = DUTIES.map(duty => {
-    // Check if any class teacher on this duty is potentially conflicted
-    const hasAnyConflict = duty.endMins >= PM_THRESHOLD_MINS && DAYS.some((_,di) =>
-      (w[duty.id]?.[di]||[]).some(sid => isClassTeacher(sid))
+    const hasAnyConflict = DAYS.some((_,di) =>
+      (w[duty.id]?.[di]||[]).some(sid => getConflicts(sid, duty.id, di).length > 0)
     );
 
     let tbody = '<tr>';
@@ -614,7 +688,7 @@ function renderGrid() {
         <span class="duty-hd-label">${duty.label}</span>
         <span class="duty-hd-time">${duty.time}</span>
         ${duty.note ? `<span class="duty-hd-note">${duty.note}</span>` : ''}
-        ${hasAnyConflict ? `<span class="warn-badge">⚠️ Class teacher — check lunch cover</span>` : ''}
+        ${hasAnyConflict ? `<span class="warn-badge">🛑 Scheduling conflict — see highlighted staff</span>` : ''}
       </div>
       <table class="rota-table">
         <thead><tr>${dayHeaders}</tr></thead>
@@ -796,10 +870,12 @@ async function init() {
     const fetches = [
       fetch(SHEET_BASE+'Staff').then(r => { if(!r.ok) throw new Error('Staff'); return r.text(); }),
       fetch(SHEET_BASE+'TermDates').then(r => { if(!r.ok) throw new Error('Terms'); return r.text(); }),
+      fetch(SHEET_BASE+'DayTimings').then(r => r.ok ? r.text() : null).catch(() => null),
+      fetch(SHEET_BASE+'PlannerState').then(r => r.ok ? r.text() : null).catch(() => null),
     ];
     if (SYNC_URL) fetches.push(fetch(SYNC_URL).then(r => r.text()).catch(() => null));
 
-    const [staffCsv, termsCsv, remoteRaw] = await Promise.all(fetches);
+    const [staffCsv, termsCsv, timingsCsv, plannerCsv, remoteRaw] = await Promise.all(fetches);
 
     const sheetStaff = buildStaff(csvToObjects(staffCsv));
     const sheetWeeks = buildWeeks(csvToObjects(termsCsv));
@@ -809,6 +885,14 @@ async function init() {
       WEEKS = sheetWeeks;
       if (state.weekIdx === 0) state.weekIdx = currentWeekIdx();
       state.weekIdx = Math.max(0, Math.min(WEEKS.length-1, state.weekIdx));
+    }
+
+    if (timingsCsv) {
+      const timingsRows = csvToObjects(timingsCsv);
+      PM_START_MINS = buildPmStartMins(timingsRows);
+    }
+    if (plannerCsv) {
+      COVER_MAP = buildCoverMap(plannerCsv);
     }
 
     if (remoteRaw && remoteRaw !== '{}') {
