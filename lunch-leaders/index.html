@@ -184,10 +184,13 @@ footer { text-align: center; font-size: 10px; color: #94a3b8; padding: 10px; bor
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunchtime Leaders · 30.07.26g</footer>
+<footer>Wallscourt Farm Academy · Lunchtime Leaders · 30.07.26h</footer>
 
 <script>
-const SYNC_URL = 'https://script.google.com/macros/s/AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec?key=wfa_ll';
+const SYNC_URL       = 'https://script.google.com/macros/s/AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec?key=wfa_ll';
+const SHEET_ID       = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
+const SHEET_BASE     = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+const COVER_PLAN_URL = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
 
 const PALETTE = ['#f9a8d4','#fca5a5','#fda4af','#fcd34d','#86efac','#d9f99d','#67e8f9','#93c5fd','#c084fc','#fb923c','#4ade80','#38bdf8','#f472b6','#a78bfa','#ec4899','#22d3ee','#94a3b8','#d1d5db','#fde68a','#e879f9'];
 
@@ -314,6 +317,72 @@ function escHtml(s) {
 }
 function absentToday() { return absences[selectedDate] || []; }
 
+// ── Cover Plan integration ─────────────────────────────────────────────────────
+let WEEKS_LL = [];
+let coverPlanData = null;
+
+function parseDateLL(s) {
+  if (!s) return null;
+  const p = s.split('/'); if (p.length !== 3) return null;
+  const [d,m,y] = p.map(Number);
+  return new Date(y < 100 ? 2000+y : y, m-1, d);
+}
+function parseCSV_LL(text) {
+  const rows=[]; let inQ=false, cur='', cells=[];
+  for (let i=0; i<text.length; i++) {
+    const c=text[i];
+    if (c==='"') inQ=!inQ;
+    else if (c===',' && !inQ) { cells.push(cur.trim()); cur=''; }
+    else if ((c==='\n'||c==='\r') && !inQ) { if (cur||cells.length) { cells.push(cur.trim()); rows.push(cells); cur=''; cells=[]; } if (c==='\r'&&text[i+1]==='\n') i++; }
+    else cur+=c;
+  }
+  if (cur||cells.length) { cells.push(cur.trim()); rows.push(cells); }
+  return rows;
+}
+function csvToObjectsLL(text) {
+  const rows=parseCSV_LL(text); if (!rows.length) return [];
+  const hdr=rows[0];
+  return rows.slice(1).map(r => Object.fromEntries(hdr.map((h,i) => [h.replace(/^"|"$/g,''), (r[i]||'').replace(/^"|"$/g,'')])));
+}
+function buildWeeksLL(rows) {
+  return rows.filter(r => r.StartDate && r.Term && r.Week).map(r => {
+    const start = parseDateLL(r.StartDate.trim());
+    if (!start || isNaN(start)) return null;
+    return { start, term: String(r.Term).trim(), week: String(r.Week).trim() };
+  }).filter(Boolean).sort((a,b) => a.start - b.start);
+}
+function dateToWeekIdx(dateStr) {
+  if (!WEEKS_LL.length || !dateStr) return -1;
+  const d = new Date(dateStr + 'T00:00:00');
+  for (let i = 0; i < WEEKS_LL.length; i++) {
+    const end = new Date(WEEKS_LL[i].start); end.setDate(end.getDate() + 4);
+    if (d >= WEEKS_LL[i].start && d <= end) return i;
+  }
+  return -1;
+}
+function dateToDayIdx(dateStr) {
+  const dow = new Date(dateStr + 'T00:00:00').getDay();
+  return dow >= 1 && dow <= 5 ? dow - 1 : -1;
+}
+function autoAbsentToday() {
+  if (!coverPlanData?.weekSlots) return [];
+  const weekIdx = dateToWeekIdx(selectedDate);
+  const dayIdx  = dateToDayIdx(selectedDate);
+  if (weekIdx < 0 || dayIdx < 0) return [];
+  const slots = coverPlanData.weekSlots[weekIdx] || [];
+  const offSiteTids = new Set(slots.filter(s => s.day === dayIdx && s.offSite).map(s => s.tid));
+  if (!offSiteTids.size) return [];
+  return LEADERS.filter(l => {
+    for (const tid of offSiteTids) {
+      if (tid === l.id || tid.startsWith(l.id + '_')) return true;
+    }
+    return false;
+  }).map(l => l.id);
+}
+function effectiveAbsentToday() {
+  return [...new Set([...absentToday(), ...autoAbsentToday()])];
+}
+
 function toggleAbsent(id) {
   const arr = absentToday().filter(x => x !== id);
   if (!absentToday().includes(id)) arr.push(id);
@@ -339,7 +408,7 @@ function loadLocal() {
 
 // ── Cover analysis ────────────────────────────────────────────────────────────
 function getCoverNeeds() {
-  const abs = absentToday();
+  const abs = effectiveAbsentToday();
   if (!abs.length) return [];
   const seen = new Set();
   const needs = [];
@@ -379,7 +448,7 @@ function renderCoverAlert() {
   const needs = getCoverNeeds();
   const el = document.getElementById('coverAlert');
   if (!needs.length) { el.innerHTML = ''; return; }
-  const absNames = absentToday().map(id => LEADERS.find(l => l.id === id)?.name || id);
+  const absNames = effectiveAbsentToday().map(id => LEADERS.find(l => l.id === id)?.name || id);
   el.innerHTML = `<div class="cover-alert">
     <h3>🛑 Absent: ${absNames.join(', ')} — activities needing cover:</h3>
     ${needs.map(n => `<div class="cover-item${n.critical?' critical':''}">
@@ -390,7 +459,9 @@ function renderCoverAlert() {
 }
 
 function renderGrid() {
-  const abs = absentToday();
+  const manualAbs = absentToday();
+  const autoAbs   = autoAbsentToday();
+  const abs = [...new Set([...manualAbs, ...autoAbs])];
   const numLeaders = LEADERS.length;
   const numRows = scheduleRows.length;
 
@@ -446,12 +517,16 @@ function renderGrid() {
   h += '<th class="tc" style="background:#f8fafc;border-right-color:#cbd5e1"></th>';
   h += LEADERS.map(l => {
     const isAbs = abs.includes(l.id);
+    const isAutoOnly = autoAbs.includes(l.id) && !manualAbs.includes(l.id);
+    const absPill = isAutoOnly
+      ? `<span class="absent-pill is-absent" style="background:#fff7ed;color:#ea580c;border-color:#fed7aa;cursor:default" title="Away per Cover Plan">📅 Cover Plan</span>`
+      : `<button class="absent-pill${isAbs?' is-absent':''}" onclick="toggleAbsent('${l.id}')">${isAbs ? '✗ Absent' : 'Mark absent'}</button>`;
     return `<th>
       <div class="lh${isAbs?' absent-hd':''}">
         <div class="lh-bar" style="background:${l.colour}"></div>
         <span class="lh-name">${escHtml(l.name)}</span>
         ${l.role ? `<span class="lh-role">${escHtml(l.role)}</span>` : ''}
-        <button class="absent-pill${isAbs?' is-absent':''}" onclick="toggleAbsent('${l.id}')">${isAbs ? '✗ Absent' : 'Mark absent'}</button>
+        ${absPill}
       </div>
     </th>`;
   }).join('');
@@ -490,9 +565,12 @@ function renderGrid() {
 }
 
 function renderCards() {
-  const abs = absentToday();
+  const manualAbs = absentToday();
+  const autoAbs   = autoAbsentToday();
+  const abs = [...new Set([...manualAbs, ...autoAbs])];
   return `<div class="cards-wrap">${LEADERS.map(l => {
     const isAbs = abs.includes(l.id);
+    const isAutoOnly = autoAbs.includes(l.id) && !manualAbs.includes(l.id);
     const timeline = [];
     const seen = new Set();
     for (const row of scheduleRows) {
@@ -509,7 +587,10 @@ function renderCards() {
       <div class="card-hd" style="border-top-color:${l.colour}">
         <div class="card-name">${escHtml(l.name)}</div>
         ${l.role?`<div class="card-role">${escHtml(l.role)}</div>`:''}
-        <button class="card-absent-btn${isAbs?' is-absent':''}" onclick="toggleAbsent('${l.id}')">${isAbs ? '✗ Absent today — tap to clear' : 'Mark absent today'}</button>
+        ${isAutoOnly
+          ? `<span class="card-absent-btn is-absent" style="background:#fff7ed;color:#ea580c;border-color:#fed7aa;cursor:default">📅 Away (Cover Plan)</span>`
+          : `<button class="card-absent-btn${isAbs?' is-absent':''}" onclick="toggleAbsent('${l.id}')">${isAbs ? '✗ Absent today — tap to clear' : 'Mark absent today'}</button>`
+        }
       </div>
       <div class="card-timeline">${timeline.map(t =>
         `<div class="tl-row">
@@ -695,7 +776,11 @@ async function init() {
   const status = document.getElementById('sheetStatus');
   try {
     if (!SYNC_URL) throw new Error('No sync');
-    const raw = await fetch(SYNC_URL).then(r => r.text());
+    const [raw, termsCsv, coverJson] = await Promise.all([
+      fetch(SYNC_URL).then(r => r.text()),
+      fetch(SHEET_BASE + encodeURIComponent('TermDates')).then(r => r.ok ? r.text() : null).catch(() => null),
+      fetch(COVER_PLAN_URL, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]);
     if (raw && raw !== '{}') {
       try {
         const remote = JSON.parse(raw);
@@ -704,6 +789,8 @@ async function init() {
         if (remote.schedule?.length) scheduleRows = remote.schedule;
       } catch(e) {}
     }
+    if (termsCsv) WEEKS_LL = buildWeeksLL(csvToObjectsLL(termsCsv));
+    if (coverJson?.weekSlots) coverPlanData = coverJson;
     localStorage.setItem('wfa_ll_absences', JSON.stringify(absences));
     localStorage.setItem('wfa_ll_leaders',  JSON.stringify(LEADERS));
     localStorage.setItem('wfa_ll_schedule', JSON.stringify(scheduleRows));
