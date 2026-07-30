@@ -184,7 +184,7 @@ footer { text-align: center; font-size: 10px; color: #94a3b8; padding: 10px; bor
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunchtime Leaders · 30.07.26e</footer>
+<footer>Wallscourt Farm Academy · Lunchtime Leaders · 30.07.26f</footer>
 
 <script>
 const SYNC_URL = 'https://script.google.com/macros/s/AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec?key=wfa_ll';
@@ -391,6 +391,57 @@ function renderCoverAlert() {
 
 function renderGrid() {
   const abs = absentToday();
+  const numLeaders = LEADERS.length;
+  const numRows = scheduleRows.length;
+
+  // Pre-compute cell content for each [rowIdx][leaderIdx]
+  const cellContent = [];
+  for (let ri = 0; ri < numRows; ri++) {
+    const row = scheduleRows[ri];
+    const rowCells = [];
+    const allItem = row.items.find(i => i.leaders === 'ALL');
+    if (allItem) {
+      for (let li = 0; li < numLeaders; li++) rowCells.push(null);
+    } else {
+      for (let li = 0; li < numLeaders; li++) {
+        const l = LEADERS[li];
+        if (abs.includes(l.id)) {
+          rowCells.push({ type: 'absent' });
+        } else {
+          const item = row.items.find(i => Array.isArray(i.leaders) && i.leaders.includes(l.id));
+          rowCells.push(item ? { type: 'act', label: item.label, colour: item.colour } : { type: 'empty' });
+        }
+      }
+    }
+    cellContent.push(rowCells);
+  }
+
+  // Compute rowspans: merge consecutive identical 'act' cells within each column
+  const rowspanInfo = cellContent.map(row => row.map(() => ({ rowspan: 1, skip: false })));
+  for (let li = 0; li < numLeaders; li++) {
+    let ri = 0;
+    while (ri < numRows) {
+      const cell = cellContent[ri][li];
+      if (cell && cell.type === 'act') {
+        let runEnd = ri + 1;
+        while (runEnd < numRows) {
+          if (scheduleRows[runEnd - 1].note !== undefined) break; // note row would interrupt span
+          const next = cellContent[runEnd][li];
+          if (!next || next.type !== 'act' || next.label !== cell.label || next.colour !== cell.colour) break;
+          runEnd++;
+        }
+        const span = runEnd - ri;
+        if (span > 1) {
+          rowspanInfo[ri][li].rowspan = span;
+          for (let k = ri + 1; k < runEnd; k++) rowspanInfo[k][li].skip = true;
+        }
+        ri = runEnd;
+      } else {
+        ri++;
+      }
+    }
+  }
+
   let h = '<div class="grid-wrap"><table class="sched"><thead><tr>';
   h += '<th class="tc" style="background:#f8fafc;border-right-color:#cbd5e1"></th>';
   h += LEADERS.map(l => {
@@ -405,7 +456,9 @@ function renderGrid() {
     </th>`;
   }).join('');
   h += '</tr></thead><tbody>';
-  for (const row of scheduleRows) {
+
+  for (let ri = 0; ri < numRows; ri++) {
+    const row = scheduleRows[ri];
     const allItem = row.items.find(i => i.leaders === 'ALL');
     if (allItem) {
       h += `<tr class="all-row"><td class="tc">${escHtml(row.time)}</td>
@@ -415,16 +468,23 @@ function renderGrid() {
       continue;
     }
     h += `<tr><td class="tc">${escHtml(row.time)}</td>`;
-    for (const l of LEADERS) {
-      if (abs.includes(l.id)) { h += `<td class="absent-col" title="${escHtml(l.name)} — absent"></td>`; continue; }
-      const item = row.items.find(i => Array.isArray(i.leaders) && i.leaders.includes(l.id));
-      h += item
-        ? `<td class="act" style="background:${item.colour}28;border-left:3px solid ${item.colour}">${escHtml(item.label)}</td>`
-        : '<td class="empty"></td>';
+    for (let li = 0; li < numLeaders; li++) {
+      const info = rowspanInfo[ri][li];
+      if (info.skip) continue;
+      const cell = cellContent[ri][li];
+      const rs = info.rowspan > 1 ? ` rowspan="${info.rowspan}"` : '';
+      if (cell.type === 'absent') {
+        h += `<td class="absent-col"${rs} title="${escHtml(LEADERS[li].name)} — absent"></td>`;
+      } else if (cell.type === 'act') {
+        h += `<td class="act"${rs} style="background:${cell.colour}28;border-left:3px solid ${cell.colour}">${escHtml(cell.label)}</td>`;
+      } else {
+        h += `<td class="empty"${rs}></td>`;
+      }
     }
     h += '</tr>';
     if (row.note) h += `<tr class="note-row"><td class="tc"></td><td colspan="${LEADERS.length}">${escHtml(row.note)}</td></tr>`;
   }
+
   h += '</tbody></table></div>';
   return h;
 }
