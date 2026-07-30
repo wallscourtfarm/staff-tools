@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 30.07.26a</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 30.07.26b</div>
       </div>
     </div>
     <div class="top-bar">
@@ -1812,9 +1812,10 @@ async function init() {
   renderGrid();
 
   try {
-    const [termsText, eventsText, resourcesText] = await Promise.all([
+    const [termsText, eventsText, calEventsText, resourcesText] = await Promise.all([
       fetch(SHEET_BASE + encodeURIComponent('TermDates')).then(r => { if (!r.ok) throw new Error('TermDates tab not found'); return r.text(); }),
       fetch(SHEET_BASE + encodeURIComponent('Events')).then(r => r.ok ? r.text() : '').catch(() => ''),
+      fetch(SHEET_BASE + encodeURIComponent('CalendarEvents')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('Resources')).then(r => r.ok ? r.text() : '').catch(() => ''),
     ]);
 
@@ -1830,10 +1831,15 @@ async function init() {
     }
 
     WEEKS = buildWeeks(csvToObjects(termsText));
-    if (eventsText) {
-      const evtRows = csvToObjects(eventsText);
-      state.nonSchoolDays = buildNonSchoolDays(evtRows);
-      state.schoolEvents = buildSchoolEvents(evtRows);
+    {
+      const evtRows = [
+        ...(eventsText    ? csvToObjects(eventsText)    : []),
+        ...(calEventsText ? csvToObjects(calEventsText) : []),
+      ];
+      if (evtRows.length) {
+        state.nonSchoolDays = buildNonSchoolDays(evtRows);
+        state.schoolEvents  = buildSchoolEvents(evtRows);
+      }
     }
 
     state.weekIdx = currentWeekIdx();
