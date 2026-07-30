@@ -134,6 +134,7 @@
   <button class="action-btn" onclick="copyToNext()">Copy → next week</button>
   <button class="action-btn" onclick="setAsTerm()" style="border-color:#a3e635;color:#4d7c0f">Set as term rota</button>
   <button class="action-btn danger" onclick="resetToTerm()">Reset to term rota</button>
+  <button class="action-btn" onclick="openDutyMgr()" style="border-color:#8b5cf6;color:#8b5cf6">⚙ Duties</button>
   <div class="myview-wrap">
     <label for="myviewSelect">View as:</label>
     <select class="myview-select" id="myviewSelect" onchange="onMyViewChange()">
@@ -169,12 +170,33 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunch Cover Rota · 30.07.26b</footer>
+<div class="modal-bg" id="dutyMgrModal">
+  <div class="modal" style="max-width:620px">
+    <h3>⚙ Duty Slots</h3>
+    <p class="modal-hint">Edit label, time, note, max staff per cell, or colour dot. Changes save when you click Done.</p>
+    <div style="display:grid;grid-template-columns:22px 1fr 110px 38px 1fr 24px;gap:6px;padding:0 2px 5px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:700;color:#94a3b8">
+      <span></span><span>Label</span><span>Time</span><span style="text-align:center">Max</span><span>Note</span><span></span>
+    </div>
+    <div id="dutyMgrRows"></div>
+    <div style="border-top:1px solid #e2e8f0;margin-top:12px;padding-top:10px">
+      <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px">Add new slot</div>
+      <div class="modal-add" style="flex-wrap:wrap;gap:6px">
+        <input id="newDutyLabel" placeholder="Slot name…" style="flex:2;min-width:120px" onkeydown="if(event.key==='Enter')addDuty()">
+        <input id="newDutyTime"  placeholder="12:00–13:00" style="width:110px;flex:none">
+        <input id="newDutyNote"  placeholder="Note (optional)…" style="flex:2;min-width:100px">
+        <input id="newDutyMax"   type="number" min="1" max="6" value="1" style="width:48px;flex:none;text-align:center" title="Max staff per cell">
+        <button onclick="addDuty()">Add</button>
+      </div>
+    </div>
+    <button class="modal-done" onclick="closeDutyMgr()">Done</button>
+  </div>
+</div>
+
+<footer>Wallscourt Farm Academy · Lunch Cover Rota · 30.07.26c</footer>
 
 <script>
 // ── Duties config ─────────────────────────────────────────────────────────────
-// endMins: duty end time in minutes from midnight — used for conflict detection
-const DUTIES = [
+const DEFAULT_DUTIES = [
   { id:'eating_support', label:'Eating Support',          time:'11:50–12:30', endMins:12*60+30, maxStaff:2, colour:'#FCD34D', note:'Named pupils: Ethan, Haadi, Hugo' },
   { id:'ks2_football',   label:'KS2 Football',           time:'12:00–12:30', endMins:12*60+30, maxStaff:2, colour:'#86EFAC' },
   { id:'ks2_sic',        label:'KS2 Special Interest',   time:'12:00–12:30', endMins:12*60+30, maxStaff:1, colour:'#C084FC' },
@@ -185,6 +207,9 @@ const DUTIES = [
   { id:'ks2_top_table',  label:'KS2 Top Table',          time:'12:30–13:00', endMins:13*60+0,  maxStaff:1, colour:'#FCD34D' },
   { id:'cafe_backup',    label:'Back up in café',        time:'12:00–13:10', endMins:13*60+10, maxStaff:1, colour:'#86EFAC' },
 ];
+let DUTIES = DEFAULT_DUTIES.map(d => ({...d}));
+
+const DUTY_PALETTE = ['#FCD34D','#86EFAC','#C084FC','#F9A8D4','#93C5FD','#FCA5A5','#6EE7B7','#A5B4FC','#FDE68A','#BAE6FD','#FB923C','#818CF8'];
 
 // Class teachers finishing at or after this time (13:00) have fewer than 15 min
 // before PM session (~13:15) — flag with a ⚠ warning
@@ -360,17 +385,19 @@ function save() {
   localStorage.setItem('wfa_lc_state',  JSON.stringify(state));
   localStorage.setItem('wfa_lc_staff',  JSON.stringify(STAFF));
   localStorage.setItem('wfa_lc_term',   JSON.stringify(termTemplate));
+  localStorage.setItem('wfa_lc_duties', JSON.stringify(DUTIES));
   if (SYNC_URL) {
     const staffColours = {};
     STAFF.forEach(s => { staffColours[s.id] = s.col; });
-    fetch(SYNC_URL, { method:'POST', body: JSON.stringify({ state, termTemplate, staffColours }) }).catch(() => {});
+    fetch(SYNC_URL, { method:'POST', body: JSON.stringify({ state, termTemplate, staffColours, duties: DUTIES }) }).catch(() => {});
   }
 }
 
 function loadAll() {
-  try { const s=localStorage.getItem('wfa_lc_state'); if (s) { const p=JSON.parse(s); state.slots=p.slots||{}; state.weekIdx=p.weekIdx||0; } } catch(e) {}
-  try { const s=localStorage.getItem('wfa_lc_staff'); if (s) STAFF=JSON.parse(s); } catch(e) {}
-  try { const s=localStorage.getItem('wfa_lc_term');  if (s) termTemplate=JSON.parse(s); } catch(e) {}
+  try { const s=localStorage.getItem('wfa_lc_state');  if (s) { const p=JSON.parse(s); state.slots=p.slots||{}; state.weekIdx=p.weekIdx||0; } } catch(e) {}
+  try { const s=localStorage.getItem('wfa_lc_staff');  if (s) STAFF=JSON.parse(s); } catch(e) {}
+  try { const s=localStorage.getItem('wfa_lc_term');   if (s) termTemplate=JSON.parse(s); } catch(e) {}
+  try { const s=localStorage.getItem('wfa_lc_duties'); if (s) { const d=JSON.parse(s); if (d&&d.length) DUTIES=d; } } catch(e) {}
   try { myViewId = localStorage.getItem('wfa_lc_myview') || ''; } catch(e) {}
 }
 
@@ -707,6 +734,56 @@ function onChipDown(e, staffId, srcDutyId, srcDi) {
   if (e.target.closest('button')) return;
   e.preventDefault(); e.stopPropagation();
   ptrDrag = { info:{staffId}, sourceEl:e.target.closest('.assign-chip'), srcDutyId, srcDi, startX:e.clientX, startY:e.clientY, active:false };
+}
+
+// ── Duty manager ─────────────────────────────────────────────────────────────
+function parseEndMins(timeStr) {
+  if (!timeStr) return 0;
+  const m = timeStr.match(/(\d+):(\d+)\s*[–\-]\s*(\d+):(\d+)/);
+  return m ? parseInt(m[3]) * 60 + parseInt(m[4]) : 0;
+}
+
+function openDutyMgr()  { renderDutyMgr(); document.getElementById('dutyMgrModal').classList.add('open'); }
+function closeDutyMgr() { document.getElementById('dutyMgrModal').classList.remove('open'); save(); render(); }
+
+function renderDutyMgr() {
+  document.getElementById('dutyMgrRows').innerHTML = DUTIES.map((d, i) => `
+    <div class="modal-row" style="display:grid;grid-template-columns:22px 1fr 110px 38px 1fr 24px;gap:6px;align-items:center;padding:5px 2px;border-bottom:1px solid #f1f5f9">
+      <div class="colour-dot" style="background:${d.colour};width:22px;height:22px;border-radius:50%;cursor:pointer;flex-shrink:0;border:2px solid transparent" onclick="cycleDutyCol(${i})" title="Click to change colour"></div>
+      <input style="border:1px solid #e2e8f0;border-radius:4px;padding:4px 7px;font-size:12px;width:100%" value="${d.label}" onchange="DUTIES[${i}].label=this.value">
+      <input style="border:1px solid #e2e8f0;border-radius:4px;padding:4px 7px;font-size:12px;width:100%" value="${d.time||''}" placeholder="12:00–13:00" onchange="DUTIES[${i}].time=this.value;DUTIES[${i}].endMins=parseEndMins(this.value)">
+      <input style="border:1px solid #e2e8f0;border-radius:4px;padding:4px 4px;font-size:12px;width:100%;text-align:center" type="number" min="1" max="6" value="${d.maxStaff||1}" onchange="DUTIES[${i}].maxStaff=+this.value" title="Max staff per cell">
+      <input style="border:1px solid #e2e8f0;border-radius:4px;padding:4px 7px;font-size:12px;width:100%" value="${d.note||''}" placeholder="Note…" onchange="DUTIES[${i}].note=this.value">
+      <button class="del-btn" onclick="deleteDuty('${d.id}')">×</button>
+    </div>`).join('');
+}
+
+function cycleDutyCol(i) {
+  const idx = DUTY_PALETTE.indexOf(DUTIES[i].colour);
+  DUTIES[i].colour = DUTY_PALETTE[(idx + 1) % DUTY_PALETTE.length];
+  renderDutyMgr();
+}
+
+function deleteDuty(id) {
+  if (!confirm('Remove this duty slot? Assignments for it will also be lost.')) return;
+  DUTIES = DUTIES.filter(d => d.id !== id);
+  Object.values(state.slots).forEach(wk => { delete wk[id]; });
+  if (termTemplate) delete termTemplate[id];
+  renderDutyMgr();
+}
+
+function addDuty() {
+  const label = document.getElementById('newDutyLabel').value.trim();
+  if (!label) return;
+  const time     = document.getElementById('newDutyTime').value.trim();
+  const note     = document.getElementById('newDutyNote').value.trim();
+  const maxStaff = parseInt(document.getElementById('newDutyMax').value) || 1;
+  const colour   = DUTY_PALETTE[DUTIES.length % DUTY_PALETTE.length];
+  DUTIES.push({ id: 'duty_' + Date.now(), label, time, endMins: parseEndMins(time), maxStaff, colour, note });
+  document.getElementById('newDutyLabel').value = '';
+  document.getElementById('newDutyTime').value  = '';
+  document.getElementById('newDutyNote').value  = '';
+  renderDutyMgr();
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
