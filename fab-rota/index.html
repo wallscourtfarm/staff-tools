@@ -103,6 +103,11 @@
     .yg-btn.y4 { background: #f0f8fd; border-color: #1798d3; color: #0c4a6e; }
     .yg-btn.y5 { background: #fff7ed; border-color: #f97316; color: #c2410c; }
     .yg-btn.y6 { background: #f0fdf4; border-color: #22c55e; color: #15803d; }
+
+    /* Cover-plan offSite warning */
+    .a-warn { font-size: 9px; color: #f97316; flex-shrink: 0; margin-left: 1px; }
+    .staff-chip.cp-offsite .s-name { color: #94a3b8; text-decoration: line-through; }
+    .staff-chip.cp-offsite::after { content: '⚠'; font-size: 9px; color: #f97316; margin-left: 2px; }
   </style>
 </head>
 <body>
@@ -111,7 +116,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title">Fresh Air Break Rota</div>
-    <div class="app-subtitle">Wallscourt Farm Academy</div>
+    <div class="app-subtitle">Wallscourt Farm Academy · 30.07.26a</div>
   </div>
 </div>
 
@@ -187,9 +192,10 @@ const YG_LIGHT = {
 // Pending assignment (for year group selection)
 let pendingAssign = null;
 
-const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
-const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
-const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
+const SHEET_ID        = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
+const SHEET_BASE      = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+const SYNC_URL        = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
+const COVER_PLAN_URL  = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let STAFF        = [];
@@ -197,6 +203,17 @@ let WEEKS        = []; // [{ start:Date, term:'T1', week:'W1', label:'T1W1' }, .
 let termTemplate = null;
 let state        = { weekIdx: 0, slots: {} };
 let isDragging   = false;
+let coverOffSiteByDay = [0,1,2,3,4].map(() => new Set());
+let coverPlanState = null;
+
+function rebuildCoverOffSite() {
+  coverOffSiteByDay = [0,1,2,3,4].map(() => new Set());
+  if (!coverPlanState?.weekSlots) return;
+  const slots = coverPlanState.weekSlots[state.weekIdx] || [];
+  slots.forEach(s => {
+    if (s.offSite && s.day >= 0 && s.day <= 4) coverOffSiteByDay[s.day].add(s.tid);
+  });
+}
 
 // ── CSV / Sheet helpers ───────────────────────────────────────────────────────
 function parseCSV(text) {
@@ -484,12 +501,12 @@ function changeWeek(dir) {
   } else {
     state.weekIdx += dir;
   }
-  save(); render();
+  rebuildCoverOffSite(); save(); render();
 }
 
 function goToday() {
   state.weekIdx = WEEKS.length ? currentWeekIdx() : 0;
-  save(); render();
+  rebuildCoverOffSite(); save(); render();
 }
 
 function copyToNext() {
@@ -578,10 +595,13 @@ function chipHtml(gid, zi, di, item) {
   const isDraggingThis = ptrDrag && ptrDrag.info.staffId === sid &&
     ptrDrag.srcGid === gid && ptrDrag.srcZi === zi && ptrDrag.srcDi === di;
 
-  return `<div class="assign-chip${isDraggingThis?' dragging':''}" style="background:${col}22;border:1.5px solid ${col}55" data-staff-id="${sid}" data-yg="${yg || ''}" data-src-gid="${gid}" data-src-zi="${zi}" data-src-di="${di}">
+  const isOffSite = coverOffSiteByDay[di]?.has(sid) || false;
+
+  return `<div class="assign-chip${isDraggingThis?' dragging':''}${isOffSite?' cp-offsite':''}" style="background:${col}22;border:1.5px solid ${col}55" data-staff-id="${sid}" data-yg="${yg || ''}" data-src-gid="${gid}" data-src-zi="${zi}" data-src-di="${di}">
     <div class="a-drag-handle" onpointerdown="onChipDown(event,'${sid}',${yg ? `'${yg}'` : 'null'},'${gid}',${zi},${di})">≡</div>
     <div class="a-avatar" style="background:${col};color:${contrastColor(col)}">${s.init}</div>
-    <span class="a-name" style="color:#1e293b">${displayName}</span>
+    <span class="a-name" style="color:${isOffSite?'#94a3b8':'#1e293b'};${isOffSite?'text-decoration:line-through':''}">${displayName}</span>
+    ${isOffSite ? '<span class="a-warn" title="Absent/off-site today (Cover Plan)">⚠</span>' : ''}
     <button class="a-del" onclick="removeFromSlot('${gid}',${zi},${di},'${sid}'${yg ? `,'${yg}'` : ''})">×</button>
   </div>`;
 }
@@ -783,10 +803,11 @@ async function init() {
 
   const status = document.getElementById('sheetStatus');
   try {
-    const [staffCsv, termsCsv, remoteRaw] = await Promise.all([
+    const [staffCsv, termsCsv, remoteRaw, coverData] = await Promise.all([
       fetch(SHEET_BASE + 'Staff').then(r => { if (!r.ok) throw new Error('Staff'); return r.text(); }),
       fetch(SHEET_BASE + encodeURIComponent('TermDates')).then(r => { if (!r.ok) throw new Error('Terms'); return r.text(); }),
       fetch(SYNC_URL).then(r => r.text()).catch(() => null),
+      fetch(COVER_PLAN_URL, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
 
     const sheetStaff = buildStaff(csvToObjects(staffCsv));
@@ -798,6 +819,9 @@ async function init() {
       if (state.weekIdx === 0) state.weekIdx = currentWeekIdx();
       state.weekIdx = Math.max(0, Math.min(WEEKS.length - 1, state.weekIdx));
     }
+
+    // Build per-day offSite sets from Cover Plan
+    if (coverData?.weekSlots) { coverPlanState = coverData; rebuildCoverOffSite(); }
 
     // Apply remote state (overrides localStorage)
     if (remoteRaw && remoteRaw !== '{}') {
