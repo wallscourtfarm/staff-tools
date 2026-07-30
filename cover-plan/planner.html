@@ -396,7 +396,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(30.07.26c)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(30.07.26d)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -781,6 +781,36 @@ function buildSchoolEvents(rows) {
     return ev;
   }).filter(e=>e.label);
 }
+function fillNonWorkingSlots() {
+  // Auto-generate 'Day Off' AM+PM slots for each teacher's non-working days.
+  // Runs after state is loaded — patches both existing saved weeks and fresh ones.
+  const FILL_SESSIONS = ['AM','PM'];
+  const ORDER = ['Before School','AM','Lunch','PM','After School'];
+  let added = false;
+  TEACHERS.forEach(t => {
+    if (!t.workingDays) return;
+    const nonWork = [0,1,2,3,4].filter(d => !t.workingDays.includes(d));
+    if (!nonWork.length) return;
+    Object.keys(state.weekSlots).forEach(wkStr => {
+      const ws = state.weekSlots[parseInt(wkStr)];
+      if (!ws) return;
+      nonWork.forEach(dayIdx => {
+        FILL_SESSIONS.forEach(session => {
+          const ti = ORDER.indexOf(session);
+          const exists = ws.some(s => s.tid===t.id && s.day===dayIdx &&
+            ORDER.indexOf(s.session)<=ti && ORDER.indexOf(s.endSession)>=ti);
+          if (!exists) {
+            ws.push({id:state.nextId++, day:dayIdx, session, endSession:session,
+              tid:t.id, reason:'Day Off', reasonNote:'', cover:null, nocover:false, offSite:true});
+            added = true;
+          }
+        });
+      });
+    });
+  });
+  if (added) stateSave();
+}
+
 function buildRecurring(rows) {
   const YG_CODES = new Set(['Reception','YR','Y1','Y2','Y3','Y4','Y5','Y6']);
   const result=[]; let id=1;
@@ -859,6 +889,7 @@ async function init() {
     }
     state.weekIdx=currentWeekIdx();
     if (!state.weekSlots[state.weekIdx] || state.weekSlots[state.weekIdx].length===0) state.weekSlots[state.weekIdx]=JSON.parse(JSON.stringify(RECURRING_SLOTS));
+    fillNonWorkingSlots();
     render();
   } catch(err) {
     document.getElementById('centerPane').innerHTML=
