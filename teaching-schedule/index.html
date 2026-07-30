@@ -441,7 +441,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 30.07.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 30.07.26b</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -532,6 +532,7 @@ const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbwlNv08Z0cFSgKq_1zcr
 const EXCEPTIONS_URL = 'https://script.google.com/macros/s/AKfycbwRTXlq_kqfstCk_lF6qVdoBBZeXdlWV2Gvja1d0H3rYEyCZvPPi2XNhCp3spOsXn3W/exec';
 const FAB_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
 const COVER_SYNC_URL = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
+const LUNCH_COVER_URL = 'https://script.google.com/macros/s/AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec?key=wfa_lc';
 
 // FAB zone definitions (must match FAB tool)
 const FAB_GROUPS = {
@@ -704,6 +705,7 @@ let FAB_STAFF = []; // [{ id, name, init, col }] - staff from FAB tool for ID→
 let FAB_EXCEPTIONS = []; // { date, staffId, zone }
 let COVER_DATA = null; // { weekSlots: {weekIdx: [slots]}, staff: [{id, name, yg, col}] } - from cover-plan tool
 let COVER_STAFF_LOOKUP = {}; // name -> {id, yg, col} for quick lookup
+let LC_DATA = null; // { state: { slots: {weekIdx: {dutyId: [[staffId,...],...]}} }, duties: [...], staffColours: {} }
 
 // Flat lookup: name → col
 const SUBJECT_COL = {};
@@ -1522,6 +1524,30 @@ function renderFABChip(duty, dateKey = '', yearGroup = '') {
   </div>`;
 }
 
+function getLCDuties(staffId, weekIdx, dayIdx) {
+  if (!LC_DATA?.state?.slots) return [];
+  const week = LC_DATA.state.slots[weekIdx];
+  if (!week) return [];
+  const duties = LC_DATA.duties || [];
+  const results = [];
+  duties.forEach(d => {
+    const assigned = week[d.id]?.[dayIdx] || [];
+    const match = staffId ? assigned.includes(staffId) : assigned.length > 0;
+    if (match) results.push({ label: d.label, colour: d.colour, endMins: d.endMins, time: d.time });
+  });
+  return results;
+}
+
+function renderLCChip(duty) {
+  const warn = duty.endMins >= 13 * 60 + 5;
+  return `<div class="cell-chip tp-activity fab-duty" style="background:${duty.colour}20;border:1.5px dashed ${duty.colour}">
+    <div class="chip-top">
+      <span class="chip-colour" style="background:${duty.colour}"></span>
+      <span class="chip-name" style="color:#1e293b">${escHtml(duty.label)}${warn ? ' <span title="Ends close to PM reg (13:20)" style="color:#f97316">⚠</span>' : ''}</span>
+    </div>
+  </div>`;
+}
+
 // ── Update title and UI ────────────────────────────────────────────────────────
 const YG_COLOURS = {
   Reception: '#1798d3', Y1: '#f97316', Y2: '#22c55e', Y3: '#FF00FF',
@@ -2023,6 +2049,18 @@ function renderBody() {
               fabHtml = fabDuties.map(d => renderFABChip(d, dk, YEAR_GROUP)).join('');
             }
           }
+          // Lunch Cover duties for lunch row
+          let lcHtml = '';
+          if (row.id === 'lunch' && LC_DATA) {
+            if (view !== 'master') {
+              const staffMember = STAFF.find(s => s.id === view);
+              if (staffMember) {
+                lcHtml = getLCDuties(staffMember.id, state.weekIdx, di).map(d => renderLCChip(d)).join('');
+              }
+            } else {
+              lcHtml = getLCDuties(null, state.weekIdx, di).map(d => renderLCChip(d)).join('');
+            }
+          }
           const isStaffFixed = (view !== 'master');
           const fixedChips = isStaffFixed ? (() => {
             const day = DAYS[di].toLowerCase();
@@ -2030,7 +2068,7 @@ function renderBody() {
             return items.map((item, idx) => renderItem(item, wk, view, day, row.id, idx)).join('');
           })() : '';
           const fixedDayAttr = isStaffFixed ? ` data-day="${DAYS[di].toLowerCase()}" data-session="${row.id}"` : '';
-          return `<td class="view-cell"${fixedDayAttr}><div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div>${strips}${soTags}${tpActHtml}${fabHtml}${fixedChips}</td>`;
+          return `<td class="view-cell"${fixedDayAttr}><div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div>${strips}${soTags}${tpActHtml}${fabHtml}${lcHtml}${fixedChips}</td>`;
         }).join('')}
       </tr>`;
     } else {
@@ -3360,7 +3398,7 @@ async function init() {
   renderGrid();
 
   try {
-    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText, tpActivitiesText, exceptionsData, fabDataRaw, coverDataRaw] = await Promise.all([
+    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText, tpActivitiesText, exceptionsData, fabDataRaw, coverDataRaw, lcDataRaw] = await Promise.all([
       fetch(SHEET_BASE + encodeURIComponent('TermDates')).then(r => { if (!r.ok) throw new Error('Terms tab not found'); return r.text(); }),
       fetch(SHEET_BASE + encodeURIComponent('CalendarEvents')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('EventsMeetings')).then(r => r.ok ? r.text() : '').catch(() => ''),
@@ -3372,6 +3410,7 @@ async function init() {
 	      EXCEPTIONS_URL ? fetch(EXCEPTIONS_URL + '?action=exceptions').then(r => r.ok ? r.json() : {exceptions:[]}).then(d => d.exceptions || []).catch(() => []) : Promise.resolve([]),
       FAB_SYNC_URL ? fetch(FAB_SYNC_URL).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
       COVER_SYNC_URL ? fetch(COVER_SYNC_URL).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
+      fetch(LUNCH_COVER_URL, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
     WEEKS = buildWeeks(csvToObjects(termsText));
     if (eventsText) {
@@ -3479,6 +3518,10 @@ async function init() {
           col: (r.Colour || '').trim() || '#475569'
         };
       });
+    }
+    // Lunch Cover data
+    if (lcDataRaw?.state?.slots) {
+      LC_DATA = lcDataRaw;
     }
 
     migrateScheduleKeys();
