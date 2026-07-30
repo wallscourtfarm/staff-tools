@@ -128,6 +128,7 @@
     .slot-name { font-weight:700; color:#111; font-size:12px; white-space:nowrap; }
     .slot-reason { font-size:10px; color:#334155; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:80px; }
     .slot-cover-name { display:inline-flex; align-items:center; gap:2px; }
+    .cover-warn { font-size:9px; line-height:1; color:#f97316; flex-shrink:0; }
     .slot-cover-x { font-size:11px; color:#94a3b8; cursor:pointer; }
     .slot-cover-x:hover { color:#dc2626; }
     .slot-avatar { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; color:white; font-size:7px; font-weight:bold; flex-shrink:0; }
@@ -396,7 +397,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(30.07.26d)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(30.07.26e)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -689,17 +690,21 @@ function buildStaff(rows) {
     const workingDays=r.WorkingDays
       ? r.WorkingDays.split(',').map(d=>parseInt(d.trim())-1).filter(d=>d>=0&&d<=4)
       : null;
+    // DayOffCover: explicit Yes/No, else infer — Class teachers need cover, others don't
+    const dayOffCover = r.DayOffCover === 'Yes' ? true
+      : r.DayOffCover === 'No' ? false
+      : r.Role === 'Class';
     // Normalise YR → Reception so CSS pip/syg classes match
     const yg = r.YearGroup === 'YR' ? 'Reception' : (r.YearGroup || null);
     // Left panel: Class teachers + non-class staff who have scheduled time (Phase, SENCO, SLT)
     const LEFT_ROLES = new Set(['Class','Phase','Phase Lead','SENCO','Principal','Vice Principal','Assistant Principal']);
     if (LEFT_ROLES.has(r.Role)) {
-      const t={id,name:r.Name,yg,role:r.Role,ent,workingDays,isLeader,isInfoOnly,email:r.Email||'',init:r.Initials||initials(r.Name)};
+      const t={id,name:r.Name,yg,role:r.Role,ent,workingDays,isLeader,isInfoOnly,dayOffCover,email:r.Email||'',init:r.Initials||initials(r.Name)};
       if (isLeader) t.reasons=['Meeting','External Visit','Training','Conference'];
       teachers.push(t);
     }
     if (r.CoverRole) {
-      cover.push({id:'c_'+id, name:r.Name, role:r.CoverRole,
+      cover.push({id:'c_'+id, name:r.Name, role:r.CoverRole, workingDays,
         init:r.Initials||r.Name.slice(0,2).toUpperCase(), col:r.Colour||'#94a3b8',
         order: r.Order !== '' && r.Order !== undefined ? parseInt(r.Order) : Infinity,
         email:r.Email||''});
@@ -801,7 +806,7 @@ function fillNonWorkingSlots() {
             ORDER.indexOf(s.session)<=ti && ORDER.indexOf(s.endSession)>=ti);
           if (!exists) {
             ws.push({id:state.nextId++, day:dayIdx, session, endSession:session,
-              tid:t.id, reason:'Day Off', reasonNote:'', cover:null, nocover:false, offSite:true});
+              tid:t.id, reason:'Day Off', reasonNote:'', cover:null, nocover:!t.dayOffCover, offSite:true});
             added = true;
           }
         });
@@ -1178,6 +1183,9 @@ function renderCoverStaff() {
     const n = coverCounts[c.name] || 0;
     let pipRow = '';
     for (let i = 0; i < n; i++) pipRow += `<div class="ent-mini used" style="background:${c.col}"></div>`;
+    const dayDots = c.workingDays
+      ? ['M','T','W','T','F'].map((l,i) => `<span style="width:13px;height:13px;border-radius:2px;font-size:8px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;background:${c.workingDays.includes(i)?c.col+'44':'#f1f5f9'};color:${c.workingDays.includes(i)?'#1e293b':'#cbd5e1'}">${l}</span>`).join('')
+      : '';
     html += `<div class="cover-chip ${dragging?'dragging':''}"
       onpointerdown="onCoverPointerDown(event,'${c.id}','${c.name}')">
       <div class="cover-avatar" style="background:${c.col};color:${contrastColor(c.col)}">${c.init}</div>
@@ -1187,6 +1195,7 @@ function renderCoverStaff() {
           <span class="cover-chip-role">${c.role}</span>
           ${n > 0 ? `<div style="display:flex;gap:2px">${pipRow}</div>` : ''}
         </div>
+        ${dayDots ? `<div style="display:flex;gap:2px;margin-top:3px">${dayDots}</div>` : ''}
       </div>
       ${n > 0 ? `<span class="cover-chip-count">${n}</span>` : ''}
     </div>`;
@@ -1319,7 +1328,7 @@ function renderGrid() {
                     ${s.reason === 'Other' ? `<span class="slot-reason slot-reason-other" onpointerdown="event.stopPropagation()" onclick="openNoteEditor(event,${s.id})">${s.reasonNote || 'Other'}</span>` : `<span class="slot-reason">${s.reason}</span>`}
                     <span class="slot-fill"></span>
                     <span class="slot-os${offSiteVal(s) ? '' : ' insch'}" onpointerdown="event.stopPropagation()" onclick="toggleOffSite(${s.id})" title="${offSiteVal(s) ? 'Off-site — click if in school' : 'In school — click if off-site'}"></span>
-                    ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
+                    ${s.cover ? `<span class="slot-cover-name">${cv?.workingDays && !cv.workingDays.includes(s.day) ? '<span class="cover-warn" title="Not working this day">⚠</span>' : ''}<span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
                   </div>
                   ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
                   <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
@@ -1446,7 +1455,7 @@ function positionSpanStrips(spans) {
           <span class="slot-reason">${s.reason === 'Other' && s.reasonNote ? s.reasonNote : s.reason}</span>
           <span class="slot-fill"></span>
           <span class="slot-os${offSiteVal(s) ? '' : ' insch'}" onpointerdown="event.stopPropagation()" onclick="toggleOffSite(${s.id})" title="${offSiteVal(s) ? 'Off-site — click if in school' : 'In school — click if off-site'}"></span>
-          ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
+          ${s.cover ? `<span class="slot-cover-name">${cv?.workingDays && !cv.workingDays.includes(s.day) ? '<span class="cover-warn" title="Not working this day">⚠</span>' : ''}<span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
         </div>
         ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
         <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
