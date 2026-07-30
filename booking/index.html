@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 30.07.26b</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 30.07.26c</div>
       </div>
     </div>
     <div class="top-bar">
@@ -398,11 +398,14 @@ const SHEET_ID        = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
 const SHEET_BASE      = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
 const SYNC_URL        = 'https://script.google.com/macros/s/AKfycbwzNtos0vdjnUhsFQ_igTtLNXyBd8k9c6rPkA0IZdkM3vJLAoIdSHonTbHAbyFNfH_BWQ/exec';
 const COVER_PLAN_URL  = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
+const FAB_ROTA_URL    = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
 
 // Cover Plan session → resource booking time range
 const CP_SESSION_TIMES = { 'AM': ['09:00','12:15'], 'PM': ['13:25','15:00'], 'Lunch': ['12:15','13:20'] };
 // Resources auto-reserved for Sports; also includes any 'field' resource from sheet
 const CP_SPORTS_RESOURCE_IDS = ['muga', 'super'];
+// FAB Rota upper group zones that map to bookable resources
+const FAB_ZONE_RESOURCE = { 'MUGA': 'muga' }; // zone name → resource id
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const DAY_SHORT = ['Mon','Tue','Wed','Thu','Fri'];
@@ -479,6 +482,7 @@ let state = {
 let WEEKS = [];
 let selectedResource = null;
 let coverPlanData = null;
+let fabRotaData   = null;
 
 function getCpSportsBars(weekIdx) {
   if (!coverPlanData?.weekSlots) return [];
@@ -496,6 +500,29 @@ function getCpSportsBars(weekIdx) {
     if (seen.has(key)) return;
     seen.add(key);
     bars.push({ dayIdx: s.day, startTime: timeRange[0], endTime: timeRange[1] });
+  });
+  return bars;
+}
+
+function getFabBars(weekIdx) {
+  if (!fabRotaData?.state?.slots) return [];
+  const weekSlots = fabRotaData.state.slots[weekIdx];
+  if (!weekSlots) return [];
+  const bars = [];
+  // Upper group (id:'upper') zones: ['MUGA','Garden Room (+Bell)','Hard Standing','Trim Trail']
+  const upperSlots = weekSlots['upper'];
+  if (!upperSlots) return [];
+  Object.entries(FAB_ZONE_RESOURCE).forEach(([zoneName, resourceId]) => {
+    // Find zone index in FAB Rota (MUGA = index 0 for upper group)
+    const FAB_UPPER_ZONES = ['MUGA','Garden Room (+Bell)','Hard Standing','Trim Trail'];
+    const zi = FAB_UPPER_ZONES.indexOf(zoneName);
+    if (zi < 0 || !upperSlots[zi]) return;
+    for (let di = 0; di < 5; di++) {
+      const assigned = upperSlots[zi][di] || [];
+      if (assigned.length > 0) {
+        bars.push({ dayIdx: di, resourceId, startTime: '10:45', endTime: '11:00', label: 'FAB Rota' });
+      }
+    }
   });
   return bars;
 }
@@ -1351,6 +1378,23 @@ function renderBookingsOverlay() {
     overlay.appendChild(bar);
   });
 
+  // Render FAB Rota location auto-blocks (MUGA during FAB time)
+  const fabBars = getFabBars(state.weekIdx);
+  fabBars.forEach(b => {
+    if (!dayCells[b.dayIdx]) return;
+    const cellRect = dayCells[b.dayIdx].getBoundingClientRect();
+    const cellLeft = cellRect.left - overlayRect.left;
+    const cellWidth = cellRect.width;
+    const topPx = timeToPosition(b.startTime);
+    const bottomPx = timeToPosition(b.endTime);
+    const heightPx = Math.max(bottomPx - topPx, 16);
+    const col = (RESOURCES.find(r => r.id === b.resourceId) || {}).colour || '#1798d3';
+    const bar = document.createElement('div');
+    bar.style.cssText = `position:absolute;left:${cellLeft+1}px;width:${cellWidth-4}px;top:${topPx}px;height:${heightPx}px;background:${col}18;border:1.5px dashed ${col}88;border-radius:4px;overflow:hidden;z-index:0;pointer-events:none;`;
+    bar.innerHTML = `<div style="font-size:8px;font-weight:bold;color:${col};padding:1px 4px">🏃 FAB</div>`;
+    overlay.appendChild(bar);
+  });
+
   // Pre-compute horizontal positions for each day's bookings
   const bookingSlots = {};
   DAYS.forEach((d, di) => {
@@ -1877,10 +1921,15 @@ async function init() {
   renderGrid();
   await syncLoad(schedKey());
 
-  // Non-critical: load Cover Plan for Sports auto-blocking
-  fetch(COVER_PLAN_URL, { signal: AbortSignal.timeout(8000) })
-    .then(r => r.ok ? r.json() : null).catch(() => null)
-    .then(json => { if (json?.weekSlots) { coverPlanData = json; renderGrid(); } });
+  // Non-critical: load Cover Plan + FAB Rota for auto-blocking indicators
+  Promise.all([
+    fetch(COVER_PLAN_URL, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch(FAB_ROTA_URL,   { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
+  ]).then(([cpJson, fabJson]) => {
+    if (cpJson?.weekSlots)     coverPlanData = cpJson;
+    if (fabJson?.state?.slots) fabRotaData   = fabJson;
+    if (coverPlanData || fabRotaData) renderGrid();
+  });
 }
 
 init();
