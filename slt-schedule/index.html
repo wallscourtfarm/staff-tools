@@ -251,7 +251,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · 29.07.26l</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · 30.07.26a</footer>
 
 <script>
 // ── Activity types ─────────────────────────────────────────────────────────────
@@ -283,7 +283,8 @@ const PALETTE = ['#1798d3','#f97316','#22c55e','#e879f9','#64748b','#ef4444','#8
 
 const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
 const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
-const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec?key=wfa_slt';
+const SYNC_URL        = 'https://script.google.com/macros/s/AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec?key=wfa_slt';
+const COVER_PLAN_URL  = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
 
 const PLANNER_REASON_MAP = { 'PPA': 'ppa', 'SENCO': 'senco', 'Phase Lead': 'phase_lead' };
 const PLANNER_SESS_MAP   = { 'AM': 'am', 'PM': 'pm' };
@@ -835,7 +836,7 @@ async function init() {
     const fetches = [
       fetch(SHEET_BASE+'Staff').then(r=>{if(!r.ok)throw new Error('Staff');return r.text();}),
       fetch(SHEET_BASE+'TermDates').then(r=>{if(!r.ok)throw new Error('Terms');return r.text();}),
-      fetch(SHEET_BASE+'PlannerState').then(r=>r.ok?r.text():null).catch(()=>null),
+      fetch(COVER_PLAN_URL, { signal: AbortSignal.timeout(8000) }).then(r=>r.ok?r.text():null).catch(()=>null),
     ];
     if (SYNC_URL) fetches.push(fetch(SYNC_URL).then(r=>r.text()).catch(()=>null));
 
