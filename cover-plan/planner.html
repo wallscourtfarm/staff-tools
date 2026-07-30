@@ -380,8 +380,8 @@ body.edit-locked .notify-btn   { display:none; }
     .reason-note:focus { outline:none; border-color:#1798d3; }
     /* Clickable "Other" label in slot bar */
     .slot-reason-other { cursor:pointer; text-decoration:underline dotted; text-decoration-color:#94a3b8; }
-    .slot-os { font-size:9px; cursor:pointer; flex-shrink:0; line-height:1; opacity:0.8; }
-    .slot-os.insch { opacity:0.2; }
+    .slot-os { width:9px; height:9px; border-radius:50%; flex-shrink:0; cursor:pointer; background:#f97316; }
+    .slot-os.insch { background:#cbd5e1; opacity:0.45; }
     /* Floating note editor popup */
     .note-edit-popup { position:fixed; background:white; border:2px solid #1798d3; border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,.18); z-index:10001; padding:6px 8px; display:flex; align-items:center; gap:6px; }
     .note-edit-popup input { border:1px solid #e2e8f0; border-radius:4px; padding:5px 9px; font-size:13px; width:140px; outline:none; color:#111; }
@@ -396,7 +396,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(30.07.26b)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(30.07.26c)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -522,9 +522,10 @@ const SESSION_SHORT = {'Before School':'Before School',AM:'AM',Lunch:'Lunch',PM:
 const DAYS          = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const DAY_IDX       = {Monday:0,Tuesday:1,Wednesday:2,Thursday:3,Friday:4};
 function initials(name) { if (!name) return ''; const p = name.trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : name.slice(0,2).toUpperCase(); }
-const REASONS       = ['PPA','Phase Lead','Leadership','Training','ECT','ECT1','ECT2','RA','SENCO','Sports','Illness','Other'];
+const REASONS       = ['PPA','Phase Lead','Leadership','Training','ECT','ECT1','ECT2','RA','SENCO','Sports','Illness','Day Off','Trip','Other'];
 const REASON_CLS    = {'PPA':'PPA','Phase Lead':'Phase','Leadership':'Leadership','Training':'Training',
-                       'ECT':'ECT1','ECT1':'ECT1','ECT2':'ECT2','RA':'RA','SENCO':'SENCO','Sports':'Sports','Illness':'Illness','Other':'Other'};
+                       'ECT':'ECT1','ECT1':'ECT1','ECT2':'ECT2','RA':'RA','SENCO':'SENCO','Sports':'Sports',
+                       'Illness':'Illness','Day Off':'Illness','Trip':'Training','Other':'Other'};
 const COUNTED_SESSIONS = new Set(['Before School','AM','Lunch','PM','After School']);
 const BLOCKING_TYPES   = new Set(['Half Term','Christmas','Easter','Summer Holiday','INSET','CLF Conference','Bank Holiday']);
 
@@ -1286,7 +1287,7 @@ function renderGrid() {
                     <span class="slot-name">${t ? t.init : s.tid.slice(0,2).toUpperCase()}</span>
                     ${s.reason === 'Other' ? `<span class="slot-reason slot-reason-other" onpointerdown="event.stopPropagation()" onclick="openNoteEditor(event,${s.id})">${s.reasonNote || 'Other'}</span>` : `<span class="slot-reason">${s.reason}</span>`}
                     <span class="slot-fill"></span>
-                    <span class="slot-os${offSiteVal(s) ? '' : ' insch'}" onpointerdown="event.stopPropagation()" onclick="toggleOffSite(${s.id})" title="${offSiteVal(s) ? 'Off-site — click if in school' : 'In school — click if off-site'}">${offSiteVal(s) ? '🏠' : '·'}</span>
+                    <span class="slot-os${offSiteVal(s) ? '' : ' insch'}" onpointerdown="event.stopPropagation()" onclick="toggleOffSite(${s.id})" title="${offSiteVal(s) ? 'Off-site — click if in school' : 'In school — click if off-site'}"></span>
                     ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
                   </div>
                   ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
@@ -1413,7 +1414,7 @@ function positionSpanStrips(spans) {
           <span class="slot-name">${t ? t.init : s.tid.slice(0,2).toUpperCase()}</span>
           <span class="slot-reason">${s.reason === 'Other' && s.reasonNote ? s.reasonNote : s.reason}</span>
           <span class="slot-fill"></span>
-          <span class="slot-os${offSiteVal(s) ? '' : ' insch'}" onpointerdown="event.stopPropagation()" onclick="toggleOffSite(${s.id})" title="${offSiteVal(s) ? 'Off-site — click if in school' : 'In school — click if off-site'}">${offSiteVal(s) ? '🏠' : '·'}</span>
+          <span class="slot-os${offSiteVal(s) ? '' : ' insch'}" onpointerdown="event.stopPropagation()" onclick="toggleOffSite(${s.id})" title="${offSiteVal(s) ? 'Off-site — click if in school' : 'In school — click if off-site'}"></span>
           ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
         </div>
         ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
