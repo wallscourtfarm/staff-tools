@@ -380,6 +380,8 @@ body.edit-locked .notify-btn   { display:none; }
     .reason-note:focus { outline:none; border-color:#1798d3; }
     /* Clickable "Other" label in slot bar */
     .slot-reason-other { cursor:pointer; text-decoration:underline dotted; text-decoration-color:#94a3b8; }
+    .slot-os { font-size:9px; cursor:pointer; flex-shrink:0; line-height:1; opacity:0.8; }
+    .slot-os.insch { opacity:0.2; }
     /* Floating note editor popup */
     .note-edit-popup { position:fixed; background:white; border:2px solid #1798d3; border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,.18); z-index:10001; padding:6px 8px; display:flex; align-items:center; gap:6px; }
     .note-edit-popup input { border:1px solid #e2e8f0; border-radius:4px; padding:5px 9px; font-size:13px; width:140px; outline:none; color:#111; }
@@ -394,7 +396,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(30.07.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(30.07.26b)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -525,6 +527,16 @@ const REASON_CLS    = {'PPA':'PPA','Phase Lead':'Phase','Leadership':'Leadership
                        'ECT':'ECT1','ECT1':'ECT1','ECT2':'ECT2','RA':'RA','SENCO':'SENCO','Sports':'Sports','Illness':'Illness','Other':'Other'};
 const COUNTED_SESSIONS = new Set(['Before School','AM','Lunch','PM','After School']);
 const BLOCKING_TYPES   = new Set(['Half Term','Christmas','Easter','Summer Holiday','INSET','CLF Conference','Bank Holiday']);
+
+// Off-site / in-school defaults by reason
+const OFF_SITE_REASONS  = new Set(['Illness','Training','Trip','CLF Conference','Day Off']);
+const IN_SCHOOL_REASONS = new Set(['PPA','Phase Lead','Leadership','ECT','ECT1','ECT2','RA','SENCO','Sports','Staff Meeting','FLC','PAC','Supervision']);
+function offSiteDefault(reason) {
+  if (OFF_SITE_REASONS.has(reason)) return true;
+  if (IN_SCHOOL_REASONS.has(reason)) return false;
+  return true; // 'Other' and any custom/unknown reason defaults to off-site
+}
+function offSiteVal(s) { return s.offSite ?? offSiteDefault(s.reason); }
 
 // ── Sheet config ──────────────────────────────────────────────────────────────
 const COLOUR_PRESETS = ['#1798d3','#7c3aed','#059669','#dc2626','#f59e0b','#0891b2','#d97706','#64748b'];
@@ -783,7 +795,7 @@ function buildRecurring(rows) {
       const yg = r.Teacher==='YR' ? 'Reception' : r.Teacher;
       TEACHERS.filter(t=>t.yg===yg && t.role==='Class').forEach(t=>{
         result.push({id:id++, day:dayIdx, session, endSession, tid:t.id,
-          reason, reasonNote:'', cover:null, nocover:false});
+          reason, reasonNote:'', cover:null, nocover:false, offSite:offSiteDefault(reason)});
       });
       return;
     }
@@ -791,7 +803,7 @@ function buildRecurring(rows) {
     const t=TEACHERS.find(t=>t.name===r.Teacher);
     if (!t) return;
     result.push({id:id++, day:dayIdx, session, endSession, tid:t.id,
-      reason, reasonNote:'', cover:null, nocover:t.isInfoOnly||false});
+      reason, reasonNote:'', cover:null, nocover:t.isInfoOnly||false, offSite:offSiteDefault(reason)});
   });
   return result;
 }
@@ -1274,6 +1286,7 @@ function renderGrid() {
                     <span class="slot-name">${t ? t.init : s.tid.slice(0,2).toUpperCase()}</span>
                     ${s.reason === 'Other' ? `<span class="slot-reason slot-reason-other" onpointerdown="event.stopPropagation()" onclick="openNoteEditor(event,${s.id})">${s.reasonNote || 'Other'}</span>` : `<span class="slot-reason">${s.reason}</span>`}
                     <span class="slot-fill"></span>
+                    <span class="slot-os${offSiteVal(s) ? '' : ' insch'}" onpointerdown="event.stopPropagation()" onclick="toggleOffSite(${s.id})" title="${offSiteVal(s) ? 'Off-site — click if in school' : 'In school — click if off-site'}">${offSiteVal(s) ? '🏠' : '·'}</span>
                     ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
                   </div>
                   ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
@@ -1400,6 +1413,7 @@ function positionSpanStrips(spans) {
           <span class="slot-name">${t ? t.init : s.tid.slice(0,2).toUpperCase()}</span>
           <span class="slot-reason">${s.reason === 'Other' && s.reasonNote ? s.reasonNote : s.reason}</span>
           <span class="slot-fill"></span>
+          <span class="slot-os${offSiteVal(s) ? '' : ' insch'}" onpointerdown="event.stopPropagation()" onclick="toggleOffSite(${s.id})" title="${offSiteVal(s) ? 'Off-site — click if in school' : 'In school — click if off-site'}">${offSiteVal(s) ? '🏠' : '·'}</span>
           ${s.cover ? `<span class="slot-cover-name"><span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
         </div>
         ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
@@ -1453,7 +1467,7 @@ function renderMyView() {
           <span class="my-badge out">OUT</span>
           <div class="my-entry-detail">
             <div class="my-entry-when">${DAYS[s.day]} · ${s.session}</div>
-            <div class="my-entry-info"><select class="reason-sel ${rbCls(s.reason)}" style="padding:1px 5px;border-radius:3px;font-size:11px;border:1px solid #e2e8f0;cursor:pointer" onchange="changeReason(${s.id},this.value)">${reasonOptions(s.tid,s.reason)}</select>${s.reason === 'Other' ? `<input class="reason-note" type="text" placeholder="e.g. training" value="${s.reasonNote||''}" onchange="changeReasonNote(${s.id},this.value)" onclick="event.stopPropagation()">` : ''}</div>
+            <div class="my-entry-info"><select class="reason-sel ${rbCls(s.reason)}" style="padding:1px 5px;border-radius:3px;font-size:11px;border:1px solid #e2e8f0;cursor:pointer" onchange="changeReason(${s.id},this.value)">${reasonOptions(s.tid,s.reason)}</select>${s.reason === 'Other' ? `<input class="reason-note" type="text" placeholder="e.g. training" value="${s.reasonNote||''}" onchange="changeReasonNote(${s.id},this.value)" onclick="event.stopPropagation()">` : ''}<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;white-space:nowrap;user-select:none;margin-left:8px;color:#475569"><input type="checkbox" ${offSiteVal(s) ? 'checked' : ''} onchange="toggleOffSite(${s.id})" onclick="event.stopPropagation()"> Off-site</label></div>
             <div class="my-entry-cover">${s.cover ? `Covered by: <strong>${s.cover}</strong>` : s.nocover ? `` : `<span style="color:#c00;font-style:italic">Cover TBC</span>`}</div>
           </div>
         </div>`;
@@ -1683,8 +1697,9 @@ function removeSlot(slotId) {
   render();
 }
 function unassignCover(slotId) { const s = slots().find(x => x.id === slotId); if (s) { logChange('unassign_cover', s); s.cover = null; stateSave(); render(); } }
-function changeReason(slotId, reason) { const s = slots().find(x => x.id === slotId); if (s) { logChange('change_reason', s); s.reason = reason; if (reason !== 'Other') s.reasonNote = ''; stateSave(); render(); } }
+function changeReason(slotId, reason) { const s = slots().find(x => x.id === slotId); if (s) { logChange('change_reason', s); s.reason = reason; if (reason !== 'Other') s.reasonNote = ''; s.offSite = offSiteDefault(reason); stateSave(); render(); } }
 function changeReasonNote(slotId, note) { const s = slots().find(x => x.id === slotId); if (s) { s.reasonNote = note; stateSave(); render(); } }
+function toggleOffSite(slotId) { const s = slots().find(x => x.id === slotId); if (!s || document.body.classList.contains('edit-locked')) return; s.offSite = !offSiteVal(s); stateSave(); render(); }
 
 // ── Inline note editor popup ───────────────────────────────────────────────
 function _noteEditorAway(ev) {
@@ -1789,7 +1804,7 @@ function selectReason(reason) {
   if (!state.pendingDrop) return;
   const { tid, dayIdx, session } = state.pendingDrop;
   const t = teacher(tid);
-  const newSlot = { id: state.nextId++, day: dayIdx, session, endSession: session, tid, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false };
+  const newSlot = { id: state.nextId++, day: dayIdx, session, endSession: session, tid, reason, reasonNote: '', cover: null, nocover: t?.isInfoOnly || false, offSite: offSiteDefault(reason) };
   setSlots([...slots(), newSlot]);
   logChange('add', newSlot);
   closeReasonPopup();
