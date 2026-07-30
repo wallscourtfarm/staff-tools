@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lunchtime Leaders</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Nunito', sans-serif; background: #f8fafc; color: #1e293b; }
+
+.header { background: #1798d3; color: white; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+.header h1 { font-size: 17px; font-weight: 900; line-height: 1.1; }
+.header h1 small { display: block; font-size: 10px; font-weight: 600; opacity: .8; }
+
+.controls { display: flex; align-items: center; gap: 6px; padding: 7px 12px; background: white; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; }
+.btn { padding: 5px 11px; border-radius: 5px; border: 1.5px solid #e2e8f0; background: white; font-family: 'Nunito', sans-serif; font-size: 11px; font-weight: 700; cursor: pointer; }
+.btn:hover { background: #f0f8fd; }
+.btn.active { background: #1798d3; color: white; border-color: #1798d3; }
+input[type=date] { font-family: 'Nunito', sans-serif; font-size: 11px; border: 1.5px solid #e2e8f0; border-radius: 5px; padding: 5px 8px; color: #1e293b; }
+.spacer { flex: 1; }
+.sheet-status { font-size: 10px; padding: 3px 8px; border-radius: 3px; }
+.sheet-status.ok  { color: #16a34a; background: #dcfce7; }
+.sheet-status.err { color: #b91c1c; background: #fee2e2; }
+
+.cover-alert { background: #fee2e2; border-left: 4px solid #ef4444; padding: 10px 14px; margin: 8px; border-radius: 4px; }
+.cover-alert h3 { font-size: 12px; font-weight: 900; color: #b91c1c; margin-bottom: 6px; }
+.cover-item { font-size: 11px; color: #7f1d1d; padding: 2px 0; }
+.cover-item.critical { font-weight: 700; }
+
+/* ── GRID VIEW ── */
+.grid-wrap { overflow-x: auto; padding-bottom: 12px; }
+table.sched { border-collapse: collapse; font-size: 10.5px; }
+table.sched th, table.sched td { border: 1px solid #e2e8f0; padding: 4px 5px; }
+.tc { width: 46px; min-width: 46px; font-weight: 700; font-size: 9.5px; color: #64748b; background: #f8fafc; position: sticky; left: 0; z-index: 2; white-space: nowrap; text-align: right; border-right: 2px solid #cbd5e1; }
+table.sched thead .tc { z-index: 3; }
+table.sched thead th { position: sticky; top: 0; background: white; z-index: 1; cursor: pointer; }
+table.sched thead th:not(.tc):hover { background: #f0f8fd; }
+.lh { min-width: 76px; text-align: center; padding: 5px 4px; }
+.lh-bar { height: 4px; border-radius: 2px 2px 0 0; margin: -5px -4px 4px; }
+.lh-name { font-weight: 900; font-size: 11px; display: block; }
+.lh-role { font-size: 8.5px; color: #64748b; font-weight: 600; display: block; }
+.lh.absent-hd .lh-name { text-decoration: line-through; color: #94a3b8; }
+.absent-tag { font-size: 7.5px; background: #ef4444; color: white; border-radius: 2px; padding: 1px 3px; font-weight: 700; display: inline-block; margin-top: 2px; }
+td.absent-col { background: repeating-linear-gradient(45deg,#f8fafc,#f8fafc 4px,#f1f5f9 4px,#f1f5f9 8px) !important; }
+td.act { white-space: pre-line; line-height: 1.25; vertical-align: middle; font-size: 10px; }
+td.empty { background: #f8fafc; }
+tr.all-row td.all-cell { font-weight: 700; text-align: center; font-size: 11px; padding: 5px; }
+tr.note-row td { font-size: 9px; color: #94a3b8; font-style: italic; padding: 2px 6px; background: #f8fafc; border-top: none; }
+
+/* ── CARD VIEW ── */
+.cards-wrap { padding: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(155px,1fr)); gap: 8px; }
+.leader-card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.leader-card.absent { opacity: .4; }
+.card-hd { padding: 8px 10px 6px; border-top: 5px solid #e2e8f0; cursor: pointer; }
+.card-hd:hover { opacity: .85; }
+.card-name { font-weight: 900; font-size: 13px; display: flex; align-items: center; justify-content: space-between; }
+.card-role { font-size: 9px; font-weight: 600; color: #64748b; margin-top: 1px; }
+.card-absent-tag { font-size: 7.5px; background: #ef4444; color: white; border-radius: 2px; padding: 1px 3px; font-weight: 700; }
+.card-timeline { padding-bottom: 4px; }
+.tl-row { display: flex; gap: 5px; padding: 4px 10px 3px; border-top: 1px solid #f1f5f9; align-items: flex-start; }
+.tl-time { font-size: 9px; font-weight: 700; color: #64748b; min-width: 30px; padding-top: 1px; }
+.tl-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+.tl-label { font-size: 10px; font-weight: 600; line-height: 1.3; flex: 1; }
+
+/* ── MODAL ── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 50; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: white; border-radius: 10px; padding: 18px; width: min(93vw,420px); max-height: 85vh; overflow-y: auto; }
+.modal h2 { font-size: 15px; font-weight: 900; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+.modal h2 button { background: none; border: none; font-size: 20px; cursor: pointer; color: #64748b; line-height: 1; }
+.ldr-row { display: flex; align-items: center; gap: 5px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
+.colour-swatch { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,.15); cursor: pointer; flex-shrink: 0; }
+.ldr-row input { border: 1.5px solid #e2e8f0; border-radius: 4px; padding: 4px 6px; font-family: 'Nunito', sans-serif; font-size: 11px; }
+.ldr-row .name-in { flex: 1; }
+.ldr-row .role-in { width: 80px; }
+.ldr-del { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 15px; padding: 0 2px; }
+.ldr-del:hover { color: #ef4444; }
+.add-row { display: flex; gap: 6px; margin-top: 8px; }
+.add-row input { border: 1.5px solid #e2e8f0; border-radius: 4px; padding: 5px 7px; font-family: 'Nunito', sans-serif; font-size: 11px; }
+.palette-row { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0 2px; }
+.pal-swatch { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform .1s; }
+.pal-swatch:hover { transform: scale(1.2); }
+.pal-swatch.sel { border-color: #1e293b; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 6px; margin-top: 14px; }
+
+footer { text-align: center; font-size: 10px; color: #94a3b8; padding: 10px; border-top: 1px solid #e2e8f0; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Lunchtime Leaders<small>Wallscourt Farm Academy</small></h1>
+</div>
+
+<div class="controls">
+  <button class="btn active" id="btnGrid" onclick="setView('grid')">Grid</button>
+  <button class="btn" id="btnCards" onclick="setView('cards')">Cards</button>
+  <input type="date" id="dateInput" onchange="onDateChange()">
+  <span class="spacer"></span>
+  <button class="btn" onclick="openMgr()">✏️ Leaders</button>
+  <span class="sheet-status" id="sheetStatus">Loading…</span>
+</div>
+
+<div id="coverAlert"></div>
+<div id="mainContent"></div>
+
+<!-- Leader manager modal -->
+<div class="modal-overlay" id="ldrModal">
+  <div class="modal">
+    <h2>Manage Leaders <button onclick="closeMgr()">×</button></h2>
+    <div id="ldrList"></div>
+    <div class="add-row">
+      <input type="text" id="newName" placeholder="Name…" class="name-in" style="flex:1">
+      <input type="text" id="newRole" placeholder="Role (opt.)" class="role-in">
+      <button class="btn" onclick="addLeader()">+ Add</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="resetLeaders()">Reset defaults</button>
+      <button class="btn active" onclick="closeMgr()">Done</button>
+    </div>
+  </div>
+</div>
+
+<footer>Wallscourt Farm Academy · Lunchtime Leaders · 30.07.26a</footer>
+
+<script>
+const SYNC_URL = 'https://script.google.com/macros/s/AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec?key=wfa_ll';
+
+const PALETTE = ['#f9a8d4','#fca5a5','#fcd34d','#86efac','#67e8f9','#93c5fd','#c084fc','#fb923c','#4ade80','#38bdf8','#f472b6','#a78bfa','#ec4899','#22d3ee','#94a3b8','#fde68a'];
+
+const DEFAULT_LEADERS = [
+  { id:'sarah_s',  name:'Sarah S',  role:'Play Leader', colour:'#f9a8d4' },
+  { id:'ewelina',  name:'Ewelina',  role:'',            colour:'#fca5a5' },
+  { id:'carman',   name:'Carman',   role:'',            colour:'#86efac' },
+  { id:'ying',     name:'Ying',     role:'',            colour:'#86efac' },
+  { id:'ameena',   name:'Ameena',   role:'',            colour:'#fca5a5' },
+  { id:'uzma',     name:'Uzma',     role:'',            colour:'#fca5a5' },
+  { id:'iwona',    name:'Iwona',    role:'',            colour:'#fca5a5' },
+  { id:'tanzella', name:'Tanzella', role:'',            colour:'#ec4899' },
+  { id:'diala',    name:'Diala',    role:'',            colour:'#ec4899' },
+  { id:'kelly',    name:'Kelly',    role:'',            colour:'#22d3ee' },
+  { id:'bushra',   name:'Bushra',   role:'',            colour:'#fb923c' },
+  { id:'ruchika',  name:'Ruchika',  role:'',            colour:'#4ade80' },
+  { id:'barsha',   name:'Barsha',   role:'',            colour:'#94a3b8' },
+  { id:'vacancy',  name:'Vacancy',  role:'',            colour:'#cbd5e1' },
+];
+
+// Schedule rows — 'ALL' means every leader in LEADERS list
+// leaders: array of ids, or 'ALL'
+const SCHEDULE_ROWS = [
+  { time:'11:25', items:[
+    { leaders:['sarah_s'],  label:'Café set up', colour:'#d1d5db' },
+    { leaders:['ewelina'],  label:'Café set up', colour:'#d1d5db' },
+    { leaders:['kelly'],    label:'Café set up', colour:'#d1d5db' },
+  ]},
+  { time:'11:35', items:[
+    { leaders:['carman','ying','ameena','uzma','iwona','tanzella','diala','bushra','ruchika'], label:'Start shift', colour:'#d1d5db' },
+  ]},
+  { time:'11:45', items:[
+    { leaders:'ALL', label:'Lunchtime leader check in', colour:'#e879f9' },
+  ]},
+  { time:'11:50', items:[
+    { leaders:['sarah_s','ewelina','carman','ying','ameena','uzma','iwona'], label:'Café – Oak arrive', colour:'#67e8f9' },
+    { leaders:['tanzella','diala','kelly','bushra','ruchika'], label:'Set up 11:50\nCh come out at 12', colour:'#9ca3af' },
+  ]},
+  { time:'11:55', items:[
+    { leaders:['sarah_s','ewelina','carman','ying','ameena','uzma','iwona'], label:'Café – Y1 arrive', colour:'#fda4af' },
+    { leaders:['tanzella','diala','kelly','bushra','ruchika'], label:'Set up 11:50\nCh come out at 12', colour:'#9ca3af' },
+  ]},
+  { time:'12:00', items:[
+    { leaders:['sarah_s','ewelina','carman','ying','ameena','uzma','iwona'], label:'Café – Y2 arrive', colour:'#fda4af' },
+    { leaders:['tanzella','diala','kelly','bushra','ruchika'], label:'Set up 11:50\nCh come out at 12', colour:'#9ca3af' },
+  ]},
+  { time:'12:15', items:[
+    { leaders:['sarah_s'],                          label:'Set up SCR tables',    colour:'#f9a8d4' },
+    { leaders:['ewelina','carman'],                 label:'Oak in garden',        colour:'#86efac' },
+    { leaders:['ying','ameena','uzma','iwona'],      label:'Café supporting KS1',  colour:'#67e8f9' },
+    { leaders:['tanzella','diala'],                 label:'In the garden',        colour:'#ec4899' },
+    { leaders:['kelly'],                            label:'In the garden',        colour:'#22d3ee' },
+    { leaders:['bushra'],                           label:'In the garden',        colour:'#fb923c' },
+    { leaders:['ruchika'],                          label:'In the garden',        colour:'#4ade80' },
+  ]},
+  { time:'12:20', items:[
+    { leaders:['sarah_s'],                          label:'Set up SCR tables',    colour:'#f9a8d4' },
+    { leaders:['ewelina','carman'],                 label:'Oak in garden',        colour:'#86efac' },
+    { leaders:['ying','ameena'],                    label:'Y1 in garden',         colour:'#86efac' },
+    { leaders:['uzma','iwona'],                     label:'Y2 in garden',         colour:'#86efac' },
+    { leaders:['tanzella','diala'],                 label:'In the garden',        colour:'#ec4899' },
+    { leaders:['kelly'],                            label:'In the garden',        colour:'#22d3ee' },
+    { leaders:['bushra'],                           label:'In the garden',        colour:'#fb923c' },
+    { leaders:['ruchika'],                          label:'In the garden',        colour:'#4ade80' },
+  ]},
+  { time:'12:25', items:[
+    { leaders:['ewelina','carman'],                 label:'Oak in garden',        colour:'#86efac' },
+    { leaders:['ying','ameena'],                    label:'Y1 in garden',         colour:'#86efac' },
+    { leaders:['uzma','iwona'],                     label:'Y2 in garden',         colour:'#86efac' },
+    { leaders:['tanzella','diala'],                 label:'In the garden',        colour:'#ec4899' },
+    { leaders:['kelly'],                            label:'In the garden',        colour:'#22d3ee' },
+    { leaders:['bushra'],                           label:'In the garden',        colour:'#fb923c' },
+    { leaders:['ruchika'],                          label:'In the garden',        colour:'#4ade80' },
+  ]},
+  { time:'12:30', items:[
+    { leaders:['sarah_s'],                          label:'Café support for KS2', colour:'#f9a8d4' },
+    { leaders:['ying','ameena'],                    label:'Y1 in garden',         colour:'#86efac' },
+    { leaders:['uzma','iwona'],                     label:'Y2 in garden',         colour:'#86efac' },
+    { leaders:['tanzella'],                         label:'Lead ch to SC',        colour:'#ec4899' },
+    { leaders:['diala'],                            label:'Lead ch to café\nthen return to SC', colour:'#ec4899' },
+    { leaders:['kelly'],                            label:'Go to Café',           colour:'#22d3ee' },
+    { leaders:['bushra'],                           label:'Go to café',           colour:'#fb923c' },
+    { leaders:['ruchika'],                          label:'Go to café',           colour:'#4ade80' },
+  ]},
+  { time:'12:50', items:[
+    { leaders:['sarah_s'],                          label:'Café support for KS2', colour:'#f9a8d4' },
+    { leaders:['ewelina','carman'],                 label:'Story in Oak home zones', colour:'#fda4af' },
+    { leaders:['ying','ameena'],                    label:'Y1 in garden',         colour:'#86efac' },
+    { leaders:['uzma','iwona'],                     label:'Y2 in garden',         colour:'#86efac' },
+  ]},
+  { time:'1:00', items:[
+    { leaders:'ALL', label:'Handover key messages to teaching team', colour:'#d9f99d' },
+  ]},
+  { time:'1:08', items:[
+    { leaders:['ewelina','carman','ying','ameena','uzma','iwona','tanzella','diala','kelly','bushra','ruchika'],
+      label:'Ring the bell', colour:'#fda4af' },
+  ]},
+  { time:'1:10', items:[
+    { leaders:'ALL', label:'Teachers collect Ch', colour:'#fda4af' },
+  ]},
+  { time:'1:10', note:'checkout', items:[
+    { leaders:['sarah_s'], label:'Lead check out', colour:'#f9a8d4' },
+    { leaders:['ewelina','carman','ying','ameena','uzma','iwona','tanzella','diala','kelly','bushra','ruchika'],
+      label:'Check out with lunchtime team', colour:'#d9f99d' },
+  ]},
+  { time:'1:20', note:'*Rotation for First Aid logs, Playpod tidy and 1:1 readers', items:[
+    { leaders:['sarah_s','ameena','uzma','iwona','tanzella','diala'], label:'1:1 reader ×1',  colour:'#d9f99d' },
+    { leaders:['carman','ying'],                                      label:'Playpod tidy',   colour:'#67e8f9' },
+    { leaders:['bushra','ruchika'],                                   label:'First Aid logs', colour:'#d9f99d' },
+  ]},
+];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let LEADERS = DEFAULT_LEADERS.map(l => ({...l}));
+let absences = {}; // { 'YYYY-MM-DD': ['id1', 'id2'] }
+let view = 'grid';
+let selectedDate = todayStr();
+let pickingColourFor = null;
+
+function todayStr() {
+  return new Date().toISOString().slice(0,10);
+}
+function absentToday() {
+  return absences[selectedDate] || [];
+}
+function toggleAbsent(id) {
+  const arr = absentToday().filter(x => x !== id);
+  if (!absentToday().includes(id)) arr.push(id);
+  absences[selectedDate] = arr;
+  save();
+  render();
+}
+
+// ── Persistence ───────────────────────────────────────────────────────────────
+function save() {
+  localStorage.setItem('wfa_ll_absences', JSON.stringify(absences));
+  localStorage.setItem('wfa_ll_leaders',  JSON.stringify(LEADERS));
+  if (SYNC_URL) {
+    fetch(SYNC_URL, { method:'POST', body: JSON.stringify({ absences, leaders: LEADERS }) }).catch(() => {});
+  }
+}
+function loadLocal() {
+  try { const s = localStorage.getItem('wfa_ll_absences'); if (s) absences = JSON.parse(s); } catch(e) {}
+  try { const s = localStorage.getItem('wfa_ll_leaders');  if (s) { const l = JSON.parse(s); if (l?.length) LEADERS = l; } } catch(e) {}
+}
+
+// ── Cover analysis ────────────────────────────────────────────────────────────
+function getCoverNeeds() {
+  const abs = absentToday();
+  if (!abs.length) return [];
+  const seen = new Set();
+  const needs = [];
+  for (const row of SCHEDULE_ROWS) {
+    for (const item of row.items) {
+      if (item.leaders === 'ALL') continue;
+      const absentFrom = item.leaders.filter(id => abs.includes(id));
+      if (!absentFrom.length) continue;
+      const key = item.label.replace(/\n/g,' ');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const presentCount = item.leaders.filter(id => !abs.includes(id)).length;
+      const absentNames = absentFrom.map(id => LEADERS.find(l => l.id === id)?.name || id);
+      needs.push({ label: key, absentNames, presentCount, critical: presentCount === 0 });
+    }
+  }
+  return needs;
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function setView(v) {
+  view = v;
+  document.getElementById('btnGrid').classList.toggle('active', v === 'grid');
+  document.getElementById('btnCards').classList.toggle('active', v === 'cards');
+  render();
+}
+function onDateChange() {
+  selectedDate = document.getElementById('dateInput').value || todayStr();
+  render();
+}
+function render() {
+  renderCoverAlert();
+  document.getElementById('mainContent').innerHTML = view === 'grid' ? renderGrid() : renderCards();
+}
+
+function renderCoverAlert() {
+  const needs = getCoverNeeds();
+  const el = document.getElementById('coverAlert');
+  if (!needs.length) { el.innerHTML = ''; return; }
+  const absNames = absentToday().map(id => LEADERS.find(l => l.id === id)?.name || id);
+  el.innerHTML = `<div class="cover-alert">
+    <h3>🛑 Absent: ${absNames.join(', ')} — activities needing cover:</h3>
+    ${needs.map(n => `<div class="cover-item${n.critical?' critical':''}">
+      ${n.critical ? '🛑' : '⚠️'} <strong>${n.label}</strong>
+      <span style="color:#b91c1c;font-size:9px;margin-left:4px">(${n.absentNames.join(', ')} absent${n.presentCount ? '; '+n.presentCount+' remaining' : ' — no cover!'})</span>
+    </div>`).join('')}
+  </div>`;
+}
+
+function renderGrid() {
+  const abs = absentToday();
+  let h = '<div class="grid-wrap"><table class="sched"><thead><tr>';
+  h += '<th class="tc" style="background:#f8fafc;border-right-color:#cbd5e1"></th>';
+  h += LEADERS.map(l => {
+    const isAbs = abs.includes(l.id);
+    return `<th onclick="toggleAbsent('${l.id}')">
+      <div class="lh${isAbs?' absent-hd':''}">
+        <div class="lh-bar" style="background:${l.colour}"></div>
+        <span class="lh-name">${l.name}</span>
+        ${l.role ? `<span class="lh-role">${l.role}</span>` : ''}
+        ${isAbs ? '<span class="absent-tag">ABSENT</span>' : ''}
+      </div>
+    </th>`;
+  }).join('');
+  h += '</tr></thead><tbody>';
+
+  for (const row of SCHEDULE_ROWS) {
+    const allItem = row.items.find(i => i.leaders === 'ALL');
+    if (allItem) {
+      h += `<tr class="all-row"><td class="tc">${row.time}</td>
+        <td class="all-cell" colspan="${LEADERS.length}" style="background:${allItem.colour}28;border-left:4px solid ${allItem.colour}">${allItem.label}</td>
+      </tr>`;
+      if (row.note) h += `<tr class="note-row"><td class="tc"></td><td colspan="${LEADERS.length}">${row.note}</td></tr>`;
+      continue;
+    }
+    h += `<tr><td class="tc">${row.time}</td>`;
+    for (const l of LEADERS) {
+      if (abs.includes(l.id)) {
+        h += `<td class="absent-col" title="${l.name} — absent"></td>`;
+        continue;
+      }
+      const item = row.items.find(i => Array.isArray(i.leaders) && i.leaders.includes(l.id));
+      if (item) {
+        h += `<td class="act" style="background:${item.colour}28;border-left:3px solid ${item.colour}">${item.label}</td>`;
+      } else {
+        h += '<td class="empty"></td>';
+      }
+    }
+    h += '</tr>';
+    if (row.note) h += `<tr class="note-row"><td class="tc"></td><td colspan="${LEADERS.length}">${row.note}</td></tr>`;
+  }
+
+  h += '</tbody></table></div>';
+  return h;
+}
+
+function renderCards() {
+  const abs = absentToday();
+  return `<div class="cards-wrap">${LEADERS.map(l => {
+    const isAbs = abs.includes(l.id);
+    const timeline = [];
+    const seen = new Set();
+    for (const row of SCHEDULE_ROWS) {
+      for (const item of row.items) {
+        const ids = item.leaders === 'ALL' ? LEADERS.map(x => x.id) : item.leaders;
+        if (!ids.includes(l.id)) continue;
+        const key = row.time + '|' + item.label;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        timeline.push({ time: row.time, label: item.label.replace(/\n/g,' '), colour: item.colour });
+      }
+    }
+    return `<div class="leader-card${isAbs?' absent':''}">
+      <div class="card-hd" style="border-top-color:${l.colour}" onclick="toggleAbsent('${l.id}')">
+        <div class="card-name">${l.name}${isAbs?'<span class="card-absent-tag">ABSENT</span>':''}</div>
+        ${l.role?`<div class="card-role">${l.role}</div>`:''}
+      </div>
+      <div class="card-timeline">${timeline.map(t =>
+        `<div class="tl-row">
+          <span class="tl-time">${t.time}</span>
+          <div class="tl-dot" style="background:${t.colour}"></div>
+          <span class="tl-label">${t.label}</span>
+        </div>`
+      ).join('')}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// ── Leader manager ────────────────────────────────────────────────────────────
+function openMgr() {
+  pickingColourFor = null;
+  renderMgr();
+  document.getElementById('ldrModal').classList.add('open');
+}
+function closeMgr() {
+  document.getElementById('ldrModal').classList.remove('open');
+  save();
+  render();
+}
+function renderMgr() {
+  document.getElementById('ldrList').innerHTML = LEADERS.map((l,i) =>
+    `<div class="ldr-row">
+      <div class="colour-swatch" style="background:${l.colour}" onclick="openPalette(${i})" title="Change colour"></div>
+      <input class="name-in" type="text" value="${l.name}" oninput="LEADERS[${i}].name=this.value">
+      <input class="role-in" type="text" value="${l.role||''}" placeholder="Role" oninput="LEADERS[${i}].role=this.value">
+      <button class="ldr-del" onclick="removeLeader(${i})">×</button>
+    </div>
+    ${pickingColourFor===i ? `<div class="palette-row">${PALETTE.map(c =>
+      `<div class="pal-swatch${l.colour===c?' sel':''}" style="background:${c}" onclick="setColour(${i},'${c}')"></div>`
+    ).join('')}</div>` : ''}`
+  ).join('');
+}
+function removeLeader(i) { LEADERS.splice(i,1); renderMgr(); }
+function openPalette(i) { pickingColourFor = (pickingColourFor === i ? null : i); renderMgr(); }
+function setColour(i, c) { LEADERS[i].colour = c; pickingColourFor = null; renderMgr(); }
+function addLeader() {
+  const name = document.getElementById('newName').value.trim();
+  if (!name) return;
+  const role = document.getElementById('newRole').value.trim();
+  const id = name.toLowerCase().replace(/[^a-z0-9]+/g,'_') + '_' + Date.now().toString(36);
+  LEADERS.push({ id, name, role, colour: PALETTE[LEADERS.length % PALETTE.length] });
+  document.getElementById('newName').value = '';
+  document.getElementById('newRole').value = '';
+  renderMgr();
+}
+function resetLeaders() {
+  if (!confirm('Reset to default leader list? Custom changes will be lost.')) return;
+  LEADERS = DEFAULT_LEADERS.map(l => ({...l}));
+  renderMgr();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  loadLocal();
+  document.getElementById('dateInput').value = selectedDate;
+  render();
+  const status = document.getElementById('sheetStatus');
+  try {
+    if (!SYNC_URL) throw new Error('No sync');
+    const raw = await fetch(SYNC_URL).then(r => r.text());
+    if (raw && raw !== '{}') {
+      try {
+        const remote = JSON.parse(raw);
+        if (remote.absences) absences = remote.absences;
+        if (remote.leaders?.length) LEADERS = remote.leaders;
+      } catch(e) {}
+    }
+    localStorage.setItem('wfa_ll_absences', JSON.stringify(absences));
+    localStorage.setItem('wfa_ll_leaders',  JSON.stringify(LEADERS));
+    status.textContent = 'Synced ✓';
+    status.className = 'sheet-status ok';
+  } catch(e) {
+    status.textContent = 'Offline';
+    status.className = 'sheet-status err';
+  }
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
