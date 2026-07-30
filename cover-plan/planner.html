@@ -394,7 +394,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(29.07.26g)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(30.07.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -406,6 +406,7 @@ body.edit-locked .notify-btn   { display:none; }
     <button class="concern-btn" onclick="openConcernPanel()" title="Raise a question or concern about the schedule">Send Message</button>
     <button class="notify-btn" id="notifyBtn" onclick="toggleNotifyPanel()" title="Notify affected staff of changes">🔔 Notify <span class="notify-badge" id="notifyBadge"></span></button>
     <button class="edit-toggle-btn" id="editToggleBtn" onclick="toggleEditMode()" title="Toggle edit mode"></button>
+    <span id="syncStatus" style="font-size:11px;font-weight:bold;padding:3px 8px;border-radius:10px;background:#f1f5f9;color:#94a3b8;white-space:nowrap">···</span>
   </div>
 </header>
 
@@ -812,7 +813,7 @@ async function init() {
     '<div style="padding:60px;text-align:center;color:#94a3b8;font-size:14px">Loading from Google Sheets…</div>';
   try {
     const cacheBuster = `&_cb=${Date.now()}`;
-    const get=tab=>fetch(SHEET_BASE+encodeURIComponent(tab)+cacheBuster).then(r=>{if(!r.ok)throw new Error(tab);return r.text();});
+    const get=tab=>fetch(SHEET_BASE+encodeURIComponent(tab)+cacheBuster, { signal: AbortSignal.timeout(12000) }).then(r=>{if(!r.ok)throw new Error(tab);return r.text();});
     const [staffTxt,termsTxt,eventsTxt,wseTxt,recTxt]=await Promise.all([
       get('Staff'),get('TermDates'),get('CalendarEvents'),get('EventsMeetings'),get('RecurringCover')
     ]);
@@ -853,18 +854,31 @@ async function init() {
   }
 }
 
+// ── Sync status badge ─────────────────────────────────────────────────────────
+function setSyncStatus(state) {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  if (state === 'syncing') { el.textContent = 'Syncing…'; el.style.background='#f1f5f9'; el.style.color='#94a3b8'; }
+  else if (state === 'ok')  { el.textContent = 'Synced ✓'; el.style.background='#dcfce7'; el.style.color='#166534'; }
+  else                      { el.textContent = 'Offline';  el.style.background='#fff7ed'; el.style.color='#c2410c'; }
+}
+
 // ── State persistence ─────────────────────────────────────────────────────────
 function stateSave() {
   const json = JSON.stringify({ weekSlots: state.weekSlots, cellNotes: state.cellNotes, nextId: state.nextId });
   try { localStorage.setItem('wfa_planner_state', json); } catch(e) {}
-  fetch(SYNC_URL, { method:'POST', body:json }).catch(()=>{});
+  setSyncStatus('syncing');
+  fetch(SYNC_URL, { method:'POST', body:json, signal: AbortSignal.timeout(8000) })
+    .then(() => setSyncStatus('ok'))
+    .catch(() => setSyncStatus('offline'));
 }
 async function stateLoad() {
   try {
-    const res = await fetch(SYNC_URL);
+    const res = await fetch(SYNC_URL, { signal: AbortSignal.timeout(8000) });
     const remote = await res.json();
-    if (remote) { localStorage.setItem('wfa_planner_state', JSON.stringify(remote)); return remote; }
+    if (remote) { localStorage.setItem('wfa_planner_state', JSON.stringify(remote)); setSyncStatus('ok'); return remote; }
   } catch(e) {}
+  setSyncStatus('offline');
   try { const s = localStorage.getItem('wfa_planner_state'); return s ? JSON.parse(s) : null; }
   catch(e) { return null; }
 }
