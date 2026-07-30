@@ -40,7 +40,6 @@ table.sched thead th { position: sticky; top: 0; background: white; z-index: 1; 
 .lh-name { font-weight: 900; font-size: 11px; display: block; }
 .lh-role { font-size: 8.5px; color: #64748b; font-weight: 600; display: block; }
 .lh.absent-hd .lh-name { text-decoration: line-through; color: #94a3b8; }
-.absent-tag { font-size: 7.5px; background: #ef4444; color: white; border-radius: 2px; padding: 1px 3px; font-weight: 700; display: inline-block; margin-top: 2px; }
 td.absent-col { background: repeating-linear-gradient(45deg,#f8fafc,#f8fafc 4px,#f1f5f9 4px,#f1f5f9 8px) !important; }
 td.act { white-space: pre-line; line-height: 1.25; vertical-align: middle; font-size: 10px; }
 td.empty { background: #f8fafc; }
@@ -48,12 +47,9 @@ tr.all-row td.all-cell { font-weight: 700; text-align: center; font-size: 11px; 
 tr.note-row td { font-size: 9px; color: #94a3b8; font-style: italic; padding: 2px 6px; background: #f8fafc; border-top: none; }
 
 /* ── ABSENT TOGGLE ── */
-/* Grid: small pill button in column header */
-table.sched thead th { position: sticky; top: 0; background: white; z-index: 1; }
 .absent-pill { display: inline-block; margin-top: 4px; font-size: 8.5px; font-weight: 700; font-family: 'Nunito', sans-serif; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 1px 7px; cursor: pointer; background: white; color: #94a3b8; white-space: nowrap; }
 .absent-pill:hover { border-color: #fca5a5; color: #b91c1c; }
 .absent-pill.is-absent { background: #fee2e2; border-color: #ef4444; color: #b91c1c; }
-/* Card: toggle button at foot of header */
 .card-absent-btn { width: 100%; margin-top: 6px; padding: 3px 0; font-family: 'Nunito', sans-serif; font-size: 9.5px; font-weight: 700; border: 1.5px solid #e2e8f0; border-radius: 6px; background: white; color: #94a3b8; cursor: pointer; }
 .card-absent-btn:hover { border-color: #fca5a5; color: #b91c1c; }
 .card-absent-btn.is-absent { background: #fee2e2; border-color: #ef4444; color: #b91c1c; }
@@ -71,6 +67,37 @@ table.sched thead th { position: sticky; top: 0; background: white; z-index: 1; 
 .tl-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
 .tl-label { font-size: 10px; font-weight: 600; line-height: 1.3; flex: 1; }
 
+/* ── SCHEDULE EDITOR ── */
+.sched-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 60; overflow-y: auto; }
+.sched-overlay.open { display: block; }
+.sched-editor { background: white; min-height: 100%; max-width: 860px; margin: 0 auto; }
+.sed-head { position: sticky; top: 0; background: white; border-bottom: 2px solid #e2e8f0; padding: 10px 12px; display: flex; align-items: center; gap: 6px; z-index: 10; flex-wrap: wrap; }
+.sed-head h2 { font-size: 14px; font-weight: 900; flex: 1; }
+.sed-body { padding: 10px; }
+.sed-slot { border: 1.5px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+.sed-slot-head { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; }
+.sed-time-in { font-family: 'Nunito', sans-serif; font-size: 13px; font-weight: 700; border: 1.5px solid #cbd5e1; border-radius: 4px; padding: 3px 6px; width: 65px; }
+.sed-note-in { font-family: 'Nunito', sans-serif; font-size: 10px; border: 1.5px solid #e2e8f0; border-radius: 4px; padding: 3px 6px; flex: 1; min-width: 100px; color: #64748b; }
+.sed-icon-btn { font-family: 'Nunito', sans-serif; font-size: 10px; font-weight: 700; border: 1.5px solid #e2e8f0; border-radius: 4px; padding: 3px 8px; background: white; cursor: pointer; }
+.sed-icon-btn:hover { background: #f0f8fd; }
+.sed-icon-btn.danger { color: #b91c1c; border-color: #fca5a5; }
+.sed-icon-btn.danger:hover { background: #fee2e2; }
+.sed-item { padding: 8px 10px 6px; border-bottom: 1px solid #f1f5f9; }
+.sed-item-row1 { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 5px; }
+.sed-colour-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(0,0,0,.15); cursor: pointer; flex-shrink: 0; margin-top: 3px; }
+.sed-label-ta { flex: 1; font-family: 'Nunito', sans-serif; font-size: 11px; border: 1.5px solid #e2e8f0; border-radius: 4px; padding: 4px 6px; resize: vertical; min-height: 34px; line-height: 1.4; }
+.sed-label-ta:focus { outline: none; border-color: #1798d3; }
+.sed-palette { display: none; flex-wrap: wrap; gap: 4px; padding: 4px 0 3px 24px; }
+.sed-leaders { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 5px; }
+.sed-ldr-chip { font-family: 'Nunito', sans-serif; font-size: 9px; font-weight: 700; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 2px 7px; cursor: pointer; background: white; color: #64748b; user-select: none; }
+.sed-ldr-chip.sel { background: #1798d3; color: white; border-color: #1798d3; }
+.sed-ldr-chip.all-chip.sel { background: #7c3aed; border-color: #7c3aed; color: white; }
+.sed-ldr-chip.dim { opacity: .3; cursor: default; }
+.sed-add-item { display: block; width: calc(100% - 20px); margin: 5px 10px 8px; padding: 5px; font-family: 'Nunito', sans-serif; font-size: 10px; font-weight: 700; border: 1.5px dashed #cbd5e1; border-radius: 5px; background: none; color: #94a3b8; cursor: pointer; }
+.sed-add-item:hover { border-color: #1798d3; color: #1798d3; background: #f0f9ff; }
+.sed-add-slot { display: block; width: 100%; padding: 9px; font-family: 'Nunito', sans-serif; font-size: 11px; font-weight: 700; border: 1.5px dashed #cbd5e1; border-radius: 6px; background: none; color: #94a3b8; cursor: pointer; margin-bottom: 20px; }
+.sed-add-slot:hover { border-color: #1798d3; color: #1798d3; background: #f0f9ff; }
+
 /* ── PRINT ── */
 @media print {
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -83,7 +110,7 @@ table.sched thead th { position: sticky; top: 0; background: white; z-index: 1; 
   .grid-wrap { display: none; }
 }
 
-/* ── MODAL ── */
+/* ── LEADER MODAL ── */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 50; align-items: center; justify-content: center; }
 .modal-overlay.open { display: flex; }
 .modal { background: white; border-radius: 10px; padding: 18px; width: min(93vw,420px); max-height: 85vh; overflow-y: auto; }
@@ -119,6 +146,7 @@ footer { text-align: center; font-size: 10px; color: #94a3b8; padding: 10px; bor
   <input type="date" id="dateInput" onchange="onDateChange()">
   <span class="spacer"></span>
   <button class="btn" onclick="openMgr()">✏️ Leaders</button>
+  <button class="btn" onclick="openSchedEditor()">📋 Schedule</button>
   <button class="btn" onclick="printCards()">🖨 Print</button>
   <span class="sheet-status" id="sheetStatus">Loading…</span>
 </div>
@@ -143,12 +171,25 @@ footer { text-align: center; font-size: 10px; color: #94a3b8; padding: 10px; bor
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunchtime Leaders · 30.07.26b</footer>
+<!-- Schedule editor (full-page overlay) -->
+<div class="sched-overlay" id="schedOverlay">
+  <div class="sched-editor">
+    <div class="sed-head">
+      <h2>📋 Edit Schedule</h2>
+      <button class="btn" onclick="resetSched()">Reset to default</button>
+      <button class="btn" onclick="closeSchedEditor()">Cancel</button>
+      <button class="btn active" onclick="saveSchedEditor()">Save for everyone</button>
+    </div>
+    <div class="sed-body" id="schedEdBody"></div>
+  </div>
+</div>
+
+<footer>Wallscourt Farm Academy · Lunchtime Leaders · 30.07.26c</footer>
 
 <script>
 const SYNC_URL = 'https://script.google.com/macros/s/AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec?key=wfa_ll';
 
-const PALETTE = ['#f9a8d4','#fca5a5','#fcd34d','#86efac','#67e8f9','#93c5fd','#c084fc','#fb923c','#4ade80','#38bdf8','#f472b6','#a78bfa','#ec4899','#22d3ee','#94a3b8','#fde68a'];
+const PALETTE = ['#f9a8d4','#fca5a5','#fda4af','#fcd34d','#86efac','#d9f99d','#67e8f9','#93c5fd','#c084fc','#fb923c','#4ade80','#38bdf8','#f472b6','#a78bfa','#ec4899','#22d3ee','#94a3b8','#d1d5db','#fde68a','#e879f9'];
 
 const DEFAULT_LEADERS = [
   { id:'sarah_s',  name:'Sarah S',  role:'Play Leader', colour:'#f9a8d4' },
@@ -167,9 +208,7 @@ const DEFAULT_LEADERS = [
   { id:'vacancy',  name:'Vacancy',  role:'',            colour:'#cbd5e1' },
 ];
 
-// Schedule rows — 'ALL' means every leader in LEADERS list
-// leaders: array of ids, or 'ALL'
-const SCHEDULE_ROWS = [
+const DEFAULT_SCHEDULE = [
   { time:'11:25', items:[
     { leaders:['sarah_s'],  label:'Café set up', colour:'#d1d5db' },
     { leaders:['ewelina'],  label:'Café set up', colour:'#d1d5db' },
@@ -183,15 +222,15 @@ const SCHEDULE_ROWS = [
   ]},
   { time:'11:50', items:[
     { leaders:['sarah_s','ewelina','carman','ying','ameena','uzma','iwona'], label:'Café – Oak arrive', colour:'#67e8f9' },
-    { leaders:['tanzella','diala','kelly','bushra','ruchika'], label:'Set up 11:50\nCh come out at 12', colour:'#9ca3af' },
+    { leaders:['tanzella','diala','kelly','bushra','ruchika'], label:'Set up 11:50\nCh come out at 12', colour:'#94a3b8' },
   ]},
   { time:'11:55', items:[
     { leaders:['sarah_s','ewelina','carman','ying','ameena','uzma','iwona'], label:'Café – Y1 arrive', colour:'#fda4af' },
-    { leaders:['tanzella','diala','kelly','bushra','ruchika'], label:'Set up 11:50\nCh come out at 12', colour:'#9ca3af' },
+    { leaders:['tanzella','diala','kelly','bushra','ruchika'], label:'Set up 11:50\nCh come out at 12', colour:'#94a3b8' },
   ]},
   { time:'12:00', items:[
     { leaders:['sarah_s','ewelina','carman','ying','ameena','uzma','iwona'], label:'Café – Y2 arrive', colour:'#fda4af' },
-    { leaders:['tanzella','diala','kelly','bushra','ruchika'], label:'Set up 11:50\nCh come out at 12', colour:'#9ca3af' },
+    { leaders:['tanzella','diala','kelly','bushra','ruchika'], label:'Set up 11:50\nCh come out at 12', colour:'#94a3b8' },
   ]},
   { time:'12:15', items:[
     { leaders:['sarah_s'],                          label:'Set up SCR tables',    colour:'#f9a8d4' },
@@ -261,17 +300,20 @@ const SCHEDULE_ROWS = [
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let LEADERS = DEFAULT_LEADERS.map(l => ({...l}));
-let absences = {}; // { 'YYYY-MM-DD': ['id1', 'id2'] }
+let scheduleRows = null;
+let absences = {};
 let view = 'grid';
 let selectedDate = todayStr();
 let pickingColourFor = null;
+let editSched = null;
 
-function todayStr() {
-  return new Date().toISOString().slice(0,10);
+function todayStr() { return new Date().toISOString().slice(0,10); }
+function deepClone(x) { return JSON.parse(JSON.stringify(x)); }
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-function absentToday() {
-  return absences[selectedDate] || [];
-}
+function absentToday() { return absences[selectedDate] || []; }
+
 function toggleAbsent(id) {
   const arr = absentToday().filter(x => x !== id);
   if (!absentToday().includes(id)) arr.push(id);
@@ -284,13 +326,15 @@ function toggleAbsent(id) {
 function save() {
   localStorage.setItem('wfa_ll_absences', JSON.stringify(absences));
   localStorage.setItem('wfa_ll_leaders',  JSON.stringify(LEADERS));
+  localStorage.setItem('wfa_ll_schedule', JSON.stringify(scheduleRows));
   if (SYNC_URL) {
-    fetch(SYNC_URL, { method:'POST', body: JSON.stringify({ absences, leaders: LEADERS }) }).catch(() => {});
+    fetch(SYNC_URL, { method:'POST', body: JSON.stringify({ absences, leaders: LEADERS, schedule: scheduleRows }) }).catch(() => {});
   }
 }
 function loadLocal() {
   try { const s = localStorage.getItem('wfa_ll_absences'); if (s) absences = JSON.parse(s); } catch(e) {}
   try { const s = localStorage.getItem('wfa_ll_leaders');  if (s) { const l = JSON.parse(s); if (l?.length) LEADERS = l; } } catch(e) {}
+  try { const s = localStorage.getItem('wfa_ll_schedule'); if (s) { const sc = JSON.parse(s); if (sc?.length) scheduleRows = sc; } } catch(e) {}
 }
 
 // ── Cover analysis ────────────────────────────────────────────────────────────
@@ -299,7 +343,7 @@ function getCoverNeeds() {
   if (!abs.length) return [];
   const seen = new Set();
   const needs = [];
-  for (const row of SCHEDULE_ROWS) {
+  for (const row of scheduleRows) {
     for (const item of row.items) {
       if (item.leaders === 'ALL') continue;
       const absentFrom = item.leaders.filter(id => abs.includes(id));
@@ -339,7 +383,7 @@ function renderCoverAlert() {
   el.innerHTML = `<div class="cover-alert">
     <h3>🛑 Absent: ${absNames.join(', ')} — activities needing cover:</h3>
     ${needs.map(n => `<div class="cover-item${n.critical?' critical':''}">
-      ${n.critical ? '🛑' : '⚠️'} <strong>${n.label}</strong>
+      ${n.critical ? '🛑' : '⚠️'} <strong>${escHtml(n.label)}</strong>
       <span style="color:#b91c1c;font-size:9px;margin-left:4px">(${n.absentNames.join(', ')} absent${n.presentCount ? '; '+n.presentCount+' remaining' : ' — no cover!'})</span>
     </div>`).join('')}
   </div>`;
@@ -354,40 +398,33 @@ function renderGrid() {
     return `<th>
       <div class="lh${isAbs?' absent-hd':''}">
         <div class="lh-bar" style="background:${l.colour}"></div>
-        <span class="lh-name">${l.name}</span>
-        ${l.role ? `<span class="lh-role">${l.role}</span>` : ''}
+        <span class="lh-name">${escHtml(l.name)}</span>
+        ${l.role ? `<span class="lh-role">${escHtml(l.role)}</span>` : ''}
         <button class="absent-pill${isAbs?' is-absent':''}" onclick="toggleAbsent('${l.id}')">${isAbs ? '✗ Absent' : 'Mark absent'}</button>
       </div>
     </th>`;
   }).join('');
   h += '</tr></thead><tbody>';
-
-  for (const row of SCHEDULE_ROWS) {
+  for (const row of scheduleRows) {
     const allItem = row.items.find(i => i.leaders === 'ALL');
     if (allItem) {
-      h += `<tr class="all-row"><td class="tc">${row.time}</td>
-        <td class="all-cell" colspan="${LEADERS.length}" style="background:${allItem.colour}28;border-left:4px solid ${allItem.colour}">${allItem.label}</td>
+      h += `<tr class="all-row"><td class="tc">${escHtml(row.time)}</td>
+        <td class="all-cell" colspan="${LEADERS.length}" style="background:${allItem.colour}28;border-left:4px solid ${allItem.colour}">${escHtml(allItem.label)}</td>
       </tr>`;
-      if (row.note) h += `<tr class="note-row"><td class="tc"></td><td colspan="${LEADERS.length}">${row.note}</td></tr>`;
+      if (row.note) h += `<tr class="note-row"><td class="tc"></td><td colspan="${LEADERS.length}">${escHtml(row.note)}</td></tr>`;
       continue;
     }
-    h += `<tr><td class="tc">${row.time}</td>`;
+    h += `<tr><td class="tc">${escHtml(row.time)}</td>`;
     for (const l of LEADERS) {
-      if (abs.includes(l.id)) {
-        h += `<td class="absent-col" title="${l.name} — absent"></td>`;
-        continue;
-      }
+      if (abs.includes(l.id)) { h += `<td class="absent-col" title="${escHtml(l.name)} — absent"></td>`; continue; }
       const item = row.items.find(i => Array.isArray(i.leaders) && i.leaders.includes(l.id));
-      if (item) {
-        h += `<td class="act" style="background:${item.colour}28;border-left:3px solid ${item.colour}">${item.label}</td>`;
-      } else {
-        h += '<td class="empty"></td>';
-      }
+      h += item
+        ? `<td class="act" style="background:${item.colour}28;border-left:3px solid ${item.colour}">${escHtml(item.label)}</td>`
+        : '<td class="empty"></td>';
     }
     h += '</tr>';
-    if (row.note) h += `<tr class="note-row"><td class="tc"></td><td colspan="${LEADERS.length}">${row.note}</td></tr>`;
+    if (row.note) h += `<tr class="note-row"><td class="tc"></td><td colspan="${LEADERS.length}">${escHtml(row.note)}</td></tr>`;
   }
-
   h += '</tbody></table></div>';
   return h;
 }
@@ -398,7 +435,7 @@ function renderCards() {
     const isAbs = abs.includes(l.id);
     const timeline = [];
     const seen = new Set();
-    for (const row of SCHEDULE_ROWS) {
+    for (const row of scheduleRows) {
       for (const item of row.items) {
         const ids = item.leaders === 'ALL' ? LEADERS.map(x => x.id) : item.leaders;
         if (!ids.includes(l.id)) continue;
@@ -410,15 +447,15 @@ function renderCards() {
     }
     return `<div class="leader-card${isAbs?' absent':''}">
       <div class="card-hd" style="border-top-color:${l.colour}">
-        <div class="card-name">${l.name}</div>
-        ${l.role?`<div class="card-role">${l.role}</div>`:''}
+        <div class="card-name">${escHtml(l.name)}</div>
+        ${l.role?`<div class="card-role">${escHtml(l.role)}</div>`:''}
         <button class="card-absent-btn${isAbs?' is-absent':''}" onclick="toggleAbsent('${l.id}')">${isAbs ? '✗ Absent today — tap to clear' : 'Mark absent today'}</button>
       </div>
       <div class="card-timeline">${timeline.map(t =>
         `<div class="tl-row">
-          <span class="tl-time">${t.time}</span>
+          <span class="tl-time">${escHtml(t.time)}</span>
           <div class="tl-dot" style="background:${t.colour}"></div>
-          <span class="tl-label">${t.label}</span>
+          <span class="tl-label">${escHtml(t.label)}</span>
         </div>`
       ).join('')}</div>
     </div>`;
@@ -440,8 +477,8 @@ function renderMgr() {
   document.getElementById('ldrList').innerHTML = LEADERS.map((l,i) =>
     `<div class="ldr-row">
       <div class="colour-swatch" style="background:${l.colour}" onclick="openPalette(${i})" title="Change colour"></div>
-      <input class="name-in" type="text" value="${l.name}" oninput="LEADERS[${i}].name=this.value">
-      <input class="role-in" type="text" value="${l.role||''}" placeholder="Role" oninput="LEADERS[${i}].role=this.value">
+      <input class="name-in" type="text" value="${escHtml(l.name)}" oninput="LEADERS[${i}].name=this.value">
+      <input class="role-in" type="text" value="${escHtml(l.role||'')}" placeholder="Role" oninput="LEADERS[${i}].role=this.value">
       <button class="ldr-del" onclick="removeLeader(${i})">×</button>
     </div>
     ${pickingColourFor===i ? `<div class="palette-row">${PALETTE.map(c =>
@@ -468,6 +505,122 @@ function resetLeaders() {
   renderMgr();
 }
 
+// ── Schedule editor ───────────────────────────────────────────────────────────
+function openSchedEditor() {
+  editSched = deepClone(scheduleRows);
+  renderSchedEditor();
+  document.getElementById('schedOverlay').classList.add('open');
+}
+function closeSchedEditor() {
+  editSched = null;
+  document.getElementById('schedOverlay').classList.remove('open');
+}
+function saveSchedEditor() {
+  scheduleRows = deepClone(editSched);
+  save();
+  closeSchedEditor();
+  render();
+}
+function resetSched() {
+  if (!confirm('Reset to built-in default schedule? All edits will be lost.')) return;
+  editSched = deepClone(DEFAULT_SCHEDULE);
+  renderSchedEditor();
+}
+
+function renderSchedEditor() {
+  const overlay = document.getElementById('schedOverlay');
+  const scrollTop = overlay.scrollTop;
+  document.getElementById('schedEdBody').innerHTML =
+    editSched.map((slot, si) => {
+      return `<div class="sed-slot">
+        <div class="sed-slot-head">
+          <input class="sed-time-in" value="${escHtml(slot.time)}" placeholder="Time" oninput="editSched[${si}].time=this.value">
+          ${slot.note !== undefined
+            ? `<input class="sed-note-in" value="${escHtml(slot.note||'')}" placeholder="Note shown below row…" oninput="editSched[${si}].note=this.value">`
+            : `<button class="sed-icon-btn" type="button" onclick="addNote(${si})">+ note</button>`}
+          <span style="flex:1"></span>
+          <button class="sed-icon-btn danger" type="button" onclick="removeSlot(${si})">Delete slot</button>
+        </div>
+        ${slot.items.map((item, ii) => {
+          const isAll = item.leaders === 'ALL';
+          return `<div class="sed-item">
+            <div class="sed-item-row1">
+              <div class="sed-colour-dot" id="dot-${si}-${ii}" style="background:${item.colour}" onclick="togglePalette(${si},${ii})" title="Change colour"></div>
+              <textarea class="sed-label-ta" rows="2" oninput="editSched[${si}].items[${ii}].label=this.value">${escHtml(item.label)}</textarea>
+              <button class="sed-icon-btn danger" type="button" onclick="removeItem(${si},${ii})">×</button>
+            </div>
+            <div class="sed-palette" id="pal-${si}-${ii}">
+              ${PALETTE.map(c => `<div class="pal-swatch${item.colour===c?' sel':''}" style="background:${c}" onclick="setItemColour(${si},${ii},'${c}')"></div>`).join('')}
+            </div>
+            <div class="sed-leaders">
+              <label class="sed-ldr-chip all-chip${isAll?' sel':''}" onclick="toggleAll(${si},${ii},${!isAll})">ALL</label>
+              ${LEADERS.map(l => {
+                const inArr = !isAll && Array.isArray(item.leaders) && item.leaders.includes(l.id);
+                const style = inArr ? `border-color:${l.colour};background:${l.colour}22` : '';
+                const click = isAll ? '' : `onclick="toggleLeader(${si},${ii},'${l.id}',${!inArr})"`;
+                return `<label class="sed-ldr-chip${inArr?' sel':''}${isAll?' dim':''}" style="${style}" ${click}>${escHtml(l.name)}</label>`;
+              }).join('')}
+            </div>
+          </div>`;
+        }).join('')}
+        <button class="sed-add-item" type="button" onclick="addItem(${si})">+ Add activity</button>
+      </div>`;
+    }).join('') + `<button class="sed-add-slot" type="button" onclick="addSlot()">+ Add time slot</button>`;
+  overlay.scrollTop = scrollTop;
+}
+
+function togglePalette(si, ii) {
+  const pal = document.getElementById(`pal-${si}-${ii}`);
+  const showing = pal.style.display === 'flex';
+  document.querySelectorAll('.sed-palette').forEach(p => p.style.display = 'none');
+  if (!showing) pal.style.display = 'flex';
+}
+function setItemColour(si, ii, c) {
+  editSched[si].items[ii].colour = c;
+  document.getElementById(`dot-${si}-${ii}`).style.background = c;
+  const pal = document.getElementById(`pal-${si}-${ii}`);
+  pal.style.display = 'none';
+  pal.querySelectorAll('.pal-swatch').forEach((el, pi) => el.classList.toggle('sel', PALETTE[pi] === c));
+}
+function toggleAll(si, ii, makeAll) {
+  editSched[si].items[ii].leaders = makeAll ? 'ALL' : [];
+  renderSchedEditor();
+}
+function toggleLeader(si, ii, id, add) {
+  const item = editSched[si].items[ii];
+  if (!Array.isArray(item.leaders)) item.leaders = [];
+  if (add) { if (!item.leaders.includes(id)) item.leaders.push(id); }
+  else { item.leaders = item.leaders.filter(x => x !== id); }
+  renderSchedEditor();
+}
+function addSlot() {
+  editSched.push({ time: '', items: [{ leaders: [], label: '', colour: '#d1d5db' }] });
+  renderSchedEditor();
+  const slots = document.querySelectorAll('#schedEdBody .sed-slot');
+  if (slots.length) slots[slots.length-1].scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+function removeSlot(si) {
+  if (!confirm('Delete this time slot?')) return;
+  editSched.splice(si, 1);
+  renderSchedEditor();
+}
+function addItem(si) {
+  editSched[si].items.push({ leaders: [], label: '', colour: '#d1d5db' });
+  renderSchedEditor();
+}
+function removeItem(si, ii) {
+  if (editSched[si].items.length === 1) {
+    alert('A slot needs at least one activity. Delete the whole slot instead.');
+    return;
+  }
+  editSched[si].items.splice(ii, 1);
+  renderSchedEditor();
+}
+function addNote(si) {
+  editSched[si].note = '';
+  renderSchedEditor();
+}
+
 function printCards() {
   if (view !== 'cards') { setView('cards'); }
   setTimeout(() => window.print(), 100);
@@ -476,6 +629,7 @@ function printCards() {
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   loadLocal();
+  if (!scheduleRows) scheduleRows = deepClone(DEFAULT_SCHEDULE);
   document.getElementById('dateInput').value = selectedDate;
   render();
   const status = document.getElementById('sheetStatus');
@@ -487,10 +641,12 @@ async function init() {
         const remote = JSON.parse(raw);
         if (remote.absences) absences = remote.absences;
         if (remote.leaders?.length) LEADERS = remote.leaders;
+        if (remote.schedule?.length) scheduleRows = remote.schedule;
       } catch(e) {}
     }
     localStorage.setItem('wfa_ll_absences', JSON.stringify(absences));
     localStorage.setItem('wfa_ll_leaders',  JSON.stringify(LEADERS));
+    localStorage.setItem('wfa_ll_schedule', JSON.stringify(scheduleRows));
     status.textContent = 'Synced ✓';
     status.className = 'sheet-status ok';
   } catch(e) {
