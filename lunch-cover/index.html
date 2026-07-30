@@ -169,7 +169,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunch Cover Rota · 29.07.26b</footer>
+<footer>Wallscourt Farm Academy · Lunch Cover Rota · 30.07.26a</footer>
 
 <script>
 // ── Duties config ─────────────────────────────────────────────────────────────
@@ -262,9 +262,13 @@ function parseDate(s) {
 function buildStaff(rows) {
   const colourById = {};
   STAFF.forEach(s => { colourById[s.id] = s.col; });
+  const hasLCCol = rows.some(r => 'InLunchCover' in r);
   return rows
     .filter(r => r.Name && r.Name.trim())
-    .filter(r => (r.Role||'').trim() !== 'Lunchtime Leader') // lunchtime leaders are in a separate tool
+    .filter(r => {
+      if (hasLCCol) { const v=(r.InLunchCover||'').trim().toLowerCase(); return v==='true'||v==='1'||v==='yes'; }
+      return true; // no InLunchCover column yet — show everyone
+    })
     .map((r, i) => {
       const name = r.Name.trim();
       const init = (r.Initials || '').trim() || mkInitials(name);
