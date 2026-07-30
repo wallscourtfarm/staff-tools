@@ -34,8 +34,7 @@ table.sched { border-collapse: collapse; font-size: 10.5px; }
 table.sched th, table.sched td { border: 1px solid #e2e8f0; padding: 4px 5px; }
 .tc { width: 46px; min-width: 46px; font-weight: 700; font-size: 9.5px; color: #64748b; background: #f8fafc; position: sticky; left: 0; z-index: 2; white-space: nowrap; text-align: right; border-right: 2px solid #cbd5e1; }
 table.sched thead .tc { z-index: 3; }
-table.sched thead th { position: sticky; top: 0; background: white; z-index: 1; cursor: pointer; }
-table.sched thead th:not(.tc):hover { background: #f0f8fd; }
+table.sched thead th { position: sticky; top: 0; background: white; z-index: 1; }
 .lh { min-width: 76px; text-align: center; padding: 5px 4px; }
 .lh-bar { height: 4px; border-radius: 2px 2px 0 0; margin: -5px -4px 4px; }
 .lh-name { font-weight: 900; font-size: 11px; display: block; }
@@ -48,20 +47,41 @@ td.empty { background: #f8fafc; }
 tr.all-row td.all-cell { font-weight: 700; text-align: center; font-size: 11px; padding: 5px; }
 tr.note-row td { font-size: 9px; color: #94a3b8; font-style: italic; padding: 2px 6px; background: #f8fafc; border-top: none; }
 
+/* ── ABSENT TOGGLE ── */
+/* Grid: small pill button in column header */
+table.sched thead th { position: sticky; top: 0; background: white; z-index: 1; }
+.absent-pill { display: inline-block; margin-top: 4px; font-size: 8.5px; font-weight: 700; font-family: 'Nunito', sans-serif; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 1px 7px; cursor: pointer; background: white; color: #94a3b8; white-space: nowrap; }
+.absent-pill:hover { border-color: #fca5a5; color: #b91c1c; }
+.absent-pill.is-absent { background: #fee2e2; border-color: #ef4444; color: #b91c1c; }
+/* Card: toggle button at foot of header */
+.card-absent-btn { width: 100%; margin-top: 6px; padding: 3px 0; font-family: 'Nunito', sans-serif; font-size: 9.5px; font-weight: 700; border: 1.5px solid #e2e8f0; border-radius: 6px; background: white; color: #94a3b8; cursor: pointer; }
+.card-absent-btn:hover { border-color: #fca5a5; color: #b91c1c; }
+.card-absent-btn.is-absent { background: #fee2e2; border-color: #ef4444; color: #b91c1c; }
+
 /* ── CARD VIEW ── */
 .cards-wrap { padding: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(155px,1fr)); gap: 8px; }
 .leader-card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .leader-card.absent { opacity: .4; }
-.card-hd { padding: 8px 10px 6px; border-top: 5px solid #e2e8f0; cursor: pointer; }
-.card-hd:hover { opacity: .85; }
-.card-name { font-weight: 900; font-size: 13px; display: flex; align-items: center; justify-content: space-between; }
+.card-hd { padding: 8px 10px 8px; border-top: 5px solid #e2e8f0; }
+.card-name { font-weight: 900; font-size: 13px; }
 .card-role { font-size: 9px; font-weight: 600; color: #64748b; margin-top: 1px; }
-.card-absent-tag { font-size: 7.5px; background: #ef4444; color: white; border-radius: 2px; padding: 1px 3px; font-weight: 700; }
 .card-timeline { padding-bottom: 4px; }
 .tl-row { display: flex; gap: 5px; padding: 4px 10px 3px; border-top: 1px solid #f1f5f9; align-items: flex-start; }
 .tl-time { font-size: 9px; font-weight: 700; color: #64748b; min-width: 30px; padding-top: 1px; }
 .tl-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
 .tl-label { font-size: 10px; font-weight: 600; line-height: 1.3; flex: 1; }
+
+/* ── PRINT ── */
+@media print {
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .controls, #coverAlert, footer { display: none !important; }
+  .header { padding: 6px 10px; }
+  #mainContent { display: block !important; }
+  .cards-wrap { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; padding: 6px; }
+  .leader-card { break-inside: avoid; page-break-inside: avoid; box-shadow: none; border: 1px solid #cbd5e1; border-radius: 6px; }
+  .card-absent-btn { display: none; }
+  .grid-wrap { display: none; }
+}
 
 /* ── MODAL ── */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 50; align-items: center; justify-content: center; }
@@ -99,6 +119,7 @@ footer { text-align: center; font-size: 10px; color: #94a3b8; padding: 10px; bor
   <input type="date" id="dateInput" onchange="onDateChange()">
   <span class="spacer"></span>
   <button class="btn" onclick="openMgr()">✏️ Leaders</button>
+  <button class="btn" onclick="printCards()">🖨 Print</button>
   <span class="sheet-status" id="sheetStatus">Loading…</span>
 </div>
 
@@ -122,7 +143,7 @@ footer { text-align: center; font-size: 10px; color: #94a3b8; padding: 10px; bor
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunchtime Leaders · 30.07.26a</footer>
+<footer>Wallscourt Farm Academy · Lunchtime Leaders · 30.07.26b</footer>
 
 <script>
 const SYNC_URL = 'https://script.google.com/macros/s/AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec?key=wfa_ll';
@@ -330,12 +351,12 @@ function renderGrid() {
   h += '<th class="tc" style="background:#f8fafc;border-right-color:#cbd5e1"></th>';
   h += LEADERS.map(l => {
     const isAbs = abs.includes(l.id);
-    return `<th onclick="toggleAbsent('${l.id}')">
+    return `<th>
       <div class="lh${isAbs?' absent-hd':''}">
         <div class="lh-bar" style="background:${l.colour}"></div>
         <span class="lh-name">${l.name}</span>
         ${l.role ? `<span class="lh-role">${l.role}</span>` : ''}
-        ${isAbs ? '<span class="absent-tag">ABSENT</span>' : ''}
+        <button class="absent-pill${isAbs?' is-absent':''}" onclick="toggleAbsent('${l.id}')">${isAbs ? '✗ Absent' : 'Mark absent'}</button>
       </div>
     </th>`;
   }).join('');
@@ -388,9 +409,10 @@ function renderCards() {
       }
     }
     return `<div class="leader-card${isAbs?' absent':''}">
-      <div class="card-hd" style="border-top-color:${l.colour}" onclick="toggleAbsent('${l.id}')">
-        <div class="card-name">${l.name}${isAbs?'<span class="card-absent-tag">ABSENT</span>':''}</div>
+      <div class="card-hd" style="border-top-color:${l.colour}">
+        <div class="card-name">${l.name}</div>
         ${l.role?`<div class="card-role">${l.role}</div>`:''}
+        <button class="card-absent-btn${isAbs?' is-absent':''}" onclick="toggleAbsent('${l.id}')">${isAbs ? '✗ Absent today — tap to clear' : 'Mark absent today'}</button>
       </div>
       <div class="card-timeline">${timeline.map(t =>
         `<div class="tl-row">
@@ -444,6 +466,11 @@ function resetLeaders() {
   if (!confirm('Reset to default leader list? Custom changes will be lost.')) return;
   LEADERS = DEFAULT_LEADERS.map(l => ({...l}));
   renderMgr();
+}
+
+function printCards() {
+  if (view !== 'cards') { setView('cards'); }
+  setTimeout(() => window.print(), 100);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
