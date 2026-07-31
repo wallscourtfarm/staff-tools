@@ -448,7 +448,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 31.07.26c</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 31.07.26d</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1531,6 +1531,15 @@ function renderFABChip(duty, dateKey = '', yearGroup = '') {
   </div>`;
 }
 
+function contrastColour(hex) {
+  const c = (hex || '').replace('#', '');
+  if (c.length < 6) return '#ffffff';
+  const r = parseInt(c.slice(0,2), 16);
+  const g = parseInt(c.slice(2,4), 16);
+  const b = parseInt(c.slice(4,6), 16);
+  return (0.299*r + 0.587*g + 0.114*b) / 255 > 0.55 ? '#1e293b' : '#ffffff';
+}
+
 function getLCDuties(staffId, weekIdx, dayIdx) {
   if (!LC_DATA?.state?.slots) return [];
   const week = LC_DATA.state.slots[weekIdx];
@@ -2026,7 +2035,7 @@ function renderBody() {
             else cls += ' strip-mid';
             return `<div class="${cls}" style="left:${si * 5 - 1}px; background:${s.colour}"></div>`;
           }).join('');
-          const soTags = soList.filter(s => s.isFirst).map(s => `<div class="staff-out-tag" style="background:${s.colour}">${escHtml(s.label)}${s.cover ? `<span class="staff-out-cover"> · ${escHtml(s.cover)}</span>` : ''}</div>`).join('');
+          const soTags = soList.filter(s => s.isFirst).map(s => { const tc = contrastColour(s.colour); return `<div class="staff-out-tag" style="background:${s.colour};color:${tc}">${escHtml(s.label)}${s.cover ? `<span class="staff-out-cover" style="color:${tc === '#ffffff' ? 'rgba(255,255,255,.85)' : 'rgba(30,41,59,.7)'}"> · ${escHtml(s.cover)}</span>` : ''}</div>`; }).join('');
           const pad = soList.length ? `margin-left:${soList.length * 5 + 3}px;` : '';
           const cellDate = new Date(mon); cellDate.setDate(mon.getDate() + di);
           const dk = dateKey(cellDate);
@@ -2131,7 +2140,7 @@ function renderBody() {
             else cls += ' strip-mid';
             return `<div class="${cls}" style="left:${si * 5 - 1}px; background:${s.colour}"></div>`;
           }).join('');
-          const soTags = soList.filter(s => s.isFirst).map(s => `<div class="staff-out-tag" style="background:${s.colour}">${escHtml(s.label)}${s.cover ? `<span class="staff-out-cover"> · ${escHtml(s.cover)}</span>` : ''}</div>`).join('');
+          const soTags = soList.filter(s => s.isFirst).map(s => { const tc = contrastColour(s.colour); return `<div class="staff-out-tag" style="background:${s.colour};color:${tc}">${escHtml(s.label)}${s.cover ? `<span class="staff-out-cover" style="color:${tc === '#ffffff' ? 'rgba(255,255,255,.85)' : 'rgba(30,41,59,.7)'}"> · ${escHtml(s.cover)}</span>` : ''}</div>`; }).join('');
           const contentPad = soList.length ? `margin-left:${soList.length * 5 + 3}px;` : '';
           const cellCls = `view-cell${n ? ' non-school-day' : ''}`;
           const overlay = n && row.id === firstSessionId ? `<div class="non-school-overlay"><span class="non-school-badge">${escHtml(n.label)}</span></div>` : '';
