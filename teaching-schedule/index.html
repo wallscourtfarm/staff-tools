@@ -378,6 +378,13 @@
       color: #475569; background: #e2e8f0; white-space: nowrap;
       max-width: 100%; overflow: hidden; text-overflow: ellipsis;
     }
+    .day-nw-row { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; margin-top: 2px; }
+    .day-nw-tag {
+      display: inline-block; font-size: 8px; font-weight: 700;
+      padding: 1px 4px; border-radius: 3px;
+      color: #92400e; background: #fef3c7; border: 1px solid #fde68a;
+      white-space: nowrap;
+    }
     .chip-resize {
       height: 4px; cursor: ns-resize; margin: 0 4px;
       border-radius: 0 0 4px 4px; opacity: .15; transition: opacity .1s;
@@ -441,7 +448,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 30.07.26b</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 31.07.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1869,7 +1876,25 @@ function renderHead() {
       const canPaste = dayClipboard && dayClipboard.view === state.activeView && !isCopied && !nsd;
       const copyBtn = !nsd ? `<button class="day-copy-btn" onclick="copyDay('${d.toLowerCase()}')" title="Copy this day">${isCopied ? '✓ Copied' : 'Copy'}</button>` : '';
       const pasteBtn = canPaste ? `<button class="day-paste-btn" onclick="pasteDay('${d.toLowerCase()}')" title="Paste ${dayClipboard.dayName} here">Paste ${dayClipboard.dayName.charAt(0).toUpperCase()+dayClipboard.dayName.slice(1)}</button>` : '';
-      return `<th class="${cls}"><span class="day-hd-name">${d}${addBtn}</span><br><span class="day-hd-date">${dayDate(i)}</span>${tags ? '<br>' + tags : ''}<div class="day-hd-actions">${copyBtn}${pasteBtn}</div></th>`;
+      // Non-working day pills — show initials of YG staff not working this day
+      let nwHtml = '';
+      if (!nsd && COVER_DATA?.weekSlots?.[state.weekIdx]) {
+        const ygIds = new Set(STAFF.map(s => s.id));
+        const nwTids = [...new Set(
+          (COVER_DATA.weekSlots[state.weekIdx] || [])
+            .filter(s => s.day === i && (s.reason === 'Non-working Day' || s.reason === 'Day Off') && ygIds.has(s.tid))
+            .map(s => s.tid)
+        )];
+        if (nwTids.length) {
+          const pills = nwTids.map(tid => {
+            const info = COVER_STAFF_LOOKUP[tid] || {};
+            const init = info.initials || tid.split('_').map(p => p[0]).join('').toUpperCase().slice(0, 3);
+            return `<span class="day-nw-tag" title="${escHtml(info.name || tid)} – Non-working day">${escHtml(init)}</span>`;
+          }).join('');
+          nwHtml = `<div class="day-nw-row">${pills}</div>`;
+        }
+      }
+      return `<th class="${cls}"><span class="day-hd-name">${d}${addBtn}</span><br><span class="day-hd-date">${dayDate(i)}</span>${tags ? '<br>' + tags : ''}${nwHtml}<div class="day-hd-actions">${copyBtn}${pasteBtn}</div></th>`;
     }).join('')}
   </tr>`;
 }
