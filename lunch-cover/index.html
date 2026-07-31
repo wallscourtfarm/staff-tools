@@ -194,7 +194,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunch Cover Rota · 30.07.26k</footer>
+<footer>Wallscourt Farm Academy · Lunch Cover Rota · 31.07.26a</footer>
 
 <script>
 // ── Duties config ─────────────────────────────────────────────────────────────
@@ -363,6 +363,27 @@ function buildPmStartMins(rows) {
     });
   });
   return Object.keys(result).length ? result : PM_START_MINS;
+}
+
+let ABSENT_MAP = {}; // weekIdx → dayIdx → Set of absent staff IDs
+
+function buildAbsentMap(csvText) {
+  const raw = csvText.replace(/^﻿/, '').trim();
+  const s = raw.indexOf('{'), e = raw.lastIndexOf('}');
+  if (s < 0 || e <= s) return {};
+  let json;
+  try { const c = raw.slice(s, e+1); try { json=JSON.parse(c); } catch(_) { json=JSON.parse(c.replace(/""/g,'"')); } } catch(_) { return {}; }
+  const result = {};
+  for (const [wk, slots] of Object.entries(json.weekSlots || {})) {
+    const wi = parseInt(wk, 10);
+    result[wi] = {};
+    for (const slot of (slots || [])) {
+      if (slot.offSite === false) continue;
+      if (!result[wi][slot.day]) result[wi][slot.day] = new Set();
+      result[wi][slot.day].add(slot.tid);
+    }
+  }
+  return result;
 }
 
 function buildCoverMap(csvText) {
@@ -677,11 +698,13 @@ function chipHtml(dutyId, di, sid) {
     conflicts[0].type === 'cover'  ? '🛑 PM cover clash' : '🛑 Conflict';
   const bg     = conflicts.length ? '#fee2e2' : col + '22';
   const border = conflicts.length ? '2px solid #ef4444' : `1.5px solid ${col}55`;
-  return `<div class="assign-chip${isDraggingThis?' dragging':''}${isFaded?' faded':''}${isMe?' mine':''}${conflicts.length?' conflict':''}" style="background:${bg};border:${border}" data-duty-id="${dutyId}" data-di="${di}" data-staff-id="${sid}">
+  const isAbsent = ABSENT_MAP[state.weekIdx]?.[di]?.has(sid) || false;
+  return `<div class="assign-chip${isDraggingThis?' dragging':''}${isFaded?' faded':''}${isMe?' mine':''}${conflicts.length?' conflict':''}${isAbsent?' cp-offsite':''}" style="background:${isAbsent?'#f1f5f9':bg};border:${isAbsent?'1.5px solid #cbd5e1':border}" data-duty-id="${dutyId}" data-di="${di}" data-staff-id="${sid}">
     <div class="a-chip-row">
       <div class="a-drag-handle" onpointerdown="onChipDown(event,'${sid}','${dutyId}',${di})">≡</div>
       <div class="a-avatar" style="background:${col};color:${contrastColor(col)}">${s.init}</div>
-      <span class="a-name" style="color:#1e293b">${s.name}</span>
+      <span class="a-name" style="color:${isAbsent?'#94a3b8':'#1e293b'};${isAbsent?'text-decoration:line-through':''}">${s.name}</span>
+      ${isAbsent ? '<span style="font-size:9px;color:#f97316;margin-left:2px" title="Absent today (Cover Plan)">⚠ absent</span>' : ''}
       <button class="a-del" onclick="removeFromSlot('${dutyId}',${di},'${sid}')">×</button>
     </div>
     ${conflicts.length ? `<div class="a-conflict-bar" title="${conflictTip}">${conflictLabel}</div>` : ''}
@@ -923,7 +946,8 @@ async function init() {
       PM_START_MINS = buildPmStartMins(timingsRows);
     }
     if (plannerCsv) {
-      COVER_MAP = buildCoverMap(plannerCsv);
+      COVER_MAP   = buildCoverMap(plannerCsv);
+      ABSENT_MAP  = buildAbsentMap(plannerCsv);
     }
 
     if (remoteRaw && remoteRaw !== '{}') {
