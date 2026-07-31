@@ -449,7 +449,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 31.07.26i</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 31.07.26j</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1065,12 +1065,13 @@ function buildDayStructure(rows, yearGroup) {
   // Blank YearGroup = universal rows (apply to all year groups, e.g. reg-am, story, home).
   // Specific YearGroup rows override universal rows with the same ID for matching year groups.
   // YearGroup supports comma-separated values (e.g. "1,2,3") and "R" for Reception.
+  const ROW_ID_CLASSES = { fab: 'fab-row', lunch: 'fab-row', lrsnack: 'fab-row', story: 'story-row' };
   const toRow = r => ({
     type: (r.Type || 'session').trim().toLowerCase(),
     id: (r.ID || '').trim().toLowerCase(),
     label: (r.Label || '').trim(),
     time: (r.Time || '').trim(),
-    cls: (r.Class || '').trim() || undefined,
+    cls: (r.Class || '').trim() || ROW_ID_CLASSES[(r.ID || '').trim().toLowerCase()] || undefined,
     afterSchool: (r.ID || '').trim().toLowerCase() === 'after',
     hideTime: (r.HideTime || '').trim().toLowerCase() === 'true',
     order: parseInt(r.Order) || 99,

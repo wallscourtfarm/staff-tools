@@ -251,24 +251,25 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · 31.07.26f</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · 31.07.26g</footer>
 
 <script>
 // ── Activity types ─────────────────────────────────────────────────────────────
 // Built-in activities (always present, can be renamed/recoloured but not deleted)
 const BUILTIN_ACTIVITIES = [
-  { id:'teaching',    label:'Teaching',            colour:'#1798d3' },
+  { id:'safeguard',   label:'Safeguarding Mtg',    colour:'#ef4444' },
   { id:'slt_time',    label:'SLT Time',            colour:'#8b5cf6' },
   { id:'slt_meeting', label:'SLT Meeting',         colour:'#6366f1' },
-  { id:'safeguard',   label:'Safeguarding Mtg',    colour:'#ef4444' },
-  { id:'non_working', label:'Non-working day',     colour:'#94a3b8' },
   { id:'ops',         label:'Ops Time',            colour:'#f97316' },
-  { id:'senco',       label:'SENCO Time',          colour:'#10b981' },
-  { id:'phase_lead',  label:'Phase Lead Time',     colour:'#f59e0b' },
-  { id:'ppa',         label:'PPA',                 colour:'#64748b' },
   { id:'ab_time',     label:'A&B Time',            colour:'#ec4899' },
-  { id:'cover',       label:'On Cover',            colour:'#0891b2' },
+  { id:'teaching',    label:'Teaching',            colour:'#1798d3' },
   { id:'other',       label:'Other…',              colour:'#78716c' },
+  // Auto-only: populated from cover tool, not shown in manual picker
+  { id:'non_working', label:'Non-working day',     colour:'#94a3b8', autoOnly: true },
+  { id:'senco',       label:'SENCO Time',          colour:'#10b981', autoOnly: true },
+  { id:'phase_lead',  label:'Phase Lead Time',     colour:'#f59e0b', autoOnly: true },
+  { id:'ppa',         label:'PPA',                 colour:'#64748b', autoOnly: true },
+  { id:'cover',       label:'Covering Teaching',   colour:'#0891b2', autoOnly: true },
 ];
 
 const ACT_COLOUR_OPTS = ['#1798d3','#8b5cf6','#6366f1','#ef4444','#94a3b8','#f97316','#10b981','#f59e0b','#64748b','#ec4899','#78716c','#06b6d4','#84cc16','#e11d48','#0891b2','#7c3aed'];
@@ -658,7 +659,7 @@ function openItemEditor(pid, di, sess, idx) {
 function closeItemEditor() { document.getElementById('itemEditorModal').classList.remove('open'); }
 
 function renderEdActGrid() {
-  document.getElementById('edActGrid').innerHTML = ACTIVITIES.map(a =>
+  document.getElementById('edActGrid').innerHTML = ACTIVITIES.filter(a => !a.autoOnly).map(a =>
     `<button class="ed-act-btn${editorState.actId===a.id?' selected':''}" style="background:${a.colour}22;color:${a.colour}" onclick="selectEdAct('${a.id}')">
       <span class="ed-dot" style="background:${a.colour}"></span>${a.label}
     </button>`
@@ -721,7 +722,7 @@ function closeActMgr() {
 }
 
 function renderActMgr() {
-  const allActs = BUILTIN_ACTIVITIES.map(a => ({
+  const allActs = BUILTIN_ACTIVITIES.filter(a => !a.autoOnly).map(a => ({
     ...a, ...(builtinEdits[a.id]||{}), _builtin: true
   })).concat(customActs.map(a => ({ ...a, _builtin: false })));
 
