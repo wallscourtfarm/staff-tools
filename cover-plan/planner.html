@@ -397,7 +397,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(31.07.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(31.07.26b)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -523,15 +523,15 @@ const SESSION_SHORT = {'Before School':'Before School',AM:'AM',Lunch:'Lunch',PM:
 const DAYS          = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const DAY_IDX       = {Monday:0,Tuesday:1,Wednesday:2,Thursday:3,Friday:4};
 function initials(name) { if (!name) return ''; const p = name.trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : name.slice(0,2).toUpperCase(); }
-const REASONS       = ['PPA','Phase Lead','Leadership','Training','ECT','ECT1','ECT2','RA','SENCO','Sports','Illness','Day Off','Trip','Other'];
+const REASONS       = ['PPA','Phase Lead','Leadership','Training','ECT','ECT1','ECT2','RA','SENCO','Sports','Illness','Non-working Day','Trip','Other'];
 const REASON_CLS    = {'PPA':'PPA','Phase Lead':'Phase','Leadership':'Leadership','Training':'Training',
                        'ECT':'ECT1','ECT1':'ECT1','ECT2':'ECT2','RA':'RA','SENCO':'SENCO','Sports':'Sports',
-                       'Illness':'Illness','Day Off':'Illness','Trip':'Training','Other':'Other'};
+                       'Illness':'Illness','Day Off':'Illness','Non-working Day':'Illness','Trip':'Training','Other':'Other'};
 const COUNTED_SESSIONS = new Set(['Before School','AM','Lunch','PM','After School']);
 const BLOCKING_TYPES   = new Set(['Half Term','Christmas','Easter','Summer Holiday','INSET','CLF Conference','Bank Holiday']);
 
 // Off-site / in-school defaults by reason
-const OFF_SITE_REASONS  = new Set(['Illness','Training','Trip','CLF Conference','Day Off']);
+const OFF_SITE_REASONS  = new Set(['Illness','Training','Trip','CLF Conference','Day Off','Non-working Day']);
 const IN_SCHOOL_REASONS = new Set(['PPA','Phase Lead','Leadership','ECT','ECT1','ECT2','RA','SENCO','Sports','Staff Meeting','FLC','PAC','Supervision']);
 function offSiteDefault(reason) {
   if (OFF_SITE_REASONS.has(reason)) return true;
@@ -806,7 +806,7 @@ function fillNonWorkingSlots() {
             ORDER.indexOf(s.session)<=ti && ORDER.indexOf(s.endSession)>=ti);
           if (!exists) {
             ws.push({id:state.nextId++, day:dayIdx, session, endSession:session,
-              tid:t.id, reason:'Day Off', reasonNote:'', cover:null, nocover:!t.dayOffCover, offSite:true});
+              tid:t.id, reason:'Non-working Day', reasonNote:'', cover:null, nocover:!t.dayOffCover, offSite:true});
             added = true;
           }
         });
@@ -891,6 +891,10 @@ async function init() {
       state.weekSlots=saved.weekSlots||{};
       state.cellNotes=saved.cellNotes||{};
       state.nextId=saved.nextId||200;
+      // Migrate old 'Day Off' reason to 'Non-working Day'
+      Object.values(state.weekSlots).forEach(slots => {
+        if (Array.isArray(slots)) slots.forEach(s => { if (s.reason==='Day Off') s.reason='Non-working Day'; });
+      });
     }
     state.weekIdx=currentWeekIdx();
     if (!state.weekSlots[state.weekIdx] || state.weekSlots[state.weekIdx].length===0) state.weekSlots[state.weekIdx]=JSON.parse(JSON.stringify(RECURRING_SLOTS));
