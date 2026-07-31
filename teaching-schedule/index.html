@@ -448,7 +448,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 31.07.26d</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 31.07.26e</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1549,18 +1549,25 @@ function getLCDuties(staffId, weekIdx, dayIdx) {
   duties.forEach(d => {
     const assigned = week[d.id]?.[dayIdx] || [];
     const match = staffId ? assigned.includes(staffId) : assigned.length > 0;
-    if (match) results.push({ label: d.label, colour: d.colour, endMins: d.endMins, time: d.time, staffIds: assigned });
+    if (match) {
+      const initials = assigned.map(sid => {
+        const info = COVER_STAFF_LOOKUP[sid] || {};
+        return info.initials || sid.split('_').map(p => p[0]).join('').toUpperCase().slice(0, 3);
+      });
+      results.push({ label: d.label, colour: d.colour, endMins: d.endMins, time: d.time, staffIds: assigned, initials });
+    }
   });
   return results;
 }
 
 function renderLCChip(duty) {
   const warn = duty.endMins >= 13 * 60 + 5;
+  const pills = (duty.initials || []).map(i => `<span style="display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:${duty.colour}40;color:#1e293b;border:1px solid ${duty.colour}80">${escHtml(i)}</span>`).join(' ');
   return `<div class="cell-chip tp-activity fab-duty" style="background:${duty.colour}20;border:1.5px dashed ${duty.colour}">
     <div class="chip-top">
       <span class="chip-colour" style="background:${duty.colour}"></span>
       <span class="chip-name" style="color:#1e293b">${escHtml(duty.label)}${warn ? ' <span title="Ends close to PM reg (13:20)" style="color:#f97316">⚠</span>' : ''}</span>
-    </div>
+    </div>${pills ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">${pills}</div>` : ''}
   </div>`;
 }
 
