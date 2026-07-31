@@ -108,6 +108,7 @@
     .a-warn { font-size: 9px; color: #f97316; flex-shrink: 0; margin-left: 1px; }
     .staff-chip.cp-offsite .s-name { color: #94a3b8; text-decoration: line-through; }
     .staff-chip.cp-offsite::after { content: '⚠'; font-size: 9px; color: #f97316; margin-left: 2px; }
+    .gap-warn { font-size: 9px; font-weight: 700; color: #dc2626; background: #fee2e2; border: 1px solid #fca5a5; padding: 1px 5px; border-radius: 3px; margin-top: 2px; text-align: center; }
   </style>
 </head>
 <body>
@@ -116,7 +117,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title">Fresh Air Break Rota</div>
-    <div class="app-subtitle">Wallscourt Farm Academy · 31.07.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy · 31.07.26b</div>
   </div>
 </div>
 
@@ -617,9 +618,12 @@ function renderGroup(g) {
       tbody += `<tr><td class="zone-label">${zone}</td>`;
       for (let di=0; di<5; di++) {
         const ids = getSlot(g.id, zi, di);
+        const allIds = ids.map(item => typeof item === 'string' ? item : item.id);
+        const isGap = allIds.length > 0 && allIds.every(sid => coverOffSiteByDay[di]?.has(sid));
         tbody += `<td class="${readyCls}" data-gid="${g.id}" data-zi="${zi}" data-di="${di}">
           <div class="cell-chips">
             ${ids.map(sid => chipHtml(g.id, zi, di, sid)).join('')}
+            ${isGap ? '<div class="gap-warn">⚠ Uncovered</div>' : ''}
             <div class="drop-hint">＋</div>
           </div>
         </td>`;
