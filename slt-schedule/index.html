@@ -251,7 +251,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · 30.07.26a</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · 31.07.26a</footer>
 
 <script>
 // ── Activity types ─────────────────────────────────────────────────────────────
@@ -267,6 +267,7 @@ const BUILTIN_ACTIVITIES = [
   { id:'phase_lead',  label:'Phase Lead Time',     colour:'#f59e0b' },
   { id:'ppa',         label:'PPA',                 colour:'#64748b' },
   { id:'ab_time',     label:'A&B Time',            colour:'#ec4899' },
+  { id:'cover',       label:'On Cover',            colour:'#0891b2' },
   { id:'other',       label:'Other…',              colour:'#78716c' },
 ];
 
@@ -288,6 +289,20 @@ const COVER_PLAN_URL  = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXN
 
 const PLANNER_REASON_MAP = { 'PPA': 'ppa', 'SENCO': 'senco', 'Phase Lead': 'phase_lead' };
 const PLANNER_SESS_MAP   = { 'AM': 'am', 'PM': 'pm' };
+
+function matchesSLTMember(coverText, member) {
+  if (!coverText || !member?.name) return false;
+  const ct = coverText.trim().toLowerCase();
+  const parts = member.name.trim().split(/\s+/);
+  const fn = parts[0].toLowerCase();
+  if (fn.length < 2 || !new RegExp('\\b' + fn + '\\b').test(ct)) return false;
+  if (parts.length >= 2) {
+    const si = parts[parts.length - 1][0].toLowerCase();
+    const ctParts = ct.split(/\s+/).filter(p => p !== fn);
+    if (ctParts.length > 0 && !ctParts[0].startsWith(si)) return false;
+  }
+  return true;
+}
 
 // ── Runtime state ─────────────────────────────────────────────────────────────
 let ACTIVITIES   = [];  // rebuilt from BUILTIN_ACTIVITIES + customActs
@@ -397,6 +412,22 @@ function buildPlannerLookup(csvText) {
       if (!lookup[wk][tid][di][sess]) lookup[wk][tid][di][sess] = [];
       const label = slot.reason + (slot.reasonNote ? ' – ' + slot.reasonNote : '');
       lookup[wk][tid][di][sess].push({ actId, label });
+    }
+    // Second pass: find slots where an SLT member is assigned as cover
+    for (const slot of (slots || [])) {
+      const coverText = (slot.cover || '').trim();
+      if (!coverText || /^(supply|no cover|tbc)$/i.test(coverText)) continue;
+      const sess = PLANNER_SESS_MAP[slot.session];
+      if (!sess) continue;
+      const di = slot.day;
+      const sltMember = SLT.find(m => matchesSLTMember(coverText, m));
+      if (!sltMember) continue;
+      if (!lookup[wk][sltMember.id]) lookup[wk][sltMember.id] = {};
+      if (!lookup[wk][sltMember.id][di]) lookup[wk][sltMember.id][di] = {};
+      if (!lookup[wk][sltMember.id][di][sess]) lookup[wk][sltMember.id][di][sess] = [];
+      const tidName = slot.tid ? slot.tid.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ') : '';
+      const label = tidName ? `Covering ${tidName}` : 'On Cover';
+      lookup[wk][sltMember.id][di][sess].push({ actId: 'cover', label });
     }
   }
   return lookup;

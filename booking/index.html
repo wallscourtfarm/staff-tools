@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 30.07.26c</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 31.07.26a</div>
       </div>
     </div>
     <div class="top-bar">
@@ -485,15 +485,20 @@ let coverPlanData = null;
 let fabRotaData   = null;
 
 function getCpSportsBars(weekIdx) {
-  if (!coverPlanData?.weekSlots) return [];
-  const slots = coverPlanData.weekSlots[weekIdx] || [];
+  if (!coverPlanData) return [];
   const bars = [];
   const seen = new Set();
-  // Include 'field' if it exists in RESOURCES
-  const sportsRids = [...CP_SPORTS_RESOURCE_IDS];
-  const fieldRes = RESOURCES.find(r => r.id === 'field' || r.name.toLowerCase() === 'field');
-  if (fieldRes && !sportsRids.includes(fieldRes.id)) sportsRids.push(fieldRes.id);
-  slots.filter(s => s.reason === 'Sports').forEach(s => {
+  // Primary source: sportsSchedule (wsEvents from Cover Plan)
+  (coverPlanData.sportsSchedule || []).forEach(s => {
+    const timeRange = CP_SESSION_TIMES[s.session];
+    if (!timeRange || s.day < 0 || s.day > 4) return;
+    const key = `${s.day}-${s.session}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    bars.push({ dayIdx: s.day, startTime: timeRange[0], endTime: timeRange[1] });
+  });
+  // Fallback: weekSlots with reason='Sports'
+  (coverPlanData.weekSlots?.[weekIdx] || []).filter(s => s.reason === 'Sports').forEach(s => {
     const timeRange = CP_SESSION_TIMES[s.session];
     if (!timeRange || s.day < 0 || s.day > 4) return;
     const key = `${s.day}-${s.session}`;
