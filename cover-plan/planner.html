@@ -397,7 +397,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(31.07.26d)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(31.07.26e)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -985,13 +985,13 @@ const YG_COLOURS = {Reception:'#dbeafe',Y1:'#ffedd5',Y2:'#d1fae5',Y3:'#fce7f3',Y
 function ygCol(yg)      { return YG_COLOURS[yg] || '#e2e8f0'; }
 
 function maxEnt(t) { return t.ent.reduce((s,e) => s + e.n, 0); }
-function teacherUsageCount(tid) { return slots().filter(s => s.tid === tid && COUNTED_SESSIONS.has(s.session)).length; }
+function teacherUsageCount(tid) { return slots().filter(s => s.tid === tid && COUNTED_SESSIONS.has(s.session) && s.reason !== 'Non-working Day').length; }
 function coverByName(name) { return COVER.find(c => c.name.toLowerCase() === (name||'').toLowerCase()); }
 
 // Per-reason usage count for a teacher this week (fortnightly ents also check previous week)
 function teacherReasonUsed(tid) {
   const used = {};
-  slots().filter(s => s.tid === tid && COUNTED_SESSIONS.has(s.session))
+  slots().filter(s => s.tid === tid && COUNTED_SESSIONS.has(s.session) && s.reason !== 'Non-working Day')
     .forEach(s => { used[s.reason] = (used[s.reason]||0)+1; });
   const t = teacher(tid);
   if (t && state.weekIdx > 0) {
