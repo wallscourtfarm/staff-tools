@@ -116,7 +116,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title">Fresh Air Break Rota</div>
-    <div class="app-subtitle">Wallscourt Farm Academy · 30.07.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy · 31.07.26a</div>
   </div>
 </div>
 
@@ -814,11 +814,7 @@ async function init() {
     const sheetWeeks = buildWeeks(csvToObjects(termsCsv));
 
     if (sheetStaff.length) STAFF = sheetStaff;
-    if (sheetWeeks.length) {
-      WEEKS = sheetWeeks;
-      if (state.weekIdx === 0) state.weekIdx = currentWeekIdx();
-      state.weekIdx = Math.max(0, Math.min(WEEKS.length - 1, state.weekIdx));
-    }
+    if (sheetWeeks.length) WEEKS = sheetWeeks;
 
     // Build per-day offSite sets from Cover Plan
     if (coverData?.weekSlots) { coverPlanState = coverData; rebuildCoverOffSite(); }
@@ -828,13 +824,17 @@ async function init() {
       try {
         const remote = JSON.parse(remoteRaw);
         if (remote.state) {
-          state.slots   = remote.state.slots   ?? state.slots;
-          state.weekIdx = remote.state.weekIdx  ?? state.weekIdx;
+          state.slots = remote.state.slots ?? state.slots;
         }
         if (remote.termTemplate !== undefined) termTemplate = remote.termTemplate;
         // Don't override sheet colours with remote data — sheet is authoritative
         // (remote.staffColours may contain stale PALETTE values from before Colour column was read)
       } catch(e) {}
+    }
+
+    // Always open on the current week (like other scheduling tools)
+    if (WEEKS.length) {
+      state.weekIdx = Math.max(0, Math.min(WEEKS.length - 1, currentWeekIdx()));
     }
 
     localStorage.setItem('wfa_fab_state', JSON.stringify(state));
