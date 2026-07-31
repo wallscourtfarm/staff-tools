@@ -378,7 +378,7 @@
       color: #475569; background: #e2e8f0; white-space: nowrap;
       max-width: 100%; overflow: hidden; text-overflow: ellipsis;
     }
-    .day-nw-row { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; margin-top: 2px; }
+    .day-nw-row { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; margin-top: 2px; overflow: hidden; }
     .day-nw-tag {
       display: inline-block; font-size: 8px; font-weight: 700;
       padding: 1px 4px; border-radius: 3px;
@@ -448,7 +448,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 31.07.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 31.07.26b</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1540,7 +1540,7 @@ function getLCDuties(staffId, weekIdx, dayIdx) {
   duties.forEach(d => {
     const assigned = week[d.id]?.[dayIdx] || [];
     const match = staffId ? assigned.includes(staffId) : assigned.length > 0;
-    if (match) results.push({ label: d.label, colour: d.colour, endMins: d.endMins, time: d.time });
+    if (match) results.push({ label: d.label, colour: d.colour, endMins: d.endMins, time: d.time, staffIds: assigned });
   });
   return results;
 }
@@ -1877,7 +1877,7 @@ function renderHead() {
       const copyBtn = !nsd ? `<button class="day-copy-btn" onclick="copyDay('${d.toLowerCase()}')" title="Copy this day">${isCopied ? '✓ Copied' : 'Copy'}</button>` : '';
       const pasteBtn = canPaste ? `<button class="day-paste-btn" onclick="pasteDay('${d.toLowerCase()}')" title="Paste ${dayClipboard.dayName} here">Paste ${dayClipboard.dayName.charAt(0).toUpperCase()+dayClipboard.dayName.slice(1)}</button>` : '';
       // Non-working day pills — show initials of YG staff not working this day
-      let nwHtml = '';
+      let nwPills = '';
       if (!nsd && COVER_DATA?.weekSlots?.[state.weekIdx]) {
         const ygIds = new Set(STAFF.map(s => s.id));
         const nwTids = [...new Set(
@@ -1886,15 +1886,15 @@ function renderHead() {
             .map(s => s.tid)
         )];
         if (nwTids.length) {
-          const pills = nwTids.map(tid => {
+          nwPills = nwTids.map(tid => {
             const info = COVER_STAFF_LOOKUP[tid] || {};
             const init = info.initials || tid.split('_').map(p => p[0]).join('').toUpperCase().slice(0, 3);
             return `<span class="day-nw-tag" title="${escHtml(info.name || tid)} – Non-working day">${escHtml(init)}</span>`;
           }).join('');
-          nwHtml = `<div class="day-nw-row">${pills}</div>`;
         }
       }
-      return `<th class="${cls}"><span class="day-hd-name">${d}${addBtn}</span><br><span class="day-hd-date">${dayDate(i)}</span>${tags ? '<br>' + tags : ''}${nwHtml}<div class="day-hd-actions">${copyBtn}${pasteBtn}</div></th>`;
+      const tagRow = (tags || nwPills) ? `<div class="day-nw-row">${tags}${nwPills}</div>` : '';
+      return `<th class="${cls}"><span class="day-hd-name">${d}${addBtn}</span><br><span class="day-hd-date">${dayDate(i)}</span>${tagRow}<div class="day-hd-actions">${copyBtn}${pasteBtn}</div></th>`;
     }).join('')}
   </tr>`;
 }
@@ -1962,6 +1962,7 @@ function renderBody() {
 
       coverSlots.forEach(slot => {
         if (!targetStaffIds.includes(slot.tid)) return;
+        if (slot.reason === 'Non-working Day' || slot.reason === 'Day Off') return;
         const di = slot.day;
         if (nsd[di]) return;
 
@@ -2083,7 +2084,8 @@ function renderBody() {
                 lcHtml = getLCDuties(staffMember.id, state.weekIdx, di).map(d => renderLCChip(d)).join('');
               }
             } else {
-              lcHtml = getLCDuties(null, state.weekIdx, di).map(d => renderLCChip(d)).join('');
+              const ygIds = new Set(STAFF.map(s => s.id));
+              lcHtml = getLCDuties(null, state.weekIdx, di).filter(d => d.staffIds.some(sid => ygIds.has(sid))).map(d => renderLCChip(d)).join('');
             }
           }
           const isStaffFixed = (view !== 'master');
