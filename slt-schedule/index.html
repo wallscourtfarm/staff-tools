@@ -251,7 +251,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · 31.07.26a</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · 31.07.26b</footer>
 
 <script>
 // ── Activity types ─────────────────────────────────────────────────────────────
@@ -311,6 +311,7 @@ let builtinEdits = {};  // { id: { label, colour } } — user edits to built-ins
 
 let SLT      = [];
 let WEEKS    = [];
+let STAFF_YG_MAP = {}; // staffId → yearGroup, built from sheet
 let termTemplate = null;
 let state    = { weekIdx: 0, slots: {} };
 let editMode = false;
@@ -426,7 +427,8 @@ function buildPlannerLookup(csvText) {
       if (!lookup[wk][sltMember.id][di]) lookup[wk][sltMember.id][di] = {};
       if (!lookup[wk][sltMember.id][di][sess]) lookup[wk][sltMember.id][di][sess] = [];
       const tidName = slot.tid ? slot.tid.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ') : '';
-      const label = tidName ? `Covering ${tidName}` : 'On Cover';
+      const tidYG   = slot.tid ? (STAFF_YG_MAP[slot.tid] || '') : '';
+      const label   = tidName ? `Covering ${tidName}${tidYG ? ' ' + tidYG : ''}` : 'On Cover';
       lookup[wk][sltMember.id][di][sess].push({ actId: 'cover', label });
     }
   }
@@ -876,7 +878,15 @@ async function init() {
     const termsCsv   = results[1];
     const plannerCsv = results[2];
     const remoteRaw  = results[3] ?? null;
-    const sheetSLT   = buildSLT(csvToObjects(staffCsv));
+    const staffRows  = csvToObjects(staffCsv);
+    const sheetSLT   = buildSLT(staffRows);
+    STAFF_YG_MAP = {};
+    staffRows.forEach(r => {
+      if (!r.Name) return;
+      const sid = r.Name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_');
+      const yg  = (r.YearGroup || '').trim();
+      if (yg) STAFF_YG_MAP[sid] = /^\d+$/.test(yg) ? 'Y' + yg : yg;
+    });
     const sheetWeeks = buildWeeks(csvToObjects(termsCsv));
     if (sheetSLT.length)   SLT   = sheetSLT;
     if (sheetWeeks.length) {

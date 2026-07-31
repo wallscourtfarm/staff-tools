@@ -385,6 +385,7 @@
       color: #92400e; background: #fef3c7; border: 1px solid #fde68a;
       white-space: nowrap;
     }
+    .sync-tag { font-size: 8px; font-weight: 600; opacity: .6; margin-left: 4px; vertical-align: top; letter-spacing: .03em; }
     .chip-resize {
       height: 4px; cursor: ns-resize; margin: 0 4px;
       border-radius: 0 0 4px 4px; opacity: .15; transition: opacity .1s;
@@ -448,7 +449,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 31.07.26e</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 31.07.26f</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1566,7 +1567,7 @@ function renderLCChip(duty) {
   return `<div class="cell-chip tp-activity fab-duty" style="background:${duty.colour}20;border:1.5px dashed ${duty.colour}">
     <div class="chip-top">
       <span class="chip-colour" style="background:${duty.colour}"></span>
-      <span class="chip-name" style="color:#1e293b">${escHtml(duty.label)}${warn ? ' <span title="Ends close to PM reg (13:20)" style="color:#f97316">⚠</span>' : ''}</span>
+      <span class="chip-name" style="color:#1e293b">${escHtml(duty.label)}${warn ? ' <span title="Ends close to PM reg (13:20)" style="color:#f97316">⚠</span>' : ''}<span class="sync-tag">RS</span></span>
     </div>${pills ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">${pills}</div>` : ''}
   </div>`;
 }
@@ -1905,7 +1906,7 @@ function renderHead() {
           nwPills = nwTids.map(tid => {
             const info = COVER_STAFF_LOOKUP[tid] || {};
             const init = info.initials || tid.split('_').map(p => p[0]).join('').toUpperCase().slice(0, 3);
-            return `<span class="day-nw-tag" title="${escHtml(info.name || tid)} – Non-working day">${escHtml(init)} Out</span>`;
+            return `<span class="day-nw-tag" title="${escHtml(info.name || tid)} – Non-working day">${escHtml(init)} Out<span class="sync-tag">RS</span></span>`;
           }).join('');
         }
       }
@@ -2042,7 +2043,7 @@ function renderBody() {
             else cls += ' strip-mid';
             return `<div class="${cls}" style="left:${si * 5 - 1}px; background:${s.colour}"></div>`;
           }).join('');
-          const soTags = soList.filter(s => s.isFirst).map(s => { const tc = contrastColour(s.colour); return `<div class="staff-out-tag" style="background:${s.colour};color:${tc}">${escHtml(s.label)}${s.cover ? `<span class="staff-out-cover" style="color:${tc === '#ffffff' ? 'rgba(255,255,255,.85)' : 'rgba(30,41,59,.7)'}"> · ${escHtml(s.cover)}</span>` : ''}</div>`; }).join('');
+          const soTags = soList.filter(s => s.isFirst).map(s => { const tc = contrastColour(s.colour); return `<div class="staff-out-tag" style="background:${s.colour};color:${tc}">${escHtml(s.label)}${s.cover ? `<span class="staff-out-cover" style="color:${tc === '#ffffff' ? 'rgba(255,255,255,.85)' : 'rgba(30,41,59,.7)'}"> · ${escHtml(s.cover)}</span>` : ''}${s.source === 'cover-plan' ? '<span class="sync-tag">RS</span>' : ''}</div>`; }).join('');
           const pad = soList.length ? `margin-left:${soList.length * 5 + 3}px;` : '';
           const cellDate = new Date(mon); cellDate.setDate(mon.getDate() + di);
           const dk = dateKey(cellDate);
@@ -2147,7 +2148,7 @@ function renderBody() {
             else cls += ' strip-mid';
             return `<div class="${cls}" style="left:${si * 5 - 1}px; background:${s.colour}"></div>`;
           }).join('');
-          const soTags = soList.filter(s => s.isFirst).map(s => { const tc = contrastColour(s.colour); return `<div class="staff-out-tag" style="background:${s.colour};color:${tc}">${escHtml(s.label)}${s.cover ? `<span class="staff-out-cover" style="color:${tc === '#ffffff' ? 'rgba(255,255,255,.85)' : 'rgba(30,41,59,.7)'}"> · ${escHtml(s.cover)}</span>` : ''}</div>`; }).join('');
+          const soTags = soList.filter(s => s.isFirst).map(s => { const tc = contrastColour(s.colour); return `<div class="staff-out-tag" style="background:${s.colour};color:${tc}">${escHtml(s.label)}${s.cover ? `<span class="staff-out-cover" style="color:${tc === '#ffffff' ? 'rgba(255,255,255,.85)' : 'rgba(30,41,59,.7)'}"> · ${escHtml(s.cover)}</span>` : ''}${s.source === 'cover-plan' ? '<span class="sync-tag">RS</span>' : ''}</div>`; }).join('');
           const contentPad = soList.length ? `margin-left:${soList.length * 5 + 3}px;` : '';
           const cellCls = `view-cell${n ? ' non-school-day' : ''}`;
           const overlay = n && row.id === firstSessionId ? `<div class="non-school-overlay"><span class="non-school-badge">${escHtml(n.label)}</span></div>` : '';
