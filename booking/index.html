@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 02.08.26c</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 02.08.26d</div>
       </div>
     </div>
     <div class="top-bar">
@@ -994,9 +994,6 @@ function endDrag() {
 
 function endBookingDrag() {
   if (!drag || drag.type !== 'move') return;
-  if (drag.bookingId) {
-    document.querySelectorAll(`.bc-item[data-booking-id="${drag.bookingId}"]`).forEach(c => c.style.opacity = '');
-  }
   if (drag.sourceBar) {
     drag.sourceBar.removeEventListener('pointermove', onBookingDragMove);
     drag.sourceBar.removeEventListener('pointerup', onBookingDragEnd);
@@ -1006,6 +1003,7 @@ function endBookingDrag() {
   document.getElementById('dragPlaceholder').style.display = 'none';
   clearDropHighlights();
   drag = null;
+  renderGrid();
 }
 
 function calculateDropTime(x, y, target) {
@@ -1330,25 +1328,27 @@ function renderBookingsOverlay() {
       const yg = b.yearGroup ? `${b.yearGroup} · ` : '';
       const label = `${yg}${resName}${b.quantity > 1 ? ' ×' + b.quantity : ''}`;
 
-      const rows = getRowsForTimeRange(b.startTime, b.endTime);
-      rows.forEach(row => {
-        const rowIdx = ROWS.indexOf(row);
-        const chip = document.createElement('div');
-        chip.className = 'bc-item';
-        chip.dataset.bookingId = b.id;
-        chip.dataset.day = day;
-        chip.style.cssText = 'margin:2px;border-radius:3px;overflow:hidden;position:relative;cursor:pointer;';
-        chip.innerHTML = `
-          <div class="bc-body" style="border-left:3px solid ${col};background:${col}22;padding:3px 22px 3px 6px;">
-            <div style="font-size:10px;font-weight:800;color:#1e293b;font-family:'Nunito',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(label)}</div>
-            <div style="font-size:8px;color:#64748b;">${b.startTime}–${b.endTime}</div>
-            ${b.purpose ? `<div style="font-size:8px;color:#64748b;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(b.purpose)}</div>` : ''}
-          </div>
-          <button class="booking-chip-del" onclick="event.stopPropagation();showDeleteOptions(event,'${b.id}','${b.groupId||b.id}','${day}')" title="Remove">×</button>
-        `;
-        chip.addEventListener('pointerdown', onBookingBarPointerDown);
-        addChip(day, rowIdx, chip);
-      });
+      // One chip per booking, placed in the row that contains the booking's start time
+      const startMins = timeToMins(b.startTime);
+      const startRow = ROWS.find(row => startMins >= timeToMins(row.start) && startMins < timeToMins(row.end))
+                    || ROWS.find(row => timeToMins(row.start) === startMins);
+      if (!startRow) return;
+      const rowIdx = ROWS.indexOf(startRow);
+      const chip = document.createElement('div');
+      chip.className = 'bc-item';
+      chip.dataset.bookingId = b.id;
+      chip.dataset.day = day;
+      chip.style.cssText = 'margin:2px;border-radius:3px;overflow:hidden;position:relative;cursor:pointer;';
+      chip.innerHTML = `
+        <div class="bc-body" style="border-left:3px solid ${col};background:${col}22;padding:3px 22px 3px 6px;">
+          <div style="font-size:10px;font-weight:800;color:#1e293b;font-family:'Nunito',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(label)}</div>
+          <div style="font-size:8px;color:#64748b;">${b.startTime}–${b.endTime}</div>
+          ${b.purpose ? `<div style="font-size:8px;color:#64748b;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(b.purpose)}</div>` : ''}
+        </div>
+        <button class="booking-chip-del" onclick="event.stopPropagation();showDeleteOptions(event,'${b.id}','${b.groupId||b.id}','${day}')" title="Remove">×</button>
+      `;
+      chip.addEventListener('pointerdown', onBookingBarPointerDown);
+      addChip(day, rowIdx, chip);
     });
   });
 
@@ -1738,12 +1738,27 @@ let _deleteBookingId = null;
 let _deleteGroupId = null;
 let _deleteDay = null;
 
+function hasSeriesBookings(bookingId, groupId) {
+  if (!groupId) return false;
+  const prefix = groupId.split('_').slice(0, 3).join('_');
+  for (const wk of Object.values(state.bookings)) {
+    for (const dayBs of Object.values(wk)) {
+      for (const b of dayBs) {
+        if (b.id !== bookingId && b.groupId && b.groupId.split('_').slice(0, 3).join('_') === prefix) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 function showDeleteOptions(event, bookingId, groupId, day) {
   event.stopPropagation();
   _deleteBookingId = bookingId;
   _deleteGroupId = groupId;
   _deleteDay = day;
-  const isSeries = groupId && groupId !== bookingId;
+  const isSeries = hasSeriesBookings(bookingId, groupId);
   document.getElementById('deleteSeriesBtn').style.display = isSeries ? '' : 'none';
   document.getElementById('deleteSingleBtn').textContent = isSeries ? 'Delete this day only' : 'Delete this booking';
   document.getElementById('deleteModal').classList.add('open');
