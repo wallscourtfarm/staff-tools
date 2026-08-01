@@ -249,7 +249,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 01.08.26b</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 01.08.26c</div>
       </div>
     </div>
     <div class="top-bar">
@@ -1366,47 +1366,16 @@ function renderBookingsOverlay() {
     return 0;
   };
 
-  // Render Cover Plan Sports auto-reservations (behind real bookings)
-  const cpSports = getCpSportsBars(state.weekIdx);
-  cpSports.forEach(b => {
-    if (!dayCells[b.dayIdx]) return;
-    const cellRect = dayCells[b.dayIdx].getBoundingClientRect();
-    const cellLeft = cellRect.left - overlayRect.left;
-    const cellWidth = cellRect.width;
-    const topPx = timeToPosition(b.startTime);
-    const bottomPx = timeToPosition(b.endTime);
-    const heightPx = Math.max(bottomPx - topPx, 24);
-    const bar = document.createElement('div');
-    bar.style.cssText = `position:absolute;left:${cellLeft+1}px;width:${cellWidth-4}px;top:${topPx}px;height:${heightPx}px;background:#f974161a;border:1.5px dashed #f9741666;border-radius:4px;overflow:hidden;z-index:0;pointer-events:none;`;
-    bar.innerHTML = `<div style="font-size:9px;font-weight:bold;color:#ea580c;padding:2px 4px;line-height:1.3">⚽ Sports</div><div style="font-size:8px;color:#ea580c99;padding:0 4px">${b.startTime}–${b.endTime} · Cover Plan</div>`;
-    overlay.appendChild(bar);
-  });
-
-  // Render FAB Rota location auto-blocks (MUGA during FAB time)
-  const fabBars = getFabBars(state.weekIdx);
-  fabBars.forEach(b => {
-    if (!dayCells[b.dayIdx]) return;
-    const cellRect = dayCells[b.dayIdx].getBoundingClientRect();
-    const cellLeft = cellRect.left - overlayRect.left;
-    const cellWidth = cellRect.width;
-    const topPx = timeToPosition(b.startTime);
-    const bottomPx = timeToPosition(b.endTime);
-    const heightPx = Math.max(bottomPx - topPx, 16);
-    const col = (RESOURCES.find(r => r.id === b.resourceId) || {}).colour || '#1798d3';
-    const bar = document.createElement('div');
-    bar.style.cssText = `position:absolute;left:${cellLeft+1}px;width:${cellWidth-4}px;top:${topPx}px;height:${heightPx}px;background:${col}18;border:1.5px dashed ${col}88;border-radius:4px;overflow:hidden;z-index:0;pointer-events:none;`;
-    bar.innerHTML = `<div style="font-size:8px;font-weight:bold;color:${col};padding:1px 4px">🏃 FAB</div>`;
-    overlay.appendChild(bar);
-  });
-
-  // Pre-compute horizontal positions for each day's bookings
+  // Pre-compute horizontal positions for each day's bookings (split width for concurrent bookings)
   const bookingSlots = {};
   DAYS.forEach((d, di) => {
     const day = d.toLowerCase();
     bookingSlots[day] = {};
     const dayBookings = getBookings(wk, day);
-    dayBookings.forEach((b) => {
-      bookingSlots[day][b.id] = { leftPct: 1, widthPct: 97 };
+    const count = Math.max(dayBookings.length, 1);
+    const widthPct = 97 / count;
+    dayBookings.forEach((b, bi) => {
+      bookingSlots[day][b.id] = { leftPct: bi * widthPct + 1, widthPct: widthPct - 1 };
     });
   });
 
@@ -1456,6 +1425,38 @@ function renderBookingsOverlay() {
       bar.addEventListener('pointerdown', onBookingBarPointerDown);
       overlay.appendChild(bar);
     });
+  });
+
+  // Render Cover Plan Sports and FAB indicators on top of booking bars
+  const cpSports = getCpSportsBars(state.weekIdx);
+  cpSports.forEach(b => {
+    if (!dayCells[b.dayIdx]) return;
+    const cellRect = dayCells[b.dayIdx].getBoundingClientRect();
+    const cellLeft = cellRect.left - overlayRect.left;
+    const cellWidth = cellRect.width;
+    const topPx = timeToPosition(b.startTime);
+    const bottomPx = timeToPosition(b.endTime);
+    const heightPx = Math.max(bottomPx - topPx, 24);
+    const bar = document.createElement('div');
+    bar.style.cssText = `position:absolute;left:${cellLeft+1}px;width:${cellWidth-4}px;top:${topPx}px;height:${heightPx}px;background:#f974160d;border:1.5px dashed #f9741666;border-radius:4px;overflow:hidden;z-index:5;pointer-events:none;`;
+    bar.innerHTML = `<div style="font-size:9px;font-weight:bold;color:#ea580c;padding:2px 4px;line-height:1.3;background:rgba(255,255,255,0.7);display:inline-block;border-radius:2px;margin:2px">⚽ Sports · ${b.startTime}–${b.endTime} · Cover Plan</div>`;
+    overlay.appendChild(bar);
+  });
+
+  const fabBars = getFabBars(state.weekIdx);
+  fabBars.forEach(b => {
+    if (!dayCells[b.dayIdx]) return;
+    const cellRect = dayCells[b.dayIdx].getBoundingClientRect();
+    const cellLeft = cellRect.left - overlayRect.left;
+    const cellWidth = cellRect.width;
+    const topPx = timeToPosition(b.startTime);
+    const bottomPx = timeToPosition(b.endTime);
+    const heightPx = Math.max(bottomPx - topPx, 16);
+    const col = (RESOURCES.find(r => r.id === b.resourceId) || {}).colour || '#1798d3';
+    const bar = document.createElement('div');
+    bar.style.cssText = `position:absolute;left:${cellLeft+1}px;width:${cellWidth-4}px;top:${topPx}px;height:${heightPx}px;background:${col}0d;border:1.5px dashed ${col}88;border-radius:4px;overflow:hidden;z-index:5;pointer-events:none;`;
+    bar.innerHTML = `<div style="font-size:8px;font-weight:bold;color:${col};padding:1px 4px;background:rgba(255,255,255,0.7);display:inline-block;border-radius:2px;margin:2px">🏃 FAB</div>`;
+    overlay.appendChild(bar);
   });
 }
 
