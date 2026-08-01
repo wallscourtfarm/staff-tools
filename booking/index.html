@@ -149,7 +149,7 @@
 
     .sched-table .session-row td.view-cell {
       vertical-align: top; padding: 0; border-right: 1px solid #e2e8f0;
-      border-bottom: 2px solid #d1d5db; height: 90px;
+      border-bottom: 2px solid #d1d5db; min-height: 60px;
       background: white; position: relative; overflow: visible;
     }
     .sched-table .session-row td.view-cell:last-child { border-right: none; }
@@ -249,7 +249,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 01.08.26c</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 01.08.26d</div>
       </div>
     </div>
     <div class="top-bar">
@@ -412,6 +412,7 @@ const DAY_SHORT = ['Mon','Tue','Wed','Thu','Fri'];
 // ── Resources (bookable spaces and equipment) ───────────────────────────────────
 // Default fallback; will be replaced by sheet data if available
 let RESOURCES = [
+  { id: 'field', name: 'Field', type: 'space', quantity: 1, colour: '#84cc16', order: 0 },
   { id: 'muga', name: 'MUGA', type: 'space', quantity: 1, colour: '#22c55e', order: 1 },
   { id: 'cafe', name: 'Cafe', type: 'space', quantity: 1, colour: '#f97316', order: 2 },
   { id: 'hall', name: 'Hall', type: 'space', quantity: 1, colour: '#8b5cf6', order: 3 },
@@ -878,8 +879,7 @@ function onResourcePointerDown(e) {
 
 function onBookingBarPointerDown(e) {
   if (e.button !== undefined && e.button !== 0) return;
-  // Don't initiate drag if clicking delete button
-  if (e.target.classList.contains('booking-bar-del')) return;
+  if (e.target.classList.contains('booking-chip-del')) return;
   e.preventDefault();
   e.stopPropagation();
 
@@ -1294,169 +1294,93 @@ function renderBody() {
 function renderBookingsOverlay() {
   const wk = schedKey();
 
-  // Get table dimensions for positioning
-  const table = document.querySelector('.sched-table');
-  if (!table) return;
+  // Clear all booking chips from cells
+  document.querySelectorAll('.view-cell .bc-item').forEach(el => el.remove());
 
-  const headerRow = table.querySelector('thead tr');
-  const gridBody = table.querySelector('tbody');
-  if (!gridBody) return;
-
-  const headerHeight = headerRow ? headerRow.offsetHeight : 36;
-
-  // Get or create overlay
-  let overlay = document.getElementById('bookingsOverlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'bookingsOverlay';
-    overlay.className = 'bookings-overlay';
-    table.parentElement.appendChild(overlay);
+  // Helper: find the td for a given day + row index and insert a chip before + book
+  function addChip(day, rowIdx, el) {
+    const cell = document.querySelector(`.view-cell[data-day="${day}"][data-row-idx="${rowIdx}"]`);
+    if (!cell) return null;
+    const hint = cell.querySelector('.drop-hint');
+    if (hint) cell.insertBefore(el, hint);
+    else cell.appendChild(el);
+    return el;
   }
-  overlay.style.cssText = `position:absolute;top:${headerHeight}px;left:0;right:0;bottom:0;pointer-events:none;`;
-  overlay.innerHTML = '';
 
-  // Get actual day column widths from the first data row
-  const sessionRows = table.querySelectorAll('.session-row');
-  if (!sessionRows.length) return;
-
-  const firstDataRow = sessionRows[0];
-  const dayCells = firstDataRow.querySelectorAll('.view-cell');
-
-  // Get overlay's position for relative calculations
-  const overlayRect = overlay.getBoundingClientRect();
-
-  // Map time to pixel position by measuring actual row positions
-  // Build a lookup: for each row start/end time, what's the pixel offset?
-  const timeToPx = [];
-  sessionRows.forEach((row, ri) => {
-    const rowDef = ROWS[ri];
-    if (!rowDef) return;
-    const viewCell = row.querySelector('.view-cell');
-    if (!viewCell) return;
-
-    // Use getBoundingClientRect for reliable positioning
-    const cellRect = viewCell.getBoundingClientRect();
-    const rowTop = cellRect.top - overlayRect.top; // position relative to overlay
-    const rowHeight = cellRect.height;
-
-    timeToPx.push({
-      startMins: timeToMins(rowDef.start),
-      endMins: timeToMins(rowDef.end),
-      topPx: rowTop,
-      heightPx: rowHeight
-    });
-  });
-
-  // Helper: convert time to pixel position within overlay
-  const timeToPosition = (timeStr) => {
-    const mins = timeToMins(timeStr);
-    // Find the row this time falls within
-    for (const row of timeToPx) {
-      if (mins >= row.startMins && mins < row.endMins) {
-        // Interpolate within this row
-        const progress = (mins - row.startMins) / (row.endMins - row.startMins);
-        return row.topPx + progress * row.heightPx;
-      }
-    }
-    // If past last row, return bottom
-    if (timeToPx.length > 0) {
-      const lastRow = timeToPx[timeToPx.length - 1];
-      if (mins >= lastRow.endMins) return lastRow.topPx + lastRow.heightPx;
-    }
-    return 0;
-  };
-
-  // Pre-compute horizontal positions for each day's bookings (split width for concurrent bookings)
-  const bookingSlots = {};
-  DAYS.forEach((d, di) => {
-    const day = d.toLowerCase();
-    bookingSlots[day] = {};
-    const dayBookings = getBookings(wk, day);
-    const count = Math.max(dayBookings.length, 1);
-    const widthPct = 97 / count;
-    dayBookings.forEach((b, bi) => {
-      bookingSlots[day][b.id] = { leftPct: bi * widthPct + 1, widthPct: widthPct - 1 };
-    });
-  });
-
-  // Render each booking as absolutely positioned bar
-  DAYS.forEach((d, di) => {
+  // Render real bookings as stacked chips inside cells
+  DAYS.forEach(d => {
     const day = d.toLowerCase();
     const dayBookings = getBookings(wk, day);
-    if (!dayCells[di]) return;
-
-    // Use getBoundingClientRect for horizontal positioning too
-    const cellRect = dayCells[di].getBoundingClientRect();
-    const cellLeft = cellRect.left - overlayRect.left;
-    const cellWidth = cellRect.width;
-
     dayBookings.forEach(b => {
-      const bStart = timeToMins(b.startTime);
-      const bEnd = timeToMins(b.endTime);
-      if (bEnd <= bStart) return;
+      if (timeToMins(b.endTime) <= timeToMins(b.startTime)) return;
+      const res = RESOURCES.find(r => r.id === b.resourceId);
+      const col = res ? res.colour : '#64748b';
+      const resName = res ? res.name : (b.resourceName || b.resourceId);
+      const yg = b.yearGroup ? `${b.yearGroup} · ` : '';
+      const label = `${yg}${resName}${b.quantity > 1 ? ' ×' + b.quantity : ''}`;
 
-      const col = (RESOURCES.find(r => r.id === b.resourceId) || {}).colour || '#64748b';
-      const slot = bookingSlots[day][b.id] || { leftPct: 1, widthPct: 11 };
-
-      // Calculate position using actual row positions
-      const topPx = timeToPosition(b.startTime);
-      const bottomPx = timeToPosition(b.endTime);
-      const heightPx = Math.max(bottomPx - topPx, 20); // minimum 20px height
-
-      const leftPx = cellLeft + (slot.leftPct / 100) * cellWidth;
-      const widthPx = (slot.widthPct / 100) * cellWidth;
-
-      const bar = document.createElement('div');
-      bar.className = 'booking-bar';
-      bar.style.cssText = `position:absolute;left:${leftPx}px;width:${widthPx}px;top:${topPx}px;height:${heightPx}px;background:${col};pointer-events:auto;cursor:grab;`;
-      bar.dataset.bookingId = b.id;
-      bar.dataset.day = day;
-      const ygDisplay = b.yearGroup ? `${b.yearGroup} · ` : '';
-      bar.innerHTML = `
-        <div class="booking-bar-inner"><strong>${ygDisplay}</strong>${escHtml(b.resourceName || b.resourceId)}${b.quantity > 1 ? ' ×' + b.quantity : ''}</div>
-        <div class="booking-bar-time">${b.startTime}–${b.endTime}</div>
-        <button class="booking-bar-del" onclick="event.stopPropagation();showDeleteOptions(event, '${b.id}', '${b.groupId || b.id}', '${day}')" title="Remove">×</button>
-      `;
-      // Click to edit (but not if dragging)
-      bar.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openEditBookingModal(day, b.id);
+      const rows = getRowsForTimeRange(b.startTime, b.endTime);
+      rows.forEach(row => {
+        const rowIdx = ROWS.indexOf(row);
+        const chip = document.createElement('div');
+        chip.className = 'bc-item';
+        chip.dataset.bookingId = b.id;
+        chip.dataset.day = day;
+        chip.style.cssText = 'margin:2px;border-radius:3px;overflow:hidden;position:relative;cursor:pointer;';
+        chip.innerHTML = `
+          <div class="bc-body" style="border-left:3px solid ${col};background:${col}22;padding:3px 22px 3px 6px;">
+            <div style="font-size:10px;font-weight:800;color:#1e293b;font-family:'Nunito',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(label)}</div>
+            <div style="font-size:8px;color:#64748b;">${b.startTime}–${b.endTime}</div>
+          </div>
+          <button class="booking-chip-del" onclick="event.stopPropagation();showDeleteOptions(event,'${b.id}','${b.groupId||b.id}','${day}')" title="Remove">×</button>
+        `;
+        chip.addEventListener('click', e => { if (!e.target.classList.contains('booking-chip-del')) { e.stopPropagation(); openEditBookingModal(day, b.id); } });
+        chip.addEventListener('pointerdown', onBookingBarPointerDown);
+        addChip(day, rowIdx, chip);
       });
-      bar.addEventListener('pointerdown', onBookingBarPointerDown);
-      overlay.appendChild(bar);
     });
   });
 
-  // Render Cover Plan Sports and FAB indicators on top of booking bars
-  const cpSports = getCpSportsBars(state.weekIdx);
-  cpSports.forEach(b => {
-    if (!dayCells[b.dayIdx]) return;
-    const cellRect = dayCells[b.dayIdx].getBoundingClientRect();
-    const cellLeft = cellRect.left - overlayRect.left;
-    const cellWidth = cellRect.width;
-    const topPx = timeToPosition(b.startTime);
-    const bottomPx = timeToPosition(b.endTime);
-    const heightPx = Math.max(bottomPx - topPx, 24);
-    const bar = document.createElement('div');
-    bar.style.cssText = `position:absolute;left:${cellLeft+1}px;width:${cellWidth-4}px;top:${topPx}px;height:${heightPx}px;background:#f974160d;border:1.5px dashed #f9741666;border-radius:4px;overflow:hidden;z-index:5;pointer-events:none;`;
-    bar.innerHTML = `<div style="font-size:9px;font-weight:bold;color:#ea580c;padding:2px 4px;line-height:1.3;background:rgba(255,255,255,0.7);display:inline-block;border-radius:2px;margin:2px">⚽ Sports · ${b.startTime}–${b.endTime} · Cover Plan</div>`;
-    overlay.appendChild(bar);
+  // Sports Cover Plan: show locked chips for Super Classroom, MUGA and Field
+  const SPORTS_RES = ['super', 'muga', 'field'];
+  getCpSportsBars(state.weekIdx).forEach(b => {
+    const day = DAYS[b.dayIdx]?.toLowerCase();
+    if (!day) return;
+    getRowsForTimeRange(b.startTime, b.endTime).forEach(row => {
+      const rowIdx = ROWS.indexOf(row);
+      SPORTS_RES.forEach(rid => {
+        const res = RESOURCES.find(r => r.id === rid);
+        const resName = res ? res.name : rid;
+        const chip = document.createElement('div');
+        chip.className = 'bc-item bc-sports';
+        chip.style.cssText = 'margin:2px;border-radius:3px;overflow:hidden;pointer-events:none;';
+        chip.innerHTML = `<div style="border-left:3px solid #f97316;background:#f974160d;padding:3px 6px;">
+          <div style="font-size:10px;font-weight:800;color:#ea580c;font-family:'Nunito',sans-serif;">⚽ ${escHtml(resName)}</div>
+          <div style="font-size:8px;color:#ea580c88;">${b.startTime}–${b.endTime} · Cover Plan</div>
+        </div>`;
+        addChip(day, rowIdx, chip);
+      });
+    });
   });
 
-  const fabBars = getFabBars(state.weekIdx);
-  fabBars.forEach(b => {
-    if (!dayCells[b.dayIdx]) return;
-    const cellRect = dayCells[b.dayIdx].getBoundingClientRect();
-    const cellLeft = cellRect.left - overlayRect.left;
-    const cellWidth = cellRect.width;
-    const topPx = timeToPosition(b.startTime);
-    const bottomPx = timeToPosition(b.endTime);
-    const heightPx = Math.max(bottomPx - topPx, 16);
-    const col = (RESOURCES.find(r => r.id === b.resourceId) || {}).colour || '#1798d3';
-    const bar = document.createElement('div');
-    bar.style.cssText = `position:absolute;left:${cellLeft+1}px;width:${cellWidth-4}px;top:${topPx}px;height:${heightPx}px;background:${col}0d;border:1.5px dashed ${col}88;border-radius:4px;overflow:hidden;z-index:5;pointer-events:none;`;
-    bar.innerHTML = `<div style="font-size:8px;font-weight:bold;color:${col};padding:1px 4px;background:rgba(255,255,255,0.7);display:inline-block;border-radius:2px;margin:2px">🏃 FAB</div>`;
-    overlay.appendChild(bar);
+  // FAB Rota: locked chips
+  getFabBars(state.weekIdx).forEach(b => {
+    const day = DAYS[b.dayIdx]?.toLowerCase();
+    if (!day) return;
+    const res = RESOURCES.find(r => r.id === b.resourceId);
+    const col = res ? res.colour : '#1798d3';
+    const resName = res ? res.name : b.resourceId;
+    getRowsForTimeRange(b.startTime, b.endTime).forEach(row => {
+      const rowIdx = ROWS.indexOf(row);
+      const chip = document.createElement('div');
+      chip.className = 'bc-item bc-fab';
+      chip.style.cssText = 'margin:2px;border-radius:3px;overflow:hidden;pointer-events:none;';
+      chip.innerHTML = `<div style="border-left:3px solid ${col};background:${col}0d;padding:3px 6px;">
+        <div style="font-size:10px;font-weight:800;color:${col};font-family:'Nunito',sans-serif;">🏃 ${escHtml(resName)}</div>
+        <div style="font-size:8px;color:${col}88;">FAB Rota</div>
+      </div>`;
+      addChip(day, rowIdx, chip);
+    });
   });
 }
 
