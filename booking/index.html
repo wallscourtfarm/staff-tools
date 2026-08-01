@@ -176,7 +176,8 @@
       width: 16px; height: 16px; font-size: 11px; line-height: 1;
       color: rgba(0,0,0,.4); cursor: pointer; display: none; z-index: 5;
     }
-    .booking-chip:hover .booking-chip-del { display: block; }
+    .booking-chip:hover .booking-chip-del,
+    .bc-item:hover .booking-chip-del { display: block; }
     .booking-chip-del:hover { background: #dc2626; color: white; }
 
     /* Timeline-style booking bars (narrow, rotated text) */
@@ -249,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 01.08.26e</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 01.08.26f</div>
       </div>
     </div>
     <div class="top-bar">
@@ -917,7 +918,7 @@ function onBookingBarPointerDown(e) {
     sourceBar: bar,
   };
 
-  bar.style.opacity = '0.3';
+  document.querySelectorAll(`.bc-item[data-booking-id="${booking.id}"]`).forEach(c => c.style.opacity = '0.3');
   bar.setPointerCapture(e.pointerId);
 
   const ghost = document.getElementById('dragGhost');
@@ -985,8 +986,10 @@ function endDrag() {
 
 function endBookingDrag() {
   if (!drag || drag.type !== 'move') return;
+  if (drag.bookingId) {
+    document.querySelectorAll(`.bc-item[data-booking-id="${drag.bookingId}"]`).forEach(c => c.style.opacity = '');
+  }
   if (drag.sourceBar) {
-    drag.sourceBar.style.opacity = '';
     drag.sourceBar.removeEventListener('pointermove', onBookingDragMove);
     drag.sourceBar.removeEventListener('pointerup', onBookingDragEnd);
     drag.sourceBar.removeEventListener('pointercancel', onBookingDragEnd);
