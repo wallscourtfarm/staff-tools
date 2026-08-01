@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 02.08.26b</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 02.08.26c</div>
       </div>
     </div>
     <div class="top-bar">
@@ -385,8 +385,8 @@
       <h3>Delete Booking</h3>
       <p class="modal-hint">Remove this booking from one day or the entire series?</p>
       <div class="modal-footer" style="flex-direction:column;gap:8px;align-items:stretch">
-        <button class="modal-save" onclick="deleteSingleBooking()" style="width:100%">Delete this day only</button>
-        <button style="width:100%;background:#dc2626;border:none;border-radius:5px;padding:8px 16px;font-size:13px;cursor:pointer;color:white;font-weight:700" onclick="deleteEntireSeries()">Delete entire series</button>
+        <button id="deleteSingleBtn" class="modal-save" onclick="deleteSingleBooking()" style="width:100%">Delete this booking</button>
+        <button id="deleteSeriesBtn" style="width:100%;background:#dc2626;border:none;border-radius:5px;padding:8px 16px;font-size:13px;cursor:pointer;color:white;font-weight:700" onclick="deleteEntireSeries()">Delete entire series</button>
         <button class="modal-cancel" onclick="closeDeleteModal()" style="width:100%">Cancel</button>
       </div>
     </div>
@@ -916,6 +916,7 @@ function onBookingBarPointerDown(e) {
     purpose: booking.purpose,
     quantity: booking.quantity || 1,
     sourceBar: bar,
+    moved: false,
   };
 
   document.querySelectorAll(`.bc-item[data-booking-id="${booking.id}"]`).forEach(c => c.style.opacity = '0.3');
@@ -945,6 +946,7 @@ function onDragMove(e) {
 
 function onBookingDragMove(e) {
   if (!drag || drag.type !== 'move') return;
+  drag.moved = true;
   moveGhost(e.clientX, e.clientY);
   updatePlaceholderPosition(e.clientX, e.clientY);
   highlightCellAt(e.clientX, e.clientY);
@@ -962,9 +964,15 @@ function onDragEnd(e) {
 
 function onBookingDragEnd(e) {
   if (!drag || drag.type !== 'move') return;
+  if (!drag.moved) {
+    // Tap (no movement) — open edit modal
+    const { originalDay, bookingId } = drag;
+    endBookingDrag();
+    openEditBookingModal(originalDay, bookingId);
+    return;
+  }
   const target = dropTargetAt(e.clientX, e.clientY);
   if (target) {
-    // Calculate new time based on vertical position
     const newTime = calculateDropTime(e.clientX, e.clientY, target);
     if (newTime) {
       moveBookingTo(target.day, newTime.startTime, newTime.endTime);
@@ -1334,10 +1342,10 @@ function renderBookingsOverlay() {
           <div class="bc-body" style="border-left:3px solid ${col};background:${col}22;padding:3px 22px 3px 6px;">
             <div style="font-size:10px;font-weight:800;color:#1e293b;font-family:'Nunito',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(label)}</div>
             <div style="font-size:8px;color:#64748b;">${b.startTime}–${b.endTime}</div>
+            ${b.purpose ? `<div style="font-size:8px;color:#64748b;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(b.purpose)}</div>` : ''}
           </div>
           <button class="booking-chip-del" onclick="event.stopPropagation();showDeleteOptions(event,'${b.id}','${b.groupId||b.id}','${day}')" title="Remove">×</button>
         `;
-        chip.addEventListener('click', e => { if (!e.target.classList.contains('booking-chip-del')) { e.stopPropagation(); openEditBookingModal(day, b.id); } });
         chip.addEventListener('pointerdown', onBookingBarPointerDown);
         addChip(day, rowIdx, chip);
       });
@@ -1735,6 +1743,9 @@ function showDeleteOptions(event, bookingId, groupId, day) {
   _deleteBookingId = bookingId;
   _deleteGroupId = groupId;
   _deleteDay = day;
+  const isSeries = groupId && groupId !== bookingId;
+  document.getElementById('deleteSeriesBtn').style.display = isSeries ? '' : 'none';
+  document.getElementById('deleteSingleBtn').textContent = isSeries ? 'Delete this day only' : 'Delete this booking';
   document.getElementById('deleteModal').classList.add('open');
 }
 
