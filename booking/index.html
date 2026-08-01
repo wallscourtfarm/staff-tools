@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 01.08.26g</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 02.08.26a</div>
       </div>
     </div>
     <div class="top-bar">
@@ -1543,12 +1543,27 @@ document.getElementById('bookingRecurring').addEventListener('change', function(
   }
 });
 
+const SPORTS_BLOCKED_RESOURCES = new Set(['super', 'muga', 'field']);
+
 function checkBookingConflict(resourceId, weekKey, day, startTime, endTime, quantity = 1) {
   const resource = RESOURCES.find(r => r.id === resourceId);
   if (!resource) return null;
 
   const startMins = timeToMins(startTime);
   const endMins = timeToMins(endTime);
+
+  // Check sports Cover Plan blocks (SC, MUGA, Field reserved during sports sessions)
+  if (SPORTS_BLOCKED_RESOURCES.has(resourceId)) {
+    const dayIdx = DAYS.findIndex(d => d.toLowerCase() === day);
+    const sportsConflict = getCpSportsBars(state.weekIdx).find(b => {
+      if (b.dayIdx !== dayIdx) return false;
+      return timeToMins(b.startTime) < endMins && timeToMins(b.endTime) > startMins;
+    });
+    if (sportsConflict) {
+      const ygLabel = sportsConflict.yg ? `${sportsConflict.yg} Sports` : 'Sports';
+      return { conflict: true, message: `${resource.name} is reserved for ${ygLabel} (Cover Plan) at this time` };
+    }
+  }
 
   const dayBookings = getBookings(weekKey, day);
   const overlapping = dayBookings.filter(b => {
