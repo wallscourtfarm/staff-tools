@@ -88,7 +88,7 @@
 
     /* Drag placeholder on grid */
     .drag-placeholder {
-      position: absolute;
+      position: fixed;
       border-radius: 3px;
       background: var(--brand);
       opacity: 0.3;
@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 01.08.26f</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 01.08.26g</div>
       </div>
     </div>
     <div class="top-bar">
@@ -1186,8 +1186,8 @@ function updatePlaceholderPosition(x, y) {
   const height = rowHeight * Math.max(1, numRows);
 
   placeholderEl.style.display = 'block';
-  placeholderEl.style.left = (cellRect.left - tableRect.left) + 'px';
-  placeholderEl.style.top = (cellRect.top - tableRect.top) + 'px';
+  placeholderEl.style.left = cellRect.left + 'px';
+  placeholderEl.style.top = cellRect.top + 'px';
   placeholderEl.style.width = cellRect.width + 'px';
   placeholderEl.style.height = Math.min(height, cellRect.height) + 'px';
   placeholderEl.style.background = drag.resourceColour;
@@ -1344,12 +1344,13 @@ function renderBookingsOverlay() {
     });
   });
 
-  // Sports Cover Plan: one combined chip per slot showing all three venues
+  // Sports Cover Plan: one combined chip per slot, session rows only (not FAB/Reg/Lunch/Story)
+  const SESSION_ROW_IDS = new Set(['s1', 's2', 's3']);
   getCpSportsBars(state.weekIdx).forEach(b => {
     const day = DAYS[b.dayIdx]?.toLowerCase();
     if (!day) return;
     const ygLabel = b.yg ? `${b.yg} ` : '';
-    getRowsForTimeRange(b.startTime, b.endTime).forEach(row => {
+    getRowsForTimeRange(b.startTime, b.endTime).filter(row => SESSION_ROW_IDS.has(row.id)).forEach(row => {
       const rowIdx = ROWS.indexOf(row);
       const chip = document.createElement('div');
       chip.className = 'bc-item bc-sports';
