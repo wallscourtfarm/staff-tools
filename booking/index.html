@@ -249,7 +249,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 01.08.26d</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 01.08.26e</div>
       </div>
     </div>
     <div class="top-bar">
@@ -495,7 +495,7 @@ function getCpSportsBars(weekIdx) {
     const key = `${s.day}-${s.session}`;
     if (seen.has(key)) return;
     seen.add(key);
-    bars.push({ dayIdx: s.day, startTime: timeRange[0], endTime: timeRange[1] });
+    bars.push({ dayIdx: s.day, startTime: timeRange[0], endTime: timeRange[1], yg: s.yg || '' });
   });
   // Fallback: weekSlots with reason='Sports'
   (coverPlanData.weekSlots?.[weekIdx] || []).filter(s => s.reason === 'Sports').forEach(s => {
@@ -504,7 +504,7 @@ function getCpSportsBars(weekIdx) {
     const key = `${s.day}-${s.session}`;
     if (seen.has(key)) return;
     seen.add(key);
-    bars.push({ dayIdx: s.day, startTime: timeRange[0], endTime: timeRange[1] });
+    bars.push({ dayIdx: s.day, startTime: timeRange[0], endTime: timeRange[1], yg: s.yg || '' });
   });
   return bars;
 }
@@ -1341,43 +1341,19 @@ function renderBookingsOverlay() {
     });
   });
 
-  // Sports Cover Plan: show locked chips for Super Classroom, MUGA and Field
-  const SPORTS_RES = ['super', 'muga', 'field'];
+  // Sports Cover Plan: one combined chip per slot showing all three venues
   getCpSportsBars(state.weekIdx).forEach(b => {
     const day = DAYS[b.dayIdx]?.toLowerCase();
     if (!day) return;
-    getRowsForTimeRange(b.startTime, b.endTime).forEach(row => {
-      const rowIdx = ROWS.indexOf(row);
-      SPORTS_RES.forEach(rid => {
-        const res = RESOURCES.find(r => r.id === rid);
-        const resName = res ? res.name : rid;
-        const chip = document.createElement('div');
-        chip.className = 'bc-item bc-sports';
-        chip.style.cssText = 'margin:2px;border-radius:3px;overflow:hidden;pointer-events:none;';
-        chip.innerHTML = `<div style="border-left:3px solid #f97316;background:#f974160d;padding:3px 6px;">
-          <div style="font-size:10px;font-weight:800;color:#ea580c;font-family:'Nunito',sans-serif;">⚽ ${escHtml(resName)}</div>
-          <div style="font-size:8px;color:#ea580c88;">${b.startTime}–${b.endTime} · Cover Plan</div>
-        </div>`;
-        addChip(day, rowIdx, chip);
-      });
-    });
-  });
-
-  // FAB Rota: locked chips
-  getFabBars(state.weekIdx).forEach(b => {
-    const day = DAYS[b.dayIdx]?.toLowerCase();
-    if (!day) return;
-    const res = RESOURCES.find(r => r.id === b.resourceId);
-    const col = res ? res.colour : '#1798d3';
-    const resName = res ? res.name : b.resourceId;
+    const ygLabel = b.yg ? `${b.yg} ` : '';
     getRowsForTimeRange(b.startTime, b.endTime).forEach(row => {
       const rowIdx = ROWS.indexOf(row);
       const chip = document.createElement('div');
-      chip.className = 'bc-item bc-fab';
+      chip.className = 'bc-item bc-sports';
       chip.style.cssText = 'margin:2px;border-radius:3px;overflow:hidden;pointer-events:none;';
-      chip.innerHTML = `<div style="border-left:3px solid ${col};background:${col}0d;padding:3px 6px;">
-        <div style="font-size:10px;font-weight:800;color:${col};font-family:'Nunito',sans-serif;">🏃 ${escHtml(resName)}</div>
-        <div style="font-size:8px;color:${col}88;">FAB Rota</div>
+      chip.innerHTML = `<div style="border-left:3px solid #f97316;background:#f974160d;padding:3px 6px;">
+        <div style="font-size:10px;font-weight:800;color:#ea580c;font-family:'Nunito',sans-serif;">⚽ ${escHtml(ygLabel)}Sports · SC, MUGA, Field</div>
+        <div style="font-size:8px;color:#ea580c88;">${b.startTime}–${b.endTime} · Cover Plan</div>
       </div>`;
       addChip(day, rowIdx, chip);
     });
