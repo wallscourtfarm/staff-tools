@@ -167,6 +167,13 @@
   }
   .subject-header h2 { font-size: 19px; font-weight: 900; }
   .subject-desc { font-size: 13px; color: var(--grey); margin-bottom: 18px; line-height: 1.6; }
+  .enquiry-toggle {
+    margin-left: auto; display: flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+    cursor: pointer; opacity: .8; white-space: nowrap;
+  }
+  .enquiry-toggle input { cursor: pointer; }
+  .enquiry-toggle:hover { opacity: 1; }
 
   /* ── Enquiry cards ── */
   .enquiry-card {
@@ -688,8 +695,15 @@
     color: #fff; font-size: 10px; font-weight: 700; line-height: 1.35;
     overflow: hidden; text-shadow: 0 1px 2px rgba(0,0,0,.25);
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
-    word-break: break-word;
+    word-break: break-word; pointer-events: none;
   }
+  .gantt-bar.draggable { cursor: grab; }
+  .gantt-bar.draggable:active { cursor: grabbing; }
+  .gantt-bar.dragging { opacity: .85; box-shadow: 0 4px 12px rgba(0,0,0,.32); z-index: 4; }
+  .gantt-bar-handle { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 2; }
+  .gantt-bar-handle-l { left: 0; border-radius: 5px 0 0 5px; }
+  .gantt-bar-handle-r { right: 0; border-radius: 0 5px 5px 0; }
+  .gantt-bar-handle:hover { background: rgba(255,255,255,.35); }
   .gantt-vline {
     position: absolute; top: 0; bottom: 0; width: 2px;
     background: #cbd5e1; pointer-events: none; z-index: 1;
@@ -721,7 +735,7 @@
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">28.07.26i</span>
+  <span class="nav-version">12.08.26a</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -733,7 +747,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>28.07.26i</strong>
+  <strong>12.08.26a</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -1423,6 +1437,28 @@ function saveWiderCell(k, wkey, rowLabel, termIdx, value) {
   d.wider[wkey][rowLabel][termIdx] = value;
   saveData(k, d);
 }
+// "Enquiry view" toggle — lets a wider-curriculum subject with real enquiry data
+// (Citizen, Computer Scientist, etc.) render as full enquiry cards, for the years
+// it runs as a proper enquiry rather than a termly bucket.
+function getEnquiryMode(k, wkey) {
+  return !!(loadData(k).enquiryMode || {})[wkey];
+}
+function toggleEnquiryMode(k, wkey, val) {
+  const d = loadData(k);
+  d.enquiryMode = d.enquiryMode || {};
+  d.enquiryMode[wkey] = val;
+  saveData(k, d);
+  renderYear(k);
+}
+// Global (1..39) <-> term-local week conversion, shared by the Term Planner drag/resize.
+function globalToLocal(gw) {
+  for (let t = 0; t < TERM_WK.length; t++) {
+    if (gw <= TERM_GS[t] + TERM_WK[t]) return { term: t+1, week: gw - TERM_GS[t] };
+  }
+  const lastT = TERM_WK.length;
+  return { term: lastT, week: TERM_WK[lastT-1] };
+}
+const localToGlobal = (term, week) => TERM_GS[term-1] + week;
 
 // ════════════════════════════════════════════════════════════
 // APP STATE
@@ -1569,119 +1605,147 @@ function renderYear(k) {
     if (item.type === 'sob') {
       const state = item.key;
       if (!activeStates.includes(state)) return;
-      const m = SOB_META[state];
       const bg = sobBg(state);
       const sEnqs = enqs.filter(e => e.stateOfBeing === state).sort((a,b)=>a.term-b.term||a.order-b.order);
-
-    h += `<div id="s-${state.toLowerCase().replace(/ /g,'-')}" class="subject-header" style="border-color:${bg};color:${bg}">
-      ${sobImg(state, 28)}
-      <h2>Being a ${m.state}</h2>
-    </div>`;
-
-    let lastTerm = null;
-    sEnqs.forEach((e, idx) => {
-      const enq = getEnq(k, e.id, e.stateOfBeing);
-      const wk = wkRange(e);
-      const statusCls = enq.planningStatus && enq.planningStatus !== 'unknown' ? `tag-status-${enq.planningStatus}` : '';
-      if (e.term !== lastTerm) {
-        lastTerm = e.term;
-        const dr = termDateRange(e.term);
-        const td = fmtTeachDays(TERM_TEACHING_DAYS[e.term - 1]);
-        h += `<div class="term-divider">
-          <span class="term-divider-label">Term ${e.term}</span>
-          ${dr ? `<span class="term-divider-dates">w/c ${dr}</span>` : ''}
-          <span class="term-divider-dates" style="color:#cbd5e1">${td}</span>
-          <span class="term-divider-line"></span>
-        </div>`;
-      }
-      const wkDate = weekDate(e.term, e.weekStart);
-      const termTag = `T${e.term} · W${e.weekStart}${e.weekStart!==e.weekEnd?'–'+e.weekEnd:''}${wkDate?' · w/c '+wkDate:''}`;
-      h += `<div class="enquiry-card" id="enq-${e.id}">
-        <div class="card-btns">
-          <button class="card-btn" title="Duplicate enquiry" onclick="duplicateEnq('${k}','${e.id}')">📋</button>
-          <button class="card-btn" title="Edit enquiry" onclick="openEnqEdit('${k}','${e.id}','${e.stateOfBeing}')">✏️</button>
-        </div>
-        <div class="enquiry-header">
-          <div class="enquiry-number" style="background:${bg}">${idx+1}</div>
-          <div class="enquiry-meta">
-            <h3>${esc(enq.keyQuestion)}</h3>
-            <div class="enquiry-tags">
-              <span class="tag tag-term">${termTag}</span>
-              ${enq.linkedText ? `<span class="tag tag-text">${esc(enq.linkedText)}</span>` : ''}
-              ${enq.genre ? `<span class="tag tag-genre">${esc(enq.genre)}</span>` : ''}
-              ${statusCls ? `<span class="tag ${statusCls}">${SPILL_TEXT[enq.planningStatus]||''}</span>` : ''}
-            </div>
-          </div>
-          <div class="enq-sob-icon">${sobImg(state, 30)}</div>
-        </div>
-        <div class="enquiry-body">
-          ${(() => {
-            const scItems = (enq.successCriteria||'').split('\n').map(l=>l.trim()).filter(Boolean);
-            const scRow = `<div class="wf-row" style="align-items:flex-start">
-              <span class="wf-label">Success Criteria</span>
-              ${scItems.length
-                ? `<ul class="sc-list" style="margin:0;flex:1">${scItems.map(l=>`<li title="${esc(l)}">${esc(l)}</li>`).join('')}</ul>`
-                : `<span class="placeholder" style="font-size:12px">Click ✏️ to add…</span>`}
-            </div>`;
-            const writerFields = (hasWF) => hasWF
-              ? `<div class="writing-fields">
-                  ${enq.genre ? `<div class="wf-row"><span class="wf-label">Purpose</span><span class="wf-val">${esc(enq.genre)}</span></div>` : ''}
-                  ${enq.audience ? `<div class="wf-row"><span class="wf-label">Audience</span><span class="wf-val">${esc(enq.audience)}</span></div>` : ''}
-                  ${enq.writingOutcome ? `<div class="wf-row"><span class="wf-label">Outcome</span><span class="wf-val">${esc(enq.writingOutcome)}</span></div>` : ''}
-                  ${scRow}
-                </div>`
-              : `<p class="placeholder" style="font-size:12px">Click ✏️ to set purpose, audience and outcome…</p>`;
-            const hasWF = !!(enq.audience||enq.genre||enq.writingOutcome);
-            return state === 'Writer'
-              ? `<div class="enquiry-section">
-                  ${writerFields(hasWF)}
-                  ${enq.overview ? `<p class="content-lines" style="margin-top:8px;font-size:12px;color:#64748b">${esc(enq.overview)}</p>` : ''}
-                </div>`
-              : `<div class="enquiry-section is-split">
-                  <div class="enq-sub">
-                    <h4>${esc(state)} Outcome</h4>
-                    ${enq.subjectOutcome
-                      ? `<p class="content-lines" style="font-size:12px;color:#1e293b;margin:0">${esc(enq.subjectOutcome)}</p>`
-                      : `<p class="placeholder" style="font-size:12px">Click ✏️ to add ${esc(state.toLowerCase())} outcome…</p>`}
-                  </div>
-                  <div class="enq-sub">
-                    <h4>Writer Outcome</h4>
-                    ${writerFields(!!(enq.audience||enq.genre||enq.writingOutcome))}
-                  </div>
-                </div>`;
-          })()}
-          <div class="enquiry-section">
-            <h4>Writing Skills</h4>
-            ${(enq.writingSkills&&enq.writingSkills.length)
-              ? `<div class="skill-chips">${renderSkillChipsHTML(enq.writingSkills||[], k)}</div>`
-              : `<p class="placeholder">Click ✏️ to assign writing skills…</p>`}
-            ${enq.contentSkills ? `<div class="content-lines" style="margin-top:8px">${esc(enq.contentSkills).split('\n').map(l=>l.trim()).filter(Boolean).map(l=>`<div style="padding:2px 0;border-bottom:1px solid #f3f4f6;font-size:12px;color:#64748b">${l}</div>`).join('')}</div>` : ''}
-          </div>
-          ${renderCoveragePanel(k, enq, state)}
-        </div>
-        <div class="enq-comment-row">
-          <span class="enq-comment-label">💬</span>
-          <div class="enq-comment-edit" contenteditable="true"
-            data-k="${k}" data-id="${e.id}"
-            onblur="saveComment(this)">${esc(enq.comment||'')}</div>
-        </div>
-        <div class="links-row">
-          <strong>Cross-curricular links:</strong>
-          ${enq.crossCurricular ? esc(enq.crossCurricular) : '<em style="color:#cbd5e1">Click ✏️ to add cross-curricular links…</em>'}
-        </div>
-      </div>`;
-    });
+      h += renderEnquirySection(k, state, sEnqs, bg, null);
       // Wider sub-sections grouped under this SOB
       WIDER_DEF.filter(w => w.group === state).forEach(w => {
-        h += renderWiderSection(k, w, yc, yd);
+        h += renderWiderSection(k, w, yc, yd, false);
       });
     } else {
       const w = WIDER_DEF.find(x => x.key === item.key);
-      if (w) h += renderWiderSection(k, w, yc, yd);
+      if (!w) return;
+      const canEnquiry = !!SOB_META[w.name];
+      if (canEnquiry && getEnquiryMode(k, w.key)) {
+        const sEnqs = enqs.filter(e => e.stateOfBeing === w.name).sort((a,b)=>a.term-b.term||a.order-b.order);
+        h += renderEnquirySection(k, w.name, sEnqs, w.colour, w.key);
+      } else {
+        h += renderWiderSection(k, w, yc, yd, canEnquiry);
+      }
     }
   });
 
   document.getElementById('main').innerHTML = h;
+}
+
+// Header + list of enquiry cards for a subject, shared by true SOB subjects
+// (Writer/Geographer/Historian/Scientist) and other subjects switched into
+// "Enquiry view" via the toggle on their wider-curriculum section.
+// toggleKey: wider-curriculum key to show an on/off "Enquiry view" switch, or null for the core 4.
+function renderEnquirySection(k, state, sEnqs, bg, toggleKey) {
+  const m = SOB_META[state] || { heading: `${state} Enquiries`, state };
+
+  let h = `<div id="s-${state.toLowerCase().replace(/ /g,'-')}" class="subject-header" style="border-color:${bg};color:${bg}">
+    ${sobImg(state, 28)}
+    <h2>Being a ${m.state}</h2>
+    ${toggleKey ? `<label class="enquiry-toggle" style="color:${bg}"><input type="checkbox" checked onchange="toggleEnquiryMode('${k}','${toggleKey}',this.checked)"> Enquiry view</label>` : ''}
+  </div>`;
+
+  h += renderEnquiryCards(k, state, sEnqs, bg);
+
+  if (toggleKey && !sEnqs.length) {
+    h += `<p class="placeholder" style="padding:4px 4px 16px">No ${esc(state)} enquiries recorded yet this year. Use 📋 on an existing card to duplicate one into this subject, then edit its details.</p>`;
+  }
+
+  return h;
+}
+
+function renderEnquiryCards(k, state, sEnqs, bg) {
+  let h = '';
+  let lastTerm = null;
+  sEnqs.forEach((e, idx) => {
+    const enq = getEnq(k, e.id, e.stateOfBeing);
+    const wk = wkRange(e);
+    const statusCls = enq.planningStatus && enq.planningStatus !== 'unknown' ? `tag-status-${enq.planningStatus}` : '';
+    if (e.term !== lastTerm) {
+      lastTerm = e.term;
+      const dr = termDateRange(e.term);
+      const td = fmtTeachDays(TERM_TEACHING_DAYS[e.term - 1]);
+      h += `<div class="term-divider">
+        <span class="term-divider-label">Term ${e.term}</span>
+        ${dr ? `<span class="term-divider-dates">w/c ${dr}</span>` : ''}
+        <span class="term-divider-dates" style="color:#cbd5e1">${td}</span>
+        <span class="term-divider-line"></span>
+      </div>`;
+    }
+    const wkDate = weekDate(e.term, e.weekStart);
+    const termTag = `T${e.term} · W${e.weekStart}${e.weekStart!==e.weekEnd?'–'+e.weekEnd:''}${wkDate?' · w/c '+wkDate:''}`;
+    h += `<div class="enquiry-card" id="enq-${e.id}">
+      <div class="card-btns">
+        <button class="card-btn" title="Duplicate enquiry" onclick="duplicateEnq('${k}','${e.id}')">📋</button>
+        <button class="card-btn" title="Edit enquiry" onclick="openEnqEdit('${k}','${e.id}','${e.stateOfBeing}')">✏️</button>
+      </div>
+      <div class="enquiry-header">
+        <div class="enquiry-number" style="background:${bg}">${idx+1}</div>
+        <div class="enquiry-meta">
+          <h3>${esc(enq.keyQuestion)}</h3>
+          <div class="enquiry-tags">
+            <span class="tag tag-term">${termTag}</span>
+            ${enq.linkedText ? `<span class="tag tag-text">${esc(enq.linkedText)}</span>` : ''}
+            ${enq.genre ? `<span class="tag tag-genre">${esc(enq.genre)}</span>` : ''}
+            ${statusCls ? `<span class="tag ${statusCls}">${SPILL_TEXT[enq.planningStatus]||''}</span>` : ''}
+          </div>
+        </div>
+        <div class="enq-sob-icon">${sobImg(state, 30)}</div>
+      </div>
+      <div class="enquiry-body">
+        ${(() => {
+          const scItems = (enq.successCriteria||'').split('\n').map(l=>l.trim()).filter(Boolean);
+          const scRow = `<div class="wf-row" style="align-items:flex-start">
+            <span class="wf-label">Success Criteria</span>
+            ${scItems.length
+              ? `<ul class="sc-list" style="margin:0;flex:1">${scItems.map(l=>`<li title="${esc(l)}">${esc(l)}</li>`).join('')}</ul>`
+              : `<span class="placeholder" style="font-size:12px">Click ✏️ to add…</span>`}
+          </div>`;
+          const writerFields = (hasWF) => hasWF
+            ? `<div class="writing-fields">
+                ${enq.genre ? `<div class="wf-row"><span class="wf-label">Purpose</span><span class="wf-val">${esc(enq.genre)}</span></div>` : ''}
+                ${enq.audience ? `<div class="wf-row"><span class="wf-label">Audience</span><span class="wf-val">${esc(enq.audience)}</span></div>` : ''}
+                ${enq.writingOutcome ? `<div class="wf-row"><span class="wf-label">Outcome</span><span class="wf-val">${esc(enq.writingOutcome)}</span></div>` : ''}
+                ${scRow}
+              </div>`
+            : `<p class="placeholder" style="font-size:12px">Click ✏️ to set purpose, audience and outcome…</p>`;
+          const hasWF = !!(enq.audience||enq.genre||enq.writingOutcome);
+          return state === 'Writer'
+            ? `<div class="enquiry-section">
+                ${writerFields(hasWF)}
+                ${enq.overview ? `<p class="content-lines" style="margin-top:8px;font-size:12px;color:#64748b">${esc(enq.overview)}</p>` : ''}
+              </div>`
+            : `<div class="enquiry-section is-split">
+                <div class="enq-sub">
+                  <h4>${esc(state)} Outcome</h4>
+                  ${enq.subjectOutcome
+                    ? `<p class="content-lines" style="font-size:12px;color:#1e293b;margin:0">${esc(enq.subjectOutcome)}</p>`
+                    : `<p class="placeholder" style="font-size:12px">Click ✏️ to add ${esc(state.toLowerCase())} outcome…</p>`}
+                </div>
+                <div class="enq-sub">
+                  <h4>Writer Outcome</h4>
+                  ${writerFields(!!(enq.audience||enq.genre||enq.writingOutcome))}
+                </div>
+              </div>`;
+        })()}
+        <div class="enquiry-section">
+          <h4>Writing Skills</h4>
+          ${(enq.writingSkills&&enq.writingSkills.length)
+            ? `<div class="skill-chips">${renderSkillChipsHTML(enq.writingSkills||[], k)}</div>`
+            : `<p class="placeholder">Click ✏️ to assign writing skills…</p>`}
+          ${enq.contentSkills ? `<div class="content-lines" style="margin-top:8px">${esc(enq.contentSkills).split('\n').map(l=>l.trim()).filter(Boolean).map(l=>`<div style="padding:2px 0;border-bottom:1px solid #f3f4f6;font-size:12px;color:#64748b">${l}</div>`).join('')}</div>` : ''}
+        </div>
+        ${renderCoveragePanel(k, enq, state)}
+      </div>
+      <div class="enq-comment-row">
+        <span class="enq-comment-label">💬</span>
+        <div class="enq-comment-edit" contenteditable="true"
+          data-k="${k}" data-id="${e.id}"
+          onblur="saveComment(this)">${esc(enq.comment||'')}</div>
+      </div>
+      <div class="links-row">
+        <strong>Cross-curricular links:</strong>
+        ${enq.crossCurricular ? esc(enq.crossCurricular) : '<em style="color:#cbd5e1">Click ✏️ to add cross-curricular links…</em>'}
+      </div>
+    </div>`;
+  });
+  return h;
 }
 
 function renderGlanceGrid(k, enqs, yc, yd, yl, activeStates) {
@@ -1697,6 +1761,31 @@ function renderGlanceGrid(k, enqs, yc, yd, yl, activeStates) {
     h += `<div class="grid-cell grid-header" style="background:${yl};color:${yd}${t===5?';border-right:none':''}">T${t+1}<div class="wks">${wkRanges[t]}</div><div class="wk-days">${fmtTeachDays(TERM_TEACHING_DAYS[t])}</div></div>`;
   }
 
+  // Renders one subject's row of term cells in the enquiry-card style (key question per term)
+  const glanceEnquiryRow = (state, bg) => {
+    let hh = '';
+    for (let t = 0; t < 6; t++) {
+      const term = t + 1;
+      const termEnqs = enqs.filter(e => e.stateOfBeing === state && e.term === term);
+      if (!termEnqs.length) {
+        hh += `<div class="grid-cell cell-empty${t===5?' no-right':''}"></div>`;
+      } else {
+        hh += `<div class="grid-cell${t===5?' no-right':''}" style="background:${bg}20">`;
+        termEnqs.forEach(e => {
+          const enq = getEnq(k, e.id, e.stateOfBeing);
+          const localWk = e.weekStart === e.weekEnd ? `W${e.weekStart}` : `W${e.weekStart}–${e.weekEnd}`;
+          hh += `<div class="cell-content" style="margin-bottom:4px;cursor:pointer" onclick="scrollToEnq('${e.id}')">
+            <span class="cell-tag" style="background:${bg}">T${e.term} · ${localWk}</span>
+            <div class="cell-q">${esc(enq.keyQuestion)}</div>
+            ${enq.linkedText ? `<div class="cell-book">${esc(enq.linkedText.split('·')[0].trim())}</div>` : ''}
+          </div>`;
+        });
+        hh += `</div>`;
+      }
+    }
+    return hh;
+  };
+
   // Unified subject rows in MASTER_ORDER
   MASTER_ORDER.forEach(item => {
     if (item.type === 'sob') {
@@ -1704,25 +1793,7 @@ function renderGlanceGrid(k, enqs, yc, yd, yl, activeStates) {
       if (!activeStates.includes(state)) return;
       const bg = sobBg(state);
       h += `<div class="grid-cell grid-subject">${sobImg(state,16)} ${state}</div>`;
-      for (let t = 0; t < 6; t++) {
-        const term = t + 1;
-        const termEnqs = enqs.filter(e => e.stateOfBeing === state && e.term === term);
-        if (!termEnqs.length) {
-          h += `<div class="grid-cell cell-empty${t===5?' no-right':''}"></div>`;
-        } else {
-          h += `<div class="grid-cell${t===5?' no-right':''}" style="background:${bg}20">`;
-          termEnqs.forEach(e => {
-            const enq = getEnq(k, e.id, e.stateOfBeing);
-            const localWk = e.weekStart === e.weekEnd ? `W${e.weekStart}` : `W${e.weekStart}–${e.weekEnd}`;
-            h += `<div class="cell-content" style="margin-bottom:4px;cursor:pointer" onclick="scrollToEnq('${e.id}')">
-              <span class="cell-tag" style="background:${bg}">T${e.term} · ${localWk}</span>
-              <div class="cell-q">${esc(enq.keyQuestion)}</div>
-              ${enq.linkedText ? `<div class="cell-book">${esc(enq.linkedText.split('·')[0].trim())}</div>` : ''}
-            </div>`;
-          });
-          h += `</div>`;
-        }
-      }
+      h += glanceEnquiryRow(state, bg);
       WIDER_DEF.filter(w => w.group === state).forEach(w => {
         const wi = SOB_ICON[w.name] ? sobImg(w.name, 14) : w.icon;
         h += `<div class="grid-cell grid-subject grid-sub-subject" style="color:${w.colour}">${wi} ${w.name}</div>`;
@@ -1740,6 +1811,10 @@ function renderGlanceGrid(k, enqs, yc, yd, yl, activeStates) {
       if (!w) return;
       const wi = SOB_ICON[w.name] ? sobImg(w.name, 14) : w.icon;
       h += `<div class="grid-cell grid-subject" style="color:${w.colour}">${wi} ${w.name}</div>`;
+      if (!!SOB_META[w.name] && getEnquiryMode(k, w.key)) {
+        h += glanceEnquiryRow(w.name, w.colour);
+        return;
+      }
     for (let t = 0; t < 6; t++) {
       const firstRow = w.rows[0];
       const last = t === 5 ? ' no-right' : '';
@@ -1765,11 +1840,12 @@ function renderGlanceGrid(k, enqs, yc, yd, yl, activeStates) {
   return h;
 }
 
-function renderWiderSection(k, w, yc, yd) {
+function renderWiderSection(k, w, yc, yd, canEnquiry) {
   let h = `<div class="wider-section" id="s-wider-${w.key}" style="border-left:3px solid ${w.colour}">
     <div class="wider-header" style="color:${w.colour}">
       <span class="wider-icon">${SOB_ICON[w.name] ? sobImg(w.name,20) : w.icon}</span>
       ${w.name}${w.state ? ` — ${w.state}` : ''}
+      ${canEnquiry ? `<label class="enquiry-toggle" style="color:${w.colour}"><input type="checkbox" onchange="toggleEnquiryMode('${k}','${w.key}',this.checked)"> Enquiry view</label>` : ''}
     </div>
     <div class="wider-table">
       <div class="wt-head">Focus</div>`;
@@ -2937,11 +3013,27 @@ document.addEventListener('click', e => {
 // ════════════════════════════════════════════════════════════
 // GANTT / TERM PLANNER VIEW
 // ════════════════════════════════════════════════════════════
+const GANTT_WK = 40; // px per week column — must match .gantt-wk-cell width
+const GANTT_LANE_H = 56;
+const GANTT_LANE_GAP = 6;
+const GANTT_ROW_PAD = 5;
+const GANTT_TOTAL_WEEKS = TERM_WK.reduce((a,b)=>a+b, 0);
+
+// Greedy interval-graph lane assignment so overlapping bars stack instead of collide.
+function ganttAssignLanes(items) {
+  const laneEnd = [];
+  return items.map(it => {
+    let lane = laneEnd.findIndex(end => end < it.gStart);
+    if (lane === -1) { lane = laneEnd.length; laneEnd.push(it.gEnd); }
+    else laneEnd[lane] = it.gEnd;
+    return { ...it, lane };
+  });
+}
+
 function showGantt(k) {
   const d = YEAR_DATA[k];
   const enqs = getMergedEnqs(k);
-  const WK = 40; // px per week column
-  const LABEL = 130; // px for subject label column
+  const WK = GANTT_WK;
 
   // T1=Blue, T2=Green, T3=Orange, T4=Pink, T5=Purple, T6=Yellow
   const TERM_COLOURS = [
@@ -2950,14 +3042,19 @@ function showGantt(k) {
     { bg:'#f3e8ff', fg:'#5b21b6' }, { bg:'#fefce8', fg:'#854d0e' },
   ];
 
-  // Build row list from MASTER_ORDER; skip grouped sub-items (Handwriting, Spelling)
+  // Build row list from MASTER_ORDER; skip grouped sub-items (Handwriting, Spelling).
+  // A wider-curriculum subject with "Enquiry view" switched on renders as a draggable
+  // enquiry row here too, same as it does in the main year view.
   const ganttRows = MASTER_ORDER.map(item => {
     if (item.type === 'sob') {
-      return { isSob: true, name: item.key, colour: SOB_BG[item.key] || '#6b7280', icon: sobImg(item.key, 15) };
+      return { isSob: true, name: item.key, key: null, colour: SOB_BG[item.key] || '#6b7280', icon: sobImg(item.key, 15) };
     }
     const wd = WIDER_DEF.find(w => w.key === item.key);
     if (!wd || wd.group) return null;
     const wIcon = SOB_ICON[wd.name] ? sobImg(wd.name, 15) : (wd.icon + ' ');
+    if (SOB_META[wd.name] && getEnquiryMode(k, wd.key)) {
+      return { isSob: true, name: wd.name, key: wd.key, colour: SOB_BG[wd.name] || wd.colour, icon: wIcon };
+    }
     return { isSob: false, name: wd.name, colour: wd.colour, icon: wIcon, widerEntry: wd };
   }).filter(Boolean);
 
@@ -2967,7 +3064,7 @@ function showGantt(k) {
   h += `<div class="gantt-header">
     <button class="cov-back" onclick="renderYear('${k}')">← Back</button>
     <span class="gantt-title">Term Planner — ${k} · ${d.learningZone.replace(' Learning Zone','')}</span>
-    <span class="gantt-hint">Click any bar to jump to that enquiry card</span>
+    <span class="gantt-hint">Click a bar to jump to that enquiry card · drag to move · drag an edge to extend or compress by a week</span>
   </div>`;
 
   h += `<div class="gantt-scroll"><div class="gantt-inner">`;
@@ -3007,35 +3104,50 @@ function showGantt(k) {
 
   // ── Subject rows ──
   ganttRows.forEach(row => {
-    const { isSob, name, colour, icon, widerEntry } = row;
+    const { isSob, name, key, colour, icon, widerEntry } = row;
 
     h += `<div class="gantt-row gantt-sob-row">`;
     h += `<div class="gantt-label-cell" style="border-left:3px solid ${colour}">
       ${icon}<span class="gantt-sob-name">${name}</span>
     </div>`;
-    h += `<div class="gantt-bars-area">`;
-
-    [7, 14, 20, 25, 32].forEach(offset => {
-      h += `<div class="gantt-vline" style="left:${offset * WK}px"></div>`;
-    });
 
     if (isSob) {
-      // Enquiry-based subject
-      enqs.filter(e => e.stateOfBeing === name).forEach(e => {
-        const gs = TERM_GS[e.term - 1] + e.weekStart - 1;
-        const ge = TERM_GS[e.term - 1] + e.weekEnd - 1;
-        const left = gs * WK;
-        const width = Math.max((ge - gs + 1) * WK - 3, 4);
-        const q = e.keyQuestion || '—';
+      // Enquiry-based subject — draggable/resizable bars, stacked into lanes if they overlap.
+      const items = enqs.filter(e => e.stateOfBeing === name).map(e => ({
+        id: e.id, keyQuestion: e.keyQuestion,
+        gStart: TERM_GS[e.term - 1] + e.weekStart - 1,
+        gEnd: TERM_GS[e.term - 1] + e.weekEnd - 1,
+        title: `${wkRange(e)} · ${(e.keyQuestion||'').replace(/"/g, '&quot;')}`,
+      }));
+      const laned = ganttAssignLanes(items);
+      const lanes = Math.max(1, ...laned.map(it => it.lane + 1));
+      const areaH = lanes*GANTT_LANE_H + (lanes-1)*GANTT_LANE_GAP + GANTT_ROW_PAD*2;
+
+      h += `<div class="gantt-bars-area" style="height:${areaH}px">`;
+      [7, 14, 20, 25, 32].forEach(offset => {
+        h += `<div class="gantt-vline" style="left:${offset * WK}px"></div>`;
+      });
+      laned.forEach(it => {
+        const left = it.gStart * WK;
+        const width = Math.max((it.gEnd - it.gStart + 1) * WK - 3, 4);
+        const top = GANTT_ROW_PAD + it.lane*(GANTT_LANE_H+GANTT_LANE_GAP);
+        const q = it.keyQuestion || '—';
         const label = q.length > 60 ? q.slice(0, 60) + '…' : q;
-        h += `<div class="gantt-bar" style="left:${left}px;width:${width}px;background:${colour}"
-                title="${wkRange(e)} · ${q.replace(/"/g, '&quot;')}"
-                onclick="renderYear('${k}');setTimeout(()=>{ const el=document.getElementById('enq-${e.id}'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },130)">
+        h += `<div class="gantt-bar draggable" data-enq-id="${it.id}" data-state="${esc(name)}"
+                style="left:${left}px;width:${width}px;top:${top}px;height:${GANTT_LANE_H}px;background:${colour}"
+                title="${it.title}">
+          <div class="gantt-bar-handle gantt-bar-handle-l" data-edge="l"></div>
           <span class="gantt-bar-label">${label}</span>
+          <div class="gantt-bar-handle gantt-bar-handle-r" data-edge="r"></div>
         </div>`;
       });
+      h += `</div>`;
     } else {
-      // Wider-curriculum subject — one full-term bar per term with content
+      // Wider-curriculum subject — one static full-term bar per term with content
+      h += `<div class="gantt-bars-area">`;
+      [7, 14, 20, 25, 32].forEach(offset => {
+        h += `<div class="gantt-vline" style="left:${offset * WK}px"></div>`;
+      });
       const wKey = widerEntry.key;
       const rowLabel = widerEntry.rows[0].label;
       for (let ti = 0; ti < 6; ti++) {
@@ -3050,16 +3162,104 @@ function showGantt(k) {
           <span class="gantt-bar-label">${label}</span>
         </div>`;
       }
+      h += `</div>`;
     }
 
-    h += `</div></div>`; // .gantt-bars-area .gantt-sob-row
+    h += `</div>`; // .gantt-sob-row
   });
 
   h += `</div></div></div>`; // .gantt-inner .gantt-scroll .gantt-wrap
 
   document.getElementById('main').innerHTML = h;
+  wireGanttDrag(k, document.getElementById('main'));
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// ── Drag to move (whole bar) and drag edges to resize (extend/compress by whole weeks) ──
+// The move/up listeners are attached once at load; wireGanttDrag() only needs to
+// (re)assign container.onmousedown on each render, which replaces rather than stacks handlers.
+let ganttDrag = null; // { k, id, bar, mode:'move'|'resize-l'|'resize-r', startX, gStart, gEnd, duration, moved }
+
+function wireGanttDrag(k, container) {
+  container.onmousedown = e => {
+    const bar = e.target.closest('.gantt-bar.draggable');
+    if (!bar) return;
+    const id = bar.dataset.enqId;
+    const state = bar.dataset.state;
+    const enq = getEnq(k, id, state);
+    const gStart = TERM_GS[enq.term - 1] + enq.weekStart - 1;
+    const gEnd = TERM_GS[enq.term - 1] + enq.weekEnd - 1;
+    const edge = e.target.dataset.edge;
+    ganttDrag = {
+      k, id, bar,
+      mode: edge === 'l' ? 'resize-l' : edge === 'r' ? 'resize-r' : 'move',
+      startX: e.clientX, gStart, gEnd, duration: gEnd - gStart, moved: false,
+    };
+    bar.classList.add('dragging');
+    e.preventDefault();
+  };
+}
+
+document.addEventListener('mousemove', e => {
+  const drag = ganttDrag;
+  if (!drag) return;
+  const deltaPx = e.clientX - drag.startX;
+  const deltaWeeks = Math.round(deltaPx / GANTT_WK);
+  if (deltaWeeks !== 0) drag.moved = true;
+  if (!drag.moved) return;
+
+  if (drag.mode === 'move') {
+    const maxStart = GANTT_TOTAL_WEEKS - 1 - drag.duration;
+    let newStart = Math.min(Math.max(0, drag.gStart + deltaWeeks), maxStart);
+    // Keep the whole bar inside a single term — clamp so it can't straddle a term boundary.
+    const startTerm = globalToLocal(newStart + 1).term;
+    const termMaxStart = TERM_GS[startTerm-1] + TERM_WK[startTerm-1] - 1 - drag.duration;
+    newStart = Math.min(newStart, Math.max(TERM_GS[startTerm-1], termMaxStart));
+    drag._newStart = newStart;
+    drag.bar.style.left = (newStart * GANTT_WK) + 'px';
+  } else if (drag.mode === 'resize-l') {
+    const termOfEnd = globalToLocal(drag.gEnd + 1).term;
+    const minStart = TERM_GS[termOfEnd-1];
+    let newStart = Math.min(Math.max(minStart, drag.gStart + deltaWeeks), drag.gEnd);
+    drag._newStart = newStart;
+    drag.bar.style.left = (newStart * GANTT_WK) + 'px';
+    drag.bar.style.width = Math.max((drag.gEnd-newStart+1)*GANTT_WK - 3, 4) + 'px';
+  } else if (drag.mode === 'resize-r') {
+    const termOfStart = globalToLocal(drag.gStart + 1).term;
+    const maxEnd = TERM_GS[termOfStart-1] + TERM_WK[termOfStart-1] - 1;
+    let newEnd = Math.max(Math.min(maxEnd, drag.gEnd + deltaWeeks), drag.gStart);
+    drag._newEnd = newEnd;
+    drag.bar.style.width = Math.max((newEnd-drag.gStart+1)*GANTT_WK - 3, 4) + 'px';
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  const drag = ganttDrag;
+  if (!drag) return;
+  ganttDrag = null;
+  const { k, id, mode, moved, bar } = drag;
+  bar.classList.remove('dragging');
+
+  if (!moved) {
+    // A plain click (no drag) — jump to the enquiry card in the main view.
+    renderYear(k);
+    setTimeout(() => { const el = document.getElementById('enq-' + id); if (el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 130);
+    return;
+  }
+
+  if (mode === 'move' && drag._newStart != null && drag._newStart !== drag.gStart) {
+    const { term, week } = globalToLocal(drag._newStart + 1);
+    saveEnqField(k, id, { term, weekStart: week, weekEnd: week + drag.duration });
+  } else if (mode === 'resize-l' && drag._newStart != null && drag._newStart !== drag.gStart) {
+    const { term, week } = globalToLocal(drag._newStart + 1);
+    saveEnqField(k, id, { term, weekStart: week });
+  } else if (mode === 'resize-r' && drag._newEnd != null && drag._newEnd !== drag.gEnd) {
+    const { term, week } = globalToLocal(drag._newEnd + 1);
+    saveEnqField(k, id, { weekEnd: week });
+  }
+
+  showGantt(k);
+});
 
 // ════════════════════════════════════════════════════════════
 // INIT
