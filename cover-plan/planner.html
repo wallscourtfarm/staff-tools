@@ -397,7 +397,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(12.08.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(12.08.26b)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -548,7 +548,8 @@ let FRONT_END_EVENTS = []; // { id, date (YYYY-MM-DD), label, colour, session, n
 const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
 const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
-let NOTIFY_URL = 'https://script.google.com/macros/s/AKfycbyB-lU6nnGGT_0xoQ10YxVegEW5tm9dKF7Jl6MQDJQ0DI_YJ47zyQ3rIo3mfHJvmSn6/exec'; // overridden by notify-config.json
+// Railway relay endpoint — avoids GAS CORS redirect issue
+const NOTIFY_URL = 'https://api.wallscourt-farm-academy.co.uk/notify';
 
 // ── Mutable data (populated by init) ─────────────────────────────────────────
 let WEEKS    = [];
@@ -854,8 +855,6 @@ function currentWeekIdx() {
   return Math.max(0,WEEKS.length-1);
 }
 async function init() {
-  // Load notify URL from config file — change notify-config.json to update without touching planner.html
-  fetch('notify-config.json').then(r=>r.json()).then(cfg=>{ if(cfg.url) NOTIFY_URL=cfg.url; }).catch(()=>{});
 
   document.getElementById('centerPane').innerHTML=
     '<div style="padding:60px;text-align:center;color:#94a3b8;font-size:14px">Loading from Google Sheets…</div>';
@@ -2188,14 +2187,15 @@ async function sendNotification() {
     recipients: recipients.map(r => ({ name: r.name, email: r.email, yg: r.yg }))
   };
 
-  const url = NOTIFY_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload));
   const panelBody = document.getElementById('notifyPanelBody');
   const actions = document.getElementById('notifyActions');
 
   try {
-    // Real CORS fetch — GAS web apps return Access-Control-Allow-Origin: * for GET requests.
-    // Do NOT use mode: 'no-cors'; that hides errors and makes every call appear to succeed.
-    const resp = await fetch(url);
+    const resp = await fetch(NOTIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
     let data = {};
     try { data = await resp.json(); } catch (_) {}
 
@@ -2259,7 +2259,11 @@ async function submitConcern() {
     recipients: CONCERN_RECIPIENTS.map(e => ({ email: e }))
   };
   try {
-    const resp = await fetch(NOTIFY_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload)));
+    const resp = await fetch(NOTIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
     let data = {};
     try { data = await resp.json(); } catch (_) {}
     if (resp.ok && data.success !== false) {
