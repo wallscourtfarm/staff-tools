@@ -300,8 +300,10 @@
   .wt-cell ul li { font-size: 11px; line-height: 1.4; padding: 1px 0; }
   .wt-cell-enquiry { background: #faf9ff; }
   .wt-cell-enquiry:hover { background: #f1eeff; }
-  .wt-enquiry-pointer { font-size: 10px; font-weight: 700; color: #6d28d9; }
-  .wt-enquiry-pointer-empty { color: #c4b5fd; font-style: italic; font-weight: 500; }
+  .wt-enquiry-pointer { font-size: 10px; font-weight: 700; color: #6d28d9; margin-bottom: 4px; cursor: pointer; }
+  .wt-enquiry-pointer:hover { text-decoration: underline; }
+  .wt-enquiry-pointer-empty { color: #c4b5fd; font-style: italic; font-weight: 500; cursor: default; }
+  .wt-enquiry-pointer-empty:hover { text-decoration: none; }
   .wt-enq-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; opacity: .7; margin-right: 6px; }
   .wt-enq-chip {
     padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 800;
@@ -747,7 +749,7 @@
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">12.08.26b</span>
+  <span class="nav-version">12.08.26c</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -759,7 +761,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>12.08.26b</strong>
+  <strong>12.08.26c</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -1878,23 +1880,26 @@ function renderWiderSection(k, w, yc, yd, canEnquiry) {
     for (let t = 0; t < 6; t++) {
       const nr = t===5 ? ' no-right' : '';
       const nb = isLast ? ' no-bottom' : '';
-      if (enqTerms.has(t+1)) {
+      const isEnq = enqTerms.has(t+1);
+      const rawVal = getWiderCell(k, w.key, row.label, t);
+      const displayVal = w.key === 'reader' ? fmtReaderVal(rawVal) : rawVal;
+      // A term switched to "Enquiry view" still keeps its normal termly overview here (e.g.
+      // the wider unit name) — the pointer just flags that there's also a full enquiry card
+      // below, it doesn't replace this cell's own content.
+      let pointer = '';
+      if (isEnq && ri === 0) {
         const e = stateEnqs.find(x => x.term === t+1);
-        h += `<div class="wt-cell wt-cell-enquiry${nr}${nb}"${e ? ` onclick="scrollToEnq('${e.id}')"` : ''}>
-          ${ri === 0
-            ? (e ? `<span class="wt-enquiry-pointer">📋 Full enquiry ↓</span>` : `<span class="wt-enquiry-pointer wt-enquiry-pointer-empty">No enquiry yet this term</span>`)
-            : ''}
-        </div>`;
-      } else {
-        const rawVal = getWiderCell(k, w.key, row.label, t);
-        const displayVal = w.key === 'reader' ? fmtReaderVal(rawVal) : rawVal;
-        h += `<div class="wt-cell${nr}${nb}" onclick="openWiderEdit('${k}','${w.key}','${esc(row.label)}',${t})">
-          <button class="wt-edit-btn" onclick="event.stopPropagation();openWiderEdit('${k}','${w.key}','${esc(row.label)}',${t})">✏️</button>
-          ${displayVal
-            ? `<div class="wt-content">${linkifyLines(displayVal)}</div>`
-            : `<span class="wt-placeholder">Click to add…</span>`}
-        </div>`;
+        pointer = e
+          ? `<div class="wt-enquiry-pointer" onclick="event.stopPropagation();scrollToEnq('${e.id}')">📋 Full enquiry ↓</div>`
+          : `<div class="wt-enquiry-pointer wt-enquiry-pointer-empty">📋 No enquiry yet this term</div>`;
       }
+      h += `<div class="wt-cell${isEnq?' wt-cell-enquiry':''}${nr}${nb}" onclick="openWiderEdit('${k}','${w.key}','${esc(row.label)}',${t})">
+        <button class="wt-edit-btn" onclick="event.stopPropagation();openWiderEdit('${k}','${w.key}','${esc(row.label)}',${t})">✏️</button>
+        ${pointer}
+        ${displayVal
+          ? `<div class="wt-content">${linkifyLines(displayVal)}</div>`
+          : `<span class="wt-placeholder">Click to add…</span>`}
+      </div>`;
     }
   });
 
