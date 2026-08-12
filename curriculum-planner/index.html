@@ -749,7 +749,7 @@
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">12.08.26c</span>
+  <span class="nav-version">12.08.26d</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -761,7 +761,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>12.08.26c</strong>
+  <strong>12.08.26d</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -1486,7 +1486,9 @@ const localToGlobal = (term, week) => TERM_GS[term-1] + week;
 // ════════════════════════════════════════════════════════════
 // APP STATE
 // ════════════════════════════════════════════════════════════
-let curYear = 'Y1';
+const LAST_YEAR_KEY = 'wfa_cp_lastYear';
+const savedYear = localStorage.getItem(LAST_YEAR_KEY);
+let curYear = YR_KEYS.includes(savedYear) ? savedYear : 'Y1';
 let crossTerm = 0;
 
 // ════════════════════════════════════════════════════════════
@@ -1525,6 +1527,7 @@ function buildYearBar() {
 
 function selectYear(k) {
   curYear = k;
+  localStorage.setItem(LAST_YEAR_KEY, k);
   buildYearBar();
   renderYear(k);
 }
@@ -2243,6 +2246,7 @@ function renderCross() {
 function crossNav(k, id) {
   closeCross();
   curYear = k;
+  localStorage.setItem(LAST_YEAR_KEY, k);
   buildYearBar();
   renderYear(k);
   // Scroll to the enquiry card after a short delay for the render to complete
