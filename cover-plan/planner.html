@@ -397,7 +397,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(31.07.26g)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(12.08.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -2188,29 +2188,42 @@ async function sendNotification() {
     recipients: recipients.map(r => ({ name: r.name, email: r.email, yg: r.yg }))
   };
 
-  // Use GET request — Google Apps Script redirects POST to GET, losing the data.
-  // GET survives the redirect and query parameters are preserved.
   const url = NOTIFY_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload));
-  fetch(url, { mode: 'no-cors' }).catch(() => {});
-
-  // Show success
-  const body = document.getElementById('notifyPanelBody');
+  const panelBody = document.getElementById('notifyPanelBody');
   const actions = document.getElementById('notifyActions');
-  body.innerHTML = `<div class="notify-sent">
-    <div style="font-size:40px;margin-bottom:10px">✓</div>
-    <h3>Notifications sent!</h3>
-    <p>${recipients.length} staff member${recipients.length !== 1 ? 's' : ''} across ${affectedYGs.size} year group${affectedYGs.size !== 1 ? 's' : ''} will be notified.</p>
-  </div>`;
-  actions.style.display = 'none';
 
-  // Clear change log
-  state.changeLog = [];
-  updateNotifyBadge();
+  try {
+    // Real CORS fetch — GAS web apps return Access-Control-Allow-Origin: * for GET requests.
+    // Do NOT use mode: 'no-cors'; that hides errors and makes every call appear to succeed.
+    const resp = await fetch(url);
+    let data = {};
+    try { data = await resp.json(); } catch (_) {}
 
-  // Auto-close after 3 seconds
-  setTimeout(() => {
-    document.getElementById('notifyOverlay').classList.add('hidden');
-  }, 3000);
+    if (resp.ok && data.success !== false) {
+      panelBody.innerHTML = `<div class="notify-sent">
+        <div style="font-size:40px;margin-bottom:10px">✓</div>
+        <h3>Notifications sent!</h3>
+        <p>${recipients.length} staff member${recipients.length !== 1 ? 's' : ''} across ${affectedYGs.size} year group${affectedYGs.size !== 1 ? 's' : ''} will be notified.</p>
+      </div>`;
+      actions.style.display = 'none';
+      state.changeLog = [];
+      updateNotifyBadge();
+      setTimeout(() => { document.getElementById('notifyOverlay').classList.add('hidden'); }, 3000);
+    } else {
+      throw new Error(data.error || `Server returned ${resp.status}`);
+    }
+  } catch (err) {
+    // Leave change log intact so the user can retry.
+    sendBtn.disabled = false;
+    sendBtn.textContent = 'Retry';
+    const existing = panelBody.querySelector('.notify-error');
+    if (existing) existing.remove();
+    panelBody.insertAdjacentHTML('afterbegin',
+      `<div class="notify-error" style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;
+        padding:10px 14px;margin-bottom:12px;color:#dc2626;font-size:13px;">
+        ⚠ Failed to send: ${err.message}.<br>Your changes are still queued — click Retry.
+      </div>`);
+  }
 }
 
 // ── Concern panel ─────────────────────────────────────────────────────────────
@@ -2246,11 +2259,17 @@ async function submitConcern() {
     recipients: CONCERN_RECIPIENTS.map(e => ({ email: e }))
   };
   try {
-    await fetch(NOTIFY_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload)), { mode: 'no-cors' });
-    statusEl.style.color = '#059669';
-    statusEl.textContent = '✓ Sent — the cover team will be in touch.';
-    sendBtn.textContent = 'Sent';
-    setTimeout(closeConcernPanel, 1800);
+    const resp = await fetch(NOTIFY_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload)));
+    let data = {};
+    try { data = await resp.json(); } catch (_) {}
+    if (resp.ok && data.success !== false) {
+      statusEl.style.color = '#059669';
+      statusEl.textContent = '✓ Sent — the cover team will be in touch.';
+      sendBtn.textContent = 'Sent';
+      setTimeout(closeConcernPanel, 1800);
+    } else {
+      throw new Error(data.error || `Server error ${resp.status}`);
+    }
   } catch(e) {
     statusEl.style.color = '#dc2626';
     statusEl.textContent = 'Failed to send. Please try again.';
