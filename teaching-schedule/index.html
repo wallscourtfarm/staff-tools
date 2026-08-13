@@ -199,6 +199,13 @@
     .sched-table .fixed-row.fab-row td { background: var(--brand-mid); }
     .sched-table .fixed-row.fab-row .fixed-label { color: var(--brand); }
 
+    /* Notes on fixed rows (registration, lunch, FAB, etc.) */
+    .fixed-row .chip-note-wrap { padding: 2px 0 0; border-top: none; background: transparent; margin-top: 2px; }
+    .fixed-row .chip-note-toggle { color: var(--brand); opacity: .45; }
+    .fixed-row .chip-note-toggle:hover { opacity: 1; }
+    .fixed-row .chip-note { color: var(--brand); font-weight: 700; }
+    .fixed-row .chip-note::placeholder { color: var(--brand); opacity: .45; font-weight: 600; }
+
     /* Session rows */
     .sched-table .session-row td.time-cell {
       font-size: 9.5px; color: #64748b; font-weight: 700;
@@ -447,7 +454,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 31.07.26l</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; 13.08.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1617,6 +1624,35 @@ function getSlot(weekKey, view, day, session) {
   return dayObj[session];
 }
 
+function getFixedNote(weekKey, view, day, rowId) {
+  const dayObj = ensureDay(weekKey, view, day);
+  return (dayObj._notes && dayObj._notes[rowId]) || '';
+}
+
+function setFixedNote(weekKey, view, day, rowId, text) {
+  const dayObj = ensureDay(weekKey, view, day);
+  if (text) {
+    if (!dayObj._notes) dayObj._notes = {};
+    dayObj._notes[rowId] = text;
+  } else if (dayObj._notes) {
+    delete dayObj._notes[rowId];
+  }
+}
+
+function renderFixedNote(wk, view, day, rowId) {
+  const note = getFixedNote(wk, view, day, rowId);
+  return `<div class="chip-note-wrap">
+    <button class="chip-note-toggle${note ? ' has-note' : ''}" onclick="this.style.display='none';this.nextElementSibling.classList.remove('hidden');this.nextElementSibling.focus();return false">+</button>
+    <textarea class="fixed-note-input chip-note${note ? '' : ' hidden'}" rows="1" placeholder="Note…" data-wk="${escHtml(wk)}" data-view="${escHtml(view)}" data-day="${escHtml(day)}" data-row="${escHtml(rowId)}">${escHtml(note)}</textarea>
+  </div>`;
+}
+
+function onFixedNoteBlur(e) {
+  const { wk, view, day, row } = e.target.dataset;
+  setFixedNote(wk, view, day, row, e.target.value);
+  persistLocal(); syncSave();
+}
+
 function persistLocal() {
   try { localStorage.setItem(scheduleKeyLS(), JSON.stringify(state.schedule)); } catch {}
 }
@@ -2117,7 +2153,8 @@ function renderBody() {
             return items.map((item, idx) => renderItem(item, wk, view, day, row.id, idx)).join('');
           })() : '';
           const fixedDayAttr = isStaffFixed ? ` data-day="${DAYS[di].toLowerCase()}" data-session="${row.id}"` : '';
-          return `<td class="view-cell"${fixedDayAttr}><div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}</div>${strips}${soTags}${tpActHtml}${fabHtml}${lcHtml}${fixedChips}</td>`;
+          const fixedNoteHtml = renderFixedNote(wk, view, DAYS[di].toLowerCase(), row.id);
+          return `<td class="view-cell"${fixedDayAttr}><div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}${fixedNoteHtml}</div>${strips}${soTags}${tpActHtml}${fabHtml}${lcHtml}${fixedChips}</td>`;
         }).join('')}
       </tr>`;
     } else {
@@ -2210,6 +2247,12 @@ function renderBody() {
 
   el.querySelectorAll('.item-note').forEach(input => {
     input.addEventListener('blur', onNoteBlur);
+    input.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); input.blur(); } });
+    input.addEventListener('input', function() { this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'; });
+    if (input.value) { input.style.height = 'auto'; input.style.height = input.scrollHeight + 'px'; }
+  });
+  el.querySelectorAll('.fixed-note-input').forEach(input => {
+    input.addEventListener('blur', onFixedNoteBlur);
     input.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); input.blur(); } });
     input.addEventListener('input', function() { this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'; });
     if (input.value) { input.style.height = 'auto'; input.style.height = input.scrollHeight + 'px'; }
@@ -3679,6 +3722,7 @@ function printSchedule() {
   .chip-colour { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   .chip-name { font-size: 12px; font-weight: 800; font-family: 'Nunito', sans-serif; }
   .chip-note-wrap { padding: 2px 6px 3px; border-top: 1px solid rgba(0,0,0,.07); font-size: 10px; color: #334155; }
+  .fixed-row .chip-note-wrap { padding: 2px 0 0; border-top: none; color: var(--brand); font-weight: 700; }
   .chip-time-wrap { padding: 2px 6px; border-top: 1px solid rgba(0,0,0,.06); font-size: 9px; color: #64748b; }
   .chip-time-inputs { display: flex; gap: 3px; }
   .chip-time-inputs.hidden { display: none; }
