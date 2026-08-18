@@ -183,6 +183,42 @@
   footer.note{
     max-width:640px; margin:18px auto 0; padding:0 20px 20px; font-size:11.5px; color:var(--muted); text-align:center; line-height:1.5;
   }
+
+  /* ── QR / PIN access gate ── */
+  .banner-error{
+    background:#fdeceb; border:1.5px solid #f3b7b3; color:#a3231f;
+    border-radius:12px; padding:12px 14px; font-size:13.5px; font-weight:600;
+    margin-bottom:18px;
+  }
+  .pin-hello{ font-size:16px; font-weight:800; text-align:center; margin-bottom:16px; }
+  .pin-hello span{ color:var(--blue-dark); }
+  .pin-dots{ display:flex; justify-content:center; gap:14px; margin-bottom:10px; }
+  .pin-dots .dot{
+    width:18px; height:18px; border-radius:50%; border:2.5px solid #cfe2ec; background:#fff;
+    transition:background .15s, border-color .15s;
+  }
+  .pin-dots .dot.filled{ background:var(--blue); border-color:var(--blue); }
+  .pin-error{ text-align:center; font-size:13px; font-weight:700; color:var(--red); min-height:18px; margin-bottom:8px; }
+  #pin-gate.shake .pin-dots{ animation:shakeAnim .32s ease; }
+  .keypad{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:280px; margin:6px auto 0; }
+  .keypad button{
+    font-size:22px; font-weight:800; font-family:inherit; padding:16px 0; border-radius:14px;
+    border:none; background:#eef5f9; color:var(--navy); cursor:pointer; box-shadow:0 4px 0 #d3e4ec;
+  }
+  .keypad button:active{ transform:translateY(3px); box-shadow:0 1px 0 #d3e4ec; }
+  .keypad button.wide{ font-size:15px; color:var(--muted); }
+  .pin-back{
+    display:block; text-align:center; width:100%; margin-top:16px; font-size:13px; color:var(--muted);
+    background:none; border:none; cursor:pointer; text-decoration:underline; font-family:inherit;
+  }
+
+  .link-btn{
+    display:block; text-align:center; width:100%; background:none; border:none; cursor:pointer;
+    color:var(--blue-dark); font-size:13px; font-weight:700; text-decoration:underline;
+    margin-top:14px; font-family:inherit;
+  }
+  .divider-row{ display:flex; align-items:center; gap:10px; margin:20px 0 2px; color:var(--muted); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
+  .divider-row::before, .divider-row::after{ content:''; flex:1; height:1px; background:#e2eef4; }
 </style>
 </head>
 <body>
@@ -202,13 +238,42 @@
         <div class="rule-examples" id="rule-examples"></div>
       </div>
 
-      <label class="field-label" for="name-input">What's your name?</label>
-      <input type="text" id="name-input" maxlength="20" placeholder="e.g. Amelia" autocomplete="off">
+      <div id="bad-code-banner" class="banner-error" style="display:none;">
+        We didn't recognise that spelling code. Ask your teacher for a new card, or use the options below.
+      </div>
 
-      <button class="btn" id="start-btn">▶ Start playing</button>
+      <!-- Shown once a pupil is identified, via QR scan or manual code -->
+      <div id="pin-gate" style="display:none;">
+        <div class="pin-hello">Hi <span id="pin-pupil-name"></span>! Enter your spelling PIN.</div>
+        <div class="pin-dots" id="pin-dots">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+        <div class="pin-error" id="pin-error">&nbsp;</div>
+        <div class="keypad" id="keypad"></div>
+        <button class="pin-back" id="pin-back">Not you? Use a different way in</button>
+      </div>
 
-      <div id="prev-player-row" style="display:none; text-align:center;">
-        <span class="name-chip"><span class="avatar" id="prev-avatar">?</span><span id="prev-name-text"></span></span>
+      <!-- Default entry: type a name, or switch to a personal code + PIN -->
+      <div id="guest-gate">
+        <label class="field-label" for="name-input">What's your name?</label>
+        <input type="text" id="name-input" maxlength="20" placeholder="e.g. Amelia" autocomplete="off">
+
+        <button class="btn" id="start-btn">▶ Start playing</button>
+
+        <div id="prev-player-row" style="display:none; text-align:center;">
+          <span class="name-chip"><span class="avatar" id="prev-avatar">?</span><span id="prev-name-text"></span></span>
+        </div>
+
+        <div class="divider-row">or</div>
+        <button class="link-btn" id="manual-toggle">I have a spelling code</button>
+        <div id="manual-form" style="display:none;">
+          <label class="field-label" for="manual-code">Your code</label>
+          <input type="text" id="manual-code" maxlength="6" placeholder="e.g. AM72" style="text-transform:uppercase;" autocomplete="off">
+          <label class="field-label" for="manual-pin" style="margin-top:10px;">Your PIN</label>
+          <input type="text" id="manual-pin" inputmode="numeric" maxlength="4" placeholder="4 digits" autocomplete="off">
+          <button class="btn secondary" id="manual-submit">Continue</button>
+          <div class="pin-error" id="manual-error">&nbsp;</div>
+        </div>
       </div>
     </div>
 
@@ -218,8 +283,7 @@
     </div>
 
     <footer class="note">
-      Proof of concept — scores are currently saved only in this browser (localStorage), tagged to the name typed above.
-      A real deployment would swap this for the same lightweight sync backend already used by the SLT Schedule and Lunch Cover tools, keyed per pupil, so scores follow a child across devices.
+      Proof of concept — each pupil's card (see <code>cards.html</code>) has a personal QR code and PIN, but scores are currently saved only in this browser (localStorage). A real deployment would swap this for the same lightweight sync backend already used by the SLT Schedule and Lunch Cover tools, keyed per pupil ID, so scores follow a child across devices. The PIN is a light identity check for a classroom setting, not real security — it's visible to anyone reading this page's code.
     </footer>
   </section>
 
@@ -258,6 +322,7 @@
     </div>
   </section>
 
+<script src="roster.js"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════
    CONFIG — this is the only block that changes week to week.
@@ -287,6 +352,7 @@ const WORDS = [
 const ROUND_SECONDS = 60;
 const LEADERBOARD_KEY = "wfa-spelling-pop-leaderboard-tch";
 const LAST_NAME_KEY = "wfa-spelling-pop-last-name";
+const LAST_ID_KEY = "wfa-spelling-pop-last-id";
 const BUBBLE_COLORS = ["#1798d3","#2fbf71","#f5a524","#c65bd6","#ff7a6b","#2ba9a1"];
 /* ═══════════════════════════════════════════════════════════════ */
 
@@ -297,6 +363,7 @@ $("rule-text").textContent = RULE.text;
 $("rule-examples").innerHTML = `<b>✓ ${RULE.goodExample}</b><s>✗ ${RULE.badExample}</s>`;
 
 let playerName = "";
+let playerId = null;
 let state = null;
 let rafId = null;
 let spawnTimer = null;
@@ -316,15 +383,16 @@ function saveScore(entry) {
   localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(top));
   return top;
 }
-function renderLeaderboard(targetId, highlightName) {
+function renderLeaderboard(targetId, highlightId) {
   const board = loadLeaderboard();
   const el = $(targetId);
   if (!board.length) {
     el.innerHTML = '<div class="board-empty">No scores yet — be the first to play!</div>';
     return;
   }
+  const firstYouIdx = highlightId ? board.findIndex(r => r.id === highlightId) : -1;
   el.innerHTML = board.map((row, i) => `
-    <div class="board-row ${row.name === highlightName && i === board.findIndex(r=>r.name===highlightName) ? 'you' : ''}">
+    <div class="board-row ${i === firstYouIdx ? 'you' : ''}">
       <div class="rank">${i + 1}</div>
       <div class="rname">${escapeHtml(row.name)}</div>
       <div class="rscore">${row.score} pts</div>
@@ -334,7 +402,98 @@ function escapeHtml(s) {
   return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-/* ── "Access" — simple name identification, not real auth ── */
+/* ── "Access" — QR code (?u=CODE) + PIN identifies a named pupil;
+   free-text name or manually-typed code are the fallbacks. ── */
+const urlParams = new URLSearchParams(location.search);
+const qrCode = (urlParams.get("u") || "").trim().toUpperCase();
+let pendingPupil = null;
+
+function findPupil(code) {
+  return (typeof ROSTER !== "undefined" ? ROSTER : []).find(p => p.id.toUpperCase() === code.toUpperCase());
+}
+
+function showPinGate(pupil) {
+  pendingPupil = pupil;
+  $("pin-pupil-name").textContent = pupil.name;
+  $("guest-gate").style.display = "none";
+  $("pin-gate").style.display = "block";
+  pinBuffer = "";
+  renderPinDots();
+}
+
+function beginAsPupil(pupil) {
+  playerName = pupil.name;
+  playerId = pupil.id;
+  localStorage.setItem(LAST_ID_KEY, pupil.id);
+  goTo("game");
+  startRound();
+}
+
+/* PIN keypad */
+let pinBuffer = "";
+function buildKeypad() {
+  const layout = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+  const kp = $("keypad");
+  kp.innerHTML = "";
+  layout.forEach(k => {
+    const btn = document.createElement("button");
+    if (k === "") { btn.style.visibility = "hidden"; btn.disabled = true; }
+    else if (k === "⌫") { btn.textContent = k; btn.className = "wide"; btn.addEventListener("click", pressDelete); }
+    else { btn.textContent = k; btn.addEventListener("click", () => pressDigit(k)); }
+    kp.appendChild(btn);
+  });
+}
+function renderPinDots() {
+  document.querySelectorAll("#pin-dots .dot").forEach((d, i) => d.classList.toggle("filled", i < pinBuffer.length));
+}
+function pressDigit(d) {
+  if (!pendingPupil || pinBuffer.length >= 4) return;
+  pinBuffer += d;
+  renderPinDots();
+  $("pin-error").innerHTML = "&nbsp;";
+  if (pinBuffer.length === 4) checkPin();
+}
+function pressDelete() { pinBuffer = pinBuffer.slice(0, -1); renderPinDots(); }
+function checkPin() {
+  if (pinBuffer === pendingPupil.pin) {
+    beginAsPupil(pendingPupil);
+  } else {
+    $("pin-gate").classList.add("shake");
+    $("pin-error").textContent = "That's not quite right — try again.";
+    setTimeout(() => { pinBuffer = ""; renderPinDots(); $("pin-gate").classList.remove("shake"); }, 420);
+  }
+}
+buildKeypad();
+
+$("pin-back").addEventListener("click", () => {
+  $("pin-gate").style.display = "none";
+  $("guest-gate").style.display = "block";
+});
+
+$("manual-toggle").addEventListener("click", () => {
+  const f = $("manual-form");
+  f.style.display = f.style.display === "block" ? "none" : "block";
+});
+$("manual-submit").addEventListener("click", () => {
+  const code = $("manual-code").value.trim().toUpperCase();
+  const pin = $("manual-pin").value.trim();
+  const pupil = code ? findPupil(code) : null;
+  if (!pupil || pupil.pin !== pin) {
+    $("manual-error").textContent = "That code and PIN don't match — check with your teacher.";
+    return;
+  }
+  beginAsPupil(pupil);
+});
+
+if (qrCode) {
+  pendingPupil = findPupil(qrCode);
+  if (pendingPupil) {
+    showPinGate(pendingPupil);
+  } else {
+    $("bad-code-banner").style.display = "block";
+  }
+}
+
 const savedName = localStorage.getItem(LAST_NAME_KEY);
 if (savedName) {
   $("name-input").value = savedName;
@@ -342,20 +501,25 @@ if (savedName) {
   $("prev-avatar").textContent = savedName.trim()[0]?.toUpperCase() || "?";
   $("prev-name-text").textContent = `Last time: ${savedName}`;
 }
-renderLeaderboard("leaderboard-list", savedName);
+renderLeaderboard("leaderboard-list", localStorage.getItem(LAST_ID_KEY));
 
 $("start-btn").addEventListener("click", () => {
   const name = $("name-input").value.trim();
   if (!name) { $("name-input").focus(); $("name-input").style.borderColor = "var(--red)"; return; }
   playerName = name;
+  playerId = "guest:" + name.toLowerCase();
   localStorage.setItem(LAST_NAME_KEY, name);
+  localStorage.setItem(LAST_ID_KEY, playerId);
   goTo("game");
   startRound();
 });
 
 $("again-btn").addEventListener("click", () => { goTo("game"); startRound(); });
 $("menu-btn").addEventListener("click", () => {
-  renderLeaderboard("leaderboard-list", playerName);
+  renderLeaderboard("leaderboard-list", playerId);
+  $("pin-gate").style.display = "none";
+  $("guest-gate").style.display = "block";
+  if (pendingPupil) { $("manual-form").style.display = "block"; }
   goTo("start");
 });
 
@@ -532,8 +696,8 @@ function endRound() {
   $("end-accuracy").textContent = accuracy + "%";
   $("end-streak").textContent = state.bestStreak;
 
-  saveScore({ name: playerName, score: state.score, accuracy, date: new Date().toISOString().slice(0,10) });
-  renderLeaderboard("leaderboard-list-end", playerName);
+  saveScore({ id: playerId, name: playerName, score: state.score, accuracy, date: new Date().toISOString().slice(0,10) });
+  renderLeaderboard("leaderboard-list-end", playerId);
 
   setTimeout(() => {
     $("game-area").querySelectorAll(".bubble,.floater").forEach(n => n.remove());
