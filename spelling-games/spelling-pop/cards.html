@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spelling Pop — Pupil Cards</title>
+<style>
+  :root{
+    --blue:#1798d3; --blue-dark:#0f6f9e; --navy:#12263a; --muted:#5b7a8a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+    background:#eef5f9; color:var(--navy); margin:0; padding:28px;
+  }
+  .toolbar{
+    max-width:900px; margin:0 auto 24px; display:flex; align-items:center; justify-content:space-between; gap:16px;
+  }
+  .toolbar h1{ font-size:22px; margin:0 0 4px; }
+  .toolbar p{ font-size:13px; color:var(--muted); margin:0; max-width:520px; }
+  .toolbar button{
+    font-size:15px; font-weight:800; font-family:inherit; padding:12px 20px; border-radius:12px; border:none;
+    background:var(--blue); color:#fff; cursor:pointer; box-shadow:0 5px 0 var(--blue-dark); white-space:nowrap;
+  }
+  .toolbar button:active{ transform:translateY(3px); box-shadow:0 2px 0 var(--blue-dark); }
+
+  .card-grid{
+    max-width:900px; margin:0 auto; display:grid; grid-template-columns:repeat(2,1fr); gap:18px;
+  }
+  .card{
+    background:#fff; border-radius:16px; padding:20px; display:flex; align-items:center; gap:16px;
+    box-shadow:0 8px 20px rgba(18,38,58,.08); border:1.5px dashed #cfe2ec;
+  }
+  .card .qr{ flex-shrink:0; width:104px; height:104px; }
+  .card .qr svg{ width:100%; height:100%; display:block; }
+  .card .info{ flex:1; min-width:0; }
+  .card .kicker{ font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.8px; color:var(--blue-dark); opacity:.8; }
+  .card .pname{ font-size:22px; font-weight:800; margin:2px 0 8px; }
+  .card .row{ display:flex; align-items:baseline; gap:8px; font-size:13px; color:var(--muted); margin-bottom:2px; }
+  .card .row b{ font-family:'Courier New',monospace; font-size:16px; letter-spacing:1.5px; color:var(--navy); font-weight:800; }
+  .card .pin-val{ font-size:20px; }
+
+  footer.note{
+    max-width:900px; margin:24px auto 0; font-size:12px; color:var(--muted); line-height:1.6;
+  }
+
+  @media print {
+    body{ background:#fff; padding:0; }
+    .toolbar{ display:none; }
+    .card-grid{ max-width:none; gap:14px; }
+    .card{ box-shadow:none; border:1.5px dashed #b9d8e6; break-inside:avoid; }
+    footer.note{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <div>
+      <h1>🫧 Spelling Pop — Pupil Cards</h1>
+      <p>Print, cut out and hand one card to each child. They scan the QR code (or open Spelling Pop and type their code) then enter their PIN.</p>
+    </div>
+    <button onclick="window.print()">🖨️ Print cards</button>
+  </div>
+
+  <div class="card-grid" id="card-grid"></div>
+
+  <footer class="note">
+    Proof of concept — QR codes are generated in your browser using the <a href="https://github.com/kazuhikoarase/qrcode-generator" target="_blank" rel="noopener">qrcode-generator</a> library (MIT licence, vendored locally in <code>../vendor/qrcode.js</code>, no external service or network call). PINs live in <code>roster.js</code> alongside this page — treat that file the way you'd treat a class list, not a secrets store.
+  </footer>
+
+<script src="../vendor/qrcode.js"></script>
+<script src="roster.js"></script>
+<script>
+  const grid = document.getElementById("card-grid");
+  const gameUrl = new URL(GAME_URL, location.href);
+
+  ROSTER.forEach(pupil => {
+    const target = new URL(gameUrl);
+    target.searchParams.set("u", pupil.id);
+
+    const qr = qrcode(0, "M");
+    qr.addData(target.href);
+    qr.make();
+    const svg = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="qr">${svg}</div>
+      <div class="info">
+        <div class="kicker">Spelling Pop · WFA</div>
+        <div class="pname">${pupil.name}</div>
+        <div class="row">Code&nbsp;<b>${pupil.id}</b></div>
+        <div class="row">PIN&nbsp;<b class="pin-val">${pupil.pin}</b></div>
+      </div>`;
+    grid.appendChild(card);
+  });
+</script>
+</body>
+</html>
