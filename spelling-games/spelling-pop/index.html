@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Spelling Pop — Wallscourt Farm Academy</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🫧</text></svg>">
+<style>
+  :root{
+    --blue:#1798d3; --blue-dark:#0f6f9e; --navy:#12263a;
+    --green:#2fbf71; --red:#e5484d; --amber:#f5a524;
+    --bg1:#eaf6fd; --bg2:#dcf0fb;
+    --card:#ffffff; --muted:#5b7a8a;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;margin:0;}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    color:var(--navy);
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    min-height:100%;
+    overflow:hidden;
+    touch-action:manipulation;
+    user-select:none;
+  }
+
+  /* ── Shared screen layout ── */
+  .screen{
+    width:100%; max-width:640px; margin:0 auto;
+    padding:20px 20px 32px;
+    display:none;
+  }
+  .screen.active{display:block;}
+
+  .brand{
+    text-align:center; padding-top:18px;
+  }
+  .brand .kicker{
+    font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+    color:var(--blue-dark); opacity:.75;
+  }
+  .brand h1{
+    margin:4px 0 2px; font-size:clamp(28px,7vw,40px); font-weight:800;
+  }
+  .brand h1 .pop-emoji{display:inline-block;}
+
+  .panel{
+    background:var(--card); border-radius:18px; padding:22px 22px 26px;
+    box-shadow:0 10px 30px rgba(18,38,58,.10);
+    margin-top:16px;
+  }
+
+  .rule-box{
+    background:#fff7e6; border:1.5px solid #f3d18a; border-radius:14px;
+    padding:14px 16px; margin-bottom:18px;
+  }
+  .rule-box .rule-label{
+    font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:1px;
+    color:#a3720b; margin-bottom:4px;
+  }
+  .rule-box .rule-title{ font-size:17px; font-weight:800; margin-bottom:4px; }
+  .rule-box .rule-text{ font-size:13.5px; color:#5b4a1f; line-height:1.45; }
+  .rule-box .rule-examples{ margin-top:8px; font-size:13.5px; }
+  .rule-box .rule-examples b{ color:var(--green); }
+  .rule-box .rule-examples s{ color:var(--red); text-decoration-thickness:2px; margin-left:10px; }
+
+  label.field-label{ display:block; font-size:13px; font-weight:700; margin-bottom:6px; color:var(--muted); }
+  input[type=text]{
+    width:100%; font-size:18px; padding:12px 14px; border-radius:12px;
+    border:2px solid #cfe2ec; outline:none; font-family:inherit;
+  }
+  input[type=text]:focus{ border-color:var(--blue); }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    font-size:17px; font-weight:800; font-family:inherit;
+    padding:14px 22px; border-radius:14px; border:none; cursor:pointer;
+    width:100%; margin-top:16px;
+    background:var(--blue); color:#fff;
+    box-shadow:0 6px 0 var(--blue-dark);
+    transition:transform .05s;
+  }
+  .btn:active{ transform:translateY(4px); box-shadow:0 2px 0 var(--blue-dark); }
+  .btn.secondary{
+    background:#eef5f9; color:var(--blue-dark); box-shadow:0 6px 0 #c9dde7;
+  }
+  .btn.secondary:active{ box-shadow:0 2px 0 #c9dde7; }
+
+  .name-chip{
+    display:inline-flex; align-items:center; gap:6px;
+    background:#eef5f9; border-radius:999px; padding:6px 12px 6px 8px;
+    font-size:13px; font-weight:700; color:var(--blue-dark); margin-top:10px;
+  }
+  .name-chip .avatar{
+    width:22px;height:22px;border-radius:50%;background:var(--blue);
+    color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;
+  }
+
+  /* ── Leaderboard ── */
+  .board-title{ font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); margin:22px 0 8px; }
+  .board-row{
+    display:flex; align-items:center; gap:10px;
+    padding:9px 4px; border-bottom:1px solid #eef3f6; font-size:14.5px;
+  }
+  .board-row .rank{ width:22px; font-weight:800; color:var(--muted); text-align:center; }
+  .board-row .rname{ flex:1; font-weight:700; }
+  .board-row .rscore{ font-weight:800; color:var(--blue-dark); }
+  .board-row.you{ background:#eaf8f0; border-radius:10px; }
+  .board-empty{ font-size:13.5px; color:var(--muted); padding:8px 4px; }
+
+  /* ── HUD ── */
+  .hud{
+    width:100%; max-width:640px; display:flex; align-items:center; gap:10px;
+    padding:10px 14px; z-index:5;
+  }
+  .hud-pill{
+    background:#fff; border-radius:12px; padding:8px 14px;
+    box-shadow:0 3px 10px rgba(18,38,58,.08);
+    font-weight:800; font-size:15px; display:flex; align-items:center; gap:6px;
+  }
+  .hud-pill.grow{ flex:1; }
+  .hud-pill .lab{ font-size:10px; font-weight:700; text-transform:uppercase; color:var(--muted); letter-spacing:.5px; }
+  #hud-time.warn{ color:var(--red); }
+  .timebar-track{ height:8px; background:#e2eef4; border-radius:6px; overflow:hidden; flex:1; }
+  .timebar-fill{ height:100%; background:var(--blue); border-radius:6px; transition:width .2s linear, background .3s; width:100%; }
+  #streak-pill{ display:none; }
+  #streak-pill.show{ display:flex; }
+
+  /* ── Game area ── */
+  #game-wrap{ display:none; flex-direction:column; align-items:center; width:100%; height:100%; }
+  #game-wrap.active{ display:flex; }
+  #game-area{
+    position:relative; width:100%; max-width:640px; flex:1;
+    background:radial-gradient(circle at 30% 20%, #ffffff 0%, var(--bg1) 45%, var(--bg2) 100%);
+    border-radius:0;
+    overflow:hidden;
+  }
+  .lane-line{ position:absolute; bottom:64px; left:0; right:0; border-top:2px dashed #b9d8e6; opacity:.6; }
+
+  .bubble{
+    position:absolute; top:-70px;
+    padding:12px 20px; border-radius:999px;
+    font-size:clamp(18px,4.6vw,26px); font-weight:800; color:#fff;
+    box-shadow:0 6px 14px rgba(0,0,0,.15), inset 0 -3px 0 rgba(0,0,0,.12);
+    cursor:pointer; white-space:nowrap;
+    will-change:transform,top;
+  }
+  .bubble.pop{ animation:popAnim .28s ease forwards; pointer-events:none; }
+  .bubble.wrongPop{ animation:shakeAnim .32s ease; }
+  @keyframes popAnim{ to{ transform:scale(1.6); opacity:0; } }
+  @keyframes shakeAnim{ 20%{transform:translateX(-8px) rotate(-4deg);} 50%{transform:translateX(8px) rotate(4deg);} 80%{transform:translateX(-4px);} 100%{transform:translateX(0);} }
+
+  .floater{
+    position:absolute; font-weight:900; font-size:20px; pointer-events:none;
+    animation:floatUp .8s ease forwards;
+  }
+  @keyframes floatUp{ from{ opacity:1; transform:translateY(0);} to{ opacity:0; transform:translateY(-46px);} }
+
+  .correction-toast{
+    position:absolute; left:50%; bottom:74px; transform:translateX(-50%) translateY(10px);
+    background:var(--navy); color:#fff; font-weight:700; font-size:14px;
+    padding:9px 16px; border-radius:12px; opacity:0; transition:opacity .2s, transform .2s;
+    pointer-events:none; text-align:center; max-width:88%;
+  }
+  .correction-toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .correction-toast b{ color:#8ee6a8; }
+
+  #ground{
+    height:64px; width:100%; max-width:640px;
+    background:#dff1e4; border-top:2px solid #bfe3c9;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12.5px; color:#3f7a54; font-weight:700; gap:6px;
+  }
+
+  /* ── End screen stats ── */
+  .stat-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:6px; }
+  .stat-box{ background:#f5fafc; border-radius:12px; padding:14px 6px; text-align:center; }
+  .stat-box .num{ font-size:24px; font-weight:900; color:var(--blue-dark); }
+  .stat-box .lab{ font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; margin-top:2px; }
+  .stat-box.new .num{ color:var(--green); }
+
+  footer.note{
+    max-width:640px; margin:18px auto 0; padding:0 20px 20px; font-size:11.5px; color:var(--muted); text-align:center; line-height:1.5;
+  }
+</style>
+</head>
+<body>
+
+  <!-- ══════════ START SCREEN ══════════ -->
+  <section id="screen-start" class="screen active">
+    <div class="brand">
+      <div class="kicker">Wallscourt Farm Academy · Spelling Games (prototype)</div>
+      <h1><span class="pop-emoji">🫧</span> Spelling Pop</h1>
+    </div>
+
+    <div class="panel">
+      <div class="rule-box">
+        <div class="rule-label">This week's spelling rule</div>
+        <div class="rule-title" id="rule-title"></div>
+        <div class="rule-text" id="rule-text"></div>
+        <div class="rule-examples" id="rule-examples"></div>
+      </div>
+
+      <label class="field-label" for="name-input">What's your name?</label>
+      <input type="text" id="name-input" maxlength="20" placeholder="e.g. Amelia" autocomplete="off">
+
+      <button class="btn" id="start-btn">▶ Start playing</button>
+
+      <div id="prev-player-row" style="display:none; text-align:center;">
+        <span class="name-chip"><span class="avatar" id="prev-avatar">?</span><span id="prev-name-text"></span></span>
+      </div>
+    </div>
+
+    <div class="board-title">🏆 Leaderboard — best scores on this device</div>
+    <div class="panel" style="margin-top:0; padding-top:10px; padding-bottom:10px;">
+      <div id="leaderboard-list"></div>
+    </div>
+
+    <footer class="note">
+      Proof of concept — scores are currently saved only in this browser (localStorage), tagged to the name typed above.
+      A real deployment would swap this for the same lightweight sync backend already used by the SLT Schedule and Lunch Cover tools, keyed per pupil, so scores follow a child across devices.
+    </footer>
+  </section>
+
+  <!-- ══════════ GAME SCREEN ══════════ -->
+  <div id="game-wrap">
+    <div class="hud">
+      <div class="hud-pill"><span class="lab">Score</span>&nbsp;<span id="hud-score">0</span></div>
+      <div class="hud-pill grow"><span class="lab" id="hud-time">60s</span><div class="timebar-track"><div class="timebar-fill" id="timebar"></div></div></div>
+      <div class="hud-pill" id="streak-pill">🔥 <span id="hud-streak">0</span></div>
+    </div>
+    <div id="game-area">
+      <div class="lane-line"></div>
+      <div class="correction-toast" id="correction-toast"></div>
+    </div>
+    <div id="ground">👇 Tap the words spelled the <strong>-tch</strong> way — let the wrong ones fall past</div>
+  </div>
+
+  <!-- ══════════ END SCREEN ══════════ -->
+  <section id="screen-end" class="screen">
+    <div class="brand">
+      <div class="kicker">Round complete</div>
+      <h1>🎉 Nice popping!</h1>
+    </div>
+    <div class="panel">
+      <div class="stat-grid">
+        <div class="stat-box"><div class="num" id="end-score">0</div><div class="lab">Score</div></div>
+        <div class="stat-box"><div class="num" id="end-accuracy">0%</div><div class="lab">Accuracy</div></div>
+        <div class="stat-box" id="end-streak-box"><div class="num" id="end-streak">0</div><div class="lab">Best streak</div></div>
+      </div>
+      <button class="btn" id="again-btn">🔁 Play again</button>
+      <button class="btn secondary" id="menu-btn">Change player / back to menu</button>
+    </div>
+    <div class="board-title">🏆 Leaderboard — best scores on this device</div>
+    <div class="panel" style="margin-top:0; padding-top:10px; padding-bottom:10px;">
+      <div id="leaderboard-list-end"></div>
+    </div>
+  </section>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   CONFIG — this is the only block that changes week to week.
+   Swap RULE + WORDS for whatever spelling pattern the class is on;
+   everything below runs off this data.
+   ════════════════════════════════════════════════════════════════ */
+const RULE = {
+  title: "The /ch/ sound after a short vowel → “-tch”",
+  text: "When the /ch/ sound comes straight after a short vowel in a one-syllable word, it's spelled -tch, not just -ch (catch, not cach).",
+  goodExample: "catch",
+  badExample: "cach"
+};
+
+const WORDS = [
+  { correct: "catch",   wrong: "cach"   },
+  { correct: "itch",    wrong: "ich"    },
+  { correct: "fetch",   wrong: "fech"   },
+  { correct: "witch",   wrong: "wich"   },
+  { correct: "notch",   wrong: "noch"   },
+  { correct: "hutch",   wrong: "huch"   },
+  { correct: "clutch",  wrong: "cluch"  },
+  { correct: "stretch", wrong: "strech" },
+  { correct: "patch",   wrong: "pach"   },
+  { correct: "match",   wrong: "mach"   }
+];
+
+const ROUND_SECONDS = 60;
+const LEADERBOARD_KEY = "wfa-spelling-pop-leaderboard-tch";
+const LAST_NAME_KEY = "wfa-spelling-pop-last-name";
+const BUBBLE_COLORS = ["#1798d3","#2fbf71","#f5a524","#c65bd6","#ff7a6b","#2ba9a1"];
+/* ═══════════════════════════════════════════════════════════════ */
+
+const $ = id => document.getElementById(id);
+
+$("rule-title").textContent = RULE.title;
+$("rule-text").textContent = RULE.text;
+$("rule-examples").innerHTML = `<b>✓ ${RULE.goodExample}</b><s>✗ ${RULE.badExample}</s>`;
+
+let playerName = "";
+let state = null;
+let rafId = null;
+let spawnTimer = null;
+let tickTimer = null;
+let lastFrame = 0;
+
+/* ── Leaderboard (localStorage stand-in for a real backend) ── */
+function loadLeaderboard() {
+  try { return JSON.parse(localStorage.getItem(LEADERBOARD_KEY) || "[]"); }
+  catch (e) { return []; }
+}
+function saveScore(entry) {
+  const board = loadLeaderboard();
+  board.push(entry);
+  board.sort((a, b) => b.score - a.score);
+  const top = board.slice(0, 10);
+  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(top));
+  return top;
+}
+function renderLeaderboard(targetId, highlightName) {
+  const board = loadLeaderboard();
+  const el = $(targetId);
+  if (!board.length) {
+    el.innerHTML = '<div class="board-empty">No scores yet — be the first to play!</div>';
+    return;
+  }
+  el.innerHTML = board.map((row, i) => `
+    <div class="board-row ${row.name === highlightName && i === board.findIndex(r=>r.name===highlightName) ? 'you' : ''}">
+      <div class="rank">${i + 1}</div>
+      <div class="rname">${escapeHtml(row.name)}</div>
+      <div class="rscore">${row.score} pts</div>
+    </div>`).join("");
+}
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ── "Access" — simple name identification, not real auth ── */
+const savedName = localStorage.getItem(LAST_NAME_KEY);
+if (savedName) {
+  $("name-input").value = savedName;
+  $("prev-player-row").style.display = "block";
+  $("prev-avatar").textContent = savedName.trim()[0]?.toUpperCase() || "?";
+  $("prev-name-text").textContent = `Last time: ${savedName}`;
+}
+renderLeaderboard("leaderboard-list", savedName);
+
+$("start-btn").addEventListener("click", () => {
+  const name = $("name-input").value.trim();
+  if (!name) { $("name-input").focus(); $("name-input").style.borderColor = "var(--red)"; return; }
+  playerName = name;
+  localStorage.setItem(LAST_NAME_KEY, name);
+  goTo("game");
+  startRound();
+});
+
+$("again-btn").addEventListener("click", () => { goTo("game"); startRound(); });
+$("menu-btn").addEventListener("click", () => {
+  renderLeaderboard("leaderboard-list", playerName);
+  goTo("start");
+});
+
+function goTo(which) {
+  $("screen-start").classList.toggle("active", which === "start");
+  $("screen-end").classList.toggle("active", which === "end");
+  $("game-wrap").classList.toggle("active", which === "game");
+}
+
+/* ── Game logic ── */
+function startRound() {
+  clearInterval(spawnTimer);
+  clearInterval(tickTimer);
+  cancelAnimationFrame(rafId);
+  $("game-area").querySelectorAll(".bubble,.floater").forEach(n => n.remove());
+
+  state = {
+    score: 0, streak: 0, bestStreak: 0,
+    correctTaps: 0, wrongTaps: 0,
+    timeLeft: ROUND_SECONDS,
+    bubbles: [],
+    ending: false
+  };
+  updateHud();
+  $("timebar").style.background = "var(--blue)";
+  $("hud-time").classList.remove("warn");
+
+  tickTimer = setInterval(() => {
+    state.timeLeft--;
+    updateHud();
+    if (state.timeLeft <= 10) $("hud-time").classList.add("warn");
+    if (state.timeLeft <= 0) endRound();
+  }, 1000);
+
+  const spawnLoop = () => {
+    if (!state || state.ending) return;
+    spawnBubble();
+    const elapsed = ROUND_SECONDS - state.timeLeft;
+    const interval = Math.max(520, 1100 - elapsed * 8);
+    spawnTimer = setTimeout(spawnLoop, interval);
+  };
+  spawnLoop();
+
+  lastFrame = performance.now();
+  rafId = requestAnimationFrame(tickFrame);
+}
+
+function updateHud() {
+  $("hud-score").textContent = state.score;
+  $("hud-time").textContent = `${state.timeLeft}s`;
+  $("timebar").style.width = `${(state.timeLeft / ROUND_SECONDS) * 100}%`;
+  if (state.streak >= 2) {
+    $("streak-pill").classList.add("show");
+    $("hud-streak").textContent = state.streak;
+  } else {
+    $("streak-pill").classList.remove("show");
+  }
+}
+
+function spawnBubble() {
+  const area = $("game-area");
+  const pair = WORDS[Math.floor(Math.random() * WORDS.length)];
+  const isCorrect = Math.random() < 0.55;
+  const word = isCorrect ? pair.correct : pair.wrong;
+
+  const el = document.createElement("div");
+  el.className = "bubble";
+  el.textContent = word;
+  el.style.background = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
+  area.appendChild(el);
+
+  const areaW = area.clientWidth;
+  const bw = el.offsetWidth;
+  const x = Math.max(8, Math.min(areaW - bw - 8, Math.random() * (areaW - bw)));
+  el.style.left = x + "px";
+
+  const speed = 34 + Math.random() * 18 + (ROUND_SECONDS - state.timeLeft) * 0.35;
+  const bubble = { el, y: -70, x, speed, isCorrect, word, correctSpelling: pair.correct, popped: false };
+  state.bubbles.push(bubble);
+
+  el.addEventListener("pointerdown", () => popBubble(bubble), { passive: true });
+}
+
+function tickFrame(now) {
+  if (!state) return;
+  const dt = Math.min(0.05, (now - lastFrame) / 1000);
+  lastFrame = now;
+  const area = $("game-area");
+  const floorY = area.clientHeight;
+
+  for (let i = state.bubbles.length - 1; i >= 0; i--) {
+    const b = state.bubbles[i];
+    if (b.popped) continue;
+    b.y += b.speed * dt;
+    b.el.style.top = b.y + "px";
+    if (b.y > floorY) {
+      if (b.isCorrect) { state.streak = 0; }
+      b.el.remove();
+      state.bubbles.splice(i, 1);
+    }
+  }
+  updateHud();
+  if (state && !state.ending) rafId = requestAnimationFrame(tickFrame);
+}
+
+function popBubble(b) {
+  if (b.popped || !state) return;
+  b.popped = true;
+  const area = $("game-area");
+  const rect = b.el.getBoundingClientRect();
+  const areaRect = area.getBoundingClientRect();
+  const localX = rect.left - areaRect.left + rect.width / 2;
+  const localY = rect.top - areaRect.top;
+
+  if (b.isCorrect) {
+    state.streak++;
+    state.bestStreak = Math.max(state.bestStreak, state.streak);
+    const mult = state.streak >= 6 ? 3 : state.streak >= 3 ? 2 : 1;
+    const pts = 10 * mult;
+    state.score += pts;
+    state.correctTaps++;
+    b.el.classList.add("pop");
+    spawnFloater(`+${pts}`, "var(--green)", localX, localY);
+  } else {
+    state.streak = 0;
+    state.score = Math.max(0, state.score - 5);
+    state.wrongTaps++;
+    b.el.classList.add("wrongPop");
+    spawnFloater("−5", "var(--red)", localX, localY);
+    showCorrection(b.correctSpelling);
+    setTimeout(() => { b.el.remove(); state.bubbles = state.bubbles.filter(x => x !== b); }, 320);
+    updateHud();
+    return;
+  }
+
+  updateHud();
+  setTimeout(() => {
+    b.el.remove();
+    state.bubbles = state.bubbles.filter(x => x !== b);
+  }, 280);
+}
+
+function spawnFloater(text, color, x, y) {
+  const f = document.createElement("div");
+  f.className = "floater";
+  f.textContent = text;
+  f.style.color = color;
+  f.style.left = x + "px";
+  f.style.top = y + "px";
+  $("game-area").appendChild(f);
+  setTimeout(() => f.remove(), 820);
+}
+
+let toastTimer = null;
+function showCorrection(word) {
+  const t = $("correction-toast");
+  t.innerHTML = `It's spelled <b>${word}</b>`;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1100);
+}
+
+function endRound() {
+  if (!state || state.ending) return;
+  state.ending = true;
+  clearInterval(tickTimer);
+  clearTimeout(spawnTimer);
+  cancelAnimationFrame(rafId);
+
+  const totalTaps = state.correctTaps + state.wrongTaps;
+  const accuracy = totalTaps ? Math.round((state.correctTaps / totalTaps) * 100) : 0;
+
+  $("end-score").textContent = state.score;
+  $("end-accuracy").textContent = accuracy + "%";
+  $("end-streak").textContent = state.bestStreak;
+
+  saveScore({ name: playerName, score: state.score, accuracy, date: new Date().toISOString().slice(0,10) });
+  renderLeaderboard("leaderboard-list-end", playerName);
+
+  setTimeout(() => {
+    $("game-area").querySelectorAll(".bubble,.floater").forEach(n => n.remove());
+    goTo("end");
+  }, 260);
+}
+</script>
+</body>
+</html>
