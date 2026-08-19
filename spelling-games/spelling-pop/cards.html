@@ -58,7 +58,7 @@
   <div class="toolbar">
     <div>
       <h1>🫧 Spelling Pop — Pupil Cards</h1>
-      <p>Print, cut out and hand one card to each child. They scan the QR code (or open Spelling Pop and type their code) then enter their PIN.</p>
+      <p id="week-label">Print, cut out and hand one card to each child. They scan the QR code (or open Spelling Pop and type their code) then enter their PIN.</p>
     </div>
     <button onclick="window.print()">🖨️ Print cards</button>
   </div>
@@ -66,18 +66,27 @@
   <div class="card-grid" id="card-grid"></div>
 
   <footer class="note">
-    Proof of concept — QR codes are generated in your browser using the <a href="https://github.com/kazuhikoarase/qrcode-generator" target="_blank" rel="noopener">qrcode-generator</a> library (MIT licence, vendored locally in <code>../vendor/qrcode.js</code>, no external service or network call). PINs live in <code>roster.js</code> alongside this page — treat that file the way you'd treat a class list, not a secrets store.
+    Proof of concept — QR codes are generated in your browser using the <a href="https://github.com/kazuhikoarase/qrcode-generator" target="_blank" rel="noopener">qrcode-generator</a> library (MIT licence, vendored locally in <code>../vendor/qrcode.js</code>, no external service or network call). PINs live in <code>roster.js</code> alongside this page — treat that file the way you'd treat a class list, not a secrets store. Each pupil's <code>year</code> and the shared <code>CURRENT_WEEK</code> (both in <code>roster.js</code>) are baked into their QR code, so scanning it opens Spelling Pop already loaded with the right week's words — no picker needed.
   </footer>
 
+<script src="../lessons-data.js"></script>
+<script src="../spelling-pool.js"></script>
 <script src="../vendor/qrcode.js"></script>
 <script src="roster.js"></script>
 <script>
   const grid = document.getElementById("card-grid");
   const gameUrl = new URL(GAME_URL, location.href);
+  const weeks = spGetWeeksForYear(ROSTER[0]?.year || "Y5");
+  const weekInfo = weeks.find(w => w.term === CURRENT_WEEK.term && w.week === CURRENT_WEEK.week);
+  document.getElementById("week-label").textContent =
+    `Cards for ${weekInfo ? weekInfo.label : `${CURRENT_WEEK.term} ${CURRENT_WEEK.week}`} — change CURRENT_WEEK in roster.js and reprint for a new week.`;
 
   ROSTER.forEach(pupil => {
     const target = new URL(gameUrl);
     target.searchParams.set("u", pupil.id);
+    target.searchParams.set("y", pupil.year);
+    target.searchParams.set("t", CURRENT_WEEK.term);
+    target.searchParams.set("w", CURRENT_WEEK.week);
 
     const qr = qrcode(0, "M");
     qr.addData(target.href);
@@ -89,7 +98,7 @@
     card.innerHTML = `
       <div class="qr">${svg}</div>
       <div class="info">
-        <div class="kicker">Spelling Pop · WFA</div>
+        <div class="kicker">Spelling Pop · WFA · ${pupil.year}</div>
         <div class="pname">${pupil.name}</div>
         <div class="row">Code&nbsp;<b>${pupil.id}</b></div>
         <div class="row">PIN&nbsp;<b class="pin-val">${pupil.pin}</b></div>
