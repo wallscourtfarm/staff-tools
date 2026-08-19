@@ -219,24 +219,66 @@
   }
   .divider-row{ display:flex; align-items:center; gap:10px; margin:20px 0 2px; color:var(--muted); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
   .divider-row::before, .divider-row::after{ content:''; flex:1; height:1px; background:#e2eef4; }
+
+  /* ── Year / week setup screen ── */
+  select{
+    width:100%; font-size:17px; padding:12px 14px; border-radius:12px;
+    border:2px solid #cfe2ec; outline:none; font-family:inherit; background:#fff; color:var(--navy);
+  }
+  select:focus{ border-color:var(--blue); }
+  .rule-mini{
+    background:#fff7e6; border:1.5px solid #f3d18a; border-radius:12px;
+    padding:12px 14px; margin-bottom:10px; font-size:13.5px; color:#5b4a1f; line-height:1.4;
+  }
+  .rule-mini b{ display:block; font-size:14.5px; color:var(--navy); margin-bottom:3px; font-weight:800; }
+  .word-tags{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  .word-tag{
+    font-family:inherit; font-size:14px; font-weight:700; padding:9px 16px; border-radius:999px;
+    border:2px solid #cfe2ec; background:#fff; color:var(--navy); cursor:pointer;
+  }
+  .word-tag.on{ background:var(--blue); border-color:var(--blue); color:#fff; }
+  .setup-link{
+    display:block; text-align:center; width:100%; margin-top:10px; font-size:12.5px; color:var(--muted);
+    background:none; border:none; cursor:pointer; text-decoration:underline; font-family:inherit;
+  }
 </style>
 </head>
 <body>
 
-  <!-- ══════════ START SCREEN ══════════ -->
-  <section id="screen-start" class="screen active">
+  <!-- ══════════ SETUP SCREEN — pick year group + week ══════════ -->
+  <section id="screen-setup" class="screen active">
+    <div class="brand">
+      <div class="kicker">Wallscourt Farm Academy · Spelling Games (prototype)</div>
+      <h1><span class="pop-emoji">🫧</span> Spelling Pop</h1>
+    </div>
+    <div class="panel">
+      <p style="font-size:13.5px; color:var(--muted); margin:0 0 16px;">
+        Words and rules come straight from the Spelling Assessment tool's lesson data — pick a year group and week to build this round's word pool.
+      </p>
+      <label class="field-label" for="setup-year">Year group</label>
+      <select id="setup-year"><option value="">Choose…</option></select>
+
+      <label class="field-label" for="setup-week" style="margin-top:14px;">Week</label>
+      <select id="setup-week"><option value="">Choose a year group first…</option></select>
+
+      <div id="setup-pool" style="display:none; margin-top:20px;">
+        <div id="setup-rules"></div>
+        <label class="field-label" style="margin-top:14px;">Words for this round <span id="setup-count" style="font-weight:400;"></span></label>
+        <div class="word-tags" id="setup-word-tags"></div>
+        <button class="btn" id="setup-continue">Continue ▶</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ START SCREEN — identify the player ══════════ -->
+  <section id="screen-start" class="screen">
     <div class="brand">
       <div class="kicker">Wallscourt Farm Academy · Spelling Games (prototype)</div>
       <h1><span class="pop-emoji">🫧</span> Spelling Pop</h1>
     </div>
 
     <div class="panel">
-      <div class="rule-box">
-        <div class="rule-label">This week's spelling rule</div>
-        <div class="rule-title" id="rule-title"></div>
-        <div class="rule-text" id="rule-text"></div>
-        <div class="rule-examples" id="rule-examples"></div>
-      </div>
+      <div id="rule-box-list"></div>
 
       <div id="bad-code-banner" class="banner-error" style="display:none;">
         We didn't recognise that spelling code. Ask your teacher for a new card, or use the options below.
@@ -274,6 +316,7 @@
           <button class="btn secondary" id="manual-submit">Continue</button>
           <div class="pin-error" id="manual-error">&nbsp;</div>
         </div>
+        <button class="setup-link" id="change-week-link">Not the right week? Change year/week</button>
       </div>
     </div>
 
@@ -298,7 +341,7 @@
       <div class="lane-line"></div>
       <div class="correction-toast" id="correction-toast"></div>
     </div>
-    <div id="ground">👇 Tap the words spelled the <strong>-tch</strong> way — let the wrong ones fall past</div>
+    <div id="ground">👇 Tap the words spelled <strong>correctly</strong> — let the wrong ones fall past</div>
   </div>
 
   <!-- ══════════ END SCREEN ══════════ -->
@@ -322,45 +365,30 @@
     </div>
   </section>
 
+<script src="../lessons-data.js"></script>
+<script src="../spelling-pool.js"></script>
 <script src="roster.js"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════
-   CONFIG — this is the only block that changes week to week.
-   Swap RULE + WORDS for whatever spelling pattern the class is on;
-   everything below runs off this data.
+   GAME IDENTITY — used to tag scores; leave as-is per game.
    ════════════════════════════════════════════════════════════════ */
-const RULE = {
-  title: "The /ch/ sound after a short vowel → “-tch”",
-  text: "When the /ch/ sound comes straight after a short vowel in a one-syllable word, it's spelled -tch, not just -ch (catch, not cach).",
-  goodExample: "catch",
-  badExample: "cach"
-};
-
-const WORDS = [
-  { correct: "catch",   wrong: "cach"   },
-  { correct: "itch",    wrong: "ich"    },
-  { correct: "fetch",   wrong: "fech"   },
-  { correct: "witch",   wrong: "wich"   },
-  { correct: "notch",   wrong: "noch"   },
-  { correct: "hutch",   wrong: "huch"   },
-  { correct: "clutch",  wrong: "cluch"  },
-  { correct: "stretch", wrong: "strech" },
-  { correct: "patch",   wrong: "pach"   },
-  { correct: "match",   wrong: "mach"   }
-];
-
+const GAME_ID = "spelling-pop";
 const ROUND_SECONDS = 60;
-const LEADERBOARD_KEY = "wfa-spelling-pop-leaderboard-tch";
 const LAST_NAME_KEY = "wfa-spelling-pop-last-name";
 const LAST_ID_KEY = "wfa-spelling-pop-last-id";
 const BUBBLE_COLORS = ["#1798d3","#2fbf71","#f5a524","#c65bd6","#ff7a6b","#2ba9a1"];
+/* Real deployment backend URL — see spelling-games/backend/. Empty = local only. */
+const BACKEND_URL = "";
 /* ═══════════════════════════════════════════════════════════════ */
 
 const $ = id => document.getElementById(id);
 
-$("rule-title").textContent = RULE.title;
-$("rule-text").textContent = RULE.text;
-$("rule-examples").innerHTML = `<b>✓ ${RULE.goodExample}</b><s>✗ ${RULE.badExample}</s>`;
+let WORDS = [];          // active { correct, wrong } pairs for this round
+let RULES = [];          // active { focus, explanation, exampleWords }[] for the chosen week
+let LEADERBOARD_KEY = ""; // set once a year/week pool is chosen
+let POOL_ID = "";         // "Y5-T1W1" — identifies this week's pool for scoring
+let currentPool = null;   // result of spGetWeekPool() for the setup screen in progress
+let selectedWords = new Set();
 
 let playerName = "";
 let playerId = null;
@@ -369,6 +397,101 @@ let rafId = null;
 let spawnTimer = null;
 let tickTimer = null;
 let lastFrame = 0;
+
+/* ── Setup screen: year + week → word pool ── */
+function populateYearSelect() {
+  const sel = $("setup-year");
+  sel.innerHTML = '<option value="">Choose…</option>' +
+    spGetYears().map(y => `<option value="${y}">${y.replace("Y", "Year ")}</option>`).join("");
+}
+function onSetupYearChange() {
+  const year = $("setup-year").value;
+  const weekSel = $("setup-week");
+  $("setup-pool").style.display = "none";
+  if (!year) { weekSel.innerHTML = '<option value="">Choose a year group first…</option>'; return; }
+  const weeks = spGetWeeksForYear(year);
+  weekSel.innerHTML = '<option value="">Choose…</option>' +
+    weeks.map(w => `<option value="${w.term}|${w.week}">${w.label}</option>`).join("");
+}
+function onSetupWeekChange() {
+  const year = $("setup-year").value;
+  const val = $("setup-week").value;
+  if (!year || !val) { $("setup-pool").style.display = "none"; return; }
+  const [term, week] = val.split("|");
+  loadPoolIntoSetup(year, term, week);
+}
+function loadPoolIntoSetup(year, term, week) {
+  currentPool = spGetWeekPool(year, term, week);
+  $("setup-rules").innerHTML = currentPool.rules.length
+    ? currentPool.rules.map(r => `<div class="rule-mini"><b>${escapeHtml(r.focus || "This week's pattern")}</b>${escapeHtml(r.explanation)}</div>`).join("")
+    : '<div class="rule-mini"><b>No rule notes recorded</b>This week has words but no saved explanation — the game will still work.</div>';
+
+  selectedWords = new Set(defaultWordSelection(currentPool.words));
+  renderWordTags();
+  $("setup-pool").style.display = "block";
+}
+function defaultWordSelection(words) {
+  return words.slice(0, Math.min(14, words.length));
+}
+function renderWordTags() {
+  $("setup-word-tags").innerHTML = currentPool.words.map(w =>
+    `<button type="button" class="word-tag ${selectedWords.has(w) ? "on" : ""}" data-word="${escapeHtml(w)}">${escapeHtml(w)}</button>`
+  ).join("");
+  $("setup-count").textContent = `(${selectedWords.size} selected)`;
+  $("setup-word-tags").querySelectorAll(".word-tag").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const w = btn.dataset.word;
+      if (selectedWords.has(w)) selectedWords.delete(w); else selectedWords.add(w);
+      renderWordTags();
+    });
+  });
+}
+$("setup-year").addEventListener("change", onSetupYearChange);
+$("setup-week").addEventListener("change", onSetupWeekChange);
+$("setup-continue").addEventListener("click", () => {
+  if (selectedWords.size < 3) { alert("Pick at least 3 words to play with."); return; }
+  activatePool(currentPool.year, currentPool.term, currentPool.week, [...selectedWords]);
+});
+populateYearSelect();
+
+/* ── Turn a chosen year/week (+ optional word subset) into an active round ── */
+function activatePool(year, term, week, words) {
+  const pool = spGetWeekPool(year, term, week);
+  RULES = pool.rules;
+  const chosenWords = words && words.length ? words : defaultWordSelection(pool.words);
+  WORDS = spBuildWordPairs(chosenWords);
+
+  POOL_ID = `${year}-${term}${week}`;
+  LEADERBOARD_KEY = "wfa-spelling-pop-leaderboard-" + POOL_ID;
+
+  renderRuleBox();
+  goTo("start");
+  initAccessScreen();
+}
+
+function renderRuleBox() {
+  const box = $("rule-box-list");
+  if (!RULES.length) {
+    box.innerHTML = '<div class="rule-box"><div class="rule-label">This week\'s words</div><div class="rule-text">No rule notes recorded for this week — words only.</div></div>';
+    return;
+  }
+  box.innerHTML = RULES.map(r => {
+    const exampleLower = (r.exampleWords || []).map(w => w.toLowerCase());
+    const pair = WORDS.find(p => exampleLower.includes(p.correct));
+    return `<div class="rule-box">
+      <div class="rule-label">This week's spelling rule</div>
+      <div class="rule-title">${escapeHtml(r.focus || "Spelling pattern")}</div>
+      <div class="rule-text">${escapeHtml(r.explanation)}</div>
+      ${pair ? `<div class="rule-examples"><b>✓ ${escapeHtml(pair.correct)}</b><s>✗ ${escapeHtml(pair.wrong)}</s></div>` : ""}
+    </div>`;
+  }).join("");
+}
+
+$("change-week-link").addEventListener("click", () => {
+  $("pin-gate").style.display = "none";
+  $("guest-gate").style.display = "block";
+  goTo("setup");
+});
 
 /* ── Leaderboard (localStorage stand-in for a real backend) ── */
 function loadLeaderboard() {
@@ -383,8 +506,9 @@ function saveScore(entry) {
   localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(top));
   return top;
 }
-function renderLeaderboard(targetId, highlightId) {
-  const board = loadLeaderboard();
+async function renderLeaderboard(targetId, highlightId) {
+  const remote = await fetchRemoteLeaderboard();
+  const board = remote || loadLeaderboard();
   const el = $(targetId);
   if (!board.length) {
     el.innerHTML = '<div class="board-empty">No scores yet — be the first to play!</div>';
@@ -485,23 +609,27 @@ $("manual-submit").addEventListener("click", () => {
   beginAsPupil(pupil);
 });
 
-if (qrCode) {
-  pendingPupil = findPupil(qrCode);
-  if (pendingPupil) {
-    showPinGate(pendingPupil);
-  } else {
-    $("bad-code-banner").style.display = "block";
+/* Runs once a word pool is active and the start (identify-yourself) screen is showing. */
+function initAccessScreen() {
+  $("bad-code-banner").style.display = "none";
+  if (qrCode) {
+    pendingPupil = findPupil(qrCode);
+    if (pendingPupil) {
+      showPinGate(pendingPupil);
+    } else {
+      $("bad-code-banner").style.display = "block";
+    }
   }
-}
 
-const savedName = localStorage.getItem(LAST_NAME_KEY);
-if (savedName) {
-  $("name-input").value = savedName;
-  $("prev-player-row").style.display = "block";
-  $("prev-avatar").textContent = savedName.trim()[0]?.toUpperCase() || "?";
-  $("prev-name-text").textContent = `Last time: ${savedName}`;
+  const savedName = localStorage.getItem(LAST_NAME_KEY);
+  if (savedName) {
+    $("name-input").value = savedName;
+    $("prev-player-row").style.display = "block";
+    $("prev-avatar").textContent = savedName.trim()[0]?.toUpperCase() || "?";
+    $("prev-name-text").textContent = `Last time: ${savedName}`;
+  }
+  renderLeaderboard("leaderboard-list", localStorage.getItem(LAST_ID_KEY));
 }
-renderLeaderboard("leaderboard-list", localStorage.getItem(LAST_ID_KEY));
 
 $("start-btn").addEventListener("click", () => {
   const name = $("name-input").value.trim();
@@ -524,6 +652,7 @@ $("menu-btn").addEventListener("click", () => {
 });
 
 function goTo(which) {
+  $("screen-setup").classList.toggle("active", which === "setup");
   $("screen-start").classList.toggle("active", which === "start");
   $("screen-end").classList.toggle("active", which === "end");
   $("game-wrap").classList.toggle("active", which === "game");
@@ -696,13 +825,58 @@ function endRound() {
   $("end-accuracy").textContent = accuracy + "%";
   $("end-streak").textContent = state.bestStreak;
 
-  saveScore({ id: playerId, name: playerName, score: state.score, accuracy, date: new Date().toISOString().slice(0,10) });
+  const scoreEntry = {
+    id: playerId, name: playerName, score: state.score, accuracy,
+    bestStreak: state.bestStreak, date: new Date().toISOString().slice(0, 10)
+  };
+  saveScore(scoreEntry);
+  syncSaveScore(scoreEntry);
   renderLeaderboard("leaderboard-list-end", playerId);
 
   setTimeout(() => {
     $("game-area").querySelectorAll(".bubble,.floater").forEach(n => n.remove());
     goTo("end");
   }, 260);
+}
+
+/* ── Optional backend sync — see spelling-games/backend/. No-ops until
+   BACKEND_URL is set, so the game works standalone until it's deployed. ── */
+function syncSaveScore(entry) {
+  if (!BACKEND_URL || !entry.id) return;
+  fetch(BACKEND_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      pupilId: entry.id, pupilName: entry.name, game: GAME_ID, ruleId: POOL_ID,
+      score: entry.score, accuracy: entry.accuracy, bestStreak: entry.bestStreak
+    }),
+    headers: { "Content-Type": "text/plain" }
+  }).catch(e => console.warn("Score sync failed, kept locally only:", e));
+}
+
+async function fetchRemoteLeaderboard() {
+  if (!BACKEND_URL) return null;
+  try {
+    const url = `${BACKEND_URL}?action=leaderboard&game=${encodeURIComponent(GAME_ID)}&rule=${encodeURIComponent(POOL_ID)}&top=10`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    return (data.leaderboard || []).map(r => ({ id: r.pupilId, name: r.pupilName, score: r.score }));
+  } catch (e) {
+    console.warn("Remote leaderboard fetch failed, showing local scores:", e);
+    return null;
+  }
+}
+
+/* ── Entry point: a QR card bakes ?y=&t=&w= in, so scanning it skips
+   straight past the setup screen. Opening the page with no params (staff
+   testing, or a guest) shows the year/week picker instead. ── */
+const paramYear = urlParams.get("y");
+const paramTerm = urlParams.get("t");
+const paramWeek = urlParams.get("w");
+if (paramYear && paramTerm && paramWeek) {
+  activatePool(paramYear, paramTerm, paramWeek);
+} else {
+  goTo("setup");
 }
 </script>
 </body>
