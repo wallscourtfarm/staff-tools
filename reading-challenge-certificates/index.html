@@ -343,6 +343,7 @@ footer {
     <h2>📡 Data Connection</h2>
     <div id="statusBar" class="status-loading">Connecting to book tracker…</div>
     <button class="btn btn-secondary btn-sm" onclick="loadData()">↺ Reload data</button>
+    <button class="btn btn-secondary btn-sm" id="hubRosterBtn" onclick="syncHubRoster()">🎒 Pull school roster</button>
   </div>
 
   <div class="card" id="pendingCard" style="display:none">
@@ -387,7 +388,7 @@ footer {
   <div class="cert-preview-wrap" id="certPreviewWrap"></div>
 </div>
 
-<footer>WFA Reading Challenge Certificates · WFA-29.08.26a</footer>
+<footer>WFA Reading Challenge Certificates · WFA-29.08.26c</footer>
 
 <script>
 'use strict';
@@ -490,6 +491,40 @@ async function loadData() {
     document.getElementById('pendingCard').style.display = '';
   } catch(e) {
     setStatus('err', '⚠️ Could not load data: ' + e.message);
+  }
+}
+
+/* ── Hub roster ──
+   The hub planning sheet's Pupils tab (shared-sync getPupils) is the
+   canonical school roster. This tops up the book tracker's children with any
+   hub pupils missing there — nobody is removed or changed. */
+const HUB_ROSTER_URL = 'https://script.google.com/macros/s/AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec';
+
+async function syncHubRoster() {
+  const btn = document.getElementById('hubRosterBtn');
+  const old = btn ? btn.textContent : '';
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = 'Pulling…'; }
+    const r = await fetch(HUB_ROSTER_URL + '?action=getPupils&t=' + Date.now() + '&token=' + WFA_TOKEN);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    const roster = (d.pupils || [])
+      .map(p => ({ name: (p.first + ' ' + p.last).trim(), yearGroup: p.yearGroup || '', class: p.class || '' }))
+      .filter(c => c.name);
+    if (!roster.length) throw new Error('hub roster is empty');
+    const existing = new Set(allChildren.map(c => (c.name || '').trim().toLowerCase()));
+    const missing = roster.filter(c => !existing.has(c.name.toLowerCase()));
+    if (!missing.length) { setStatus('ok', 'Roster already up to date — ' + allChildren.length + ' children'); return; }
+    await fetch(API_URL + '?token=' + WFA_TOKEN, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'importData', children: missing })
+    });
+    setStatus('ok', `Added ${missing.length} pupil${missing.length === 1 ? '' : 's'} from the school roster`);
+    await loadData();
+  } catch(e) {
+    setStatus('err', '⚠️ Roster pull failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🎒 Pull school roster'; }
   }
 }
 

@@ -37,7 +37,17 @@ function outJson_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function doPost(e) { return doGet(e); }
+// POST bodies (used by the certificates tool for markIssued and importData)
+// carry JSON in e.postData.body — doGet above only reads query parameters, so
+// merge any JSON body over the query params before dispatching.
+function doPost(e) {
+  try {
+    const body = (e && e.postData && e.postData.contents) ? JSON.parse(e.postData.contents) : {};
+    return doGet({ parameter: Object.assign({}, (e && e.parameter) || {}, body) });
+  } catch(err) {
+    return outJson_({ error: err.message });
+  }
+}
 
 function dispatch(p) {
   switch(p.action) {
@@ -53,6 +63,7 @@ function dispatch(p) {
     case 'setCoverOverride': return setCoverOverride(p);
     case 'saveCopyCounts':   return saveCopyCounts(p);
     case 'importChildren':   return importChildren(p);
+    case 'importData':       return p.children ? importChildren({ children: p.children }) : importBooks({ books: p.books });
     case 'importBooks':      return importBooks(p);
     case 'bulkImportReads':  return bulkImportReads(p);
     case 'clearData':        return clearData(p);
