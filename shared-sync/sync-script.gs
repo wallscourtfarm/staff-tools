@@ -60,36 +60,117 @@ function doPost(e) {
   }
 }
 
-// Pupils tab headers: id, first, last, class, yeargroup, sex, eal, pp, sen
-// Optional `yeargroup`/`class` filters arrive as query params.
+// ── Canonical pupil roster ──────────────────────────────────────────────────
+//
+// Source of truth: the WFA Pupil Tracker master sheet ("pupils" tab), written
+// by that app's Import Pupils page from Bromcom CSV exports, keyed by UPN.
+// Upload a new Bromcom export there and every tracker sees it immediately —
+// nothing else to run. The old hub Pupils tab is kept only as a fallback.
+//
+// Output shape (per pupil):
+//   id        — the UPN (canonical identifier; unique per pupil)
+//   upn       — same value, explicit
+//   first/last/class/yearGroup/sex
+//   eal/pp/fsm/lac — booleans
+//   sen       — sen_status ('' when none)
+//   source    — 'bromcom' or 'hub' (diagnostics)
+//
+// Filters: ?yeargroup=Y4 and ?class=4CK.
+
+const MASTER_SHEET_ID = '1NMY0KUGGnReVV-pGPCBp2UIjhc8OylIkGrFTAoiGZqM';
+const MASTER_PUPILS_TAB = 'pupils';
+
+function truthy(val) {
+  const s = String(val === true ? 'Y' : val || '').trim().toUpperCase();
+  return s === 'Y' || s === 'YES' || s === 'TRUE' || s === '1';
+}
+
 function getPupils(p) {
+  // Prefer the Bromcom-fed master sheet; fall back to the legacy hub tab.
+  try {
+    const pupils = readMasterPupils();
+    if (pupils.length) return filterPupils(pupils, p, 'bromcom');
+  } catch (err) {
+    console.warn('master pupils read failed: ' + err.message);
+  }
+  return filterPupils(readHubPupils(), p, 'hub');
+}
+
+function filterPupils(all, p, source) {
+  const out = [];
+  for (let i = 0; i < all.length; i++) {
+    const pupil = all[i];
+    if (p.yeargroup && pupil.yearGroup !== p.yeargroup) continue;
+    if (p.class && pupil.class !== p.class) continue;
+    out.push(Object.assign({}, pupil, { source: source }));
+  }
+  return { pupils: out };
+}
+
+function readMasterPupils() {
+  const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+  const sh = ss.getSheetByName(MASTER_PUPILS_TAB);
+  if (!sh) throw new Error(MASTER_PUPILS_TAB + ' tab missing from master sheet');
+  const rows = sh.getDataRange().getValues();
+  if (rows.length < 2) return [];
+  const hdr = rows[0].map(function (h) { return String(h).trim().toLowerCase(); });
+  const ix = function (name) { return hdr.indexOf(name); };
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const upn = String(r[ix('upn')] || '').trim();
+    if (!upn) continue; // import rejects UPN-less rows too
+    // status: active | check_leaver | left. Blank (legacy rows) counts as active.
+    const status = String(r[ix('status')] || '').trim().toLowerCase();
+    if (status && status !== 'active') continue;
+    out.push({
+      id: upn,
+      upn: upn,
+      first: String(r[ix('first_name')] || '').trim(),
+      last: String(r[ix('last_name')] || '').trim(),
+      class: String(r[ix('tutor_group')] || '').trim(),
+      yearGroup: String(r[ix('year_group')] || '').trim(),
+      sex: String(r[ix('sex')] || '').trim(),
+      eal: truthy(r[ix('is_eal')]),
+      pp: truthy(r[ix('is_pp')]),
+      fsm: truthy(r[ix('is_fsm')]),
+      lac: truthy(r[ix('is_lac')]),
+      sen: String(r[ix('sen_status')] || '').trim()
+    });
+  }
+  return out;
+}
+
+// Legacy source: hub planning workbook's Pupils tab
+// (headers: id, first, last, class, yeargroup, sex, eal, pp, sen).
+function readHubPupils() {
   const ss = SpreadsheetApp.openById(HUB_SHEET_ID);
   const sh = ss.getSheetByName(PUPILS_TAB);
-  if (!sh) return { pupils: [], hint: PUPILS_TAB + ' tab missing from hub sheet' };
+  if (!sh) return [];
   const rows = sh.getDataRange().getValues();
-  if (rows.length < 2) return { pupils: [] };
+  if (rows.length < 2) return [];
   const hdr = rows[0].map(function (h) { return String(h).toLowerCase(); });
   const ix = function (name) { return hdr.indexOf(name); };
   const out = [];
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     if (!r[ix('first')] && !r[ix('last')]) continue;
-    const pupil = {
+    out.push({
       id: String(r[ix('id')] || ''),
+      upn: String(r[ix('id')] || ''),
       first: String(r[ix('first')] || ''),
       last: String(r[ix('last')] || ''),
       class: String(r[ix('class')] || ''),
       yearGroup: String(r[ix('yeargroup')] || ''),
       sex: String(r[ix('sex')] || ''),
-      eal: r[ix('eal')] === true || String(r[ix('eal')]).toUpperCase() === 'Y',
-      pp: r[ix('pp')] === true || String(r[ix('pp')]).toUpperCase() === 'Y',
-      sen: String(r[ix('sen')] || '') || null
-    };
-    if (p.yeargroup && pupil.yearGroup !== p.yeargroup) continue;
-    if (p.class && pupil.class !== p.class) continue;
-    out.push(pupil);
+      eal: truthy(r[ix('eal')]),
+      pp: truthy(r[ix('pp')]),
+      fsm: false,
+      lac: false,
+      sen: String(r[ix('sen')] || '')
+    });
   }
-  return { pupils: out };
+  return out;
 }
 
 function seedPupils(e) {
