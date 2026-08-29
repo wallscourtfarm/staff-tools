@@ -2,6 +2,18 @@
 var SHEET_ID = '1A0pjyjX2lYVlruAKJYmn3j36GoSzIol6kt6u8qI44D0';
 var SHEET_NAME = 'Tracking';
 
+// Shared light token (same scheme as shared-sync). Token arrives in the query
+// string, never headers, to avoid the Apps Script CORS preflight.
+function tokenOK(e) {
+  var expected = PropertiesService.getScriptProperties().getProperty('SHARED_TOKEN') || '2013';
+  return !!(e && e.parameter && e.parameter.token && e.parameter.token === expected);
+}
+
+function denied() {
+  return ContentService.createTextOutput(JSON.stringify({ok: false, error: 'unauthorised'}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function getSheet() {
   var ss = SpreadsheetApp.openById(SHEET_ID);
   var sheet = ss.getSheetByName(SHEET_NAME);
@@ -26,6 +38,7 @@ function getRowMap(sheet) {
 // GET — returns all issued tracking data, or handles action=update to save a single pupil's milestones
 function doGet(e) {
   try {
+    if (!tokenOK(e)) return denied();
     var sheet = getSheet();
 
     // action=update: save a single pupil record sent as URL params (avoids POST redirect issue)
@@ -102,6 +115,8 @@ function fixBadData() {
 }
 
 // doPost kept for reference but not used by the frontend (redirect converts POST to GET)
+// POST redirect converts to GET on Apps Script, so the frontend's bulk save
+// POST lands here; forward the token so the gate still passes.
 function doPost(e) {
-  return doGet({parameter: {action: 'noop'}});
+  return doGet({parameter: {action: 'noop', token: (e && e.parameter && e.parameter.token) || ''}});
 }
