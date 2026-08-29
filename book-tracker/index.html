@@ -286,7 +286,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · WFA-29.08.26a</div>
+  <div class="version">WFA Book Tracker · WFA-29.08.26c</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -350,6 +350,10 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
       <strong>Books:</strong> <code style="background:#f0f0f0;padding:1px 4px;border-radius:3px">title,author,phase,copies</code> e.g. <em>The Worst Witch,Jill Murphy,LKS2,2</em>
     </p>
     <textarea class="inp" id="importCsv" rows="5" placeholder="Paste CSV here…" style="resize:vertical"></textarea>
+    <hr class="div">
+    <h3 style="font-size:16px;margin-bottom:4px">School Roster</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">One-click refresh from the hub Pupils tab (Y1–Y6, all classes). Adds any pupils not already here — nobody is removed and no existing data changes.</p>
+    <button class="btn btn-blue btn-sm" id="rosterSyncBtn" onclick="syncHubRoster()">Pull School Roster</button>
     <div class="modal-btns" style="margin-top:8px">
       <button class="btn btn-ghost btn-sm" onclick="importCSV('children')">Import Children</button>
       <button class="btn btn-ghost btn-sm" onclick="importCSV('books')">Import Books</button>
@@ -613,6 +617,32 @@ async function importCSV(type) {
     document.getElementById('importCsv').value = '';
     await loadData();
   } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ════════════════════════════════════════════════
+// HUB ROSTER (school Pupils tab via shared-sync)
+// ════════════════════════════════════════════════
+const HUB_ROSTER_URL = 'https://script.google.com/macros/s/AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec';
+
+async function syncHubRoster() {
+  const btn = document.getElementById('rosterSyncBtn');
+  try {
+    btn.disabled = true; btn.textContent = 'Pulling…';
+    const r = await fetch(HUB_ROSTER_URL + '?action=getPupils&t=' + Date.now() + '&token=' + WFA_TOKEN);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    const roster = (d.pupils || [])
+      .map(p => ({ name: (p.first + ' ' + p.last).trim(), yearGroup: p.yearGroup || '', class: p.class || '' }))
+      .filter(c => c.name);
+    if (!roster.length) { toast('Roster came back empty — is the hub Pupils tab populated?'); return; }
+    const existing = new Set(children.map(c => (c.name || '').trim().toLowerCase()));
+    const missing = roster.filter(c => !existing.has(c.name.toLowerCase()));
+    if (!missing.length) { toast('✓ Children list already up to date'); return; }
+    const res = await api({ action: 'importData', children: missing });
+    toast(`✓ Added ${res.children || missing.length} pupil${(res.children || missing.length) === 1 ? '' : 's'} from the school roster`);
+    await loadData();
+  } catch(e) { toast('Error: ' + e.message, 5000); }
+  finally { btn.disabled = false; btn.textContent = 'Pull School Roster'; }
 }
 
 // ════════════════════════════════════════════════
