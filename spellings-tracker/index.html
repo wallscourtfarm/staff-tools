@@ -353,7 +353,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">WFA-29.08.26a</span>
+  <span class="version">WFA-29.08.26b</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <div id="yg-bar">
@@ -682,6 +682,10 @@ const YG_CLASSES = {
 const REAL_PUPILS_BY_YG = {};  // filled after per-YG arrays defined
 
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbzwY-2zUMhFsNDdck_hgGswxXgOusGozaogPMR5w9-IWgCy4jmLuLcv88r2vs6OYpmW/exec';
+// Shared light token (see shared-sync/sync-script.gs). Sent in the query
+// string, never headers, because these fetches omit Content-Type to avoid
+// CORS preflight. localStorage override for token rotation.
+const WFA_TOKEN = localStorage.getItem('wfa_shared_token') || '2013';
 let state = loadLocal();
 let syncInProgress = false;
 
@@ -739,7 +743,7 @@ async function sheetLoadAll() {
   if (!SYNC_URL || (state.currentYg || 'Y5') !== 'Y5') { updateSyncStatus(); return false; }
   updateSyncStatus('loading');
   try {
-    const res = await fetch(SYNC_URL + '?action=loadAll');
+    const res = await fetch(SYNC_URL + '?action=loadAll&token=' + WFA_TOKEN);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (!data || !data.pupils) throw new Error('Invalid response');
@@ -797,7 +801,7 @@ async function sheetSaveAll() {
     }
   };
   try {
-    const res = await fetch(SYNC_URL, {
+    const res = await fetch(SYNC_URL + '?token=' + WFA_TOKEN, {
       method: 'POST',
       body: JSON.stringify(payload),
       headers: { 'Content-Type': 'text/plain' }
