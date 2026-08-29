@@ -251,7 +251,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · WFA-29.08.26a</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · WFA-29.08.26b</footer>
 
 <script>
 // ── Activity types ─────────────────────────────────────────────────────────────
@@ -613,9 +613,27 @@ function pinKey(k) {
   if(k==='⌫'){pinEntry=pinEntry.slice(0,-1);refreshPinDots();return;}
   if(pinEntry.length>=4) return;
   pinEntry+=k; refreshPinDots();
-  if(pinEntry.length===4){
-    if(pinEntry===EDIT_PIN){editMode=true;closePinModal();updateLockUI();}
-    else{refreshPinDots(true);setTimeout(()=>{pinEntry='';refreshPinDots();},700);}
+  if(pinEntry.length===4) checkPinAsync(pinEntry);
+}
+// PIN is verified server-side (shared-sync checkPin / STAFF_PIN Script Property).
+// Offline fallback: accept the local PIN when the server can't be reached.
+// editMode already granted this browser session skips the prompt entirely.
+async function checkPinAsync(pin) {
+  if (sessionStorage.getItem('wfa_slt_edit_ok') === '1') {
+    editMode = true; closePinModal(); updateLockUI(); return;
+  }
+  try {
+    const r = await fetch(SYNC_URL + '&action=checkPin&pin=' + encodeURIComponent(pin) + '&t=' + Date.now());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if (d && d.ok) {
+      sessionStorage.setItem('wfa_slt_edit_ok', '1');
+      editMode = true; closePinModal(); updateLockUI();
+    } else { refreshPinDots(true); setTimeout(() => { pinEntry=''; refreshPinDots(); }, 700); }
+  } catch (err) {
+    if (pin === EDIT_PIN) {
+      editMode = true; closePinModal(); updateLockUI();
+    } else { refreshPinDots(true); setTimeout(() => { pinEntry=''; refreshPinDots(); }, 700); }
   }
 }
 
