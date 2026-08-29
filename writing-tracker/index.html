@@ -524,7 +524,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-interventions" onclick="showTab('interventions')">Interventions</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">27.07.26r</span>
+      <span class="version">WFA-29.08.26a</span>
     </div>
   </header>
 
@@ -775,8 +775,10 @@ function showSetup() {
   document.getElementById('app').classList.add('hidden');
 }
 
+const WFA_TOKEN = localStorage.getItem('wfa_shared_token') || '2013';
+
 async function apiGet(action, params = {}, timeoutMs = 45000) {
-  const qs = new URLSearchParams({ action, ...params }).toString();
+  const qs = new URLSearchParams({ action, token: WFA_TOKEN, ...params }).toString();
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -794,7 +796,7 @@ async function apiGet(action, params = {}, timeoutMs = 45000) {
 }
 
 async function apiPost(data) {
-  const res = await fetch(state.apiUrl, {
+  const res = await fetch(`${state.apiUrl}?token=${WFA_TOKEN}`, {
     method: 'POST',
     body: JSON.stringify(data)
     // No Content-Type — avoids CORS preflight for Apps Script
