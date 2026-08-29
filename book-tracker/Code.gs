@@ -5,25 +5,36 @@
 
 const SS = SpreadsheetApp.openById('1l8ZNNUd4jdXeVisB7ZEhz7N8ipW7GL4UQh6fWD9_XGY');
 
+// Light shared token (see shared-sync/sync-script.gs). Set the SHARED_TOKEN
+// Script Property to raise the bar; default matches the shipped client.
+function tokenOK(e) {
+  const want = PropertiesService.getScriptProperties().getProperty('SHARED_TOKEN') || '2013';
+  return (((e || {}).parameter || {}).token || '') === want;
+}
+
 function doGet(e) {
   try {
+    if (!tokenOK(e)) return outJson_({ error: 'unauthorised' });
     const params = e.parameter;
     let payload = {};
     if (params.payload) {
       payload = JSON.parse(params.payload);
+      if (!payload.action && params.action) payload.action = params.action;
     } else {
       payload = Object.assign({}, params);
       if (!payload.action) payload.action = 'getAll';
     }
     const result = dispatch(payload);
-    return ContentService
-      .createTextOutput(JSON.stringify(result))
-      .setMimeType(ContentService.MimeType.JSON);
+    return outJson_(result);
   } catch(err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ error: err.message }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return outJson_({ error: err.message });
   }
+}
+
+function outJson_(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function doPost(e) { return doGet(e); }
@@ -45,11 +56,43 @@ function dispatch(p) {
     case 'importBooks':      return importBooks(p);
     case 'bulkImportReads':  return bulkImportReads(p);
     case 'clearData':        return clearData(p);
+    case 'certsIssued':      return getCertsIssued();
+    case 'markIssued':       return markCertsIssued(p);
     case 'rawSheet':         return rawSheet(p);
     case 'fixSchema':        return fixSchema();
     case 'testWrite':        return testWrite(p);
     default: return { error: 'Unknown action: ' + p.action };
   }
+}
+
+// ════════════════════════════════════════════════
+// CERTIFICATE ISSUE TRACKING
+// ════════════════════════════════════════════════
+// CertIssues headers: childId, milestone, issuedOn (DD/MM/YYYY), issuedBy
+function markCertsIssued(p) {
+  const sh = SS.getSheetByName('CertIssues') || SS.insertSheet('CertIssues');
+  if (sh.getLastRow() === 0) sh.appendRow(['childId', 'milestone', 'issuedOn', 'issuedBy']);
+  const by = String(p.issuedBy || '');
+  const items = p.items || [];
+  items.forEach(it => {
+    sh.appendRow([String(it.childId || ''), String(it.ms || ''), new Date().toLocaleDateString('en-GB'), by]);
+  });
+  return { ok: true, count: items.length };
+}
+
+function getCertsIssued() {
+  const sh = SS.getSheetByName('CertIssues');
+  if (!sh) return { ok: true, certIssues: [] };
+  const rows = sh.getDataRange().getValues();
+  const hdr = rows[0].map(h => String(h).trim().toLowerCase());
+  const iId = hdr.indexOf('childid'), iMs = hdr.indexOf('milestone'), iOn = hdr.indexOf('issuedon');
+  const out = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row[iId]) continue;
+    out.push({ childId: String(row[iId]), ms: String(row[iMs] || ''), issuedOn: String(row[iOn] || '') });
+  }
+  return { ok: true, certIssues: out };
 }
 
 // ════════════════════════════════════════════════
@@ -207,7 +250,8 @@ function getAll() {
   return {
     children: Object.values(children),
     books:    Object.values(books),
-    coverOverrides
+    coverOverrides,
+    certIssues: getCertsIssued().certIssues
   };
 }
 
