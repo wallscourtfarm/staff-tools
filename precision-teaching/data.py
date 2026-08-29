@@ -4,6 +4,7 @@ import json
 import os
 import random
 import string
+import re
 import subprocess
 from datetime import date, datetime
 from pathlib import Path
@@ -402,7 +403,46 @@ def write_json(path, data):
 
 # ── Git Sync ────────────────────────────────────────────────────────────────
 
+def _github_token():
+    """Token from the environment or Streamlit secrets, if either is present."""
+    tok = os.environ.get("GITHUB_TOKEN", "")
+    if tok:
+        return tok
+    try:
+        import streamlit as st
+        return st.secrets.get("GITHUB_TOKEN", "")
+    except Exception:
+        return ""
+
+
+def ensure_remote_auth():
+    """Keep the origin remote clean of baked-in tokens; auth via env/secrets.
+
+    A PAT in .git/config would ship the credential wherever the repo is
+    copied, so the remote is kept as plain https:// and the token is applied
+    per-operation from Streamlit secrets / GITHUB_TOKEN instead.
+    """
+    gitcfg = REPO_DIR / ".git" / "config"
+    try:
+        if gitcfg.exists():
+            cfg = gitcfg.read_text(encoding="utf-8", errors="ignore")
+            if re.search(r"https://[^@\s]+@", cfg):
+                cfg = re.sub(r"(https://)[^@\s]+@", r"\1", cfg)
+                gitcfg.write_text(cfg, encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _git_auth_url():
+    tok = _github_token()
+    base = "https://github.com/wallscourtfarm/staff-tools.git"
+    if tok:
+        return f"https://{tok}@{base[len('https://'):]}"
+    return base
+
+
 def git_pull():
+    ensure_remote_auth()
     try:
         subprocess.run(["git", "pull", "--rebase"], cwd=REPO_DIR, capture_output=True, timeout=15)
         return True
@@ -412,12 +452,18 @@ def git_pull():
 
 def git_add_commit_push(filepath, message):
     try:
+        ensure_remote_auth()
         subprocess.run(["git", "add", filepath], cwd=REPO_DIR, capture_output=True, timeout=10)
         subprocess.run(["git", "commit", "-m", message], cwd=REPO_DIR, capture_output=True, timeout=10)
-        result = subprocess.run(["git", "push"], cwd=REPO_DIR, capture_output=True, timeout=30)
+        remote = subprocess.run(["git", "remote", "get-url", "origin"], cwd=REPO_DIR,
+                                capture_output=True, text=True, timeout=5)
+        push_url = _git_auth_url() if remote.returncode == 0 else None
+        result = subprocess.run(["git", "push", push_url or "origin", "HEAD:main"],
+                                cwd=REPO_DIR, capture_output=True, timeout=30)
         if result.returncode != 0:
             subprocess.run(["git", "pull", "--rebase"], cwd=REPO_DIR, capture_output=True, timeout=15)
-            subprocess.run(["git", "push"], cwd=REPO_DIR, capture_output=True, timeout=30)
+            subprocess.run(["git", "push", push_url or "origin", "HEAD:main"],
+                           cwd=REPO_DIR, capture_output=True, timeout=30)
         return True
     except Exception:
         return False
