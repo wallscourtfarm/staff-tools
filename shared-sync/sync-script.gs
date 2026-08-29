@@ -35,6 +35,7 @@ function doGet(e) {
     if (!tokenOK(e)) return json({ error: 'unauthorised' });
     const p = e.parameter || {};
     if (p.action === 'getPupils') return json(getPupils(p));
+    if (p.action === 'checkPin') return json(checkPin(p));
     const key = p.key;
     if (!key) return json({ error: 'missing key' });
     const data = props().getProperty(key);
@@ -116,6 +117,15 @@ function seedPupils(e) {
   } catch (err) {
     return json({ status: 'error', message: err.message });
   }
+}
+
+// One staff PIN for all tools. Set the STAFF_PIN Script Property to change it
+// everywhere at once (client fallback is '2013' while offline). Light check —
+// the shared token above is the real gate; this exists so staff PINs can be
+// rotated in one place instead of per-tool.
+function checkPin(p) {
+  const want = props().getProperty('STAFF_PIN') || '2013';
+  return { ok: ((p || {}).pin || '') === want };
 }
 
 function json(obj) {
