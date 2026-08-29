@@ -22,7 +22,7 @@ CLASSES = ['1ER', '1JS', '2JH', '2MY', '3JW', '3WU', '4CK', '4RB',
            '5IM', '5LS', '6JM', '6SD']
 
 SHARED_SYNC_URL = ('https://script.google.com/macros/s/'
-                   'AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec')
+                   'AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec')
 TOKEN = '2013'
 
 
