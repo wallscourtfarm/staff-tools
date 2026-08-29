@@ -48,7 +48,9 @@ function doGet(e) {
 function doPost(e) {
   try {
     if (!tokenOK(e)) return json({ error: 'unauthorised' });
-    const key = (e.parameter || {}).key;
+    const p = e.parameter || {};
+    if (p.action === 'seedPupils') return seedPupils(e);
+    const key = p.key;
     if (!key) return json({ error: 'missing key' });
     props().setProperty(key, e.postData.contents);
     return json({ status: 'ok' });
@@ -87,6 +89,33 @@ function getPupils(p) {
     out.push(pupil);
   }
   return { pupils: out };
+}
+
+function seedPupils(e) {
+  try {
+    const body = JSON.parse(e.postData.contents);
+    const pupils = body.pupils || [];
+    const ss = SpreadsheetApp.openById(HUB_SHEET_ID);
+    let sh = ss.getSheetByName(PUPILS_TAB);
+    if (!sh) sh = ss.insertSheet(PUPILS_TAB);
+    const rows = [
+      ['id', 'first', 'last', 'class', 'yeargroup', 'sex', 'eal', 'pp', 'sen']
+    ];
+    pupils.forEach(function (p) {
+      rows.push([
+        p.id || '', p.first || '', p.last || '',
+        p.class || '', p.yearGroup || p.yeargroup || '',
+        p.sex || '', p.eal ? 'Y' : 'N', p.pp ? 'Y' : 'N',
+        p.sen || ''
+      ]);
+    });
+    sh.clearContents();
+    sh.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+    sh.getRange(1, 1, 1, rows[0].length).setFontWeight('bold');
+    return json({ status: 'ok', count: pupils.length });
+  } catch (err) {
+    return json({ status: 'error', message: err.message });
+  }
 }
 
 function json(obj) {
