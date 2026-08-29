@@ -353,7 +353,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">WFA-29.08.26b</span>
+  <span class="version">WFA-29.08.26c</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <div id="yg-bar">
@@ -850,11 +850,15 @@ function switchYearGroup(yg) {
 
   // Only Y5 syncs to the existing Google Sheet
   if (yg === 'Y5' && SYNC_URL) {
-    sheetLoadAll().then(() => { updateSyncStatus('ok'); renderDashboard(); goTab('dashboard'); });
+    sheetLoadAll()
+      .then(() => hubRefreshPupils())
+      .then(() => { updateSyncStatus('ok'); renderDashboard(); goTab('dashboard'); });
   } else {
     updateSyncStatus();
-    renderDashboard();
-    goTab('dashboard');
+    hubRefreshPupils().then(() => {
+      renderDashboard();
+      goTab('dashboard');
+    });
   }
 }
 
@@ -2787,16 +2791,60 @@ function downloadPDF(element, filename, orientation) {
 }
 
 // ========================
+// HUB ROSTER
+// ========================
+// The hub planning sheet's Pupils tab (via shared-sync getPupils) is the
+// canonical school roster — see scripts/seed_pupils.py. Hub refresh adds any
+// new pupils and corrects names/classes; existing tracking data (mastery,
+// pairs, TT sets) is always preserved, and nobody is auto-removed.
+const HUB_ROSTER_URL = 'https://script.google.com/macros/s/AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw/exec';
+const nameKey = p => (p.firstName || p.first || '').trim().toLowerCase() + ' ' + (p.lastName || p.last || '').trim().toLowerCase();
+
+async function hubRefreshPupils() {
+  try {
+    const yg = state.currentYg || 'Y5';
+    const res = await fetch(HUB_ROSTER_URL + '?action=getPupils&yeargroup=' + yg + '&t=' + Date.now() + '&token=' + WFA_TOKEN);
+    if (!res.ok) return;
+    const data = await res.json();
+    const list = (data.pupils || []).filter(p => p.first || p.first === '');
+    if (!list.length) return;
+    const byName = {};
+    state.pupils.forEach(p => { byName[nameKey(p)] = p; });
+    list.forEach(hp => {
+      const key = (hp.first || '').trim().toLowerCase() + ' ' + (hp.last || '').trim().toLowerCase();
+      const existing = byName[key];
+      if (existing) {
+        if (hp.class && existing.class !== hp.class) existing.class = hp.class;
+        if (!existing.id && hp.id) existing.id = hp.id;
+      } else {
+        state.pupils.push({
+          id: hp.id || '', firstName: hp.first, lastName: hp.last || '',
+          class: hp.class || '', pairId: null, tableNum: '', ttSet: '',
+          mastery: {}
+        });
+      }
+    });
+    state.pupils.sort((a, b) =>
+      (a.firstName || '').localeCompare(b.firstName || '') ||
+      (a.lastName || '').localeCompare(b.lastName || ''));
+    saveLocal();
+  } catch (e) { console.warn('Hub roster refresh failed:', e); }
+}
+
+// ========================
 // INIT
 // ========================
 // Initialise year group bar and class buttons
 updateYgBar();
 updateSyncStatus();
-if ((state.currentYg || 'Y5') === 'Y5' && SYNC_URL) {
-  sheetLoadAll().then(() => { updateSyncStatus('ok'); renderDashboard(); goTab('dashboard'); });
-} else {
+(async function boot() {
+  if ((state.currentYg || 'Y5') === 'Y5' && SYNC_URL) {
+    const ok = await sheetLoadAll();
+    if (ok) updateSyncStatus('ok');
+  }
+  await hubRefreshPupils();
   renderDashboard(); goTab('dashboard');
-}
+})();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 </body>
