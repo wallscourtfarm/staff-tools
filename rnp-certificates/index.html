@@ -132,6 +132,7 @@ var xlsxData = null;
 var certsToGenerate = [];
 var newTracking = null;
 var API_URL = 'https://script.google.com/macros/s/AKfycbzsgKQgORQ8S_V_X0hiTuPl5JCVgijW_JkDs4m6R27-_TMxoFGwt4L3mcjPaKBHPd1O/exec';
+var WFA_TOKEN = localStorage.getItem('wfa_shared_token') || '2013';
 
 function loadXlsx(input) {
   var f = input.files[0]; if (!f) return;
@@ -203,7 +204,7 @@ function processData() {
   btn.textContent = '\u23F3  Loading tracking data…';
 
   var confirmBtn = document.getElementById('confirm-btn'); if (confirmBtn) { confirmBtn.style.display='none'; confirmBtn.disabled=false; confirmBtn.innerHTML='&#10003; &nbsp;Confirm certificates printed'; }
-  fetch(API_URL)
+  fetch(API_URL + '?token=' + WFA_TOKEN)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (!data.ok) throw new Error(data.error || 'Failed to load tracking data');
@@ -248,7 +249,7 @@ function processData() {
 
 function saveTracking() {
   if (!newTracking) return;
-  fetch(API_URL, {
+  fetch(API_URL + '?token=' + WFA_TOKEN, {
     method: 'POST',
     headers: {'Content-Type': 'text/plain'},
     body: JSON.stringify({issued: newTracking.issued})
@@ -364,7 +365,7 @@ function confirmPrinted() {
   function saveNext() {
     if (idx >= keys.length) {
       // All saved — verify with a GET
-      return fetch(API_URL)
+      return fetch(API_URL + '?token=' + WFA_TOKEN)
         .then(function(r){ return r.json(); })
         .then(function(data) {
           var issued = data.issued || {};
@@ -379,7 +380,7 @@ function confirmPrinted() {
     }
     var key = keys[idx++];
     var msStr = keysToSave[key].slice().sort(function(a,b){return a-b;}).join(',');
-    var url = API_URL + '?action=update&key=' + encodeURIComponent(key) + '&ms=' + encodeURIComponent(msStr);
+    var url = API_URL + '?action=update&key=' + encodeURIComponent(key) + '&ms=' + encodeURIComponent(msStr) + '&token=' + WFA_TOKEN;
     return fetch(url)
       .then(function(r){ return r.json(); })
       .then(function(data) {
@@ -398,5 +399,6 @@ function confirmPrinted() {
 }
 
 </script>
+<footer style="text-align:center;font-size:11px;color:#a0aec0;padding:8px 0;">Wallscourt Farm Academy &middot; RNP Certificate Tracker &middot; WFA-29.08.26a</footer>
 </body>
 </html>
