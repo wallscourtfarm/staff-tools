@@ -35,6 +35,7 @@ function doGet(e) {
     if (!tokenOK(e)) return json({ error: 'unauthorised' });
     const p = e.parameter || {};
     if (p.action === 'getPupils') return json(getPupils(p));
+    if (p.action === 'getClasses') return json(getClasses(p));
     if (p.action === 'checkPin') return json(checkPin(p));
     const key = p.key;
     if (!key) return json({ error: 'missing key' });
@@ -79,6 +80,7 @@ function doPost(e) {
 
 const MASTER_SHEET_ID = '1NMY0KUGGnReVV-pGPCBp2UIjhc8OylIkGrFTAoiGZqM';
 const MASTER_PUPILS_TAB = 'pupils';
+const MASTER_CLASSES_TAB = 'classes';
 
 function truthy(val) {
   const s = String(val === true ? 'Y' : val || '').trim().toUpperCase();
@@ -107,6 +109,107 @@ function filterPupils(all, p, source) {
   return { pupils: out };
 }
 
+// ── Class mapping (Bromcom code ↔ display name) ────────────────────────────
+//
+// The "classes" tab of the master sheet is the single source of truth:
+//   tutor_group   — the permanent Bromcom tutor-group code (e.g. 5H2)
+//   display_name  — the teacher-facing name shown in every tool (e.g. 5IM)
+//   academic_year — e.g. 2026-27
+//   teacher_initials — current teacher's initials (e.g. IM)
+//
+// When a teacher changes, edit display_name (+teacher_initials) here and
+// every tool follows. Bromcom codes are stable and never need editing.
+
+function readClassMap() {
+  const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+  const sh = ss.getSheetByName(MASTER_CLASSES_TAB);
+  if (!sh) return [];
+  const rows = sh.getDataRange().getValues();
+  if (rows.length < 2) return [];
+  const hdr = rows[0].map(function (h) { return String(h).trim().toLowerCase(); });
+  const ix = function (name) { return hdr.indexOf(name); };
+  const map = {};
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const code = String(r[ix('tutor_group')] || '').trim();
+    if (!code) continue;
+    const display = String(r[ix('display_name')] || '').trim() || code;
+    map[code] = {
+      code: code,
+      display: display,
+      teacherInitials: String(r[ix('teacher_initials')] || '').trim(),
+      academicYear: String(r[ix('academic_year')] || '').trim()
+    };
+  }
+  return map;
+}
+
+function getClasses(p) {
+  const year = (p || {}).academic_year || '';
+  const map = readClassMap();
+  let rows = Object.keys(map).map(function (code) { return map[code]; });
+  if (year) rows = rows.filter(function (c) { return c.academicYear === year; });
+  return { classes: rows };
+}
+
+/** One-off seed: rewrite the classes tab with the 2026-27 Bromcom-code map. */
+function seedClassMap() {
+  const SEED = [
+    ['tutor_group', 'display_name', 'academic_year', 'teacher_initials'],
+    ['1B1', '1JS', '2026-27', 'JS'],
+    ['1B2', '1ER', '2026-27', 'ER'],
+    ['2W1', '2JH', '2026-27', 'JH'],
+    ['2W2', '2MY', '2026-27', 'MY'],
+    ['3A1', '3JW', '2026-27', 'JW'],
+    ['3A2', '3WU', '2026-27', 'WU'],
+    ['4M1', '4CC', '2026-27', 'CC'],
+    ['4M2', '4RB', '2026-27', 'RB'],
+    ['5H1', '5LS', '2026-27', 'LS'],
+    ['5H2', '5IM', '2026-27', 'IM'],
+    ['6E1', '6JM', '2026-27', 'JM'],
+    ['6E2', '6SD', '2026-27', 'SD']
+  ];
+  const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+  const sh = ss.getSheetByName(MASTER_CLASSES_TAB) || ss.insertSheet(MASTER_CLASSES_TAB);
+  sh.clearContents();
+  // Force text format BEFORE writing so '6E1' is not parsed as 6.00E+01
+  sh.getRange(1, 1, SEED.length, SEED[0].length).setNumberFormat('@');
+  sh.getRange(1, 1, SEED.length, SEED[0].length).setValues(SEED);
+  sh.getRange(1, 1, 1, SEED[0].length).setFontWeight('bold');
+  return { status: 'ok', rows: SEED.length - 1 };
+}
+
+/** One-off: re-key the pupils tab tutor_group from display names to Bromcom
+ *  codes (idempotent — rows already carrying real codes are left alone). */
+function rekeyPupilsToCodes() {
+  const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+  const sh = ss.getSheetByName(MASTER_PUPILS_TAB);
+  if (!sh) throw new Error(MASTER_PUPILS_TAB + ' tab missing from master sheet');
+  const map = readClassMap();
+  // display name → code
+  const byDisplay = {};
+  Object.keys(map).forEach(function (code) { byDisplay[map[code].display] = code; });
+  const rows = sh.getDataRange().getValues();
+  if (rows.length < 2) throw new Error('no pupil rows');
+  const hdr = rows[0].map(function (h) { return String(h).trim().toLowerCase(); });
+  const col = hdr.indexOf('tutor_group') + 1;
+  if (!col) throw new Error('tutor_group column missing');
+  let changed = 0, unchanged = 0, unmatched = [];
+  for (let i = 2; i <= rows.length; i++) {
+    const v = String(rows[i - 1][col - 1] || '').trim();
+    if (!v) continue;
+    if (map[v]) { unchanged++; continue; }          // already a Bromcom code
+    if (byDisplay[v]) {                             // display name → code
+      sh.getRange(i, col).setNumberFormat('@');
+      sh.getRange(i, col).setValue(byDisplay[v]);
+      changed++;
+    } else {
+      unmatched.push(v);
+    }
+  }
+  return { status: 'ok', changed: changed, unchanged: unchanged, unmatched: unmatched };
+}
+
 function readMasterPupils() {
   const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
   const sh = ss.getSheetByName(MASTER_PUPILS_TAB);
@@ -115,6 +218,16 @@ function readMasterPupils() {
   if (rows.length < 2) return [];
   const hdr = rows[0].map(function (h) { return String(h).trim().toLowerCase(); });
   const ix = function (name) { return hdr.indexOf(name); };
+  // Bromcom code → display name (best effort; unmapped codes pass through)
+  let cmap = {};
+  try {
+    const cm = readClassMap();
+    Object.keys(cm).forEach(function (code) { cmap[code.toUpperCase()] = cm[code].display; });
+  } catch (err) { /* mapping tab missing — serve raw codes */ }
+  const display = function (code) {
+    code = String(code || '').trim();
+    return cmap[code.toUpperCase()] || code;
+  };
   const out = [];
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
@@ -123,12 +236,14 @@ function readMasterPupils() {
     // status: active | check_leaver | left. Blank (legacy rows) counts as active.
     const status = String(r[ix('status')] || '').trim().toLowerCase();
     if (status && status !== 'active') continue;
+    const rawCode = String(r[ix('tutor_group')] || '').trim();
     out.push({
       id: upn,
       upn: upn,
       first: String(r[ix('first_name')] || '').trim(),
       last: String(r[ix('last_name')] || '').trim(),
-      class: String(r[ix('tutor_group')] || '').trim(),
+      code: rawCode,                              // permanent Bromcom code
+      class: display(rawCode),                    // teacher-facing display name
       yearGroup: String(r[ix('year_group')] || '').trim(),
       sex: String(r[ix('sex')] || '').trim(),
       eal: truthy(r[ix('is_eal')]),
