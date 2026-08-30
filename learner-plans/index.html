@@ -1210,6 +1210,7 @@ function showNewYearModal() {
   const nextYG = YGS[Math.min(YGS.indexOf(child.year_group) + 1, YGS.length - 1)] || child.year_group || '';
   yg.value = nextYG;
   updateNyClasses();
+  hubRefreshClassDisplay();
   document.getElementById('nyTeacher').value = child.teacher || '';
   document.getElementById('newYearModal').style.display = 'flex';
 }
@@ -1224,12 +1225,40 @@ const YG_CLASSES = {
   'Year 6': ['6E1','6E2'],
 };
 
+// Live class map from the hub's classes tab (shared-sync getClasses). Values
+// stay Bromcom codes (stable across teacher changes); display names are shown
+// next to them when available. Cached so the rollover dialog still works
+// offline after the first successful fetch.
+const HUB_CLS_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
+const HUB_CLS_KEY = 'learner-plans-hub-classes';
+let HUB_CLASS_DISPLAY = (() => {  // code -> display
+  try { return JSON.parse(localStorage.getItem(HUB_CLS_KEY)) || {}; }
+  catch (e) { return {}; }
+})();
+async function hubRefreshClassDisplay() {
+  try {
+    const token = localStorage.getItem('wfa_shared_token') || '2013';
+    const res = await fetch(HUB_CLS_URL + '?action=getClasses&t=' + Date.now() + '&token=' + token);
+    if (!res.ok) return;
+    const data = await res.json();
+    const map = {};
+    (data.classes || []).forEach(c => { map[c.code] = c.display || c.code; });
+    if (!Object.keys(map).length) return;
+    HUB_CLASS_DISPLAY = map;
+    localStorage.setItem(HUB_CLS_KEY, JSON.stringify(map));
+    updateNyClasses();
+  } catch (e) { /* offline / hub down — YG_CLASSES skeleton still lists codes */ }
+}
+
 function updateNyClasses() {
   const yg = document.getElementById('nyYearGroup').value;
   const sel = document.getElementById('nyClass');
   const classes = YG_CLASSES[yg] || [];
   sel.innerHTML = classes.length
-    ? classes.map(c => `<option value="${c}">${c}</option>`).join('')
+    ? classes.map(c => {
+        const disp = HUB_CLASS_DISPLAY[c];
+        return `<option value="${c}">${c}${disp && disp !== c ? ' · ' + disp : ''}</option>`;
+      }).join('')
     : '<option value="">-- select year group first --</option>';
 }
 
@@ -1680,7 +1709,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; 20.07.26a
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-30.08.26a
 </footer>
 </body>
 </html>

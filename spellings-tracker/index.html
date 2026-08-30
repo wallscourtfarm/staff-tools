@@ -353,7 +353,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">WFA-29.08.26d</span>
+  <span class="version">WFA-30.08.26a</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <div id="yg-bar">
@@ -675,9 +675,12 @@
 const STORAGE_KEY = 'wfa-spellings-v4';  // legacy key — kept for migration
 
 const YG_DATA_KEY = 'wfa-spellings-ygdata';
+// Fallback only — the live list comes from the hub's classes tab
+// (getClasses, shared-sync) via hubRefreshClasses(). Y4 was stale here
+// ('4CK'); kept in sync with the 2026-27 master map.
 const YG_CLASSES = {
   Y1: ['1ER','1JS'], Y2: ['2MY','2JH'], Y3: ['3JW','3WU'],
-  Y4: ['4CK','4RB'], Y5: ['5LS','5IM'], Y6: ['6JM','6SD']
+  Y4: ['4CC','4RB'], Y5: ['5LS','5IM'], Y6: ['6JM','6SD']
 };
 const REAL_PUPILS_BY_YG = {};  // filled after per-YG arrays defined
 
@@ -872,7 +875,7 @@ function updateYgBar() {
 }
 
 function getYgClasses() {
-  return YG_CLASSES[state.currentYg || 'Y5'] || ['A','B'];
+  return HUB_CLASSES[state.currentYg || 'Y5'] || YG_CLASSES[state.currentYg || 'Y5'] || ['A','B'];
 }
 
 function updateClassButtons() {
@@ -2798,7 +2801,37 @@ function downloadPDF(element, filename, orientation) {
 // new pupils and corrects names/classes; existing tracking data (mastery,
 // pairs, TT sets) is always preserved, and nobody is auto-removed.
 const HUB_ROSTER_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
+const HUB_CLASSES_KEY = 'wfa-spellings-classes';
 const nameKey = p => (p.firstName || p.first || '').trim().toLowerCase() + ' ' + (p.lastName || p.last || '').trim().toLowerCase();
+
+// Class display names per year group, from the hub's classes tab (getClasses).
+// Grouped by the leading digit of the Bromcom code ('1B1' → Y1). Cached in
+// localStorage so the tool works offline after the first successful fetch.
+let HUB_CLASSES = (() => {
+  try { return JSON.parse(localStorage.getItem(HUB_CLASSES_KEY)) || {}; }
+  catch (e) { return {}; }
+})();
+
+async function hubRefreshClasses() {
+  try {
+    const res = await fetch(HUB_ROSTER_URL + '?action=getClasses&t=' + Date.now() + '&token=' + WFA_TOKEN);
+    if (!res.ok) return;
+    const data = await res.json();
+    const byYg = {};
+    (data.classes || []).forEach(c => {
+      const code = (c.code || '').trim();
+      if (!/^\d/.test(code)) return;
+      const yg = 'Y' + code.charAt(0);
+      const name = (c.display || code).trim();
+      if (!byYg[yg]) byYg[yg] = [];
+      if (!byYg[yg].includes(name)) byYg[yg].push(name);
+    });
+    if (!Object.keys(byYg).length) return;
+    HUB_CLASSES = byYg;
+    localStorage.setItem(HUB_CLASSES_KEY, JSON.stringify(byYg));
+    updateClassButtons();
+  } catch (e) { console.warn('Hub class list refresh failed:', e); }
+}
 
 async function hubRefreshPupils() {
   try {
@@ -2842,6 +2875,7 @@ updateSyncStatus();
     const ok = await sheetLoadAll();
     if (ok) updateSyncStatus('ok');
   }
+  await hubRefreshClasses();
   await hubRefreshPupils();
   renderDashboard(); goTab('dashboard');
 })();
