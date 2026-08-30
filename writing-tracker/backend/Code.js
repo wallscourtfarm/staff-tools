@@ -105,11 +105,22 @@ function initSheets_() {
       ensureColumns_(existing, headers);
     }
   }
-  // Force class_name column to plain text so values like "6E1" aren't auto-converted to 60.
-  const classesSheet = spreadsheet.getSheetByName('classes');
-  if (classesSheet && classesSheet.getLastRow() > 0) {
-    const classNameCol = SHEET_HEADERS.classes.indexOf('class_name') + 1;
-    classesSheet.getRange(2, classNameCol, classesSheet.getMaxRows() - 1, 1).setNumberFormat('@');
+  // Force text formats so IDs and codes like "6E1" aren't auto-converted
+  // (all-digit hex UUIDs would become sci-notation floats).
+  const TEXT_COLUMNS = [
+    ['classes', 'class_id'],
+    ['classes', 'class_name'],
+    ['pupils', 'pupil_id'],
+    ['pupils', 'class_id'],
+    ['assessments', 'assess_id'],
+    ['assessments', 'pupil_id']
+  ];
+  for (const [name, header] of TEXT_COLUMNS) {
+    const sh = spreadsheet.getSheetByName(name);
+    if (!sh || sh.getMaxRows() < 2) continue;
+    const headers = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
+    const col = headers.indexOf(header) + 1;
+    if (col > 0) sh.getRange(2, col, sh.getMaxRows() - 1, 1).setNumberFormat('@');
   }
   // Seed default config if empty
   const cfg = spreadsheet.getSheetByName('config');
@@ -170,16 +181,19 @@ function addClass_(d) {
   const sh = ss_().getSheetByName('classes');
   const id = Utilities.getUuid().substring(0, 8);
   const nextRow = sh.getLastRow() + 1;
-  const classNameCol = SHEET_HEADERS.classes.indexOf('class_name') + 1;
-  // Set text format before writing to prevent scientific notation auto-conversion (e.g. "6E1" → 60)
-  sh.getRange(nextRow, classNameCol).setNumberFormat('@');
+  // Set text format on the whole row before writing: prevents both
+  // "6E1" → 60 (class_name) AND all-digit hex IDs → sci-notation floats
+  // (class_id) — see the mangled 3JW row that produced 4.6245e+55.
+  sh.getRange(nextRow, 1, 1, SHEET_HEADERS.classes.length).setNumberFormat('@');
   sh.getRange(nextRow, 1, 1, SHEET_HEADERS.classes.length)
     .setValues([[id, d.year_group, d.class_name, d.teacher_name || '', d.academic_year, true]]);
   return { success: true, class_id: id };
 }
 
 function updateClass_(d) {
-  const found = findRow_('classes', r => r.class_id === d.class_id);
+  // String coercion both sides: rows written before text-formatting may hold
+  // numbers (or mangled floats), while the client always sends strings.
+  const found = findRow_('classes', r => String(r.class_id) === String(d.class_id));
   if (!found) return { error: 'Class not found' };
   const { rowNum, sheet, headers } = found;
   ['class_name','teacher_name','active'].forEach(f => {
@@ -196,7 +210,8 @@ function updateClass_(d) {
 
 function getPupils_(p) {
   let pupils = sheetData_('pupils').filter(r => truthy_(r.active));
-  if (p.class_id) pupils = pupils.filter(r => r.class_id === p.class_id);
+  // String coercion: pre-fix rows may hold numeric class_ids.
+  if (p.class_id) pupils = pupils.filter(r => String(r.class_id) === String(p.class_id));
   return pupils.sort((a, b) => String(a.name).localeCompare(String(b.name)));
 }
 
@@ -228,12 +243,21 @@ function buildPupilRow_(sh, id, d) {
 function addPupil_(d) {
   const sh = ss_().getSheetByName('pupils');
   const id = Utilities.getUuid().substring(0, 8);
-  sh.appendRow(buildPupilRow_(sh, id, d));
+  const nextRow = sh.getLastRow() + 1;
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  // Text-format the ID columns before writing — an all-digit hex UUID
+  // (e.g. "46245555") would otherwise parse as a number.
+  const formatCols = ['pupil_id', 'class_id']
+    .map(h => headers.indexOf(h) + 1)
+    .filter(c => c > 0);
+  formatCols.forEach(c => sh.getRange(nextRow, c).setNumberFormat('@'));
+  sh.getRange(nextRow, 1, 1, headers.length).setValues([buildPupilRow_(sh, id, d)]);
   return { success: true, pupil_id: id };
 }
 
 function updatePupil_(d) {
-  const found = findRow_('pupils', r => r.pupil_id === d.pupil_id);
+  // String coercion, as in updateClass_ — legacy rows may hold numeric IDs.
+  const found = findRow_('pupils', r => String(r.pupil_id) === String(d.pupil_id));
   if (!found) return { error: 'Pupil not found' };
   const { rowNum, sheet, headers } = found;
   ['name','class_id','working_at_level','active','notes','year_group',
@@ -319,7 +343,13 @@ function saveScores_(d) {
   }
 
   if (toAppend.length > 0) {
-    sh.getRange(sh.getLastRow() + 1, 1, toAppend.length, headers.length).setValues(toAppend);
+    const nextRow = sh.getLastRow() + 1;
+    // Text-format ID columns so all-digit hex assess/pupil IDs stay text.
+    ['assess_id', 'pupil_id'].forEach(h => {
+      const c = col(h) + 1;
+      if (c > 0) sh.getRange(nextRow, c, toAppend.length, 1).setNumberFormat('@');
+    });
+    sh.getRange(nextRow, 1, toAppend.length, headers.length).setValues(toAppend);
   }
 
   return { success: true, updated, inserted: toAppend.length };
@@ -344,7 +374,147 @@ function upsert_(pupil_id, skill_id, academic_year, score, assessed_by) {
     }
   }
 
-  sh.appendRow([Utilities.getUuid().substring(0,8), pupil_id, skill_id, academic_year, '', score, now, assessed_by || '']);
+  const nextRow = sh.getLastRow() + 1;
+  // Text-format ID columns so all-digit hex IDs stay text.
+  ['assess_id', 'pupil_id'].forEach(h => {
+    const c = col(h) + 1;
+    if (c > 0) sh.getRange(nextRow, c).setNumberFormat('@');
+  });
+  sh.getRange(nextRow, 1, 1, headers.length)
+    .setValues([[Utilities.getUuid().substring(0,8), pupil_id, skill_id, academic_year, '', score, now, assessed_by || '']]);
+}
+
+// ── One-off data repair (run manually from the Apps Script editor) ──
+//
+// Fixes the roster damage found on 30 Aug 2026 (all traced to sci-notation
+// ID mangling + a class list that briefly held raw Bromcom codes):
+//  1. Class rows whose class_id cell became a number (Y3 "3JW" → 4.6245e+55,
+//     which made getAssessments silently return an empty class) get a fresh
+//     prefixed text ID; their pupils are re-attached.
+//  2. Class rows whose class_name isn't in the hub's live classes tab
+//     (stray "1B2" from the pre-rekey roster) are deactivated.
+//  3. Pupil rows pointing at no active class (seed-era duplicates) are
+//     deactivated.
+//  4. Among live rows, hand-added name-variant duplicates of a hub pupil
+//     ("Eva H Haskins" vs "Eva Haskins") are deactivated when a hub-named
+//     row exists in the same class.
+//  Pupils matching no hub child at all (e.g. added-by-hand leavers) are
+//  reported, not touched. No assessment scores existed at repair time.
+//  Safe to re-run: every step is idempotent.
+function repairWritingTracker() {
+  const result = { classIdsFixed: 0, classesDeactivated: [], pupilsReattached: 0,
+                   pupilsDeactivated: 0, nameVariantsDeactivated: [], notInHubLeftActive: [] };
+
+  // Reference data from the hub (same shared token scheme).
+  const HUB = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
+  const token = PropertiesService.getScriptProperties().getProperty('SHARED_TOKEN') || '2013';
+  const hubClasses = JSON.parse(UrlFetchApp.fetch(HUB + '?action=getClasses&token=' + token).getContentText()).classes || [];
+  const hubDisplayNames = hubClasses.map(c => String(c.display || '').trim());
+  const hubPupils = JSON.parse(UrlFetchApp.fetch(HUB + '?action=getPupils&token=' + token).getContentText()).pupils || [];
+  // canonical(): letters-only, middle initials dropped — "Eva H Haskins" and
+  // "Eva Haskins" both become "evahaskins"; "Savanna Mason - Harrison" and
+  // "Savanna Mason-Harrison" both become "savannamasonharrison".
+  const canonical = n => String(n || '').toLowerCase().replace(/[^a-z ]/g, '')
+    .split(/\s+/).filter(t => t.length > 1).join('');
+  const hubCanon = new Set(hubPupils.map(h => canonical(h.first + ' ' + h.last)));
+  const hubExact = {};   // canonical name → hub's own "first last" (lowercase)
+  hubPupils.forEach(h => {
+    hubExact[canonical(h.first + ' ' + h.last)] = (h.first + ' ' + h.last).trim().toLowerCase();
+  });
+
+  // 1+2. Repair class IDs; deactivate classes not in the hub's live list.
+  const csh = ss_().getSheetByName('classes');
+  const cvals = csh.getDataRange().getValues();
+  const cIdCol = cvals[0].indexOf('class_id') + 1;
+  const cNameCol = cvals[0].indexOf('class_name') + 1;
+  const cActiveCol = cvals[0].indexOf('active') + 1;
+  const oldToNew = {};   // lowercased old id text -> new id
+  for (let i = 1; i < cvals.length; i++) {
+    const rawId = cvals[i][cIdCol - 1];
+    const cid = String(rawId).trim().toLowerCase();
+    if (typeof rawId === 'number') {          // sci-notation mangling
+      const newId = 'c' + Utilities.getUuid().substring(0, 7);
+      oldToNew[cid] = newId;
+      csh.getRange(i + 1, cIdCol).setNumberFormat('@');
+      csh.getRange(i + 1, cIdCol).setValue(newId);
+      result.classIdsFixed++;
+    }
+    const cname = String(cvals[i][cNameCol - 1] || '').trim();
+    if (hubDisplayNames.length && hubDisplayNames.indexOf(cname) === -1) {
+      csh.getRange(i + 1, cActiveCol).setValue(false);
+      result.classesDeactivated.push(cname);
+    }
+  }
+  // Fresh read: active classes after step 2, including the fresh IDs.
+  const activeClassIds = new Set();
+  csh.getDataRange().getValues().slice(1).forEach(v => {
+    if (truthy_(v[cActiveCol - 1])) activeClassIds.add(String(v[cIdCol - 1]).trim().toLowerCase());
+  });
+
+  // 3. Pupils: re-attach rows of repaired classes, then deactivate orphans.
+  const psh = ss_().getSheetByName('pupils');
+  const pvals = psh.getDataRange().getValues();
+  const pNameCol = pvals[0].indexOf('name') + 1;
+  const pClassCol = pvals[0].indexOf('class_id') + 1;
+  const pActiveCol = pvals[0].indexOf('active') + 1;
+  const rows = pvals.slice(1).map((v, i) => ({ rowNum: i + 2, v }));
+
+  rows.forEach(({ rowNum, v }) => {
+    if (!truthy_(v[pActiveCol - 1])) return;
+    const cid = String(v[pClassCol - 1]).trim().toLowerCase();
+    if (oldToNew[cid] !== undefined) {
+      psh.getRange(rowNum, pClassCol).setNumberFormat('@');
+      psh.getRange(rowNum, pClassCol).setValue(oldToNew[cid]);
+      v[pClassCol - 1] = oldToNew[cid];
+      result.pupilsReattached++;
+    }
+  });
+  rows.forEach(({ rowNum, v }) => {
+    if (!truthy_(v[pActiveCol - 1])) return;
+    const cid = String(v[pClassCol - 1]).trim().toLowerCase();
+    if (!activeClassIds.has(cid)) {
+      psh.getRange(rowNum, pActiveCol).setValue(false);
+      result.pupilsDeactivated++;
+      v[pActiveCol - 1] = false;
+    }
+  });
+
+  // 4. Name-variant dedupe: group live rows by (class, canonical name);
+  // keep the hub-named one, deactivate hand-added variants.
+  const groups = {};
+  rows.forEach(({ rowNum, v }) => {
+    if (!truthy_(v[pActiveCol - 1])) return;
+    const canon = canonical(v[pNameCol - 1]);
+    const key = String(v[pClassCol - 1]).toLowerCase() + '|' + canon;
+    (groups[key] = groups[key] || []).push({
+      rowNum, name: String(v[pNameCol - 1]), canon, classId: String(v[pClassCol - 1]).toLowerCase()
+    });
+  });
+  Object.keys(groups).forEach(key => {
+    const g = groups[key];
+    if (g.length < 2) return;
+    const canon = key.split('|')[1];
+    const keep = g.find(r => hubCanon.has(canon) && hubExact[canon] === r.name.trim().toLowerCase()) || g[0];
+    g.forEach(r => {
+      if (r === keep) return;
+      psh.getRange(r.rowNum, pActiveCol).setValue(false);
+      result.nameVariantsDeactivated.push(r.name + ' (kept: ' + keep.name + ')');
+    });
+  });
+
+  // Report pupils matching no hub child at all — leave them active.
+  rows.forEach(({ v }) => {
+    if (!truthy_(v[pActiveCol - 1])) return;
+    const c = canonical(v[pNameCol - 1]);
+    const fuzzy = hubPupils.some(h => {
+      const hc = canonical(h.first + ' ' + h.last);
+      return hc.length >= 8 && (c.endsWith(hc) || hc.endsWith(c));
+    });
+    if (!hubCanon.has(c) && !fuzzy) result.notInHubLeftActive.push(String(v[pNameCol - 1]));
+  });
+
+  Logger.log(JSON.stringify(result, null, 2));
+  return result;
 }
 
 // ── Config ────────────────────────────────────────────────────
