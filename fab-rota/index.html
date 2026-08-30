@@ -118,7 +118,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title">Fresh Air Break Rota</div>
-    <div class="app-subtitle">Wallscourt Farm Academy · 31.07.26c</div>
+    <div class="app-subtitle">Wallscourt Farm Academy · 30.08.26a</div>
   </div>
 </div>
 
@@ -535,10 +535,18 @@ function copyToNext() {
 }
 
 function setAsTerm() {
-  if (!confirm('Save this week\'s rota as the term default? New weeks will auto-fill from it.')) return;
+  const todayIdx = WEEKS.length ? currentWeekIdx() : state.weekIdx;
+  if (!confirm('Save this week\'s rota as the term default? Every week from today onward will be overwritten to match — past weeks are left untouched.')) return;
   termTemplate = deepCopyWeek(getWeek());
-  save();
-  alert('Term rota saved. New weeks will now start with this layout.');
+  let updated = 0;
+  Object.keys(state.slots).forEach(key => {
+    if (Number(key) >= todayIdx) {
+      state.slots[key] = deepCopyWeek(termTemplate);
+      updated++;
+    }
+  });
+  save(); render();
+  alert(`Term rota saved and applied to ${updated} week(s) from today onward.`);
 }
 
 function resetToTerm() {
