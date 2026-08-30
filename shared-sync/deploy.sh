@@ -5,7 +5,7 @@
 set -e
 cd "$(dirname "$0")"
 
-DEPLOYMENT_ID="AKfycbxsgnaxr9iuvw6_SDA5XRXS7OafQqNJeAjmYdILWICsy2ai0088pkY1YSjHV6_MevTSqw"
+DEPLOYMENT_ID="AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w"
 DESC="${1:-Deploy $(date '+%d %b %Y %H:%M')}"
 
 echo "→ Pushing to HEAD..."
