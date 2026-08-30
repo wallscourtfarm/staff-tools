@@ -93,6 +93,15 @@ header {
 }
 .save-indicator.visible { opacity: 1; }
 
+/* ── Save error banner ───────────────────────────────────────── */
+#save-error-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 300;
+  background: #fef2f2; border-bottom: 1px solid #fca5a5; color: #991b1b;
+  padding: 8px 16px; font-size: 13px; display: flex; align-items: center;
+  gap: 12px; justify-content: center; flex-wrap: wrap;
+}
+#save-error-banner.hidden { display: none; }
+
 /* ── Header nav links (small, in header-right) ───────────────── */
 .header-nav { display: flex; gap: 4px; align-items: center; }
 .header-nav-link {
@@ -524,9 +533,15 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-interventions" onclick="showTab('interventions')">Interventions</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">WFA-30.08.26a</span>
+      <span class="version">WFA-30.08.26b</span>
     </div>
   </header>
+
+  <div id="save-error-banner" class="hidden">
+    <span id="save-error-text"></span>
+    <button class="btn btn-primary btn-sm" onclick="retryFailedSave()">Retry</button>
+    <button class="btn btn-secondary btn-sm" onclick="dismissSaveError()">Dismiss</button>
+  </div>
 
   <!-- GRID TAB -->
   <div id="tab-grid" class="tab-content active">
@@ -861,16 +876,37 @@ async function apiGet(action, params = {}, timeoutMs = 45000) {
   }
 }
 
-async function apiPost(data) {
-  const res = await fetch(`${state.apiUrl}?token=${WFA_TOKEN}`, {
-    method: 'POST',
-    body: JSON.stringify(data)
-    // No Content-Type — avoids CORS preflight for Apps Script
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const result = await res.json();
-  if (result.error) throw new Error(result.error);
-  return result;
+async function apiPost(data, { retries = 2, timeoutMs = 20000 } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${state.apiUrl}?token=${WFA_TOKEN}`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+        signal: ctrl.signal
+        // No Content-Type — avoids CORS preflight for Apps Script
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+      return result;
+    } catch (err) {
+      // Transport-level failures (bad HTTP status, timeout, network drop) are
+      // worth retrying — GAS can cold-start or blip. A well-formed backend
+      // error (e.g. "unauthorised") won't fix itself, so fail fast on those.
+      const transient = err.name === 'AbortError' || err instanceof TypeError ||
+        /^HTTP \d/.test(err.message);
+      if (!transient || attempt >= retries) {
+        throw err.name === 'AbortError'
+          ? new Error('Request timed out — GAS may be cold-starting.')
+          : err;
+      }
+      await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 }
 
 // ================================================================
@@ -1517,6 +1553,9 @@ async function applyScoreToCells(targets, value) {
   const scoreVal = value == null ? '' : String(value);
   const meta = scoreMeta(value);
 
+  // Remember prior state so a failed save can be rolled back cleanly
+  const prior = targets.map(({ pupilId, skillId }) => state.assessments[pupilId]?.[skillId]);
+
   // Optimistic UI update
   for (const { pupilId, skillId, cellEl } of targets) {
     if (!state.assessments[pupilId]) state.assessments[pupilId] = {};
@@ -1530,24 +1569,36 @@ async function applyScoreToCells(targets, value) {
     if (lbl) { lbl.style.color = meta.fg; lbl.textContent = value == null ? '' : scoreVal; }
   }
 
-  if (targets.length === 1) {
-    // Single save
-    showSaving(true);
-    try {
+  const revert = () => {
+    targets.forEach(({ pupilId, skillId, cellEl }, i) => {
+      const prevVal = prior[i];
+      if (prevVal === undefined) delete state.assessments[pupilId]?.[skillId];
+      else { if (!state.assessments[pupilId]) state.assessments[pupilId] = {}; state.assessments[pupilId][skillId] = prevVal; }
+      const prevMeta = scoreMeta(prevVal ?? null);
+      cellEl.style.background = prevMeta.bg;
+      const lbl = cellEl.querySelector('.score-label');
+      if (lbl) { lbl.style.color = prevMeta.fg; lbl.textContent = prevVal ?? ''; }
+    });
+  };
+
+  showSaving(true);
+  try {
+    if (targets.length === 1) {
       await apiPost({ action: 'saveScore', pupil_id: targets[0].pupilId, skill_id: targets[0].skillId,
         academic_year: state.currentYear, score: scoreVal });
-    } catch (err) { console.error('Save failed:', err); alert('Save failed: ' + err.message); }
-    finally { showSaving(false); }
-  } else {
-    // Batch save
-    showSaving(true);
-    try {
+    } else {
       await apiPost({ action: 'saveScores',
         scores: targets.map(t => ({ pupil_id: t.pupilId, skill_id: t.skillId,
           academic_year: state.currentYear, score: scoreVal })),
         assessed_by: '' });
-    } catch (err) { console.error('Batch save failed:', err); alert('Save failed: ' + err.message); }
-    finally { showSaving(false); }
+    }
+    hideSaveError();
+  } catch (err) {
+    console.error('Save failed:', err);
+    revert();
+    showSaveError(`Save failed (${err.message}) — change was not kept.`, () => applyScoreToCells(targets, value));
+  } finally {
+    showSaving(false);
   }
 }
 
@@ -1571,6 +1622,25 @@ function showSaving(on) {
   const el = document.getElementById('save-indicator');
   if (on) { state.saving++; el.classList.add('visible'); }
   else { state.saving = Math.max(0, state.saving - 1); if (!state.saving) el.classList.remove('visible'); }
+}
+
+let pendingRetry = null;
+function showSaveError(message, retryFn) {
+  pendingRetry = retryFn || null;
+  document.getElementById('save-error-text').textContent = message;
+  document.getElementById('save-error-banner').classList.remove('hidden');
+}
+function dismissSaveError() {
+  pendingRetry = null;
+  document.getElementById('save-error-banner').classList.add('hidden');
+}
+function hideSaveError() {
+  document.getElementById('save-error-banner').classList.add('hidden');
+}
+function retryFailedSave() {
+  const fn = pendingRetry;
+  dismissSaveError();
+  if (fn) fn();
 }
 
 // ================================================================
