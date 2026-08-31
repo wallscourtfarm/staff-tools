@@ -9,9 +9,35 @@ import subprocess
 from datetime import date, datetime
 from pathlib import Path
 
+import requests
+
 DATA_DIR = Path(__file__).parent / "data"
 PROBES_DIR = DATA_DIR / "probes"
 REPO_DIR = Path(__file__).parent
+
+# ── Hub roster (Bromcom-sourced, via shared-sync) ────────────────────────────
+# Pupils only ever enter this tool by being picked from the live roster here
+# — never by typing a name. See add_pupil / sync_pupils_from_roster below.
+
+HUB_URL = os.environ.get(
+    "HUB_URL",
+    "https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec",
+)
+HUB_TOKEN = os.environ.get("HUB_TOKEN", "2013")
+
+
+def fetch_hub_pupils():
+    """Live pupil list from the hub. Returns [] on any failure — callers
+    should treat that as 'roster unavailable right now', not 'no pupils'."""
+    try:
+        r = requests.get(HUB_URL, params={"action": "getPupils", "token": HUB_TOKEN}, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+    except Exception:
+        return []
+    if data.get("error"):
+        return []
+    return data.get("pupils", [])
 
 # ── Skill Ladders ──────────────────────────────────────────────────────────
 
@@ -582,13 +608,19 @@ def check_aim_met(step, probes_data):
 
 # ── Pupil Helpers ───────────────────────────────────────────────────────────
 
-def add_pupil(pupils_data, first_name, last_name, class_name=""):
+def add_pupil(pupils_data, upn, first_name, last_name, class_name=""):
+    """Create a locally-tracked pupil record. upn links it back to the
+    Bromcom-sourced roster — first/last/class are a snapshot taken at add
+    time; call sync_pupils_from_roster to refresh them later. The p### id
+    stays the internal key (probe history is filed under it) — upn is the
+    identity link, not a replacement for it."""
     pupil_id = f"p{len(pupils_data['pupils']) + 1:03d}"
     while any(p["id"] == pupil_id for p in pupils_data["pupils"]):
         num = int(pupil_id[1:]) + 1
         pupil_id = f"p{num:03d}"
     pupil = {
         "id": pupil_id,
+        "upn": upn,
         "firstName": first_name,
         "lastName": last_name,
         "class": class_name,
@@ -605,6 +637,49 @@ def get_pupil(pupils_data, pupil_id):
         if p["id"] == pupil_id:
             return p
     return None
+
+
+def sync_pupils_from_roster(pupils_data):
+    """Refresh every tracked pupil's name/class from the live hub roster.
+    Pupils added before UPN tracking existed (no upn stored) are matched by
+    name and have their upn attached; unmatched ones are reported rather
+    than left silently stale. Returns {updated, upnAttached, unmatched}."""
+    hub_pupils = fetch_hub_pupils()
+    if not hub_pupils:
+        return {"updated": 0, "upnAttached": 0, "unmatched": [], "error": "roster unavailable"}
+
+    by_upn = {p.get("upn"): p for p in hub_pupils if p.get("upn")}
+    by_name = {}
+    for p in hub_pupils:
+        key = f"{p.get('first','')} {p.get('last','')}".strip().lower()
+        by_name.setdefault(key, p)
+
+    updated, attached, unmatched = 0, 0, []
+    for pupil in pupils_data["pupils"]:
+        hub_p = by_upn.get(pupil.get("upn")) if pupil.get("upn") else None
+        attaching = False
+        if not hub_p:
+            key = f"{pupil.get('firstName','')} {pupil.get('lastName','')}".strip().lower()
+            hub_p = by_name.get(key)
+            attaching = hub_p is not None
+
+        if not hub_p:
+            unmatched.append(f"{pupil.get('firstName','')} {pupil.get('lastName','')}".strip())
+            continue
+
+        new_first = hub_p.get("first", pupil["firstName"])
+        new_last  = hub_p.get("last", pupil["lastName"])
+        new_class = hub_p.get("class", pupil.get("class", ""))
+        changed = (new_first != pupil["firstName"] or new_last != pupil["lastName"]
+                   or new_class != pupil.get("class", ""))
+        if attaching:
+            pupil["upn"] = hub_p.get("upn")
+            attached += 1
+        if changed:
+            pupil["firstName"], pupil["lastName"], pupil["class"] = new_first, new_last, new_class
+            updated += 1
+
+    return {"updated": updated, "upnAttached": attached, "unmatched": unmatched}
 
 
 # ── Skill Status Helpers ─────────────────────────────────────────────────────

@@ -12,6 +12,7 @@ from data import (
     get_skill_status, set_skill_status, pass_review, fail_review, get_reviews_due,
     migrate_skills_format, skill_status, active_skills_for, count_by_status,
     generate_sheet, get_answer, get_review_items,
+    fetch_hub_pupils, sync_pupils_from_roster,
 )
 
 # ── PDF Helper ────────────────────────────────────────────────────────────────
@@ -723,45 +724,47 @@ with tab2:
     pupils_data = st.session_state.pupils_data
     ladders_data = st.session_state.ladders_data
 
-    add_mode = st.radio("Add pupils:", ["One at a time", "Bulk import"], horizontal=True, key="add_mode")
+    st.markdown("**Add a pupil to track** — search the school roster, no typing a name")
+    tracked_upns = {p.get("upn") for p in pupils_data["pupils"] if p.get("upn")}
 
-    if add_mode == "One at a time":
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            first = st.text_input("First name", key="new_first")
-        with col2:
-            last = st.text_input("Last name", key="new_last")
-        with col3:
-            cls = st.text_input("Class", key="new_class")
-
-        if st.button("Add Pupil", disabled=not first):
-            pupil = add_pupil(pupils_data, first, last, cls)
-            save_pupils(pupils_data)
-            git_add_commit_push("data/pupils.json", f"Add pupil: {first} {last}")
-            st.success(f"Added {first} {last} (token: **{pupil['token']}**)")
-            st.rerun()
-
-    else:  # Bulk import
-        st.markdown("**Paste pupil names below** — one per line as `FirstName LastName [Class]`")
-        bulk_text = st.text_area("Pupil list", placeholder="Aaliyah Rehman IM\nBen Smith IM\nCharlotte Jones WU", height=150, key="bulk_pupils")
-        default_class = st.text_input("Default class (if not specified per line)", value="IM", key="bulk_class")
-
-        if st.button("Import All", disabled=not bulk_text.strip(), type="primary"):
-            lines = [l.strip() for l in bulk_text.strip().split("\n") if l.strip()]
-            added = 0
-            for line in lines:
-                parts = line.split()
-                if len(parts) >= 2:
-                    first_name = parts[0]
-                    last_name = parts[1]
-                    cls = parts[2] if len(parts) >= 3 else default_class
-                    add_pupil(pupils_data, first_name, last_name, cls)
-                    added += 1
-            if added:
+    search_col, refresh_col = st.columns([4, 1])
+    with search_col:
+        roster_query = st.text_input("Search by name", key="roster_search", label_visibility="collapsed", placeholder="Type a name…")
+    with refresh_col:
+        if st.button("🔄 Refresh names", help="Refresh names/classes of already-tracked pupils from the roster"):
+            result = sync_pupils_from_roster(pupils_data)
+            if result.get("error"):
+                st.warning("Could not reach the roster right now — try again shortly.")
+            else:
                 save_pupils(pupils_data)
-                git_add_commit_push("data/pupils.json", f"Bulk import {added} pupils")
-                st.success(f"Added {added} pupil{'s' if added != 1 else ''}!")
+                git_add_commit_push("data/pupils.json", "Refresh pupil names/classes from roster")
+                msg = f"{result['updated']} refreshed"
+                if result["upnAttached"]:
+                    msg += f", {result['upnAttached']} matched to the roster for the first time"
+                if result["unmatched"]:
+                    msg += f". Not found on the roster: {', '.join(result['unmatched'])}"
+                st.success(msg)
                 st.rerun()
+
+    if roster_query.strip():
+        hub_pupils = fetch_hub_pupils()
+        if not hub_pupils:
+            st.warning("Could not reach the roster right now — try again shortly.")
+        else:
+            q = roster_query.strip().lower()
+            matches = [p for p in hub_pupils
+                       if q in f"{p.get('first','')} {p.get('last','')}".lower()
+                       and p.get("upn") not in tracked_upns][:10]
+            if not matches:
+                st.info("No match on the active roster (or they're already being tracked).")
+            for p in matches:
+                label = f"{p.get('first','')} {p.get('last','')} — {p.get('yearGroup','')} {p.get('class','')}"
+                if st.button(f"+ {label}", key=f"addroster_{p.get('upn')}"):
+                    pupil = add_pupil(pupils_data, p.get("upn"), p.get("first", ""), p.get("last", ""), p.get("class", ""))
+                    save_pupils(pupils_data)
+                    git_add_commit_push("data/pupils.json", f"Track pupil: {p.get('first')} {p.get('last')}")
+                    st.success(f"Now tracking {p.get('first')} {p.get('last')} (token: **{pupil['token']}**)")
+                    st.rerun()
 
     # ── Set Starting Points ──────────────────────────────────────────────
 
@@ -907,11 +910,12 @@ with tab2:
                 else:
                     st.info("No skills assigned yet. Use 'Set Starting Points' above.")
 
-                # Remove pupil
-                if st.button(f"Remove {p['firstName']}", key=f"remove_{p['id']}"):
+                # Stop tracking — only removes them from this tool's list, not
+                # from the school roster or any other WFA tool.
+                if st.button(f"Stop tracking {p['firstName']}", key=f"remove_{p['id']}"):
                     pupils_data["pupils"] = [pp for pp in pupils_data["pupils"] if pp["id"] != p["id"]]
                     save_pupils(pupils_data)
-                    git_add_commit_push("data/pupils.json", f"Remove pupil {p['firstName']} {p['lastName']}")
+                    git_add_commit_push("data/pupils.json", f"Stop tracking {p['firstName']} {p['lastName']}")
                     st.rerun()
 
 # ── Tab 3: Skill Ladders ───────────────────────────────────────────────────
