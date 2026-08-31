@@ -142,9 +142,28 @@ body.locked main, body.locked header{display:none}
     <button class="applybtn" id="applyBtn">✅ Apply changes</button>
     <div id="applyResult"></div>
   </div>
+
+  <div class="card">
+    <h2>Class names</h2>
+    <p class="hint">Bromcom's tutor group code (e.g. <b>5H2</b>) never changes — it's the permanent class identifier.
+    The teacher in that room can change every year, so set what it's <i>shown as</i> here (e.g. <b>5IM</b> for
+    "Y5, Innes McLean") — every WFA tool follows this. Codes themselves only ever come from Bromcom; this just renames them.</p>
+    <div id="classesStatus" class="status">Loading current classes…</div>
+    <table id="classesTable" style="display:none;width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="text-align:left;padding:.4rem .5rem;font-size:.8rem;color:var(--muted);border-bottom:1px solid var(--border)">Code</th>
+        <th style="text-align:left;padding:.4rem .5rem;font-size:.8rem;color:var(--muted);border-bottom:1px solid var(--border)">Year</th>
+        <th style="text-align:left;padding:.4rem .5rem;font-size:.8rem;color:var(--muted);border-bottom:1px solid var(--border)">Shown as</th>
+        <th style="text-align:left;padding:.4rem .5rem;font-size:.8rem;color:var(--muted);border-bottom:1px solid var(--border)">Teacher initials</th>
+      </tr></thead>
+      <tbody id="classesBody"></tbody>
+    </table>
+    <button class="applybtn" id="saveClassesBtn" style="display:none;margin-top:1rem">💾 Save class names</button>
+    <div id="classesResult"></div>
+  </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-31.08.26c</div>
+<div class="version">WFA Roster Import · WFA-31.08.26d</div>
 
 <script>
 const HUB_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
@@ -186,6 +205,7 @@ function unlock(){
   sessionStorage.setItem('wfa_roster_import_ok', '1');
   document.body.classList.remove('locked');
   document.getElementById('pinGate').style.display = 'none';
+  loadClasses();
 }
 if (sessionStorage.getItem('wfa_roster_import_ok') === '1') unlock();
 
@@ -448,6 +468,74 @@ document.getElementById('applyBtn').addEventListener('click', async function(){
     btn.disabled = false;
   }
 });
+
+// ── Class names ──────────────────────────────────────────────────────────
+let originalClasses = [];
+
+async function loadClasses(){
+  const statusEl2 = document.getElementById('classesStatus');
+  try {
+    const url = HUB_URL + '?action=getClasses&token=' + encodeURIComponent(WFA_TOKEN) + '&v=' + Date.now();
+    const r = await fetch(url, { cache: 'no-store' });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    originalClasses = (data.classes || []).slice().sort(function(a,b){ return a.code.localeCompare(b.code); });
+    renderClasses(originalClasses);
+    statusEl2.style.display = 'none';
+    document.getElementById('classesTable').style.display = 'table';
+    document.getElementById('saveClassesBtn').style.display = 'inline-block';
+  } catch (err) {
+    statusEl2.textContent = 'Could not load classes: ' + err.message;
+  }
+}
+
+function codeToYear(code){
+  const m = String(code||'').match(/^(\d)/);
+  return m ? 'Y' + m[1] : '—';
+}
+
+function renderClasses(classes){
+  const body = document.getElementById('classesBody');
+  body.innerHTML = classes.map(function(c, i){
+    return '<tr>' +
+      '<td style="padding:.4rem .5rem;font-weight:600">' + esc(c.code) + '</td>' +
+      '<td style="padding:.4rem .5rem;color:var(--muted)">' + esc(codeToYear(c.code)) + '</td>' +
+      '<td style="padding:.4rem .5rem"><input data-idx="' + i + '" data-field="display" value="' + esc(c.display||'') + '" style="width:90px;padding:.3rem .5rem;border:1px solid var(--border);border-radius:5px"></td>' +
+      '<td style="padding:.4rem .5rem"><input data-idx="' + i + '" data-field="teacherInitials" value="' + esc(c.teacherInitials||'') + '" style="width:70px;padding:.3rem .5rem;border:1px solid var(--border);border-radius:5px"></td>' +
+      '</tr>';
+  }).join('');
+}
+
+document.getElementById('saveClassesBtn').addEventListener('click', async function(){
+  const btn = this;
+  const rows = Array.from(document.querySelectorAll('#classesBody input')).reduce(function(acc, inp){
+    const i = inp.dataset.idx;
+    acc[i] = acc[i] || Object.assign({}, originalClasses[i]);
+    acc[i][inp.dataset.field] = inp.value.trim();
+    return acc;
+  }, {});
+  const classes = Object.values(rows).map(function(c){
+    return { code: c.code, display: c.display, teacher_initials: c.teacherInitials };
+  });
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  const resultEl2 = document.getElementById('classesResult');
+  resultEl2.innerHTML = '';
+  try {
+    const url = HUB_URL + '?action=updateClasses&token=' + encodeURIComponent(WFA_TOKEN);
+    const r = await fetch(url, { method: 'POST', body: JSON.stringify({ classes: classes }) });
+    const data = await r.json();
+    if (data.status !== 'ok') throw new Error(data.message || 'unknown error');
+    resultEl2.innerHTML = '<div class="success">✓ ' + data.updated + ' class name(s) updated.</div>';
+    await loadClasses();
+  } catch (err) {
+    resultEl2.innerHTML = '<div class="aborted">Error: ' + esc(err.message) + '</div>';
+  }
+  btn.disabled = false;
+  btn.textContent = '💾 Save class names';
+});
+
+if (!document.body.classList.contains('locked')) loadClasses();
 </script>
 </body>
 </html>

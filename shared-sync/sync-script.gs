@@ -53,6 +53,7 @@ function doPost(e) {
     const p = e.parameter || {};
     if (p.action === 'seedPupils') return seedPupils(e);
     if (p.action === 'importPupils') return importPupils(e);
+    if (p.action === 'updateClasses') return updateClasses(e);
     const key = p.key;
     if (!key) return json({ error: 'missing key' });
     props().setProperty(key, e.postData.contents);
@@ -151,6 +152,56 @@ function getClasses(p) {
   let rows = Object.keys(map).map(function (code) { return map[code]; });
   if (year) rows = rows.filter(function (c) { return c.academicYear === year; });
   return { classes: rows };
+}
+
+// POST ?action=updateClasses&token=… with a raw JSON body:
+//   { classes: [{ code, display, teacher_initials }] }
+// Sets display_name/teacher_initials for EXISTING tutor_group codes only —
+// never creates or deletes a row. Codes are permanent Bromcom identifiers
+// and only ever enter this tab via importPupils (a fresh code seen in an
+// import); this action just renames how a known code is shown.
+function updateClasses(e) {
+  const body = JSON.parse(e.postData.contents || '{}');
+  const incoming = body.classes || [];
+  if (!incoming.length) return json({ status: 'error', message: 'classes array is empty' });
+
+  const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+  const sh = ss.getSheetByName(MASTER_CLASSES_TAB);
+  if (!sh) return json({ status: 'error', message: MASTER_CLASSES_TAB + ' tab missing' });
+
+  const rows = sh.getDataRange().getValues();
+  if (rows.length < 2) return json({ status: 'error', message: 'no class rows to update' });
+  const hdr = rows[0].map(function (h) { return String(h).trim().toLowerCase(); });
+  const ix = function (name) { return hdr.indexOf(name); };
+  const codeIx = ix('tutor_group'), dispIx = ix('display_name'), tiIx = ix('teacher_initials');
+  if (codeIx < 0) return json({ status: 'error', message: 'tutor_group column missing' });
+
+  const rowByCode = {};
+  for (let i = 1; i < rows.length; i++) {
+    const code = String(rows[i][codeIx] || '').trim();
+    if (code) rowByCode[code] = i;
+  }
+
+  let updated = 0, unknownCodes = [];
+  incoming.forEach(function (c) {
+    const code = String(c.code || '').trim();
+    if (!code || !rowByCode.hasOwnProperty(code)) { if (code) unknownCodes.push(code); return; }
+    const i = rowByCode[code];
+    const newDisplay = String(c.display || '').trim() || code;
+    const newTi = String(c.teacher_initials || '').trim();
+    const changed = String(rows[i][dispIx] || '') !== newDisplay ||
+      (tiIx >= 0 && String(rows[i][tiIx] || '') !== newTi);
+    if (!changed) return;
+    const range = sh.getRange(i + 1, 1, 1, hdr.length);
+    range.setNumberFormat('@');
+    const rowVals = rows[i].slice();
+    rowVals[dispIx] = newDisplay;
+    if (tiIx >= 0) rowVals[tiIx] = newTi;
+    range.setValues([rowVals]);
+    updated++;
+  });
+
+  return json({ status: 'ok', updated: updated, unknownCodes: unknownCodes });
 }
 
 /** One-off seed: rewrite the classes tab with the 2026-27 Bromcom-code map. */
