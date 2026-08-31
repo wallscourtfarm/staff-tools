@@ -263,25 +263,26 @@ nav .brand span { opacity: .7; font-weight: 400; font-size: .88rem; }
     <div class="modal">
       <h3 id="childModalTitle">New Learner Plan</h3>
       <input type="hidden" id="editingChildId">
+      <input type="hidden" id="nUpn">
+
+      <!-- New: pick from the roster — name/class/year/SEN all come from Bromcom -->
+      <div id="pickerBlock" class="form-group">
+        <label>Find the pupil *</label>
+        <input type="text" id="rosterSearch" placeholder="Type a name…" oninput="renderRosterResults()" autocomplete="off">
+        <div id="rosterResults" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:6px;display:none"></div>
+        <p id="rosterPickedLine" style="font-weight:600;margin-top:8px;display:none"></p>
+      </div>
+
+      <!-- Edit: read-only snapshot from Bromcom — nothing here is typed -->
+      <div id="editInfoBlock" style="display:none">
+        <p style="font-weight:600;font-size:1.05rem;margin-bottom:2px" id="editInfoName"></p>
+        <p style="color:var(--muted);font-size:.88rem;margin-bottom:10px" id="editInfoMeta"></p>
+        <p style="font-size:.78rem;color:var(--muted)">Name, class, year group and SEN status come from Bromcom via Roster Import — they can't be edited here.</p>
+      </div>
+
       <div class="form-group">
-        <label>Child's Full Name *</label>
-        <input type="text" id="nName" placeholder="">
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>Class</label><input type="text" id="nClass" placeholder=""></div>
-        <div class="form-group"><label>Class Teacher</label><input type="text" id="nTeacher" placeholder=""></div>
-      </div>
-      <div class="form-group">
-        <label>Year Group</label>
-        <select id="nYear">
-          <option value="">Select…</option>
-          <option>EYFS</option><option>Year 1</option><option>Year 2</option>
-          <option>Year 3</option><option>Year 4</option><option>Year 5</option><option>Year 6</option>
-        </select>
-      </div>
-      <div class="form-group" style="display:flex;align-items:center;gap:10px;margin-top:4px">
-        <input type="checkbox" id="nIsEhcp" style="width:16px;height:16px;cursor:pointer">
-        <label for="nIsEhcp" style="margin:0;font-weight:600;cursor:pointer">This child has an EHCP</label>
+        <label>Class Teacher</label>
+        <input type="text" id="nTeacher" placeholder="">
       </div>
       <div id="yearFieldWrap" style="display:none">
         <div class="form-group">
@@ -307,17 +308,8 @@ nav .brand span { opacity: .7; font-weight: 400; font-size: .88rem; }
         <label>New Academic Year</label>
         <input type="text" id="newYearInput" placeholder="">
       </div>
-      <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">Update the child's details for the new year (year group, class and teacher may change):</p>
-      <div class="form-row" style="margin-bottom:14px">
-        <div class="form-group" style="margin:0"><label>Year Group</label>
-          <select id="nyYearGroup" onchange="updateNyClasses()">
-            <option value="">-- select --</option>
-            <option>EYFS</option><option>Year 1</option><option>Year 2</option><option>Year 3</option>
-            <option>Year 4</option><option>Year 5</option><option>Year 6</option>
-          </select></div>
-        <div class="form-group" style="margin:0"><label>Class</label>
-          <select id="nyClass" onchange=""></select></div>
-      </div>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Year group and class come from Bromcom — refreshed just now from the current roster:</p>
+      <p id="nyRosterSnapshot" style="font-weight:600;margin-bottom:14px"></p>
       <div class="form-group">
         <label>Class Teacher</label>
         <input type="text" id="nyTeacher" placeholder="e.g. Priya Patel">
@@ -1193,7 +1185,7 @@ function setTargetStatus(t, i, status) {
 }
 
 // ── NEW YEAR ──────────────────────────────────────────────────────────────────
-function showNewYearModal() {
+async function showNewYearModal() {
   const prevYear = currentPlan.academic_year;
   const [start] = prevYear.split('-');
   const nextStart = parseInt(start) + 1;
@@ -1202,84 +1194,31 @@ function showNewYearModal() {
   document.getElementById('newYearDesc').textContent = `Creates a new plan for ${suggested} based on Term 6 of ${prevYear}.`;
   const prevYearEl = document.getElementById('prevYearLabel'); if (prevYearEl) prevYearEl.textContent = prevYear;
   document.getElementById('newYearInput').value = suggested;
-  // pre-fill child details (user can update)
-  const child = children.find(c => c.id === currentChildId) || {};
-  const yg = document.getElementById('nyYearGroup');
-  // suggest next year group
-  const YGS = ['EYFS','Year 1','Year 2','Year 3','Year 4','Year 5','Year 6'];
-  const nextYG = YGS[Math.min(YGS.indexOf(child.year_group) + 1, YGS.length - 1)] || child.year_group || '';
-  yg.value = nextYG;
-  updateNyClasses();
-  hubRefreshClassDisplay();
-  document.getElementById('nyTeacher').value = child.teacher || '';
+
+  const snapshotEl = document.getElementById('nyRosterSnapshot');
+  snapshotEl.textContent = 'Refreshing from roster…';
   document.getElementById('newYearModal').style.display = 'flex';
-}
-
-const YG_CLASSES = {
-  'EYFS':   ['0O1','0O2'],
-  'Year 1': ['1B1','1B2'],
-  'Year 2': ['2W1','2W2'],
-  'Year 3': ['3A1','3A2'],
-  'Year 4': ['4M1','4M2'],
-  'Year 5': ['5H1','5H2'],
-  'Year 6': ['6E1','6E2'],
-};
-
-// Live class map from the hub's classes tab (shared-sync getClasses). Values
-// stay Bromcom codes (stable across teacher changes); display names are shown
-// next to them when available. Cached so the rollover dialog still works
-// offline after the first successful fetch.
-const HUB_CLS_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
-const HUB_CLS_KEY = 'learner-plans-hub-classes';
-let HUB_CLASS_DISPLAY = (() => {  // code -> display
-  try { return JSON.parse(localStorage.getItem(HUB_CLS_KEY)) || {}; }
-  catch (e) { return {}; }
-})();
-async function hubRefreshClassDisplay() {
-  try {
-    const token = localStorage.getItem('wfa_shared_token') || '2013';
-    const res = await fetch(HUB_CLS_URL + '?action=getClasses&t=' + Date.now() + '&token=' + token);
-    if (!res.ok) return;
-    const data = await res.json();
-    const map = {};
-    (data.classes || []).forEach(c => { map[c.code] = c.display || c.code; });
-    if (!Object.keys(map).length) return;
-    HUB_CLASS_DISPLAY = map;
-    localStorage.setItem(HUB_CLS_KEY, JSON.stringify(map));
-    updateNyClasses();
-  } catch (e) { /* offline / hub down — YG_CLASSES skeleton still lists codes */ }
-}
-
-function updateNyClasses() {
-  const yg = document.getElementById('nyYearGroup').value;
-  const sel = document.getElementById('nyClass');
-  const classes = YG_CLASSES[yg] || [];
-  sel.innerHTML = classes.length
-    ? classes.map(c => {
-        const disp = HUB_CLASS_DISPLAY[c];
-        return `<option value="${c}">${c}${disp && disp !== c ? ' · ' + disp : ''}</option>`;
-      }).join('')
-    : '<option value="">-- select year group first --</option>';
+  try { await api('POST', '/learner-plans/children/sync-from-roster'); } catch (e) { /* show whatever we already have */ }
+  await fetchChildren();
+  const child = children.find(c => c.id === currentChildId) || {};
+  snapshotEl.textContent = `${child.year_group || '—'} · ${child.class_name || '—'}`;
+  document.getElementById('nyTeacher').value = child.teacher || '';
 }
 
 async function createNewYear() {
   const year = document.getElementById('newYearInput').value.trim();
   if (!year) { toast('Enter an academic year.'); return; }
   if (childPlans.some(p => p.academic_year === year)) { toast(`Plan for ${year} already exists.`); return; }
-  // Update child record with new year group / class / teacher
-  const newYG = document.getElementById('nyYearGroup').value;
-  const newClass = document.getElementById('nyClass').value.trim();
+  // Year group / class already refreshed from the roster when this modal
+  // opened — only teacher (a local field) can be changed here.
   const newTeacher = document.getElementById('nyTeacher').value.trim();
-  const childUpdate = {};
-  if (newYG) childUpdate.year_group = newYG;
-  if (newClass) childUpdate.class_name = newClass;
-  if (newTeacher) childUpdate.teacher = newTeacher;
-  if (Object.keys(childUpdate).length) {
+  const currentChild = children.find(c => c.id === currentChildId) || {};
+  if (newTeacher && newTeacher !== currentChild.teacher) {
     try {
-      await api('PUT', `/learner-plans/children/${currentChildId}`, childUpdate);
+      await api('PUT', `/learner-plans/children/${currentChildId}`, { teacher: newTeacher });
       const idx = children.findIndex(c => c.id === currentChildId);
-      if (idx >= 0) children[idx] = { ...children[idx], ...childUpdate };
-    } catch(e) { toast('Could not update child details: ' + e.message, 'error'); }
+      if (idx >= 0) children[idx] = { ...children[idx], teacher: newTeacher };
+    } catch(e) { toast('Could not update teacher: ' + e.message, 'error'); }
   }
 
   // T6 of the previous year is the source
@@ -1328,28 +1267,74 @@ async function copyT6ToExistingPlan(targetPlanId, hasExistingData) {
 }
 
 // ── CHILD CRUD ────────────────────────────────────────────────────────────────
-function showNewChildModal() {
+
+// Roster picker (create only) — pupils not yet tracked in Learner Plans
+let rosterCandidates = [];
+let rosterPicked = null;
+
+async function loadRosterCandidates() {
+  try { rosterCandidates = await api('GET', '/learner-plans/roster'); }
+  catch (e) { rosterCandidates = []; toast('Could not load the roster: ' + e.message, 'error'); }
+}
+
+function renderRosterResults() {
+  const q = document.getElementById('rosterSearch').value.trim().toLowerCase();
+  const box = document.getElementById('rosterResults');
+  if (!q) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const matches = rosterCandidates.filter(p =>
+    `${p.first} ${p.last}`.toLowerCase().includes(q)).slice(0, 15);
+  if (!matches.length) {
+    box.style.display = 'block';
+    box.innerHTML = '<div style="padding:10px 12px;color:var(--muted);font-size:.85rem">No match — check they\'re on the active roster (Roster Import).</div>';
+    return;
+  }
+  box.style.display = 'block';
+  box.innerHTML = matches.map(p => `
+    <div onclick="pickRosterPupil('${p.upn}')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+      <strong>${p.first} ${p.last}</strong>
+      <span style="color:var(--muted);font-size:.82rem"> · ${p.yearGroup || ''} ${p.class || ''}</span>
+    </div>`).join('');
+}
+
+function pickRosterPupil(upn) {
+  rosterPicked = rosterCandidates.find(p => p.upn === upn);
+  if (!rosterPicked) return;
+  document.getElementById('nUpn').value = upn;
+  document.getElementById('rosterResults').style.display = 'none';
+  document.getElementById('rosterSearch').value = '';
+  document.getElementById('rosterPickedLine').style.display = 'block';
+  document.getElementById('rosterPickedLine').textContent =
+    `✓ ${rosterPicked.first} ${rosterPicked.last} — ${rosterPicked.yearGroup || ''} ${rosterPicked.class || ''}`;
+}
+
+async function showNewChildModal() {
   document.getElementById('childModalTitle').textContent = 'New Learner Plan';
   document.getElementById('editingChildId').value = '';
-  document.getElementById('nName').value = '';
-  document.getElementById('nClass').value = '';
+  document.getElementById('nUpn').value = '';
+  rosterPicked = null;
+  document.getElementById('rosterSearch').value = '';
+  document.getElementById('rosterResults').style.display = 'none';
+  document.getElementById('rosterPickedLine').style.display = 'none';
+  document.getElementById('pickerBlock').style.display = 'block';
+  document.getElementById('editInfoBlock').style.display = 'none';
   document.getElementById('nTeacher').value = '';
-  document.getElementById('nYear').value = '';
   document.getElementById('nAcYear').value = currentAcademicYear();
-  document.getElementById('nIsEhcp').checked = false;
   document.getElementById('yearFieldWrap').style.display = 'block';
   document.getElementById('childModal').style.display = 'flex';
+  await loadRosterCandidates();
 }
 
 function editChildModal() {
   const c = children.find(c => c.id === currentChildId);
   document.getElementById('childModalTitle').textContent = 'Edit Learner Info';
   document.getElementById('editingChildId').value = c.id;
-  document.getElementById('nName').value = c.name;
-  document.getElementById('nClass').value = c.class_name || '';
+  document.getElementById('pickerBlock').style.display = 'none';
+  document.getElementById('editInfoBlock').style.display = 'block';
+  document.getElementById('editInfoName').textContent = c.name;
+  const senBit = c.is_ehcp === 'true' ? 'EHCP' : (c.sen_status || '');
+  document.getElementById('editInfoMeta').textContent =
+    [c.year_group, c.class_name, senBit && `SEN: ${senBit}${c.sen_type ? ' (' + c.sen_type + ')' : ''}`].filter(Boolean).join(' · ');
   document.getElementById('nTeacher').value = c.teacher || '';
-  document.getElementById('nYear').value = c.year_group || '';
-  document.getElementById('nIsEhcp').checked = c.is_ehcp === 'true';
   document.getElementById('yearFieldWrap').style.display = 'none';
   document.getElementById('childModal').style.display = 'flex';
 }
@@ -1357,15 +1342,13 @@ function editChildModal() {
 function closeChildModal() { document.getElementById('childModal').style.display = 'none'; }
 
 async function saveChild() {
-  const name = document.getElementById('nName').value.trim();
-  if (!name) { alert('Please enter the child\'s name.'); return; }
   const editId = document.getElementById('editingChildId').value;
-  const payload = { name, class_name: document.getElementById('nClass').value.trim(), teacher: document.getElementById('nTeacher').value.trim(), year_group: document.getElementById('nYear').value, is_ehcp: document.getElementById('nIsEhcp').checked ? 'true' : 'false' };
-  closeChildModal();
 
   if (editId) {
+    const teacher = document.getElementById('nTeacher').value.trim();
+    closeChildModal();
     try {
-      await api('PUT', `/learner-plans/children/${editId}`, payload);
+      await api('PUT', `/learner-plans/children/${editId}`, { teacher });
     } catch(e) { toast('Update failed: ' + e.message, 'error'); return; }
     await fetchChildren();
     const c = children.find(c => c.id === editId);
@@ -1373,7 +1356,10 @@ async function saveChild() {
     document.getElementById('planMeta').textContent = [c.year_group, c.class_name, c.teacher].filter(Boolean).join(' · ');
     toast('Info updated', 'success');
   } else {
+    if (!rosterPicked) { alert('Search for and select the pupil first.'); return; }
+    const payload = { upn: rosterPicked.upn, teacher: document.getElementById('nTeacher').value.trim() };
     const acYear = document.getElementById('nAcYear').value.trim() || currentAcademicYear();
+    closeChildModal();
     let created;
     try {
       created = await api('POST', '/learner-plans/children', payload);
@@ -1709,7 +1695,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-30.08.26a
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-31.08.26a
 </footer>
 </body>
 </html>
