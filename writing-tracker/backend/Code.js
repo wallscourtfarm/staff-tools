@@ -492,12 +492,15 @@ function syncRosterFromHub_(dryRun) {
   const nameCol = pIx('name'), actCol = pIx('active'), upnCol = pIx('upn');
 
   const activePupilRows = [];
-  const byUpn = {}; // ALL rows, active or not — a re-enrolling leaver must
-                     // reactivate their existing row, never duplicate it.
+  const byUpnActive = {};   // active rows only — the normal, common case
+  const byUpnInactive = {}; // inactive rows — only used as a last-resort
+                             // reactivation fallback, never preferred over
+                             // an already-active row (see matching below)
   for (let i = 1; i < pvals.length; i++) {
     const upn = String(pvals[i][upnCol] || '').trim();
-    if (upn) byUpn[upn] = i + 1;
-    if (truthy_(pvals[i][actCol])) activePupilRows.push(i + 1);
+    const isActive = truthy_(pvals[i][actCol]);
+    if (upn) (isActive ? byUpnActive : byUpnInactive)[upn] = i + 1;
+    if (isActive) activePupilRows.push(i + 1);
   }
 
   if (activePupilRows.length && hubPupils.length < 0.8 * activePupilRows.length) {
@@ -512,16 +515,18 @@ function syncRosterFromHub_(dryRun) {
     const upn = String(hp.upn || '').trim();
     if (!upn) return;
     const canon = canonical_(hp.first + ' ' + hp.last);
-    let rowNum = byUpn[upn];
 
-    // A stored upn is only trustworthy if the row it points to is actually
-    // that same pupil by name — a stray/incorrect historical upn on some
-    // other row must never silently steal this match (and would otherwise
-    // leave the pupil's real, correctly-named row unmatched forever, since
-    // nothing else will ever scan for it once byUpn "succeeds").
-    if (rowNum && canonical_(pvals[rowNum - 1][nameCol]) !== canon) {
-      rowNum = null;
-    }
+    // Precedence: (1) an active row already carrying this upn — the normal
+    // case; (2) an active row matched by name (attaches upn) — covers a
+    // duplicate where an old inactive row already holds the real upn but
+    // someone was re-added as a new active row later: the active one wins,
+    // the dormant duplicate is left untouched, never silently reactivated;
+    // (3) only if NEITHER active option exists, fall back to reactivating
+    // an inactive row with this upn (a genuine re-enrolling leaver).
+    // A stored upn is only trusted if that row's own name actually matches
+    // — a stray/incorrect historical upn must never steal this match.
+    let rowNum = byUpnActive[upn];
+    if (rowNum && canonical_(pvals[rowNum - 1][nameCol]) !== canon) rowNum = null;
 
     if (!rowNum) {
       for (let i = 0; i < activePupilRows.length; i++) {
@@ -530,6 +535,11 @@ function syncRosterFromHub_(dryRun) {
         if (String(pvals[r - 1][upnCol] || '').trim()) continue; // already claimed by a different upn
         if (canonical_(pvals[r - 1][nameCol]) === canon) { rowNum = r; break; }
       }
+    }
+
+    if (!rowNum) {
+      const inactiveRow = byUpnInactive[upn];
+      if (inactiveRow && canonical_(pvals[inactiveRow - 1][nameCol]) === canon) rowNum = inactiveRow;
     }
 
     const classId = classIdByTg[String(hp.code || '').trim()] || '';
@@ -593,7 +603,7 @@ function syncRosterFromHub_(dryRun) {
       if (result.debug.length < 6) {
         const canon = canonical_(rowName);
         const freshUpn = debugHubCanon[canon] || null;
-        const conflictRow = freshUpn ? byUpn[freshUpn] : null;
+        const conflictRow = freshUpn ? (byUpnActive[freshUpn] || byUpnInactive[freshUpn]) : null;
         result.debug.push({
           name: rowName,
           rowNum: rowNum,
