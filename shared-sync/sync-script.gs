@@ -130,17 +130,22 @@ function readClassMap() {
   if (rows.length < 2) return [];
   const hdr = rows[0].map(function (h) { return String(h).trim().toLowerCase(); });
   const ix = function (name) { return hdr.indexOf(name); };
+  const cell = function (r, name) { const i = ix(name); return i >= 0 ? String(r[i] || '').trim() : ''; };
   const map = {};
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
-    const code = String(r[ix('tutor_group')] || '').trim();
+    const code = cell(r, 'tutor_group');
     if (!code) continue;
-    const display = String(r[ix('display_name')] || '').trim() || code;
+    const display = cell(r, 'display_name') || code;
     map[code] = {
       code: code,
       display: display,
-      teacherInitials: String(r[ix('teacher_initials')] || '').trim(),
-      academicYear: String(r[ix('academic_year')] || '').trim()
+      teacherInitials: cell(r, 'teacher_initials'),
+      // The friendly class name children actually know (e.g. "Blaise") —
+      // distinct from both the permanent Bromcom code and the staff-facing
+      // display code. Blank until set via Roster Import's class editor.
+      homeZoneName: cell(r, 'home_zone_name'),
+      academicYear: cell(r, 'academic_year')
     };
   }
   return map;
@@ -155,11 +160,11 @@ function getClasses(p) {
 }
 
 // POST ?action=updateClasses&token=… with a raw JSON body:
-//   { classes: [{ code, display, teacher_initials }] }
-// Sets display_name/teacher_initials for EXISTING tutor_group codes only —
-// never creates or deletes a row. Codes are permanent Bromcom identifiers
-// and only ever enter this tab via importPupils (a fresh code seen in an
-// import); this action just renames how a known code is shown.
+//   { classes: [{ code, display, teacher_initials, home_zone_name }] }
+// Sets display_name/teacher_initials/home_zone_name for EXISTING tutor_group
+// codes only — never creates or deletes a row. Codes are permanent Bromcom
+// identifiers and only ever enter this tab via importPupils (a fresh code
+// seen in an import); this action just renames how a known code is shown.
 function updateClasses(e) {
   const body = JSON.parse(e.postData.contents || '{}');
   const incoming = body.classes || [];
@@ -169,11 +174,12 @@ function updateClasses(e) {
   const sh = ss.getSheetByName(MASTER_CLASSES_TAB);
   if (!sh) return json({ status: 'error', message: MASTER_CLASSES_TAB + ' tab missing' });
 
+  ensureHomeZoneNameColumn_(sh);
   const rows = sh.getDataRange().getValues();
   if (rows.length < 2) return json({ status: 'error', message: 'no class rows to update' });
   const hdr = rows[0].map(function (h) { return String(h).trim().toLowerCase(); });
   const ix = function (name) { return hdr.indexOf(name); };
-  const codeIx = ix('tutor_group'), dispIx = ix('display_name'), tiIx = ix('teacher_initials');
+  const codeIx = ix('tutor_group'), dispIx = ix('display_name'), tiIx = ix('teacher_initials'), hzIx = ix('home_zone_name');
   if (codeIx < 0) return json({ status: 'error', message: 'tutor_group column missing' });
 
   const rowByCode = {};
@@ -189,19 +195,31 @@ function updateClasses(e) {
     const i = rowByCode[code];
     const newDisplay = String(c.display || '').trim() || code;
     const newTi = String(c.teacher_initials || '').trim();
+    const newHz = String(c.home_zone_name || '').trim();
     const changed = String(rows[i][dispIx] || '') !== newDisplay ||
-      (tiIx >= 0 && String(rows[i][tiIx] || '') !== newTi);
+      (tiIx >= 0 && String(rows[i][tiIx] || '') !== newTi) ||
+      (hzIx >= 0 && String(rows[i][hzIx] || '') !== newHz);
     if (!changed) return;
     const range = sh.getRange(i + 1, 1, 1, hdr.length);
     range.setNumberFormat('@');
     const rowVals = rows[i].slice();
     rowVals[dispIx] = newDisplay;
     if (tiIx >= 0) rowVals[tiIx] = newTi;
+    if (hzIx >= 0) rowVals[hzIx] = newHz;
     range.setValues([rowVals]);
     updated++;
   });
 
   return json({ status: 'ok', updated: updated, unknownCodes: unknownCodes });
+}
+
+// Appends a home_zone_name header cell if the classes tab doesn't have one
+// yet — never touches any other column or row. Safe to call every time.
+function ensureHomeZoneNameColumn_(sh) {
+  const hdrRange = sh.getRange(1, 1, 1, sh.getLastColumn());
+  const hdr = hdrRange.getValues()[0].map(function (h) { return String(h).trim().toLowerCase(); });
+  if (hdr.indexOf('home_zone_name') >= 0) return;
+  sh.getRange(1, hdr.length + 1).setValue('home_zone_name');
 }
 
 /** One-off seed: rewrite the classes tab with the 2026-27 Bromcom-code map. */
@@ -286,6 +304,11 @@ function readMasterPupils() {
     const entry = cmap[code.toUpperCase()];
     return (entry && entry.teacherInitials) || '';
   };
+  const homeZoneName = function (code) {
+    code = String(code || '').trim();
+    const entry = cmap[code.toUpperCase()];
+    return (entry && entry.homeZoneName) || '';
+  };
   const out = [];
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
@@ -303,6 +326,7 @@ function readMasterPupils() {
       code: rawCode,                              // permanent Bromcom code
       class: display(rawCode),                    // teacher-facing display name
       teacherInitials: teacherInitials(rawCode),   // current teacher's initials, from the classes tab
+      homeZoneName: homeZoneName(rawCode),         // pupil-facing friendly class name, from the classes tab
       yearGroup: String(r[ix('year_group')] || '').trim(),
       sex: String(r[ix('sex')] || '').trim(),
       eal: truthy(r[ix('is_eal')]),
