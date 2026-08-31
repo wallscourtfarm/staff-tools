@@ -9,12 +9,21 @@
 const SPREADSHEET_ID = ''; // blank = use active/bound spreadsheet
 
 const SHEET_HEADERS = {
-  classes:     ['class_id','year_group','class_name','teacher_name','academic_year','active'],
+  classes:     ['class_id','year_group','class_name','teacher_name','academic_year','active','tutor_group'],
   pupils:      ['pupil_id','name','year_group','class_id','working_at_level','active','added_date','notes',
                  'admission_no','upn','sex','pp','sen','eal'],
   assessments: ['assess_id','pupil_id','skill_id','academic_year','term','score','assessed_date','assessed_by'],
   config:      ['key','value']
 };
+
+// The hub — same shared-sync deployment every other WFA tool reads. Classes
+// and pupils only ever enter this sheet via syncRosterFromHub below; the
+// permanent link is tutor_group (class) / upn (pupil), both Bromcom-sourced
+// and immune to a display-name or name-spelling change.
+const HUB_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
+function hubToken_() {
+  return PropertiesService.getScriptProperties().getProperty('SHARED_TOKEN') || '2013';
+}
 
 // ── Entry points ──────────────────────────────────────────────
 
@@ -76,11 +85,9 @@ function handlePost_(d) {
   switch (d.action) {
     case 'saveScore':   return saveScore_(d);
     case 'saveScores':  return saveScores_(d);
-    case 'addPupil':    return addPupil_(d);
     case 'updatePupil': return updatePupil_(d);
-    case 'addClass':    return addClass_(d);
-    case 'updateClass': return updateClass_(d);
     case 'setConfig':   return setConfig_(d);
+    case 'syncRoster':  return syncRosterFromHub_(!!d.dryRun);
     default:            return { error: 'Unknown POST action: ' + d.action };
   }
 }
@@ -177,34 +184,9 @@ function getClasses_(p) {
     .filter(c => !year || c.academic_year === year);
 }
 
-function addClass_(d) {
-  const sh = ss_().getSheetByName('classes');
-  const id = Utilities.getUuid().substring(0, 8);
-  const nextRow = sh.getLastRow() + 1;
-  // Set text format on the whole row before writing: prevents both
-  // "6E1" → 60 (class_name) AND all-digit hex IDs → sci-notation floats
-  // (class_id) — see the mangled 3JW row that produced 4.6245e+55.
-  sh.getRange(nextRow, 1, 1, SHEET_HEADERS.classes.length).setNumberFormat('@');
-  sh.getRange(nextRow, 1, 1, SHEET_HEADERS.classes.length)
-    .setValues([[id, d.year_group, d.class_name, d.teacher_name || '', d.academic_year, true]]);
-  return { success: true, class_id: id };
-}
-
-function updateClass_(d) {
-  // String coercion both sides: rows written before text-formatting may hold
-  // numbers (or mangled floats), while the client always sends strings.
-  const found = findRow_('classes', r => String(r.class_id) === String(d.class_id));
-  if (!found) return { error: 'Class not found' };
-  const { rowNum, sheet, headers } = found;
-  ['class_name','teacher_name','active'].forEach(f => {
-    if (d[f] !== undefined) {
-      const cell = sheet.getRange(rowNum, headers.indexOf(f) + 1);
-      if (f === 'class_name') cell.setNumberFormat('@');
-      cell.setValue(d[f]);
-    }
-  });
-  return { success: true };
-}
+// Classes only ever enter/change here via syncRosterFromHub_ — class_name,
+// teacher_name and year_group are all Bromcom-sourced (via the hub's
+// getClasses), keyed on the permanent tutor_group code, never typed.
 
 // ── Pupils ────────────────────────────────────────────────────
 
@@ -240,28 +222,17 @@ function buildPupilRow_(sh, id, d) {
   });
 }
 
-function addPupil_(d) {
-  const sh = ss_().getSheetByName('pupils');
-  const id = Utilities.getUuid().substring(0, 8);
-  const nextRow = sh.getLastRow() + 1;
-  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
-  // Text-format the ID columns before writing — an all-digit hex UUID
-  // (e.g. "46245555") would otherwise parse as a number.
-  const formatCols = ['pupil_id', 'class_id']
-    .map(h => headers.indexOf(h) + 1)
-    .filter(c => c > 0);
-  formatCols.forEach(c => sh.getRange(nextRow, c).setNumberFormat('@'));
-  sh.getRange(nextRow, 1, 1, headers.length).setValues([buildPupilRow_(sh, id, d)]);
-  return { success: true, pupil_id: id };
-}
-
+// Pupils only ever enter here via syncRosterFromHub_ (below). The one
+// legitimately local field is working_at_level (this tool's own writing
+// judgement, not a Bromcom fact) — everything else (name/class_id/
+// year_group/upn/sex/pp/sen/eal/admission_no/active) is Bromcom-sourced
+// and only the sync may change it.
 function updatePupil_(d) {
-  // String coercion, as in updateClass_ — legacy rows may hold numeric IDs.
+  // String coercion, as in the sync — legacy rows may hold numeric IDs.
   const found = findRow_('pupils', r => String(r.pupil_id) === String(d.pupil_id));
   if (!found) return { error: 'Pupil not found' };
   const { rowNum, sheet, headers } = found;
-  ['name','class_id','working_at_level','active','notes','year_group',
-   'admission_no','upn','sex','pp','sen','eal'].forEach(f => {
+  ['working_at_level', 'notes'].forEach(f => {
     if (d[f] !== undefined) {
       const col = headers.indexOf(f);
       if (col >= 0) sheet.getRange(rowNum, col + 1).setValue(d[f]);
@@ -401,6 +372,210 @@ function upsert_(pupil_id, skill_id, academic_year, score, assessed_by) {
 //  Pupils matching no hub child at all (e.g. added-by-hand leavers) are
 //  reported, not touched. No assessment scores existed at repair time.
 //  Safe to re-run: every step is idempotent.
+// ── Roster sync (Bromcom, via the hub) ─────────────────────────
+//
+// The single door pupils/classes enter or leave through. Classes match on
+// tutor_group (permanent Bromcom code); pupils match on upn, falling back
+// to a canonical-name match for pre-migration rows (attaching upn once
+// found — never claiming a UPN two rows already disagree on). Never
+// deletes a row — leavers are deactivated, same as everywhere else.
+// dryRun computes and returns the full change report without writing.
+
+function canonical_(n) {
+  return String(n || '').toLowerCase().replace(/[^a-z ]/g, '')
+    .split(/\s+/).filter(t => t.length > 1).join('');
+}
+
+function codeToYearGroup_(code) {
+  const m = String(code || '').match(/^(\d)/);
+  return m ? 'Y' + m[1] : '';
+}
+
+function syncRosterFromHub_(dryRun) {
+  const token = hubToken_();
+  const hubClasses = JSON.parse(UrlFetchApp.fetch(HUB_URL + '?action=getClasses&token=' + token).getContentText()).classes || [];
+  const hubPupilsResp = JSON.parse(UrlFetchApp.fetch(HUB_URL + '?action=getPupils&token=' + token).getContentText());
+  if (hubPupilsResp.error) return { error: 'Hub error: ' + hubPupilsResp.error };
+  const hubPupils = hubPupilsResp.pupils || [];
+  if (!hubPupils.length) return { error: 'Hub returned no pupils — aborting, nothing written' };
+
+  const result = {
+    dryRun: !!dryRun,
+    classesAdded: 0, classesUpdated: 0, classesDeactivated: [],
+    pupilsAdded: 0, pupilsUpdated: 0, pupilsDeactivated: 0,
+    upnAttached: 0, unmatched: [], aborted: false, reason: ''
+  };
+
+  // ── Classes ──────────────────────────────────────────────────
+  const csh = ss_().getSheetByName('classes');
+  const cvals = csh.getDataRange().getValues();
+  const chdr = cvals[0];
+  const cIx = h => chdr.indexOf(h);
+  const tgCol = cIx('tutor_group'), cnCol = cIx('class_name'), tnCol = cIx('teacher_name'),
+        ygCol = cIx('year_group'), ayCol = cIx('academic_year'), caCol = cIx('active'), cidCol = cIx('class_id');
+
+  const classRowByTg = {}, classRowByName = {};
+  for (let i = 1; i < cvals.length; i++) {
+    const tg = String(cvals[i][tgCol] || '').trim();
+    if (tg) classRowByTg[tg] = i + 1;
+    const nm = String(cvals[i][cnCol] || '').trim();
+    if (nm) classRowByName[nm] = i + 1;
+  }
+
+  const classIdByTg = {};
+  const seenTg = {};
+
+  hubClasses.forEach(hc => {
+    const tg = String(hc.code || '').trim();
+    if (!tg) return;
+    seenTg[tg] = true;
+    const display = String(hc.display || tg).trim();
+    const teacher = String(hc.teacherInitials || '').trim();
+    const yg = codeToYearGroup_(tg);
+    const ay = String(hc.academicYear || '').trim();
+
+    let rowNum = classRowByTg[tg] || classRowByName[display];
+
+    if (rowNum) {
+      const row = cvals[rowNum - 1];
+      const changed = String(row[cnCol] || '') !== display || String(row[tnCol] || '') !== teacher ||
+                       String(row[tgCol] || '') !== tg || !truthy_(row[caCol]);
+      classIdByTg[tg] = String(row[cidCol]);
+      if (changed) {
+        result.classesUpdated++;
+        if (!dryRun) {
+          const range = csh.getRange(rowNum, 1, 1, chdr.length);
+          range.setNumberFormat('@');
+          const newRow = row.slice();
+          newRow[cnCol] = display; newRow[tnCol] = teacher; newRow[ygCol] = yg;
+          newRow[tgCol] = tg; newRow[caCol] = true;
+          range.setValues([newRow]);
+        }
+      }
+    } else {
+      const id = 'c' + Utilities.getUuid().substring(0, 7);
+      classIdByTg[tg] = id;
+      result.classesAdded++;
+      if (!dryRun) {
+        const nextRow = csh.getLastRow() + 1;
+        const newRow = chdr.map(h => {
+          switch (h) {
+            case 'class_id':      return id;
+            case 'year_group':    return yg;
+            case 'class_name':    return display;
+            case 'teacher_name':  return teacher;
+            case 'academic_year': return ay;
+            case 'active':        return true;
+            case 'tutor_group':   return tg;
+            default:              return '';
+          }
+        });
+        csh.getRange(nextRow, 1, 1, chdr.length).setNumberFormat('@');
+        csh.getRange(nextRow, 1, 1, chdr.length).setValues([newRow]);
+      }
+    }
+  });
+
+  // Retired classes — tutor_group no longer in the hub's live list.
+  for (let i = 1; i < cvals.length; i++) {
+    const tg = String(cvals[i][tgCol] || '').trim();
+    if (!tg || seenTg[tg] || !truthy_(cvals[i][caCol])) continue;
+    result.classesDeactivated.push(String(cvals[i][cnCol] || tg));
+    if (!dryRun) csh.getRange(i + 1, caCol + 1).setValue(false);
+  }
+
+  // ── Pupils ───────────────────────────────────────────────────
+  const psh = ss_().getSheetByName('pupils');
+  const pvals = psh.getDataRange().getValues();
+  const phdr = pvals[0];
+  const pIx = h => phdr.indexOf(h);
+  const nameCol = pIx('name'), actCol = pIx('active'), upnCol = pIx('upn');
+
+  const activePupilRows = [];
+  const byUpn = {}; // ALL rows, active or not — a re-enrolling leaver must
+                     // reactivate their existing row, never duplicate it.
+  for (let i = 1; i < pvals.length; i++) {
+    const upn = String(pvals[i][upnCol] || '').trim();
+    if (upn) byUpn[upn] = i + 1;
+    if (truthy_(pvals[i][actCol])) activePupilRows.push(i + 1);
+  }
+
+  if (activePupilRows.length && hubPupils.length < 0.8 * activePupilRows.length) {
+    result.aborted = true;
+    result.reason = 'Hub active pupil count (' + hubPupils.length + ') is under 80% of current active (' +
+      activePupilRows.length + ') — looks like a partial roster. Nothing written.';
+    return result;
+  }
+
+  const matchedRows = {};
+  hubPupils.forEach(hp => {
+    const upn = String(hp.upn || '').trim();
+    if (!upn) return;
+    let rowNum = byUpn[upn];
+
+    if (!rowNum) {
+      const canon = canonical_(hp.first + ' ' + hp.last);
+      for (let i = 0; i < activePupilRows.length; i++) {
+        const r = activePupilRows[i];
+        if (matchedRows[r]) continue;
+        if (String(pvals[r - 1][upnCol] || '').trim()) continue; // already claimed by a different upn
+        if (canonical_(pvals[r - 1][nameCol]) === canon) { rowNum = r; break; }
+      }
+    }
+
+    const classId = classIdByTg[String(hp.code || '').trim()] || '';
+    const name = (hp.first + ' ' + hp.last).trim();
+    const newVals = {
+      name: name, year_group: hp.yearGroup || '', class_id: classId,
+      active: true, upn: upn, sex: hp.sex || '',
+      pp: !!hp.pp, sen: hp.sen || '', eal: !!hp.eal
+    };
+
+    if (rowNum) {
+      matchedRows[rowNum] = true;
+      const row = pvals[rowNum - 1];
+      if (!String(row[upnCol] || '').trim()) result.upnAttached++;
+      let changed = false;
+      Object.keys(newVals).forEach(f => {
+        const col = pIx(f);
+        if (col >= 0 && String(row[col]) !== String(newVals[f])) changed = true;
+      });
+      if (changed) {
+        result.pupilsUpdated++;
+        if (!dryRun) {
+          const range = psh.getRange(rowNum, 1, 1, phdr.length);
+          range.setNumberFormat('@');
+          const newRow = row.slice();
+          Object.keys(newVals).forEach(f => { const col = pIx(f); if (col >= 0) newRow[col] = newVals[f]; });
+          range.setValues([newRow]);
+        }
+      }
+    } else {
+      result.pupilsAdded++;
+      if (!dryRun) {
+        const id = Utilities.getUuid().substring(0, 8);
+        const nextRow = psh.getLastRow() + 1;
+        const newRow = buildPupilRow_(psh, id, newVals);
+        const formatCols = ['pupil_id', 'class_id'].map(h => phdr.indexOf(h) + 1).filter(c => c > 0);
+        formatCols.forEach(c => psh.getRange(nextRow, c).setNumberFormat('@'));
+        psh.getRange(nextRow, 1, 1, phdr.length).setValues([newRow]);
+      }
+    }
+  });
+
+  // Anyone active and untouched this run: a real leaver if they carry a upn
+  // (it just wasn't in this hub pull), otherwise unmatched — report, don't touch.
+  activePupilRows.forEach(rowNum => {
+    if (matchedRows[rowNum]) return;
+    const upn = String(pvals[rowNum - 1][upnCol] || '').trim();
+    if (!upn) { result.unmatched.push(String(pvals[rowNum - 1][nameCol] || rowNum)); return; }
+    result.pupilsDeactivated++;
+    if (!dryRun) psh.getRange(rowNum, actCol + 1).setValue(false);
+  });
+
+  return result;
+}
+
 function repairWritingTracker() {
   const result = { classIdsFixed: 0, classesDeactivated: [], pupilsReattached: 0,
                    pupilsDeactivated: 0, nameVariantsDeactivated: [], notInHubLeftActive: [] };
