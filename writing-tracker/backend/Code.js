@@ -511,10 +511,19 @@ function syncRosterFromHub_(dryRun) {
   hubPupils.forEach(hp => {
     const upn = String(hp.upn || '').trim();
     if (!upn) return;
+    const canon = canonical_(hp.first + ' ' + hp.last);
     let rowNum = byUpn[upn];
 
+    // A stored upn is only trustworthy if the row it points to is actually
+    // that same pupil by name — a stray/incorrect historical upn on some
+    // other row must never silently steal this match (and would otherwise
+    // leave the pupil's real, correctly-named row unmatched forever, since
+    // nothing else will ever scan for it once byUpn "succeeds").
+    if (rowNum && canonical_(pvals[rowNum - 1][nameCol]) !== canon) {
+      rowNum = null;
+    }
+
     if (!rowNum) {
-      const canon = canonical_(hp.first + ' ' + hp.last);
       for (let i = 0; i < activePupilRows.length; i++) {
         const r = activePupilRows[i];
         if (matchedRows[r]) continue;
@@ -583,13 +592,20 @@ function syncRosterFromHub_(dryRun) {
       result.unmatched.push(rowName);
       if (result.debug.length < 6) {
         const canon = canonical_(rowName);
+        const freshUpn = debugHubCanon[canon] || null;
+        const conflictRow = freshUpn ? byUpn[freshUpn] : null;
         result.debug.push({
           name: rowName,
           rowNum: rowNum,
           canonical: canon,
-          freshHubMatchUpn: debugHubCanon[canon] || null,
+          freshHubMatchUpn: freshUpn,
           wasInActivePupilRowsList: activePupilRows.indexOf(rowNum) >= 0,
-          wasAlreadyMarkedMatched: !!matchedRows[rowNum]
+          wasAlreadyMarkedMatched: !!matchedRows[rowNum],
+          conflictingRowForThatUpn: conflictRow ? {
+            rowNum: conflictRow,
+            name: String(pvals[conflictRow - 1][nameCol] || ''),
+            active: truthy_(pvals[conflictRow - 1][actCol])
+          } : null
         });
       }
       return;
