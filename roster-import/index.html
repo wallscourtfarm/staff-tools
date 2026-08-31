@@ -48,10 +48,46 @@ input[type=file]{display:none}
 .success{background:#f3fdf7;border:1px solid #a0e0b8;border-radius:6px;padding:1rem;color:var(--green);font-weight:600;margin-top:1rem;font-size:.9rem;line-height:1.6}
 .aborted{background:#fdf3f3;border:1px solid #e0a0a0;border-radius:6px;padding:1rem;color:var(--red);font-weight:600;margin-top:1rem;font-size:.9rem}
 .collapsed-hint{font-size:.8rem;color:var(--muted);font-style:italic}
+#pinGate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+.pin-box{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:2rem;max-width:300px;width:90%;text-align:center;box-shadow:0 8px 30px rgba(10,20,40,.08)}
+.pin-box h2{margin:0 0 4px}
+.pin-box p{font-size:.82rem;color:var(--muted);margin:0 0 1.2rem}
+.pin-dots{display:flex;gap:10px;justify-content:center;margin-bottom:18px}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid #cbd5e1;transition:all .15s}
+.pin-dot.filled{background:var(--blue);border-color:var(--blue)}
+.pin-dot.error{background:var(--red);border-color:var(--red)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pin-key{padding:14px 0;border:1.5px solid #e2e8f0;border-radius:8px;background:#f8fafc;cursor:pointer;font-size:16px;font-weight:700;color:var(--text)}
+.pin-key:hover{background:#dbeafe;border-color:#93c5fd}
+body.locked main, body.locked header{display:none}
 .version{text-align:center;padding:20px 10px 10px;color:#aaa;font-size:11px}
 </style>
 </head>
-<body>
+<body class="locked">
+<div id="pinGate">
+  <div class="pin-box">
+    <h2>🔐 Staff PIN</h2>
+    <p>Enter the PIN to open Roster Import</p>
+    <div class="pin-dots">
+      <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pinKey('1')">1</button>
+      <button class="pin-key" onclick="pinKey('2')">2</button>
+      <button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button>
+      <button class="pin-key" onclick="pinKey('5')">5</button>
+      <button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button>
+      <button class="pin-key" onclick="pinKey('8')">8</button>
+      <button class="pin-key" onclick="pinKey('9')">9</button>
+      <div></div>
+      <button class="pin-key" onclick="pinKey('0')">0</button>
+      <button class="pin-key" onclick="pinKey('⌫')">⌫</button>
+    </div>
+  </div>
+</div>
 <header>
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA" onerror="this.style.display='none'">
   <div>
@@ -108,11 +144,50 @@ input[type=file]{display:none}
   </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-31.08.26b</div>
+<div class="version">WFA Roster Import · WFA-31.08.26c</div>
 
 <script>
 const HUB_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
 const WFA_TOKEN = localStorage.getItem('wfa_shared_token') || '2013';
+const LOCAL_PIN_FALLBACK = '2013'; // offline fallback only — real check is server-side (STAFF_PIN)
+
+let pinEntry = '';
+function refreshPinDots(error){
+  for (let i = 0; i < 4; i++) {
+    const d = document.getElementById('pd' + i);
+    d.className = 'pin-dot';
+    if (error) d.classList.add('error');
+    else if (i < pinEntry.length) d.classList.add('filled');
+  }
+}
+function pinKey(k){
+  if (k === '⌫') { pinEntry = pinEntry.slice(0, -1); refreshPinDots(); return; }
+  if (pinEntry.length >= 4) return;
+  pinEntry += k; refreshPinDots();
+  if (pinEntry.length === 4) checkPinAsync(pinEntry);
+}
+async function checkPinAsync(pin){
+  try {
+    const r = await fetch(HUB_URL + '?action=checkPin&pin=' + encodeURIComponent(pin) + '&token=' + encodeURIComponent(WFA_TOKEN) + '&t=' + Date.now());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if (d && d.ok) unlock();
+    else pinFail();
+  } catch (err) {
+    if (pin === LOCAL_PIN_FALLBACK) unlock();
+    else pinFail();
+  }
+}
+function pinFail(){
+  refreshPinDots(true);
+  setTimeout(() => { pinEntry = ''; refreshPinDots(); }, 700);
+}
+function unlock(){
+  sessionStorage.setItem('wfa_roster_import_ok', '1');
+  document.body.classList.remove('locked');
+  document.getElementById('pinGate').style.display = 'none';
+}
+if (sessionStorage.getItem('wfa_roster_import_ok') === '1') unlock();
 
 const YEAR_GROUP_MAP = { '00':'R','01':'Y1','02':'Y2','03':'Y3','04':'Y4','05':'Y5','06':'Y6', 'R':'R' };
 const SEN_STATUS_MAP = { 'N':'', 'K':'Support', 'E':'EHCP' };
