@@ -428,9 +428,10 @@ async function fetchChildren() {
       if (!planCache[p.child_id]) planCache[p.child_id] = {};
       planCache[p.child_id][p.academic_year] = p;
     });
-    // populate year selector from known years
-    const thisYear = currentAcademicYear();
-    const years = [...new Set(allPlans.map(p => p.academic_year))].filter(y => y <= thisYear).sort().reverse();
+    // populate year selector from known years — no upper bound, since
+    // staff legitimately prepare next year's plans before the rollover date
+    const years = [...new Set(allPlans.map(p => p.academic_year))].sort().reverse();
+    if (years.length && !years.includes(activeYear)) activeYear = years[0];
     const ySel = document.getElementById('dashYearSel');
     if (ySel) {
       ySel.innerHTML = years.map(y => `<option value="${y}"${y===activeYear?' selected':''}>${y}</option>`).join('');
@@ -1695,7 +1696,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-31.08.26a
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-31.08.26b
 </footer>
 </body>
 </html>
