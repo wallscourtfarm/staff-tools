@@ -270,15 +270,21 @@ function readMasterPupils() {
   if (rows.length < 2) return [];
   const hdr = rows[0].map(function (h) { return String(h).trim().toLowerCase(); });
   const ix = function (name) { return hdr.indexOf(name); };
-  // Bromcom code → display name (best effort; unmapped codes pass through)
+  // Bromcom code → class map (best effort; unmapped codes pass through)
   let cmap = {};
   try {
     const cm = readClassMap();
-    Object.keys(cm).forEach(function (code) { cmap[code.toUpperCase()] = cm[code].display; });
+    Object.keys(cm).forEach(function (code) { cmap[code.toUpperCase()] = cm[code]; });
   } catch (err) { /* mapping tab missing — serve raw codes */ }
   const display = function (code) {
     code = String(code || '').trim();
-    return cmap[code.toUpperCase()] || code;
+    const entry = cmap[code.toUpperCase()];
+    return (entry && entry.display) || code;
+  };
+  const teacherInitials = function (code) {
+    code = String(code || '').trim();
+    const entry = cmap[code.toUpperCase()];
+    return (entry && entry.teacherInitials) || '';
   };
   const out = [];
   for (let i = 1; i < rows.length; i++) {
@@ -296,6 +302,7 @@ function readMasterPupils() {
       last: String(r[ix('last_name')] || '').trim(),
       code: rawCode,                              // permanent Bromcom code
       class: display(rawCode),                    // teacher-facing display name
+      teacherInitials: teacherInitials(rawCode),   // current teacher's initials, from the classes tab
       yearGroup: String(r[ix('year_group')] || '').trim(),
       sex: String(r[ix('sex')] || '').trim(),
       eal: truthy(r[ix('is_eal')]),
