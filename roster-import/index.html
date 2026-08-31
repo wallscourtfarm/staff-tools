@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WFA Roster Import</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --blue:#1798d3; --blue-dk:#0a5c8a; --dark:#0a0101;
+  --bg:#f4f7fa; --white:#fff; --border:#d0dde8; --muted:#5a6a7a; --text:#1A3C6E;
+  --green:#2bae62; --amber:#E8B84B; --red:#c0392b;
+}
+*{box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);margin:0;min-height:100vh}
+header{background:linear-gradient(135deg,var(--blue) 0%,var(--blue-dk) 100%);color:#fff;padding:22px 28px;display:flex;align-items:center;gap:14px}
+header img{height:40px}
+header h1{font-size:1.25rem;margin:0;font-weight:800}
+header p{margin:2px 0 0;font-size:.85rem;opacity:.9}
+main{max-width:820px;margin:0 auto;padding:28px 20px 60px}
+.card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:1.5rem;margin-bottom:1.25rem}
+h2{font-size:1.05rem;margin:0 0 8px;color:var(--text)}
+.hint{font-size:.85rem;color:var(--muted);margin:0 0 1.2rem;line-height:1.5}
+.upload-area{display:flex;flex-direction:column;align-items:center;gap:8px;padding:2rem;border:2px dashed var(--border);border-radius:8px;cursor:pointer;background:var(--white);transition:border-color .15s}
+.upload-area:hover{border-color:var(--blue)}
+.upload-icon{font-size:32px}
+.upload-text{font-size:.9rem;color:var(--muted)}
+input[type=file]{display:none}
+.status{color:var(--muted);padding:1rem 0;font-size:.9rem}
+.error{background:#fdf3f3;border:1px solid #e0a0a0;border-radius:6px;padding:.75rem 1rem;color:var(--red);font-size:.9rem;margin-top:1rem}
+.metric-row{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:1.4rem}
+.metric{text-align:center;min-width:80px}
+.metric-value{font-size:1.8rem;font-weight:800}
+.metric-label{font-size:.75rem;color:var(--muted)}
+.section{margin-bottom:1.1rem}
+.section h3{font-size:.9rem;font-weight:700;color:var(--text);margin:0 0 6px}
+.list-item{padding:.35rem 0;border-bottom:1px solid #f0f2f5;font-size:.88rem;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.list-item:last-child{border-bottom:none}
+.badge{background:var(--blue-lt,#e8f4fc);color:var(--blue);padding:.1rem .5rem;border-radius:10px;font-size:.72rem;font-weight:700}
+.badge.leave{background:#fdf0f0;color:var(--red)}
+.badge.join{background:#eefaf1;color:var(--green)}
+.field-diff{font-size:.78rem;color:var(--muted)}
+.notice{background:#fffbea;border:1px solid #f0d080;border-radius:6px;padding:.7rem 1rem;font-size:.85rem;color:#7a5c00;margin-bottom:1rem}
+.applybtn{margin-top:.5rem;padding:.65rem 1.6rem;background:var(--text);color:#fff;border:none;border-radius:7px;font-weight:700;cursor:pointer;font-size:.92rem}
+.applybtn:disabled{opacity:.5;cursor:default}
+.success{background:#f3fdf7;border:1px solid #a0e0b8;border-radius:6px;padding:1rem;color:var(--green);font-weight:600;margin-top:1rem;font-size:.9rem;line-height:1.6}
+.aborted{background:#fdf3f3;border:1px solid #e0a0a0;border-radius:6px;padding:1rem;color:var(--red);font-weight:600;margin-top:1rem;font-size:.9rem}
+.collapsed-hint{font-size:.8rem;color:var(--muted);font-style:italic}
+.version{text-align:center;padding:20px 10px 10px;color:#aaa;font-size:11px}
+</style>
+</head>
+<body>
+<header>
+  <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA" onerror="this.style.display='none'">
+  <div>
+    <h1>WFA Roster Import</h1>
+    <p>The one place pupil data enters every WFA tool</p>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Import from Bromcom</h2>
+    <p class="hint">Export the Student List (.xlsx) from Bromcom and upload it here. Every joiner, leaver, and
+    profile change (name, class, PP, SEN, EAL…) is matched by UPN and previewed before anything is written.
+    Nothing else needs updating — every WFA tool reads pupils from the same place this writes to.</p>
+
+    <label class="upload-area" id="uploadArea">
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      <span class="upload-icon">📂</span>
+      <span class="upload-text" id="uploadText">Click to select the Bromcom Student List export (.xlsx)</span>
+    </label>
+
+    <div id="status" class="status" style="display:none"></div>
+    <div id="error" class="error" style="display:none"></div>
+  </div>
+
+  <div id="previewCard" class="card" style="display:none">
+    <h2>Preview — nothing has been written yet</h2>
+    <div class="metric-row">
+      <div class="metric"><div class="metric-value" style="color:var(--green)" id="mNew">0</div><div class="metric-label">New pupils</div></div>
+      <div class="metric"><div class="metric-value" style="color:var(--red)" id="mLeave">0</div><div class="metric-label">Leaving</div></div>
+      <div class="metric"><div class="metric-value" style="color:var(--blue)" id="mChanged">0</div><div class="metric-label">Profile changes</div></div>
+      <div class="metric"><div class="metric-value" style="color:var(--muted)" id="mUnchanged">0</div><div class="metric-label">Unchanged</div></div>
+      <div class="metric"><div class="metric-value" style="color:var(--amber)" id="mMissing">0</div><div class="metric-label">Not in file</div></div>
+    </div>
+
+    <div id="rejectedNotice" class="notice" style="display:none"></div>
+    <div id="missingNotice" class="notice" style="display:none"></div>
+
+    <div class="section" id="secNew" style="display:none">
+      <h3>New pupils</h3>
+      <div id="listNew"></div>
+    </div>
+    <div class="section" id="secLeave" style="display:none">
+      <h3>Leaving (will be marked left, never deleted)</h3>
+      <div id="listLeave"></div>
+    </div>
+    <div class="section" id="secChanged" style="display:none">
+      <h3>Profile changes</h3>
+      <div id="listChanged"></div>
+    </div>
+
+    <button class="applybtn" id="applyBtn">✅ Apply changes</button>
+    <div id="applyResult"></div>
+  </div>
+</main>
+
+<div class="version">WFA Roster Import · WFA-31.08.26b</div>
+
+<script>
+const HUB_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
+const WFA_TOKEN = localStorage.getItem('wfa_shared_token') || '2013';
+
+const YEAR_GROUP_MAP = { '00':'R','01':'Y1','02':'Y2','03':'Y3','04':'Y4','05':'Y5','06':'Y6', 'R':'R' };
+const SEN_STATUS_MAP = { 'N':'', 'K':'Support', 'E':'EHCP' };
+const COMPARE_FIELDS = ['first_name','last_name','year_group','tutor_group','sex',
+  'is_pp','is_fsm','is_sen','sen_status','sen_type','is_lac','is_eal','is_service_child','is_disadvantaged'];
+const FIELD_LABELS = { first_name:'First name', last_name:'Last name', year_group:'Year group',
+  tutor_group:'Class', sex:'Sex', is_pp:'PP', is_fsm:'FSM', is_sen:'SEN', sen_status:'SEN status',
+  sen_type:'SEN type', is_lac:'LAC', is_eal:'EAL', is_service_child:'Service child', is_disadvantaged:'Disadvantaged' };
+
+function currentAcademicYear(){
+  const d = new Date();
+  const start = d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1;
+  return start + '-' + String(start + 1).slice(2);
+}
+
+function yn(v){ return String(v||'').trim().toUpperCase() === 'Y' || String(v||'').trim() === 'Yes'; }
+
+function normaliseRow(row){
+  const upn = String(row['UPN'] || '').trim();
+  if (!upn) return null;
+
+  const ygRaw = String(row['Year Group'] || '').trim().toUpperCase();
+  const tgRaw = String(row['Tutor Group'] || '').trim().toUpperCase();
+  const isLeaver = ygRaw === 'NA' || tgRaw === 'NA' || !ygRaw;
+
+  const senCode = String(row['SEN Status Code'] || 'N').trim().toUpperCase();
+  const senStatus = SEN_STATUS_MAP.hasOwnProperty(senCode) ? SEN_STATUS_MAP[senCode] : '';
+  const isSen = senCode !== 'N' && senCode !== '';
+
+  const sexRaw = String(row['Sex'] || '').trim().toLowerCase();
+  const sex = sexRaw === 'male' ? 'M' : (sexRaw === 'female' ? 'F' : '');
+
+  const isPp = yn(row['Pupil Premium']);
+  const isLac = yn(row['LAC']);
+  const isEal = yn(row['EAL']);
+  const isFsm = yn(row['FSM']);
+  const isServiceChild = yn(row['Service Children']);
+
+  return {
+    upn: upn,
+    first_name: String(row['First Name'] || '').trim(),
+    last_name: String(row['Last Name'] || '').trim(),
+    year_group: isLeaver ? '' : (YEAR_GROUP_MAP[ygRaw] || ygRaw),
+    tutor_group: isLeaver ? '' : tgRaw,
+    sex: sex,
+    is_pp: isPp,
+    is_fsm: isFsm,
+    is_sen: isSen,
+    sen_status: senStatus,
+    sen_type: String(row['SEN Code'] || '').trim(),
+    is_lac: isLac,
+    is_eal: isEal,
+    is_service_child: isServiceChild,
+    is_disadvantaged: isPp || isLac || isSen,
+    status: isLeaver ? 'left' : 'active'
+  };
+}
+
+function fieldDiffText(before, after){
+  const diffs = [];
+  COMPARE_FIELDS.forEach(function(f){
+    const a = before[f], b = after[f];
+    const an = (typeof a === 'boolean') ? a : String(a||'');
+    const bn = (typeof b === 'boolean') ? b : String(b||'');
+    if (an !== bn) diffs.push(FIELD_LABELS[f] + ': ' + fmt(a) + ' → ' + fmt(b));
+  });
+  return diffs.join(' · ');
+  function fmt(v){
+    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    return v || '—';
+  }
+}
+
+let currentPayload = null;
+
+const fileInput = document.getElementById('fileInput');
+const uploadText = document.getElementById('uploadText');
+const statusEl = document.getElementById('status');
+const errorEl = document.getElementById('error');
+
+fileInput.addEventListener('change', handleFile);
+
+async function handleFile(e){
+  const file = e.target.files[0];
+  if (!file) return;
+  uploadText.textContent = file.name;
+  errorEl.style.display = 'none';
+  document.getElementById('previewCard').style.display = 'none';
+  statusEl.style.display = 'block';
+  statusEl.textContent = 'Reading file…';
+
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    const normalised = [];
+    let rejectedNoUpn = 0;
+    rows.forEach(function(r){
+      const n = normaliseRow(r);
+      if (n) normalised.push(n); else rejectedNoUpn++;
+    });
+
+    statusEl.textContent = 'Fetching current roster to build preview…';
+    const hubPupils = await fetchHubPupils();
+
+    buildPreview(normalised, hubPupils, rejectedNoUpn);
+    statusEl.style.display = 'none';
+  } catch (err) {
+    statusEl.style.display = 'none';
+    errorEl.style.display = 'block';
+    errorEl.textContent = 'Could not read this file: ' + err.message;
+  }
+}
+
+async function fetchHubPupils(){
+  const url = HUB_URL + '?action=getPupils&token=' + encodeURIComponent(WFA_TOKEN) + '&v=' + Date.now();
+  const r = await fetch(url, { cache: 'no-store' });
+  const data = await r.json();
+  if (data.error) throw new Error('Hub error: ' + data.error);
+  return data.pupils || [];
+}
+
+function buildPreview(normalised, hubPupils, rejectedNoUpn){
+  const hubByUpn = {};
+  hubPupils.forEach(function(p){ hubByUpn[p.upn] = p; });
+
+  const newPupils = [], leaving = [], changed = [];
+  const seenUpns = {};
+  let unchanged = 0;
+
+  normalised.forEach(function(p){
+    seenUpns[p.upn] = true;
+    const existing = hubByUpn[p.upn];
+    if (!existing) {
+      if (p.status === 'active') newPupils.push(p);
+      return;
+    }
+    if (p.status === 'left') { leaving.push(Object.assign({}, p, { wasClass: existing.class })); return; }
+    const before = {
+      first_name: existing.first, last_name: existing.last,
+      year_group: existing.yearGroup, tutor_group: existing.code,
+      sex: existing.sex, is_pp: existing.pp, is_fsm: existing.fsm,
+      is_sen: !!existing.sen, sen_status: existing.sen, sen_type: existing.senType || '',
+      is_lac: existing.lac, is_eal: existing.eal, is_service_child: !!existing.serviceChild,
+      is_disadvantaged: !!existing.disadvantaged
+    };
+    const diffText = fieldDiffText(before, p);
+    if (diffText) changed.push({ p: p, diff: diffText });
+    else unchanged++;
+  });
+
+  const missing = hubPupils.filter(function(hp){ return !seenUpns[hp.upn]; });
+
+  document.getElementById('mNew').textContent = newPupils.length;
+  document.getElementById('mLeave').textContent = leaving.length;
+  document.getElementById('mChanged').textContent = changed.length;
+  document.getElementById('mUnchanged').textContent = unchanged;
+  document.getElementById('mMissing').textContent = missing.length;
+
+  const rejNotice = document.getElementById('rejectedNotice');
+  if (rejectedNoUpn > 0) {
+    rejNotice.style.display = 'block';
+    rejNotice.textContent = '⚠️ ' + rejectedNoUpn + ' row(s) had no UPN and were skipped entirely.';
+  } else rejNotice.style.display = 'none';
+
+  const missNotice = document.getElementById('missingNotice');
+  if (missing.length > 0) {
+    missNotice.style.display = 'block';
+    missNotice.textContent = '📋 ' + missing.length + ' pupil(s) currently active are not in this file at all. ' +
+      'They will be left untouched (not marked as leavers) — only rows explicitly marked as leaving in Bromcom are changed.';
+  } else missNotice.style.display = 'none';
+
+  fillSection('secNew', 'listNew', newPupils, function(p){
+    return rowHtml(p.first_name + ' ' + p.last_name, p.year_group, 'join');
+  });
+  fillSection('secLeave', 'listLeave', leaving, function(p){
+    return rowHtml(p.first_name + ' ' + p.last_name, p.wasClass || '', 'leave');
+  });
+  fillSection('secChanged', 'listChanged', changed, function(c){
+    return '<div class="list-item"><span>' + esc(c.p.first_name + ' ' + c.p.last_name) +
+      '</span></div><div class="field-diff" style="padding-bottom:.5rem">' + esc(c.diff) + '</div>';
+  });
+
+  currentPayload = {
+    pupils: normalised,
+    classes: buildClassPayload(normalised)
+  };
+  document.getElementById('previewCard').style.display = 'block';
+  document.getElementById('applyResult').innerHTML = '';
+  document.getElementById('applyBtn').disabled = false;
+  document.getElementById('applyBtn').textContent = '✅ Apply changes';
+}
+
+function buildClassPayload(normalised){
+  const seen = {};
+  const out = [];
+  normalised.forEach(function(p){
+    if (p.status !== 'active' || !p.tutor_group) return;
+    if (seen[p.tutor_group]) return;
+    seen[p.tutor_group] = true;
+    out.push({ code: p.tutor_group, display: p.tutor_group, academic_year: currentAcademicYear() });
+  });
+  return out;
+}
+
+function rowHtml(name, badge, badgeClass){
+  return '<div class="list-item"><span>' + esc(name) + '</span>' +
+    (badge ? '<span class="badge ' + badgeClass + '">' + esc(badge) + '</span>' : '') + '</div>';
+}
+
+function fillSection(sectionId, listId, items, renderer){
+  const sec = document.getElementById(sectionId);
+  const list = document.getElementById(listId);
+  if (!items.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  list.innerHTML = items.map(renderer).join('');
+}
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+  });
+}
+
+document.getElementById('applyBtn').addEventListener('click', async function(){
+  if (!currentPayload) return;
+  const btn = this;
+  btn.disabled = true;
+  btn.textContent = 'Applying…';
+  const resultEl = document.getElementById('applyResult');
+  resultEl.innerHTML = '';
+  try {
+    const url = HUB_URL + '?action=importPupils&token=' + encodeURIComponent(WFA_TOKEN);
+    const r = await fetch(url, { method: 'POST', body: JSON.stringify(currentPayload) });
+    const data = await r.json();
+    if (data.status === 'aborted') {
+      resultEl.innerHTML = '<div class="aborted">⛔ Aborted — ' + esc(data.reason) + '<br>Nothing was written. ' +
+        'Check the file is a full export, not a partial one.</div>';
+      btn.textContent = '✅ Apply changes';
+      btn.disabled = false;
+      return;
+    }
+    if (data.status !== 'ok') {
+      resultEl.innerHTML = '<div class="aborted">Error: ' + esc(data.message || 'unknown error') + '</div>';
+      btn.textContent = '✅ Apply changes';
+      btn.disabled = false;
+      return;
+    }
+    resultEl.innerHTML = '<div class="success">✓ Done — ' + data.added + ' added, ' + data.updated +
+      ' updated, ' + data.leftMarked + ' marked as leavers, ' + data.classesAdded + ' new class(es).<br>' +
+      '<span class="collapsed-hint">Every WFA tool will see this the next time it loads.</span></div>';
+    btn.textContent = 'Applied';
+  } catch (err) {
+    resultEl.innerHTML = '<div class="aborted">Network error: ' + esc(err.message) + '</div>';
+    btn.textContent = '✅ Apply changes';
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

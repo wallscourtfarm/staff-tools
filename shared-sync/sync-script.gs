@@ -52,6 +52,7 @@ function doPost(e) {
     if (!tokenOK(e)) return json({ error: 'unauthorised' });
     const p = e.parameter || {};
     if (p.action === 'seedPupils') return seedPupils(e);
+    if (p.action === 'importPupils') return importPupils(e);
     const key = p.key;
     if (!key) return json({ error: 'missing key' });
     props().setProperty(key, e.postData.contents);
@@ -250,10 +251,242 @@ function readMasterPupils() {
       pp: truthy(r[ix('is_pp')]),
       fsm: truthy(r[ix('is_fsm')]),
       lac: truthy(r[ix('is_lac')]),
-      sen: String(r[ix('sen_status')] || '').trim()
+      sen: String(r[ix('sen_status')] || '').trim(),
+      senType: String(r[ix('sen_type')] || '').trim(),
+      serviceChild: truthy(r[ix('is_service_child')]),
+      disadvantaged: truthy(r[ix('is_disadvantaged')])
     });
   }
   return out;
+}
+
+// ── Bromcom import (single front door — see roster-import tool) ───────────
+//
+// POST ?action=importPupils&token=… with a raw JSON body (no Content-Type):
+//   { pupils: [{upn, first_name, last_name, year_group, tutor_group, sex,
+//               is_pp, is_fsm, is_sen, sen_status, sen_type, is_lac, is_eal,
+//               is_service_child, is_disadvantaged, status}],
+//     classes: [{code, display, academic_year}] }
+//
+// Upserts by UPN into MASTER_PUPILS_TAB / MASTER_CLASSES_TAB of this same
+// spreadsheet (the one the WFA Pupil Tracker's own Attainment tabs live in,
+// and the one every getPupils/getClasses caller already reads live — so
+// nothing downstream needs to change to see a new import).
+//
+// Never touches clf_vul / wfa_vul / target — those are maintained separately
+// in the Tracker's own Setup screen and must survive every Bromcom import.
+// Never deletes a row. A pupil missing from the payload entirely is left
+// untouched and counted in notInPayload; only an explicit status:'left' row
+// marks a leaver. Safety valve: aborts (writes nothing) if the payload's
+// active-pupil count is under 80% of the sheet's current active count —
+// guards against a partial/corrupt export being applied by accident.
+
+const PROTECTED_PUPIL_COLUMNS = ['clf_vul', 'wfa_vul', 'target'];
+const PUPIL_TEXT_COLUMNS = ['upn', 'tutor_group', 'year_group'];
+
+function _today() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+function _boolStr(v) {
+  return (v === true || v === 'True' || v === 'true') ? 'True' : 'False';
+}
+
+function _currentAcademicYear() {
+  const d = new Date();
+  const y = d.getFullYear();
+  // UK school year rolls over in September
+  const startYear = d.getMonth() >= 8 ? y : y - 1;
+  return startYear + '-' + String(startYear + 1).slice(2);
+}
+
+function importPupils(e) {
+  const body = JSON.parse(e.postData.contents || '{}');
+  const incoming = body.pupils || [];
+  const incomingClasses = body.classes || [];
+
+  if (!incoming.length) {
+    return json({ status: 'error', message: 'pupils array is empty' });
+  }
+
+  const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+  const sh = ss.getSheetByName(MASTER_PUPILS_TAB);
+  if (!sh) return json({ status: 'error', message: MASTER_PUPILS_TAB + ' tab missing' });
+
+  const allRows = sh.getDataRange().getValues();
+  const hdr = allRows[0].map(function (h) { return String(h).trim().toLowerCase(); });
+  const ix = function (name) { return hdr.indexOf(name); };
+  const upnIx = ix('upn');
+  const statusIx = ix('status');
+  if (upnIx < 0) return json({ status: 'error', message: 'upn column missing' });
+
+  // ── Validate + safety valve (before any writes) ──────────────────────────
+  let rejectedNoUpn = 0;
+  const clean = [];
+  incoming.forEach(function (p) {
+    const upn = String(p.upn || '').trim();
+    if (!upn) { rejectedNoUpn++; return; }
+    clean.push(Object.assign({}, p, { upn: upn }));
+  });
+
+  const payloadActiveCount = clean.filter(function (p) {
+    return String(p.status || 'active').trim().toLowerCase() !== 'left';
+  }).length;
+
+  let existingActiveCount = 0;
+  const existingByUpn = {};
+  for (let i = 1; i < allRows.length; i++) {
+    const upn = String(allRows[i][upnIx] || '').trim();
+    if (!upn) continue;
+    existingByUpn[upn] = i; // row index into allRows (0-based; sheet row = i+1)
+    const status = String(allRows[i][statusIx] || '').trim().toLowerCase();
+    if (!status || status === 'active') existingActiveCount++;
+  }
+
+  if (existingActiveCount > 0 && payloadActiveCount < 0.8 * existingActiveCount) {
+    return json({
+      status: 'aborted',
+      reason: 'payload active count (' + payloadActiveCount + ') is under 80% of ' +
+        'current active count (' + existingActiveCount + ') — looks like a partial export',
+      safetyValve: true
+    });
+  }
+
+  // ── Compute changes ───────────────────────────────────────────────────────
+  const MUTABLE = [
+    'first_name', 'last_name', 'year_group', 'tutor_group', 'sex',
+    'is_pp', 'is_fsm', 'is_sen', 'sen_status', 'sen_type',
+    'is_lac', 'is_eal', 'is_service_child', 'is_disadvantaged', 'status'
+  ];
+  const BOOL_FIELDS = ['is_pp', 'is_fsm', 'is_sen', 'is_lac', 'is_eal',
+    'is_service_child', 'is_disadvantaged'];
+
+  const today = _today();
+  const seenUpns = {};
+  let added = 0, updated = 0, unchanged = 0, leftMarked = 0;
+  const rowUpdates = []; // {rowIndex0, values}
+  const newRows = [];
+
+  clean.forEach(function (p) {
+    seenUpns[p.upn] = true;
+    const wasStatus = existingByUpn.hasOwnProperty(p.upn)
+      ? String(allRows[existingByUpn[p.upn]][statusIx] || '').trim().toLowerCase()
+      : null;
+
+    if (existingByUpn.hasOwnProperty(p.upn)) {
+      const rowIx = existingByUpn[p.upn];
+      const existingRow = allRows[rowIx];
+      const newRow = existingRow.slice();
+      let changed = false;
+      MUTABLE.forEach(function (field) {
+        const col = ix(field);
+        if (col < 0) return;
+        let val = p[field];
+        if (BOOL_FIELDS.indexOf(field) >= 0) val = _boolStr(val);
+        else if (field === 'status') val = String(val || 'active').trim().toLowerCase();
+        else val = String(val === undefined || val === null ? '' : val).trim();
+        if (String(existingRow[col]) !== val) changed = true;
+        newRow[col] = val;
+      });
+      if (changed) {
+        const duIx = ix('date_updated');
+        const lsIx = ix('last_seen_in_import');
+        if (duIx >= 0) newRow[duIx] = today;
+        if (lsIx >= 0) newRow[lsIx] = today;
+        rowUpdates.push({ rowIndex0: rowIx, values: newRow });
+        const newStatus = String(p.status || 'active').trim().toLowerCase();
+        if (newStatus === 'left' && wasStatus !== 'left') leftMarked++;
+        else updated++;
+      } else {
+        unchanged++;
+      }
+    } else {
+      const newRow = hdr.map(function () { return ''; });
+      MUTABLE.forEach(function (field) {
+        const col = ix(field);
+        if (col < 0) return;
+        let val = p[field];
+        if (BOOL_FIELDS.indexOf(field) >= 0) val = _boolStr(val);
+        else if (field === 'status') val = String(val || 'active').trim().toLowerCase();
+        else val = String(val === undefined || val === null ? '' : val).trim();
+        newRow[col] = val;
+      });
+      const upIx = ix('upn'); if (upIx >= 0) newRow[upIx] = p.upn;
+      const daIx = ix('date_added'); if (daIx >= 0) newRow[daIx] = today;
+      const duIx2 = ix('date_updated'); if (duIx2 >= 0) newRow[duIx2] = today;
+      const lsIx2 = ix('last_seen_in_import'); if (lsIx2 >= 0) newRow[lsIx2] = today;
+      newRows.push(newRow);
+      added++;
+    }
+  });
+
+  // Pupils in the sheet as active but absent from this payload entirely —
+  // report only, never touch (flag-don't-delete).
+  let notInPayload = 0;
+  Object.keys(existingByUpn).forEach(function (upn) {
+    if (seenUpns[upn]) return;
+    const status = String(allRows[existingByUpn[upn]][statusIx] || '').trim().toLowerCase();
+    if (!status || status === 'active') notInPayload++;
+  });
+
+  // ── Write phase ────────────────────────────────────────────────────────
+  rowUpdates.forEach(function (u) {
+    const range = sh.getRange(u.rowIndex0 + 1, 1, 1, hdr.length);
+    range.setNumberFormat('@');
+    range.setValues([u.values]);
+  });
+  if (newRows.length) {
+    const startRow = sh.getLastRow() + 1;
+    const range = sh.getRange(startRow, 1, newRows.length, hdr.length);
+    range.setNumberFormat('@');
+    range.setValues(newRows);
+  }
+
+  // ── Classes upsert — insert brand-new codes only, never touch existing ──
+  let classesAdded = 0;
+  if (incomingClasses.length) {
+    const csh = ss.getSheetByName(MASTER_CLASSES_TAB);
+    if (csh) {
+      const crows = csh.getDataRange().getValues();
+      const chdr = crows[0].map(function (h) { return String(h).trim().toLowerCase(); });
+      const cix = function (name) { return chdr.indexOf(name); };
+      const knownCodes = {};
+      for (let i = 1; i < crows.length; i++) {
+        const code = String(crows[i][cix('tutor_group')] || '').trim();
+        if (code) knownCodes[code] = true;
+      }
+      const newClassRows = [];
+      incomingClasses.forEach(function (c) {
+        const code = String(c.code || '').trim();
+        if (!code || knownCodes[code]) return;
+        knownCodes[code] = true;
+        const row = chdr.map(function () { return ''; });
+        const tgIx = cix('tutor_group'); if (tgIx >= 0) row[tgIx] = code;
+        const dnIx = cix('display_name'); if (dnIx >= 0) row[dnIx] = c.display || code;
+        const ayIx = cix('academic_year'); if (ayIx >= 0) row[ayIx] = c.academic_year || _currentAcademicYear();
+        newClassRows.push(row);
+      });
+      if (newClassRows.length) {
+        const startRow = csh.getLastRow() + 1;
+        const range = csh.getRange(startRow, 1, newClassRows.length, chdr.length);
+        range.setNumberFormat('@');
+        range.setValues(newClassRows);
+        classesAdded = newClassRows.length;
+      }
+    }
+  }
+
+  return json({
+    status: 'ok',
+    added: added,
+    updated: updated,
+    leftMarked: leftMarked,
+    unchanged: unchanged,
+    notInPayload: notInPayload,
+    rejectedNoUpn: rejectedNoUpn,
+    classesAdded: classesAdded,
+    safetyValve: false
+  });
 }
 
 // Legacy source: hub planning workbook's Pupils tab
