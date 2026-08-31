@@ -245,7 +245,6 @@ nav .brand span { opacity: .7; font-weight: 400; font-size: .88rem; }
       <div class="plan-meta" id="planMeta"></div>
     </div>
     <select class="year-selector" id="yearSelector" onchange="switchYear(this.value)"></select>
-    <button class="btn btn-ghost btn-sm" onclick="editChildModal()">Edit Info</button>
     <button class="btn btn-outline btn-sm" style="background:var(--blue);color:white;border:none" onclick="printPlan()">🖨 Print PDF</button>
     <button class="btn btn-danger btn-sm" onclick="archiveChild()">Archive</button>
   </div>
@@ -257,15 +256,14 @@ nav .brand span { opacity: .7; font-weight: 400; font-size: .88rem; }
   </div>
 </div>
 
-<!-- NEW/EDIT CHILD MODAL -->
+<!-- NEW CHILD MODAL -->
 <div id="childModal" style="display:none">
   <div class="modal-overlay" onmousedown="if(event.target===this)closeChildModal()">
     <div class="modal">
       <h3 id="childModalTitle">New Learner Plan</h3>
-      <input type="hidden" id="editingChildId">
       <input type="hidden" id="nUpn">
 
-      <!-- New: pick from the roster — name/class/year/SEN all come from Bromcom -->
+      <!-- Pick from the roster — name/class/teacher/year/SEN all come from Bromcom -->
       <div id="pickerBlock" class="form-group">
         <label>Find the pupil *</label>
         <input type="text" id="rosterSearch" placeholder="Type a name…" oninput="renderRosterResults()" autocomplete="off">
@@ -273,18 +271,7 @@ nav .brand span { opacity: .7; font-weight: 400; font-size: .88rem; }
         <p id="rosterPickedLine" style="font-weight:600;margin-top:8px;display:none"></p>
       </div>
 
-      <!-- Edit: read-only snapshot from Bromcom — nothing here is typed -->
-      <div id="editInfoBlock" style="display:none">
-        <p style="font-weight:600;font-size:1.05rem;margin-bottom:2px" id="editInfoName"></p>
-        <p style="color:var(--muted);font-size:.88rem;margin-bottom:10px" id="editInfoMeta"></p>
-        <p style="font-size:.78rem;color:var(--muted)">Name, class, year group and SEN status come from Bromcom via Roster Import — they can't be edited here.</p>
-      </div>
-
-      <div class="form-group">
-        <label>Class Teacher</label>
-        <input type="text" id="nTeacher" placeholder="">
-      </div>
-      <div id="yearFieldWrap" style="display:none">
+      <div id="yearFieldWrap">
         <div class="form-group">
           <label>Academic Year *</label>
           <input type="text" id="nAcYear" placeholder="">
@@ -308,12 +295,8 @@ nav .brand span { opacity: .7; font-weight: 400; font-size: .88rem; }
         <label>New Academic Year</label>
         <input type="text" id="newYearInput" placeholder="">
       </div>
-      <p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Year group and class come from Bromcom — refreshed just now from the current roster:</p>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Year group, class and teacher come from Bromcom — refreshed just now from the current roster:</p>
       <p id="nyRosterSnapshot" style="font-weight:600;margin-bottom:14px"></p>
-      <div class="form-group">
-        <label>Class Teacher</label>
-        <input type="text" id="nyTeacher" placeholder="e.g. Priya Patel">
-      </div>
       <p style="font-size:.82rem;color:var(--muted)">T6 new targets → T1 SMART targets · T6 strategies → T1 provision · Assess section carries forward.</p>
       <div class="modal-actions">
         <button class="btn btn-ghost" onclick="document.getElementById('newYearModal').style.display='none'">Cancel</button>
@@ -1202,25 +1185,15 @@ async function showNewYearModal() {
   try { await api('POST', '/learner-plans/children/sync-from-roster'); } catch (e) { /* show whatever we already have */ }
   await fetchChildren();
   const child = children.find(c => c.id === currentChildId) || {};
-  snapshotEl.textContent = `${child.year_group || '—'} · ${child.class_name || '—'}`;
-  document.getElementById('nyTeacher').value = child.teacher || '';
+  snapshotEl.textContent = `${child.year_group || '—'} · ${child.class_name || '—'} · ${child.teacher || '—'}`;
 }
 
 async function createNewYear() {
   const year = document.getElementById('newYearInput').value.trim();
   if (!year) { toast('Enter an academic year.'); return; }
   if (childPlans.some(p => p.academic_year === year)) { toast(`Plan for ${year} already exists.`); return; }
-  // Year group / class already refreshed from the roster when this modal
-  // opened — only teacher (a local field) can be changed here.
-  const newTeacher = document.getElementById('nyTeacher').value.trim();
-  const currentChild = children.find(c => c.id === currentChildId) || {};
-  if (newTeacher && newTeacher !== currentChild.teacher) {
-    try {
-      await api('PUT', `/learner-plans/children/${currentChildId}`, { teacher: newTeacher });
-      const idx = children.findIndex(c => c.id === currentChildId);
-      if (idx >= 0) children[idx] = { ...children[idx], teacher: newTeacher };
-    } catch(e) { toast('Could not update teacher: ' + e.message, 'error'); }
-  }
+  // Year group / class / teacher were already refreshed from the roster
+  // when this modal opened — nothing left to save here.
 
   // T6 of the previous year is the source
   const t6 = currentPlan.terms[6];
@@ -1309,68 +1282,32 @@ function pickRosterPupil(upn) {
 }
 
 async function showNewChildModal() {
-  document.getElementById('childModalTitle').textContent = 'New Learner Plan';
-  document.getElementById('editingChildId').value = '';
   document.getElementById('nUpn').value = '';
   rosterPicked = null;
   document.getElementById('rosterSearch').value = '';
   document.getElementById('rosterResults').style.display = 'none';
   document.getElementById('rosterPickedLine').style.display = 'none';
-  document.getElementById('pickerBlock').style.display = 'block';
-  document.getElementById('editInfoBlock').style.display = 'none';
-  document.getElementById('nTeacher').value = '';
   document.getElementById('nAcYear').value = currentAcademicYear();
-  document.getElementById('yearFieldWrap').style.display = 'block';
   document.getElementById('childModal').style.display = 'flex';
   await loadRosterCandidates();
-}
-
-function editChildModal() {
-  const c = children.find(c => c.id === currentChildId);
-  document.getElementById('childModalTitle').textContent = 'Edit Learner Info';
-  document.getElementById('editingChildId').value = c.id;
-  document.getElementById('pickerBlock').style.display = 'none';
-  document.getElementById('editInfoBlock').style.display = 'block';
-  document.getElementById('editInfoName').textContent = c.name;
-  const senBit = c.is_ehcp === 'true' ? 'EHCP' : (c.sen_status || '');
-  document.getElementById('editInfoMeta').textContent =
-    [c.year_group, c.class_name, senBit && `SEN: ${senBit}${c.sen_type ? ' (' + c.sen_type + ')' : ''}`].filter(Boolean).join(' · ');
-  document.getElementById('nTeacher').value = c.teacher || '';
-  document.getElementById('yearFieldWrap').style.display = 'none';
-  document.getElementById('childModal').style.display = 'flex';
 }
 
 function closeChildModal() { document.getElementById('childModal').style.display = 'none'; }
 
 async function saveChild() {
-  const editId = document.getElementById('editingChildId').value;
-
-  if (editId) {
-    const teacher = document.getElementById('nTeacher').value.trim();
-    closeChildModal();
-    try {
-      await api('PUT', `/learner-plans/children/${editId}`, { teacher });
-    } catch(e) { toast('Update failed: ' + e.message, 'error'); return; }
-    await fetchChildren();
-    const c = children.find(c => c.id === editId);
-    document.getElementById('planName').textContent = c.name;
-    document.getElementById('planMeta').textContent = [c.year_group, c.class_name, c.teacher].filter(Boolean).join(' · ');
-    toast('Info updated', 'success');
-  } else {
-    if (!rosterPicked) { alert('Search for and select the pupil first.'); return; }
-    const payload = { upn: rosterPicked.upn, teacher: document.getElementById('nTeacher').value.trim() };
-    const acYear = document.getElementById('nAcYear').value.trim() || currentAcademicYear();
-    closeChildModal();
-    let created;
-    try {
-      created = await api('POST', '/learner-plans/children', payload);
-    } catch(e) { toast('Could not create: ' + e.message, 'error'); return; }
-    await fetchChildren();
-    const plan = await createPlan(created.id, acYear);
-    if (!plan) return;
-    childPlans = [plan];
-    await openChild(created.id);
-  }
+  if (!rosterPicked) { alert('Search for and select the pupil first.'); return; }
+  const payload = { upn: rosterPicked.upn };
+  const acYear = document.getElementById('nAcYear').value.trim() || currentAcademicYear();
+  closeChildModal();
+  let created;
+  try {
+    created = await api('POST', '/learner-plans/children', payload);
+  } catch(e) { toast('Could not create: ' + e.message, 'error'); return; }
+  await fetchChildren();
+  const plan = await createPlan(created.id, acYear);
+  if (!plan) return;
+  childPlans = [plan];
+  await openChild(created.id);
 }
 
 async function archiveChild() {
@@ -1696,7 +1633,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-31.08.26b
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-31.08.26c
 </footer>
 </body>
 </html>
