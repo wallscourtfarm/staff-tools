@@ -533,7 +533,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-interventions" onclick="showTab('interventions')">Interventions</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">WFA-31.08.26a</span>
+      <span class="version">WFA-31.08.26b</span>
     </div>
   </header>
 
@@ -651,14 +651,6 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
           <button class="btn btn-secondary" id="hub-roster-btn" onclick="syncHubRoster(true)">🔍 Check for changes (dry run)</button>
           <button class="btn btn-primary" onclick="syncHubRoster(false)">🎒 Sync from Bromcom</button>
         </div>
-      </div>
-
-      <div class="admin-section">
-        <h2>Classes</h2>
-        <table class="admin-table" id="classes-table">
-          <thead><tr><th>Year</th><th>Class</th><th>Teacher</th></tr></thead>
-          <tbody id="classes-tbody"></tbody>
-        </table>
       </div>
 
       <div class="admin-section">
@@ -884,7 +876,6 @@ async function bootstrap() {
     const classes = await apiGet('getClasses', { academic_year: state.currentYear });
     state.classes = classes;
     populateClassSelect();
-    renderAdminClasses();
     renderAdminPupils();
     if (document.getElementById('class-select').value) await onClassChange();
 
@@ -981,7 +972,6 @@ async function onYearChange() {
     state.classes = classes;
   } catch (err) { console.error(err); }
   populateClassSelect();
-  renderAdminClasses();
   renderAdminPupils();
 }
 
@@ -1910,16 +1900,6 @@ function renderInterventions() {
 // ================================================================
 // ADMIN
 // ================================================================
-function renderAdminClasses() {
-  const tbody = document.getElementById('classes-tbody');
-  tbody.innerHTML = '';
-  state.classes.forEach(c => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${c.year_group}</td><td>${c.class_name}</td><td>${c.teacher_name || '—'}</td>`;
-    tbody.appendChild(tr);
-  });
-}
-
 function renderAdminPupils() {
   const tbody = document.getElementById('pupils-tbody');
   tbody.innerHTML = '';
@@ -2310,7 +2290,7 @@ function showTab(name) {
   if (navBtn) navBtn.classList.add('active');
 
   if (name === 'interventions') renderInterventions();
-  if (name === 'admin') { renderAdminClasses(); renderAdminPupils(); }
+  if (name === 'admin') { renderAdminPupils(); }
 }
 
 // ================================================================
