@@ -76,7 +76,7 @@ function handleGet_(p) {
     case 'getAssessments':  return getAssessments_(p);
     case 'getPupilHistory': return getPupilHistory_(p);
     case 'getConfig':       return getConfig_();
-    case 'ping':            return { ok: true, ts: new Date().toISOString() };
+    case 'ping':            return { ok: true, ts: new Date().toISOString(), codeVersion: 'precedence-fix-3' };
     default:                return { error: 'Unknown GET action: ' + p.action };
   }
 }
