@@ -286,7 +286,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · WFA-29.08.26d</div>
+  <div class="version">WFA Book Tracker · WFA-31.08.26a</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -307,18 +307,6 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
     <div style="margin-top:8px">
       <a id="sheetLink" href="#" target="_blank" style="font-size:13px;color:var(--blue)">📊 Open Google Sheet ↗</a>
-    </div>
-
-    <hr class="div">
-    <h3 style="font-size:16px;margin-bottom:12px">Add a Child</h3>
-    <div style="display:grid;gap:9px">
-      <input class="inp" id="nCName" placeholder="Full name">
-      <select class="inp" id="nCYear">
-        <option value="Y3">Year 3</option><option value="Y4" selected>Year 4</option>
-        <option value="Y5">Year 5</option><option value="Y6">Year 6</option>
-      </select>
-      <input class="inp" id="nCClass" placeholder="Class (e.g. 4A)">
-      <button class="btn btn-blue btn-sm" onclick="addChild()">Add Child</button>
     </div>
 
     <hr class="div">
@@ -344,20 +332,18 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     <button class="btn btn-blue btn-sm" onclick="saveCopyCounts()">Save Copy Counts</button>
 
     <hr class="div">
-    <h3 style="font-size:16px;margin-bottom:6px">Bulk Import (CSV)</h3>
+    <h3 style="font-size:16px;margin-bottom:6px">Bulk Import Books (CSV)</h3>
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-      <strong>Children:</strong> <code style="background:#f0f0f0;padding:1px 4px;border-radius:3px">name,yearGroup,class</code> e.g. <em>John Smith,Y4,4A</em><br>
-      <strong>Books:</strong> <code style="background:#f0f0f0;padding:1px 4px;border-radius:3px">title,author,phase,copies</code> e.g. <em>The Worst Witch,Jill Murphy,LKS2,2</em>
+      <code style="background:#f0f0f0;padding:1px 4px;border-radius:3px">title,author,phase,copies</code> e.g. <em>The Worst Witch,Jill Murphy,LKS2,2</em>
     </p>
     <textarea class="inp" id="importCsv" rows="5" placeholder="Paste CSV here…" style="resize:vertical"></textarea>
-    <hr class="div">
-    <h3 style="font-size:16px;margin-bottom:4px">School Roster</h3>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">One-click refresh from the hub Pupils tab (Y1–Y6, all classes). Adds any pupils not already here — nobody is removed and no existing data changes.</p>
-    <button class="btn btn-blue btn-sm" id="rosterSyncBtn" onclick="syncHubRoster()">Pull School Roster</button>
     <div class="modal-btns" style="margin-top:8px">
-      <button class="btn btn-ghost btn-sm" onclick="importCSV('children')">Import Children</button>
       <button class="btn btn-ghost btn-sm" onclick="importCSV('books')">Import Books</button>
     </div>
+    <hr class="div">
+    <h3 style="font-size:16px;margin-bottom:4px">School Roster</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Children only ever come from Bromcom via the hub — one-click refresh from the hub Pupils tab (Y1–Y6, all classes). Adds any pupils not already here — nobody is removed and no existing data changes.</p>
+    <button class="btn btn-blue btn-sm" id="rosterSyncBtn" onclick="syncHubRoster()">Pull School Roster</button>
 
     <hr class="div">
     <div class="modal-btns">
@@ -549,20 +535,6 @@ function disconnectApi() {
   location.reload();
 }
 
-async function addChild() {
-  const name = document.getElementById('nCName').value.trim();
-  const yr   = document.getElementById('nCYear').value;
-  const cls  = document.getElementById('nCClass').value.trim();
-  if (!name) return toast('Enter a name');
-  try {
-    await api({ action: 'addChild', name, yearGroup: yr, class: cls });
-    toast(`✓ ${name} added`);
-    document.getElementById('nCName').value = '';
-    document.getElementById('nCClass').value = '';
-    await loadData();
-  } catch(e) { toast('Error: ' + e.message); }
-}
-
 async function addBook() {
   const title  = document.getElementById('nBTitle').value.trim();
   const author = document.getElementById('nBAuthor').value.trim();
@@ -594,26 +566,15 @@ async function importCSV(type) {
     }
     out.push(field.trim()); return out;
   }
-  let payload = {};
-  if (type === 'children') {
-    const list = data.map(l => {
-      const [name, yearGroup, cls] = parseCSVLine(l);
-      return { name, yearGroup: yearGroup || 'Y4', class: cls || '' };
-    }).filter(c => c.name);
-    if (!list.length) return toast('No valid rows found');
-    payload = { action: 'importData', children: list };
-  } else {
-    const list = data.map(l => {
-      const [title, author, ph, copies] = parseCSVLine(l);
-      return { title, author: author || '', phase: ph || phase, copies: parseInt(copies) || 1 };
-    }).filter(b => b.title);
-    if (!list.length) return toast('No valid rows found');
-    payload = { action: 'importData', books: list };
-  }
+  const list = data.map(l => {
+    const [title, author, ph, copies] = parseCSVLine(l);
+    return { title, author: author || '', phase: ph || phase, copies: parseInt(copies) || 1 };
+  }).filter(b => b.title);
+  if (!list.length) return toast('No valid rows found');
 
   try {
-    const r = await api(payload);
-    toast(`✓ Imported ${r.children || r.books} ${type}`);
+    const r = await api({ action: 'importData', books: list });
+    toast(`✓ Imported ${r.books} books`);
     document.getElementById('importCsv').value = '';
     await loadData();
   } catch(e) { toast('Error: ' + e.message); }
