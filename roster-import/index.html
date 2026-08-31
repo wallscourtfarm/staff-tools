@@ -153,6 +153,7 @@ body.locked main, body.locked header{display:none}
         <th style="text-align:left;padding:.4rem .5rem;font-size:.8rem;color:var(--muted);border-bottom:1px solid var(--border)">Year</th>
         <th style="text-align:left;padding:.4rem .5rem;font-size:.8rem;color:var(--muted);border-bottom:1px solid var(--border)">Shown as</th>
         <th style="text-align:left;padding:.4rem .5rem;font-size:.8rem;color:var(--muted);border-bottom:1px solid var(--border)">Teacher initials</th>
+        <th style="text-align:left;padding:.4rem .5rem;font-size:.8rem;color:var(--muted);border-bottom:1px solid var(--border)">Home Zone name</th>
       </tr></thead>
       <tbody id="classesBody"></tbody>
     </table>
@@ -161,7 +162,7 @@ body.locked main, body.locked header{display:none}
   </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-31.08.26e</div>
+<div class="version">WFA Roster Import · WFA-31.08.26f</div>
 
 <script>
 const HUB_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
@@ -500,6 +501,7 @@ function renderClasses(classes){
       '<td style="padding:.4rem .5rem;color:var(--muted)">' + esc(codeToYear(c.code)) + '</td>' +
       '<td style="padding:.4rem .5rem"><input data-idx="' + i + '" data-field="display" value="' + esc(c.display||'') + '" style="width:90px;padding:.3rem .5rem;border:1px solid var(--border);border-radius:5px"></td>' +
       '<td style="padding:.4rem .5rem"><input data-idx="' + i + '" data-field="teacherInitials" value="' + esc(c.teacherInitials||'') + '" style="width:70px;padding:.3rem .5rem;border:1px solid var(--border);border-radius:5px"></td>' +
+      '<td style="padding:.4rem .5rem"><input data-idx="' + i + '" data-field="homeZoneName" value="' + esc(c.homeZoneName||'') + '" placeholder="e.g. Blaise" style="width:110px;padding:.3rem .5rem;border:1px solid var(--border);border-radius:5px"></td>' +
       '</tr>';
   }).join('');
 }
@@ -513,7 +515,7 @@ document.getElementById('saveClassesBtn').addEventListener('click', async functi
     return acc;
   }, {});
   const classes = Object.values(rows).map(function(c){
-    return { code: c.code, display: c.display, teacher_initials: c.teacherInitials };
+    return { code: c.code, display: c.display, teacher_initials: c.teacherInitials, home_zone_name: c.homeZoneName };
   });
   btn.disabled = true;
   btn.textContent = 'Saving…';
