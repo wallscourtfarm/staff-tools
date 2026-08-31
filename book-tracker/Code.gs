@@ -54,9 +54,6 @@ function dispatch(p) {
     case 'getAll':           return getAll();
     case 'checkout':         return checkout(p);
     case 'returnBook':       return returnBook(p);
-    case 'addChild':         return addChild(p);
-    case 'updateChild':      return updateChild(p);
-    case 'deleteChild':      return deleteChild(p);
     case 'addBook':          return addBook(p);
     case 'setup':            return setup();
     case 'setCopyStatus':    return setCopyStatus(p);
@@ -318,60 +315,9 @@ function returnBook(p) {
 // ════════════════════════════════════════════════
 // ADD CHILD
 // ════════════════════════════════════════════════
-function addChild(p) {
-  const sheet = SS.getSheetByName('Children');
-  const id    = 'CH' + Date.now();
-  sheet.appendRow([id, p.name, p.yearGroup, p.class || '', p.pp || '', p.eal || '', p.gender || '', 0, 0]);
-  return { ok: true, id };
-}
-
-// ════════════════════════════════════════════════
-// UPDATE CHILD
-// ════════════════════════════════════════════════
-function updateChild(p) {
-  const sheet = SS.getSheetByName('Children');
-  const rows  = sheet.getDataRange().getValues();
-  const hdr   = rows[0].map(h => String(h).trim().toLowerCase());
-  const iId   = hdr.indexOf('id');
-  const iNm   = hdr.indexOf('name');
-  const iYr   = hdr.indexOf('yeargroup');
-  const iCl   = hdr.indexOf('class');
-  const iPP   = hdr.indexOf('pp');
-  const iEAL  = hdr.indexOf('eal');
-  const iGen  = hdr.indexOf('gender');
-  const iTR   = hdr.indexOf('totalreads');
-  const iLR   = hdr.indexOf('lks2reads');
-  for (let r = 1; r < rows.length; r++) {
-    if (String(rows[r][iId]) === String(p.id)) {
-      if (p.name       !== undefined) sheet.getRange(r+1, iNm+1).setValue(p.name);
-      if (p.yearGroup  !== undefined) sheet.getRange(r+1, iYr+1).setValue(p.yearGroup);
-      if (p.class      !== undefined) sheet.getRange(r+1, iCl+1).setValue(p.class);
-      if (p.pp         !== undefined) sheet.getRange(r+1, iPP+1).setValue(p.pp);
-      if (p.eal        !== undefined) sheet.getRange(r+1, iEAL+1).setValue(p.eal);
-      if (p.gender     !== undefined) sheet.getRange(r+1, iGen+1).setValue(p.gender);
-      if (p.totalReads !== undefined) sheet.getRange(r+1, iTR+1).setValue(Number(p.totalReads));
-      if (p.lks2Reads  !== undefined && iLR >= 0) sheet.getRange(r+1, iLR+1).setValue(Number(p.lks2Reads));
-      return { ok: true };
-    }
-  }
-  return { error: 'Child not found' };
-}
-
-// ════════════════════════════════════════════════
-// DELETE CHILD
-// ════════════════════════════════════════════════
-function deleteChild(p) {
-  const sheet = SS.getSheetByName('Children');
-  const rows  = sheet.getDataRange().getValues();
-  const iId   = rows[0].map(h => String(h).trim().toLowerCase()).indexOf('id');
-  for (let r = 1; r < rows.length; r++) {
-    if (String(rows[r][iId]) === String(p.id)) {
-      sheet.deleteRow(r + 1);
-      return { ok: true };
-    }
-  }
-  return { error: 'Child not found' };
-}
+// Children only ever enter via importChildren/importData, called from
+// syncHubRoster (hub-sourced, additive-only — see index.html). No
+// addChild/updateChild/deleteChild here: identity comes from Bromcom only.
 
 // ════════════════════════════════════════════════
 // ADD BOOK
@@ -577,7 +523,10 @@ function rawSheet(p) {
 }
 
 function clearData(p) {
-  const targets = (p.sheets && p.sheets.length) ? p.sheets : ['Children', 'Reads'];
+  // Children never gets wiped here — that sheet only ever changes via
+  // importChildren/importData from the Bromcom-sourced hub roster.
+  const requested = (p.sheets && p.sheets.length) ? p.sheets : ['Reads'];
+  const targets = requested.filter(name => name !== 'Children');
   const cleared = {};
   targets.forEach(name => {
     const s = SS.getSheetByName(name);
