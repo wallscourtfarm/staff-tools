@@ -563,12 +563,37 @@ function syncRosterFromHub_(dryRun) {
     }
   });
 
+  // TEMP DIAGNOSTIC — recompute a fresh canonical->upn map straight from
+  // hubPupils right here, independent of the matching loop above, so we can
+  // tell whether an "unmatched" row genuinely has no hub counterpart or
+  // whether the main loop's matching is somehow missing a real one.
+  const debugHubCanon = {};
+  hubPupils.forEach(h => {
+    debugHubCanon[canonical_(h.first + ' ' + h.last)] = h.upn;
+  });
+  result.debug = [];
+
   // Anyone active and untouched this run: a real leaver if they carry a upn
   // (it just wasn't in this hub pull), otherwise unmatched — report, don't touch.
   activePupilRows.forEach(rowNum => {
     if (matchedRows[rowNum]) return;
     const upn = String(pvals[rowNum - 1][upnCol] || '').trim();
-    if (!upn) { result.unmatched.push(String(pvals[rowNum - 1][nameCol] || rowNum)); return; }
+    const rowName = String(pvals[rowNum - 1][nameCol] || rowNum);
+    if (!upn) {
+      result.unmatched.push(rowName);
+      if (result.debug.length < 6) {
+        const canon = canonical_(rowName);
+        result.debug.push({
+          name: rowName,
+          rowNum: rowNum,
+          canonical: canon,
+          freshHubMatchUpn: debugHubCanon[canon] || null,
+          wasInActivePupilRowsList: activePupilRows.indexOf(rowNum) >= 0,
+          wasAlreadyMarkedMatched: !!matchedRows[rowNum]
+        });
+      }
+      return;
+    }
     result.pupilsDeactivated++;
     if (!dryRun) psh.getRange(rowNum, actCol + 1).setValue(false);
   });
