@@ -533,7 +533,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-interventions" onclick="showTab('interventions')">Interventions</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">WFA-30.08.26b</span>
+      <span class="version">WFA-31.08.26a</span>
     </div>
   </header>
 
@@ -645,44 +645,26 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
     <div class="admin-wrapper">
 
       <div class="admin-section">
-        <h2>Classes</h2>
-        <div id="add-cohort-form" style="margin-bottom:12px">
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-            <select id="new-cohort-yg" style="flex:0 0 auto">
-              <option value="Y1">Y1 · Beech</option>
-              <option value="Y2">Y2 · Willow</option>
-              <option value="Y3">Y3 · Acer</option>
-              <option value="Y4" selected>Y4 · Maple</option>
-              <option value="Y5">Y5 · Hazel</option>
-              <option value="Y6">Y6 · Elm</option>
-            </select>
-            <span style="font-size:12px;color:#94a3b8">Enter one row per class</span>
-          </div>
-          <div id="cohort-class-rows"></div>
-          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-            <button class="btn btn-sm btn-secondary" onclick="addCohortRow()">+ Add row</button>
-            <button class="btn btn-primary" onclick="addCohortFromForm()" id="cohort-submit-btn">Add classes</button>
-          </div>
+        <h2>Classes and Pupils</h2>
+        <p style="font-size:12px;color:#94a3b8;margin-bottom:8px">Names, classes and joiners/leavers come from Bromcom via the hub — nothing is typed here. Class display names are edited centrally in <a href="https://staff.wallscourt-farm-academy.co.uk/roster-import/" target="_blank">Roster Import</a>.</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+          <button class="btn btn-secondary" id="hub-roster-btn" onclick="syncHubRoster(true)">🔍 Check for changes (dry run)</button>
+          <button class="btn btn-primary" onclick="syncHubRoster(false)">🎒 Sync from Bromcom</button>
         </div>
+      </div>
+
+      <div class="admin-section">
+        <h2>Classes</h2>
         <table class="admin-table" id="classes-table">
-          <thead><tr><th>Year</th><th>Class</th><th>Teacher</th><th></th></tr></thead>
+          <thead><tr><th>Year</th><th>Class</th><th>Teacher</th></tr></thead>
           <tbody id="classes-tbody"></tbody>
         </table>
       </div>
 
       <div class="admin-section">
         <h2>Pupils <span id="pupils-class-label" style="font-weight:400;color:#94a3b8"></span></h2>
-        <div id="add-pupil-form" style="margin-bottom:12px">
-          <p style="font-size:12px;color:#94a3b8;margin-bottom:6px">Class selected in the header above. Paste one name per line.</p>
-          <textarea id="new-pupil-names" rows="6" placeholder="Alice Smith&#10;Ben Jones&#10;Cara Brown&#10;…" oninput="onPupilNamesInput()" style="width:100%;box-sizing:border-box;border:1px solid #d5e3ed;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;line-height:1.5"></textarea>
-          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-            <button class="btn btn-primary" id="pupil-submit-btn" onclick="addPupilsFromForm()">Add pupils</button>
-            <button class="btn btn-secondary" id="hub-roster-btn" onclick="syncHubRoster()">🎒 Pull school roster</button>
-            <span id="pupil-parse-count" style="font-size:12px;color:#94a3b8"></span>
-          </div>
-        </div>
         <table class="admin-table" id="pupils-table">
-          <thead><tr><th>Name</th><th>Working at</th><th>Class</th><th></th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Working at</th><th>Class</th><th></th></tr></thead>
           <tbody id="pupils-tbody"></tbody>
         </table>
       </div>
@@ -793,66 +775,30 @@ function showSetup() {
 
 const WFA_TOKEN = localStorage.getItem('wfa_shared_token') || '2013';
 
-// Hub roster (shared-sync getPupils over the planning sheet's Pupils tab) —
-// canonical school roster, all year groups. Seeded via scripts/seed_pupils.py.
-const HUB_ROSTER_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
-
-// Pull the hub roster into the writing tracker's own database: creates any
-// missing classes for the current academic year, adds pupils not yet in the
-// tool, and follows pupils who have changed class. Existing pupil_ids (and
-// therefore assessment history) are never touched.
-async function syncHubRoster() {
+// The one door pupils/classes enter or leave through — see syncRosterFromHub_
+// in the Apps Script backend. Matches by UPN (tutor_group for classes),
+// falling back to a canonical-name match for pre-migration rows and
+// attaching their UPN once found. Never deletes — leavers are deactivated.
+async function syncHubRoster(dryRun) {
   const btn = document.getElementById('hub-roster-btn');
   const oldLabel = btn ? btn.textContent : '';
   try {
-    if (btn) { btn.disabled = true; btn.textContent = 'Pulling…'; }
-    const r = await fetch(HUB_ROSTER_URL + '?action=getPupils&t=' + Date.now() + '&token=' + WFA_TOKEN);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const d = await r.json();
-    const roster = (d.pupils || []).filter(p => p.first || p.last);
-    if (!roster.length) { alert('Hub roster came back empty — is the Pupils tab seeded?'); return; }
-
-    // 1. Ensure a class exists for every hub class (current academic year)
-    const hubClassNames = [...new Set(roster.map(p => p.class).filter(Boolean))];
-    const existingByYear = new Set(state.classes.filter(c => c.academic_year === state.currentYear).map(c => c.class_name));
-    const missingClasses = hubClassNames.filter(cn => !existingByYear.has(cn));
-    for (const cn of missingClasses) {
-      const m = String(cn).match(/^Y?(\d)/);
-      const yg = m ? ('Y' + m[1]) : '';
-      const res = await apiPost({ action: 'addClass', year_group: yg, class_name: cn, teacher_name: '', academic_year: state.currentYear });
-      state.classes.push({ class_id: res.class_id, year_group: yg, class_name: cn, teacher_name: '', academic_year: state.currentYear, active: true });
+    if (btn) { btn.disabled = true; btn.textContent = dryRun ? 'Checking…' : 'Syncing…'; }
+    const r = await apiPost({ action: 'syncRoster', dryRun: !!dryRun }, { timeoutMs: 120000 });
+    if (r.aborted) { alert('Sync aborted — ' + r.reason); return; }
+    const lines = [
+      `Classes: ${r.classesAdded} added, ${r.classesUpdated} updated${r.classesDeactivated.length ? ', ' + r.classesDeactivated.length + ' retired (' + r.classesDeactivated.join(', ') + ')' : ''}`,
+      `Pupils: ${r.pupilsAdded} added, ${r.pupilsUpdated} updated, ${r.pupilsDeactivated} left${r.upnAttached ? ', ' + r.upnAttached + ' matched to a UPN for the first time' : ''}`,
+    ];
+    if (r.unmatched.length) lines.push(`Not found on the roster (left untouched): ${r.unmatched.join(', ')}`);
+    if (dryRun) {
+      alert('DRY RUN — nothing written yet.\n\n' + lines.join('\n') + '\n\nRun again without dry-run to apply.');
+    } else {
+      await bootstrap();
+      alert('Roster synced.\n\n' + lines.join('\n'));
     }
-
-    // 2. Compare hub pupils against existing pupils (matched by name)
-    const all = await apiGet('getPupils', {});
-    const classIdByName = {};
-    state.classes.filter(c => c.academic_year === state.currentYear).forEach(c => { classIdByName[c.class_name] = c.class_id; });
-    const existingPupils = {};
-    all.forEach(p => { existingPupils[String(p.name).trim().toLowerCase()] = p; });
-
-    let added = 0, moved = 0;
-    for (const hp of roster) {
-      const name = (hp.first + ' ' + hp.last).trim();
-      if (!hp.class || !classIdByName[hp.class]) continue;
-      const key = name.toLowerCase();
-      const existing = existingPupils[key];
-      if (!existing) {
-        const res = await apiPost({ action: 'addPupil', name, year_group: hp.yearGroup || '', class_id: classIdByName[hp.class], working_at_level: hp.yearGroup || '' });
-        state.pupils.push({ pupil_id: res.pupil_id, name, year_group: hp.yearGroup || '', class_id: classIdByName[hp.class], working_at_level: hp.yearGroup || '', active: true });
-        existingPupils[key] = { pupil_id: res.pupil_id, class_id: classIdByName[hp.class] };
-        added++;
-      } else if (existing.class_id && existing.class_id !== classIdByName[hp.class]) {
-        await apiPost({ action: 'updatePupil', pupil_id: existing.pupil_id, class_id: classIdByName[hp.class], year_group: hp.yearGroup || '' });
-        const local = state.pupils.find(x => x.pupil_id === existing.pupil_id);
-        if (local) { local.class_id = classIdByName[hp.class]; local.year_group = hp.yearGroup || ''; }
-        moved++;
-      }
-    }
-
-    await bootstrap();
-    alert(`School roster synced — ${added} pupil${added === 1 ? '' : 's'} added, ${moved} moved class, ${missingClasses.length} class${missingClasses.length === 1 ? '' : 'es'} created.`);
   } catch (err) {
-    alert('Roster pull failed: ' + err.message);
+    alert('Roster sync failed: ' + err.message);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = oldLabel; }
   }
@@ -1969,9 +1915,7 @@ function renderAdminClasses() {
   tbody.innerHTML = '';
   state.classes.forEach(c => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${c.year_group}</td><td>${c.class_name}</td><td>${c.teacher_name || '—'}</td>
-      <td><button class="btn btn-sm btn-secondary" onclick="editClassTeacher('${c.class_id}','${c.class_name}')">Edit</button></td>
-      <td><button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5" onclick="deleteClass('${c.class_id}','${c.class_name}')">Delete</button></td>`;
+    tr.innerHTML = `<td>${c.year_group}</td><td>${c.class_name}</td><td>${c.teacher_name || '—'}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -1991,103 +1935,9 @@ function renderAdminPupils() {
         <select onchange="updatePupilLevel('${p.pupil_id}', this.value)" style="padding:2px 4px;font-size:11px;border:1px solid #e2e8f0;border-radius:4px">
           ${['Y1','Y2','Y3','Y4','Y5','Y6'].map(y => `<option value="${y}" ${y === level ? 'selected' : ''}>${y}</option>`).join('')}
         </select>
-      </td>
-      <td><button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5" onclick="removePupil('${p.pupil_id}','${p.name}')">Remove</button></td>`;
+      </td>`;
     tbody.appendChild(tr);
   });
-}
-
-let cohortRowId = 0;
-function addCohortRow(name = '', teacher = '') {
-  const id = ++cohortRowId;
-  const container = document.getElementById('cohort-class-rows');
-  const row = document.createElement('div');
-  row.className = 'form-row';
-  row.dataset.rowId = id;
-  row.style.marginBottom = '4px';
-  row.innerHTML = `
-    <input type="text" placeholder="Class name (e.g. Clifton)" maxlength="40" value="${name}" data-field="name" style="flex:1;min-width:120px">
-    <input type="text" placeholder="Teacher name" maxlength="60" value="${teacher}" data-field="teacher" style="flex:1.5;min-width:140px">
-    <button class="btn btn-sm btn-secondary" onclick="removeCohortRow(${id})" title="Remove" style="flex:0 0 auto;padding:0 8px">✕</button>
-  `;
-  container.appendChild(row);
-  updateCohortSubmitLabel();
-}
-
-function removeCohortRow(id) {
-  const row = document.querySelector(`[data-row-id="${id}"]`);
-  if (row) row.remove();
-  updateCohortSubmitLabel();
-}
-
-function updateCohortSubmitLabel() {
-  const n = document.querySelectorAll('#cohort-class-rows .form-row').length;
-  const btn = document.getElementById('cohort-submit-btn');
-  if (btn) btn.textContent = n === 1 ? 'Add 1 class' : `Add ${n} classes`;
-}
-
-async function addCohortFromForm() {
-  const yg = document.getElementById('new-cohort-yg').value;
-  const rows = document.querySelectorAll('#cohort-class-rows .form-row');
-  const toAdd = [];
-  for (const row of rows) {
-    const name = row.querySelector('[data-field="name"]').value.trim();
-    const teacher = row.querySelector('[data-field="teacher"]').value.trim();
-    if (name) toAdd.push({ name, teacher });
-  }
-  if (!toAdd.length) { alert('Enter at least one class name.'); return; }
-
-  const btn = document.getElementById('cohort-submit-btn');
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
-  try {
-    for (const cls of toAdd) {
-      const result = await apiPost({ action: 'addClass', year_group: yg, class_name: cls.name, teacher_name: cls.teacher, academic_year: state.currentYear });
-      state.classes.push({ class_id: result.class_id, year_group: yg, class_name: cls.name, teacher_name: cls.teacher, academic_year: state.currentYear, active: true });
-    }
-    // Reset form: clear all rows, add 2 fresh ones
-    document.getElementById('cohort-class-rows').innerHTML = '';
-    cohortRowId = 0;
-    addCohortRow(); addCohortRow();
-    populateClassSelect();
-    renderAdminClasses();
-  } catch (err) { alert('Error: ' + err.message); }
-  finally { btn.disabled = false; updateCohortSubmitLabel(); }
-}
-
-function parsePupilNames() {
-  const raw = document.getElementById('new-pupil-names').value;
-  return raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-}
-
-function onPupilNamesInput() {
-  const names = parsePupilNames();
-  const n = names.length;
-  const btn = document.getElementById('pupil-submit-btn');
-  const lbl = document.getElementById('pupil-parse-count');
-  if (btn) btn.textContent = n === 1 ? 'Add 1 pupil' : `Add ${n} pupils`;
-  if (lbl) lbl.textContent = n > 0 ? `${n} name${n === 1 ? '' : 's'} detected` : '';
-}
-
-async function addPupilsFromForm() {
-  if (!state.currentClassId) { alert('Select a class in the header first.'); return; }
-  const names = parsePupilNames();
-  if (!names.length) { alert('Paste at least one pupil name.'); return; }
-
-  const btn = document.getElementById('pupil-submit-btn');
-  btn.disabled = true; btn.textContent = 'Saving…';
-  const yg = state.currentClass?.year_group || 'Y4';
-
-  try {
-    for (const name of names) {
-      const result = await apiPost({ action: 'addPupil', name, year_group: yg, class_id: state.currentClassId, working_at_level: yg });
-      state.pupils.push({ pupil_id: result.pupil_id, name, year_group: yg, class_id: state.currentClassId, working_at_level: yg, active: true });
-    }
-    document.getElementById('new-pupil-names').value = '';
-    renderGrid();
-    renderAdminPupils();
-  } catch (err) { alert('Error: ' + err.message); }
-  finally { btn.disabled = false; onPupilNamesInput(); }
 }
 
 async function updatePupilLevel(pupilId, newLevel) {
@@ -2098,45 +1948,6 @@ async function updatePupilLevel(pupilId, newLevel) {
     renderGrid();
     renderAdminPupils();
   } catch (err) { alert('Error updating pupil: ' + err.message); }
-}
-
-async function deleteClass(classId, className) {
-  const pupils = state.pupils.filter(p => p.class_id === classId);
-  const msg = pupils.length
-    ? `Delete class "${className}"? It has ${pupils.length} pupil${pupils.length === 1 ? '' : 's'} who will be hidden from all views.`
-    : `Delete class "${className}"?`;
-  if (!confirm(msg)) return;
-  try {
-    await apiPost({ action: 'updateClass', class_id: classId, active: false });
-    state.classes = state.classes.filter(c => c.class_id !== classId);
-    state.pupils = state.pupils.filter(p => p.class_id !== classId);
-    populateClassSelect();
-    renderAdminClasses();
-    renderAdminPupils();
-    renderGrid();
-  } catch (err) { alert('Error: ' + err.message); }
-}
-
-async function removePupil(pupilId, name) {
-  if (!confirm(`Remove ${name}? They will be hidden from all views.`)) return;
-  try {
-    await apiPost({ action: 'updatePupil', pupil_id: pupilId, active: false });
-    state.pupils = state.pupils.filter(p => p.pupil_id !== pupilId);
-    renderGrid();
-    renderAdminPupils();
-  } catch (err) { alert('Error: ' + err.message); }
-}
-
-async function editClassTeacher(classId, className) {
-  const name = prompt(`Teacher name for ${className}:`);
-  if (name === null) return;
-  try {
-    await apiPost({ action: 'updateClass', class_id: classId, teacher_name: name });
-    const c = state.classes.find(x => x.class_id === classId);
-    if (c) c.teacher_name = name;
-    renderAdminClasses();
-    populateClassSelect();
-  } catch (err) { alert('Error: ' + err.message); }
 }
 
 async function saveSettingYear() {
@@ -2506,8 +2317,6 @@ function showTab(name) {
 // INIT
 // ================================================================
 document.addEventListener('DOMContentLoaded', () => {
-  addCohortRow(); addCohortRow();
-
   // Single delegated click handler replaces one listener per score cell
   document.getElementById('grid-body').addEventListener('click', e => {
     const cell = e.target.closest('.score-cell');
