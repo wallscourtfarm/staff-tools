@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EYFS Oak — Morning Learning</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%238B5E34'/%3E%3Ctext x='16' y='21' font-family='Arial' font-size='12' font-weight='bold' fill='white' text-anchor='middle'%3EEY%3C/text%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'Nunito',sans-serif}
+#app{width:100%;height:100%;display:flex;flex-direction:column;outline:5px solid #8B5E34;outline-offset:-2px}
+
+#date-hdr{display:flex;align-items:center;justify-content:space-between;padding:0.06em 0.5em;border-bottom:3px solid #111;flex-shrink:0;line-height:1.05}
+#date-logo{height:clamp(48px,7vh,80px);width:auto;object-fit:contain;flex-shrink:0}
+#date-text{font-size:clamp(2.8rem,8vh,6rem);font-weight:700;color:#111;letter-spacing:0.01em;flex:1;text-align:center}
+#class-name{font-size:clamp(2rem,5vh,4rem);font-weight:900;color:#8B5E34;line-height:1}
+#version-tag{font-size:clamp(0.45rem,1vh,0.7rem);font-weight:600;color:#AAA;letter-spacing:0.05em;line-height:1;text-align:right;display:block;margin-top:0.1em}
+
+#lunch-bar{display:grid;grid-template-columns:1.8fr 1.8fr 1.2fr 1.2fr 1.2fr 1fr;border-bottom:3px solid #111;flex-shrink:0}
+.lc{display:flex;align-items:center;justify-content:center;font-weight:900;font-size:clamp(1.3rem,3.2vh,2.2rem);padding:0.4em 0.6em;text-align:center;line-height:1.2;min-height:clamp(60px,9.5vh,100px);min-width:0;flex-direction:column;gap:0.15em}
+.lc img.food-img{height:clamp(38px,6vh,62px);width:auto;object-fit:contain;flex-shrink:0}
+.lc+.lc{border-left:2.5px solid rgba(0,0,0,0.18)}
+.lc-r{background:#E00;color:#fff;position:relative}.lc-g{background:#3A9922;color:#fff}.lc-p{background:#E07070;color:#fff}.lc-j{background:#6B4820;color:#F0DFC0}.lc-b{background:#111;color:#fff}.lc-roll{background:#D9A441;color:#fff}
+.halal-badge{position:absolute;top:3px;right:3px;width:42%;max-width:90px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4))}
+
+#main{flex:1;min-height:0;overflow:hidden}
+#img-grid{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px;padding:12px}
+.img-slot{position:relative;border:3px solid #EEE;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#FAFAFA;min-height:0}
+.img-slot img{max-width:100%;max-height:100%;object-fit:contain;display:none}
+.img-slot img.has{display:block}
+.slot-placeholder{color:#CCC;font-size:clamp(1rem,2.4vh,1.4rem);font-weight:800;text-align:center;padding:1em}
+.slot-btn{position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:7px;padding:0.4em 0.9em;font-size:clamp(0.7rem,1.5vh,0.95rem);font-weight:700;cursor:pointer;font-family:'Nunito',sans-serif}
+.slot-btn:hover{background:rgba(0,0,0,0.75)}
+.slot-remove{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.5);color:#fff;border:none;border-radius:7px;padding:0.25em 0.7em;font-size:clamp(0.65rem,1.4vh,0.85rem);cursor:pointer;font-family:'Nunito',sans-serif}
+.slot-remove:hover{background:rgba(0,0,0,0.75)}
+.slot-input{display:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="date-hdr">
+    <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
+    <span id="date-text"></span>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Oak</span><span id="version-tag">EYFS-03.09.26a</span></div>
+  </div>
+  <div id="lunch-bar">
+    <div class="lc lc-r" id="lc0">—</div>
+    <div class="lc lc-g" id="lc1">—</div>
+    <div class="lc lc-p" id="lc-pasta"><img class="food-img" src="../img/tomato-pasta.png" alt="">Pasta</div>
+    <div class="lc lc-j"><img class="food-img" src="../img/jacket-potato.png" alt="">Jacket Potato</div>
+    <div class="lc lc-roll" id="lc-roll"><img class="food-img" src="../img/filled-roll.png" alt="">Filled Roll</div>
+    <div class="lc lc-b"><img class="food-img" src="../img/packed-lunch.png" alt="">Packed Lunch</div>
+  </div>
+  <div id="main">
+    <div id="img-grid">
+      <div class="img-slot" id="slot-1">
+        <span class="slot-placeholder">Tap to add image</span>
+        <img id="slot-img-1" src="" alt="">
+        <button class="slot-btn" onclick="pickImg(1)">Add image</button>
+        <button class="slot-remove" id="slot-remove-1" onclick="removeImg(1)" style="display:none">Remove</button>
+      </div>
+      <div class="img-slot" id="slot-2">
+        <span class="slot-placeholder">Tap to add image</span>
+        <img id="slot-img-2" src="" alt="">
+        <button class="slot-btn" onclick="pickImg(2)">Add image</button>
+        <button class="slot-remove" id="slot-remove-2" onclick="removeImg(2)" style="display:none">Remove</button>
+      </div>
+      <div class="img-slot" id="slot-3">
+        <span class="slot-placeholder">Tap to add image</span>
+        <img id="slot-img-3" src="" alt="">
+        <button class="slot-btn" onclick="pickImg(3)">Add image</button>
+        <button class="slot-remove" id="slot-remove-3" onclick="removeImg(3)" style="display:none">Remove</button>
+      </div>
+      <div class="img-slot" id="slot-4">
+        <span class="slot-placeholder">Tap to add image</span>
+        <img id="slot-img-4" src="" alt="">
+        <button class="slot-btn" onclick="pickImg(4)">Add image</button>
+        <button class="slot-remove" id="slot-remove-4" onclick="removeImg(4)" style="display:none">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<input type="file" id="slot-input" class="slot-input" accept="image/*" onchange="handleImgFile(event)">
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// MENU DATA — in-file fallback, mirrors year1-beech (shared via menu.json)
+// ═══════════════════════════════════════════════════════════
+const MENU_BY_WEEK={
+  '2026-04-13':{Mon:['Macaroni Cheese','Mixed Bean Fajitas'],Tue:['Homemade Sausage Roll','Veggie Sausage Roll'],Wed:['Roast Chicken','Cauliflower & Broccoli Cheese Bake'],Thu:['Cottage Pie','Shepherdless Pie'],Fri:['Golden Fish Fingers','BBQ Veggie Wrap']},
+  '2026-04-20':{Mon:['Cheese & Tomato Pizza','Cheddar & Tomato Puff Pastry Tart'],Tue:['Bangers and Mash','Veggie Bangers and Mash'],Wed:['Roast Gammon','Tomato & Lentil Layer Bake'],Thu:['Beef Pasta Bolognese','Veggie Pasta Bolognese'],Fri:['Golden Fish Fingers','Cheesy Bean Wrap']},
+  '2026-04-27':{Mon:['Cheese & Tomato Pizza','Macaroni Cheese'],Tue:['Creamy Swedish Meatballs','Creamy Veggie Sausage'],Wed:['Roast Pork','Med Veg Wellington'],Thu:['Jerk Chicken Wrap','Sweet Potato Coconut Bean Stew'],Fri:['Golden Fish Fingers','Vegetable Fingers']},
+  '2026-05-04':{Mon:['Macaroni Cheese','Mixed Bean Fajitas'],Tue:['Homemade Sausage Roll','Veggie Sausage Roll'],Wed:['Roast Chicken','Cauliflower & Broccoli Cheese Bake'],Thu:['Cottage Pie','Shepherdless Pie'],Fri:['Golden Fish Fingers','BBQ Veggie Wrap']},
+  '2026-05-11':{Mon:['Cheese & Tomato Pizza','Cheddar & Tomato Puff Pastry Tart'],Tue:['Bangers and Mash','Veggie Bangers and Mash'],Wed:['Roast Gammon','Tomato & Lentil Layer Bake'],Thu:['Beef Pasta Bolognese','Veggie Pasta Bolognese'],Fri:['Golden Fish Fingers','Cheesy Bean Wrap']},
+  '2026-05-18':{Mon:['Cheese & Tomato Pizza','Macaroni Cheese'],Tue:['Creamy Swedish Meatballs','Creamy Veggie Sausage'],Wed:['Roast Pork','Med Veg Wellington'],Thu:['Jerk Chicken Wrap','Sweet Potato Coconut Bean Stew'],Fri:['Golden Fish Fingers','Vegetable Fingers']},
+  '2026-05-25':{Mon:['Macaroni Cheese','Mixed Bean Fajitas'],Tue:['Homemade Sausage Roll','Veggie Sausage Roll'],Wed:['Roast Chicken','Cauliflower & Broccoli Cheese Bake'],Thu:['Cottage Pie','Shepherdless Pie'],Fri:['Golden Fish Fingers','BBQ Veggie Wrap']},
+  '2026-06-01':{Mon:['Cheese & Tomato Pizza','Cheddar & Tomato Puff Pastry Tart'],Tue:['Bangers and Mash','Veggie Bangers and Mash'],Wed:['Roast Gammon','Tomato & Lentil Layer Bake'],Thu:['Beef Pasta Bolognese','Veggie Pasta Bolognese'],Fri:['Golden Fish Fingers','Cheesy Bean Wrap']},
+  '2026-06-08':{Mon:['Cheese & Tomato Pizza','Macaroni Cheese'],Tue:['Creamy Swedish Meatballs','Creamy Veggie Sausage'],Wed:['Roast Pork','Med Veg Wellington'],Thu:['Jerk Chicken Wrap','Sweet Potato Coconut Bean Stew'],Fri:['Golden Fish Fingers','Vegetable Fingers']},
+  '2026-06-15':{Mon:['Macaroni Cheese','Mixed Bean Fajitas'],Tue:['Homemade Sausage Roll','Veggie Sausage Roll'],Wed:['Roast Chicken','Cauliflower & Broccoli Cheese Bake'],Thu:['Cottage Pie','Shepherdless Pie'],Fri:['Golden Fish Fingers','BBQ Veggie Wrap']},
+  '2026-06-22':{Mon:['Cheese & Tomato Pizza','Cheddar & Tomato Puff Pastry Tart'],Tue:['Bangers and Mash','Veggie Bangers and Mash'],Wed:['Roast Gammon','Tomato & Lentil Layer Bake'],Thu:['Beef Pasta Bolognese','Veggie Pasta Bolognese'],Fri:['Golden Fish Fingers','Cheesy Bean Wrap']},
+  '2026-06-29':{Mon:['Cheese & Tomato Pizza','Macaroni Cheese'],Tue:['Creamy Swedish Meatballs','Creamy Veggie Sausage'],Wed:['Roast Pork','Med Veg Wellington'],Thu:['Jerk Chicken Wrap','Sweet Potato Coconut Bean Stew'],Fri:['Golden Fish Fingers','Vegetable Fingers']},
+  '2026-07-06':{Mon:['Macaroni Cheese','Mixed Bean Fajitas'],Tue:['Homemade Sausage Roll','Veggie Sausage Roll'],Wed:['Roast Chicken','Cauliflower & Broccoli Cheese Bake'],Thu:['Cottage Pie','Shepherdless Pie'],Fri:['Golden Fish Fingers','BBQ Veggie Wrap']},
+  '2026-07-13':{Mon:['Cheese & Tomato Pizza','Cheddar & Tomato Puff Pastry Tart'],Tue:['Bangers and Mash','Veggie Bangers and Mash'],Wed:['Roast Gammon','Tomato & Lentil Layer Bake'],Thu:['Beef Pasta Bolognese','Veggie Pasta Bolognese'],Fri:['Golden Fish Fingers','Cheesy Bean Wrap']},
+  '2026-07-20':{Mon:['Cheese & Tomato Pizza','Macaroni Cheese'],Tue:['Creamy Swedish Meatballs','Creamy Veggie Sausage'],Wed:['Roast Pork','Med Veg Wellington'],Thu:['Jerk Chicken Wrap','Sweet Potato Coconut Bean Stew'],Fri:['Golden Fish Fingers','Vegetable Fingers']},
+  '2026-07-27':{Mon:['Macaroni Cheese','Mixed Bean Fajitas'],Tue:['Homemade Sausage Roll','Veggie Sausage Roll'],Wed:['Roast Chicken','Cauliflower & Broccoli Cheese Bake'],Thu:['Cottage Pie','Shepherdless Pie'],Fri:['Golden Fish Fingers','BBQ Veggie Wrap']},
+  '2026-08-03':{Mon:['Cheese & Tomato Pizza','Cheddar & Tomato Puff Pastry Tart'],Tue:['Bangers and Mash','Veggie Bangers and Mash'],Wed:['Roast Gammon','Tomato & Lentil Layer Bake'],Thu:['Beef Pasta Bolognese','Veggie Pasta Bolognese'],Fri:['Golden Fish Fingers','Cheesy Bean Wrap']},
+  '2026-08-10':{Mon:['Cheese & Tomato Pizza','Macaroni Cheese'],Tue:['Creamy Swedish Meatballs','Creamy Veggie Sausage'],Wed:['Roast Pork','Med Veg Wellington'],Thu:['Jerk Chicken Wrap','Sweet Potato Coconut Bean Stew'],Fri:['Golden Fish Fingers','Vegetable Fingers']},
+  '2026-08-24':{Mon:['Cheese & Tomato Pizza','Cheddar & Tomato Puff Pastry Tart'],Tue:['Bangers and Mash','Veggie Bangers and Mash'],Wed:['Roast Gammon','Tomato & Lentil Layer Bake'],Thu:['Beef Pasta Bolognese','Veggie Pasta Bolognese'],Fri:['Golden Fish Fingers','Cheesy Bean Wrap']},
+  '2026-08-31':{Mon:['Cheese & Tomato Pizza','Macaroni Cheese'],Tue:['Creamy Swedish Meatballs','Creamy Veggie Sausage'],Wed:['Roast Pork','Med Veg Wellington'],Thu:['Jerk Chicken Wrap','Sweet Potato Coconut Bean Stew'],Fri:['Golden Fish Fingers','Vegetable Fingers']},
+  '2026-09-07':{Mon:['Macaroni Cheese','Mixed Bean Fajitas'],Tue:['Homemade Sausage Roll','Veggie Sausage Roll'],Wed:['Roast Chicken','Cauliflower & Broccoli Cheese Bake'],Thu:['Cottage Pie','Shepherdless Pie'],Fri:['Golden Fish Fingers','BBQ Veggie Wrap']},
+  '2026-09-14':{Mon:['Cheese & Tomato Pizza','Cheddar & Tomato Puff Pastry Tart'],Tue:['Bangers and Mash','Veggie Bangers and Mash'],Wed:['Roast Gammon','Tomato & Lentil Layer Bake'],Thu:['Beef Pasta Bolognese','Veggie Pasta Bolognese'],Fri:['Golden Fish Fingers','Cheesy Bean Wrap']},
+  '2026-09-21':{Mon:['Cheese & Tomato Pizza','Macaroni Cheese'],Tue:['Creamy Swedish Meatballs','Creamy Veggie Sausage'],Wed:['Roast Pork','Med Veg Wellington'],Thu:['Jerk Chicken Wrap','Sweet Potato Coconut Bean Stew'],Fri:['Golden Fish Fingers','Vegetable Fingers']},
+  '2026-09-28':{Mon:['Macaroni Cheese','Mixed Bean Fajitas'],Tue:['Homemade Sausage Roll','Veggie Sausage Roll'],Wed:['Roast Chicken','Cauliflower & Broccoli Cheese Bake'],Thu:['Cottage Pie','Shepherdless Pie'],Fri:['Golden Fish Fingers','BBQ Veggie Wrap']},
+  '2026-10-05':{Mon:['Cheese & Tomato Pizza','Cheddar & Tomato Puff Pastry Tart'],Tue:['Bangers and Mash','Veggie Bangers and Mash'],Wed:['Roast Gammon','Tomato & Lentil Layer Bake'],Thu:['Beef Pasta Bolognese','Veggie Pasta Bolognese'],Fri:['Golden Fish Fingers','Cheesy Bean Wrap']},
+  '2026-10-12':{Mon:['Cheese & Tomato Pizza','Macaroni Cheese'],Tue:['Creamy Swedish Meatballs','Creamy Veggie Sausage'],Wed:['Roast Pork','Med Veg Wellington'],Thu:['Jerk Chicken Wrap','Sweet Potato Coconut Bean Stew'],Fri:['Golden Fish Fingers','Vegetable Fingers']},
+  '2026-10-19':{Mon:['Macaroni Cheese','Mixed Bean Fajitas'],Tue:['Homemade Sausage Roll','Veggie Sausage Roll'],Wed:['Roast Chicken','Cauliflower & Broccoli Cheese Bake'],Thu:['Cottage Pie','Shepherdless Pie'],Fri:['Golden Fish Fingers','BBQ Veggie Wrap']},
+};
+const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAYNAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function todayStr(){const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`}
+function getMon(ds){const dt=new Date(ds+'T12:00:00');const d=dt.getDay();dt.setDate(dt.getDate()-(d===0?6:d-1));return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`}
+function getDK(ds){return DAYS[new Date(ds+'T12:00:00').getDay()]}
+
+function getMenu(){
+  const ts=todayStr(),dk=getDK(ts);
+  if(!['Mon','Tue','Wed','Thu','Fri'].includes(dk))return['No school today',''];
+  const mon=getMon(ts);
+  const base=(MENU_BY_WEEK[mon]&&MENU_BY_WEEK[mon][dk])||['Menu not yet set',''];
+  return base;
+}
+
+async function loadSharedMenu(){
+  try{
+    const res=await fetch('https://staff.wallscourt-farm-academy.co.uk/menu.json',{cache:'no-cache'});
+    if(!res.ok)throw new Error('fetch failed');
+    const data=await res.json();
+    if(data&&data.weeks&&typeof data.weeks==='object'){
+      Object.keys(MENU_BY_WEEK).forEach(k=>delete MENU_BY_WEEK[k]);
+      Object.assign(MENU_BY_WEEK,data.weeks);
+      console.log('[SharedMenu] Loaded',Object.keys(MENU_BY_WEEK).length,'weeks');
+    }
+  }catch(e){console.log('[SharedMenu] Using in-file fallback:',e.message);}
+}
+
+const MEAL_IMG={
+  'Margherita Pizza with Wedges':'pizza.png',
+  'Cajun Chicken Pizza with Wedges':'cajun-chicken-pizza.png',
+  'Cheesy Bean Pasta Bake':'cheesy-bean-pasta-bake.png',
+  'Mild Chilli Beef and Bean Macaroni Cheese':'chilli-beef-macaroni-cheese.png',
+  'Vegetable Sausages, Roast Potatoes and Gravy':'veggie-sausages.png',
+  'Roast Gammon, Roast Potatoes and Gravy':'roast-gammon.png',
+  '5 Bean Chilli with Mexican Rice':'five-bean-chilli-mexican-rice.png',
+  'Chicken Fajita with Mexican Rice':'chicken-fajita-mexican-rice.png',
+  'Vegetable Nuggets, Chips and Ketchup':'veg-fingers.png',
+  'Fish Fingers, Chips and Ketchup':'fish-fingers.png',
+  'Sweet Chilli Salmon Melt with Wedges':'sweet-chilli-salmon-melt.png',
+  'Baked Creamy Mac \'n\' Cheese':'creamy-mac-cheese.png',
+  'BBQ Chicken Loaded Mac \'n\' Cheese':'bbq-chicken-mac-cheese.png',
+  'Roast Quorn Fillet, Mashed Potatoes and Gravy':'roast-quorn-fillet.png',
+  'Pork Sausages, Stuffed Yorkie, Mash and Gravy':'bangers-and-mash.png',
+  'Mixed Bean and Vegetable Fajita with Mexican Rice':'veggie-fajita-mexican-rice.png',
+  'Mild Beef Chilli Topped Jacket Potato with Nacho Crunch':'beef-chilli-jacket-nacho.png',
+  'Vegetable Sausages, Chips and Ketchup':'veggie-sausages.png',
+  'Fish and Chips with Ketchup':'fish-fingers.png',
+  'Mixed Bean Bolognaise with Penne Pasta':'veggie-pasta-bolognaise.png',
+  'Beef and Lentil Bolognaise with Penne Pasta':'pasta-bolognaise.png',
+  'Vegetable Sausage Stuffed Yorkie, Mash and Gravy':'veggie-bangers-and-mash.png',
+  'Pork Sausages, Mashed Potatoes and Gravy':'bangers-and-mash.png',
+  'Roast Quorn Fillet, Roast Potatoes and Gravy':'roast-quorn-fillet.png',
+  'Roast Chicken Breast, Roast Potatoes and Gravy':'roast-chicken.png',
+  'Cauliflower and Chickpea Korma with Mixed Rice':'cauliflower-chickpea-korma.png',
+  'Chicken and Chickpea Korma with Mixed Rice':'chicken-chickpea-korma.png',
+  'Quorn Dippers, Chips and Ketchup':'veg-fingers.png',
+};
+const PASTA_IMG={
+  'Penne pasta with house tomato sauce':'tomato-pasta.png',
+  'Penne pasta with a creamy cheese sauce':'creamy-cheese-pasta.png',
+  'Creamy pesto penne pasta':'pesto-pasta.png',
+};
+const FILLED_ROLL_BY_DAY={Mon:'Ham, Cheese or Tuna',Tue:'Ham, Cheese or Tuna',Wed:'Ham, Cheese or Tuna',Thu:'Ham, Cheese or Tuna',Fri:'Cheese or Tuna'};
+
+function setLunchCell(id,mealName){
+  const el=document.getElementById(id);
+  const imgFile=MEAL_IMG[mealName];
+  const badge=id==='lc0'?'<img class="halal-badge" src="../img/halal-badge.png" alt="Halal option available">':'';
+  el.innerHTML=(imgFile?`<img class="food-img" src="../img/${imgFile}" alt="">${mealName}`:mealName)+badge;
+}
+function getPastaForToday(){
+  const ts=todayStr(),dk=getDK(ts);
+  if(!['Mon','Tue','Wed','Thu','Fri'].includes(dk))return'';
+  const mon=getMon(ts);
+  const week=MENU_BY_WEEK[mon];
+  return(week&&week[dk]&&week[dk][2])||'Pasta';
+}
+function setPastaCell(){
+  const p=getPastaForToday();
+  const el=document.getElementById('lc-pasta');
+  const imgFile=PASTA_IMG[p];
+  el.innerHTML=imgFile?`<img class="food-img" src="../img/${imgFile}" alt="">${p}`:p;
+}
+function setRollCell(){
+  const dk=getDK(todayStr());
+  const filling=FILLED_ROLL_BY_DAY[dk]||'Ham, Cheese or Tuna';
+  const el=document.getElementById('lc-roll');
+  el.innerHTML=`<img class="food-img" src="../img/filled-roll.png" alt="">Filled Roll<br><span style="font-size:0.72em;font-weight:600;opacity:0.9">${filling}</span>`;
+}
+function renderLunch(){
+  const[m1,m2]=getMenu();
+  setLunchCell('lc0',m1);
+  setLunchCell('lc1',m2);
+  setPastaCell();
+  setRollCell();
+}
+function renderDate(){
+  const n=new Date();
+  document.getElementById('date-text').textContent=`${DAYNAMES[n.getDay()]},  ${n.getDate()} ${MONTHS[n.getMonth()]} ${n.getFullYear()}`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// IMAGE SLOTS — 4 fixed slots, stored per-device in localStorage
+// ═══════════════════════════════════════════════════════════
+let activeSlot=null;
+function pickImg(n){
+  activeSlot=n;
+  document.getElementById('slot-input').click();
+}
+function handleImgFile(ev){
+  const file=ev.target.files[0];
+  if(!file||!activeSlot)return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    localStorage.setItem('eyfs_oak_img_'+activeSlot,reader.result);
+    renderSlot(activeSlot);
+  };
+  reader.readAsDataURL(file);
+  ev.target.value='';
+}
+function removeImg(n){
+  localStorage.removeItem('eyfs_oak_img_'+n);
+  renderSlot(n);
+}
+function renderSlot(n){
+  const data=localStorage.getItem('eyfs_oak_img_'+n);
+  const img=document.getElementById('slot-img-'+n);
+  const slot=document.getElementById('slot-'+n);
+  const removeBtn=document.getElementById('slot-remove-'+n);
+  if(data){
+    img.src=data;
+    img.classList.add('has');
+    slot.querySelector('.slot-placeholder').style.display='none';
+    removeBtn.style.display='block';
+  }else{
+    img.src='';
+    img.classList.remove('has');
+    slot.querySelector('.slot-placeholder').style.display='block';
+    removeBtn.style.display='none';
+  }
+}
+function loadSlots(){for(let n=1;n<=4;n++)renderSlot(n)}
+
+function init(){
+  renderDate();renderLunch();loadSlots();
+}
+loadSharedMenu().then(renderLunch);
+init();
+setInterval(renderDate,60000);
+</script>
+</body>
+</html>
