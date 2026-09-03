@@ -1351,7 +1351,7 @@ function renderGrid() {
                     <span class="slot-fill"></span>
                     ${s.cover ? `<span class="slot-cover-name">${cv?.workingDays && !cv.workingDays.includes(s.day) ? '<span class="cover-warn" title="Not working this day">⚠</span>' : ''}<span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
                   </div>
-                  ${s.nocover ? '' : !s.cover ? `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>` : isSupplyCover(s.cover) ? `<div class="slot-supply-zone${s.supplyName?'':' unset'}" onpointerdown="event.stopPropagation()" onclick="openFieldEditor(event,${s.id},'supplyName','Supply teacher name',30)" title="${s.supplyName ? 'Supply teacher: '+s.supplyName+' — click to edit' : 'Click to name the supply teacher'}">${s.supplyName || '+ supply name'}</div>` : ''}
+                  ${s.nocover ? '' : !s.cover ? `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>` : isSupplyCover(s.cover) ? `<div class="slot-supply-zone${s.supplyName?'':' unset'}" onpointerdown="event.stopPropagation()" onclick="openFieldEditor(event,${s.id},'supplyName','Supply teacher name',30)" title="${s.supplyName ? 'Supply teacher: '+s.supplyName+' — click to edit' : 'Click to name the supply teacher'}">${s.supplyBooked ? '✓ ' : ''}${s.supplyName || '+ supply name'}</div>` : ''}
                   <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
                 </div>
               </div>`;
@@ -1478,7 +1478,7 @@ function positionSpanStrips(spans) {
           <span class="slot-fill"></span>
           ${s.cover ? `<span class="slot-cover-name">${cv?.workingDays && !cv.workingDays.includes(s.day) ? '<span class="cover-warn" title="Not working this day">⚠</span>' : ''}<span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
         </div>
-        ${s.nocover ? '' : !s.cover ? `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>` : isSupplyCover(s.cover) ? `<div class="slot-supply-zone${s.supplyName?'':' unset'}" onpointerdown="event.stopPropagation()" onclick="openFieldEditor(event,${s.id},'supplyName','Supply teacher name',30)" title="${s.supplyName ? 'Supply teacher: '+s.supplyName+' — click to edit' : 'Click to name the supply teacher'}">${s.supplyName || '+ supply name'}</div>` : ''}
+        ${s.nocover ? '' : !s.cover ? `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>` : isSupplyCover(s.cover) ? `<div class="slot-supply-zone${s.supplyName?'':' unset'}" onpointerdown="event.stopPropagation()" onclick="openFieldEditor(event,${s.id},'supplyName','Supply teacher name',30)" title="${s.supplyName ? 'Supply teacher: '+s.supplyName+' — click to edit' : 'Click to name the supply teacher'}">${s.supplyBooked ? '✓ ' : ''}${s.supplyName || '+ supply name'}</div>` : ''}
         <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
       </div>
     </div>`;
@@ -1530,7 +1530,7 @@ function renderMyView() {
           <div class="my-entry-detail">
             <div class="my-entry-when">${DAYS[s.day]} · ${s.session}</div>
             <div class="my-entry-info"><select class="reason-sel ${rbCls(s.reason)}" style="padding:1px 5px;border-radius:3px;font-size:11px;border:1px solid #e2e8f0;cursor:pointer" onchange="changeReason(${s.id},this.value)">${reasonOptions(s.tid,s.reason)}</select>${s.reason === 'Other' ? `<input class="reason-note" type="text" placeholder="e.g. training" value="${s.reasonNote||''}" onchange="changeReasonNote(${s.id},this.value)" onclick="event.stopPropagation()">` : ''}<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;white-space:nowrap;user-select:none;margin-left:8px;color:#475569"><input type="checkbox" ${offSiteVal(s) ? 'checked' : ''} onchange="toggleOffSite(${s.id})" onclick="event.stopPropagation()"> Off-site</label></div>
-            <div class="my-entry-cover">${s.cover ? `Covered by: <strong>${s.cover}</strong>${isSupplyCover(s.cover) ? ` <span class="slot-supply-name${s.supplyName?'':' unset'}" onclick="openFieldEditor(event,${s.id},'supplyName','Supply teacher name',30)">${s.supplyName || '+ name'}</span>` : ''}` : s.nocover ? `` : `<span style="color:#c00;font-style:italic">Cover TBC</span>`}</div>
+            <div class="my-entry-cover">${s.cover ? `Covered by: <strong>${s.cover}</strong>${isSupplyCover(s.cover) ? ` <span class="slot-supply-name${s.supplyName?'':' unset'}" onclick="openFieldEditor(event,${s.id},'supplyName','Supply teacher name',30)">${s.supplyBooked ? '✓ ' : ''}${s.supplyName || '+ name'}</span>` : ''}` : s.nocover ? `` : `<span style="color:#c00;font-style:italic">Cover TBC</span>`}</div>
           </div>
         </div>`;
       });
