@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26e</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26f</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1359,6 +1359,14 @@ function staffBelongsToYearGroup(fabStaffId, yearGroup, supplyYg = null) {
 }
 
 // ── Cover-plan integration helpers ─────────────────────────────────────────────
+// A slot covered by the generic "Supply" placeholder shows the actual agency
+// supply teacher's name (set in cover-plan's supply-admin tool) once known,
+// falling back to the placeholder itself until then.
+function coverPlanDisplayCover(slot) {
+  if (slot.cover && slot.cover.toLowerCase() === 'supply' && slot.supplyName) return slot.supplyName;
+  return slot.cover || '';
+}
+
 // Map cover-plan sessions to teaching-schedule row IDs
 const COVER_SESSION_MAP = {
   'Before School': { start: 'reg-am', end: 'reg-am' },
@@ -2056,7 +2064,7 @@ function renderBody() {
             if (!exists) {
               staffOutMap[key].push({
                 label: label,
-                cover: slot.cover || '',
+                cover: coverPlanDisplayCover(slot),
                 colour: colour,
                 isFirst: ri === startIdx,
                 isLast: ri === endIdx,
