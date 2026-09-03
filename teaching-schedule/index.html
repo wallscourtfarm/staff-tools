@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26h</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26i</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1362,12 +1362,16 @@ function staffBelongsToYearGroup(fabStaffId, yearGroup, supplyYg = null) {
 }
 
 // ── Resource booking integration ────────────────────────────────────────────
-// Shows a chip on the master (year-group) view for any session a booking from
-// the Resource Booking tool overlaps, for this year group or "Whole School" —
-// e.g. the Library booked out during Session 2 shows up here so the class
-// isn't planned to use it. Pulled from booking's own sync endpoint, one week
-// at a time (that's all its "loadBookings" action supports), so it's re-fetched
-// whenever the displayed week changes — see loadBookingOverlay() call sites.
+// Library bookings from the Resource Booking tool are folded into the same
+// staffOutMap the "release" (staff-out) strips use, in renderBody() — so a
+// Library booking gets the identical thin-strip-plus-tag treatment as a
+// teacher's release, spanning every row its time overlaps. Only the Library
+// resource is shown here (not other bookable resources — the school only
+// wanted this one, see project_teaching_schedule_booking_overlay memory);
+// master (year-group) view only, since a room booking isn't one person's.
+// Pulled from booking's own sync endpoint, one week at a time (that's all its
+// "loadBookings" action supports), so it's re-fetched whenever the displayed
+// week changes — see loadBookingOverlay() call sites.
 function timeToMins(t) {
   if (!t) return null;
   const [h, m] = t.split(':').map(Number);
@@ -1379,28 +1383,20 @@ function bookingMatchesYearGroup(booking) {
   const bookingYG = booking.yearGroup === 'Rec' ? 'Reception' : booking.yearGroup;
   return bookingYG === YEAR_GROUP;
 }
-function getBookingsForRow(dayIdx, row) {
-  if (!row.time) return [];
-  const [startStr, endStr] = row.time.split('-');
-  const rowStart = timeToMins(startStr);
-  if (rowStart == null) return [];
-  const rowEnd = endStr ? timeToMins(endStr) : rowStart; // open-ended rows (e.g. "15:15-") never match a real booking end
-  const dayKey = DAYS[dayIdx].toLowerCase();
-  return (BOOKINGS[dayKey] || []).filter(bookingMatchesYearGroup).filter(b => {
-    const bStart = timeToMins(b.startTime), bEnd = timeToMins(b.endTime);
-    if (bStart == null || bEnd == null) return false;
-    return bStart < (endStr ? rowEnd : Infinity) && bEnd > rowStart;
+// Which ROWS (by index) does this booking's time range overlap, in order?
+function getBookingRowIndexes(booking) {
+  const bStart = timeToMins(booking.startTime), bEnd = timeToMins(booking.endTime);
+  if (bStart == null || bEnd == null) return [];
+  const indexes = [];
+  ROWS.forEach((row, ri) => {
+    if (!row.time) return;
+    const [startStr, endStr] = row.time.split('-');
+    const rowStart = timeToMins(startStr);
+    if (rowStart == null) return;
+    const rowEnd = endStr ? timeToMins(endStr) : Infinity; // open-ended rows (e.g. "15:15-") just extend to end of day
+    if (bStart < rowEnd && bEnd > rowStart) indexes.push(ri);
   });
-}
-function renderBookingChip(booking) {
-  const colour = '#0d9488';
-  const wholeSchool = booking.yearGroup === 'Whole School';
-  return `<div class="cell-chip tp-activity fab-duty" style="background:${colour}28;border:1.5px solid ${colour}">
-    <div class="chip-top">
-      <span class="chip-colour" style="background:${colour}"></span>
-      <span class="chip-name" style="color:#1e293b">${escHtml(booking.resourceName)} booked${wholeSchool ? ' (whole school)' : ''}</span>
-    </div>${booking.purpose ? `<div style="margin-top:2px;font-size:9.5px;color:#475569">${escHtml(booking.purpose)}</div>` : ''}
-  </div>`;
+  return indexes;
 }
 async function loadBookingOverlay(weekKey) {
   if (!BOOKING_SYNC_URL) return;
@@ -2136,6 +2132,39 @@ function renderBody() {
         });
       });
     }
+
+    // Library bookings (from the Resource Booking tool) — same strip+tag
+    // treatment as staff-out above, master view only
+    if (view === 'master') {
+      DAYS.forEach((d, di) => {
+        if (nsd[di]) return;
+        const dayKey = d.toLowerCase();
+        (BOOKINGS[dayKey] || [])
+          .filter(b => b.resourceId === 'library')
+          .filter(bookingMatchesYearGroup)
+          .forEach(b => {
+            const rowIndexes = getBookingRowIndexes(b);
+            if (!rowIndexes.length) return;
+            const startIdx = rowIndexes[0], endIdx = rowIndexes[rowIndexes.length - 1];
+            const wholeSchool = b.yearGroup === 'Whole School';
+            ROWS.forEach((row, ri) => {
+              if (ri >= startIdx && ri <= endIdx) {
+                const key = `${di}-${ri}`;
+                if (!staffOutMap[key]) staffOutMap[key] = [];
+                staffOutMap[key].push({
+                  label: `📚 Library${wholeSchool ? ' · Whole School' : ''}`,
+                  cover: b.purpose || '',
+                  colour: '#0d9488',
+                  isFirst: ri === startIdx,
+                  isLast: ri === endIdx,
+                  isFixed: row.type === 'fixed',
+                  source: 'booking'
+                });
+              }
+            });
+          });
+      });
+    }
   }
 
   let html = '';
@@ -2218,9 +2247,6 @@ function renderBody() {
               lcHtml = getLCDuties(null, state.weekIdx, di).filter(d => d.staffIds.some(sid => ygIds.has(sid))).map(d => renderLCChip(d)).join('');
             }
           }
-          // Resource bookings (Library etc.) — shown on the master view only,
-          // a resource booking is a whole-year-group constraint, not one person's
-          const bookingHtml = view === 'master' ? getBookingsForRow(di, row).map(b => renderBookingChip(b)).join('') : '';
           const isStaffFixed = (view !== 'master');
           const fixedChips = isStaffFixed ? (() => {
             const day = DAYS[di].toLowerCase();
@@ -2229,7 +2255,7 @@ function renderBody() {
           })() : '';
           const fixedDayAttr = isStaffFixed ? ` data-day="${DAYS[di].toLowerCase()}" data-session="${row.id}"` : '';
           const fixedNoteHtml = renderFixedNote(wk, view, DAYS[di].toLowerCase(), row.id);
-          return `<td class="view-cell"${fixedDayAttr}><div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}${fixedNoteHtml}</div>${strips}${soTags}${tpActHtml}${fabHtml}${lcHtml}${bookingHtml}${fixedChips}</td>`;
+          return `<td class="view-cell"${fixedDayAttr}><div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}${fixedNoteHtml}</div>${strips}${soTags}${tpActHtml}${fabHtml}${lcHtml}${fixedChips}</td>`;
         }).join('')}
       </tr>`;
     } else {
@@ -2293,9 +2319,6 @@ function renderBody() {
             masterTpHtml = allTpActs.map(a => renderTPActivityChip(a, a.staffName, dk)).join('');
           }
 
-          // Resource bookings (Library etc.) — master view only, see the fixed-row branch above for why
-          const masterBookingHtml = !isStaffView ? getBookingsForRow(di, row).map(b => renderBookingChip(b)).join('') : '';
-
           // Build cell content
           let cellContent;
           if (isStaffView && !row.afterSchool) {
@@ -2303,8 +2326,8 @@ function renderBody() {
             if (ownItems.length === 0 && !afterEvents && !tpActs.length && !n) cellContent = '<div class="drop-hint">drop here</div>';
             else cellContent += renderStaffCell(ownItems, wk, view, day, row.id);
           } else {
-            cellContent = afterEvents + masterTpHtml + masterBookingHtml;
-            if (items.length === 0 && !afterEvents && !masterTpHtml && !masterBookingHtml && !n) cellContent = '<div class="drop-hint">drop here</div>';
+            cellContent = afterEvents + masterTpHtml;
+            if (items.length === 0 && !afterEvents && !masterTpHtml && !n) cellContent = '<div class="drop-hint">drop here</div>';
             cellContent += items.map((item, idx) => renderItem(item, wk, view, day, row.id, idx)).join('');
           }
 
