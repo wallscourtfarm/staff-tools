@@ -370,7 +370,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.03.09.26c</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Maple</span><span id="version-tag">m.03.09.26d</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -472,6 +472,16 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
     <label style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;cursor:pointer;margin-bottom:10px"><input type="checkbox" id="setup-lunch-imgs" style="width:18px;height:18px;accent-color:#1798d3;cursor:pointer"> Show food images on lunch bar</label>
     <div id="menu-form"></div>
 
+    <h3 style="margin-top:1.5rem">Default weekday messages</h3>
+    <p style="font-size:0.82rem;color:#666;margin-bottom:10px">Shown automatically each day unless overridden for today. Leave a day blank for no automatic message.</p>
+    <div id="default-msg-form">
+      <div class="ov-field"><label>Monday</label><textarea id="dm-Mon" placeholder="No automatic message"></textarea></div>
+      <div class="ov-field"><label>Tuesday</label><textarea id="dm-Tue" placeholder="No automatic message"></textarea></div>
+      <div class="ov-field"><label>Wednesday</label><textarea id="dm-Wed" placeholder="No automatic message"></textarea></div>
+      <div class="ov-field"><label>Thursday</label><textarea id="dm-Thu" placeholder="No automatic message"></textarea></div>
+      <div class="ov-field"><label>Friday</label><textarea id="dm-Fri" placeholder="No automatic message"></textarea></div>
+    </div>
+
     <h3 style="margin-top:1.5rem">Two Truths &amp; a Lie — question bank</h3>
     <p style="font-size:0.82rem;color:#666;margin-bottom:10px">Add your own sets. The game picks randomly from this bank. Mark which statement is the lie — the lie is shown in solutions but not to pupils.</p>
     <div id="tt-bank-list"></div>
@@ -530,6 +540,11 @@ const MENU_BY_WEEK={
   '2026-10-19':{Mon:['Macaroni Cheese','Mixed Bean Fajitas'],Tue:['Homemade Sausage Roll','Veggie Sausage Roll'],Wed:['Roast Chicken','Cauliflower & Broccoli Cheese Bake'],Thu:['Cottage Pie','Shepherdless Pie'],Fri:['Golden Fish Fingers','BBQ Veggie Wrap']},
 };
 const AUTO_MSGS={Thu:'Hand in your home learning\nPaired Spelling Bee',Fri:'Stick in your home learning\nLeave last week\'s to be checked'};
+function getDefaultMsgs(){
+  const raw=localStorage.getItem('y4_default_msgs');
+  if(raw===null)return{...AUTO_MSGS};
+  try{return JSON.parse(raw)}catch(e){return{...AUTO_MSGS}}
+}
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const DAYNAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -2410,7 +2425,7 @@ function getMsg(){
   const ts=todayStr(),dk=getDK(ts);
   const ov=JSON.parse(localStorage.getItem('y4_ov_'+ts)||'{}');
   if(ov.hasOwnProperty('msg'))return ov.msg;
-  return AUTO_MSGS[dk]||'';
+  return getDefaultMsgs()[dk]||'';
 }
 function getTTSet(){
   const ts=todayStr();
@@ -3848,7 +3863,7 @@ function openOverride(){
   document.getElementById('ov-tt-2').value=tt.stmts?tt.stmts[1]:'';
   document.getElementById('ov-tt-3').value=tt.stmts?tt.stmts[2]:'';
   document.getElementById('ov-tt-lie').value=tt.lie||1;
-  const auto=AUTO_MSGS[dk];
+  const auto=getDefaultMsgs()[dk];
   document.getElementById('ov-auto-preview').textContent=auto?`Auto for ${DAYNAMES[new Date(ts+'T12:00:00').getDay()]}: "${auto}"`:'No automatic message today.';
   document.getElementById('ov-overlay').classList.add('on');
 }
@@ -3902,6 +3917,7 @@ function openSetup(){
     </label>`
   ).join('');
   document.getElementById('setup-lunch-imgs').checked=localStorage.getItem('y4_lunch_imgs')==='1';
+  const dm=getDefaultMsgs();['Mon','Tue','Wed','Thu','Fri'].forEach(d=>{document.getElementById('dm-'+d).value=dm[d]||'';});
   document.getElementById('setup-ov').classList.add('on');
 }
 function closeSetup(){document.getElementById('setup-ov').classList.remove('on')}
@@ -3949,7 +3965,9 @@ function saveSetup(){
   const tables=MTC_ALL_DEFAULT.filter(t=>document.getElementById('mtc_t_'+t)?.checked);
   if(tables.length>0)localStorage.setItem('y4_mtc_tables',JSON.stringify(tables));
   if(document.getElementById('setup-lunch-imgs').checked)localStorage.setItem('y4_lunch_imgs','1');else localStorage.removeItem('y4_lunch_imgs');
-  closeSetup();renderLunch();
+  const dm={};['Mon','Tue','Wed','Thu','Fri'].forEach(d=>{dm[d]=document.getElementById('dm-'+d).value;});
+  localStorage.setItem('y4_default_msgs',JSON.stringify(dm));
+  closeSetup();renderLunch();renderMsg();
 }
 
 loadSharedMenu().then(init);
