@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26d</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26e</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -3639,7 +3639,12 @@ async function init() {
   renderSidebar();
   renderGrid();
   await syncLoad(schedKey());
-  syncPushAll(); // push all local weeks to cloud on first connection
+  // syncPushAll() used to run here on every page load, unconditionally pushing
+  // every locally cached week to the server. That silently overwrote good
+  // server data with a stale local copy on any device whose cache had gone
+  // out of date (e.g. from an old bug, or just from being offline) — real,
+  // repeated data loss. Removed: individual edits already push themselves via
+  // syncSave(), so nothing legitimate depended on this running at load time.
 }
 
 init();
