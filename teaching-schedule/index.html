@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26f</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26g</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -3502,8 +3502,30 @@ async function init() {
   renderViewTabs();
   renderGrid();
 
+  // Two batches, fired together so neither waits on the other's network round trip:
+  //  - "core" is the handful of Google Sheets CSV reads (staff/terms/subjects/…) —
+  //    typically back in well under a second, and everything needed to show the
+  //    actual timetable (right week, right staff, right subjects).
+  //  - "overlays" is the four separate Apps Script sync endpoints (cover-plan,
+  //    FAB rota, lunch cover, activity exceptions) — these routinely take 1-3s+
+  //    each (Apps Script web apps are slow, more on a cold start), and previously
+  //    blocked the entire page behind whichever of the four was slowest.
+  // The schedule's own saved data (syncLoad) used to run only after ALL twelve of
+  // the above resolved; it doesn't actually depend on any of them (YEAR_GROUP is
+  // already known from localStorage, and schedKey() has a same-answer fallback
+  // for "this week" before WEEKS loads — see weekMonday()), so it's fired here
+  // too instead of being chained on the end.
+  const initialWeekKey = schedKey();
+  const syncLoadPromise = syncLoad(initialWeekKey);
+  const overlaysPromise = Promise.all([
+    EXCEPTIONS_URL ? fetch(EXCEPTIONS_URL + '?action=exceptions').then(r => r.ok ? r.json() : {exceptions:[]}).then(d => d.exceptions || []).catch(() => []) : Promise.resolve([]),
+    FAB_SYNC_URL ? fetch(FAB_SYNC_URL).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
+    COVER_SYNC_URL ? fetch(COVER_SYNC_URL).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
+    fetch(LUNCH_COVER_URL, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
+  ]);
+
   try {
-    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText, tpActivitiesText, exceptionsData, fabDataRaw, coverDataRaw, lcDataRaw] = await Promise.all([
+    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText, tpActivitiesText] = await Promise.all([
       fetch(SHEET_BASE + encodeURIComponent('TermDates')).then(r => { if (!r.ok) throw new Error('Terms tab not found'); return r.text(); }),
       fetch(SHEET_BASE + encodeURIComponent('CalendarEvents')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('EventsMeetings')).then(r => r.ok ? r.text() : '').catch(() => ''),
@@ -3512,10 +3534,6 @@ async function init() {
       fetch(SHEET_BASE + encodeURIComponent('Interventions')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('DayTimings')).then(r => r.ok ? r.text() : '').catch(() => ''),
       fetch(SHEET_BASE + encodeURIComponent('DayActivities')).then(r => r.ok ? r.text() : '').catch(() => ''),
-	      EXCEPTIONS_URL ? fetch(EXCEPTIONS_URL + '?action=exceptions').then(r => r.ok ? r.json() : {exceptions:[]}).then(d => d.exceptions || []).catch(() => []) : Promise.resolve([]),
-      FAB_SYNC_URL ? fetch(FAB_SYNC_URL).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
-      COVER_SYNC_URL ? fetch(COVER_SYNC_URL).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
-      fetch(LUNCH_COVER_URL, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
     WEEKS = buildWeeks(csvToObjects(termsText));
     if (eventsText) {
@@ -3576,18 +3594,51 @@ async function init() {
       TP_ACTIVITIES = csvToObjects(tpActivitiesText);
     }
 
-    // Activity exceptions (from deployed Apps Script endpoint)
+    migrateScheduleKeys();
+    state.weekIdx = currentWeekIdx();
+    document.getElementById('btnPrev').disabled = state.weekIdx === 0;
+    document.getElementById('btnNext').disabled = state.weekIdx === WEEKS.length-1;
+    document.getElementById('weekLabel').textContent = weekLabel();
+    const nsdCount = Object.keys(state.nonSchoolDays).length;
+    document.getElementById('sheetStatus').textContent = `● Sheet connected · ${nsdCount} non-school days`;
+    document.getElementById('sheetStatus').className = 'sheet-status ok';
+
+    // Now that the real week is known, the fallback key syncLoad() was fired
+    // with at the top of init() might not match (only possible when today
+    // falls in a gap the TermDates sheet doesn't cover, e.g. a holiday) — in
+    // the ordinary case this is a no-op re-check, not a second real fetch.
+    const correctedWeekKey = schedKey();
+    if (correctedWeekKey !== initialWeekKey) syncLoad(correctedWeekKey);
+  } catch (err) {
+    document.getElementById('weekLabel').textContent = weekLabel();
+    document.getElementById('sheetStatus').textContent = '● Sheet offline – using local';
+    document.getElementById('sheetStatus').className = 'sheet-status err';
+  }
+
+  // Render now with just the core data — this is the actual timetable (right
+  // week, right staff, right subjects), not a placeholder, so there's no
+  // reason to keep it behind the four slower requests below.
+  renderViewTabs();
+  renderSidebar();
+  renderGrid();
+
+  // Layer in the cover/FAB/lunch/exceptions overlays once they land (these
+  // were kicked off back at the top of init(), in parallel with everything
+  // above) and re-render. staff-out tags etc. simply won't show until this
+  // resolves, same as they wouldn't have shown before this render was split
+  // out — the difference is the timetable itself no longer waits for them.
+  try {
+    const [exceptionsData, fabDataRaw, coverDataRaw, lcDataRaw] = await overlaysPromise;
+
     if (exceptionsData && Array.isArray(exceptionsData)) {
       ACTIVITY_EXCEPTIONS = exceptionsData;
     }
 
-    // FAB data (from FAB tool sync endpoint)
     if (fabDataRaw && fabDataRaw.state && fabDataRaw.state.slots) {
       FAB_DATA = {
         ...fabDataRaw.state.slots,
         staffColours: fabDataRaw.staffColours || {}
       };
-      // Also get FAB staff list for ID→initials mapping
       if (fabDataRaw.staff) {
         FAB_STAFF = fabDataRaw.staff;
       }
@@ -3603,7 +3654,6 @@ async function init() {
       }));
     ACTIVITY_EXCEPTIONS = ACTIVITY_EXCEPTIONS.filter(e => !e.type || e.type === 'DayActivity');
 
-    // Cover-plan data (from cover-plan tool sync endpoint)
     if (coverDataRaw && coverDataRaw.weekSlots) {
       COVER_DATA = {
         weekSlots: coverDataRaw.weekSlots,
@@ -3624,29 +3674,19 @@ async function init() {
         };
       });
     }
-    // Lunch Cover data
     if (lcDataRaw?.state?.slots) {
       LC_DATA = lcDataRaw;
     }
 
-    migrateScheduleKeys();
-    state.weekIdx = currentWeekIdx();
-    document.getElementById('btnPrev').disabled = state.weekIdx === 0;
-    document.getElementById('btnNext').disabled = state.weekIdx === WEEKS.length-1;
-    document.getElementById('weekLabel').textContent = weekLabel();
-    const nsdCount = Object.keys(state.nonSchoolDays).length;
-    document.getElementById('sheetStatus').textContent = `● Sheet connected · ${nsdCount} non-school days`;
-    document.getElementById('sheetStatus').className = 'sheet-status ok';
+    renderViewTabs();
+    renderSidebar();
+    renderGrid();
   } catch (err) {
-    document.getElementById('weekLabel').textContent = weekLabel();
-    document.getElementById('sheetStatus').textContent = '● Sheet offline – using local';
-    document.getElementById('sheetStatus').className = 'sheet-status err';
+    // Overlays are supplementary (cover/FAB/lunch tags) — a failure here
+    // shouldn't disturb the core timetable already on screen.
   }
 
-  renderViewTabs();
-  renderSidebar();
-  renderGrid();
-  await syncLoad(schedKey());
+  await syncLoadPromise;
   // syncPushAll() used to run here on every page load, unconditionally pushing
   // every locally cached week to the server. That silently overwrote good
   // server data with a stale local copy on any device whose cache had gone
