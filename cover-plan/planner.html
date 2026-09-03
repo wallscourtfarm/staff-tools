@@ -405,7 +405,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(03.09.26b)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(03.09.26c)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -571,6 +571,7 @@ let HIDDEN_EVENT_DATES = JSON.parse(localStorage.getItem('hiddenEventDates')||'{
 
 // ── Whole-school events (localStorage-backed; defaults loaded from sheet) ─────
 let WS_SHEET_DEFAULTS = [];
+let SERVER_SPORTS_SCHEDULE = []; // last-fetched server sportsSchedule, for ensureAllSports() to hydrate from
 function wsLoad() {
   try { const s = localStorage.getItem('wfa_ws_events'); return s ? JSON.parse(s) : WS_SHEET_DEFAULTS; }
   catch(e) { return WS_SHEET_DEFAULTS; }
@@ -890,7 +891,6 @@ async function init() {
     });
     WS_SHEET_DEFAULTS=buildSchoolEvents(csvToObjects(wseTxt));
     wsEvents=wsLoad();
-    ensureAllSports();
     RECURRING_SLOTS=buildRecurring(csvToObjects(recTxt));
     // Restore saved planner state, falling back to recurring slots for current week
     const saved=await stateLoad();
@@ -903,6 +903,13 @@ async function init() {
         if (Array.isArray(slots)) slots.forEach(s => { if (s.reason==='Day Off') s.reason='Non-working Day'; });
       });
     }
+    // Must run after stateLoad(): a device whose local sports table is
+    // missing a year group should pick up the real shared schedule from the
+    // server, not silently invent one — see ensureAllSports() for why this
+    // ordering matters (a stale/empty local cache used to regenerate wrong
+    // defaults and then overwrite the real server copy on the next save).
+    SERVER_SPORTS_SCHEDULE = saved?.sportsSchedule || [];
+    ensureAllSports(SERVER_SPORTS_SCHEDULE);
     state.weekIdx=currentWeekIdx();
     if (!state.weekSlots[state.weekIdx] || state.weekSlots[state.weekIdx].length===0) state.weekSlots[state.weekIdx]=JSON.parse(JSON.stringify(RECURRING_SLOTS));
     fillNonWorkingSlots();
@@ -932,7 +939,9 @@ function setSyncStatus(state) {
 
 // ── State persistence ─────────────────────────────────────────────────────────
 function stateSave() {
-  const sportsSchedule = wsEvents.filter(e => e.sport).map(e => ({ yg: e.yg, day: e.day, session: e.session }));
+  // Only push fully-configured entries — an in-progress "— Select —" one
+  // (day/session still null) shouldn't overwrite a real value elsewhere.
+  const sportsSchedule = wsEvents.filter(e => e.sport && e.day != null && e.session).map(e => ({ yg: e.yg, day: e.day, session: e.session, provider: e.provider || '' }));
   const json = JSON.stringify({ weekSlots: state.weekSlots, cellNotes: state.cellNotes, nextId: state.nextId, sportsSchedule });
   try { localStorage.setItem('wfa_planner_state', json); } catch(e) {}
   setSyncStatus('syncing');
@@ -1941,11 +1950,20 @@ const SPORT_DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 function getSportEntry(yg) {
   return wsEvents.find(e => e.sport && e.yg === yg);
 }
-function ensureAllSports() {
+function ensureAllSports(serverSportsSchedule) {
+  // For any year group with no local sport entry, hydrate it from the
+  // server's copy (the shared, last-known-good schedule everyone else's
+  // saves have been building) rather than inventing a Monday/PM default —
+  // a fabricated default here is exactly what silently overwrote the real
+  // schedule before (see the caller in init() for the full story). If a
+  // year group genuinely has no entry anywhere yet, leave it unset — the
+  // School events modal lets it be configured from a blank state.
   let changed = false;
   SPORT_YGS.forEach(yg => {
-    if (!wsEvents.find(e => e.sport && e.yg === yg)) {
-      wsEvents.push({ day:0, session:'PM', label:yg+' Sports', bg:SPORT_YG_COLOURS[yg], sport:true, yg, provider:'' });
+    if (wsEvents.find(e => e.sport && e.yg === yg)) return;
+    const fromServer = (serverSportsSchedule || []).find(s => s.yg === yg);
+    if (fromServer) {
+      wsEvents.push({ day:fromServer.day, session:fromServer.session, label:yg+' Sports', bg:SPORT_YG_COLOURS[yg], sport:true, yg, provider:fromServer.provider||'' });
       changed = true;
     }
   });
@@ -1954,20 +1972,26 @@ function ensureAllSports() {
 
 function renderWsModal() {
   const days = SPORT_DAYS;
-  ensureAllSports();
+  ensureAllSports(SERVER_SPORTS_SCHEDULE);
 
-  // Sports table — every YG always present, editable day/session/provider
+  // Sports table — every YG always present, editable day/session/provider.
+  // A year group with no entry yet (no local data, nothing on the server
+  // either) shows blank "— Select —" prompts rather than a fabricated
+  // default — see ensureAllSports() for why guessing a default is exactly
+  // what caused the real schedule to get silently overwritten before.
   let sportHtml = '<tr><th></th><th>Day</th><th>Session</th><th>Provider</th></tr>';
   SPORT_YGS.forEach(yg => {
-    const ev = getSportEntry(yg);
+    const ev = getSportEntry(yg) || { day:null, session:null, provider:'' };
     const col = SPORT_YG_COLOURS[yg];
-    const dayOpts = days.map((d,i) => `<option value="${i}"${ev.day===i?' selected':''}>${d}</option>`).join('');
-    const sessOpts = ['AM','PM'].map(s => `<option${ev.session===s?' selected':''}>${s}</option>`).join('');
+    const dayOpts = '<option value=""' + (ev.day==null?' selected':'') + '>— Select —</option>'
+      + days.map((d,i) => `<option value="${i}"${ev.day===i?' selected':''}>${d}</option>`).join('');
+    const sessOpts = '<option value=""' + (ev.session==null?' selected':'') + '>— Select —</option>'
+      + ['AM','PM'].map(s => `<option${ev.session===s?' selected':''}>${s}</option>`).join('');
     const provOpts = [['','None'],['AB','AB'],['Brs','Brs']].map(([v,l]) => `<option value="${v}"${ev.provider===v?' selected':''}>${l}</option>`).join('');
     sportHtml += `<tr>
       <td><div class="yg-cell"><div class="yg-pip-sm" style="background:${col}"></div>${yg}</div></td>
-      <td><select onchange="updateSport('${yg}','day',+this.value)">${dayOpts}</select></td>
-      <td><select onchange="updateSport('${yg}','session',this.value)">${sessOpts}</select></td>
+      <td><select onchange="updateSport('${yg}','day',this.value===''?null:+this.value)">${dayOpts}</select></td>
+      <td><select onchange="updateSport('${yg}','session',this.value||null)">${sessOpts}</select></td>
       <td><select onchange="updateSport('${yg}','provider',this.value)">${provOpts}</select></td>
     </tr>`;
   });
@@ -1994,8 +2018,11 @@ function renderWsModal() {
   document.getElementById('wsEventList').innerHTML = otherHtml;
 }
 function updateSport(yg, field, value) {
-  const ev = getSportEntry(yg);
-  if (!ev) return;
+  let ev = getSportEntry(yg);
+  if (!ev) {
+    ev = { day:null, session:null, provider:'', sport:true, yg };
+    wsEvents.push(ev);
+  }
   if (field === 'day') ev.day = value;
   else if (field === 'session') ev.session = value;
   else if (field === 'provider') ev.provider = value;
@@ -2003,6 +2030,10 @@ function updateSport(yg, field, value) {
   ev.label = yg + ' Sports' + (ev.provider ? ` (${ev.provider})` : '');
   ev.bg = SPORT_YG_COLOURS[yg];
   wsSave();
+  // Push to the server immediately rather than waiting for some unrelated
+  // edit to carry it along — this is what let the schedule drift out of
+  // sync before (see ensureAllSports()).
+  stateSave();
   render();
 }
 function addWsEvent() {
