@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26g</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26h</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -549,6 +549,7 @@ const FAB_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J
 const COVER_SYNC_URL = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
 const SHARED_TOKEN = localStorage.getItem('wfa_shared_token') || '2013';
 const LUNCH_COVER_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?key=wfa_lc&token=' + SHARED_TOKEN;
+const BOOKING_SYNC_URL = 'https://script.google.com/macros/s/AKfycbwzNtos0vdjnUhsFQ_igTtLNXyBd8k9c6rPkA0IZdkM3vJLAoIdSHonTbHAbyFNfH_BWQ/exec';
 
 // FAB zone definitions (must match FAB tool)
 const FAB_GROUPS = {
@@ -722,6 +723,8 @@ let FAB_EXCEPTIONS = []; // { date, staffId, zone }
 let COVER_DATA = null; // { weekSlots: {weekIdx: [slots]}, staff: [{id, name, yg, col}] } - from cover-plan tool
 let COVER_STAFF_LOOKUP = {}; // name -> {id, yg, col} for quick lookup
 let LC_DATA = null; // { state: { slots: {weekIdx: {dutyId: [[staffId,...],...]}} }, duties: [...], staffColours: {} }
+let BOOKINGS = {}; // day (lowercase) -> [booking, ...], for whichever week was last loaded — see loadBookingOverlay()
+let BOOKINGS_WEEK_KEY = null;
 
 // Flat lookup: name → col
 const SUBJECT_COL = {};
@@ -1358,6 +1361,61 @@ function staffBelongsToYearGroup(fabStaffId, yearGroup, supplyYg = null) {
   return yearGroupMatches(staffYearGroups, yearGroup);
 }
 
+// ── Resource booking integration ────────────────────────────────────────────
+// Shows a chip on the master (year-group) view for any session a booking from
+// the Resource Booking tool overlaps, for this year group or "Whole School" —
+// e.g. the Library booked out during Session 2 shows up here so the class
+// isn't planned to use it. Pulled from booking's own sync endpoint, one week
+// at a time (that's all its "loadBookings" action supports), so it's re-fetched
+// whenever the displayed week changes — see loadBookingOverlay() call sites.
+function timeToMins(t) {
+  if (!t) return null;
+  const [h, m] = t.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+function bookingMatchesYearGroup(booking) {
+  if (!booking.yearGroup) return false;
+  if (booking.yearGroup === 'Whole School') return true;
+  const bookingYG = booking.yearGroup === 'Rec' ? 'Reception' : booking.yearGroup;
+  return bookingYG === YEAR_GROUP;
+}
+function getBookingsForRow(dayIdx, row) {
+  if (!row.time) return [];
+  const [startStr, endStr] = row.time.split('-');
+  const rowStart = timeToMins(startStr);
+  if (rowStart == null) return [];
+  const rowEnd = endStr ? timeToMins(endStr) : rowStart; // open-ended rows (e.g. "15:15-") never match a real booking end
+  const dayKey = DAYS[dayIdx].toLowerCase();
+  return (BOOKINGS[dayKey] || []).filter(bookingMatchesYearGroup).filter(b => {
+    const bStart = timeToMins(b.startTime), bEnd = timeToMins(b.endTime);
+    if (bStart == null || bEnd == null) return false;
+    return bStart < (endStr ? rowEnd : Infinity) && bEnd > rowStart;
+  });
+}
+function renderBookingChip(booking) {
+  const colour = '#0d9488';
+  const wholeSchool = booking.yearGroup === 'Whole School';
+  return `<div class="cell-chip tp-activity fab-duty" style="background:${colour}28;border:1.5px solid ${colour}">
+    <div class="chip-top">
+      <span class="chip-colour" style="background:${colour}"></span>
+      <span class="chip-name" style="color:#1e293b">${escHtml(booking.resourceName)} booked${wholeSchool ? ' (whole school)' : ''}</span>
+    </div>${booking.purpose ? `<div style="margin-top:2px;font-size:9.5px;color:#475569">${escHtml(booking.purpose)}</div>` : ''}
+  </div>`;
+}
+async function loadBookingOverlay(weekKey) {
+  if (!BOOKING_SYNC_URL) return;
+  try {
+    const res = await fetch(`${BOOKING_SYNC_URL}?action=loadBookings&weekKey=${encodeURIComponent(weekKey)}`);
+    if (!res.ok) return;
+    const json = await res.json();
+    if (json && json.bookings) {
+      BOOKINGS = json.bookings;
+      BOOKINGS_WEEK_KEY = weekKey;
+      renderGrid();
+    }
+  } catch {}
+}
+
 // ── Cover-plan integration helpers ─────────────────────────────────────────────
 // A slot covered by the generic "Supply" placeholder shows the actual agency
 // supply teacher's name (set in cover-plan's supply-admin tool) once known,
@@ -1854,6 +1912,7 @@ function changeWeek(dir) {
   renderViewTabs();
   renderGrid();
   syncLoad(schedKey());
+  loadBookingOverlay(schedKey());
 }
 
 function goToday() {
@@ -2159,6 +2218,9 @@ function renderBody() {
               lcHtml = getLCDuties(null, state.weekIdx, di).filter(d => d.staffIds.some(sid => ygIds.has(sid))).map(d => renderLCChip(d)).join('');
             }
           }
+          // Resource bookings (Library etc.) — shown on the master view only,
+          // a resource booking is a whole-year-group constraint, not one person's
+          const bookingHtml = view === 'master' ? getBookingsForRow(di, row).map(b => renderBookingChip(b)).join('') : '';
           const isStaffFixed = (view !== 'master');
           const fixedChips = isStaffFixed ? (() => {
             const day = DAYS[di].toLowerCase();
@@ -2167,7 +2229,7 @@ function renderBody() {
           })() : '';
           const fixedDayAttr = isStaffFixed ? ` data-day="${DAYS[di].toLowerCase()}" data-session="${row.id}"` : '';
           const fixedNoteHtml = renderFixedNote(wk, view, DAYS[di].toLowerCase(), row.id);
-          return `<td class="view-cell"${fixedDayAttr}><div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}${fixedNoteHtml}</div>${strips}${soTags}${tpActHtml}${fabHtml}${lcHtml}${fixedChips}</td>`;
+          return `<td class="view-cell"${fixedDayAttr}><div style="${pad}"><div class="fixed-label">${row.label}</div>${row.time && !row.hideTime ? `<div class="fixed-sub">${row.time}</div>` : ''}${fixedNoteHtml}</div>${strips}${soTags}${tpActHtml}${fabHtml}${lcHtml}${bookingHtml}${fixedChips}</td>`;
         }).join('')}
       </tr>`;
     } else {
@@ -2231,6 +2293,9 @@ function renderBody() {
             masterTpHtml = allTpActs.map(a => renderTPActivityChip(a, a.staffName, dk)).join('');
           }
 
+          // Resource bookings (Library etc.) — master view only, see the fixed-row branch above for why
+          const masterBookingHtml = !isStaffView ? getBookingsForRow(di, row).map(b => renderBookingChip(b)).join('') : '';
+
           // Build cell content
           let cellContent;
           if (isStaffView && !row.afterSchool) {
@@ -2238,8 +2303,8 @@ function renderBody() {
             if (ownItems.length === 0 && !afterEvents && !tpActs.length && !n) cellContent = '<div class="drop-hint">drop here</div>';
             else cellContent += renderStaffCell(ownItems, wk, view, day, row.id);
           } else {
-            cellContent = afterEvents + masterTpHtml;
-            if (items.length === 0 && !afterEvents && !masterTpHtml && !n) cellContent = '<div class="drop-hint">drop here</div>';
+            cellContent = afterEvents + masterTpHtml + masterBookingHtml;
+            if (items.length === 0 && !afterEvents && !masterTpHtml && !masterBookingHtml && !n) cellContent = '<div class="drop-hint">drop here</div>';
             cellContent += items.map((item, idx) => renderItem(item, wk, view, day, row.id, idx)).join('');
           }
 
@@ -3517,6 +3582,7 @@ async function init() {
   // too instead of being chained on the end.
   const initialWeekKey = schedKey();
   const syncLoadPromise = syncLoad(initialWeekKey);
+  const bookingPromise = loadBookingOverlay(initialWeekKey);
   const overlaysPromise = Promise.all([
     EXCEPTIONS_URL ? fetch(EXCEPTIONS_URL + '?action=exceptions').then(r => r.ok ? r.json() : {exceptions:[]}).then(d => d.exceptions || []).catch(() => []) : Promise.resolve([]),
     FAB_SYNC_URL ? fetch(FAB_SYNC_URL).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
@@ -3608,7 +3674,7 @@ async function init() {
     // falls in a gap the TermDates sheet doesn't cover, e.g. a holiday) — in
     // the ordinary case this is a no-op re-check, not a second real fetch.
     const correctedWeekKey = schedKey();
-    if (correctedWeekKey !== initialWeekKey) syncLoad(correctedWeekKey);
+    if (correctedWeekKey !== initialWeekKey) { syncLoad(correctedWeekKey); loadBookingOverlay(correctedWeekKey); }
   } catch (err) {
     document.getElementById('weekLabel').textContent = weekLabel();
     document.getElementById('sheetStatus').textContent = '● Sheet offline – using local';
@@ -3686,7 +3752,7 @@ async function init() {
     // shouldn't disturb the core timetable already on screen.
   }
 
-  await syncLoadPromise;
+  await Promise.all([syncLoadPromise, bookingPromise]);
   // syncPushAll() used to run here on every page load, unconditionally pushing
   // every locally cached week to the server. That silently overwrote good
   // server data with a stale local copy on any device whose cache had gone
