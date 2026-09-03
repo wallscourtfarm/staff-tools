@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26c</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26d</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1681,12 +1681,14 @@ async function syncLoad(weekKey) {
     const res = await fetch(`${SYNC_URL}?action=load&yearGroup=${encodeURIComponent(YEAR_GROUP)}&weekKey=${encodeURIComponent(weekKey)}`);
     if (!res.ok) return;
     const json = await res.json();
-    if (json && json.data) {
-      // Validate: only accept data if its view keys match current VIEWS
-      // (old sync script ignores yearGroup param and could return wrong year group's data)
-      const dataViews = Object.keys(json.data);
-      const validViews = dataViews.every(v => VIEWS.includes(v));
-      if (!validViews) return;
+    if (json && json.data && json.data.master) {
+      // Basic sanity check only (must look like real schedule data). The backend
+      // now keys storage by yearGroup itself, so cross-year-group bleed can't
+      // happen server-side. Do NOT reject on staff-view keys not matching current
+      // VIEWS — a departed/renamed staff member's old view key is still real,
+      // legitimate saved data, not corruption. Rejecting it caused active data
+      // loss: a device would silently treat the week as blank, then overwrite
+      // the real save with that blank state on its next load.
       state.schedule[weekKey] = json.data;
       renderGrid();
       persistLocal();
