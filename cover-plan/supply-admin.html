@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Supply Booking — Wallscourt Farm Academy</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231798d3'/%3E%3Crect x='8' y='4' width='16' height='24' rx='2' fill='white'/%3E%3Crect x='10' y='8' width='12' height='2' rx='1' fill='%231798d3'/%3E%3Crect x='10' y='12' width='12' height='2' rx='1' fill='%23ccc'/%3E%3Crect x='10' y='16' width='12' height='2' rx='1' fill='%23ccc'/%3E%3Crect x='10' y='20' width='8' height='2' rx='1' fill='%23ccc'/%3E%3C/svg%3E">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f4f8; min-height: 100vh; font-size: 13px; }
+
+    .header-strip { background: #1798d3; height: 8px; }
+    header {
+      background: white; padding: 14px 20px;
+      display: flex; align-items: center; gap: 15px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    header img { height: 52px; }
+    .header-title { font-family:'Nunito',sans-serif; font-size:19px; font-weight:900; color:#1798d3; line-height:1.2; }
+    .header-sub { font-size:12px; color:#94a3b8; margin-top:2px; }
+
+    .week-nav { display:flex; align-items:center; gap:8px; margin-left:auto; }
+    .week-nav button { padding:7px 14px; border:1px solid #e2e8f0; border-radius:4px; background:white; cursor:pointer; font-size:18px; color:#475569; line-height:1; }
+    .week-nav button:hover:not(:disabled) { background:#f0f8fd; border-color:#93c5fd; }
+    .week-nav button:disabled { opacity:.35; cursor:default; }
+    #weekLabel { font-family:'Nunito',sans-serif; font-weight:900; font-size:16px; color:#1798d3; text-align:center; min-width:170px; line-height:1.2; }
+    #weekLabel small { display:block; font-size:11px; color:#94a3b8; font-weight:normal; margin-top:2px; }
+
+    .sync-badge { font-size:11px; padding:3px 9px; border-radius:10px; background:#f1f5f9; color:#94a3b8; margin-left:10px; }
+    .sync-badge.ok { background:#dcfce7; color:#166534; }
+    .sync-badge.offline { background:#fff7ed; color:#c2410c; }
+
+    .stats-bar { background:white; border-bottom:1px solid #e8eef4; padding:9px 20px; display:flex; align-items:center; gap:18px; font-size:12.5px; color:#64748b; }
+    .stats-bar strong { color:#1e3a8a; }
+    .stat-dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:4px; }
+
+    .wrap { max-width:1240px; margin:0 auto; padding:16px 20px 40px; }
+
+    .empty-week { background:white; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:60px 20px; text-align:center; color:#94a3b8; font-size:14px; }
+    .empty-week strong { display:block; font-size:16px; color:#166534; margin-bottom:6px; font-family:'Nunito',sans-serif; }
+
+    .halves { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    @media (max-width: 860px) { .halves { grid-template-columns:1fr; } }
+    .half-panel { background:white; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:hidden; }
+    .half-hd { padding:10px 16px; font-family:'Nunito',sans-serif; font-weight:900; font-size:14px; color:#1e3a8a; border-bottom:2px solid #f1f5f9; background:#f8fafc; }
+    .half-body { padding:8px 12px 14px; }
+
+    .day-group { margin-top:10px; }
+    .day-group:first-child { margin-top:4px; }
+    .day-hd { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#64748b; font-weight:bold; padding:4px 4px; }
+
+    .req-card { border:1.5px solid #e2e8f0; border-left-width:4px; border-radius:6px; padding:9px 11px; margin-bottom:8px; transition:border-color .12s, background .12s; }
+    .req-card.booked { border-color:#bbf7d0; background:#f7fefb; }
+    .req-row1 { display:flex; align-items:center; gap:8px; }
+    .yg-pip { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+    .req-who { font-weight:bold; font-size:13px; color:#111; }
+    .req-yg { font-size:10.5px; color:#64748b; }
+    .req-reason { font-size:10.5px; background:#eef2ff; color:#3730a3; padding:1px 7px; border-radius:9px; margin-left:auto; white-space:nowrap; }
+    .req-row2 { display:flex; align-items:center; gap:8px; margin-top:7px; }
+    .booked-toggle { display:flex; align-items:center; gap:5px; font-size:12px; color:#374151; cursor:pointer; white-space:nowrap; user-select:none; }
+    .booked-toggle input { width:15px; height:15px; cursor:pointer; accent-color:#22c55e; }
+    .supply-name-input { flex:1; min-width:0; padding:6px 9px; font-size:13px; border:1px solid #cbd5e1; border-radius:5px; color:#111; }
+    .supply-name-input:focus { outline:none; border-color:#1798d3; }
+    .row-status { font-size:11px; width:16px; text-align:center; flex-shrink:0; }
+    .row-status.saving { color:#94a3b8; }
+    .row-status.ok { color:#22c55e; }
+    .row-status.error { color:#dc2626; }
+
+    footer { text-align:center; font-size:11px; color:#cbd5e1; padding:14px 0 22px; }
+  </style>
+</head>
+<body>
+
+<div class="header-strip"></div>
+<header>
+  <img src="logo.png" alt="Wallscourt Farm Academy">
+  <div>
+    <div class="header-title">Supply Booking <span style="color:#64748b;font-weight:normal;font-size:12px">(03.09.26a)</span></div>
+    <div class="header-sub">Wallscourt Farm Academy — booked against the <a href="planner.html" style="color:#1798d3">Release Schedule</a></div>
+  </div>
+  <div class="week-nav">
+    <span class="sync-badge" id="syncBadge">—</span>
+    <button id="prevWeek" title="Previous week">‹</button>
+    <div id="weekLabel">—</div>
+    <button id="nextWeek" title="Next week">›</button>
+  </div>
+</header>
+
+<div class="stats-bar" id="statsBar"></div>
+
+<div class="wrap" id="mainWrap">
+  <div class="empty-week"><strong>Loading…</strong></div>
+</div>
+
+<footer>Wallscourt Farm Academy · Supply Booking</footer>
+
+<script>
+// ── Shared config (same source as planner.html) ─────────────────────────────
+const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
+const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
+
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+const SESSION_IDX = { 'Before School': 0, 'AM': 1, 'Lunch': 2, 'PM': 3, 'After School': 4 };
+const YG_ORDER  = ['Reception','Y1','Y2','Y3','Y4','Y5','Y6'];
+const YG_COLOURS = {Reception:'#93c5fd',Y1:'#fb923c',Y2:'#6ee7b7',Y3:'#f9a8d4',Y4:'#60a5fa',Y5:'#fdba74',Y6:'#4ade80'};
+
+let TEACHERS = [];
+let WEEKS = [];
+let weekSlotsCache = {}; // last-fetched server copy, keyed by weekIdx (string)
+let weekIdx = 0;
+
+// ── CSV helpers (copied from planner.html) ──────────────────────────────────
+function parseCSV(text) {
+  const rows = []; let inQ=false, cur='', cells=[];
+  for (let i=0; i<text.length; i++) {
+    const c=text[i];
+    if (c==='"') { inQ=!inQ; }
+    else if (c===',' && !inQ) { cells.push(cur.trim()); cur=''; }
+    else if ((c==='\n'||c==='\r') && !inQ) {
+      cells.push(cur.trim()); cur='';
+      if (cells.some(x=>x)) rows.push(cells);
+      cells=[];
+      if (c==='\r' && text[i+1]==='\n') i++;
+    } else cur+=c;
+  }
+  cells.push(cur.trim());
+  if (cells.some(x=>x)) rows.push(cells);
+  return rows;
+}
+function csvToObjects(text) {
+  text = text.replace(/^﻿/, '');
+  const rows=parseCSV(text);
+  if (rows.length<2) return [];
+  const firstRow=rows[0];
+  const gvizRe=/^([A-Za-z]\w*)( .*)?$/;
+  const nonEmpty = firstRow.filter(h=>h.length>0);
+  const isGviz = nonEmpty.every(h=>gvizRe.test(h))
+    && nonEmpty.some(h=>{ const m=h.match(gvizRe); return m&&m[2]&&m[2].trim(); });
+  let headers, dataRows;
+  if (isGviz) {
+    headers  = firstRow.map(h=>{ const m=h.match(gvizRe); return m?m[1]:h; });
+    const firstData = firstRow.map(h=>{ const m=h.match(gvizRe); return m&&m[2]?m[2].trim():''; });
+    dataRows = [firstData, ...rows.slice(1)];
+  } else {
+    headers  = firstRow;
+    dataRows = rows.slice(1);
+  }
+  return dataRows.map(r=>{
+    const obj={};
+    headers.forEach((h,i)=>{ if(h) obj[h]=(r[i]||'').trim(); });
+    return obj;
+  });
+}
+function parseDateStr(str) {
+  if (!str) return null;
+  const p=str.split('/');
+  if (p.length!==3) return null;
+  const [d,m,y]=p.map(Number);
+  return new Date(y<100?2000+y:y, m-1, d);
+}
+
+// ── Data builders (trimmed to what this tool needs) ─────────────────────────
+function buildTeachers(rows) {
+  const teachers=[];
+  const LEFT_ROLES = new Set(['Class','Phase','Phase Lead','SENCO','Principal','Vice Principal','Assistant Principal']);
+  rows.forEach(r=>{
+    if (!r.Name || !LEFT_ROLES.has(r.Role)) return;
+    const id=r.Name.toLowerCase().replace(/[^a-z0-9]+/g,'_');
+    const yg = r.YearGroup === 'YR' ? 'Reception' : (r.YearGroup || null);
+    teachers.push({id, name:r.Name, yg, role:r.Role});
+  });
+  return teachers;
+}
+function buildWeeks(rows) {
+  return rows.map(r=>{
+    const start=parseDateStr(r.StartDate);
+    if (!start||isNaN(start)) return null;
+    return {label:`Term ${r.Term}  Week ${r.Week}`, term:+r.Term, week:+r.Week, start};
+  }).filter(Boolean);
+}
+function currentWeekIdx() {
+  const today=new Date(); today.setHours(0,0,0,0);
+  for (let i=0;i<WEEKS.length;i++) {
+    const end=new Date(WEEKS[i].start); end.setDate(end.getDate()+4);
+    if (today<=end) return i;
+  }
+  return Math.max(0,WEEKS.length-1);
+}
+function teacher(tid) { return TEACHERS.find(t=>t.id===tid); }
+function isSupplyCover(name) { return (name||'').toLowerCase() === 'supply'; }
+
+// ── Sync ──────────────────────────────────────────────────────────────────
+function setSyncBadge(state) {
+  const el = document.getElementById('syncBadge');
+  el.className = 'sync-badge' + (state==='ok' ? ' ok' : state==='offline' ? ' offline' : '');
+  el.textContent = state==='syncing' ? 'Syncing…' : state==='ok' ? 'Synced ✓' : state==='offline' ? 'Offline' : '…';
+}
+async function fetchLiveState() {
+  const res = await fetch(SYNC_URL, { signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new Error('sync fetch failed');
+  return res.json();
+}
+// Re-fetch fresh state, patch one field on one slot, push straight back.
+// Deliberately does NOT keep a long-lived local copy of the whole state to edit —
+// re-reading immediately before writing keeps the window for clobbering a
+// concurrent edit (e.g. someone in planner.html) as small as possible.
+async function patchSlot(wIdx, slotId, patch, rowId) {
+  setRowStatus(rowId, 'saving');
+  setSyncBadge('syncing');
+  try {
+    const fresh = await fetchLiveState();
+    const arr = fresh.weekSlots[wIdx] || [];
+    const idx = arr.findIndex(s => s.id === slotId);
+    if (idx === -1) { setRowStatus(rowId, 'error'); setSyncBadge('offline'); return; }
+    Object.assign(arr[idx], patch);
+    fresh.weekSlots[wIdx] = arr;
+    const res = await fetch(SYNC_URL, { method:'POST', body: JSON.stringify(fresh), signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error('save failed');
+    weekSlotsCache[wIdx] = arr;
+    setRowStatus(rowId, 'ok');
+    setSyncBadge('ok');
+    if (wIdx === weekIdx) syncCardsForSlot(slotId, arr[idx]);
+  } catch (e) {
+    setRowStatus(rowId, 'error');
+    setSyncBadge('offline');
+    console.error(e);
+  }
+}
+// Update every rendered card for this slot (a spanning AM+PM slot renders in
+// both halves) plus the stats bar, without rebuilding the whole page — a
+// full re-render would wipe out unsaved text a teacher might be mid-typing
+// in a different row.
+function syncCardsForSlot(slotId, slotData) {
+  document.querySelectorAll(`.req-card[data-slot-id="${slotId}"]`).forEach(card => {
+    card.classList.toggle('booked', !!slotData.supplyBooked);
+    const cb = card.querySelector('.booked-input');
+    if (cb) cb.checked = !!slotData.supplyBooked;
+    const nameInput = card.querySelector('.supply-name-input');
+    if (nameInput && document.activeElement !== nameInput) nameInput.value = slotData.supplyName || '';
+  });
+  updateStatsBar();
+}
+function updateStatsBar() {
+  const requests = requestsForWeek(weekIdx);
+  const bookedCount = requests.filter(s => s.supplyBooked).length;
+  const stats = document.getElementById('statsBar');
+  if (!requests.length) { stats.innerHTML = `<span>No supply cover needed this week</span>`; return; }
+  stats.innerHTML = `
+    <span><strong>${requests.length}</strong> supply session${requests.length===1?'':'s'} needed</span>
+    <span><span class="stat-dot" style="background:#22c55e"></span><strong>${bookedCount}</strong> booked</span>
+    <span><span class="stat-dot" style="background:#f59e0b"></span><strong>${requests.length-bookedCount}</strong> still to book</span>
+  `;
+}
+function setRowStatus(rowId, status) {
+  const el = document.getElementById('rs_'+rowId);
+  if (!el) return;
+  el.className = 'row-status ' + status;
+  el.textContent = status==='saving' ? '…' : status==='ok' ? '✓' : status==='error' ? '⚠' : '';
+  if (status === 'ok') setTimeout(() => { if (el) { el.textContent=''; el.className='row-status'; } }, 2500);
+}
+
+// ── Rendering ─────────────────────────────────────────────────────────────
+function ygLabel(t) { return t ? (t.yg || t.role) : ''; }
+function ygPipColour(t) { return t && t.yg ? (YG_COLOURS[t.yg] || '#cbd5e1') : '#cbd5e1'; }
+
+function requestsForWeek(wIdx) {
+  const slots = weekSlotsCache[wIdx] || [];
+  return slots.filter(s => isSupplyCover(s.cover));
+}
+
+function renderWeekLabel() {
+  const w = WEEKS[weekIdx];
+  const label = document.getElementById('weekLabel');
+  if (!w) { label.innerHTML = '—'; return; }
+  const end = new Date(w.start); end.setDate(end.getDate()+4);
+  const fmt = d => d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  label.innerHTML = `<div>${w.label}</div><small>${fmt(w.start)} – ${fmt(end)}</small>`;
+  document.getElementById('prevWeek').disabled = weekIdx === 0;
+  document.getElementById('nextWeek').disabled = weekIdx === WEEKS.length - 1;
+}
+
+function reqCardHtml(s, rowId) {
+  const t = teacher(s.tid);
+  const booked = !!s.supplyBooked;
+  return `<div class="req-card ${booked?'booked':''}" data-slot-id="${s.id}">
+    <div class="req-row1">
+      <span class="yg-pip" style="background:${ygPipColour(t)}"></span>
+      <span class="req-who">${t ? t.name : s.tid}</span>
+      <span class="req-yg">${ygLabel(t)}</span>
+      <span class="req-reason">${s.reason === 'Other' && s.reasonNote ? s.reasonNote : s.reason}</span>
+    </div>
+    <div class="req-row2">
+      <label class="booked-toggle">
+        <input type="checkbox" class="booked-input" ${booked?'checked':''} onchange="patchSlot(${weekIdx},${s.id},{supplyBooked:this.checked},'${rowId}')">
+        Booked
+      </label>
+      <input class="supply-name-input" type="text" placeholder="Supply teacher's name" value="${s.supplyName||''}"
+        onkeydown="if(event.key==='Enter'){this.blur()}"
+        onblur="patchSlot(${weekIdx},${s.id},{supplyName:this.value.trim()},'${rowId}')">
+      <span class="row-status" id="rs_${rowId}"></span>
+    </div>
+  </div>`;
+}
+
+function renderHalf(title, sessionKey, requests) {
+  // A request belongs to this half if its session span overlaps the half's session index.
+  const idx = SESSION_IDX[sessionKey];
+  const byDay = {};
+  requests.forEach(s => {
+    const start = SESSION_IDX[s.session] ?? 0;
+    const end = SESSION_IDX[s.endSession ?? s.session] ?? start;
+    if (idx < start || idx > end) return;
+    (byDay[s.day] = byDay[s.day] || []).push(s);
+  });
+  let body = '';
+  let any = false;
+  DAYS.forEach((day, dayIdx) => {
+    const list = byDay[dayIdx];
+    if (!list || !list.length) return;
+    any = true;
+    body += `<div class="day-group"><div class="day-hd">${day}</div>`;
+    list.forEach(s => { body += reqCardHtml(s, `${sessionKey}_${s.id}`); });
+    body += `</div>`;
+  });
+  if (!any) body = `<div style="padding:20px 6px;color:#94a3b8;text-align:center;font-size:12.5px">No supply needed</div>`;
+  return `<div class="half-panel"><div class="half-hd">${title}</div><div class="half-body">${body}</div></div>`;
+}
+
+function render() {
+  renderWeekLabel();
+  const requests = requestsForWeek(weekIdx);
+  const wrap = document.getElementById('mainWrap');
+
+  updateStatsBar();
+
+  if (requests.length === 0) {
+    wrap.innerHTML = `<div class="empty-week"><strong>Nothing to book this week</strong>No sessions are marked for Supply cover in the Release Schedule.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = `<div class="halves">
+    ${renderHalf('☀️ Morning', 'AM', requests)}
+    ${renderHalf('🌤️ Afternoon', 'PM', requests)}
+  </div>`;
+}
+
+// ── Week navigation ──────────────────────────────────────────────────────
+async function goToWeek(newIdx) {
+  weekIdx = Math.max(0, Math.min(WEEKS.length-1, newIdx));
+  document.getElementById('mainWrap').innerHTML = `<div class="empty-week"><strong>Loading…</strong></div>`;
+  await refreshWeek();
+}
+async function refreshWeek() {
+  try {
+    setSyncBadge('syncing');
+    const fresh = await fetchLiveState();
+    weekSlotsCache[weekIdx] = fresh.weekSlots[weekIdx] || [];
+    setSyncBadge('ok');
+  } catch(e) {
+    weekSlotsCache[weekIdx] = weekSlotsCache[weekIdx] || [];
+    setSyncBadge('offline');
+    console.error(e);
+  }
+  render();
+}
+
+document.getElementById('prevWeek').onclick = () => goToWeek(weekIdx-1);
+document.getElementById('nextWeek').onclick = () => goToWeek(weekIdx+1);
+
+// ── Init ─────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const cacheBuster = `&_cb=${Date.now()}`;
+    const get = tab => fetch(SHEET_BASE+encodeURIComponent(tab)+cacheBuster, { signal: AbortSignal.timeout(12000) }).then(r=>{if(!r.ok)throw new Error(tab);return r.text();});
+    const [staffTxt, termsTxt] = await Promise.all([get('Staff'), get('TermDates')]);
+    TEACHERS = buildTeachers(csvToObjects(staffTxt));
+    WEEKS = buildWeeks(csvToObjects(termsTxt));
+    weekIdx = currentWeekIdx();
+    await refreshWeek();
+  } catch (err) {
+    document.getElementById('mainWrap').innerHTML =
+      `<div class="empty-week" style="color:#dc2626"><strong>Could not load</strong>${err.message}</div>`;
+    console.error(err);
+  }
+}
+init();
+</script>
+</body>
+</html>
