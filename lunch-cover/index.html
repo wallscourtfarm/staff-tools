@@ -195,7 +195,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunch Cover Rota · WFA-29.08.26b</footer>
+<footer>Wallscourt Farm Academy · Lunch Cover Rota · WFA-03.09.26a</footer>
 
 <script>
 // ── Duties config ─────────────────────────────────────────────────────────────
@@ -369,6 +369,20 @@ function buildPmStartMins(rows) {
 
 let ABSENT_MAP = {}; // weekIdx → dayIdx → Set of absent staff IDs
 
+// Mirrors cover-plan/planner.html's offSiteDefault() — release-time reasons
+// (PPA, RA, SENCO, ECT, etc.) are in-school by default and must never count
+// as absent just because the synced slot has no explicit offSite field.
+const OFF_SITE_REASONS  = new Set(['Illness','Training','Trip','CLF Conference','Day Off','Non-working Day']);
+const IN_SCHOOL_REASONS = new Set(['PPA','Phase Lead','Leadership','ECT','ECT1','ECT2','RA','SENCO','Sports','Staff Meeting','FLC','PAC','Supervision']);
+function offSiteDefault(reason) {
+  if (OFF_SITE_REASONS.has(reason)) return true;
+  if (IN_SCHOOL_REASONS.has(reason)) return false;
+  return true; // 'Other' and any custom/unknown reason defaults to off-site
+}
+function slotIsOffSite(slot) {
+  return slot.offSite ?? offSiteDefault(slot.reason);
+}
+
 function buildAbsentMap(csvText) {
   const raw = csvText.replace(/^﻿/, '').trim();
   const s = raw.indexOf('{'), e = raw.lastIndexOf('}');
@@ -380,7 +394,7 @@ function buildAbsentMap(csvText) {
     const wi = parseInt(wk, 10);
     result[wi] = {};
     for (const slot of (slots || [])) {
-      if (slot.offSite === false) continue;
+      if (!slotIsOffSite(slot)) continue;
       if (!result[wi][slot.day]) result[wi][slot.day] = new Set();
       result[wi][slot.day].add(slot.tid);
     }
