@@ -130,10 +130,6 @@
     .staff-own-col .chip-del { font-size: 11px; }
     .staff-own-col .chip-split { display: none; }
     .staff-own-col .chip-note-toggle { font-size: 9px; padding: 0 2px; }
-    @media (max-width: 960px) {
-      .app-body { flex-direction: column; }
-      .subjects-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #e2e8f0; max-height: 180px; }
-    }
 
     /* ── Subjects sidebar ────────────────────────────────────────── */
     .subjects-sidebar {
@@ -142,6 +138,12 @@
       overflow-y: auto; overflow-x: hidden;
       position: sticky; top: 0; max-height: 100vh;
       align-self: flex-start;
+    }
+    /* Must come after the base rule above — same specificity, so source
+       order decides which max-height wins at narrow widths. */
+    @media (max-width: 960px) {
+      .app-body { flex-direction: column; }
+      .subjects-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #e2e8f0; max-height: 180px; }
     }
     .sidebar-hd {
       font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 11px;
@@ -454,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26b</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -3642,12 +3644,19 @@ init();
 
 // ── Sticky sidebar: track below the sticky header ────────────────────────
 function updateSidebarTop() {
-  const stickyH = document.querySelector('.sticky-top')?.offsetHeight || 0;
   const sidebar = document.getElementById('subjectsSidebar');
-  if (sidebar) {
-    sidebar.style.top = stickyH + 'px';
-    sidebar.style.maxHeight = `calc(100vh - ${stickyH}px)`;
+  if (!sidebar) return;
+  // Below 960px the CSS switches .app-body to a column layout and caps the
+  // sidebar at 180px (horizontal strip above the grid). An inline max-height
+  // here would override that and push the whole schedule off-screen.
+  if (window.innerWidth <= 960) {
+    sidebar.style.top = '';
+    sidebar.style.maxHeight = '';
+    return;
   }
+  const stickyH = document.querySelector('.sticky-top')?.offsetHeight || 0;
+  sidebar.style.top = stickyH + 'px';
+  sidebar.style.maxHeight = `calc(100vh - ${stickyH}px)`;
 }
 window.addEventListener('resize', updateSidebarTop);
 // Run after tabs render (sticky-top height can change when tabs wrap)
