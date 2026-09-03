@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 03.09.26a</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 03.09.26b</div>
       </div>
     </div>
     <div class="top-bar">
@@ -490,10 +490,14 @@ function getCpSportsBars(weekIdx) {
   const bars = [];
   const seen = new Set();
   // Primary source: sportsSchedule (wsEvents from Cover Plan)
+  // Key includes yg: multiple year groups routinely share the same day+session
+  // (e.g. the whole school has PM Sports on the same day) and each needs its
+  // own bar — deduping on day+session alone silently dropped every year group
+  // but the first one encountered.
   (coverPlanData.sportsSchedule || []).forEach(s => {
     const timeRange = CP_SESSION_TIMES[s.session];
     if (!timeRange || s.day < 0 || s.day > 4) return;
-    const key = `${s.day}-${s.session}`;
+    const key = `${s.day}-${s.session}-${s.yg || ''}`;
     if (seen.has(key)) return;
     seen.add(key);
     bars.push({ dayIdx: s.day, startTime: timeRange[0], endTime: timeRange[1], yg: s.yg || '' });
@@ -502,7 +506,7 @@ function getCpSportsBars(weekIdx) {
   (coverPlanData.weekSlots?.[weekIdx] || []).filter(s => s.reason === 'Sports').forEach(s => {
     const timeRange = CP_SESSION_TIMES[s.session];
     if (!timeRange || s.day < 0 || s.day > 4) return;
-    const key = `${s.day}-${s.session}`;
+    const key = `${s.day}-${s.session}-${s.yg || ''}`;
     if (seen.has(key)) return;
     seen.add(key);
     bars.push({ dayIdx: s.day, startTime: timeRange[0], endTime: timeRange[1], yg: s.yg || '' });
