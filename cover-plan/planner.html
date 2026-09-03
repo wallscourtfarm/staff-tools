@@ -131,6 +131,12 @@
     .cover-warn { font-size:9px; line-height:1; color:#f97316; flex-shrink:0; }
     .slot-cover-x { font-size:11px; color:#94a3b8; cursor:pointer; }
     .slot-cover-x:hover { color:#dc2626; }
+    .slot-supply-zone { padding:1px 6px 2px; font-size:9px; font-weight:700; color:#1798d3; text-align:right; cursor:pointer; border-top:1px dashed #bfdbfe; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .slot-supply-zone:hover { background:#f0f8fd; }
+    .slot-supply-zone.unset { color:#94a3b8; font-weight:normal; }
+    .slot-supply-name { font-size:9.5px; font-weight:600; color:#1798d3; cursor:pointer; text-decoration:underline dotted; text-decoration-color:#94a3b8; }
+    .slot-supply-name:hover { color:#0c6ea3; }
+    .slot-supply-name.unset { color:#94a3b8; font-weight:normal; }
     .slot-avatar { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; color:white; font-size:7px; font-weight:bold; flex-shrink:0; }
     .slot-controls { display:flex; flex-direction:column; gap:2px; padding:3px 2px; border-top:1px solid rgba(0,0,0,.07); }
     .slot-del { position:absolute; top:2px; right:2px; background:white; border:1px solid #e2e8f0; border-radius:2px; cursor:pointer; color:#cbd5e1; font-size:10px; width:14px; height:14px; display:flex; align-items:center; justify-content:center; z-index:10; }
@@ -368,6 +374,8 @@
     body.edit-locked .slot-extend  { display:none; }
     body.edit-locked .slot-cover-zone { pointer-events:none; }
     body.edit-locked .slot-cover-assigned .cv-x { display:none; }
+    body.edit-locked .slot-supply-name { pointer-events:none; }
+    body.edit-locked .slot-supply-zone { pointer-events:none; }
     body.edit-locked .reason-sel   { pointer-events:none; }
     body.edit-locked .reason-note  { pointer-events:none; }
     body.edit-locked .cell-note .note-del { display:none; }
@@ -397,7 +405,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(03.09.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(03.09.26b)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -992,6 +1000,7 @@ function ygCol(yg)      { return YG_COLOURS[yg] || '#e2e8f0'; }
 function maxEnt(t) { return t.ent.reduce((s,e) => s + e.n, 0); }
 function teacherUsageCount(tid) { return slots().filter(s => s.tid === tid && COUNTED_SESSIONS.has(s.session) && s.reason !== 'Non-working Day').length; }
 function coverByName(name) { return COVER.find(c => c.name.toLowerCase() === (name||'').toLowerCase()); }
+function isSupplyCover(name) { return (name||'').toLowerCase() === 'supply'; }
 
 // Per-reason usage count for a teacher this week (fortnightly ents also check previous week)
 function teacherReasonUsed(tid) {
@@ -1338,11 +1347,11 @@ function renderGrid() {
                   <div class="slot-text">
                     <span class="slot-os${offSiteVal(s) ? '' : ' insch'}" onpointerdown="event.stopPropagation()" onclick="toggleOffSite(${s.id})" title="${offSiteVal(s) ? 'Off-site — click if in school' : 'In school — click if off-site'}"></span>
                     <span class="slot-name">${t ? t.init : s.tid.slice(0,2).toUpperCase()}</span>
-                    ${s.reason === 'Other' ? `<span class="slot-reason slot-reason-other" onpointerdown="event.stopPropagation()" onclick="openNoteEditor(event,${s.id})">${s.reasonNote || 'Other'}</span>` : `<span class="slot-reason">${s.reason === 'Non-working Day' ? '🔄 ' : ''}${s.reason}</span>`}
+                    ${s.reason === 'Other' ? `<span class="slot-reason slot-reason-other" onpointerdown="event.stopPropagation()" onclick="openFieldEditor(event,${s.id},'reasonNote','e.g. Training',25)">${s.reasonNote || 'Other'}</span>` : `<span class="slot-reason">${s.reason === 'Non-working Day' ? '🔄 ' : ''}${s.reason}</span>`}
                     <span class="slot-fill"></span>
                     ${s.cover ? `<span class="slot-cover-name">${cv?.workingDays && !cv.workingDays.includes(s.day) ? '<span class="cover-warn" title="Not working this day">⚠</span>' : ''}<span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
                   </div>
-                  ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
+                  ${s.nocover ? '' : !s.cover ? `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>` : isSupplyCover(s.cover) ? `<div class="slot-supply-zone${s.supplyName?'':' unset'}" onpointerdown="event.stopPropagation()" onclick="openFieldEditor(event,${s.id},'supplyName','Supply teacher name',30)" title="${s.supplyName ? 'Supply teacher: '+s.supplyName+' — click to edit' : 'Click to name the supply teacher'}">${s.supplyName || '+ supply name'}</div>` : ''}
                   <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
                 </div>
               </div>`;
@@ -1469,7 +1478,7 @@ function positionSpanStrips(spans) {
           <span class="slot-fill"></span>
           ${s.cover ? `<span class="slot-cover-name">${cv?.workingDays && !cv.workingDays.includes(s.day) ? '<span class="cover-warn" title="Not working this day">⚠</span>' : ''}<span class="slot-avatar" style="background:${cv?.col||'#94a3b8'}">${cv?.init||initials(s.cover)}</span><span class="slot-cover-x" onpointerdown="event.stopPropagation();event.preventDefault();unassignCover(${s.id})">✕</span></span>` : ''}
         </div>
-        ${s.nocover ? '' : s.cover ? '' : `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>`}
+        ${s.nocover ? '' : !s.cover ? `<div class="slot-cover-zone" data-slot="${s.id}">+ TBC</div>` : isSupplyCover(s.cover) ? `<div class="slot-supply-zone${s.supplyName?'':' unset'}" onpointerdown="event.stopPropagation()" onclick="openFieldEditor(event,${s.id},'supplyName','Supply teacher name',30)" title="${s.supplyName ? 'Supply teacher: '+s.supplyName+' — click to edit' : 'Click to name the supply teacher'}">${s.supplyName || '+ supply name'}</div>` : ''}
         <div class="slot-extend" onpointerdown="onExtendPointerDown(event,${s.id})"></div>
       </div>
     </div>`;
@@ -1521,7 +1530,7 @@ function renderMyView() {
           <div class="my-entry-detail">
             <div class="my-entry-when">${DAYS[s.day]} · ${s.session}</div>
             <div class="my-entry-info"><select class="reason-sel ${rbCls(s.reason)}" style="padding:1px 5px;border-radius:3px;font-size:11px;border:1px solid #e2e8f0;cursor:pointer" onchange="changeReason(${s.id},this.value)">${reasonOptions(s.tid,s.reason)}</select>${s.reason === 'Other' ? `<input class="reason-note" type="text" placeholder="e.g. training" value="${s.reasonNote||''}" onchange="changeReasonNote(${s.id},this.value)" onclick="event.stopPropagation()">` : ''}<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;white-space:nowrap;user-select:none;margin-left:8px;color:#475569"><input type="checkbox" ${offSiteVal(s) ? 'checked' : ''} onchange="toggleOffSite(${s.id})" onclick="event.stopPropagation()"> Off-site</label></div>
-            <div class="my-entry-cover">${s.cover ? `Covered by: <strong>${s.cover}</strong>` : s.nocover ? `` : `<span style="color:#c00;font-style:italic">Cover TBC</span>`}</div>
+            <div class="my-entry-cover">${s.cover ? `Covered by: <strong>${s.cover}</strong>${isSupplyCover(s.cover) ? ` <span class="slot-supply-name${s.supplyName?'':' unset'}" onclick="openFieldEditor(event,${s.id},'supplyName','Supply teacher name',30)">${s.supplyName || '+ name'}</span>` : ''}` : s.nocover ? `` : `<span style="color:#c00;font-style:italic">Cover TBC</span>`}</div>
           </div>
         </div>`;
       });
@@ -1754,51 +1763,53 @@ function changeReason(slotId, reason) { const s = slots().find(x => x.id === slo
 function changeReasonNote(slotId, note) { const s = slots().find(x => x.id === slotId); if (s) { s.reasonNote = note; stateSave(); render(); } }
 function toggleOffSite(slotId) { const s = slots().find(x => x.id === slotId); if (!s || document.body.classList.contains('edit-locked')) return; s.offSite = !offSiteVal(s); stateSave(); render(); }
 
-// ── Inline note editor popup ───────────────────────────────────────────────
-function _noteEditorAway(ev) {
-  const popup = document.getElementById('noteEditPopup');
-  if (!popup) { document.removeEventListener('click', _noteEditorAway); return; }
-  if (!popup.contains(ev.target)) commitNoteEditor();
+// ── Inline field editor popup (reasonNote, supplyName, …) ──────────────────
+function _fieldEditorAway(ev) {
+  const popup = document.getElementById('fieldEditPopup');
+  if (!popup) { document.removeEventListener('click', _fieldEditorAway); return; }
+  if (!popup.contains(ev.target)) commitFieldEditor();
 }
-function closeNoteEditor() {
-  document.getElementById('noteEditPopup')?.remove();
-  document.removeEventListener('click', _noteEditorAway);
+function closeFieldEditor() {
+  document.getElementById('fieldEditPopup')?.remove();
+  document.removeEventListener('click', _fieldEditorAway);
 }
-function commitNoteEditor() {
-  const popup = document.getElementById('noteEditPopup');
+function commitFieldEditor() {
+  const popup = document.getElementById('fieldEditPopup');
   if (!popup) return;
   const slotId = parseInt(popup.dataset.slotId);
-  const note = (popup.querySelector('input')?.value || '').trim();
+  const field = popup.dataset.field;
+  const val = (popup.querySelector('input')?.value || '').trim();
   const s = slots().find(x => x.id === slotId);
-  if (s) { s.reasonNote = note; stateSave(); }
-  closeNoteEditor();
+  if (s) { s[field] = val; stateSave(); }
+  closeFieldEditor();
   render();
 }
-function openNoteEditor(e, slotId) {
+function openFieldEditor(e, slotId, field, placeholder, maxlen) {
   e.stopPropagation();
   e.preventDefault();
   if (document.body.classList.contains('edit-locked')) return;
-  closeNoteEditor();
+  closeFieldEditor();
   const s = slots().find(x => x.id === slotId);
   if (!s) return;
   const popup = document.createElement('div');
-  popup.id = 'noteEditPopup';
+  popup.id = 'fieldEditPopup';
   popup.className = 'note-edit-popup';
   popup.dataset.slotId = String(slotId);
+  popup.dataset.field = field;
   const px = Math.min(e.clientX + 6, window.innerWidth - 220);
   const py = Math.max(e.clientY - 18, 8);
   popup.style.cssText = `left:${px}px;top:${py}px;`;
-  popup.innerHTML = `<input type="text" placeholder="e.g. Training" value="${s.reasonNote||''}" maxlength="25"><button title="Close" onclick="closeNoteEditor()">✕</button>`;
+  popup.innerHTML = `<input type="text" placeholder="${placeholder}" value="${s[field]||''}" maxlength="${maxlen||25}"><button title="Close" onclick="closeFieldEditor()">✕</button>`;
   document.body.appendChild(popup);
   const input = popup.querySelector('input');
   input.focus();
   input.select();
   input.addEventListener('keydown', ev => {
-    if (ev.key === 'Enter') { ev.preventDefault(); commitNoteEditor(); }
-    if (ev.key === 'Escape') { closeNoteEditor(); }
+    if (ev.key === 'Enter') { ev.preventDefault(); commitFieldEditor(); }
+    if (ev.key === 'Escape') { closeFieldEditor(); }
   });
   // Use 'click' (not pointerdown capture) so delete-button clicks complete first
-  setTimeout(() => document.addEventListener('click', _noteEditorAway), 0);
+  setTimeout(() => document.addEventListener('click', _fieldEditorAway), 0);
 }
 function changeEndSession(slotId, endSession) {
   const s = slots().find(x => x.id === slotId);
