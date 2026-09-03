@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 02.08.26d</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 03.09.26a</div>
       </div>
     </div>
     <div class="top-bar">
@@ -780,13 +780,18 @@ async function syncSaveAll() {
   if (!SYNC_URL) return;
   try {
     const weekKeys = Object.keys(state.bookings).filter(k => state.bookings[k] && Object.keys(state.bookings[k]).length > 0);
-    for (const weekKey of weekKeys) {
-      await fetch(SYNC_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'saveBookings', weekKey: weekKey, bookings: state.bookings[weekKey] || {} }),
-        headers: { 'Content-Type': 'text/plain' }
-      });
-    }
+    document.getElementById('sheetStatus').textContent = `● Saving ${weekKeys.length} weeks…`;
+    document.getElementById('sheetStatus').className = 'sheet-status';
+    // Used to await each week's POST one at a time in sequence. A long
+    // recurrence (many weeks) could then take a minute or more to finish
+    // saving in the background, with no indication anything was still in
+    // progress — easy to close the tab before it completed and silently
+    // lose whichever weeks hadn't been sent yet. Send them all at once instead.
+    await Promise.all(weekKeys.map(weekKey => fetch(SYNC_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'saveBookings', weekKey: weekKey, bookings: state.bookings[weekKey] || {} }),
+      headers: { 'Content-Type': 'text/plain' }
+    })));
     document.getElementById('sheetStatus').textContent = '● Synced';
     document.getElementById('sheetStatus').className = 'sheet-status ok';
   } catch {
