@@ -195,7 +195,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunch Cover Rota · WFA-03.09.26a</footer>
+<footer>Wallscourt Farm Academy · Lunch Cover Rota · WFA-04.09.26a</footer>
 
 <script>
 // ── Duties config ─────────────────────────────────────────────────────────────
@@ -231,6 +231,7 @@ let termTemplate = null;
 let state        = { weekIdx: 0, slots: {} };
 let myViewId     = '';
 let isDragging   = false;
+let syncReady    = false; // true once the remote SYNC_URL state has been fetched+merged in init() — guards save() from POSTing unconfirmed local state
 let PM_START_MINS = { R:12*60+45, Y1:12*60+45, Y2:12*60+45, Y3:13*60+10, Y4:13*60+10, Y5:13*60+15, Y6:13*60+15, default:13*60+10 };
 let COVER_MAP    = {}; // weekIdx → dayIdx → [{tid, coverName, session}]
 
@@ -521,7 +522,7 @@ function save() {
   localStorage.setItem('wfa_lc_staff',  JSON.stringify(STAFF));
   localStorage.setItem('wfa_lc_term',   JSON.stringify(termTemplate));
   localStorage.setItem('wfa_lc_duties', JSON.stringify(DUTIES));
-  if (SYNC_URL) {
+  if (SYNC_URL && syncReady) {
     const staffColours = {};
     STAFF.forEach(s => { staffColours[s.id] = s.col; });
     fetch(SYNC_URL, { method:'POST', body: JSON.stringify({ state, termTemplate, staffColours, duties: DUTIES }) }).catch(() => {});
@@ -973,6 +974,10 @@ async function init() {
         if (remote.termTemplate !== undefined) termTemplate = remote.termTemplate;
       } catch(e) {}
     }
+    // Only trust local state enough to sync it back once we've actually confirmed the remote
+    // state (remoteRaw !== null means the SYNC_URL fetch itself succeeded, even if it was '{}').
+    // If the fetch failed, leave syncReady false so save() never overwrites unconfirmed data.
+    if (remoteRaw !== null) syncReady = true;
 
     localStorage.setItem('wfa_lc_state', JSON.stringify(state));
     localStorage.setItem('wfa_lc_staff', JSON.stringify(STAFF));
