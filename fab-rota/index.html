@@ -118,7 +118,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title">Fresh Air Break Rota</div>
-    <div class="app-subtitle">Wallscourt Farm Academy · 04.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy · 04.09.26b</div>
   </div>
 </div>
 
@@ -471,6 +471,21 @@ function loadAll() {
 // ── Staff helpers ─────────────────────────────────────────────────────────────
 function staffById(id) { return STAFF.find(s => s.id === id); }
 
+// Some older assignments carry a "name_<timestamp>" id from a since-removed
+// duplicate manual staff entry (see STAFF.push in addStaffRow). STAFF is
+// rebuilt fresh from the Staff sheet on every load, so that literal id never
+// resolves again — the chip silently failed to render (chipHtml returned '')
+// with no way to select/delete it, while teaching-schedule's own lookup
+// strips the same suffix and matches the base name, so it kept showing the
+// "invisible" duty as real. Falling back to the base id here makes fab-rota
+// show (and let you delete) exactly what teaching-schedule shows.
+function staffByIdLoose(id) {
+  const s = staffById(id);
+  if (s) return s;
+  const baseId = id.replace(/_\d{10,}$/, '');
+  return baseId === id ? undefined : staffById(baseId);
+}
+
 function mkInitials(name) {
   const p = name.trim().split(/\s+/);
   return p.length === 1 ? name.slice(0,2).toUpperCase() : (p[0][0]+p[p.length-1][0]).toUpperCase();
@@ -491,7 +506,7 @@ function staffAssignCount(sid) {
         // Handle both string (old format) and object (new format)
         if (arr.some(item => {
           const itemId = typeof item === 'string' ? item : item.id;
-          return itemId === sid;
+          return itemId === sid || itemId.replace(/_\d{10,}$/, '') === sid;
         })) n++;
       }
   });
@@ -596,7 +611,7 @@ function chipHtml(gid, zi, di, item) {
   const sid = typeof item === 'string' ? item : item.id;
   const yg = typeof item === 'string' ? null : item.yg;
 
-  const s = staffById(sid);
+  const s = staffByIdLoose(sid);
   if (!s) return '';
 
   // Use year group colour for supply, otherwise use staff colour
