@@ -118,7 +118,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title">Fresh Air Break Rota</div>
-    <div class="app-subtitle">Wallscourt Farm Academy · 30.08.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy · 04.09.26a</div>
   </div>
 </div>
 
@@ -203,6 +203,7 @@ const COVER_PLAN_URL  = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXN
 let STAFF        = [];
 let WEEKS        = []; // [{ start:Date, term:'T1', week:'W1', label:'T1W1' }, ...]
 let termTemplate = null;
+let syncReady     = false; // guards save() from POSTing before the remote merge in init() has run
 let state        = { weekIdx: 0, slots: {} };
 let isDragging   = false;
 let coverOffSiteByDay = [0,1,2,3,4].map(() => new Set());
@@ -447,6 +448,7 @@ function save() {
   localStorage.setItem('wfa_fab_state', JSON.stringify(state));
   localStorage.setItem('wfa_fab_staff', JSON.stringify(STAFF));
   localStorage.setItem('wfa_fab_term',  JSON.stringify(termTemplate));
+  if (!syncReady) return; // don't POST until init() has merged the real remote state in — otherwise a save this early would overwrite the shared backend with incomplete local data
   const staffColours = {};
   STAFF.forEach(s => { staffColours[s.id] = s.col; });
   fetch(SYNC_URL, { method:'POST', body: JSON.stringify({ state, termTemplate, staffColours }) }).catch(() => {});
@@ -855,10 +857,12 @@ async function init() {
     localStorage.setItem('wfa_fab_term',  JSON.stringify(termTemplate));
     status.textContent = `Sheet loaded · ${STAFF.length} staff · ${WEEKS.length} weeks`;
     status.className = 'sheet-status ok';
+    syncReady = true; // only now do we know state reflects the real shared backend — safe for save() to POST
   } catch(e) {
     console.warn('Sheet load failed, using cached data', e);
     status.textContent = STAFF.length ? 'Using cached data (offline)' : 'Sheet unavailable — add staff manually';
     status.className = 'sheet-status err';
+    // syncReady stays false: we never confirmed the real remote state, so don't risk overwriting it
   }
   render();
 }
