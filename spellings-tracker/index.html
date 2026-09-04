@@ -353,7 +353,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">WFA-31.08.26a</span>
+  <span class="version">WFA-04.09.26a</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <div id="yg-bar">
@@ -690,6 +690,12 @@ const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbzwY-2zUMhFsNDdck_hg
 const WFA_TOKEN = localStorage.getItem('wfa_shared_token') || '2013';
 let state = loadLocal();
 let syncInProgress = false;
+// Guards the remote POST in sheetSaveAll(): stays false until sheetLoadAll()
+// has successfully merged the real Sheet data at least once this session, so
+// a user interaction firing a save before that merge can't overwrite the
+// shared backend with incomplete/default local state. Never set true on a
+// failed load — localStorage writes (saveLocal) are unaffected by this flag.
+let syncReady = false;
 
 function loadLocal() {
   // Load the active year group from the YG data store
@@ -768,10 +774,14 @@ async function sheetLoadAll() {
     if (!state.lessons || !state.lessons.length) state.lessons = defaultLessons();
     saveLocal();
     updateSyncStatus('ok');
+    syncReady = true; // real remote state confirmed — safe to allow saves to POST now
     return true;
   } catch (e) {
     console.error('Sheet load failed:', e);
     updateSyncStatus('err');
+    // Leave syncReady as-is (false, if this is the first/only load this
+    // session) — we never confirmed the real remote state, so don't risk
+    // POSTing unconfirmed local state over it.
     return false;
   }
 }
@@ -780,6 +790,10 @@ async function sheetSaveAll() {
   if (!SYNC_URL) return;
   if ((state.currentYg || 'Y5') !== 'Y5') return; // only Y5 uses existing GAS
   if (syncInProgress) return;
+  // Don't POST until the initial remote merge has succeeded this session —
+  // otherwise an early user action could overwrite the shared Sheet with
+  // incomplete/default local state (see sheetLoadAll/syncReady above).
+  if (!syncReady) return;
   syncInProgress = true;
   updateSyncStatus('loading');
   const payload = {
