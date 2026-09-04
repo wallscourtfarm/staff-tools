@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-03.09.26i</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-04.09.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1729,9 +1729,23 @@ function loadLocal() {
   } catch {}
 }
 
+// Per-week readiness gate: init()/changeWeek() render instantly from local
+// (possibly empty/stale) localStorage, then merge in the real backend state for
+// that week asynchronously via syncLoad(). If the user edits/interacts before
+// that merge lands, a naive syncSave() would POST the incomplete local state and
+// permanently overwrite the real backend for that week — this is exactly the
+// data-loss bug fixed in fab-rota (commit 04e5370) on 2026-09-04. A weekKey is
+// added here only once syncLoad() has confirmed the real remote state for it
+// (merged in, or confirmed there's genuinely nothing saved yet); on a failed or
+// errored fetch it is deliberately left out, so that week stays un-writable for
+// this session rather than risk overwriting unconfirmed backend data.
+const syncedWeeks = new Set();
+
 async function syncSave() {
   if (!SYNC_URL) return;
-  const body = JSON.stringify({ action:'save', yearGroup: YEAR_GROUP, weekKey: schedKey(), data: state.schedule[schedKey()] || {} });
+  const wk = schedKey();
+  if (!syncedWeeks.has(wk)) return; // haven't confirmed the real backend state for this week yet — don't risk overwriting it
+  const body = JSON.stringify({ action:'save', yearGroup: YEAR_GROUP, weekKey: wk, data: state.schedule[wk] || {} });
   fetch(SYNC_URL, { method:'POST', body, headers:{'Content-Type':'text/plain'} })
     .then(() => updateSyncStatus('ok'))
     .catch(() => updateSyncStatus('err'));
@@ -1755,6 +1769,10 @@ async function syncLoad(weekKey) {
       renderGrid();
       persistLocal();
     }
+    // Reached only on a successful, parsed response — whether or not this week
+    // had saved data — so we now know the real backend state for it and it's
+    // safe to let syncSave()/copy* write to it.
+    syncedWeeks.add(weekKey);
   } catch {}
 }
 
@@ -3077,6 +3095,7 @@ function onCellLeave(e) { e.currentTarget.classList.remove('drop-over'); }
 // ── Copy / clear helpers ─────────────────────────────────────────────────────
 async function copyWeekToNext() {
   const wk = schedKey();
+  if (!syncedWeeks.has(wk)) { alert('Still confirming this week\'s saved data — try again in a moment.'); return; }
   const idx = state.weekIdx;
   if (!WEEKS[idx + 1]) { alert('No next week available.'); return; }
   const nextKey = WEEKS[idx + 1].key;
@@ -3097,6 +3116,7 @@ async function copyWeekToNext() {
 
 async function copyWeekToTerm() {
   const wk = schedKey();
+  if (!syncedWeeks.has(wk)) { alert('Still confirming this week\'s saved data — try again in a moment.'); return; }
   const idx = state.weekIdx;
   if (!WEEKS.length) { alert('No weeks available.'); return; }
 
