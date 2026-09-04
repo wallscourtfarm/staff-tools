@@ -251,7 +251,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · WFA-29.08.26c</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · WFA-04.09.26a</footer>
 
 <script>
 // ── Activity types ─────────────────────────────────────────────────────────────
@@ -318,6 +318,12 @@ let termTemplate = null;
 let state    = { weekIdx: 0, slots: {} };
 let editMode = false;
 let PLANNER_SLOTS = {}; // weekIdx → tid → di → sess → [{actId, label}]
+// Guards save() from POSTing to SYNC_URL until init()'s async remote fetch+merge has
+// confirmed the real shared state. render() shows localStorage data immediately (see init()),
+// so without this a click before that merge completes would POST incomplete/stale local
+// state and overwrite the shared backend for every other device. Set true only on a
+// confirmed successful SYNC_URL read; left false for the session if that read fails.
+let syncReady = false;
 
 // ── Activity helpers ──────────────────────────────────────────────────────────
 function rebuildActivities() {
@@ -525,7 +531,7 @@ function save() {
   localStorage.setItem('wfa_slt_state', JSON.stringify(state));
   localStorage.setItem('wfa_slt_slt',   JSON.stringify(SLT));
   localStorage.setItem('wfa_slt_term',  JSON.stringify(termTemplate));
-  if (SYNC_URL) {
+  if (SYNC_URL && syncReady) {
     fetch(SYNC_URL, { method:'POST', body: JSON.stringify({ state, termTemplate }) }).catch(()=>{});
   }
 }
@@ -915,12 +921,17 @@ async function init() {
       state.weekIdx = Math.max(0, Math.min(WEEKS.length-1, state.weekIdx));
     }
     if (plannerCsv) PLANNER_SLOTS = buildPlannerLookup(plannerCsv);
-    if (remoteRaw && remoteRaw !== '{}') {
-      try {
-        const remote = JSON.parse(remoteRaw);
-        if (remote.state)        { state.slots=remote.state.slots??state.slots; state.weekIdx=remote.state.weekIdx??state.weekIdx; }
-        if (remote.termTemplate !== undefined) termTemplate=remote.termTemplate;
-      } catch(e) {}
+    if (remoteRaw !== null) {
+      // SYNC_URL responded — we now have the real shared state (even if it happens to be
+      // empty), so it's safe to let save() start POSTing local changes back to it.
+      if (remoteRaw !== '{}') {
+        try {
+          const remote = JSON.parse(remoteRaw);
+          if (remote.state)        { state.slots=remote.state.slots??state.slots; state.weekIdx=remote.state.weekIdx??state.weekIdx; }
+          if (remote.termTemplate !== undefined) termTemplate=remote.termTemplate;
+        } catch(e) {}
+      }
+      syncReady = true;
     }
     localStorage.setItem('wfa_slt_state', JSON.stringify(state));
     localStorage.setItem('wfa_slt_slt',   JSON.stringify(SLT));
