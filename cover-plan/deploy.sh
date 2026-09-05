@@ -6,6 +6,9 @@
 set -e
 cd "$(dirname "$0")"
 
+# This must always match the deployment ID in notify-config.json's URL — the relay
+# reads that file to know which Apps Script web app to call. If you change this ID,
+# update notify-config.json too, or every notification will fail with a 400.
 DEPLOYMENT_ID="AKfycbyVWhEyo2vaiD2TsePRMoMzUj535_hdxyw-JAYoqJIVcQEG7cC8HsJEo-Um27VS1EZm"
 DESC="${1:-Deploy $(date '+%d %b %Y %H:%M')}"
 
