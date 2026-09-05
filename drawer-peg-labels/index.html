@@ -76,6 +76,7 @@
     .avery-preview { width: 114px; height: 64px; }
     .l7164-preview { width: 96px; height: 108px; }
     .label64x34-preview { width: 96px; height: 51px; }
+    .l7169-preview { width: 168px; height: 120px; }
 
     footer { text-align: center; color: var(--muted); font-size: 0.7rem; padding: 14px; }
     .size-info { background: var(--blue-lt); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 0.8rem; color: var(--blue-dk); }
@@ -135,6 +136,7 @@
               <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="labelSize" value="label64x34" onchange="onLabelConfig()"> 24 (3×8) <span style="color:var(--muted)">— 64×34mm</span></label>
               <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="labelSize" value="drawer" onchange="onLabelConfig()"> 12 (2×6) <span style="color:var(--muted)">— 120×30mm</span></label>
               <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="labelSize" value="l7159" onchange="onLabelConfig()"> 12 (2×6) <span style="color:var(--muted)">— 99×42mm · multi-field</span></label>
+              <label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:0.85rem;"><input type="radio" name="labelSize" value="l7169" onchange="onLabelConfig()"> 4 (2×2) <span style="color:var(--muted)">— 139×99.1mm</span></label>
             </div>
           </div>
           <div class="field" id="modeTabsRow">
@@ -221,7 +223,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Label Generator · <strong>21.07.26e</strong></footer>
+<footer>Wallscourt Farm Academy — Label Generator · <strong>05.09.26a</strong></footer>
 
 <script>
 // Year group colours
@@ -325,6 +327,21 @@ const LABEL_CONFIG = {
     logoInset: 3,
     colOffsets: [-4, 1],
     rowOffsets: [-4, -2, 0, 2, 4, 6]
+  },
+  l7169: {
+    // Same physical sheet as the Book Labels tool's Avery L7169 (139×99.1mm, 4 per A4 landscape sheet)
+    width: 139,
+    height: 99.1,
+    border: 4,
+    perSheet: 4,
+    cols: 2,
+    rows: 2,
+    orientation: 'landscape',
+    gap: 0,
+    fixedMarginLeft: 9.5,
+    fixedMarginTop: 5.4,
+    fontSize: 40,
+    logoH: 30
   }
 };
 
@@ -570,7 +587,8 @@ function updatePreview() {
     const imgHints = {
       avery:      'Ideal: 320×136px (2.06:1) — fills Avery L7651 inner area (35×17mm inside 1.5mm border)',
       l7164:      'Ideal: 595×680px (0.88:1) — fills Avery L7164 inner area (59.5×68mm inside 2mm border)',
-      label64x34: 'Ideal: 595×300px (1.98:1) — fills 64×34mm label inner area (59.5×30mm inside 2mm border)'
+      label64x34: 'Ideal: 595×300px (1.98:1) — fills 64×34mm label inner area (59.5×30mm inside 2mm border)',
+      l7169:      'Ideal: 655×455px (1.44:1) — fills Avery L7169 inner area (131×91.1mm inside 4mm border)'
     };
     if (hint) hint.textContent = imgHints[currentLabelType] || '';
     const yearData = currentYear ? YEAR_COLOURS[currentYear] : null;
@@ -711,7 +729,7 @@ async function generatePdf() {
         }
       }
 
-      const imgTypeStr = currentLabelType === 'avery' ? 'L7651' : currentLabelType === 'l7164' ? 'L7164' : '64x34';
+      const imgTypeStr = currentLabelType === 'avery' ? 'L7651' : currentLabelType === 'l7164' ? 'L7164' : currentLabelType === 'l7169' ? 'L7169' : '64x34';
       doc.save(`WFA_Image_Labels_Y${currentYear}_${imgTypeStr}.pdf`);
       statusEl.textContent = '✓ Downloaded';
       setTimeout(()=>{ statusEl.textContent=''; dlBtn.disabled=false; updatePreview(); }, 3000);
@@ -979,7 +997,7 @@ async function generatePdf() {
       }
     }
 
-    const typeStr = currentLabelType === 'drawer' ? 'Drawer' : currentLabelType === 'peg' ? 'Peg' : currentLabelType === 'l7164' ? 'Avery_L7164' : currentLabelType === 'label64x34' ? 'Labels_64x34' : 'Avery_L7651';
+    const typeStr = currentLabelType === 'drawer' ? 'Drawer' : currentLabelType === 'peg' ? 'Peg' : currentLabelType === 'l7164' ? 'Avery_L7164' : currentLabelType === 'label64x34' ? 'Labels_64x34' : currentLabelType === 'l7169' ? 'Avery_L7169' : 'Avery_L7651';
     const filename = `WFA_${typeStr}_Labels_Y${currentYear}.pdf`;
     doc.save(filename);
 
