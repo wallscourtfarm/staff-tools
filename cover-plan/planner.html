@@ -2244,8 +2244,10 @@ async function sendNotification() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    const rawText = await resp.text();
     let data = {};
-    try { data = await resp.json(); } catch (_) {}
+    try { data = JSON.parse(rawText); } catch (_) {}
+    console.log('sendNotification response: status=' + resp.status + ' body=' + rawText.slice(0, 500));
 
     if (resp.ok && data.success !== false) {
       panelBody.innerHTML = `<div class="notify-sent">
@@ -2258,7 +2260,7 @@ async function sendNotification() {
       updateNotifyBadge();
       setTimeout(() => { document.getElementById('notifyOverlay').classList.add('hidden'); }, 3000);
     } else {
-      throw new Error(data.error || `Server returned ${resp.status}`);
+      throw new Error(data.error || `Server returned ${resp.status}: ${rawText.slice(0, 200)}`);
     }
   } catch (err) {
     // Leave change log intact so the user can retry.
