@@ -972,6 +972,12 @@ function staffYG(name) {
   const t = TEACHERS.find(t => t.name === name);
   return t?.yg || '';
 }
+function staffInit(name) {
+  const t = TEACHERS.find(t => t.name === name);
+  if (t && t.init) return t.init;
+  const c = COVER.find(c => c.name === name);
+  return c?.init || '';
+}
 function logChange(type, slot) {
   const teacherName = slot.tid ? (teacher(slot.tid)?.name || '') : (slot.teacherName || '');
   const coverName = slot.cover || '';
@@ -979,8 +985,10 @@ function logChange(type, slot) {
     type,
     teacherName,
     teacherYG: staffYG(teacherName),
+    teacherInit: staffInit(teacherName),
     coverName,
     coverYG: coverName ? staffYG(coverName) : '',
+    coverInit: coverName ? staffInit(coverName) : '',
     day: slot.day !== undefined ? DAYS[slot.day] : '',
     session: slot.session || '',
     reason: slot.reason || '',
