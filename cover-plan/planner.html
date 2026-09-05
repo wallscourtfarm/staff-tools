@@ -709,7 +709,7 @@ function buildStaff(rows) {
     // Left panel: Class teachers + non-class staff who have scheduled time (Phase, SENCO, SLT)
     const LEFT_ROLES = new Set(['Class','Phase','Phase Lead','SENCO','Principal','Vice Principal','Assistant Principal']);
     if (LEFT_ROLES.has(r.Role)) {
-      const t={id,name:r.Name,yg,role:r.Role,ent,workingDays,isLeader,isInfoOnly,dayOffCover,email:r.Email||'',init:r.Initials||initials(r.Name)};
+      const t={id,name:r.Name,yg,role:r.Role,ent,workingDays,isLeader,isInfoOnly,dayOffCover,email:r.Email||'',phone:r.Phone||'',init:r.Initials||initials(r.Name)};
       if (isLeader) t.reasons=['Meeting','External Visit','Training','Conference'];
       teachers.push(t);
     }
@@ -717,7 +717,7 @@ function buildStaff(rows) {
       cover.push({id:'c_'+id, name:r.Name, role:r.CoverRole, workingDays,
         init:r.Initials||r.Name.slice(0,2).toUpperCase(), col:r.Colour||'#94a3b8',
         order: r.Order !== '' && r.Order !== undefined ? parseInt(r.Order) : Infinity,
-        email:r.Email||''});
+        email:r.Email||'', phone:r.Phone||''});
     }
   });
   cover.sort((a,b) => a.order - b.order);
@@ -2115,7 +2115,7 @@ function renderNotifyPanel() {
 
   // Determine affected year groups and recipients
   const affectedYGs = new Set();
-  const recipientsByEmail = {};
+  const recipientsByPhone = {};
   state.changeLog.forEach(ch => {
     if (ch.teacherYG) affectedYGs.add(ch.teacherYG);
     if (ch.coverName) {
@@ -2126,15 +2126,15 @@ function renderNotifyPanel() {
 
   // Build recipients: all staff in affected YGs + directly involved cover staff
   TEACHERS.forEach(t => {
-    if (affectedYGs.has(t.yg) && t.email) {
-      recipientsByEmail[t.email] = t.name;
+    if (affectedYGs.has(t.yg) && t.phone) {
+      recipientsByPhone[t.phone] = t.name;
     }
   });
   COVER.forEach(c => {
     // Cover staff directly involved in a change
     const involved = state.changeLog.some(ch => ch.coverName === c.name);
-    if (involved && c.email) {
-      recipientsByEmail[c.email] = c.name;
+    if (involved && c.phone) {
+      recipientsByPhone[c.phone] = c.name;
     }
   });
 
@@ -2160,10 +2160,10 @@ function renderNotifyPanel() {
 
   // Recipients section
   html += '<div class="notify-recipients">';
-  html += `<h4>Will notify ${Object.keys(recipientsByEmail).length} staff member${Object.keys(recipientsByEmail).length !== 1 ? 's' : ''}</h4>`;
+  html += `<h4>Will notify ${Object.keys(recipientsByPhone).length} staff member${Object.keys(recipientsByPhone).length !== 1 ? 's' : ''}</h4>`;
   html += '<div class="email-list">';
-  Object.entries(recipientsByEmail).forEach(([email, name]) => {
-    html += `<div>${name} <span style="color:#94a3b8">&lt;${email}&gt;</span></div>`;
+  Object.entries(recipientsByPhone).forEach(([phone, name]) => {
+    html += `<div>${name} <span style="color:#94a3b8">${phone}</span></div>`;
   });
   html += '</div></div>';
 
@@ -2190,7 +2190,7 @@ function renderNotifyPanel() {
   });
 
   body.innerHTML = html;
-  sendBtn.disabled = Object.keys(recipientsByEmail).length === 0;
+  sendBtn.disabled = Object.keys(recipientsByPhone).length === 0;
   sendBtn.textContent = 'Send notifications';
 }
 
@@ -2215,16 +2215,16 @@ async function sendNotification() {
   });
 
   TEACHERS.forEach(t => {
-    if (affectedYGs.has(t.yg) && t.email && !seen.has(t.email)) {
-      seen.add(t.email);
-      recipients.push({ name: t.name, email: t.email, yg: t.yg });
+    if (affectedYGs.has(t.yg) && t.phone && !seen.has(t.phone)) {
+      seen.add(t.phone);
+      recipients.push({ name: t.name, email: t.email, phone: t.phone, yg: t.yg });
     }
   });
   COVER.forEach(c => {
     const involved = state.changeLog.some(ch => ch.coverName === c.name);
-    if (involved && c.email && !seen.has(c.email)) {
-      seen.add(c.email);
-      recipients.push({ name: c.name, email: c.email, yg: staffYG(c.name) || 'Cover' });
+    if (involved && c.phone && !seen.has(c.phone)) {
+      seen.add(c.phone);
+      recipients.push({ name: c.name, email: c.email, phone: c.phone, yg: staffYG(c.name) || 'Cover' });
     }
   });
 
