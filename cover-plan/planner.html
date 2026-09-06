@@ -405,7 +405,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(06.09.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(06.09.26b)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -992,6 +992,7 @@ function logChange(type, slot) {
     day: slot.day !== undefined ? DAYS[slot.day] : '',
     session: slot.session || '',
     reason: slot.reason || '',
+    reasonNote: slot.reason === 'Other' ? (slot.reasonNote || '') : '',
     week: WEEKS[state.weekIdx]?.label || '',
     timestamp: Date.now()
   });
@@ -1777,7 +1778,7 @@ function removeSlot(slotId) {
 }
 function unassignCover(slotId) { const s = slots().find(x => x.id === slotId); if (s) { logChange('unassign_cover', s); s.cover = null; stateSave(); render(); } }
 function changeReason(slotId, reason) { const s = slots().find(x => x.id === slotId); if (s) { logChange('change_reason', s); s.reason = reason; if (reason !== 'Other') s.reasonNote = ''; s.offSite = offSiteDefault(reason); stateSave(); render(); } }
-function changeReasonNote(slotId, note) { const s = slots().find(x => x.id === slotId); if (s) { s.reasonNote = note; stateSave(); render(); } }
+function changeReasonNote(slotId, note) { const s = slots().find(x => x.id === slotId); if (s) { s.reasonNote = note; logChange('change_reason', s); stateSave(); render(); } }
 function toggleOffSite(slotId) { const s = slots().find(x => x.id === slotId); if (!s || document.body.classList.contains('edit-locked')) return; s.offSite = !offSiteVal(s); stateSave(); render(); }
 
 // ── Inline field editor popup (reasonNote, supplyName, …) ──────────────────
@@ -1797,7 +1798,11 @@ function commitFieldEditor() {
   const field = popup.dataset.field;
   const val = (popup.querySelector('input')?.value || '').trim();
   const s = slots().find(x => x.id === slotId);
-  if (s) { s[field] = val; stateSave(); }
+  if (s) {
+    s[field] = val;
+    if (field === 'reasonNote') logChange('change_reason', s);
+    stateSave();
+  }
   closeFieldEditor();
   render();
 }
