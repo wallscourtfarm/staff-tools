@@ -55,7 +55,23 @@ function doPost(e) {
     if (!tokenOK(e)) return denied_();
     initSheets_();
     const data = JSON.parse(e.postData.contents);
-    return json_(handlePost_(data));
+    // saveScore_/saveScores_/upsert_ read all rows, index by (pupil, skill,
+    // year), then setValue or appendRow based on that index — with no lock,
+    // two staff assessing pupils around the same time can both read before
+    // either writes, so both decide a row is "new" and append a duplicate
+    // (or one silently overwrites the other's write). Serializing every
+    // POST closes that gap.
+    const lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(20000);
+    } catch (lockErr) {
+      return json_({ error: 'locked, try again' });
+    }
+    try {
+      return json_(handlePost_(data));
+    } finally {
+      lock.releaseLock();
+    }
   } catch (err) {
     return json_({ error: err.message });
   }
