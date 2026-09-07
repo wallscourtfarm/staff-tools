@@ -107,7 +107,7 @@ async function post(action,body){
   return data.data;
 }
 async function get(){
-  const res=await fetch(URL_BASE,{cache:'no-cache'});
+  const res=await fetch(URL_BASE+'?_='+Date.now(),{cache:'no-cache'});
   return res.json();
 }
 
@@ -118,26 +118,30 @@ function showMsg(id,text,isErr){
   setTimeout(()=>{el.className='msg'},4000);
 }
 
+function renderActive(data){
+  const box=document.getElementById('active-list');
+  const overrides=data.overrides||{};
+  const swaps=data.swaps||{};
+  const items=[];
+  Object.keys(overrides).sort().forEach(date=>{
+    items.push({date,html:`<div><span class="lbl">${fmtDate(date)}</span><span class="detail">Override: ${overrides[date][0]||'—'} / ${overrides[date][1]||'—'}</span></div><button class="clear-btn" onclick="quickClearOverride('${date}')">Clear</button>`});
+  });
+  const seenSwap=new Set();
+  Object.keys(swaps).sort().forEach(date=>{
+    if(seenSwap.has(date))return;
+    const other=swaps[date];
+    seenSwap.add(date);seenSwap.add(other);
+    items.push({date,html:`<div><span class="lbl">${fmtDate(date)} ⇄ ${fmtDate(other)}</span><span class="detail">Menus swapped</span></div><button class="clear-btn" onclick="quickClearSwap('${date}')">Undo</button>`});
+  });
+  if(!items.length){box.innerHTML='<p class="empty">Nothing overridden or swapped — all boards are showing the normal menu.</p>';return;}
+  items.sort((a,b)=>a.date.localeCompare(b.date));
+  box.innerHTML='<ul class="active">'+items.map(i=>`<li>${i.html}</li>`).join('')+'</ul>';
+}
+
 async function refreshActive(){
   const box=document.getElementById('active-list');
   try{
-    const data=await get();
-    const overrides=data.overrides||{};
-    const swaps=data.swaps||{};
-    const items=[];
-    Object.keys(overrides).sort().forEach(date=>{
-      items.push({date,html:`<div><span class="lbl">${fmtDate(date)}</span><span class="detail">Override: ${overrides[date][0]||'—'} / ${overrides[date][1]||'—'}</span></div><button class="clear-btn" onclick="quickClearOverride('${date}')">Clear</button>`});
-    });
-    const seenSwap=new Set();
-    Object.keys(swaps).sort().forEach(date=>{
-      if(seenSwap.has(date))return;
-      const other=swaps[date];
-      seenSwap.add(date);seenSwap.add(other);
-      items.push({date,html:`<div><span class="lbl">${fmtDate(date)} ⇄ ${fmtDate(other)}</span><span class="detail">Menus swapped</span></div><button class="clear-btn" onclick="quickClearSwap('${date}')">Undo</button>`});
-    });
-    if(!items.length){box.innerHTML='<p class="empty">Nothing overridden or swapped — all boards are showing the normal menu.</p>';return;}
-    items.sort((a,b)=>a.date.localeCompare(b.date));
-    box.innerHTML='<ul class="active">'+items.map(i=>`<li>${i.html}</li>`).join('')+'</ul>';
+    renderActive(await get());
   }catch(e){
     box.innerHTML='<p class="empty">Could not load current status: '+e.message+'</p>';
   }
@@ -150,18 +154,16 @@ async function setOverride(){
   if(!date){showMsg('ov-msg','Pick a date first.',true);return;}
   if(!meal1&&!meal2){showMsg('ov-msg','Enter at least one meal option.',true);return;}
   try{
-    await post('setOverride',{date,meal1,meal2});
+    renderActive(await post('setOverride',{date,meal1,meal2}));
     showMsg('ov-msg','Override set for '+fmtDate(date)+'.',false);
-    refreshActive();
   }catch(e){showMsg('ov-msg','Failed: '+e.message,true);}
 }
 async function clearOverride(){
   const date=document.getElementById('ov-date').value;
   if(!date){showMsg('ov-msg','Pick a date first.',true);return;}
   try{
-    await post('clearOverride',{date});
+    renderActive(await post('clearOverride',{date}));
     showMsg('ov-msg','Override cleared for '+fmtDate(date)+'.',false);
-    refreshActive();
   }catch(e){showMsg('ov-msg','Failed: '+e.message,true);}
 }
 async function setSwap(){
@@ -170,16 +172,15 @@ async function setSwap(){
   if(!dateA||!dateB){showMsg('sw-msg','Pick both dates.',true);return;}
   if(dateA===dateB){showMsg('sw-msg','Pick two different dates.',true);return;}
   try{
-    await post('setSwap',{dateA,dateB});
+    renderActive(await post('setSwap',{dateA,dateB}));
     showMsg('sw-msg','Swapped '+fmtDate(dateA)+' and '+fmtDate(dateB)+'.',false);
-    refreshActive();
   }catch(e){showMsg('sw-msg','Failed: '+e.message,true);}
 }
 async function quickClearOverride(date){
-  try{await post('clearOverride',{date});refreshActive();}catch(e){alert('Failed: '+e.message);}
+  try{renderActive(await post('clearOverride',{date}));}catch(e){alert('Failed: '+e.message);}
 }
 async function quickClearSwap(date){
-  try{await post('clearSwap',{date});refreshActive();}catch(e){alert('Failed: '+e.message);}
+  try{renderActive(await post('clearSwap',{date}));}catch(e){alert('Failed: '+e.message);}
 }
 
 document.getElementById('ov-date').value=todayStr();
