@@ -45,7 +45,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Oak</span><span id="version-tag">EYFS-04.09.26b</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Oak</span><span id="version-tag">EYFS-07.09.26a</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -147,11 +147,15 @@ function getDK(ds){return DAYS[new Date(ds+'T12:00:00').getDay()]}
 function getMenu(){
   const ts=todayStr(),dk=getDK(ts);
   if(!['Mon','Tue','Wed','Thu','Fri'].includes(dk))return['No school today',''];
-  const mon=getMon(ts);
-  const base=(MENU_BY_WEEK[mon]&&MENU_BY_WEEK[mon][dk])||['Menu not yet set',''];
+  if(CENTRAL_OVERRIDES[ts])return CENTRAL_OVERRIDES[ts];
+  const lookupDate=CENTRAL_SWAPS[ts]||ts,lookupDk=getDK(lookupDate);
+  const mon=getMon(lookupDate);
+  const base=(MENU_BY_WEEK[mon]&&MENU_BY_WEEK[mon][lookupDk])||['Menu not yet set',''];
   return base;
 }
 
+let CENTRAL_OVERRIDES={}, CENTRAL_SWAPS={};
+const LUNCH_OVERRIDE_URL='https://script.google.com/macros/s/AKfycbz0yYbvPGa7csQYwJAQg7NTRYrbNjt-wgz4XYjdSEJ1GxuV2rQornoKicohiKDoBbhC/exec';
 async function loadSharedMenu(){
   try{
     const res=await fetch('https://staff.wallscourt-farm-academy.co.uk/menu.json',{cache:'no-cache'});
@@ -163,6 +167,13 @@ async function loadSharedMenu(){
       console.log('[SharedMenu] Loaded',Object.keys(MENU_BY_WEEK).length,'weeks');
     }
   }catch(e){console.log('[SharedMenu] Using in-file fallback:',e.message);}
+  try{
+    const or=await fetch(LUNCH_OVERRIDE_URL,{cache:'no-cache'});
+    if(!or.ok)throw new Error('fetch failed');
+    const od=await or.json();
+    CENTRAL_OVERRIDES=od.overrides||{};
+    CENTRAL_SWAPS=od.swaps||{};
+  }catch(e){console.log('[LunchOverride] none available:',e.message);}
 }
 
 const MEAL_IMG={
