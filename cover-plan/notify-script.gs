@@ -559,6 +559,18 @@ function buildTodaySummary(planSheet, todayStr) {
 // ── CALENDAR EVENT WRITE HANDLER ─────────────────────────────────────────────
 
 function handleEventWrite(payload) {
+  // Looks a row up (by ID or virtual sheet_row_N), then appendRow/setValue/
+  // deleteRow's based on that lookup — with no lock, two concurrent edits
+  // can both read before either writes, risking a duplicate row or, worse,
+  // a delete racing an update onto a row index that just shifted under it.
+  // Serialize the whole read-decide-write cycle.
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+  } catch (lockErr) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'locked, try again' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   try {
     const COVER_PLAN_SHEET_ID = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
     const ss = SpreadsheetApp.openById(COVER_PLAN_SHEET_ID);
@@ -639,6 +651,8 @@ function handleEventWrite(payload) {
     console.error('handleEventWrite error: ' + err.message);
     return ContentService.createTextOutput(JSON.stringify({ success:false, error:err.message }))
       .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
   }
 }
 

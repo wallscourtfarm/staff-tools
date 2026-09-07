@@ -46,18 +46,34 @@ function doGet(e) {
       var key  = e.parameter.key || '';
       var msStr = e.parameter.ms  || '';
       var parts = key.split('|');
-      var rowMap = getRowMap(sheet);
-      var now = new Date().toISOString().slice(0, 10);
-      if (rowMap[key]) {
-        var msCell = sheet.getRange(rowMap[key], 4);
-        msCell.setNumberFormat('@');
-        msCell.setValue(msStr);
-        sheet.getRange(rowMap[key], 5).setValue(now);
-      } else {
-        sheet.appendRow([key, parts[0] || '', parts[1] || '', msStr, now]);
-        // Force text on the milestones cell in the new row
-        var newRow = sheet.getLastRow();
-        sheet.getRange(newRow, 4).setNumberFormat('@');
+      // Two staff saving certs around the same time can both read rowMap
+      // before either writes, so both decide a pupil's row is "new" and
+      // appendRow a duplicate (or one silently overwrites the other's row
+      // lookup). Lock around the read-decide-write cycle to close that gap.
+      var lock = LockService.getScriptLock();
+      try {
+        lock.waitLock(20000);
+      } catch (lockErr) {
+        return ContentService
+          .createTextOutput(JSON.stringify({ok: false, error: 'locked, try again'}))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      try {
+        var rowMap = getRowMap(sheet);
+        var now = new Date().toISOString().slice(0, 10);
+        if (rowMap[key]) {
+          var msCell = sheet.getRange(rowMap[key], 4);
+          msCell.setNumberFormat('@');
+          msCell.setValue(msStr);
+          sheet.getRange(rowMap[key], 5).setValue(now);
+        } else {
+          sheet.appendRow([key, parts[0] || '', parts[1] || '', msStr, now]);
+          // Force text on the milestones cell in the new row
+          var newRow = sheet.getLastRow();
+          sheet.getRange(newRow, 4).setNumberFormat('@');
+        }
+      } finally {
+        lock.releaseLock();
       }
       return ContentService
         .createTextOutput(JSON.stringify({ok: true}))

@@ -40,12 +40,26 @@ function outJson_(obj) {
 // POST bodies (used by the certificates tool for markIssued and importData)
 // carry JSON in e.postData.body — doGet above only reads query parameters, so
 // merge any JSON body over the query params before dispatching.
+// Every write action here (checkout/returnBook/setCopyStatus/etc.) reads all
+// rows, looks a key up, then appendRow's or setValue's based on that lookup —
+// with no lock, two concurrent requests (two devices checking books out at
+// once) can both read before either writes, so both decide a row is "new"
+// and append duplicates, or one silently loses an update. Serializing every
+// POST closes that gap (reads via plain GET are unaffected and stay fast).
 function doPost(e) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+  } catch (err) {
+    return outJson_({ error: 'locked, try again' });
+  }
   try {
     const body = (e && e.postData && e.postData.contents) ? JSON.parse(e.postData.contents) : {};
     return doGet({ parameter: Object.assign({}, (e && e.parameter) || {}, body) });
   } catch(err) {
     return outJson_({ error: err.message });
+  } finally {
+    lock.releaseLock();
   }
 }
 
