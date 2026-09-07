@@ -393,7 +393,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Elm</span><span id="version-tag">e.04.09.26b</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Elm</span><span id="version-tag">e.07.09.26a</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -3054,13 +3054,15 @@ function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.fl
 function getMenu(){
   const ts=todayStr(),dk=getDK(ts);
   if(!['Mon','Tue','Wed','Thu','Fri'].includes(dk))return['No school today',''];
+  if(CENTRAL_OVERRIDES[ts])return CENTRAL_OVERRIDES[ts];
+  const lookupDate=CENTRAL_SWAPS[ts]||ts,lookupDk=getDK(lookupDate);
   const ov=JSON.parse(localStorage.getItem('y6_ov_'+ts)||'{}');
   const saved=JSON.parse(localStorage.getItem('y6_menu')||'{}');
-  const mon=getMon(ts);
+  const mon=getMon(lookupDate);
   // check saved overrides first, then new menu, then fallback
   let base;
-  if(saved[mon]&&saved[mon][dk])base=saved[mon][dk];
-  else if(MENU_BY_WEEK[mon])base=MENU_BY_WEEK[mon][dk]||['Menu not set',''];
+  if(saved[mon]&&saved[mon][lookupDk])base=saved[mon][lookupDk];
+  else if(MENU_BY_WEEK[mon])base=MENU_BY_WEEK[mon][lookupDk]||['Menu not set',''];
   else base=['Menu not yet set',''];
   return[ov.meal1||base[0],ov.meal2||base[1]];
 }
@@ -3374,6 +3376,8 @@ const ALL_TYPES=['boggle','number','combined','literacy','spotmistakecombo','mat
 // Fetches menu.json from the central repo on page load.
 // Falls back silently to in-file MENU_BY_WEEK on any error.
 // ═══════════════════════════════════════════════════════════
+let CENTRAL_OVERRIDES={}, CENTRAL_SWAPS={};
+const LUNCH_OVERRIDE_URL='https://script.google.com/macros/s/AKfycbz0yYbvPGa7csQYwJAQg7NTRYrbNjt-wgz4XYjdSEJ1GxuV2rQornoKicohiKDoBbhC/exec';
 async function loadSharedMenu(){
   try{
     const res = await fetch('https://staff.wallscourt-farm-academy.co.uk/menu.json', {cache:'no-cache'});
@@ -3388,6 +3392,17 @@ async function loadSharedMenu(){
     }
   } catch(e){
     console.log('[SharedMenu] Using in-file fallback:', e.message);
+  }
+  // Central, date-keyed lunch overrides/swaps set by the admin team.
+  // Reverts automatically — nothing here persists past its own date.
+  try{
+    const or = await fetch(LUNCH_OVERRIDE_URL, {cache:'no-cache'});
+    if(!or.ok) throw new Error('fetch failed');
+    const od = await or.json();
+    CENTRAL_OVERRIDES = od.overrides || {};
+    CENTRAL_SWAPS = od.swaps || {};
+  } catch(e){
+    console.log('[LunchOverride] none available:', e.message);
   }
 }
 
@@ -4855,7 +4870,7 @@ function saveOverride(){
   closeOverride();renderLunch();renderMsg();updateDot();
 }
 function clearOverride(){localStorage.removeItem('y6_ov_'+todayStr());closeOverride();renderLunch();renderMsg();updateDot();}
-function updateDot(){const ov=JSON.parse(localStorage.getItem('y6_ov_'+todayStr())||'{}');document.getElementById('override-dot').style.display=Object.keys(ov).length?'inline-block':'none';}
+function updateDot(){const ts=todayStr();const ov=JSON.parse(localStorage.getItem('y6_ov_'+ts)||'{}');const central=CENTRAL_OVERRIDES[ts]||CENTRAL_SWAPS[ts];document.getElementById('override-dot').style.display=(Object.keys(ov).length||central)?'inline-block':'none';}
 
 // ═══════════════════════════════════════════════════════════
 // SETUP (menu + TT bank)
