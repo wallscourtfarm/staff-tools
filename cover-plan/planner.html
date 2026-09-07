@@ -405,7 +405,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(06.09.26d)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(07.09.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -556,8 +556,18 @@ let FRONT_END_EVENTS = []; // { id, date (YYYY-MM-DD), label, colour, session, n
 const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
 const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
-// Railway relay endpoint — avoids GAS CORS redirect issue
+// Railway relay endpoint — avoids GAS CORS redirect issue. Handles staff SMS
+// notifications and the "raise a concern" form only; it has no Apps Script
+// forwarding logic, so it must NOT be used for CalendarEvents CRUD (see
+// EVENT_WRITE_URL below).
 const NOTIFY_URL = 'https://api.wallscourt-farm-academy.co.uk/notify';
+
+// CalendarEvents CRUD (add/update/delete term events) goes straight to the
+// notify-script.gs Apps Script web app — these are one-way, fire-and-forget
+// GETs (mode:'no-cors'), so the GAS CORS issue that forced the Railway relay
+// for the POST-based staff notifications never applied here. Loaded from
+// notify-config.json at init() so it can be repointed without editing this file.
+let EVENT_WRITE_URL = 'https://script.google.com/macros/s/AKfycbyP4GDIFJ4wClMfb0bNiO6Qo4oad9wsGrM2AbmMg0l_KxHdHz-R01MCm7mGexve0V5G/exec';
 
 // ── Mutable data (populated by init) ─────────────────────────────────────────
 let WEEKS    = [];
@@ -864,6 +874,9 @@ function currentWeekIdx() {
   return Math.max(0,WEEKS.length-1);
 }
 async function init() {
+  // Load the CalendarEvents write endpoint from config file — change
+  // notify-config.json to update without touching planner.html.
+  fetch('notify-config.json').then(r=>r.json()).then(cfg=>{ if(cfg.url) EVENT_WRITE_URL=cfg.url; }).catch(()=>{});
 
   document.getElementById('centerPane').innerHTML=
     '<div style="padding:60px;text-align:center;color:#94a3b8;font-size:14px">Loading from Google Sheets…</div>';
@@ -2548,7 +2561,7 @@ function saveTermEvent(mode, date, id) {
       if (seriesId) ev.seriesId = seriesId;
       FRONT_END_EVENTS.push(ev);
       const payload = { type:'event_write', action:'add', event: ev };
-      fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
+      fetch(EVENT_WRITE_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
     });
   } else {
     const existing = FRONT_END_EVENTS.find(f=>f.id===id);
@@ -2557,7 +2570,7 @@ function saveTermEvent(mode, date, id) {
     const idx = FRONT_END_EVENTS.findIndex(f=>f.id===id);
     if (idx>=0) FRONT_END_EVENTS[idx]=ev; else FRONT_END_EVENTS.push(ev);
     const payload = { type:'event_write', action:'update', event: ev };
-    fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
+    fetch(EVENT_WRITE_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
   }
   _syncFrontEndToInfoEvents();
   renderTermView();
@@ -2680,7 +2693,7 @@ function _deleteSheetEventAll(id) {
   });
   if (id) {
     const payload = { type:'event_write', action:'delete', event:{ id } };
-    fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
+    fetch(EVENT_WRITE_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
   }
   renderTermView();
 }
@@ -2689,7 +2702,7 @@ function _deleteFESingle(id) {
   FRONT_END_EVENTS = FRONT_END_EVENTS.filter(f=>f.id!==id);
   _syncFrontEndToInfoEvents();
   renderTermView();
-  fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify({type:'event_write',action:'delete',event:{id}})), {mode:'no-cors'}).catch(()=>{});
+  fetch(EVENT_WRITE_URL+'?payload='+encodeURIComponent(JSON.stringify({type:'event_write',action:'delete',event:{id}})), {mode:'no-cors'}).catch(()=>{});
 }
 
 function _deleteFESeries(seriesId) {
@@ -2698,7 +2711,7 @@ function _deleteFESeries(seriesId) {
   _syncFrontEndToInfoEvents();
   renderTermView();
   toDelete.forEach(ev => {
-    fetch(NOTIFY_URL+'?payload='+encodeURIComponent(JSON.stringify({type:'event_write',action:'delete',event:{id:ev.id}})), {mode:'no-cors'}).catch(()=>{});
+    fetch(EVENT_WRITE_URL+'?payload='+encodeURIComponent(JSON.stringify({type:'event_write',action:'delete',event:{id:ev.id}})), {mode:'no-cors'}).catch(()=>{});
   });
 }
 
