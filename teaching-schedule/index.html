@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-06.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-07.09.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1421,6 +1421,19 @@ function coverPlanDisplayCover(slot) {
   return slot.cover || '';
 }
 
+// A cover-plan slot actually covered by an external sports coach (AB Sports /
+// Bristol Sports) means that class is really getting PE/Athletics that
+// session — shown as an "Athlete" tag instead of the generic "<initials>
+// <reason>" staff-out label. This is distinct from the recurring weekly
+// Sports fixture (cover-plan's own sportsSchedule), which isn't tied to any
+// actual cover slot and must NOT trigger this.
+const SPORTS_COVER_NAMES = new Set(['ab sports', 'bristol sports']);
+const ATHLETE_COLOUR = '#16a34a';
+function sportsCoverInfo(slot) {
+  const raw = (slot.cover || '').trim().toLowerCase();
+  return SPORTS_COVER_NAMES.has(raw) ? { label: '🏃 Athlete', colour: ATHLETE_COLOUR } : null;
+}
+
 // Map cover-plan sessions to teaching-schedule row IDs
 const COVER_SESSION_MAP = {
   'Before School': { start: 'reg-am', end: 'reg-am' },
@@ -2128,9 +2141,10 @@ function renderBody() {
         if (startIdx < 0 || endIdx < 0) return;
 
         const staffInfo = COVER_STAFF_LOOKUP[slot.tid] || {};
-        const colour = staffInfo.col || '#475569';
+        const sportsInfo = sportsCoverInfo(slot);
         const initials = staffInfo.initials || '';
-        const label = initials ? `${initials} ${slot.reason || 'Out'}` : (slot.reason || 'Out');
+        const colour = sportsInfo ? sportsInfo.colour : (staffInfo.col || '#475569');
+        const label = sportsInfo ? sportsInfo.label : (initials ? `${initials} ${slot.reason || 'Out'}` : (slot.reason || 'Out'));
 
         ROWS.forEach((row, ri) => {
           if (ri >= startIdx && ri <= endIdx) {
