@@ -2100,6 +2100,10 @@ function init(){
   if(vtag)vtag.textContent=vtag.textContent+' · '+PHASE_LABELS[SCHOOL_PHASE];
 }
 loadSharedMenu().then(init);
+// Re-poll for central lunch overrides periodically — boards are opened once
+// in the morning and left running, so a same-day override needs this to
+// reach a display that's already open before lunch.
+setInterval(()=>{loadSharedMenu().then(renderLunch);},5*60*1000);
 
 </script>
 </body>
