@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-07.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-07.09.26b</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -720,7 +720,7 @@ let ACTIVITY_EXCEPTIONS = []; // { date, staff, activity, session, type? }
 let FAB_DATA = null; // { weekKey: { lower: [[...]], upper: [[...]] } } - zones x days
 let FAB_STAFF = []; // [{ id, name, init, col }] - staff from FAB tool for ID→initials mapping
 let FAB_EXCEPTIONS = []; // { date, staffId, zone }
-let COVER_DATA = null; // { weekSlots: {weekIdx: [slots]}, staff: [{id, name, yg, col}] } - from cover-plan tool
+let COVER_DATA = null; // { weekSlots: {weekIdx: [slots]}, staff: [{id, name, yg, col}], sportsSchedule: [{yg, day, session, provider}] } - from cover-plan tool
 let COVER_STAFF_LOOKUP = {}; // name -> {id, yg, col} for quick lookup
 let LC_DATA = null; // { state: { slots: {weekIdx: {dutyId: [[staffId,...],...]}} }, duties: [...], staffColours: {} }
 let BOOKINGS = {}; // day (lowercase) -> [booking, ...], for whichever week was last loaded — see loadBookingOverlay()
@@ -1421,18 +1421,13 @@ function coverPlanDisplayCover(slot) {
   return slot.cover || '';
 }
 
-// A cover-plan slot actually covered by an external sports coach (AB Sports /
-// Bristol Sports) means that class is really getting PE/Athletics that
-// session — shown as an "Athlete" tag instead of the generic "<initials>
-// <reason>" staff-out label. This is distinct from the recurring weekly
-// Sports fixture (cover-plan's own sportsSchedule), which isn't tied to any
-// actual cover slot and must NOT trigger this.
-const SPORTS_COVER_NAMES = new Set(['ab sports', 'bristol sports']);
+// cover-plan's recurring per-year-group Sports fixture (the "Y2 Sports" /
+// "Y5 Sports (AB)" sidebar bars in cover-plan) — one weekly day/session per
+// year group, unconditional on any actual staff cover that day. Reflected
+// onto this class's Learning Schedule as an "Athlete" tag regardless of
+// whether the class teacher runs it themselves or a coach covers it.
 const ATHLETE_COLOUR = '#16a34a';
-function sportsCoverInfo(slot) {
-  const raw = (slot.cover || '').trim().toLowerCase();
-  return SPORTS_COVER_NAMES.has(raw) ? { label: '🏃 Athlete', colour: ATHLETE_COLOUR } : null;
-}
+const SPORTS_PROVIDER_NAMES = { AB: 'AB Sports', Brs: 'Bristol Sports' };
 
 // Map cover-plan sessions to teaching-schedule row IDs
 const COVER_SESSION_MAP = {
@@ -2141,10 +2136,9 @@ function renderBody() {
         if (startIdx < 0 || endIdx < 0) return;
 
         const staffInfo = COVER_STAFF_LOOKUP[slot.tid] || {};
-        const sportsInfo = sportsCoverInfo(slot);
+        const colour = staffInfo.col || '#475569';
         const initials = staffInfo.initials || '';
-        const colour = sportsInfo ? sportsInfo.colour : (staffInfo.col || '#475569');
-        const label = sportsInfo ? sportsInfo.label : (initials ? `${initials} ${slot.reason || 'Out'}` : (slot.reason || 'Out'));
+        const label = initials ? `${initials} ${slot.reason || 'Out'}` : (slot.reason || 'Out');
 
         ROWS.forEach((row, ri) => {
           if (ri >= startIdx && ri <= endIdx) {
@@ -2202,6 +2196,40 @@ function renderBody() {
             });
           });
       });
+    }
+
+    // Sports fixture (cover-plan's recurring per-year-group Sports schedule)
+    // — same strip+tag treatment, master view only. Unconditional: shows
+    // whenever this year group has a Sports slot set on cover-plan, whether
+    // the class teacher runs it themselves or an external coach covers it —
+    // does not depend on any staff-out/cover assignment.
+    if (view === 'master' && COVER_DATA && COVER_DATA.sportsSchedule) {
+      const fixture = COVER_DATA.sportsSchedule.find(s => yearGroupMatches(s.yg, YEAR_GROUP));
+      if (fixture && !nsd[fixture.day]) {
+        const sessionMap = COVER_SESSION_MAP[fixture.session];
+        if (sessionMap) {
+          const startIdx = ROWS.findIndex(r => r.id === sessionMap.start);
+          const endIdx = ROWS.findIndex(r => r.id === sessionMap.end);
+          if (startIdx >= 0 && endIdx >= 0) {
+            const providerName = SPORTS_PROVIDER_NAMES[fixture.provider] || '';
+            ROWS.forEach((row, ri) => {
+              if (ri >= startIdx && ri <= endIdx) {
+                const key = `${fixture.day}-${ri}`;
+                if (!staffOutMap[key]) staffOutMap[key] = [];
+                staffOutMap[key].push({
+                  label: '🏃 Athlete',
+                  cover: providerName,
+                  colour: ATHLETE_COLOUR,
+                  isFirst: ri === startIdx,
+                  isLast: ri === endIdx,
+                  isFixed: row.type === 'fixed',
+                  source: 'sports-fixture'
+                });
+              }
+            });
+          }
+        }
+      }
     }
   }
 
@@ -3786,7 +3814,8 @@ async function init() {
     if (coverDataRaw && coverDataRaw.weekSlots) {
       COVER_DATA = {
         weekSlots: coverDataRaw.weekSlots,
-        staff: coverDataRaw.staff || []
+        staff: coverDataRaw.staff || [],
+        sportsSchedule: coverDataRaw.sportsSchedule || []
       };
       // Build staff lookup from ALL_SHEET_STAFF (use same ID format as cover-plan)
       COVER_STAFF_LOOKUP = {};
