@@ -286,7 +286,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · WFA-31.08.26a</div>
+  <div class="version">WFA Book Tracker · WFA-08.09.26a</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -430,6 +430,27 @@ async function loadData() {
     render();
     checkLocalCoverMigration();
   } catch(e) { toast('⚠️ ' + e.message, 5000); }
+}
+
+// getAll() is slow (the Apps Script backend can take several seconds even
+// when warm). Checking out several books in a row used to fire one full
+// background loadData() per checkout, so those requests piled up against
+// the same slow endpoint and made each successive checkout feel slower than
+// the last. scheduleSync() coalesces bursts of checkouts/returns into a
+// single trailing refresh instead of one per action.
+let syncPending = false, syncInFlight = false;
+function scheduleSync() {
+  syncPending = true;
+  if (syncInFlight) return;
+  runSync();
+}
+async function runSync() {
+  syncInFlight = true;
+  while (syncPending) {
+    syncPending = false;
+    await loadData();
+  }
+  syncInFlight = false;
 }
 
 function checkLocalCoverMigration() {
@@ -774,7 +795,7 @@ function renderBookPicker() {
           <div class="copies-row">
             ${b.copies.map(c => `
               <button class="copy-btn ${c.available ? 'avail' : 'taken'}"
-                ${c.available ? `onclick="doCheckout('${b.id}',${c.copyNum},'${esc(b.title)}')"` : ''}
+                ${c.available ? `onclick="doCheckout('${b.id}',${c.copyNum},'${escJs(b.title)}')"` : ''}
                 title="${c.lost ? 'Marked as lost' : c.available ? '' : 'Out to '+childName(c.childId)}">
                 ${copyLabel(c)}
               </button>`).join('')}
@@ -834,7 +855,7 @@ async function doCheckout(bookId, copyNum, title) {
     toast(`✓ Checked out to ${selChild.name}`);
     deselect();
     renderChildList(phaseChildren());
-    loadData(); // background sync
+    scheduleSync(); // background sync, coalesced
   } catch(e) { toast('Error: '+e.message); }
 }
 
@@ -870,8 +891,8 @@ function renderReturns() {
       <div class="co-book">${esc(co.book?.title||'Unknown')} · Copy ${co.copyNum}</div>
       <div class="co-date">Since ${fmtDate(co.checkoutDate)}</div>
       <div class="ret-btns">
-        <button class="btn btn-green" onclick="doReturn('${co.checkoutId}',true,'${esc(co.child.name)}','${co.child.id}')">✓ Completed &amp; Returned</button>
-        <button class="btn btn-ghost" onclick="doReturn('${co.checkoutId}',false,'${esc(co.child.name)}','${co.child.id}')">↩ Returned</button>
+        <button class="btn btn-green" onclick="doReturn('${co.checkoutId}',true,'${escJs(co.child.name)}','${co.child.id}')">✓ Completed &amp; Returned</button>
+        <button class="btn btn-ghost" onclick="doReturn('${co.checkoutId}',false,'${escJs(co.child.name)}','${co.child.id}')">↩ Returned</button>
       </div>
     </div>`).join('');
 }
@@ -905,7 +926,7 @@ async function doReturn(checkoutId, completed, childName, childId) {
       toast(completed ? `✓ Great reading, ${childName}!` : `↩ Book returned`);
     }
     renderReturns();
-    loadData(); // background sync
+    scheduleSync(); // background sync, coalesced
   } catch(e) { toast('Error: '+e.message); }
 }
 
@@ -1332,6 +1353,15 @@ function fmtDate(str) {
 
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// For interpolating into a single-quoted JS string literal inside an inline
+// onclick="..." attribute — esc() alone leaves apostrophes untouched, which
+// breaks the attribute's JS (e.g. book titles like "The Skylarks' War" or
+// surnames like "O'Brien"), silently killing the click handler with no
+// visible error.
+function escJs(s) {
+  return esc(String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
 }
 
 function empty(icon, msg) {
