@@ -2784,6 +2784,7 @@ function downloadPDF(element, filename, orientation) {
 // new pupils and corrects names/classes; existing tracking data (mastery,
 // pairs, TT sets) is always preserved, and nobody is auto-removed.
 const HUB_ROSTER_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
+const HUB_TOKEN = '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05'; // shared-sync gateway token (rotated 2026-09-08) — distinct from this tool's own SYNC_URL token above
 const HUB_CLASSES_KEY = 'wfa-spellings-classes';
 const nameKey = p => (p.firstName || p.first || '').trim().toLowerCase() + ' ' + (p.lastName || p.last || '').trim().toLowerCase();
 
@@ -2797,7 +2798,7 @@ let HUB_CLASSES = (() => {
 
 async function hubRefreshClasses() {
   try {
-    const res = await fetch(HUB_ROSTER_URL + '?action=getClasses&t=' + Date.now() + '&token=' + WFA_TOKEN);
+    const res = await fetch(HUB_ROSTER_URL + '?action=getClasses&t=' + Date.now() + '&token=' + HUB_TOKEN);
     if (!res.ok) return;
     const data = await res.json();
     const byYg = {};
@@ -2819,7 +2820,7 @@ async function hubRefreshClasses() {
 async function hubRefreshPupils() {
   try {
     const yg = state.currentYg || 'Y5';
-    const res = await fetch(HUB_ROSTER_URL + '?action=getPupils&yeargroup=' + yg + '&t=' + Date.now() + '&token=' + WFA_TOKEN);
+    const res = await fetch(HUB_ROSTER_URL + '?action=getPupils&yeargroup=' + yg + '&t=' + Date.now() + '&token=' + HUB_TOKEN);
     if (!res.ok) return;
     const data = await res.json();
     const list = (data.pupils || []).filter(p => p.first || p.first === '');
