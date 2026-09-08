@@ -283,10 +283,9 @@ const EDIT_PIN = '0638ca808b91e684df3002bc';
 const DAYS    = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const PALETTE = ['#1798d3','#f97316','#22c55e','#e879f9','#64748b','#ef4444','#8b5cf6'];
 
-const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
-const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
 const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
-const SYNC_URL        = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?key=wfa_slt&token=' + SHARED_TOKEN;
+const GATEWAY_URL     = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
+const SYNC_URL        = GATEWAY_URL + '&key=wfa_slt';
 const COVER_PLAN_URL  = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
 
 const PLANNER_REASON_MAP = { 'PPA': 'ppa', 'SENCO': 'senco', 'Phase Lead': 'phase_lead' };
@@ -893,18 +892,17 @@ async function init() {
   const status = document.getElementById('sheetStatus');
   try {
     const fetches = [
-      fetch(SHEET_BASE+'Staff').then(r=>{if(!r.ok)throw new Error('Staff');return r.text();}),
-      fetch(SHEET_BASE+'TermDates').then(r=>{if(!r.ok)throw new Error('Terms');return r.text();}),
+      fetch(GATEWAY_URL+'&action=getSheetTab&tab=Staff').then(r=>{if(!r.ok)throw new Error('Staff');return r.json();}).then(j=>{if(j.error)throw new Error(j.error);return j.rows;}),
+      fetch(GATEWAY_URL+'&action=getSheetTab&tab=TermDates').then(r=>{if(!r.ok)throw new Error('Terms');return r.json();}).then(j=>{if(j.error)throw new Error(j.error);return j.rows;}),
       fetch(COVER_PLAN_URL, { signal: AbortSignal.timeout(8000) }).then(r=>r.ok?r.text():null).catch(()=>null),
     ];
     if (SYNC_URL) fetches.push(fetch(SYNC_URL).then(r=>r.text()).catch(()=>null));
 
     const results = await Promise.all(fetches);
-    const staffCsv   = results[0];
-    const termsCsv   = results[1];
+    const staffRows  = results[0];
+    const termsRows  = results[1];
     const plannerCsv = results[2];
     const remoteRaw  = results[3] ?? null;
-    const staffRows  = csvToObjects(staffCsv);
     const sheetSLT   = buildSLT(staffRows);
     STAFF_YG_MAP = {};
     staffRows.forEach(r => {
@@ -913,7 +911,7 @@ async function init() {
       const yg  = (r.YearGroup || '').trim();
       if (yg) STAFF_YG_MAP[sid] = /^\d+$/.test(yg) ? 'Y' + yg : yg;
     });
-    const sheetWeeks = buildWeeks(csvToObjects(termsCsv));
+    const sheetWeeks = buildWeeks(termsRows);
     if (sheetSLT.length)   SLT   = sheetSLT;
     if (sheetWeeks.length) {
       WEEKS = sheetWeeks;
