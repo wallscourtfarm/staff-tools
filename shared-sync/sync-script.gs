@@ -653,7 +653,7 @@ const ALLOWED_TABS = [
   'TermDates', 'Staff', 'Config', 'DayTimings', 'DayStructure',
   'Interventions', 'CalendarEvents', 'EventsMeetings', 'DayActivities',
   'RecurringCover', 'SubjectGroups', 'Resources', 'Bookings',
-  'ActivityExceptions', 'PlannerState', 'Setup', 'SchoolEvents', 'Recurring'
+  'ActivityExceptions', 'PlannerState', 'Setup', 'SchoolEvents', 'Recurring', 'Events'
 ];
 
 function getSheetTab(p) {
