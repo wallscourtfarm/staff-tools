@@ -23,7 +23,7 @@ CLASSES = ['1ER', '1JS', '2JH', '2MY', '3JW', '3WU', '4CK', '4RB',
 
 SHARED_SYNC_URL = ('https://script.google.com/macros/s/'
                    'AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec')
-TOKEN = '2013'
+TOKEN = '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05'
 
 
 def fetch_class(class_id: str) -> dict:
