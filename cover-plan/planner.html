@@ -553,8 +553,8 @@ const COLOUR_PRESETS = ['#1798d3','#7c3aed','#059669','#dc2626','#f59e0b','#0891
 
 let FRONT_END_EVENTS = []; // { id, date (YYYY-MM-DD), label, colour, session, notes }
 
-const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
-const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+const SHARED_TOKEN = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
+const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
 // Railway relay endpoint — avoids GAS CORS redirect issue. Handles staff SMS
 // notifications and the "raise a concern" form only; it has no Apps Script
@@ -882,14 +882,14 @@ async function init() {
     '<div style="padding:60px;text-align:center;color:#94a3b8;font-size:14px">Loading from Google Sheets…</div>';
   try {
     const cacheBuster = `&_cb=${Date.now()}`;
-    const get=tab=>fetch(SHEET_BASE+encodeURIComponent(tab)+cacheBuster, { signal: AbortSignal.timeout(12000) }).then(r=>{if(!r.ok)throw new Error(tab);return r.text();});
-    const [staffTxt,termsTxt,eventsTxt,wseTxt,recTxt]=await Promise.all([
+    const get=tab=>fetch(GATEWAY_URL+'&action=getSheetTab&tab='+tab+cacheBuster, { signal: AbortSignal.timeout(12000) }).then(r=>{if(!r.ok)throw new Error(tab);return r.json();}).then(j=>{if(j.error)throw new Error(j.error);return j.rows;});
+    const [staffRows,termsRows,eventsRows,wseRows,recRows]=await Promise.all([
       get('Staff'),get('TermDates'),get('CalendarEvents'),get('EventsMeetings'),get('RecurringCover')
     ]);
-    const {teachers,cover}=buildStaff(csvToObjects(staffTxt));
+    const {teachers,cover}=buildStaff(staffRows);
     TEACHERS=teachers; COVER=cover;
-    WEEKS=buildWeeks(csvToObjects(termsTxt));
-    const {blocking,info,sessionInfo,frontEnd}=buildEvents(csvToObjects(eventsTxt));
+    WEEKS=buildWeeks(termsRows);
+    const {blocking,info,sessionInfo,frontEnd}=buildEvents(eventsRows);
     EVENTS=blocking; INFO_EVENTS=info; SESSION_INFO_EVENTS=sessionInfo;
     FRONT_END_EVENTS=frontEnd;
     // Apply per-date suppressions (single-date deletes that survived refresh)
@@ -902,9 +902,9 @@ async function init() {
         });
       });
     });
-    WS_SHEET_DEFAULTS=buildSchoolEvents(csvToObjects(wseTxt));
+    WS_SHEET_DEFAULTS=buildSchoolEvents(wseRows);
     wsEvents=wsLoad();
-    RECURRING_SLOTS=buildRecurring(csvToObjects(recTxt));
+    RECURRING_SLOTS=buildRecurring(recRows);
     // Restore saved planner state, falling back to recurring slots for current week
     const saved=await stateLoad();
     if (saved) {
