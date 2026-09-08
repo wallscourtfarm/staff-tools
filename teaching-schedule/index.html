@@ -541,14 +541,13 @@
 
 <script>
 // ── Config ──────────────────────────────────────────────────────────────────
-const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
-const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbxKhzKMmoVbU1V_cXJla5wom1VCtXWA72IllygNX4XZffCBxt5kdt_wKYZ0YLyMopN0/exec';
 const EXCEPTIONS_URL = 'https://script.google.com/macros/s/AKfycbwRTXlq_kqfstCk_lF6qVdoBBZeXdlWV2Gvja1d0H3rYEyCZvPPi2XNhCp3spOsXn3W/exec';
 const FAB_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
 const COVER_SYNC_URL = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
 const SHARED_TOKEN = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
-const LUNCH_COVER_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?key=wfa_lc&token=' + SHARED_TOKEN;
+const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
+const LUNCH_COVER_URL = GATEWAY_URL + '&key=wfa_lc';
 const BOOKING_SYNC_URL = 'https://script.google.com/macros/s/AKfycbwzNtos0vdjnUhsFQ_igTtLNXyBd8k9c6rPkA0IZdkM3vJLAoIdSHonTbHAbyFNfH_BWQ/exec';
 
 // FAB zone definitions (must match FAB tool)
@@ -3682,28 +3681,32 @@ async function init() {
   ]);
 
   try {
-    const [termsText, eventsText, schoolEventsText, staffText, subjectGroupsText, interventionsText, dayStructureText, tpActivitiesText] = await Promise.all([
-      fetch(SHEET_BASE + encodeURIComponent('TermDates')).then(r => { if (!r.ok) throw new Error('Terms tab not found'); return r.text(); }),
-      fetch(SHEET_BASE + encodeURIComponent('CalendarEvents')).then(r => r.ok ? r.text() : '').catch(() => ''),
-      fetch(SHEET_BASE + encodeURIComponent('EventsMeetings')).then(r => r.ok ? r.text() : '').catch(() => ''),
-      fetch(SHEET_BASE + encodeURIComponent('Staff')).then(r => r.ok ? r.text() : '').catch(() => ''),
-      fetch(SHEET_BASE + encodeURIComponent('SubjectGroups')).then(r => r.ok ? r.text() : '').catch(() => ''),
-      fetch(SHEET_BASE + encodeURIComponent('Interventions')).then(r => r.ok ? r.text() : '').catch(() => ''),
-      fetch(SHEET_BASE + encodeURIComponent('DayTimings')).then(r => r.ok ? r.text() : '').catch(() => ''),
-      fetch(SHEET_BASE + encodeURIComponent('DayActivities')).then(r => r.ok ? r.text() : '').catch(() => ''),
+    const fetchTab = (tab, required) => fetch(GATEWAY_URL + '&action=getSheetTab&tab=' + tab)
+      .then(r => { if (!r.ok) throw new Error(tab + ' tab not found'); return r.json(); })
+      .then(j => { if (j.error) throw new Error(j.error); return j.rows; })
+      .catch(err => { if (required) throw err; return []; });
+    const [termsRows, eventsRows, schoolEventsRows, staffRows0, subjectGroupsRows, interventionsRows, dayStructureRows, tpActivitiesRows] = await Promise.all([
+      fetchTab('TermDates', true),
+      fetchTab('CalendarEvents', false),
+      fetchTab('EventsMeetings', false),
+      fetchTab('Staff', false),
+      fetchTab('SubjectGroups', false),
+      fetchTab('Interventions', false),
+      fetchTab('DayTimings', false),
+      fetchTab('DayActivities', false),
     ]);
-    WEEKS = buildWeeks(csvToObjects(termsText));
-    if (eventsText) {
-      const evtRows = csvToObjects(eventsText);
+    WEEKS = buildWeeks(termsRows);
+    if (eventsRows.length) {
+      const evtRows = eventsRows;
       state.afterSchoolEvents = buildAfterSchoolEvents(evtRows);
       state.nonSchoolDays = buildNonSchoolDays(evtRows);
       state.schoolEvents = buildSchoolEvents(evtRows);
     }
-    if (schoolEventsText) recurringAfterSchool = buildRecurringAfterSchool(csvToObjects(schoolEventsText));
+    if (schoolEventsRows.length) recurringAfterSchool = buildRecurringAfterSchool(schoolEventsRows);
 
     // NEW: Staff tab
-    if (staffText) {
-      const staffRows = csvToObjects(staffText);
+    if (staffRows0.length) {
+      const staffRows = staffRows0;
       ALL_SHEET_STAFF = staffRows;
       const yearGroups = [...new Set(staffRows.flatMap(r => {
         return expandYearGroups((r.YearGroup || '').trim());
@@ -3722,16 +3725,16 @@ async function init() {
     }
 
     // NEW: SubjectGroups tab
-    if (subjectGroupsText) {
-      const sgRows = csvToObjects(subjectGroupsText);
+    if (subjectGroupsRows.length) {
+      const sgRows = subjectGroupsRows;
       SHEET_SUBJECT_GROUPS = sgRows;
       SUBJECTS = buildSubjectGroups(sgRows, YEAR_GROUP);
       rebuildSubjectCol();
     }
 
     // NEW: Interventions tab
-    if (interventionsText) {
-      const intRows = csvToObjects(interventionsText);
+    if (interventionsRows.length) {
+      const intRows = interventionsRows;
       SHEET_INTERVENTIONS = intRows;
       INTERVENTIONS = buildInterventions(intRows, YEAR_GROUP);
       injectBuiltinInterventions();
@@ -3740,15 +3743,15 @@ async function init() {
     }
 
     // NEW: DayStructure tab
-    if (dayStructureText) {
-      const dsRows = csvToObjects(dayStructureText);
+    if (dayStructureRows.length) {
+      const dsRows = dayStructureRows;
       SHEET_DAY_STRUCTURES = dsRows;
       ROWS = buildDayStructure(dsRows, YEAR_GROUP);
     }
 
     // NEW: TPActivities tab
-    if (tpActivitiesText) {
-      TP_ACTIVITIES = csvToObjects(tpActivitiesText);
+    if (tpActivitiesRows.length) {
+      TP_ACTIVITIES = tpActivitiesRows;
     }
 
     migrateScheduleKeys();
