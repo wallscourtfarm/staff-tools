@@ -97,8 +97,8 @@
 
 <script>
 // ── Shared config (same source as planner.html) ─────────────────────────────
-const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
-const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+const SHARED_TOKEN = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
+const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
@@ -373,10 +373,10 @@ document.getElementById('nextWeek').onclick = () => goToWeek(weekIdx+1);
 async function init() {
   try {
     const cacheBuster = `&_cb=${Date.now()}`;
-    const get = tab => fetch(SHEET_BASE+encodeURIComponent(tab)+cacheBuster, { signal: AbortSignal.timeout(12000) }).then(r=>{if(!r.ok)throw new Error(tab);return r.text();});
-    const [staffTxt, termsTxt] = await Promise.all([get('Staff'), get('TermDates')]);
-    TEACHERS = buildTeachers(csvToObjects(staffTxt));
-    WEEKS = buildWeeks(csvToObjects(termsTxt));
+    const get = tab => fetch(GATEWAY_URL+'&action=getSheetTab&tab='+tab+cacheBuster, { signal: AbortSignal.timeout(12000) }).then(r=>{if(!r.ok)throw new Error(tab);return r.json();}).then(j=>{if(j.error)throw new Error(j.error);return j.rows;});
+    const [staffRows, termsRows] = await Promise.all([get('Staff'), get('TermDates')]);
+    TEACHERS = buildTeachers(staffRows);
+    WEEKS = buildWeeks(termsRows);
     weekIdx = currentWeekIdx();
     await refreshWeek();
   } catch (err) {
