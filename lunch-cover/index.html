@@ -217,11 +217,9 @@ const DUTY_PALETTE = ['#FCD34D','#86EFAC','#C084FC','#F9A8D4','#93C5FD','#FCA5A5
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const PALETTE = ['#1798d3','#f97316','#22c55e','#e879f9','#64748b','#ef4444','#8b5cf6'];
 
-const SHEET_ID   = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
-const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
-// Paste the deployed Apps Script URL here once sync-script.gs is deployed:
 const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
-const SYNC_URL        = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?key=wfa_lc&token=' + SHARED_TOKEN;
+const GATEWAY_URL     = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
+const SYNC_URL        = GATEWAY_URL + '&key=wfa_lc';
 const COVER_PLAN_URL  = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -939,17 +937,17 @@ async function init() {
   const status = document.getElementById('sheetStatus');
   try {
     const fetches = [
-      fetch(SHEET_BASE+'Staff').then(r => { if(!r.ok) throw new Error('Staff'); return r.text(); }),
-      fetch(SHEET_BASE+'TermDates').then(r => { if(!r.ok) throw new Error('Terms'); return r.text(); }),
-      fetch(SHEET_BASE+'DayTimings').then(r => r.ok ? r.text() : null).catch(() => null),
+      fetch(GATEWAY_URL+'&action=getSheetTab&tab=Staff').then(r => {if(!r.ok) throw new Error('Staff'); return r.json();}).then(j=>{if(j.error) throw new Error(j.error); return j.rows;}),
+      fetch(GATEWAY_URL+'&action=getSheetTab&tab=TermDates').then(r => {if(!r.ok) throw new Error('Terms'); return r.json();}).then(j=>{if(j.error) throw new Error(j.error); return j.rows;}),
+      fetch(GATEWAY_URL+'&action=getSheetTab&tab=DayTimings').then(r => r.ok ? r.json() : null).then(j=>j&&!j.error?j.rows:null).catch(() => null),
       fetch(COVER_PLAN_URL, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.text() : null).catch(() => null),
     ];
     if (SYNC_URL) fetches.push(fetch(SYNC_URL).then(r => r.text()).catch(() => null));
 
-    const [staffCsv, termsCsv, timingsCsv, plannerCsv, remoteRaw] = await Promise.all(fetches);
+    const [staffRows, termsRows, timingsRows, plannerCsv, remoteRaw] = await Promise.all(fetches);
 
-    const sheetStaff = buildStaff(csvToObjects(staffCsv));
-    const sheetWeeks = buildWeeks(csvToObjects(termsCsv));
+    const sheetStaff = buildStaff(staffRows);
+    const sheetWeeks = buildWeeks(termsRows);
 
     if (sheetStaff.length) STAFF = sheetStaff;
     if (sheetWeeks.length) {
@@ -958,8 +956,7 @@ async function init() {
       state.weekIdx = Math.max(0, Math.min(WEEKS.length-1, state.weekIdx));
     }
 
-    if (timingsCsv) {
-      const timingsRows = csvToObjects(timingsCsv);
+    if (timingsRows) {
       PM_START_MINS = buildPmStartMins(timingsRows);
     }
     if (plannerCsv) {
