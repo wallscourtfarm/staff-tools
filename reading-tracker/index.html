@@ -616,6 +616,7 @@ const SYNC_URL='https://script.google.com/macros/s/AKfycbwfNrj7V3wYussJ8ryDUSxlo
 // Hub roster (shared-sync getPupils over the planning sheet's Pupils tab) —
 // canonical school roster, all year groups. Seeded via scripts/seed_pupils.py.
 const HUB_ROSTER_URL='https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
+const HUB_TOKEN='050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05'; // shared-sync gateway token (rotated 2026-09-08) — distinct from this tool's own SYNC_URL token above
 // Shared light token (see shared-sync/sync-script.gs) — query string, not
 // headers, because fetches omit Content-Type to avoid CORS preflight.
 const WFA_TOKEN=localStorage.getItem('wfa_shared_token')||'2013';
@@ -800,7 +801,7 @@ function renderYrTabs(){
 const RT_YEAR_GROUPS=['Y3','Y4','Y5','Y6'];
 async function initHubRoster(){
   try{
-    const res=await fetch(HUB_ROSTER_URL+'?action=getPupils&t='+Date.now()+'&token='+WFA_TOKEN);
+    const res=await fetch(HUB_ROSTER_URL+'?action=getPupils&t='+Date.now()+'&token='+HUB_TOKEN);
     if(!res.ok)return;
     const d=await res.json();const ps=d.pupils||[];if(!ps.length)return;
     const byYr={};const hzByYr={};
@@ -989,7 +990,7 @@ function handlePinKey(p){
       // so the tracker still unlocks when offline.
       let good=null;
       try{
-        const r=await fetch(HUB_ROSTER_URL+'?action=checkPin&pin='+encodeURIComponent(p)+'&token='+WFA_TOKEN);
+        const r=await fetch(HUB_ROSTER_URL+'?action=checkPin&pin='+encodeURIComponent(p)+'&token='+HUB_TOKEN);
         const d=await r.json();
         if(typeof d.ok==='boolean')good=d.ok;
       }catch(e){}
