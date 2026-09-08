@@ -644,9 +644,10 @@ function checkPin(p) {
 // ── Generic hub-sheet tab reader ────────────────────────────────────────────
 // Replaces the old pattern of every tool fetching the hub sheet directly via
 // Google's public gviz CSV export (which only works while the sheet itself is
-// link-shared). Returns rows as objects keyed by lowercased header, same as
-// gviz would after CSV parsing, so client-side migration is a fetch/parse
-// swap only — table layout is unchanged.
+// link-shared). Returns rows as objects keyed by header, every value coerced
+// to a trimmed string (dates as dd/MM/yyyy) — matching what gviz's CSV export
+// + client-side csvToObjects() would have produced, so downstream code that
+// does e.g. r.Term.trim() keeps working unchanged.
 // GET ?action=getSheetTab&tab=TermDates&token=…
 const ALLOWED_TABS = [
   'TermDates', 'Staff', 'Config', 'DayTimings', 'DayStructure',
@@ -674,7 +675,9 @@ function getSheetTab(p) {
     hdr.forEach(function (h, idx) {
       if (!h) return;
       let v = r[idx];
-      if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+      else if (v === null || v === undefined) v = '';
+      else v = String(v).trim();
       obj[h] = v;
     });
     out.push(obj);
