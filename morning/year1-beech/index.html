@@ -2214,9 +2214,15 @@ async function loadTermDates(){
     let rows=null;
     if(cached){const c=JSON.parse(cached);if(c.ts&&(Date.now()-c.ts)<TTL)rows=c.rows;}
     if(!rows){
-      const url='https://docs.google.com/spreadsheets/d/1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw/gviz/tq?tqx=out:csv&sheet=TermDates';
-      const text=await fetch(url,{cache:'no-cache'}).then(r=>r.text());
-      rows=parseTermCsv(text);
+      const url='https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?action=getSheetTab&tab=TermDates&token=050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
+      const json=await fetch(url,{cache:'no-cache'}).then(r=>r.json());
+      rows=(json.rows||[]).map(r=>{
+        const term=parseInt(r.Term,10);
+        const p=(r.StartDate||'').split('/');
+        if(!term||p.length!==3)return null;
+        const d=new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0]));
+        return isNaN(d.getTime())?null:{term,start:d.getTime()};
+      }).filter(Boolean);
       localStorage.setItem(CACHE_KEY,JSON.stringify({ts:Date.now(),rows}));
     }
     curTerm=computeTerm(rows);
