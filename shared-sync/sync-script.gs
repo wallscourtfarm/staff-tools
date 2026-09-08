@@ -10,9 +10,11 @@
 //   wfa_lc   — Lunch Cover Rota
 //   wfa_ll   — Lunchtime Leaders
 
-// hub planning workbook (same sheet all staff tools read via gviz)
+// hub planning workbook — Drive sharing is Restricted (2026-09-08); every
+// tool now reads it through this gateway via getSheetTab/getPupils/getClasses
+// rather than the old public gviz CSV export.
 const HUB_SHEET_ID = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
-const PUPILS_TAB = 'Pupils';
+const PUPILS_TAB = 'Pupils'; // fallback only; First/Last pseudonymised 2026-09-08 (see MASTER_SHEET_ID below for the real source)
 
 function props() {
   return PropertiesService.getScriptProperties();
