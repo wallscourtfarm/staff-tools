@@ -23,7 +23,7 @@ HUB_URL = os.environ.get(
     "HUB_URL",
     "https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec",
 )
-HUB_TOKEN = os.environ.get("HUB_TOKEN", "2013")
+HUB_TOKEN = os.environ.get("HUB_TOKEN", "050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05")
 
 
 def fetch_hub_pupils():
