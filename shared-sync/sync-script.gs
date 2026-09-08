@@ -20,23 +20,26 @@ function props() {
 
 // Token gate. Token arrives in the query string (not a header) because client
 // fetches deliberately omit Content-Type to avoid the Apps Script CORS
-// preflight, and bulk-sync client POSTs opaque {key:value} maps. The token is
-// a light deterrence against scrapers and accidental overwrites — it ships in
-// the public HTML, like the staff PIN, so it is not a strong secret. Set the
-// SHARED_TOKEN Script Property to a random value later to raise the bar
-// (clients must then be redeployed with the new constant).
+// preflight, and bulk-sync client POSTs opaque {key:value} maps. Still a
+// client-embedded secret (ships in public HTML), so it deters scrapers and
+// accidental overwrites rather than being real access control — but it must
+// come from the SHARED_TOKEN Script Property, not a hardcoded fallback, so
+// rotating it here doesn't require redeploying this file too, and an unset
+// property fails closed instead of silently accepting a known default.
 function tokenOK(e) {
-  const want = props().getProperty('SHARED_TOKEN') || '2013';
+  const want = props().getProperty('SHARED_TOKEN');
+  if (!want) return false;
   return ((e.parameter || {}).token || '') === want;
 }
 
 function doGet(e) {
   try {
-    if (!tokenOK(e)) return json({ error: 'unauthorised' });
     const p = e.parameter || {};
+    if (!tokenOK(e)) return json({ error: 'unauthorised' });
     if (p.action === 'getPupils') return json(getPupils(p));
     if (p.action === 'getClasses') return json(getClasses(p));
     if (p.action === 'checkPin') return json(checkPin(p));
+    if (p.action === 'getSheetTab') return json(getSheetTab(p));
     const key = p.key;
     if (!key) return json({ error: 'missing key' });
     const data = props().getProperty(key);
@@ -631,12 +634,52 @@ function seedPupils(e) {
 }
 
 // One staff PIN for all tools. Set the STAFF_PIN Script Property to change it
-// everywhere at once (client fallback is '2013' while offline). Light check —
-// the shared token above is the real gate; this exists so staff PINs can be
-// rotated in one place instead of per-tool.
+// everywhere at once. No hardcoded fallback — an unset property fails closed.
 function checkPin(p) {
-  const want = props().getProperty('STAFF_PIN') || '2013';
+  const want = props().getProperty('STAFF_PIN');
+  if (!want) return { ok: false };
   return { ok: ((p || {}).pin || '') === want };
+}
+
+// ── Generic hub-sheet tab reader ────────────────────────────────────────────
+// Replaces the old pattern of every tool fetching the hub sheet directly via
+// Google's public gviz CSV export (which only works while the sheet itself is
+// link-shared). Returns rows as objects keyed by lowercased header, same as
+// gviz would after CSV parsing, so client-side migration is a fetch/parse
+// swap only — table layout is unchanged.
+// GET ?action=getSheetTab&tab=TermDates&token=…
+const ALLOWED_TABS = [
+  'TermDates', 'Staff', 'Config', 'DayTimings', 'DayStructure',
+  'Interventions', 'CalendarEvents', 'EventsMeetings', 'DayActivities',
+  'RecurringCover', 'SubjectGroups', 'Resources', 'Bookings',
+  'ActivityExceptions', 'PlannerState', 'Setup', 'SchoolEvents', 'Recurring'
+];
+
+function getSheetTab(p) {
+  const tab = String((p || {}).tab || '').trim();
+  if (!tab) return { error: 'missing tab' };
+  if (ALLOWED_TABS.indexOf(tab) < 0) return { error: 'tab not allowed: ' + tab };
+  const ss = SpreadsheetApp.openById(HUB_SHEET_ID);
+  const sh = ss.getSheetByName(tab);
+  if (!sh) return { error: 'tab not found: ' + tab };
+  const rows = sh.getDataRange().getValues();
+  if (rows.length < 1) return { rows: [] };
+  const hdr = rows[0].map(function (h) { return String(h).trim(); });
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    // Skip fully-blank rows (gviz would omit these too)
+    if (r.every(function (v) { return v === '' || v === null; })) continue;
+    const obj = {};
+    hdr.forEach(function (h, idx) {
+      if (!h) return;
+      let v = r[idx];
+      if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      obj[h] = v;
+    });
+    out.push(obj);
+  }
+  return { tab: tab, rows: out };
 }
 
 function json(obj) {
