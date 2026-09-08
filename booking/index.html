@@ -394,8 +394,8 @@
 
 <script>
 // ── Config ──────────────────────────────────────────────────────────────────
-const SHEET_ID        = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
-const SHEET_BASE      = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
+const GATEWAY_URL     = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
 const SYNC_URL        = 'https://script.google.com/macros/s/AKfycbwzNtos0vdjnUhsFQ_igTtLNXyBd8k9c6rPkA0IZdkM3vJLAoIdSHonTbHAbyFNfH_BWQ/exec';
 const COVER_PLAN_URL  = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
 const FAB_ROTA_URL    = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
@@ -1836,17 +1836,18 @@ async function init() {
   renderGrid();
 
   try {
-    const [termsText, eventsText, calEventsText, resourcesText] = await Promise.all([
-      fetch(SHEET_BASE + encodeURIComponent('TermDates')).then(r => { if (!r.ok) throw new Error('TermDates tab not found'); return r.text(); }),
-      fetch(SHEET_BASE + encodeURIComponent('Events')).then(r => r.ok ? r.text() : '').catch(() => ''),
-      fetch(SHEET_BASE + encodeURIComponent('CalendarEvents')).then(r => r.ok ? r.text() : '').catch(() => ''),
-      fetch(SHEET_BASE + encodeURIComponent('Resources')).then(r => r.ok ? r.text() : '').catch(() => ''),
+    const fetchTab = tab => fetch(GATEWAY_URL + '&action=getSheetTab&tab=' + tab)
+      .then(r => r.ok ? r.json() : null).then(j => j && !j.error ? j.rows : []).catch(() => []);
+    const [termsRows, eventsRows, calEventsRows, resourcesRows] = await Promise.all([
+      fetchTab('TermDates').then(rows => { if (!rows.length) throw new Error('TermDates tab not found'); return rows; }),
+      fetchTab('Events'),
+      fetchTab('CalendarEvents'),
+      fetchTab('Resources'),
     ]);
 
     // Load resources from sheet if available
-    if (resourcesText) {
-      const resourceRows = csvToObjects(resourcesText);
-      const sheetResources = buildResources(resourceRows);
+    if (resourcesRows.length) {
+      const sheetResources = buildResources(resourcesRows);
       if (sheetResources.length > 0) {
         RESOURCES = sheetResources;
         renderSidebar(); // Re-render with sheet resources
@@ -1854,12 +1855,9 @@ async function init() {
       }
     }
 
-    WEEKS = buildWeeks(csvToObjects(termsText));
+    WEEKS = buildWeeks(termsRows);
     {
-      const evtRows = [
-        ...(eventsText    ? csvToObjects(eventsText)    : []),
-        ...(calEventsText ? csvToObjects(calEventsText) : []),
-      ];
+      const evtRows = [...eventsRows, ...calEventsRows];
       if (evtRows.length) {
         state.nonSchoolDays = buildNonSchoolDays(evtRows);
         state.schoolEvents  = buildSchoolEvents(evtRows);
