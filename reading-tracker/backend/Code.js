@@ -8,10 +8,26 @@ function tokenOK(e) {
   return !!(e && e.parameter && e.parameter.token && e.parameter.token === expected);
 }
 
+// Teacher "backdoor" PIN (logo triple-tap on the tracker) — scoped to this
+// tool only, deliberately separate from shared-sync's STAFF_PIN. The page is
+// already behind Cloudflare Access, so this PIN's job is just to stop a pupil
+// on a shared classroom device wandering into edit mode, not to gate access
+// on its own. Value lives in this project's own Script Properties.
+function checkPin_(e) {
+  const want = PropertiesService.getScriptProperties().getProperty('TEACHER_PIN');
+  const pin = (e && e.parameter && e.parameter.pin) || '';
+  const ok = !!want && pin === want;
+  return ContentService.createTextOutput(JSON.stringify({ ok: ok }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function doGet(e) {
   if (!tokenOK(e)) {
     return ContentService.createTextOutput('{"error":"unauthorised"}')
       .setMimeType(ContentService.MimeType.JSON);
+  }
+  if (e.parameter && e.parameter.action === 'checkPin') {
+    return checkPin_(e);
   }
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
