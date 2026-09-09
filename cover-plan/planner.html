@@ -405,7 +405,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(07.09.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(09.09.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -952,10 +952,16 @@ function setSyncStatus(state) {
 
 // ── State persistence ─────────────────────────────────────────────────────────
 function stateSave() {
-  // Only push fully-configured entries — an in-progress "— Select —" one
-  // (day/session still null) shouldn't overwrite a real value elsewhere.
-  const sportsSchedule = wsEvents.filter(e => e.sport && e.day != null && e.session).map(e => ({ yg: e.yg, day: e.day, session: e.session, provider: e.provider || '' }));
-  const json = JSON.stringify({ weekSlots: state.weekSlots, cellNotes: state.cellNotes, nextId: state.nextId, sportsSchedule });
+  // sportsSchedule is deliberately NOT rebuilt from wsEvents here. It used to
+  // be, which meant every unrelated edit (marking cover, PPA, anything) sent
+  // this browser's local sports cache along with it — so any device whose
+  // wfa_ws_events cache still held an old/wrong sports schedule would
+  // silently overwrite the real shared one on its very next ordinary save.
+  // Confirmed to have happened twice (see [[project_cover_plan_sports_schedule_bug]]).
+  // SERVER_SPORTS_SCHEDULE is the last-known-good copy (from stateLoad(), or
+  // updated in lockstep by updateSport() when an admin actually changes a
+  // fixture) — every save just echoes it straight back unchanged.
+  const json = JSON.stringify({ weekSlots: state.weekSlots, cellNotes: state.cellNotes, nextId: state.nextId, sportsSchedule: SERVER_SPORTS_SCHEDULE });
   try { localStorage.setItem('wfa_planner_state', json); } catch(e) {}
   setSyncStatus('syncing');
   fetch(SYNC_URL, { method:'POST', body:json, signal: AbortSignal.timeout(8000) })
@@ -2056,6 +2062,14 @@ function updateSport(yg, field, value) {
   ev.label = yg + ' Sports' + (ev.provider ? ` (${ev.provider})` : '');
   ev.bg = SPORT_YG_COLOURS[yg];
   wsSave();
+  // Keep SERVER_SPORTS_SCHEDULE (what every stateSave() now echoes back
+  // unchanged) in lockstep with this edit — it's the only place that's
+  // allowed to change it.
+  if (ev.day != null && ev.session) {
+    const entry = { yg, day: ev.day, session: ev.session, provider: ev.provider || '' };
+    const idx = SERVER_SPORTS_SCHEDULE.findIndex(s => s.yg === yg);
+    if (idx >= 0) SERVER_SPORTS_SCHEDULE[idx] = entry; else SERVER_SPORTS_SCHEDULE.push(entry);
+  }
   // Push to the server immediately rather than waiting for some unrelated
   // edit to carry it along — this is what let the schedule drift out of
   // sync before (see ensureAllSports()).
