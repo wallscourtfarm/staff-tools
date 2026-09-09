@@ -43,7 +43,7 @@
 <div class="wrap">
   <header>
     <h1>Lunch Menu Admin</h1>
-    <span id="version-tag">07.09.26c</span>
+    <span id="version-tag">09.09.26a</span>
   </header>
   <p class="sub">Wallscourt Farm Academy — override or swap the lunch menu shown on every year group's morning display board. Changes appear on all boards within about a minute, and revert automatically the day after.</p>
 
@@ -93,6 +93,7 @@
 
 <script>
 const URL_BASE='https://script.google.com/macros/s/AKfycbz0yYbvPGa7csQYwJAQg7NTRYrbNjt-wgz4XYjdSEJ1GxuV2rQornoKicohiKDoBbhC/exec';
+const ADMIN_TOKEN='52bbee9d248dc78cfe394b7e4a6386ed05cd8bb580ee3fe0';
 
 function todayStr(){const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`}
 function fmtDate(ds){
@@ -101,7 +102,7 @@ function fmtDate(ds){
 }
 
 async function post(action,body){
-  const res=await fetch(URL_BASE,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({action},body))});
+  const res=await fetch(URL_BASE,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({action,token:ADMIN_TOKEN},body))});
   const data=await res.json();
   if(!data.ok)throw new Error(data.error||'Something went wrong');
   return data.data;
