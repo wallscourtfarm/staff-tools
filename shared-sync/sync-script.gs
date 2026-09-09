@@ -58,6 +58,7 @@ function doPost(e) {
     const p = e.parameter || {};
     if (p.action === 'seedPupils') return seedPupils(e);
     if (p.action === 'importPupils') return importPupils(e);
+    if (p.action === 'markLeavers') return markLeavers(e);
     if (p.action === 'updateClasses') return updateClasses(e);
     const key = p.key;
     if (!key) return json({ error: 'missing key' });
@@ -573,6 +574,70 @@ function importPupils(e) {
     rejectedNoUpn: rejectedNoUpn,
     classesAdded: classesAdded,
     safetyValve: false
+  });
+}
+
+// ── Manual leaver marking (roster-import "Missing from this import" list) ─
+//
+// POST ?action=markLeavers&token=… with a raw JSON body:
+//   { upns: ['A123456789012', …] }
+//
+// Bromcom's export never marks a leaver with NA — leavers simply aren't in
+// the file at all, so importPupils deliberately leaves them alone (see the
+// notInPayload comment above importPupils). This is the explicit, one-at-a-
+// time confirmation step for turning "missing from an import" into "left":
+// nothing here is automatic, every UPN passed in was hand-picked by staff
+// from that import's missing list.
+function markLeavers(e) {
+  const body = JSON.parse(e.postData.contents || '{}');
+  const upns = (body.upns || []).map(function (u) { return String(u || '').trim(); }).filter(Boolean);
+  if (!upns.length) return json({ status: 'error', message: 'upns array is empty' });
+
+  const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
+  const sh = ss.getSheetByName(MASTER_PUPILS_TAB);
+  if (!sh) return json({ status: 'error', message: MASTER_PUPILS_TAB + ' tab missing' });
+
+  const allRows = sh.getDataRange().getValues();
+  const hdr = allRows[0].map(function (h) { return String(h).trim().toLowerCase(); });
+  const ix = function (name) { return hdr.indexOf(name); };
+  const upnIx = ix('upn');
+  const statusIx = ix('status');
+  const duIx = ix('date_updated');
+  if (upnIx < 0 || statusIx < 0) return json({ status: 'error', message: 'upn/status column missing' });
+
+  const wantedUpns = {};
+  upns.forEach(function (u) { wantedUpns[u] = true; });
+
+  const today = _today();
+  let leftMarked = 0;
+  const notFound = [];
+  const alreadyLeft = [];
+  const foundUpns = {};
+
+  for (let i = 1; i < allRows.length; i++) {
+    const upn = String(allRows[i][upnIx] || '').trim();
+    if (!upn || !wantedUpns[upn]) continue;
+    foundUpns[upn] = true;
+    const status = String(allRows[i][statusIx] || '').trim().toLowerCase();
+    if (status === 'left') { alreadyLeft.push(upn); continue; }
+    const range = sh.getRange(i + 1, statusIx + 1);
+    range.setNumberFormat('@');
+    range.setValue('left');
+    if (duIx >= 0) {
+      const duRange = sh.getRange(i + 1, duIx + 1);
+      duRange.setNumberFormat('@');
+      duRange.setValue(today);
+    }
+    leftMarked++;
+  }
+
+  upns.forEach(function (u) { if (!foundUpns[u]) notFound.push(u); });
+
+  return json({
+    status: 'ok',
+    leftMarked: leftMarked,
+    alreadyLeft: alreadyLeft,
+    notFound: notFound
   });
 }
 
