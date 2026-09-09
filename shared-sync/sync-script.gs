@@ -742,7 +742,21 @@ function getSheetTab(p) {
     hdr.forEach(function (h, idx) {
       if (!h) return;
       let v = r[idx];
-      if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+      if (v instanceof Date) {
+        // A cell entered as a bare time (e.g. "15:00", no dash — DayTimings'
+        // Home Time row) comes back from getValues() as a Date on the Sheets
+        // serial-0 epoch (30/12/1899) with only the time-of-day set. Blindly
+        // formatting every Date as dd/MM/yyyy turned that into the literal
+        // string "30/12/1899" — teaching-schedule's row-overlap code then
+        // parsed that as if it were a real (very early) time, so it silently
+        // matched every event's time range and any spanning bar (a resource
+        // booking, cover slot) got dragged all the way down to the Home Time
+        // row. Format epoch-dated values as a time instead.
+        const tz = Session.getScriptTimeZone();
+        v = (Utilities.formatDate(v, tz, 'yyyy-MM-dd') === '1899-12-30')
+          ? Utilities.formatDate(v, tz, 'HH:mm')
+          : Utilities.formatDate(v, tz, 'dd/MM/yyyy');
+      }
       else if (v === null || v === undefined) v = '';
       else v = String(v).trim();
       obj[h] = v;
