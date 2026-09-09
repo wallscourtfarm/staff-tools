@@ -88,7 +88,6 @@ input[type=file]{display:none}
     </div>
 
     <div id="rejectedNotice" class="notice" style="display:none"></div>
-    <div id="missingNotice" class="notice" style="display:none"></div>
 
     <div class="section" id="secNew" style="display:none">
       <h3>New pupils</h3>
@@ -105,6 +104,16 @@ input[type=file]{display:none}
 
     <button class="applybtn" id="applyBtn">✅ Apply changes</button>
     <div id="applyResult"></div>
+  </div>
+
+  <div id="missingCard" class="card" style="display:none">
+    <h2>Missing from this import</h2>
+    <p class="hint">Bromcom's export doesn't flag leavers — they just aren't in the file. Nothing here is changed
+    automatically. Tick anyone who has actually left the school and confirm below; everyone else stays active
+    untouched (they may simply be in a different export, e.g. a different year group).</p>
+    <div id="listMissing"></div>
+    <button class="applybtn" id="markLeaversBtn" disabled>🚪 Mark selected as leavers</button>
+    <div id="markLeaversResult"></div>
   </div>
 
   <div class="card">
@@ -126,7 +135,7 @@ input[type=file]{display:none}
   </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-09.09.26a</div>
+<div class="version">WFA Roster Import · WFA-09.09.26b</div>
 
 <script>
 const HUB_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
@@ -300,12 +309,7 @@ function buildPreview(normalised, hubPupils, rejectedNoUpn){
     rejNotice.textContent = '⚠️ ' + rejectedNoUpn + ' row(s) had no UPN and were skipped entirely.';
   } else rejNotice.style.display = 'none';
 
-  const missNotice = document.getElementById('missingNotice');
-  if (missing.length > 0) {
-    missNotice.style.display = 'block';
-    missNotice.textContent = '📋 ' + missing.length + ' pupil(s) currently active are not in this file at all. ' +
-      'They will be left untouched (not marked as leavers) — only rows explicitly marked as leaving in Bromcom are changed.';
-  } else missNotice.style.display = 'none';
+  fillMissingSection(missing);
 
   fillSection('secNew', 'listNew', newPupils, function(p){
     return rowHtml(p.first_name + ' ' + p.last_name, p.year_group, 'join');
@@ -353,6 +357,29 @@ function fillSection(sectionId, listId, items, renderer){
   list.innerHTML = items.map(renderer).join('');
 }
 
+function fillMissingSection(missing){
+  const card = document.getElementById('missingCard');
+  const list = document.getElementById('listMissing');
+  document.getElementById('markLeaversResult').innerHTML = '';
+  if (!missing.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  list.innerHTML = missing.map(function(p){
+    return '<div class="list-item"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1">' +
+      '<input type="checkbox" class="missingCheck" data-upn="' + esc(p.upn) + '">' +
+      '<span>' + esc((p.first || '') + ' ' + (p.last || '')) + '</span></label>' +
+      (p.class ? '<span class="badge">' + esc(p.class) + '</span>' : '') + '</div>';
+  }).join('');
+  list.querySelectorAll('.missingCheck').forEach(function(cb){
+    cb.addEventListener('change', updateMarkLeaversBtn);
+  });
+  updateMarkLeaversBtn();
+}
+
+function updateMarkLeaversBtn(){
+  const any = document.querySelectorAll('.missingCheck:checked').length > 0;
+  document.getElementById('markLeaversBtn').disabled = !any;
+}
+
 function esc(s){
   return String(s).replace(/[&<>"']/g, function(c){
     return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
@@ -392,6 +419,35 @@ document.getElementById('applyBtn').addEventListener('click', async function(){
     btn.textContent = '✅ Apply changes';
     btn.disabled = false;
   }
+});
+
+document.getElementById('markLeaversBtn').addEventListener('click', async function(){
+  const checked = Array.from(document.querySelectorAll('.missingCheck:checked'));
+  if (!checked.length) return;
+  const upns = checked.map(function(cb){ return cb.dataset.upn; });
+  const btn = this;
+  btn.disabled = true;
+  btn.textContent = 'Marking…';
+  const resultEl = document.getElementById('markLeaversResult');
+  resultEl.innerHTML = '';
+  try {
+    const url = HUB_URL + '?action=markLeavers&token=' + encodeURIComponent(WFA_TOKEN);
+    const r = await fetch(url, { method: 'POST', body: JSON.stringify({ upns: upns }) });
+    const data = await r.json();
+    if (data.status !== 'ok') throw new Error(data.message || 'unknown error');
+    resultEl.innerHTML = '<div class="success">✓ ' + data.leftMarked + ' pupil(s) marked as left.' +
+      (data.alreadyLeft && data.alreadyLeft.length ? ' (' + data.alreadyLeft.length + ' were already marked left.)' : '') +
+      '<br><span class="collapsed-hint">Every WFA tool will see this the next time it loads.</span></div>';
+    checked.forEach(function(cb){ cb.closest('.list-item').remove(); });
+    const remaining = document.querySelectorAll('#listMissing .list-item').length;
+    document.getElementById('mMissing').textContent = remaining;
+    if (!remaining) document.getElementById('missingCard').style.display = 'none';
+    btn.textContent = '🚪 Mark selected as leavers';
+  } catch (err) {
+    resultEl.innerHTML = '<div class="aborted">Network error: ' + esc(err.message) + '</div>';
+    btn.textContent = '🚪 Mark selected as leavers';
+  }
+  updateMarkLeaversBtn();
 });
 
 // ── Class names ──────────────────────────────────────────────────────────
