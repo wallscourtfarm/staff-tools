@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-07.09.26b</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-09.09.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1374,7 +1374,13 @@ function staffBelongsToYearGroup(fabStaffId, yearGroup, supplyYg = null) {
 function timeToMins(t) {
   if (!t) return null;
   const [h, m] = t.split(':').map(Number);
-  return (h || 0) * 60 + (m || 0);
+  // Any unparseable value (e.g. a malformed sheet cell) must fail closed as
+  // "no time", not silently coerce to midnight via `h || 0` — that made a
+  // garbage row time overlap every event's time range (see the getSheetTab
+  // Date-formatting fix in shared-sync/sync-script.gs for the actual source
+  // of the garbage, and project_teaching_schedule_booking_overlay).
+  if (!Number.isFinite(h)) return null;
+  return h * 60 + (Number.isFinite(m) ? m : 0);
 }
 function bookingMatchesYearGroup(booking) {
   if (!booking.yearGroup) return false;
@@ -1431,9 +1437,9 @@ const SPORTS_PROVIDER_NAMES = { AB: 'AB Sports', Brs: 'Bristol Sports' };
 // Map cover-plan sessions to teaching-schedule row IDs
 const COVER_SESSION_MAP = {
   'Before School': { start: 'reg-am', end: 'reg-am' },
-  'AM': { start: 's1', end: 'lunch' },           // Session 1 through to end of lunchtime (before PM reg)
+  'AM': { start: 's1', end: 'wash' },            // Session 1 up to the start of lunchtime (not into it)
   'Lunch': { start: 'lunch', end: 'lunch' },
-  'PM': { start: 'lunch', end: 'home' },         // Lunchtime through to end of school day (Home Time)
+  'PM': { start: 'reg-pm', end: 'home' },        // PM registration through to end of school day (Home Time)
   'After School': { start: 'after', end: 'after' }
 };
 
