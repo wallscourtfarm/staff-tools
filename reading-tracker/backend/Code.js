@@ -46,13 +46,11 @@ function doPost(e) {
     return ContentService.createTextOutput('{"error":"unauthorised"}')
       .setMimeType(ContentService.MimeType.JSON);
   }
-  // Multiple laptops can POST within the same second, and this sheet is now
-  // large enough that a read-modify-write cycle (read all rows, look up or
-  // append) takes several seconds — without a lock, two concurrent doPost
-  // calls both read the sheet before either has written, so they can both
-  // decide a key is "new" and append duplicate rows for it (doGet then
-  // returns whichever duplicate happens to sit lower in the sheet), or one
-  // write can simply overwrite the other's. Serializing here closes that gap.
+  // Multiple laptops can POST within the same second, so without a lock two
+  // concurrent doPost calls could both decide a key is "new" and append
+  // duplicate rows for it (doGet then returns whichever duplicate happens
+  // to sit lower in the sheet), or one write could simply overwrite the
+  // other's. Serializing here closes that gap.
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(20000);
@@ -65,14 +63,20 @@ function doPost(e) {
     let sheet = ss.getSheetByName(SHEET_NAME);
     if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
     const payload = JSON.parse(e.postData.contents);
-    const data = sheet.getLastRow() > 0 ? sheet.getDataRange().getValues() : [];
-    const rowMap = {};
-    for (let i = 0; i < data.length; i++) {
-      if (data[i][0]) rowMap[String(data[i][0])] = i + 1;
-    }
+    // The sheet has ~8000 rows and keeps growing — pulling every row's key
+    // AND value into memory (getDataRange().getValues()) just to look up a
+    // handful of keys was measured at 10+ seconds per write while holding
+    // the lock above, which is most of why syncing felt slow and why a slow
+    // write could get starved out by another device's write queued behind
+    // the same lock. TextFinder searches column A server-side instead, so a
+    // typical write (a handful of keys) no longer pays for the whole
+    // sheet's size.
+    const lastRow = sheet.getLastRow();
+    const keyCol = lastRow > 0 ? sheet.getRange(1, 1, lastRow, 1) : null;
     for (const [key, value] of Object.entries(payload)) {
-      if (rowMap[key]) {
-        sheet.getRange(rowMap[key], 2).setValue(value);
+      const found = keyCol ? keyCol.createTextFinder(key).matchEntireCell(true).matchCase(true).findNext() : null;
+      if (found) {
+        sheet.getRange(found.getRow(), 2).setValue(value);
       } else {
         sheet.appendRow([key, value]);
       }
