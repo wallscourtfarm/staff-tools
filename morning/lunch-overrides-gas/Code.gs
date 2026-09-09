@@ -16,6 +16,18 @@
 var PROP_KEY = 'LUNCH_DATA';
 var TZ = 'Europe/London';
 
+// doGet stays fully open — every classroom board reads from it with no
+// friction, by design. doPost (the only thing that changes shared state)
+// requires this token, which lives only in Script Properties, never in
+// source — the exec URL itself is unavoidably visible in every board's
+// page source, so an unauthenticated write here would let anyone who
+// looks reach it directly, same class of bug fixed elsewhere today.
+function adminTokenOK_(body) {
+  var want = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
+  if (!want) return false;
+  return String(body.token || '') === want;
+}
+
 function getData_() {
   var raw = PropertiesService.getScriptProperties().getProperty(PROP_KEY);
   if (!raw) return { overrides: {}, swaps: {} };
@@ -67,13 +79,15 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  var data = getData_();
   var body;
   try {
     body = JSON.parse(e.postData.contents);
   } catch (err) {
     return json_({ ok: false, error: 'bad json' });
   }
+  if (!adminTokenOK_(body)) return json_({ ok: false, error: 'unauthorised' });
+
+  var data = getData_();
   var action = body.action;
 
   if (action === 'setOverride') {
