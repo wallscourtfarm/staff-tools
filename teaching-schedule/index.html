@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-09.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-09.09.26b</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -3687,20 +3687,33 @@ async function init() {
   ]);
 
   try {
-    const fetchTab = (tab, required) => fetch(GATEWAY_URL + '&action=getSheetTab&tab=' + tab)
-      .then(r => { if (!r.ok) throw new Error(tab + ' tab not found'); return r.json(); })
-      .then(j => { if (j.error) throw new Error(j.error); return j.rows; })
-      .catch(err => { if (required) throw err; return []; });
-    const [termsRows, eventsRows, schoolEventsRows, staffRows0, subjectGroupsRows, interventionsRows, dayStructureRows, tpActivitiesRows] = await Promise.all([
-      fetchTab('TermDates', true),
-      fetchTab('CalendarEvents', false),
-      fetchTab('EventsMeetings', false),
-      fetchTab('Staff', false),
-      fetchTab('SubjectGroups', false),
-      fetchTab('Interventions', false),
-      fetchTab('DayTimings', false),
-      fetchTab('DayActivities', false),
-    ]);
+    // One request for all 8 tabs, not 8 separate ones. Apps Script pays a
+    // ~2-4s per-request execution/open-spreadsheet cost regardless of what
+    // it does — 8 concurrent requests to the same deployment don't run in
+    // true parallel, so the page used to hang on its default year group for
+    // several seconds waiting on the slowest of the 8 (this got much worse
+    // after the 08.09.26 gviz→gateway migration, which is when these became
+    // Apps Script calls instead of near-instant CSV reads). See
+    // project_teaching_schedule_perf and the getSheetTabs() comment in
+    // shared-sync/sync-script.gs.
+    const NEEDED_TABS = ['TermDates','CalendarEvents','EventsMeetings','Staff','SubjectGroups','Interventions','DayTimings','DayActivities'];
+    const tabsRes = await fetch(GATEWAY_URL + '&action=getSheetTabs&tabs=' + NEEDED_TABS.join(','));
+    if (!tabsRes.ok) throw new Error('getSheetTabs request failed');
+    const tabsJson = await tabsRes.json();
+    if (tabsJson.error) throw new Error(tabsJson.error);
+    const tabRows = (tab, required) => {
+      const entry = (tabsJson.tabs || {})[tab];
+      if (!entry || entry.error) { if (required) throw new Error((entry && entry.error) || (tab + ' tab not found')); return []; }
+      return entry.rows || [];
+    };
+    const termsRows = tabRows('TermDates', true);
+    const eventsRows = tabRows('CalendarEvents', false);
+    const schoolEventsRows = tabRows('EventsMeetings', false);
+    const staffRows0 = tabRows('Staff', false);
+    const subjectGroupsRows = tabRows('SubjectGroups', false);
+    const interventionsRows = tabRows('Interventions', false);
+    const dayStructureRows = tabRows('DayTimings', false);
+    const tpActivitiesRows = tabRows('DayActivities', false);
     WEEKS = buildWeeks(termsRows);
     if (eventsRows.length) {
       const evtRows = eventsRows;

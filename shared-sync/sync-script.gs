@@ -42,6 +42,7 @@ function doGet(e) {
     if (p.action === 'getClasses') return json(getClasses(p));
     if (p.action === 'checkPin') return json(checkPin(p));
     if (p.action === 'getSheetTab') return json(getSheetTab(p));
+    if (p.action === 'getSheetTabs') return json(getSheetTabs(p));
     const key = p.key;
     if (!key) return json({ error: 'missing key' });
     const data = props().getProperty(key);
@@ -723,15 +724,11 @@ const ALLOWED_TABS = [
   'ActivityExceptions', 'PlannerState', 'Setup', 'SchoolEvents', 'Recurring', 'Events'
 ];
 
-function getSheetTab(p) {
-  const tab = String((p || {}).tab || '').trim();
-  if (!tab) return { error: 'missing tab' };
-  if (ALLOWED_TABS.indexOf(tab) < 0) return { error: 'tab not allowed: ' + tab };
-  const ss = SpreadsheetApp.openById(HUB_SHEET_ID);
-  const sh = ss.getSheetByName(tab);
-  if (!sh) return { error: 'tab not found: ' + tab };
+// Shared row-extraction used by both getSheetTab (one tab) and getSheetTabs
+// (several tabs in one execution — see below for why that split exists).
+function readTabRows(sh) {
   const rows = sh.getDataRange().getValues();
-  if (rows.length < 1) return { rows: [] };
+  if (rows.length < 1) return [];
   const hdr = rows[0].map(function (h) { return String(h).trim(); });
   const out = [];
   for (let i = 1; i < rows.length; i++) {
@@ -763,7 +760,44 @@ function getSheetTab(p) {
     });
     out.push(obj);
   }
-  return { tab: tab, rows: out };
+  return out;
+}
+
+function getSheetTab(p) {
+  const tab = String((p || {}).tab || '').trim();
+  if (!tab) return { error: 'missing tab' };
+  if (ALLOWED_TABS.indexOf(tab) < 0) return { error: 'tab not allowed: ' + tab };
+  const ss = SpreadsheetApp.openById(HUB_SHEET_ID);
+  const sh = ss.getSheetByName(tab);
+  if (!sh) return { error: 'tab not found: ' + tab };
+  return { tab: tab, rows: readTabRows(sh) };
+}
+
+// GET ?action=getSheetTabs&tabs=TermDates,Staff,SubjectGroups&token=…
+// Reads several tabs in ONE script execution. A tool that needs N tabs at
+// load (teaching-schedule needs 8) used to fire N separate getSheetTab
+// requests — each one pays Apps Script's own per-request overhead
+// (SpreadsheetApp.openById + execution start-up), independently measured at
+// ~2-4s *each* even when the N requests are fired concurrently client-side
+// (Apps Script doesn't parallelize genuinely — see
+// project_teaching_schedule_perf's follow-up). That's what caused
+// teaching-schedule's load to hang on its default year group for several
+// seconds after the 08.09.26 gviz→gateway migration. Opening the spreadsheet
+// once and reading every requested tab inside that single execution avoids
+// paying that overhead N times.
+function getSheetTabs(p) {
+  const tabsParam = String((p || {}).tabs || '').trim();
+  if (!tabsParam) return { error: 'missing tabs' };
+  const requested = tabsParam.split(',').map(function (t) { return t.trim(); }).filter(Boolean);
+  const ss = SpreadsheetApp.openById(HUB_SHEET_ID);
+  const result = {};
+  requested.forEach(function (tab) {
+    if (ALLOWED_TABS.indexOf(tab) < 0) { result[tab] = { error: 'tab not allowed: ' + tab }; return; }
+    const sh = ss.getSheetByName(tab);
+    if (!sh) { result[tab] = { error: 'tab not found: ' + tab }; return; }
+    result[tab] = { rows: readTabRows(sh) };
+  });
+  return { tabs: result };
 }
 
 function json(obj) {
