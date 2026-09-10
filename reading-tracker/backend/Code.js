@@ -73,12 +73,28 @@ function doPost(e) {
     // sheet's size.
     const lastRow = sheet.getLastRow();
     const keyCol = lastRow > 0 ? sheet.getRange(1, 1, lastRow, 1) : null;
-    for (const [key, value] of Object.entries(payload)) {
+    for (const [key, entry] of Object.entries(payload)) {
+      // Every write carries the timestamp of the moment it was actually
+      // made (set client-side when the user's edit happens, not when the
+      // network request fires) as {v, t}. A key already holding a newer
+      // timestamp than this write can never be overwritten by it, no
+      // matter which device, which race, or which stale/zombie browser tab
+      // it comes from — this is what makes "a value reverts to an older
+      // one" structurally impossible instead of just unlikely. A bare
+      // (non-{v,t}) value is treated as t=0, the lowest priority: it's
+      // either a client from before this safeguard shipped, or a
+      // low-confidence backfill (see autoMigrateRenamedClasses), and it can
+      // only land on a key nothing has written a real timestamp to yet.
+      const hasTs = entry && typeof entry === 'object' && 'v' in entry;
+      const value = hasTs ? entry.v : entry;
+      const ts = hasTs ? (Number(entry.t) || 0) : 0;
       const found = keyCol ? keyCol.createTextFinder(key).matchEntireCell(true).matchCase(true).findNext() : null;
       if (found) {
-        sheet.getRange(found.getRow(), 2).setValue(value);
+        const existingTs = Number(sheet.getRange(found.getRow(), 3).getValue()) || 0;
+        if (ts < existingTs) continue;
+        sheet.getRange(found.getRow(), 2, 1, 2).setValues([[value, ts]]);
       } else {
-        sheet.appendRow([key, value]);
+        sheet.appendRow([key, value, ts]);
       }
     }
     return ContentService.createTextOutput('ok').setMimeType(ContentService.MimeType.TEXT);
