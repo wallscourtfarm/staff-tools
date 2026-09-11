@@ -195,7 +195,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunch Cover Rota · WFA-04.09.26a</footer>
+<footer>Wallscourt Farm Academy · Lunch Cover Rota · WFA-11.09.26a</footer>
 
 <script>
 // ── Duties config ─────────────────────────────────────────────────────────────
@@ -936,15 +936,26 @@ async function init() {
 
   const status = document.getElementById('sheetStatus');
   try {
+    // Staff/TermDates/DayTimings in one combined request rather than 3
+    // separate ones — Apps Script doesn't run concurrent requests to the same
+    // deployment in true parallel, so 3 "parallel" calls actually queue
+    // behind each other (measured live elsewhere spiking past 25s). See
+    // cover-plan/planner.html's init() for the numbers this is based on.
+    const tabsPromise = fetch(GATEWAY_URL+'&action=getSheetTabs&tabs=Staff,TermDates,DayTimings', { signal: AbortSignal.timeout(20000) })
+      .then(r => { if (!r.ok) throw new Error('getSheetTabs request failed'); return r.json(); })
+      .then(j => { if (j.error) throw new Error(j.error); return j.tabs || {}; });
     const fetches = [
-      fetch(GATEWAY_URL+'&action=getSheetTab&tab=Staff').then(r => {if(!r.ok) throw new Error('Staff'); return r.json();}).then(j=>{if(j.error) throw new Error(j.error); return j.rows;}),
-      fetch(GATEWAY_URL+'&action=getSheetTab&tab=TermDates').then(r => {if(!r.ok) throw new Error('Terms'); return r.json();}).then(j=>{if(j.error) throw new Error(j.error); return j.rows;}),
-      fetch(GATEWAY_URL+'&action=getSheetTab&tab=DayTimings').then(r => r.ok ? r.json() : null).then(j=>j&&!j.error?j.rows:null).catch(() => null),
+      tabsPromise,
       fetch(COVER_PLAN_URL, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.text() : null).catch(() => null),
     ];
     if (SYNC_URL) fetches.push(fetch(SYNC_URL).then(r => r.text()).catch(() => null));
 
-    const [staffRows, termsRows, timingsRows, plannerCsv, remoteRaw] = await Promise.all(fetches);
+    const [tabs, plannerCsv, remoteRaw] = await Promise.all(fetches);
+    if (!tabs.Staff || tabs.Staff.error) throw new Error('Staff');
+    if (!tabs.TermDates || tabs.TermDates.error) throw new Error('Terms');
+    const staffRows = tabs.Staff.rows;
+    const termsRows = tabs.TermDates.rows;
+    const timingsRows = (tabs.DayTimings && !tabs.DayTimings.error) ? tabs.DayTimings.rows : null;
 
     const sheetStaff = buildStaff(staffRows);
     const sheetWeeks = buildWeeks(termsRows);
