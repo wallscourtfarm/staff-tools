@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-11.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-11.09.26b</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -3701,8 +3701,16 @@ async function init() {
     // Apps Script calls instead of near-instant CSV reads). See
     // project_teaching_schedule_perf and the getSheetTabs() comment in
     // shared-sync/sync-script.gs.
+    // Read-only proxy (fast, cached, doesn't have Apps Script's concurrent-
+    // request ceiling) in front of the same underlying sheet — see
+    // project_shared_gateway_apps_script_ceiling in Claude's memory. This
+    // file never writes to these tabs, only reads them, so it's safe to
+    // point at the cache. Verified live 11.09.26 under an 8-concurrent
+    // burst: the direct Apps Script gateway failed 2/8 requests outright
+    // (HTTP 404), the proxy succeeded 8/8 in 1.8-3.2s each.
+    const RAILWAY_TABS_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/tabs?token=' + SHARED_TOKEN;
     const NEEDED_TABS = ['TermDates','CalendarEvents','EventsMeetings','Staff','SubjectGroups','Interventions','DayTimings','DayActivities'];
-    const tabsRes = await fetch(GATEWAY_URL + '&action=getSheetTabs&tabs=' + NEEDED_TABS.join(','));
+    const tabsRes = await fetch(RAILWAY_TABS_URL + '&tabs=' + NEEDED_TABS.join(','));
     if (!tabsRes.ok) throw new Error('getSheetTabs request failed');
     const tabsJson = await tabsRes.json();
     if (tabsJson.error) throw new Error(tabsJson.error);
