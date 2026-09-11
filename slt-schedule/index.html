@@ -251,7 +251,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · WFA-11.09.26b</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · WFA-11.09.26c</footer>
 
 <script>
 // ── Activity types ─────────────────────────────────────────────────────────────
@@ -901,7 +901,10 @@ async function init() {
     // requests to the same deployment in true parallel (measured live
     // elsewhere spiking past 25s). See cover-plan/planner.html's init() for
     // the numbers this is based on.
-    const tabsPromise = fetch(GATEWAY_URL+'&action=getSheetTabs&tabs=Staff,TermDates', { signal: AbortSignal.timeout(30000) })
+    // Now via the Railway read-through proxy rather than Apps Script
+    // directly — see project_shared_gateway_apps_script_ceiling in Claude's
+    // memory. This file never writes to these tabs, only reads them.
+    const tabsPromise = fetch('https://api.wallscourt-farm-academy.co.uk/planning/tabs?token=' + SHARED_TOKEN + '&tabs=Staff,TermDates', { signal: AbortSignal.timeout(30000) })
       .then(r=>{if(!r.ok)throw new Error('getSheetTabs request failed');return r.json();})
       .then(j=>{if(j.error)throw new Error(j.error);return j.tabs || {};});
     const fetches = [
