@@ -76,7 +76,7 @@
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Supply Booking <span style="color:#64748b;font-weight:normal;font-size:12px">(03.09.26a)</span></div>
+    <div class="header-title">Supply Booking <span style="color:#64748b;font-weight:normal;font-size:12px">(11.09.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy — booked against the <a href="planner.html" style="color:#1798d3">Release Schedule</a></div>
   </div>
   <div class="week-nav">
@@ -373,8 +373,19 @@ document.getElementById('nextWeek').onclick = () => goToWeek(weekIdx+1);
 async function init() {
   try {
     const cacheBuster = `&_cb=${Date.now()}`;
-    const get = tab => fetch(GATEWAY_URL+'&action=getSheetTab&tab='+tab+cacheBuster, { signal: AbortSignal.timeout(12000) }).then(r=>{if(!r.ok)throw new Error(tab);return r.json();}).then(j=>{if(j.error)throw new Error(j.error);return j.rows;});
-    const [staffRows, termsRows] = await Promise.all([get('Staff'), get('TermDates')]);
+    // One combined request, not 2 separate ones — see planner.html's init()
+    // for why (Apps Script doesn't run concurrent requests to the same
+    // deployment in true parallel; measured live spiking past 25s).
+    const tabsRes = await fetch(GATEWAY_URL+'&action=getSheetTabs&tabs=Staff,TermDates'+cacheBuster, { signal: AbortSignal.timeout(20000) });
+    if (!tabsRes.ok) throw new Error('getSheetTabs request failed');
+    const tabsJson = await tabsRes.json();
+    if (tabsJson.error) throw new Error(tabsJson.error);
+    const tabRows = tab => {
+      const entry = (tabsJson.tabs || {})[tab];
+      if (!entry || entry.error) throw new Error((entry && entry.error) || (tab + ' tab not found'));
+      return entry.rows || [];
+    };
+    const staffRows = tabRows('Staff'), termsRows = tabRows('TermDates');
     TEACHERS = buildTeachers(staffRows);
     WEEKS = buildWeeks(termsRows);
     weekIdx = currentWeekIdx();
