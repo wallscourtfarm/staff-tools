@@ -76,7 +76,7 @@
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Supply Booking <span style="color:#64748b;font-weight:normal;font-size:12px">(11.09.26a)</span></div>
+    <div class="header-title">Supply Booking <span style="color:#64748b;font-weight:normal;font-size:12px">(11.09.26b)</span></div>
     <div class="header-sub">Wallscourt Farm Academy — booked against the <a href="planner.html" style="color:#1798d3">Release Schedule</a></div>
   </div>
   <div class="week-nav">
@@ -376,7 +376,10 @@ async function init() {
     // One combined request, not 2 separate ones — see planner.html's init()
     // for why (Apps Script doesn't run concurrent requests to the same
     // deployment in true parallel; measured live spiking past 25s).
-    const tabsRes = await fetch(GATEWAY_URL+'&action=getSheetTabs&tabs=Staff,TermDates'+cacheBuster, { signal: AbortSignal.timeout(30000) });
+    // Now via the Railway read-through proxy rather than Apps Script
+    // directly — see project_shared_gateway_apps_script_ceiling in Claude's
+    // memory. This page never writes to these tabs, only reads them.
+    const tabsRes = await fetch('https://api.wallscourt-farm-academy.co.uk/planning/tabs?token='+SHARED_TOKEN+'&tabs=Staff,TermDates'+cacheBuster, { signal: AbortSignal.timeout(30000) });
     if (!tabsRes.ok) throw new Error('getSheetTabs request failed');
     const tabsJson = await tabsRes.json();
     if (tabsJson.error) throw new Error(tabsJson.error);

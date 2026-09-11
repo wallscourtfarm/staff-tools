@@ -405,7 +405,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(11.09.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(11.09.26b)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -889,8 +889,12 @@ async function init() {
     // timeout. getSheetTabs opens the spreadsheet once and reads every tab in
     // one execution instead (see teaching-schedule's WFA-09.09.26b fix and
     // project_teaching_schedule_perf for the numbers this is based on).
+    // Now via the Railway read-through proxy rather than Apps Script
+    // directly — see project_shared_gateway_apps_script_ceiling in Claude's
+    // memory. This page never writes to these 5 tabs, only reads them (its
+    // own writes go to the separate cover-plan-state endpoint below).
     const TABS = ['Staff','TermDates','CalendarEvents','EventsMeetings','RecurringCover'];
-    const tabsRes = await fetch(GATEWAY_URL+'&action=getSheetTabs&tabs='+TABS.join(',')+cacheBuster, { signal: AbortSignal.timeout(30000) });
+    const tabsRes = await fetch('https://api.wallscourt-farm-academy.co.uk/planning/tabs?token='+SHARED_TOKEN+'&tabs='+TABS.join(',')+cacheBuster, { signal: AbortSignal.timeout(30000) });
     if (!tabsRes.ok) throw new Error('getSheetTabs request failed');
     const tabsJson = await tabsRes.json();
     if (tabsJson.error) throw new Error(tabsJson.error);
