@@ -763,14 +763,58 @@ function readTabRows(sh) {
   return out;
 }
 
+// Lazily opens the hub spreadsheet at most once per execution, and only if
+// something actually needs it (a cache miss) — see getCachedTabRows().
+let _hubSs = null;
+function hubSpreadsheet() {
+  if (!_hubSs) _hubSs = SpreadsheetApp.openById(HUB_SHEET_ID);
+  return _hubSs;
+}
+
+// These tabs (Staff, TermDates, DayTimings, ...) are edited by hand in the
+// sheet a few times a term, not written by any tool here — so a short cache
+// is free accuracy-wise but a big win for load, especially the "whole
+// staffroom opens a tool at 08:45" case. Without this, N browsers all
+// requesting the same tab within the same few seconds each triggered their
+// own SpreadsheetApp read, and that contention is what made load times spike
+// to 20-70s (see project_teaching_schedule_perf /
+// project_cover_plan_planner_gateway_contention). Now only the first request
+// per tab per TTL window actually reads the sheet; everyone else within that
+// window gets a cache hit.
+const TAB_CACHE_TTL_SECONDS = 30;
+function getCachedTabRows(tab) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'tabrows_' + tab;
+  const cached = cache.get(cacheKey);
+  if (cached !== null) return JSON.parse(cached);
+
+  // A cold cache still means every concurrent request misses at the same
+  // instant and would otherwise all hit SpreadsheetApp together — the exact
+  // contention this is meant to avoid. The lock serializes just the actual
+  // sheet read: one request reads and populates the cache, the rest wait
+  // briefly then get it from cache instead of piling onto the sheet too.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const recheck = cache.get(cacheKey);
+    if (recheck !== null) return JSON.parse(recheck);
+    const sh = hubSpreadsheet().getSheetByName(tab);
+    if (!sh) return null;
+    const rows = readTabRows(sh);
+    cache.put(cacheKey, JSON.stringify(rows), TAB_CACHE_TTL_SECONDS);
+    return rows;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function getSheetTab(p) {
   const tab = String((p || {}).tab || '').trim();
   if (!tab) return { error: 'missing tab' };
   if (ALLOWED_TABS.indexOf(tab) < 0) return { error: 'tab not allowed: ' + tab };
-  const ss = SpreadsheetApp.openById(HUB_SHEET_ID);
-  const sh = ss.getSheetByName(tab);
-  if (!sh) return { error: 'tab not found: ' + tab };
-  return { tab: tab, rows: readTabRows(sh) };
+  const rows = getCachedTabRows(tab);
+  if (rows === null) return { error: 'tab not found: ' + tab };
+  return { tab: tab, rows: rows };
 }
 
 // GET ?action=getSheetTabs&tabs=TermDates,Staff,SubjectGroups&token=…
@@ -789,13 +833,12 @@ function getSheetTabs(p) {
   const tabsParam = String((p || {}).tabs || '').trim();
   if (!tabsParam) return { error: 'missing tabs' };
   const requested = tabsParam.split(',').map(function (t) { return t.trim(); }).filter(Boolean);
-  const ss = SpreadsheetApp.openById(HUB_SHEET_ID);
   const result = {};
   requested.forEach(function (tab) {
     if (ALLOWED_TABS.indexOf(tab) < 0) { result[tab] = { error: 'tab not allowed: ' + tab }; return; }
-    const sh = ss.getSheetByName(tab);
-    if (!sh) { result[tab] = { error: 'tab not found: ' + tab }; return; }
-    result[tab] = { rows: readTabRows(sh) };
+    const rows = getCachedTabRows(tab);
+    if (rows === null) { result[tab] = { error: 'tab not found: ' + tab }; return; }
+    result[tab] = { rows: rows };
   });
   return { tabs: result };
 }
