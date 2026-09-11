@@ -184,13 +184,18 @@ footer { text-align: center; font-size: 10px; color: #94a3b8; padding: 10px; bor
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunchtime Leaders · WFA-04.09.26a</footer>
+<footer>Wallscourt Farm Academy · Lunchtime Leaders · WFA-11.09.26a</footer>
 
 <script>
 const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
 const GATEWAY_URL     = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
 const SYNC_URL       = GATEWAY_URL + '&key=wfa_ll';
-const COVER_PLAN_URL = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
+// Read-only proxy (fast, cached) in front of the real Apps Script state
+// store — see project_shared_gateway_apps_script_ceiling in Claude's
+// memory. This file never writes to cover-plan state, only reads it, so
+// it's safe to point at the cache; writes (planner.html/supply-admin.html)
+// still go straight to the real backend, unchanged.
+const COVER_PLAN_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/coverstate';
 let syncReady = false;
 
 const PALETTE = ['#f9a8d4','#fca5a5','#fda4af','#fcd34d','#86efac','#d9f99d','#67e8f9','#93c5fd','#c084fc','#fb923c','#4ade80','#38bdf8','#f472b6','#a78bfa','#ec4899','#22d3ee','#94a3b8','#d1d5db','#fde68a','#e879f9'];
@@ -781,7 +786,7 @@ async function init() {
     const [raw, termsResp, coverJson] = await Promise.all([
       fetch(SYNC_URL).then(r => r.text()),
       fetch(GATEWAY_URL + '&action=getSheetTab&tab=TermDates').then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(COVER_PLAN_URL, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(COVER_PLAN_URL + '?token=' + SHARED_TOKEN, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
     if (raw && raw !== '{}') {
       try {
