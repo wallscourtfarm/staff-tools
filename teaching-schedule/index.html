@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-09.09.26b</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-11.09.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -544,7 +544,12 @@
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbxKhzKMmoVbU1V_cXJla5wom1VCtXWA72IllygNX4XZffCBxt5kdt_wKYZ0YLyMopN0/exec';
 const EXCEPTIONS_URL = 'https://script.google.com/macros/s/AKfycbwRTXlq_kqfstCk_lF6qVdoBBZeXdlWV2Gvja1d0H3rYEyCZvPPi2XNhCp3spOsXn3W/exec';
 const FAB_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
-const COVER_SYNC_URL = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec';
+// Read-only proxy (fast, cached) in front of the real Apps Script state
+// store — see project_shared_gateway_apps_script_ceiling in Claude's
+// memory. This file never writes to cover-plan state, only reads it, so
+// it's safe to point at the cache; writes (planner.html/supply-admin.html)
+// still go straight to the real backend, unchanged.
+const COVER_SYNC_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/coverstate';
 const SHARED_TOKEN = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
 const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
 const LUNCH_COVER_URL = GATEWAY_URL + '&key=wfa_lc';
@@ -3682,7 +3687,7 @@ async function init() {
   const overlaysPromise = Promise.all([
     EXCEPTIONS_URL ? fetch(EXCEPTIONS_URL + '?action=exceptions').then(r => r.ok ? r.json() : {exceptions:[]}).then(d => d.exceptions || []).catch(() => []) : Promise.resolve([]),
     FAB_SYNC_URL ? fetch(FAB_SYNC_URL).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
-    COVER_SYNC_URL ? fetch(COVER_SYNC_URL).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
+    COVER_SYNC_URL ? fetch(COVER_SYNC_URL + '?token=' + SHARED_TOKEN).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
     fetch(LUNCH_COVER_URL, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
 
