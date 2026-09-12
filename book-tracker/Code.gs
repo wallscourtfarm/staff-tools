@@ -300,12 +300,44 @@ function getAll() {
     }
   }
 
+  const childList = Object.values(children);
+  const demographics = computeDemographics_(childList);
+  // PP/EAL never leave this function from here on — the dashboard's
+  // group averages are pre-computed above into `demographics`, so the
+  // per-child records the browser actually receives don't carry the flag.
+  const childrenForClient = childList.map(function (c) {
+    const copy = Object.assign({}, c);
+    delete copy.pp;
+    delete copy.eal;
+    return copy;
+  });
+
   return {
-    children: Object.values(children),
+    children: childrenForClient,
+    demographics: demographics,
     books:    Object.values(books),
     coverOverrides,
     certIssues: getCertsIssued().certIssues,
     passedCheckouts: getPassedCheckoutIds()
+  };
+}
+
+// Group counts + average totalReads for PP/non-PP and EAL/non-EAL —
+// computed once here so the dashboard never needs a child's own flag.
+function computeDemographics_(childList) {
+  function group(pred) {
+    const matched = childList.filter(pred);
+    const n = matched.length;
+    const avg = n ? matched.reduce(function (s, c) { return s + (c.totalReads || 0); }, 0) / n : 0;
+    return { n: n, avgReads: Math.round(avg * 10) / 10 };
+  }
+  const isPP = function (c) { return String(c.pp).toUpperCase() === 'Y'; };
+  const isEAL = function (c) { return String(c.eal).toUpperCase() === 'Y'; };
+  return {
+    pp:    group(isPP),
+    nonPp: group(function (c) { return !isPP(c); }),
+    eal:    group(isEAL),
+    nonEal: group(function (c) { return !isEAL(c); })
   };
 }
 
