@@ -249,6 +249,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     <button class="tab" id="tab-bk" onclick="showTab('bk')"><span>📖</span>Books</button>
     <button class="tab" id="tab-dash" onclick="showTab('dash')"><span>📊</span>Dashboard</button>
     <button class="tab" id="tab-certs" onclick="showTab('certs')"><span>🎖️</span>Certificates</button>
+    <button class="tab" id="tab-quiz" onclick="showTab('quiz')"><span>📝</span>Quiz</button>
   </div>
 
   <div id="coverMigrateBanner" class="hidden" style="background:#fff3e0;border-bottom:2px solid #e65100;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px">
@@ -295,8 +296,14 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
       <div id="certsContent"></div>
     </div>
 
+    <!-- QUIZ REVIEW TAB -->
+    <div id="view-quiz" class="hidden">
+      <input class="inp" id="quizSearch" type="text" placeholder="🔍  Search by title or author…" oninput="filterQuizReview()" autocomplete="off" style="margin-bottom:10px">
+      <div id="quizList"></div>
+    </div>
+
   </div>
-  <div class="version">WFA Book Tracker · WFA-12.09.26c</div>
+  <div class="version">WFA Book Tracker · WFA-12.09.26d</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -405,6 +412,10 @@ const HARDCODED_URL = 'https://script.google.com/macros/s/AKfycbyXw7lwvL5O1xJApG
 let apiUrl  = localStorage.getItem(API_KEY) || HARDCODED_URL;
 const WFA_TOKEN = localStorage.getItem('wfa_shared_token') || '2013';
 let children = [], books = [], serverCoverOverrides = {};
+// PP/EAL per-child never reach this page at all (see Code.gs's getAll) —
+// `demographics` is the pre-computed group counts/averages the dashboard
+// uses instead. Girls/boys aren't hidden, so those stay computed locally.
+let demographics = { pp: {n:0,avgReads:0}, nonPp: {n:0,avgReads:0}, eal: {n:0,avgReads:0}, nonEal: {n:0,avgReads:0} };
 let passedCheckouts = new Set(); // checkoutIds already quiz-passed via the reading-quiz QR page
 let phase      = 'Y3';
 let pickPhase  = 'LKS2'; // phase used inside the book picker (can differ from header phase)
@@ -1009,6 +1020,7 @@ async function loadData() {
     const d = await api({ action: 'getAll' });
     children = d.children || [];
     books    = d.books    || [];
+    demographics = d.demographics || demographics;
     serverCoverOverrides = d.coverOverrides || {};
     passedCheckouts = new Set(d.passedCheckouts || []);
     render();
@@ -1217,7 +1229,7 @@ async function syncHubRoster() {
 // ════════════════════════════════════════════════
 function showTab(t) {
   curTab = t;
-  ['co','ret','ch','bk','dash','certs'].forEach(id => {
+  ['co','ret','ch','bk','dash','certs','quiz'].forEach(id => {
     document.getElementById(`tab-${id}`).classList.toggle('on', id === t);
     document.getElementById(`view-${id}`).classList.toggle('hidden', id !== t);
   });
@@ -1248,7 +1260,60 @@ function render() {
   if (curTab === 'bk')   renderBooks();
   if (curTab === 'dash') renderDashboard();
   if (curTab === 'certs') renderCerts();
+  if (curTab === 'quiz') renderQuizReview();
 }
+
+// ════════════════════════════════════════════════
+// QUIZ REVIEW — read-only view of every book's 5 comprehension questions,
+// for proofreading/spot-checking content. Reads straight from the same
+// QUIZ_DATA this tool uses to run the actual quiz, so it can never drift
+// out of sync with what pupils are actually asked.
+// ════════════════════════════════════════════════
+function renderQuizReview() {
+  let list = books.filter(b => b.phase === phaseToBookPhase(phase)).sort((a,b) => a.title.localeCompare(b.title));
+
+  const q = (document.getElementById('quizSearch')?.value || '').toLowerCase().trim();
+  if (q) list = list.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
+
+  const el = document.getElementById('quizList');
+  if (!list.length) { el.innerHTML = empty('📝','No books in this phase yet'); return; }
+
+  const withQuiz = list.filter(b => QUIZ_DATA[b.id]?.questions?.length === 5).length;
+  el.innerHTML = `
+    <div class="card" style="text-align:center;margin-bottom:14px">
+      <div class="stats">
+        <div class="stat"><div class="n">${list.length}</div><div class="l">Books</div></div>
+        <div class="stat"><div class="n">${withQuiz}</div><div class="l">With Quiz</div></div>
+        <div class="stat"><div class="n">${list.length - withQuiz}</div><div class="l">Missing</div></div>
+      </div>
+    </div>
+    ${list.map(b => {
+      const quiz = QUIZ_DATA[b.id];
+      if (!quiz || !quiz.questions || quiz.questions.length < 5) {
+        return `<div class="card">
+          <div style="font-weight:800;font-size:16px">${esc(b.title)}</div>
+          <div style="color:var(--muted);font-size:13px;margin-bottom:8px">${esc(b.author)}</div>
+          <div class="alert alert-warn">No quiz written yet for this book.</div>
+        </div>`;
+      }
+      return `<div class="card">
+        <div style="font-weight:800;font-size:16px">${esc(b.title)}</div>
+        <div style="color:var(--muted);font-size:13px;margin-bottom:12px">${esc(b.author)}</div>
+        ${quiz.questions.map((qq, i) => `
+          <div style="margin-bottom:${i < quiz.questions.length - 1 ? '14px' : '0'}">
+            <div style="font-weight:700;font-size:14px;margin-bottom:6px">${i + 1}. ${esc(qq.q)}</div>
+            <div style="display:grid;gap:4px">
+              ${qq.options.map((opt, oi) => `
+                <div style="font-size:13px;padding:5px 10px;border-radius:6px;${oi === qq.correct ? 'background:var(--green-lt);color:var(--green);font-weight:700' : 'color:var(--muted)'}">
+                  ${oi === qq.correct ? '✓ ' : ''}${esc(opt)}
+                </div>`).join('')}
+            </div>
+          </div>`).join('')}
+      </div>`;
+    }).join('')}`;
+}
+
+function filterQuizReview() { renderQuizReview(); }
 
 // ════════════════════════════════════════════════
 // CHECK OUT TAB
@@ -1674,9 +1739,9 @@ function renderDashboard() {
   const lksCh = allCh.filter(c => ['Y3','Y4'].includes(c.yearGroup));
   const uksCh = allCh.filter(c => ['Y5','Y6'].includes(c.yearGroup));
 
-  // Demographic splits
-  const ppCh    = allCh.filter(c => String(c.pp).toUpperCase()  === 'Y');
-  const ealCh   = allCh.filter(c => String(c.eal).toUpperCase() === 'Y');
+  // Girls/boys aren't a hidden flag, so those still come from the local
+  // list. PP/EAL are — their counts and averages come from `demographics`
+  // (server-computed; see loadData), never from a per-child value here.
   const girlsCh = allCh.filter(c => String(c.gender).toUpperCase() === 'F');
   const boysCh  = allCh.filter(c => String(c.gender).toUpperCase() === 'M');
 
@@ -1694,6 +1759,21 @@ function renderDashboard() {
           <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:4px">${labelB}</div>
           <div style="font-size:26px;font-weight:900;color:var(--blue)">${b.length}</div>
           <div style="font-size:11px;color:var(--muted)">avg ${avgReads(b)} reads</div>
+        </div>
+      </div>`;
+  }
+  function demoPairStats(labelA, statsA, labelB, statsB) {
+    return `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:4px">${labelA}</div>
+          <div style="font-size:26px;font-weight:900;color:var(--blue)">${statsA.n}</div>
+          <div style="font-size:11px;color:var(--muted)">avg ${statsA.n?statsA.avgReads.toFixed(1):'—'} reads</div>
+        </div>
+        <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:4px">${labelB}</div>
+          <div style="font-size:26px;font-weight:900;color:var(--blue)">${statsB.n}</div>
+          <div style="font-size:11px;color:var(--muted)">avg ${statsB.n?statsB.avgReads.toFixed(1):'—'} reads</div>
         </div>
       </div>`;
   }
@@ -1743,9 +1823,9 @@ function renderDashboard() {
 
     <!-- Demographic breakdown -->
     <div class="sec-hdr">Demographic Breakdown</div>
-    ${demoPair('PP', ppCh, 'Non-PP', allCh.filter(c => String(c.pp).toUpperCase() !== 'Y'))}
+    ${demoPairStats('PP', demographics.pp, 'Non-PP', demographics.nonPp)}
     ${demoPair('Girls', girlsCh, 'Boys', boysCh)}
-    ${demoPair('EAL', ealCh, 'Non-EAL', allCh.filter(c => String(c.eal).toUpperCase() !== 'Y'))}
+    ${demoPairStats('EAL', demographics.eal, 'Non-EAL', demographics.nonEal)}
 
     <!-- Milestone breakdown -->
     <div class="sec-hdr">Milestone Breakdown</div>
