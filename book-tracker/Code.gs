@@ -83,8 +83,37 @@ function dispatch(p) {
     case 'rawSheet':         return rawSheet(p);
     case 'fixSchema':        return fixSchema();
     case 'testWrite':        return testWrite(p);
+    case 'submitQuizAttempt': return submitQuizAttempt(p);
     default: return { error: 'Unknown action: ' + p.action };
   }
+}
+
+// ════════════════════════════════════════════════
+// QUIZ ATTEMPT LOGGING
+// ════════════════════════════════════════════════
+// QuizAttempts headers: id, childId, bookId, checkoutId, score, total,
+// passed, override, overrideBy, overrideReason, timestamp.
+// Every attempt is logged — pass, fail, or staff override — for audit:
+// which child passed which book's quiz, failed attempts, and who signed
+// off any override and why. Called via doPost (POST) so it goes through
+// the same LockService lock as other writes.
+function submitQuizAttempt(p) {
+  const sh = SS.getSheetByName('QuizAttempts') || SS.insertSheet('QuizAttempts');
+  if (sh.getLastRow() === 0) sh.appendRow(['id', 'childId', 'bookId', 'checkoutId', 'score', 'total', 'passed', 'override', 'overrideBy', 'overrideReason', 'timestamp']);
+  sh.appendRow([
+    'QA' + Date.now(),
+    String(p.childId || ''),
+    String(p.bookId || ''),
+    String(p.checkoutId || ''),
+    (p.score === null || p.score === undefined) ? '' : Number(p.score),
+    Number(p.total || 5),
+    p.passed === true,
+    p.override === true,
+    String(p.overrideBy || ''),
+    String(p.overrideReason || ''),
+    new Date().toISOString()
+  ]);
+  return { ok: true };
 }
 
 // ════════════════════════════════════════════════

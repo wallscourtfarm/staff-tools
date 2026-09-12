@@ -164,6 +164,15 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .modal-btns{display:flex;gap:10px;margin-top:16px}
 hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
 
+/* ── QUIZ MODAL ── */
+.quiz-opt{display:block;width:100%;text-align:left;margin-bottom:9px;padding:12px 16px}
+.quiz-opt:disabled{opacity:.55;cursor:default}
+.qz-feedback{min-height:20px;margin-top:8px;font-weight:700;font-size:14px}
+.qz-feedback.qz-ok{color:var(--green)}
+.qz-feedback.qz-no{color:var(--red)}
+.qz-override-link{font-size:12px;color:var(--muted)}
+.qz-override-strong{display:inline-block;color:var(--amber);background:var(--amber-lt);padding:6px 12px;border-radius:8px;font-weight:600;text-decoration:none;font-size:13px}
+
 /* ── CERTIFICATE MODAL ── */
 .cert-preview{text-align:center;padding:20px 0}
 .cert-preview .trophy{font-size:52px;margin-bottom:8px}
@@ -286,7 +295,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · WFA-08.09.26a</div>
+  <div class="version">WFA Book Tracker · WFA-12.09.26a</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -372,6 +381,14 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
   </div>
 </div>
 
+<!-- ══ QUIZ MODAL ══ -->
+<div class="overlay hidden" id="quizOverlay">
+  <div class="modal" style="max-width:460px">
+    <h2 style="margin-bottom:2px">📖 Reading Check</h2>
+    <div id="quizBody"></div>
+  </div>
+</div>
+
 <!-- ══ PRINT CERTIFICATE ══ -->
 <div class="print-cert" id="certPrintArea"></div>
 
@@ -397,6 +414,45 @@ let bookPickerSearch = '';
 let curTab  = 'co';
 let selChild = null;
 let pendingCert = null;
+let activeQuiz = null; // {checkoutId, childId, childName, bookId, order, idx, correct, optionOrder, overrideMode, overrideReason, attempt}
+
+// ════════════════════════════════════════════════
+// QUIZ DATA — 5 multiple-choice questions per book (mix of
+// general-comprehension + book-specific plot questions), keyed by the
+// Books sheet id. A book missing here (or with <5 questions) falls back
+// to the staff-override form with reason 'no_quiz_content' instead of
+// silently letting the read count. Content is researched for accuracy —
+// don't hand-guess a "correct" index when adding new entries.
+// ════════════════════════════════════════════════
+const QUIZ_DATA = {
+  'BK17835374222508': { // Private Peaceful — Michael Morpurgo
+    questions: [
+      { q: "Who is telling the story in Private Peaceful?", options: ["Tommo Peaceful", "Charlie Peaceful", "Molly", "Sergeant Hanley"], correct: 0 },
+      { q: "What is Tommo doing through most of the book, as he remembers his life?", options: ["Sitting an exam", "Staying awake through the night before dawn", "Writing a letter home", "Hiding in a forest"], correct: 1 },
+      { q: "Which war is Private Peaceful set during?", options: ["The Second World War", "The Falklands War", "The First World War", "The Napoleonic Wars"], correct: 2 },
+      { q: "What happens to Charlie at the end of the book?", options: ["He is sent home wounded", "He is executed by his own army", "He is promoted to officer", "He deserts and escapes"], correct: 1 },
+      { q: "Who does Tommo love, who is also loved by his brother Charlie?", options: ["Molly", "Big Joe", "Anna", "Sergeant Hanley"], correct: 0 }
+    ]
+  },
+  'BK17835374212334': { // Good Night Mr Tom — Michelle Magorian
+    questions: [
+      { q: "Why is Willie Beech sent to live in the countryside?", options: ["His parents died", "He is evacuated because of the war", "He was sent to boarding school", "He ran away from home"], correct: 1 },
+      { q: "What is the name of the old man Willie goes to live with?", options: ["Mr Tom Oakley", "Mr Charlie Peaceful", "Mr Hanley", "Mr Fletcher"], correct: 0 },
+      { q: "What is the name of the dog in the story?", options: ["Sammy", "Patch", "Sam", "Buster"], correct: 2 },
+      { q: "How has Willie been treated before he comes to the countryside?", options: ["He was spoiled by his mother", "He was abused and neglected by his mother", "He grew up in an orphanage", "He was raised by his grandparents"], correct: 1 },
+      { q: "What does Willie discover he is talented at while living with Tom?", options: ["Football", "Acting and drawing", "Playing the piano", "Cooking"], correct: 1 }
+    ]
+  },
+  'BK17835374220007': { // Famous Five: Five on Treasure Island — Enid Blyton
+    questions: [
+      { q: "How many children are in the Famous Five (not counting the dog)?", options: ["Three", "Four", "Five", "Two"], correct: 1 },
+      { q: "What is the name of the dog in the Famous Five?", options: ["Timmy", "Tom", "Toby", "Timothy Tail"], correct: 0 },
+      { q: "Who owns the island the children explore?", options: ["A stranger they meet on a train", "George's family", "The local fisherman", "Nobody — it is unclaimed"], correct: 1 },
+      { q: "What are the children searching for on the island?", options: ["A lost pet", "Buried treasure from a wrecked ship", "A missing person", "A hidden cave painting"], correct: 1 },
+      { q: "What is unusual about George, one of the five?", options: ["She insists on being treated as a boy and hates her full name Georgina", "She cannot swim", "She is much older than the others", "She is afraid of the sea"], correct: 0 }
+    ]
+  }
+};
 
 // ════════════════════════════════════════════════
 // BOOT
@@ -419,6 +475,27 @@ async function api(payload) {
   const data = await r.json();
   if (data.error) throw new Error(data.error);
   return data;
+}
+
+// POST (routed through doPost's LockService lock server-side) — used for
+// writes like quiz-attempt logging where a lost race would corrupt an audit
+// trail rather than just data that gets overwritten on the next sync.
+async function apiPost(payload) {
+  const url = `${apiUrl}?token=${WFA_TOKEN}`;
+  const r = await fetch(url, { method: 'POST', body: JSON.stringify(payload) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
 async function loadData() {
@@ -892,17 +969,29 @@ function renderReturns() {
       <div class="co-book">${esc(co.book?.title||'Unknown')} · Copy ${co.copyNum}</div>
       <div class="co-date">Since ${fmtDate(co.checkoutDate)}</div>
       <div class="ret-btns">
-        <button class="btn btn-green" onclick="doReturn('${co.checkoutId}',true,'${escJs(co.child.name)}','${co.child.id}')">✓ Completed &amp; Returned</button>
+        <button class="btn btn-green" onclick="doReturn('${co.checkoutId}',true,'${escJs(co.child.name)}','${co.child.id}','${co.bookId}')">✓ Completed &amp; Returned</button>
         <button class="btn btn-ghost" onclick="doReturn('${co.checkoutId}',false,'${escJs(co.child.name)}','${co.child.id}')">↩ Returned</button>
       </div>
     </div>`).join('');
 }
 
-async function doReturn(checkoutId, completed, childName, childId) {
-  const msg = completed
-    ? `Mark as completed and returned by ${childName}?`
-    : `Mark as returned (not finished) by ${childName}?`;
-  if (!confirm(msg)) return;
+// A "completed" return must pass (or be staff-overridden on) the book's
+// quiz before it's allowed to count — see openQuiz()/finishQuizAttempt().
+// "Not finished" skips straight through, same as before.
+async function doReturn(checkoutId, completed, childName, childId, bookId) {
+  if (!completed) {
+    if (!confirm(`Mark as returned (not finished) by ${childName}?`)) return;
+    return finishReturn(checkoutId, childId, childName, false);
+  }
+  const quiz = QUIZ_DATA[bookId];
+  if (!quiz || !quiz.questions || quiz.questions.length < 5) {
+    openOverride(checkoutId, childId, childName, bookId, 'no_quiz_content');
+    return;
+  }
+  openQuiz(checkoutId, childId, childName, bookId, 1);
+}
+
+async function finishReturn(checkoutId, childId, childName, completed) {
   try {
     const r = await api({ action:'returnBook', checkoutId, completed });
     if (!r.ok) return;
@@ -929,6 +1018,139 @@ async function doReturn(checkoutId, completed, childName, childId) {
     renderReturns();
     scheduleSync(); // background sync, coalesced
   } catch(e) { toast('Error: '+e.message); }
+}
+
+// ════════════════════════════════════════════════
+// QUIZ MODAL — gates a "completed" return on a 5-question comprehension
+// check. Question order and each question's option order are reshuffled
+// every attempt; a wrong answer never reveals which option was correct
+// (only a neutral right/wrong per question), so a retry can't just be
+// memorised from the previous attempt.
+// ════════════════════════════════════════════════
+function openQuiz(checkoutId, childId, childName, bookId, attempt) {
+  activeQuiz = {
+    checkoutId, childId, childName, bookId, attempt: attempt || 1,
+    order: shuffle(QUIZ_DATA[bookId].questions.map((_, i) => i)),
+    idx: 0, correct: 0, optionOrder: [], overrideReason: null
+  };
+  document.getElementById('quizOverlay').classList.remove('hidden');
+  renderQuizStep();
+}
+
+function renderQuizStep() {
+  const aq = activeQuiz;
+  const q  = QUIZ_DATA[aq.bookId].questions[aq.order[aq.idx]];
+  const optOrder = shuffle(q.options.map((_, i) => i));
+  aq.optionOrder[aq.idx] = optOrder;
+  document.getElementById('quizBody').innerHTML = `
+    <div class="m-sub">Question ${aq.idx + 1} of ${aq.order.length} — ${esc(bookTitle(aq.bookId))}${aq.attempt > 1 ? ` (attempt ${aq.attempt})` : ''}</div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:14px;line-height:1.4">${esc(q.q)}</div>
+    <div id="quizOpts">${optOrder.map((oi, pos) => `
+      <button class="btn btn-ghost quiz-opt" onclick="selectQuizOption(${pos})">${esc(q.options[oi])}</button>`).join('')}</div>
+    <div id="quizFeedback" class="qz-feedback"></div>
+    <div class="modal-btns hidden" id="quizNextWrap"><button class="btn btn-blue" style="flex:1" onclick="quizNext()">Next</button></div>
+    <div style="text-align:center;margin-top:14px"><a href="#" class="qz-override-link" onclick="event.preventDefault();activeQuiz.overrideReason='staff_override';showOverrideForm()">Reading support needed? (staff)</a></div>`;
+}
+
+function selectQuizOption(pos) {
+  const aq = activeQuiz;
+  const q  = QUIZ_DATA[aq.bookId].questions[aq.order[aq.idx]];
+  const isCorrect = aq.optionOrder[aq.idx][pos] === q.correct;
+  if (isCorrect) aq.correct++;
+  document.querySelectorAll('#quizOpts .quiz-opt').forEach(btn => btn.disabled = true);
+  const fb = document.getElementById('quizFeedback');
+  fb.textContent = isCorrect ? '✓ Correct!' : '✗ Not quite.';
+  fb.className = 'qz-feedback ' + (isCorrect ? 'qz-ok' : 'qz-no');
+  document.getElementById('quizNextWrap').classList.remove('hidden');
+}
+
+async function quizNext() {
+  activeQuiz.idx++;
+  if (activeQuiz.idx < activeQuiz.order.length) { renderQuizStep(); return; }
+  await finishQuizAttempt();
+}
+
+async function finishQuizAttempt() {
+  const aq = activeQuiz;
+  const total = aq.order.length;
+  const passed = aq.correct >= 4; // pass mark: 4/5
+  try {
+    await apiPost({ action:'submitQuizAttempt', childId:aq.childId, bookId:aq.bookId, checkoutId:aq.checkoutId,
+      score: aq.correct, total, passed, override: false, overrideBy: '', overrideReason: '' });
+  } catch (e) { /* don't block the read on a logging hiccup */ }
+  if (passed) {
+    closeQuiz();
+    finishReturn(aq.checkoutId, aq.childId, aq.childName, true);
+  } else {
+    renderQuizFail();
+  }
+}
+
+function renderQuizFail() {
+  const aq = activeQuiz;
+  document.getElementById('quizBody').innerHTML = `
+    <div style="text-align:center;padding:6px 0 2px">
+      <div style="font-size:36px;margin-bottom:8px">📖</div>
+      <div style="font-weight:800;font-size:17px;margin-bottom:6px">Almost there — ${esc(aq.childName)} got ${aq.correct}/${aq.order.length}</div>
+      <p style="color:var(--muted);font-size:14px;line-height:1.5">Have another go, or come back to this book later.</p>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeQuiz();finishReturn('${aq.checkoutId}','${aq.childId}','${escJs(aq.childName)}',false)">Not finished yet</button>
+      <button class="btn btn-blue" style="flex:1" onclick="openQuiz('${aq.checkoutId}','${aq.childId}','${escJs(aq.childName)}','${aq.bookId}',${aq.attempt + 1})">Try Again</button>
+    </div>
+    <div style="text-align:center;margin-top:14px">
+      <a href="#" class="${aq.attempt >= 2 ? 'qz-override-strong' : 'qz-override-link'}" onclick="event.preventDefault();activeQuiz.overrideReason='staff_override';showOverrideForm()">Reading support needed? (staff)</a>
+    </div>`;
+}
+
+// Staff override — accessibility/SEND cases, or a book with no quiz content
+// yet. Always requires a typed staff name (never a single silent tap) and
+// is always logged server-side via submitQuizAttempt.
+function openOverride(checkoutId, childId, childName, bookId, reason) {
+  activeQuiz = { checkoutId, childId, childName, bookId, order: [], idx: 0, correct: null, overrideReason: reason };
+  document.getElementById('quizOverlay').classList.remove('hidden');
+  const intro = reason === 'no_quiz_content'
+    ? `No quiz has been written yet for "${esc(bookTitle(bookId))}" — you can still mark it completed, logged for follow-up.`
+    : null;
+  showOverrideForm(intro);
+}
+
+function showOverrideForm(introHtml) {
+  const intro = introHtml || 'For SEND/access needs — e.g. audiobook or 1:1 reading support. This is logged.';
+  document.getElementById('quizBody').innerHTML = `
+    <div class="m-sub">${intro}</div>
+    <div class="field">
+      <label>Staff name</label>
+      <input class="inp" id="qzOverrideName" placeholder="Your name" oninput="document.getElementById('qzOverrideConfirm').disabled = !this.value.trim()">
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" style="flex:1" onclick="backFromOverride()">Back</button>
+      <button class="btn btn-blue" style="flex:1" id="qzOverrideConfirm" disabled onclick="confirmOverride()">Confirm override</button>
+    </div>`;
+}
+
+function backFromOverride() {
+  const aq = activeQuiz;
+  if (!aq || !QUIZ_DATA[aq.bookId]) { closeQuiz(); return; }
+  if (aq.idx >= aq.order.length) renderQuizFail(); else renderQuizStep();
+}
+
+async function confirmOverride() {
+  const aq = activeQuiz;
+  const name = document.getElementById('qzOverrideName').value.trim();
+  if (!name) return;
+  try {
+    await apiPost({ action:'submitQuizAttempt', childId:aq.childId, bookId:aq.bookId, checkoutId:aq.checkoutId,
+      score: aq.correct, total: aq.order.length || 5, passed: true, override: true,
+      overrideBy: name, overrideReason: aq.overrideReason || 'staff_override' });
+  } catch (e) { toast('Error logging override: ' + e.message); }
+  closeQuiz();
+  finishReturn(aq.checkoutId, aq.childId, aq.childName, true);
+}
+
+function closeQuiz() {
+  document.getElementById('quizOverlay').classList.add('hidden');
+  activeQuiz = null;
 }
 
 // ════════════════════════════════════════════════
