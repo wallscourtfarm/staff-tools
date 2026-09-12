@@ -404,6 +404,7 @@ const HARDCODED_URL = 'https://script.google.com/macros/s/AKfycbyXw7lwvL5O1xJApG
 let apiUrl  = localStorage.getItem(API_KEY) || HARDCODED_URL;
 const WFA_TOKEN = localStorage.getItem('wfa_shared_token') || '2013';
 let children = [], books = [], serverCoverOverrides = {};
+let passedCheckouts = new Set(); // checkoutIds already quiz-passed via the reading-quiz QR page
 let phase      = 'Y3';
 let pickPhase  = 'LKS2'; // phase used inside the book picker (can differ from header phase)
 let yrFilter   = 'all';
@@ -504,6 +505,7 @@ async function loadData() {
     children = d.children || [];
     books    = d.books    || [];
     serverCoverOverrides = d.coverOverrides || {};
+    passedCheckouts = new Set(d.passedCheckouts || []);
     render();
     checkLocalCoverMigration();
   } catch(e) { toast('⚠️ ' + e.message, 5000); }
@@ -983,6 +985,10 @@ async function doReturn(checkoutId, completed, childName, childId, bookId) {
     if (!confirm(`Mark as returned (not finished) by ${childName}?`)) return;
     return finishReturn(checkoutId, childId, childName, false);
   }
+  // Already quiz-passed at home via the reading-quiz QR page — don't ask again.
+  if (passedCheckouts.has(checkoutId)) {
+    return finishReturn(checkoutId, childId, childName, true, `✓ Already passed the reading check — nice one, ${childName}!`);
+  }
   const quiz = QUIZ_DATA[bookId];
   if (!quiz || !quiz.questions || quiz.questions.length < 5) {
     openOverride(checkoutId, childId, childName, bookId, 'no_quiz_content');
@@ -991,7 +997,7 @@ async function doReturn(checkoutId, completed, childName, childId, bookId) {
   openQuiz(checkoutId, childId, childName, bookId, 1);
 }
 
-async function finishReturn(checkoutId, childId, childName, completed) {
+async function finishReturn(checkoutId, childId, childName, completed, msg) {
   try {
     const r = await api({ action:'returnBook', checkoutId, completed });
     if (!r.ok) return;
@@ -1013,7 +1019,7 @@ async function finishReturn(checkoutId, childId, childName, completed) {
     if (completed && r.milestone) {
       showMilestone(childId, r.milestone);
     } else {
-      toast(completed ? `✓ Great reading, ${childName}!` : `↩ Book returned`);
+      toast(msg || (completed ? `✓ Great reading, ${childName}!` : `↩ Book returned`));
     }
     renderReturns();
     scheduleSync(); // background sync, coalesced

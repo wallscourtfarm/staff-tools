@@ -84,6 +84,7 @@ function dispatch(p) {
     case 'fixSchema':        return fixSchema();
     case 'testWrite':        return testWrite(p);
     case 'submitQuizAttempt': return submitQuizAttempt(p);
+    case 'getQuizCandidates': return getQuizCandidates(p);
     default: return { error: 'Unknown action: ' + p.action };
   }
 }
@@ -302,8 +303,81 @@ function getAll() {
     children: Object.values(children),
     books:    Object.values(books),
     coverOverrides,
-    certIssues: getCertsIssued().certIssues
+    certIssues: getCertsIssued().certIssues,
+    passedCheckouts: getPassedCheckoutIds()
   };
+}
+
+// checkoutIds that already have a passing QuizAttempts row (pass or staff
+// override) — lets the return flow skip re-quizzing a book whose quiz was
+// already passed at home via the reading-quiz QR page.
+function getPassedCheckoutIds() {
+  const sh = SS.getSheetByName('QuizAttempts');
+  if (!sh) return [];
+  const rows = sh.getDataRange().getValues();
+  const hdr = rows[0].map(h => String(h).trim().toLowerCase());
+  const iCo = hdr.indexOf('checkoutid'), iPass = hdr.indexOf('passed');
+  const seen = new Set();
+  for (let r = 1; r < rows.length; r++) {
+    const co = String(rows[r][iCo] || '');
+    const passed = rows[r][iPass] === true || String(rows[r][iPass]).toUpperCase() === 'TRUE';
+    if (co && passed) seen.add(co);
+  }
+  return Array.from(seen);
+}
+
+// ════════════════════════════════════════════════
+// QUIZ CANDIDATES — for the pupil-facing reading-quiz QR page. Given a
+// bookId, returns only the children who CURRENTLY have that exact book
+// checked out (narrow fields: no PP/EAL/gender) — a child can only ever
+// discover names of other children holding the same book, never the full
+// roster, and can't be quizzed for a book they don't actually have.
+// ════════════════════════════════════════════════
+function getQuizCandidates(p) {
+  const bookId = String(p.bookId || '');
+  if (!bookId) return { error: 'bookId required' };
+
+  const bookSheet = SS.getSheetByName('Books');
+  const bRows = bookSheet.getDataRange().getValues();
+  const bHdr  = bRows[0].map(h => String(h).trim().toLowerCase());
+  const bId = bHdr.indexOf('id'), bTi = bHdr.indexOf('title');
+  let bookTitle = null;
+  for (let r = 1; r < bRows.length; r++) {
+    if (String(bRows[r][bId]) === bookId) { bookTitle = String(bRows[r][bTi] || ''); break; }
+  }
+  if (bookTitle === null) return { error: 'Unknown book' };
+
+  const coSheet = SS.getSheetByName('Checkouts');
+  const coRows  = coSheet ? coSheet.getDataRange().getValues() : [];
+  const coHdr   = coRows.length ? coRows[0].map(h => String(h).trim().toLowerCase()) : [];
+  const cBk = coHdr.indexOf('bookid'), cCh = coHdr.indexOf('childid'), cRt = coHdr.indexOf('returndate'), cId = coHdr.indexOf('id');
+  const checkoutByChild = {};
+  for (let r = 1; r < coRows.length; r++) {
+    const row = coRows[r];
+    if (String(row[cBk]) !== bookId || row[cRt]) continue; // wrong book, or already returned
+    checkoutByChild[String(row[cCh])] = String(row[cId]);
+  }
+  const wanted = Object.keys(checkoutByChild);
+  if (!wanted.length) return { ok: true, bookTitle, candidates: [] };
+
+  const chSheet = SS.getSheetByName('Children');
+  const chRows  = chSheet.getDataRange().getValues();
+  const chHdr   = chRows[0].map(h => String(h).trim().toLowerCase());
+  const iId = chHdr.indexOf('id'), iNm = chHdr.indexOf('name'), iYr = chHdr.indexOf('yeargroup'), iCl = chHdr.indexOf('class');
+  const wantedSet = new Set(wanted);
+  const candidates = [];
+  for (let r = 1; r < chRows.length; r++) {
+    const id = String(chRows[r][iId]);
+    if (!wantedSet.has(id)) continue;
+    candidates.push({
+      childId: id,
+      name: String(chRows[r][iNm] || ''),
+      yearGroup: String(chRows[r][iYr] || ''),
+      class: String(chRows[r][iCl] || ''),
+      checkoutId: checkoutByChild[id]
+    });
+  }
+  return { ok: true, bookTitle, candidates };
 }
 
 // ════════════════════════════════════════════════
