@@ -69,6 +69,7 @@ function dispatch(p) {
     case 'checkout':         return checkout(p);
     case 'returnBook':       return returnBook(p);
     case 'addBook':          return addBook(p);
+    case 'updateBook':       return updateBook(p);
     case 'setup':            return setup();
     case 'setCopyStatus':    return setCopyStatus(p);
     case 'setCoverOverride': return setCoverOverride(p);
@@ -447,6 +448,28 @@ function addBook(p) {
   const id    = 'BK' + Date.now();
   sheet.appendRow([id, p.title, p.author || '', p.phase || 'LKS2', p.copies || 1]);
   return { ok: true, id };
+}
+
+// Fixes a book's title/author/phase/copies without touching its id (and
+// therefore without touching QUIZ_DATA, Checkouts, or QuizAttempts, which
+// are all keyed by id). Pass only the fields you want changed.
+function updateBook(p) {
+  const bookId = String(p.bookId || '');
+  if (!bookId) return { error: 'bookId required' };
+  const sheet = SS.getSheetByName('Books');
+  const rows  = sheet.getDataRange().getValues();
+  const hdr   = rows[0].map(h => String(h).trim().toLowerCase());
+  const iId = hdr.indexOf('id'), iTi = hdr.indexOf('title'), iAu = hdr.indexOf('author'),
+        iPh = hdr.indexOf('phase'), iCo = hdr.indexOf('copies');
+  for (let r = 1; r < rows.length; r++) {
+    if (String(rows[r][iId]) !== bookId) continue;
+    if (p.title  !== undefined) sheet.getRange(r + 1, iTi + 1).setValue(p.title);
+    if (p.author !== undefined) sheet.getRange(r + 1, iAu + 1).setValue(p.author);
+    if (p.phase  !== undefined) sheet.getRange(r + 1, iPh + 1).setValue(p.phase);
+    if (p.copies !== undefined) sheet.getRange(r + 1, iCo + 1).setValue(Number(p.copies));
+    return { ok: true };
+  }
+  return { error: 'Book not found' };
 }
 
 // ════════════════════════════════════════════════
