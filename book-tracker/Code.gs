@@ -85,8 +85,32 @@ function dispatch(p) {
     case 'testWrite':        return testWrite(p);
     case 'submitQuizAttempt': return submitQuizAttempt(p);
     case 'getQuizCandidates': return getQuizCandidates(p);
+    case '_testMilestone':    return _testMilestone();
     default: return { error: 'Unknown action: ' + p.action };
   }
+}
+
+// TEMP — verifies returnBook() computes/returns a milestone. Inserts a
+// throwaway child+checkout row, calls the real returnBook(), then deletes
+// both rows. Remove this + its dispatch case once verified live.
+function _testMilestone() {
+  const chSheet = SS.getSheetByName('Children');
+  const coSheet = SS.getSheetByName('Checkouts');
+  const childId = 'TESTMS' + Date.now();
+  const checkoutId = 'TESTCO' + Date.now();
+  chSheet.appendRow([childId, 'ZZ_TEST_DELETE_ME', 'Y5', '', 'N', 'N', 'F', 4, 0]);
+  coSheet.appendRow([checkoutId, childId, 'BKTEST', 1, '01/01/2026', '', false, false]);
+  SpreadsheetApp.flush();
+  const result = returnBook({ checkoutId, completed: true });
+  const chRows = chSheet.getDataRange().getValues();
+  for (let r = chRows.length - 1; r >= 1; r--) {
+    if (String(chRows[r][0]) === childId) { chSheet.deleteRow(r + 1); break; }
+  }
+  const coRows = coSheet.getDataRange().getValues();
+  for (let r = coRows.length - 1; r >= 1; r--) {
+    if (String(coRows[r][0]) === checkoutId) { coSheet.deleteRow(r + 1); break; }
+  }
+  return { result, cleanedUp: true };
 }
 
 // ════════════════════════════════════════════════
@@ -410,6 +434,7 @@ function returnBook(p) {
       coSheet.getRange(r + 1, iRt + 1).setValue(date);
       coSheet.getRange(r + 1, iCm + 1).setValue(p.completed === true);
 
+      let milestone = null;
       if (p.completed) {
         const childId = String(rows[r][iCh]);
         const chRows  = chSheet.getDataRange().getValues();
@@ -418,12 +443,14 @@ function returnBook(p) {
         const ciTR    = chHdr.indexOf('totalreads');
         for (let cr = 1; cr < chRows.length; cr++) {
           if (String(chRows[cr][ciId]) === childId) {
-            chSheet.getRange(cr + 1, ciTR + 1).setValue(Number(chRows[cr][ciTR] || 0) + 1);
+            const newTotal = Number(chRows[cr][ciTR] || 0) + 1;
+            chSheet.getRange(cr + 1, ciTR + 1).setValue(newTotal);
+            if ([5, 10, 15, 20, 25].indexOf(newTotal) !== -1) milestone = newTotal;
             break;
           }
         }
       }
-      return { ok: true };
+      return { ok: true, milestone: milestone };
     }
   }
   return { error: 'Checkout not found' };
