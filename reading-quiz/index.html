@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Reading Check</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --blue:#1798d3; --blue-dk:#1280b5; --blue-lt:#e8f4fb;
+  --dark:#0a0101; --text:#1a1a1a; --muted:#666; --bg:#f0f4f8;
+  --white:#fff; --border:#dde3ea;
+  --green:#2e7d32; --green-lt:#e8f5e9;
+  --amber:#e65100; --amber-lt:#fff3e0;
+  --red:#c62828;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;
+  -webkit-tap-highlight-color:transparent}
+.hdr{background:var(--blue);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px;
+  box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.hdr-logo{height:44px;width:auto;border-radius:8px;object-fit:contain;flex-shrink:0;padding:4px;background:#fff}
+.hdr h1{font-size:18px;font-weight:800}
+.hdr .sub{font-size:12px;opacity:.9}
+.wrap{max-width:520px;margin:0 auto;padding:20px 16px 60px}
+.card{background:var(--white);border-radius:18px;padding:24px 22px;box-shadow:0 2px 10px rgba(0,0,0,.08);margin-bottom:16px}
+.card h2{font-size:20px;margin-bottom:8px}
+.card p{color:var(--muted);font-size:15px;line-height:1.6}
+.big-icon{font-size:44px;text-align:center;margin-bottom:8px}
+.name-btn{display:block;width:100%;text-align:left;padding:16px 18px;margin-bottom:10px;
+  border:2px solid var(--border);border-radius:12px;background:#fff;cursor:pointer;
+  font-family:inherit;font-size:16px;font-weight:700;transition:all .12s}
+.name-btn:active{transform:scale(.98);background:var(--blue-lt);border-color:var(--blue)}
+.name-btn .cls{display:block;font-weight:500;font-size:13px;color:var(--muted);margin-top:2px}
+.qz-sub{color:var(--muted);font-size:13px;margin-bottom:16px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.qz-q{font-weight:800;font-size:19px;line-height:1.4;margin-bottom:20px}
+.quiz-opt{display:block;width:100%;text-align:left;padding:15px 18px;margin-bottom:11px;
+  border:2px solid var(--border);border-radius:12px;background:#fff;cursor:pointer;
+  font-family:inherit;font-size:16px;font-weight:600;color:var(--text);transition:all .12s}
+.quiz-opt:active:not(:disabled){transform:scale(.98)}
+.quiz-opt:disabled{opacity:.5;cursor:default}
+.qz-feedback{min-height:24px;margin:6px 0 4px;font-weight:800;font-size:15px}
+.qz-feedback.qz-ok{color:var(--green)}
+.qz-feedback.qz-no{color:var(--red)}
+.btn{display:block;width:100%;padding:16px;border-radius:12px;border:none;cursor:pointer;
+  font-size:16px;font-weight:800;font-family:inherit;margin-top:6px}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-ghost{background:var(--border);color:var(--text)}
+.progress{height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:18px}
+.progress .fill{height:100%;background:var(--blue);transition:width .2s}
+.result-icon{font-size:56px;text-align:center;margin-bottom:6px}
+.spinner{width:36px;height:36px;border:4px solid var(--border);border-top-color:var(--blue);
+  border-radius:50%;margin:30px auto;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+.version{text-align:center;padding:10px;color:#aaa;font-size:11px}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <img class="hdr-logo" src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA">
+  <div>
+    <h1>📖 Reading Check</h1>
+    <div class="sub">Wallscourt Farm Academy — Reading Challenge</div>
+  </div>
+</div>
+
+<div class="wrap" id="app"></div>
+<div class="version">WFA Reading Quiz · 12.09.26a</div>
+
+<script>
+// ════════════════════════════════════════════════
+// This is the pupil-facing "scan the QR in your book" quiz. It talks to
+// the same book-tracker backend as staff-tools/book-tracker/index.html —
+// same HARDCODED_URL/WFA_TOKEN, same submitQuizAttempt action/schema.
+//
+// A pass here is logged but deliberately does NOT complete the read —
+// that only happens once the book is physically back at school and staff
+// use book-tracker's return flow (which skips re-quizzing a checkout that
+// already has a passing attempt here — see passedCheckouts in getAll()).
+//
+// QUIZ_DATA below must be kept identical to book-tracker/index.html's
+// copy — this project's single-file convention means it's duplicated
+// rather than shared, so update both together when authoring content.
+// ════════════════════════════════════════════════
+const HARDCODED_URL = 'https://script.google.com/macros/s/AKfycbyXw7lwvL5O1xJApGdKGM_R-zQDfbC_kWZcAf9yUS0VwOjmVWnigAsDEcfxbwjoAe1B/exec';
+const WFA_TOKEN = '2013';
+
+const QUIZ_DATA = {
+  'BK17835374222508': { // Private Peaceful — Michael Morpurgo
+    questions: [
+      { q: "Who is telling the story in Private Peaceful?", options: ["Tommo Peaceful", "Charlie Peaceful", "Molly", "Sergeant Hanley"], correct: 0 },
+      { q: "What is Tommo doing through most of the book, as he remembers his life?", options: ["Sitting an exam", "Staying awake through the night before dawn", "Writing a letter home", "Hiding in a forest"], correct: 1 },
+      { q: "Which war is Private Peaceful set during?", options: ["The Second World War", "The Falklands War", "The First World War", "The Napoleonic Wars"], correct: 2 },
+      { q: "What happens to Charlie at the end of the book?", options: ["He is sent home wounded", "He is executed by his own army", "He is promoted to officer", "He deserts and escapes"], correct: 1 },
+      { q: "Who does Tommo love, who is also loved by his brother Charlie?", options: ["Molly", "Big Joe", "Anna", "Sergeant Hanley"], correct: 0 }
+    ]
+  },
+  'BK17835374212334': { // Good Night Mr Tom — Michelle Magorian
+    questions: [
+      { q: "Why is Willie Beech sent to live in the countryside?", options: ["His parents died", "He is evacuated because of the war", "He was sent to boarding school", "He ran away from home"], correct: 1 },
+      { q: "What is the name of the old man Willie goes to live with?", options: ["Mr Tom Oakley", "Mr Charlie Peaceful", "Mr Hanley", "Mr Fletcher"], correct: 0 },
+      { q: "What is the name of the dog in the story?", options: ["Sammy", "Patch", "Sam", "Buster"], correct: 2 },
+      { q: "How has Willie been treated before he comes to the countryside?", options: ["He was spoiled by his mother", "He was abused and neglected by his mother", "He grew up in an orphanage", "He was raised by his grandparents"], correct: 1 },
+      { q: "What does Willie discover he is talented at while living with Tom?", options: ["Football", "Acting and drawing", "Playing the piano", "Cooking"], correct: 1 }
+    ]
+  },
+  'BK17835374220007': { // Famous Five: Five on Treasure Island — Enid Blyton
+    questions: [
+      { q: "How many children are in the Famous Five (not counting the dog)?", options: ["Three", "Four", "Five", "Two"], correct: 1 },
+      { q: "What is the name of the dog in the Famous Five?", options: ["Timmy", "Tom", "Toby", "Timothy Tail"], correct: 0 },
+      { q: "Who owns the island the children explore?", options: ["A stranger they meet on a train", "George's family", "The local fisherman", "Nobody — it is unclaimed"], correct: 1 },
+      { q: "What are the children searching for on the island?", options: ["A lost pet", "Buried treasure from a wrecked ship", "A missing person", "A hidden cave painting"], correct: 1 },
+      { q: "What is unusual about George, one of the five?", options: ["She insists on being treated as a boy and hates her full name Georgina", "She cannot swim", "She is much older than the others", "She is afraid of the sea"], correct: 0 }
+    ]
+  }
+};
+
+async function api(payload) {
+  const url = `${HARDCODED_URL}?payload=${encodeURIComponent(JSON.stringify(payload))}&token=${WFA_TOKEN}&_t=${Date.now()}`;
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+async function apiPost(payload) {
+  const r = await fetch(`${HARDCODED_URL}?token=${WFA_TOKEN}`, { method: 'POST', body: JSON.stringify(payload) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+const app = document.getElementById('app');
+const bookId = new URLSearchParams(location.search).get('book') || '';
+let quiz = null; // {bookId, bookTitle, childId, childName, checkoutId, order, idx, correct, optionOrder}
+
+function render(html) { app.innerHTML = html; }
+
+async function boot() {
+  if (!bookId) {
+    render(`<div class="card"><div class="big-icon">🤔</div><h2>Hmm, that link's not quite right</h2>
+      <p>This page needs a book's QR code to know which book to check. Ask your teacher for help.</p></div>`);
+    return;
+  }
+  render(`<div class="spinner"></div>`);
+  try {
+    const r = await api({ action: 'getQuizCandidates', bookId });
+    if (!r.candidates || !r.candidates.length) {
+      render(`<div class="card"><div class="big-icon">📚</div><h2>Not checked out right now</h2>
+        <p>"${esc(r.bookTitle || '')}" doesn't look like it's checked out to anyone at the moment. Ask your teacher to check you out first, then try scanning again.</p></div>`);
+      return;
+    }
+    renderNamePicker(r.bookTitle, r.candidates);
+  } catch (e) {
+    render(`<div class="card"><div class="big-icon">😕</div><h2>Something went wrong</h2>
+      <p>${esc(e.message)}. Ask your teacher for help.</p></div>`);
+  }
+}
+
+function renderNamePicker(bookTitle, candidates) {
+  render(`
+    <div class="card">
+      <h2>Which book did you finish?</h2>
+      <p><strong>${esc(bookTitle)}</strong></p>
+    </div>
+    <div class="card">
+      <p style="margin-bottom:14px">Tap your name to start your reading check:</p>
+      ${candidates.map((c, i) => `
+        <button class="name-btn" onclick="startQuiz(${i})">${esc(c.name)}<span class="cls">${esc(c.yearGroup)} ${esc(c.class)}</span></button>
+      `).join('')}
+    </div>`);
+  window.__candidates = candidates;
+  window.__bookTitle = bookTitle;
+}
+
+function startQuiz(i) {
+  const c = window.__candidates[i];
+  const data = QUIZ_DATA[bookId];
+  if (!data || !data.questions || data.questions.length < 5) {
+    render(`<div class="card"><div class="big-icon">📝</div><h2>No quiz for this book yet</h2>
+      <p>Well done for finishing <strong>${esc(window.__bookTitle)}</strong>! There's no reading check ready for this title yet — just bring the book back to school and your teacher will sort it out.</p></div>`);
+    return;
+  }
+  quiz = {
+    bookId, bookTitle: window.__bookTitle, childId: c.childId, childName: c.name, checkoutId: c.checkoutId,
+    order: shuffle(data.questions.map((_, idx) => idx)), idx: 0, correct: 0, optionOrder: []
+  };
+  renderQuizStep();
+}
+
+function renderQuizStep() {
+  const q = QUIZ_DATA[quiz.bookId].questions[quiz.order[quiz.idx]];
+  const optOrder = shuffle(q.options.map((_, i) => i));
+  quiz.optionOrder[quiz.idx] = optOrder;
+  const pct = Math.round((quiz.idx / quiz.order.length) * 100);
+  render(`
+    <div class="card">
+      <div class="progress"><div class="fill" style="width:${pct}%"></div></div>
+      <div class="qz-sub">Question ${quiz.idx + 1} of ${quiz.order.length} — ${esc(quiz.bookTitle)}</div>
+      <div class="qz-q">${esc(q.q)}</div>
+      <div id="quizOpts">${optOrder.map((oi, pos) => `
+        <button class="quiz-opt" onclick="selectOption(${pos})">${esc(q.options[oi])}</button>`).join('')}</div>
+      <div id="quizFeedback" class="qz-feedback"></div>
+      <button class="btn btn-blue hidden" id="nextBtn" onclick="nextQuestion()">Next</button>
+    </div>`);
+}
+
+function selectOption(pos) {
+  const q = QUIZ_DATA[quiz.bookId].questions[quiz.order[quiz.idx]];
+  const isCorrect = quiz.optionOrder[quiz.idx][pos] === q.correct;
+  if (isCorrect) quiz.correct++;
+  document.querySelectorAll('#quizOpts .quiz-opt').forEach(b => b.disabled = true);
+  const fb = document.getElementById('quizFeedback');
+  fb.textContent = isCorrect ? '✓ Correct!' : '✗ Not quite.';
+  fb.className = 'qz-feedback ' + (isCorrect ? 'qz-ok' : 'qz-no');
+  document.getElementById('nextBtn').classList.remove('hidden');
+}
+
+async function nextQuestion() {
+  quiz.idx++;
+  if (quiz.idx < quiz.order.length) { renderQuizStep(); return; }
+  await finishAttempt();
+}
+
+async function finishAttempt() {
+  const total = quiz.order.length;
+  const passed = quiz.correct >= 4;
+  render(`<div class="spinner"></div>`);
+  try {
+    await apiPost({ action: 'submitQuizAttempt', childId: quiz.childId, bookId: quiz.bookId, checkoutId: quiz.checkoutId,
+      score: quiz.correct, total, passed, override: false, overrideBy: '', overrideReason: '' });
+  } catch (e) { /* still show the result even if logging hiccups */ }
+  if (passed) renderPass(); else renderFail();
+}
+
+function renderPass() {
+  render(`
+    <div class="card">
+      <div class="result-icon">🎉</div>
+      <h2 style="text-align:center">Well done, ${esc(quiz.childName)}!</h2>
+      <p style="text-align:center">You got ${quiz.correct}/${quiz.order.length} — great reading!</p>
+      <p style="text-align:center;margin-top:10px">Bring <strong>${esc(quiz.bookTitle)}</strong> back to school and your teacher will finish it off for you.</p>
+    </div>`);
+}
+
+function renderFail() {
+  render(`
+    <div class="card">
+      <div class="result-icon">📖</div>
+      <h2 style="text-align:center">Almost there!</h2>
+      <p style="text-align:center">You got ${quiz.correct}/${quiz.order.length} this time.</p>
+      <p style="text-align:center;margin-top:6px">Have another go, or come back to it later.</p>
+      <button class="btn btn-blue" onclick="retryQuiz()">Try Again</button>
+      <button class="btn btn-ghost" onclick="boot()">I'll try later</button>
+    </div>`);
+}
+
+function retryQuiz() {
+  quiz.order = shuffle(QUIZ_DATA[quiz.bookId].questions.map((_, i) => i));
+  quiz.idx = 0; quiz.correct = 0; quiz.optionOrder = [];
+  renderQuizStep();
+}
+
+boot();
+</script>
+</body>
+</html>
