@@ -329,7 +329,7 @@ function getAll() {
     books:    Object.values(books),
     coverOverrides,
     certIssues: getCertsIssued().certIssues,
-    passedCheckouts: getPassedCheckoutIds()
+    homeQuizScores: getHomeQuizScores()
   };
 }
 
@@ -355,22 +355,27 @@ function computeDemographics_(childList) {
   };
 }
 
-// checkoutIds that already have a passing QuizAttempts row (pass or staff
-// override) — lets the return flow skip re-quizzing a book whose quiz was
-// already passed at home via the reading-quiz QR page.
-function getPassedCheckoutIds() {
+// checkoutId -> {checkoutId, score, total} for the latest real (non-override)
+// QuizAttempts row on that checkout — lets the return flow skip re-quizzing
+// a book whose reading check was already taken at home via the QR page, and
+// shows staff the score so they can judge whether it's worth a conversation.
+// Not a pass/fail gate: any score here still completes the read.
+function getHomeQuizScores() {
   const sh = SS.getSheetByName('QuizAttempts');
   if (!sh) return [];
   const rows = sh.getDataRange().getValues();
   const hdr = rows[0].map(h => String(h).trim().toLowerCase());
-  const iCo = hdr.indexOf('checkoutid'), iPass = hdr.indexOf('passed');
-  const seen = new Set();
+  const iCo = hdr.indexOf('checkoutid'), iSc = hdr.indexOf('score'),
+        iTo = hdr.indexOf('total'), iOv = hdr.indexOf('override');
+  const byCheckout = {};
   for (let r = 1; r < rows.length; r++) {
     const co = String(rows[r][iCo] || '');
-    const passed = rows[r][iPass] === true || String(rows[r][iPass]).toUpperCase() === 'TRUE';
-    if (co && passed) seen.add(co);
+    const isOverride = rows[r][iOv] === true || String(rows[r][iOv]).toUpperCase() === 'TRUE';
+    const scoreRaw = rows[r][iSc];
+    if (!co || isOverride || scoreRaw === '' || scoreRaw === null || scoreRaw === undefined) continue;
+    byCheckout[co] = { checkoutId: co, score: Number(scoreRaw), total: Number(rows[r][iTo] || 5) };
   }
-  return Array.from(seen);
+  return Object.values(byCheckout);
 }
 
 // ════════════════════════════════════════════════
