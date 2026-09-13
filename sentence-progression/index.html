@@ -727,7 +727,7 @@
 </main>
 
 <footer>
-  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v13.09.26l
+  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v13.09.26m
 </footer>
 
 <div class="present-overlay" id="presentOverlay">
@@ -1912,13 +1912,21 @@ function autoTagSentence(str){
     if(PREP_OTHER.has(lw) && !(vState==='aux' && lw==='like')){
       if(sentenceStart && !clauseHasSubject){
         // Fronted prepositional phrase before the sentence has a subject yet ("With a heavy
-        // heart, the dog walked away."): sweep the WHOLE phrase as one plain chunk rather
-        // than just this one word. Leaving the rest to the normal rules below (as the
-        // mid-clause case does) wrongly promotes the phrase's own noun ("heart") to who,
-        // since those rules assume "no subject yet" can only mean the real subject is next.
+        // heart, the dog walked away."): sweep the WHOLE phrase as one chunk rather than just
+        // this one word. Leaving the rest to the normal rules below (as the mid-clause case
+        // does) wrongly promotes the phrase's own noun ("heart") to who, since those rules
+        // assume "no subject yet" can only mean the real subject is next.
         let k=i; const chunk=[];
         while(k<n && !/^[,.!?;]$/.test(raw[k]) && !(k>i && isBoundaryWord(lower(raw[k])))){ chunk.push(raw[k]); k++; }
-        items.push({text: chunk.join(' '), cat:'lit'});
+        // This is exactly the Y4 "fronted adverbial" structure (how/where/when + comma +
+        // who + doing + what) — PREP_WHERE- and TIME_HINT-led fronted phrases already land
+        // in "where"/"when" via their own branches elsewhere, so the only gap here is manner:
+        // "with"/"without" fronting a phrase overwhelmingly reads as how something was done
+        // ("with a heavy heart", "without hesitation"). The rest of PREP_OTHER (of, than,
+        // despite...) doesn't map cleanly onto how/where/when, so those stay plain — still
+        // reassignable to any category via the chip's own dropdown either way.
+        const cat = (lw==='with' || lw==='without') ? 'how' : 'lit';
+        items.push({text: chunk.join(' '), cat});
         if(items.length===1) frontedPhrasePending = true;
         i=k; continue;
       }
