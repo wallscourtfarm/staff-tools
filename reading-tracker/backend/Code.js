@@ -262,24 +262,28 @@ function getDashboardStats_(e) {
   return { school: school, years: years };
 }
 
-// One class+term's average reads by PP/EAL/SEN — powers the stats
-// modal's group-averages bars. Never returns a per-pupil row.
+// One class+term's average reads by PP/EAL/SEN, both for the whole term
+// and for one specific week — powers the stats modal's group-averages
+// bars (term) and its this-week breakdown. Never returns a per-pupil row.
 function getClassGroupStats_(e) {
   const yr = e.parameter.yr, cls = e.parameter.cls, term = e.parameter.term || 'Term 1';
+  const weekIdx = (parseInt(e.parameter.week, 10) || 1) - 1;
   const roster = fetchRosterFlags_();
   const scores = readScoreTree_();
   const pupils = ((roster[yr] || {})[cls]) || {};
   const totals = pupilTermTotals_(scores, yr, cls, term);
-  const g = { eal: { s: 0, n: 0 }, pp: { s: 0, n: 0 }, sen: { s: 0, n: 0 } };
+  const mkGroup = function () { return { eal: { s: 0, n: 0 }, pp: { s: 0, n: 0 }, sen: { s: 0, n: 0 } }; };
+  const termG = mkGroup(), weekG = mkGroup();
   Object.keys(totals).forEach(function (pk) {
     const f = pupils[pk];
     if (!f) return;
     const tot = totals[pk];
-    if (f.eal) { g.eal.s += tot; g.eal.n++; }
-    if (f.pp) { g.pp.s += tot; g.pp.n++; }
-    if (f.sen) { g.sen.s += tot; g.sen.n++; }
+    const wv = pupilWeekValue_(scores, yr, cls, term, pk, weekIdx);
+    if (f.eal) { termG.eal.s += tot; termG.eal.n++; weekG.eal.s += wv; weekG.eal.n++; }
+    if (f.pp) { termG.pp.s += tot; termG.pp.n++; weekG.pp.s += wv; weekG.pp.n++; }
+    if (f.sen) { termG.sen.s += tot; termG.sen.n++; weekG.sen.s += wv; weekG.sen.n++; }
   });
-  return g;
+  return { term: termG, week: weekG };
 }
 
 function doGet(e) {
