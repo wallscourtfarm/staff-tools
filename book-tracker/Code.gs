@@ -5,6 +5,27 @@
 
 const SS = SpreadsheetApp.openById('1l8ZNNUd4jdXeVisB7ZEhz7N8ipW7GL4UQh6fWD9_XGY');
 
+// So the browser never needs a child's own PP/EAL flag: the Children sheet
+// no longer stores them at all (migrated 13.09.26) and computeDemographics_
+// fetches them live from the canonical roster hub, joins by name, and
+// returns only group totals.
+const HUB_ROSTER_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
+const HUB_TOKEN = '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
+
+function nameKey_(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
+function fetchRosterFlags_() {
+  const res = UrlFetchApp.fetch(HUB_ROSTER_URL + '?action=getPupils&token=' + HUB_TOKEN, { muteHttpExceptions: true });
+  const d = JSON.parse(res.getContentText());
+  const byName = {};
+  (d.pupils || []).forEach(function (p) {
+    byName[nameKey_(p.first + ' ' + p.last)] = { eal: !!p.eal, pp: !!p.pp, sen: p.sen || null };
+  });
+  return byName;
+}
+
 // Light shared token (see shared-sync/sync-script.gs). Set the SHARED_TOKEN
 // Script Property to raise the bar; default matches the shipped client.
 function tokenOK(e) {
@@ -165,8 +186,6 @@ function getAll() {
   const iNm  = childHdr.indexOf('name');
   const iYr  = childHdr.indexOf('yeargroup');
   const iCl  = childHdr.indexOf('class');
-  const iPP  = childHdr.indexOf('pp');
-  const iEAL = childHdr.indexOf('eal');
   const iGen = childHdr.indexOf('gender');
   const iTR  = childHdr.indexOf('totalreads');
   const iLR  = childHdr.indexOf('lks2reads');
@@ -181,8 +200,6 @@ function getAll() {
       name:            String(row[iNm]  || ''),
       yearGroup:       String(row[iYr]  || ''),
       class:           String(row[iCl]  || ''),
-      pp:              String(row[iPP]  || ''),
-      eal:             String(row[iEAL] || ''),
       gender:          String(row[iGen] || ''),
       totalReads:      Number(row[iTR]  || 0),
       lks2Reads:       iLR >= 0 ? Number(row[iLR] || 0) : 0,
@@ -302,18 +319,12 @@ function getAll() {
 
   const childList = Object.values(children);
   const demographics = computeDemographics_(childList);
-  // PP/EAL never leave this function from here on — the dashboard's
-  // group averages are pre-computed above into `demographics`, so the
-  // per-child records the browser actually receives don't carry the flag.
-  const childrenForClient = childList.map(function (c) {
-    const copy = Object.assign({}, c);
-    delete copy.pp;
-    delete copy.eal;
-    return copy;
-  });
+  // PP/EAL are fetched live inside computeDemographics_ and never attached
+  // to a child object at all — nothing to strip before this goes to the
+  // browser.
 
   return {
-    children: childrenForClient,
+    children: childList,
     demographics: demographics,
     books:    Object.values(books),
     coverOverrides,
@@ -322,17 +333,20 @@ function getAll() {
   };
 }
 
-// Group counts + average totalReads for PP/non-PP and EAL/non-EAL —
-// computed once here so the dashboard never needs a child's own flag.
+// Group counts + average totalReads for PP/non-PP and EAL/non-EAL — fetched
+// live from the roster hub and joined by name (the Children sheet no longer
+// stores its own copy of these flags at all), computed once here so the
+// dashboard never needs a child's own flag.
 function computeDemographics_(childList) {
+  const roster = fetchRosterFlags_();
   function group(pred) {
     const matched = childList.filter(pred);
     const n = matched.length;
     const avg = n ? matched.reduce(function (s, c) { return s + (c.totalReads || 0); }, 0) / n : 0;
     return { n: n, avgReads: Math.round(avg * 10) / 10 };
   }
-  const isPP = function (c) { return String(c.pp).toUpperCase() === 'Y'; };
-  const isEAL = function (c) { return String(c.eal).toUpperCase() === 'Y'; };
+  const isPP = function (c) { const f = roster[nameKey_(c.name)]; return !!(f && f.pp); };
+  const isEAL = function (c) { const f = roster[nameKey_(c.name)]; return !!(f && f.eal); };
   return {
     pp:    group(isPP),
     nonPp: group(function (c) { return !isPP(c); }),
@@ -570,7 +584,7 @@ function importChildren(p) {
   let added = 0;
   (p.children || []).forEach(c => {
     const id = 'CH' + Date.now() + Math.floor(Math.random() * 9999);
-    sheet.appendRow([id, c.name, c.yearGroup, c.class || '', c.pp || '', c.eal || '', c.gender || '', c.totalReads || 0]);
+    sheet.appendRow([id, c.name, c.yearGroup, c.class || '', c.gender || '', c.totalReads || 0]);
     added++;
     Utilities.sleep(10);
   });
@@ -661,7 +675,7 @@ function setup() {
 // ════════════════════════════════════════════════
 function fixSchema() {
   const fixes = {
-    'Children': ['id','name','yearGroup','class','pp','eal','gender','totalReads','lks2Reads'],
+    'Children': ['id','name','yearGroup','class','gender','totalReads','lks2Reads'],
     'Books':    ['id','title','author','phase','copies'],
     'Reads':    ['childId','bookTitle','dateRead'],
     'Checkouts':['id','childId','bookId','copyNum','checkoutDate','returnDate','completed','lost'],
