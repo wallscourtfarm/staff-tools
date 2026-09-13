@@ -159,6 +159,11 @@ function loadAll(yearGroup) {
         const word = w.trim().toLowerCase(); if (word) obj.mastery[word] = false;
       });
       delete obj.masteredWords; delete obj.failedWords;
+      // ssUser/ssPassword (Spelling Shed login) are a live third-party
+      // credential, not school data — nothing in this tool's UI has ever
+      // read them (dead placeholder fields only), so they never need to
+      // leave this backend at all.
+      delete obj.ssUser; delete obj.ssPassword;
       obj.pairId = obj.pairId === '' || obj.pairId === null ? null : Number(obj.pairId);
       if (isNaN(obj.pairId)) obj.pairId = null;
       return obj;
