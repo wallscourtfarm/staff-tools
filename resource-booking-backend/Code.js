@@ -1,9 +1,21 @@
-// Booking System — Cross-device sync via Google Apps Script                                                                                                                                                                           
-                                                        
-  const PREFIX = 'booking_';                                                                                                                                                                                                             
-                                                                                                                                                                                                                                         
-  function doPost(e) {                                                                                                                                                                                                                   
-    try {                                                                                                                                                                                                                                
+// Booking System — Cross-device sync via Google Apps Script
+
+  const PREFIX = 'booking_';
+
+  // Shared light token (same scheme as every other WFA tool's own
+  // backend) — a deterrent, not real access control, but this endpoint
+  // previously had none at all.
+  function tokenOK_(e) {
+    const want = PropertiesService.getScriptProperties().getProperty('SHARED_TOKEN') || '2013';
+    return !!(e && e.parameter && e.parameter.token && e.parameter.token === want);
+  }
+
+  function doPost(e) {
+    if (!tokenOK_(e)) {
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'unauthorised' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    try {                                                                                                                                                                                                                              
       const payload = JSON.parse(e.postData.contents);                                                                                                                                                                                   
                                                                                    
       // Save bookings for a week                                                                                                                                                                                                        
@@ -22,9 +34,13 @@
     }                                                                                                                                                                                                                                    
   }                                                                                                                                                                                                                                      
                                                                                                                                                                                                                                          
-  function doGet(e) {                                                                                                                                                                                                                    
-    try {                                                                                                                                                                                                                                
-      const action = e.parameter.action;                                                                                                                                                                                                 
+  function doGet(e) {
+    if (!tokenOK_(e)) {
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'unauthorised' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    try {
+      const action = e.parameter.action;                                                                                                                                                                                             
                                                                                                                                                                                                                                          
       // Load bookings for a week                                                                                                                                                                                                        
       if (action === 'loadBookings' && e.parameter.weekKey) {                                                                                                                                                                            
