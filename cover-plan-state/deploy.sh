@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Re-deploy the cover-plan state script (weekSlots/cellNotes/sportsSchedule
+# Re-deploy the release-plan state script (weekSlots/cellNotes/sportsSchedule
 # GET+POST key-value store) to the live web app.
 # Usage: ./deploy.sh "optional description"
 #
-# This project ("WFA Cover Plan State", scriptId
+# This project ("WFA Release Plan State", scriptId
 # 1C1KwanbrGx7EDUHQpXS6Ymd3SWnyg8TCnPy1ve5HduyKZiJxyOnCb5DI) was never
 # clasp-tracked before 11.09.26 — it existed only in the Apps Script web
 # editor. Cloned into this repo so it's finally under version control; see
