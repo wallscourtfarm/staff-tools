@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-11.09.26b</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-13.09.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -551,6 +551,11 @@ const FAB_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J
 // still go straight to the real backend, unchanged.
 const COVER_SYNC_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/coverstate';
 const SHARED_TOKEN = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
+// Distinct from SHARED_TOKEN above (that one's for the shared-sync hub) —
+// this is the light deterrent token each tool's own dedicated backend
+// checks (SYNC_URL/BOOKING_SYNC_URL/FAB_SYNC_URL below previously had no
+// check at all).
+const OWN_BACKEND_TOKEN = '2013';
 const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
 const LUNCH_COVER_URL = GATEWAY_URL + '&key=wfa_lc';
 const BOOKING_SYNC_URL = 'https://script.google.com/macros/s/AKfycbwzNtos0vdjnUhsFQ_igTtLNXyBd8k9c6rPkA0IZdkM3vJLAoIdSHonTbHAbyFNfH_BWQ/exec';
@@ -1411,7 +1416,7 @@ function getBookingRowIndexes(booking) {
 async function loadBookingOverlay(weekKey) {
   if (!BOOKING_SYNC_URL) return;
   try {
-    const res = await fetch(`${BOOKING_SYNC_URL}?action=loadBookings&weekKey=${encodeURIComponent(weekKey)}`);
+    const res = await fetch(`${BOOKING_SYNC_URL}?action=loadBookings&weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
     if (!res.ok) return;
     const json = await res.json();
     if (json && json.bookings) {
@@ -1770,7 +1775,7 @@ async function syncSave() {
   const wk = schedKey();
   if (!syncedWeeks.has(wk)) return; // haven't confirmed the real backend state for this week yet — don't risk overwriting it
   const body = JSON.stringify({ action:'save', yearGroup: YEAR_GROUP, weekKey: wk, data: state.schedule[wk] || {} });
-  fetch(SYNC_URL, { method:'POST', body, headers:{'Content-Type':'text/plain'} })
+  fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, { method:'POST', body, headers:{'Content-Type':'text/plain'} })
     .then(() => updateSyncStatus('ok'))
     .catch(() => updateSyncStatus('err'));
 }
@@ -1778,7 +1783,7 @@ async function syncSave() {
 async function syncLoad(weekKey) {
   if (!SYNC_URL) return;
   try {
-    const res = await fetch(`${SYNC_URL}?action=load&yearGroup=${encodeURIComponent(YEAR_GROUP)}&weekKey=${encodeURIComponent(weekKey)}`);
+    const res = await fetch(`${SYNC_URL}?action=load&yearGroup=${encodeURIComponent(YEAR_GROUP)}&weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
     if (!res.ok) return;
     const json = await res.json();
     if (json && json.data && json.data.master) {
@@ -1806,7 +1811,7 @@ async function syncPushAll() {
     const data = state.schedule[weekKey];
     if (!data || !Object.keys(data).length) continue;
     try {
-      await fetch(SYNC_URL, {
+      await fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, {
         method:'POST',
         body: JSON.stringify({ action:'save', yearGroup: YEAR_GROUP, weekKey, data }),
         headers:{'Content-Type':'text/plain'}
@@ -3162,7 +3167,7 @@ async function copyWeekToNext() {
   // Sync next week to cloud (syncSave only syncs current week)
   if (SYNC_URL) {
     try {
-      await fetch(SYNC_URL, {
+      await fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, {
         method: 'POST',
         body: JSON.stringify({ action: 'save', yearGroup: YEAR_GROUP, weekKey: nextKey, data: state.schedule[nextKey] || {} }),
         headers: { 'Content-Type': 'text/plain' }
@@ -3196,7 +3201,7 @@ async function copyWeekToTerm() {
   if (SYNC_URL) {
     for (const week of weeksToCopy) {
       try {
-        await fetch(SYNC_URL, {
+        await fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, {
           method: 'POST',
           body: JSON.stringify({ action: 'save', yearGroup: YEAR_GROUP, weekKey: week.key, data: state.schedule[week.key] || {} }),
           headers: { 'Content-Type': 'text/plain' }
@@ -3686,7 +3691,7 @@ async function init() {
   const bookingPromise = loadBookingOverlay(initialWeekKey);
   const overlaysPromise = Promise.all([
     EXCEPTIONS_URL ? fetch(EXCEPTIONS_URL + '?action=exceptions').then(r => r.ok ? r.json() : {exceptions:[]}).then(d => d.exceptions || []).catch(() => []) : Promise.resolve([]),
-    FAB_SYNC_URL ? fetch(FAB_SYNC_URL).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
+    FAB_SYNC_URL ? fetch(FAB_SYNC_URL + '?token=' + OWN_BACKEND_TOKEN).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
     COVER_SYNC_URL ? fetch(COVER_SYNC_URL + '?token=' + SHARED_TOKEN).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
     fetch(LUNCH_COVER_URL, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
