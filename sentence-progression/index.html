@@ -723,7 +723,7 @@
 </main>
 
 <footer>
-  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v13.09.26j
+  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v13.09.26k
 </footer>
 
 <div class="present-overlay" id="presentOverlay">
@@ -1660,7 +1660,12 @@ function autoTagSentence(str){
   const SUBORD_MULTI = ['in order to','provided that','as soon as','as long as','even though','such that'];
   const SUBORD = new Set(['because','if','although','unless','whenever','whereas','though','supposing','as','since','while','until','before','after','when']);
   const TIME_HINT = new Set(['before','after','since','while','until','when']);
-  const AUX = new Set(['is','was','are','were','am','has','have','had','be','been','being','do','does','did','might','can','could','may','must','shall','should','will','would']);
+  const AUX = new Set(['is','was','are','were','am','has','have','had','be','been','being','do','does','did','might','can','could','may','must','shall','should','will','would',
+    // Contracted negative auxiliaries ("don't", "isn't"...) function exactly like their
+    // uncontracted form for this tagger's purposes — tagging them plain 'aux' (rather than
+    // letting them fall through to the "no subject yet" default, which used to mistag them
+    // as who/doing) needs no separate negation category, just recognising them here.
+    'cannot',"don't","doesn't","didn't","isn't","aren't","wasn't","weren't","haven't","hasn't","hadn't","won't","can't","couldn't","shouldn't","wouldn't","mustn't","shan't","mightn't","needn't"]);
   const PREP_WHERE = new Set(['at','in','on','under','over','near','beside','behind','above','below','inside','outside','between','among','through','across','around','from','into','onto','towards','by','along','beyond','beneath','alongside','past','upon','amid','down','up','against']);
   const PREP_OTHER = new Set(['with','without','of','about','like','than','except','despite','via','per']);
   const ADV_EXTRA = new Set(['perhaps','maybe','surely','completely','probably','certainly','definitely','possibly','obviously','clearly','actually','really','totally','absolutely','quite','rather','extremely','very','soon','then','now','today','yesterday','tomorrow','later','finally','suddenly','immediately','afterwards','meanwhile','already','still','again','often','always','never','sometimes','hard','fast']);
@@ -1743,6 +1748,12 @@ function autoTagSentence(str){
   // the adult tells a joke, laughs.") — holds the outer clause's clauseHasSubject so it can
   // be restored at the aside's closing comma, rather than losing the outer subject entirely.
   let embeddedSubordSaved = null;
+  // True while the sentence's opening clause is a FRONTED subordinate clause ("Before you
+  // leave, ..."). The comma ending it is, structurally, a fresh clause boundary exactly like
+  // a full stop — the imperative check below only fires when sentenceStart is true, so
+  // without this an imperative main clause after a fronted subordinate clause ("Before you
+  // leave, tidy your desk.") would silently never be recognised as one.
+  let frontedSubordPending = false;
 
   while(i < n){
     const w = raw[i];
@@ -1765,6 +1776,7 @@ function autoTagSentence(str){
       } else {
         clauseHasSubject = false; vState = 'none';
         embeddedSubordSaved = null;
+        if(frontedSubordPending){ sentenceStart = true; frontedSubordPending = false; }
       }
       if(w !== ',') sentenceStart = true;
       i++; continue;
@@ -1778,6 +1790,7 @@ function autoTagSentence(str){
       }
     }
     if(matchedMulti){
+      if(items.length===0) frontedSubordPending = true;
       items.push({text: raw.slice(i,i+matchedMulti).join(' '), cat:'subord'});
       i += matchedMulti; clauseHasSubject=false; vState='none'; continue;
     }
@@ -1845,6 +1858,7 @@ function autoTagSentence(str){
           i=k; continue;
         }
       }
+      if(items.length===0) frontedSubordPending = true;
       items.push({text:w, cat:'subord'});
       clauseHasSubject=false; vState='none'; i++; continue;
     }
@@ -1852,6 +1866,19 @@ function autoTagSentence(str){
     if(AUX.has(lw)){
       items.push({text:w, cat:'aux'});
       if(vState==='none') vState='aux';
+      i++; continue;
+    }
+
+    // Negation ("do NOT touch", "is NOT happy", "cannot swim"): "not" has no colour category
+    // of its own in this tool, and — crucially — isn't the clause's verb or subject either.
+    // Left unhandled, it used to fall through to the "no subject yet" default and get
+    // mistagged as who/doing itself, bumping the REAL verb after it into the wrong category
+    // (e.g. "She does not like spiders." tagged "not" as doing and "like" as a plain literal).
+    // Passing it through as a plain, uncoloured word — without touching clauseHasSubject or
+    // vState — leaves that state exactly as it was, so the real verb/complement after "not"
+    // still lands in the right slot.
+    if(lw==='not'){
+      items.push({text:w, cat:'lit'});
       i++; continue;
     }
 
@@ -1871,7 +1898,12 @@ function autoTagSentence(str){
       i=k; continue;
     }
 
-    if(PREP_OTHER.has(lw)){
+    // "like" is in PREP_OTHER (see below) for its overwhelmingly common preposition sense
+    // ("looks like rain"), but right after an aux with no verb yet (vState==='aux' — "does
+    // not LIKE spiders", "I DO like cake") it's the clause's genuine main verb, and a clause
+    // can't have none — skip the preposition treatment there so it falls through to the
+    // normal doing-assignment below instead of stranding the object with no verb at all.
+    if(PREP_OTHER.has(lw) && !(vState==='aux' && lw==='like')){
       // A preposition that isn't clearly spatial (where) or temporal (when) — e.g. "with",
       // "of" — doesn't fit any of this tool's categories cleanly, so it's left as a plain,
       // uncoloured word rather than forced into "what". The noun phrase after it is still
@@ -1991,6 +2023,30 @@ function autoTagSentence(str){
       items.push({text:w, cat:'how'}); i++; continue;
     }
 
+    // Imperative sentence ("Tap the button.", "Colour the picture carefully.", "Give the
+    // dog a bone."): the sentence opens directly with its verb — the subject ("you") is
+    // implied, never stated — so defaulting the first bare word of a clause to "who" (as
+    // the branch below does for every other sentence) is wrong here. Only fires at the very
+    // start of the sentence, and only when no OTHER verb turns up later in the clause —
+    // that second check is what stops it firing on a real subject that merely happens to be
+    // a bossy-verb-shaped word, e.g. "Colour is important." ("is" confirms "Colour" is the
+    // subject there, not the verb). Deliberately placed BEFORE the looksAdj/taggerAdj check
+    // below: several imperative verbs this tool cares about (tidy, clean, clear, open...)
+    // are also genuine adjectives, and the adjective branch would otherwise claim them first
+    // and misread the following noun phrase as if IT were the subject (e.g. "tidy your desk"
+    // → "tidy" swallowed as a describe word, "your" wrongly promoted to subject).
+    if(sentenceStart && !clauseHasSubject && !AUX.has(lw)
+       && (/^VB/.test(posOf(i)) || ENGLISH_VERBS.has(lw)) && !hasLaterVerb(i+1)){
+      let text = w;
+      if(i+1<n && PARTICLES.has(lower(raw[i+1]))){ text += ' ' + raw[i+1]; i++; }
+      items.push({text, cat:'doing'});
+      // No real subject exists, but marking one as "found" is what routes every later word
+      // in this clause through the what/object path instead of a second, equally wrong "who".
+      clauseHasSubject = true;
+      vState = 'full';
+      sentenceStart = false; i++; continue;
+    }
+
     if(looksAdj(lw) || taggerAdj(i)){
       if(vState==='aux'){
         items.push({text:w, cat:'describe'});
@@ -2041,26 +2097,6 @@ function autoTagSentence(str){
         if(cat==='who') clauseHasSubject=true;
       }
       i=k; sentenceStart=false; continue;
-    }
-
-    // Imperative sentence ("Tap the button.", "Colour the picture carefully.", "Give the
-    // dog a bone."): the sentence opens directly with its verb — the subject ("you") is
-    // implied, never stated — so defaulting the first bare word of a clause to "who" (as
-    // the branch below does for every other sentence) is wrong here. Only fires at the very
-    // start of the sentence, and only when no OTHER verb turns up later in the clause —
-    // that second check is what stops it firing on a real subject that merely happens to be
-    // a bossy-verb-shaped word, e.g. "Colour is important." ("is" confirms "Colour" is the
-    // subject there, not the verb).
-    if(sentenceStart && !clauseHasSubject && !AUX.has(lw)
-       && (/^VB/.test(posOf(i)) || ENGLISH_VERBS.has(lw)) && !hasLaterVerb(i+1)){
-      let text = w;
-      if(i+1<n && PARTICLES.has(lower(raw[i+1]))){ text += ' ' + raw[i+1]; i++; }
-      items.push({text, cat:'doing'});
-      // No real subject exists, but marking one as "found" is what routes every later word
-      // in this clause through the what/object path instead of a second, equally wrong "who".
-      clauseHasSubject = true;
-      vState = 'full';
-      sentenceStart = false; i++; continue;
     }
 
     // A bare noun-noun compound subject ("Roman army", "police officer", "football team",
