@@ -11,9 +11,14 @@ from pathlib import Path
 
 import requests
 
-DATA_DIR = Path(__file__).parent / "data"
+# Pupil data lives in its own private repo (moved out of the public
+# staff-tools repo 13.09.26 — see wallscourtfarm/precision-teaching-data),
+# nested here as a plain git checkout with its own .git and remote.
+# App/probe-tab code stays in staff-tools; only the data + its git history
+# live in the private repo.
+REPO_DIR = Path(__file__).parent / "private-data"
+DATA_DIR = REPO_DIR / "data"
 PROBES_DIR = DATA_DIR / "probes"
-REPO_DIR = Path(__file__).parent
 
 # ── Hub roster (Bromcom-sourced, via shared-sync) ────────────────────────────
 # Pupils only ever enter this tool by being picked from the live roster here
@@ -461,7 +466,9 @@ def ensure_remote_auth():
 
 def _git_auth_url():
     tok = _github_token()
-    base = "https://github.com/wallscourtfarm/staff-tools.git"
+    # Pupil data's own private repo (moved 13.09.26) — distinct from the
+    # public staff-tools repo the app's own code lives in.
+    base = "https://github.com/wallscourtfarm/precision-teaching-data.git"
     if tok:
         return f"https://{tok}@{base[len('https://'):]}"
     return base
