@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Colour-Coded Sentence Progression — Reference Guide</title>
+<style>
+  :root{
+    --brand:#1798d3;
+    --dark:#0a0101;
+    --who:#e8792e;
+    --doing:#f2c94c;
+    --what:#4caf6d;
+    --where:#2e74c4;
+    --when:#a35332;
+    --how:#cb79bb;
+    --describe:#a873be;
+    --coord:#c0392b;
+    --subord:#2e5fa3;
+    --relative-bg:#e9e9f1;
+    --relative-border:#7a7a8c;
+    --lit-bg:#e2e2e2;
+    --ink:#1c1c1c;
+    --muted:#5a6470;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    color:var(--ink);
+    background:#e9edf0;
+  }
+  .page{
+    width:210mm;
+    min-height:296mm;
+    margin:6mm auto;
+    background:#fff;
+    box-shadow:0 2px 10px rgba(0,0,0,0.15);
+    padding:16mm 16mm;
+    position:relative;
+    page-break-after:always;
+  }
+  .page.no-break-after{ page-break-after:auto; }
+
+  /* ---------- Cover ---------- */
+  .cover{
+    background:var(--dark);
+    color:#fff;
+    text-align:center;
+    padding:110mm 16mm 0;
+  }
+  .cover .rainbow{
+    display:flex;
+    gap:10px;
+    margin-bottom:36px;
+  }
+  .cover .rainbow div{
+    width:16px;
+    height:70px;
+    border-radius:8px;
+    transform:rotate(var(--rot));
+  }
+  .cover h1{
+    font-size:2.6rem;
+    margin:0 0 10px;
+    letter-spacing:0.01em;
+  }
+  .cover h2{
+    font-size:1.3rem;
+    font-weight:400;
+    color:#bcd8e8;
+    margin:0 0 50px;
+  }
+  .cover .credit{
+    font-size:0.9rem;
+    color:#9fb3bd;
+    max-width:420px;
+    line-height:1.5;
+  }
+  .cover img.logo{
+    height:56px;
+    background:#fff;
+    border-radius:8px;
+    padding:6px;
+    margin-bottom:40px;
+  }
+
+  /* ---------- Generic page chrome ---------- */
+  .page-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    border-bottom:3px solid var(--brand);
+    padding-bottom:8px;
+    margin-bottom:18px;
+  }
+  .page-header h1{
+    font-size:1.5rem;
+    margin:0;
+    color:var(--dark);
+  }
+  .page-header .tag{
+    font-size:0.75rem;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:var(--muted);
+    font-weight:700;
+  }
+  .lede{
+    font-size:0.95rem;
+    line-height:1.6;
+    color:#333;
+    margin:0 0 18px;
+  }
+  h3.section{
+    font-size:1.05rem;
+    color:var(--dark);
+    border-left:5px solid var(--brand);
+    padding-left:10px;
+    margin:22px 0 10px;
+  }
+
+  /* ---------- Colour key ---------- */
+  .key-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:14px;
+    margin-top:10px;
+  }
+  .key-item{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    border:1px solid #e2e6ea;
+    border-radius:10px;
+    padding:10px 12px;
+  }
+  .key-swatch{
+    width:52px;
+    height:52px;
+    border-radius:10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+  }
+  .key-swatch img{ width:30px; height:30px; object-fit:contain; }
+  .key-text b{ display:block; font-size:0.9rem; color:var(--dark); }
+  .key-text span{ font-size:0.78rem; color:var(--muted); }
+
+  /* ---------- Year intro ---------- */
+  .year-band{
+    background:var(--dark);
+    color:#fff;
+    border-radius:10px;
+    padding:16px 20px;
+    margin-bottom:16px;
+  }
+  .year-band h1{ margin:0 0 6px; font-size:1.6rem; }
+  .year-band p{ margin:0; font-size:0.88rem; line-height:1.55; color:#dbe7ec; }
+
+  /* ---------- Structure card (reused visual language from the web tool) ---------- */
+  .structure-card{
+    border:1px solid #e2e6ea;
+    border-radius:10px;
+    padding:12px 14px 14px;
+    margin-bottom:12px;
+    break-inside:avoid;
+  }
+  .structure-card h4{ margin:0 0 2px; font-size:0.98rem; color:var(--dark); }
+  .structure-note{ margin:0 0 10px; font-size:0.75rem; color:var(--muted); }
+  .chip-row{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:6px; margin-bottom:8px; }
+  .slot{ display:flex; flex-direction:column; min-width:74px; }
+  .slot-label{
+    font-size:0.55rem; font-weight:800; text-transform:uppercase; letter-spacing:0.03em;
+    text-align:center; margin-bottom:2px; color:#444;
+  }
+  .slot-box{
+    border-radius:6px; padding:5px 4px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; min-height:56px;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .slot-box img.icon{ height:18px; width:auto; margin-bottom:2px; }
+  .slot-box .word{ font-weight:700; font-size:0.78rem; text-align:center; color:inherit; }
+  .aux-box{ background:var(--doing); }
+  .aux-diamond{
+    width:100%; min-height:46px; background:#fff; border:2px solid #222;
+    clip-path:polygon(50% 2%, 98% 50%, 50% 98%, 2% 50%);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .aux-diamond .word{ color:#222; font-size:0.78rem; }
+  .comma-mark{ width:12px; height:16px; align-self:flex-end; margin:0 0 4px; flex-shrink:0; background:url('icons/comma.png') no-repeat center / contain; }
+  .fullstop-mark{ width:12px; height:12px; align-self:flex-end; margin:0 0 4px; flex-shrink:0; background:url('icons/fullstop.png') no-repeat center / contain; }
+  .lit-badge{ background:var(--lit-bg); color:#333; border-radius:6px; padding:6px 10px; font-weight:700; font-size:0.78rem; min-height:56px; display:flex; align-items:center; justify-content:center; }
+  .written-ex{ font-size:0.82rem; color:#1c3d22; background:#f1f6f2; border:1px dashed #9bbf9f; border-radius:6px; padding:6px 10px; }
+  .written-ex div{ margin:1px 0; }
+
+  /* ---------- Glossary ---------- */
+  .glossary dt{ font-weight:700; color:var(--dark); margin-top:12px; font-size:0.92rem; }
+  .glossary dd{ margin:2px 0 0; font-size:0.85rem; color:#333; line-height:1.5; }
+
+  .note-box{
+    background:#eaf6fd; border-left:4px solid var(--brand); border-radius:6px;
+    padding:10px 14px; font-size:0.82rem; color:#0a3a52; margin-top:16px; line-height:1.5;
+  }
+
+  .print-controls{
+    max-width:210mm; margin:10px auto; text-align:center;
+  }
+  .print-controls button{
+    background:var(--brand); color:#fff; border:none; border-radius:8px;
+    padding:10px 22px; font-size:0.95rem; font-weight:700; cursor:pointer;
+  }
+
+  @media print{
+    body{ background:#fff; }
+    .page{ box-shadow:none; margin:0; width:auto; min-height:0; }
+    .page.cover{ min-height:269mm; }
+    .print-controls{ display:none; }
+    @page{ size:A4; margin:14mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="print-controls">
+  <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+</div>
+
+<!-- COVER -->
+<div class="page cover">
+  <div class="rainbow">
+    <div style="background:#c0392b;--rot:-18deg"></div>
+    <div style="background:var(--who);--rot:-10deg"></div>
+    <div style="background:var(--doing);--rot:-2deg"></div>
+    <div style="background:var(--what);--rot:6deg"></div>
+    <div style="background:var(--where);--rot:14deg"></div>
+    <div style="background:var(--describe);--rot:22deg"></div>
+  </div>
+  <h1>Colour-Coded Sentence Progression</h1>
+  <h2>A Teacher's Reference Guide — Year 1 to Year 6</h2>
+  <div class="credit">Wallscourt Farm Academy edition. The colour-coded sentence-progression framework and its Year 1–6 structure sequence are the work of <strong>Jacobs Education</strong> (Primary English Consultancy). This guide restates that framework in a cleaner, typeset layout for staff reference, alongside <a style="color:#bcd8e8" href="#">the school's companion interactive tool</a>.</div>
+</div>
+
+<!-- OVERVIEW -->
+<div class="page">
+  <div class="page-header"><h1>Overview</h1><div class="tag">Reference Guide</div></div>
+  <p class="lede">
+    This guide sets out a colour-coded approach to teaching sentence construction across Years 1–6, following the sentence-type progression set by the National Curriculum. Each part of a sentence — its subject, its verb, its object, and so on — is given a consistent colour and symbol, so that the same visual language carries through every year group, only growing more complex as pupils do.
+  </p>
+  <p class="lede">
+    The parts of a sentence used throughout this guide are: <strong>who</strong> (the subject — who or what the sentence is about), <strong>doing</strong> (the verb), <strong>what</strong> (the object), <strong>where</strong>, <strong>when</strong>, <strong>how</strong> (an adverb), <strong>describe</strong> (an adjective), an unlabelled diamond for <strong>auxiliary and modal verbs</strong> (is/was/has/might…, where the verb isn't itself the action), and three connecting parts: <strong>co-ordinating</strong> and <strong>subordinating conjunctions</strong>, and <strong>relative clauses</strong>.
+  </p>
+  <div class="note-box">
+    <strong>A note on "who":</strong> the subject of a sentence isn't always a person — "the ball" is the subject of "The ball deflates." From Year 3 onwards, this guide labels the block <strong>who (subject)</strong> to make that explicit as pupils' grammatical vocabulary develops; Years 1–2 keep the simpler term "who" to match the concrete, person-icon-friendly language young children need.
+  </div>
+  <div class="note-box">
+    This guide can be used flexibly: follow a class's own year-group table for whole-class teaching, or drop down to an earlier year's table to scaffold a pupil working below age-related expectations, or up to stretch one working ahead.
+  </div>
+</div>
+
+<!-- COLOUR KEY -->
+<div class="page">
+  <div class="page-header"><h1>Colour Key</h1><div class="tag">Reference Guide</div></div>
+  <p class="lede">Every block in this guide uses one of the following eleven colours and symbols, consistently across all six years.</p>
+  <div class="key-grid" id="keyGrid"></div>
+</div>
+
+<div id="yearPages"></div>
+
+<!-- GLOSSARY -->
+<div class="page no-break-after">
+  <div class="page-header"><h1>Glossary</h1><div class="tag">Reference Guide</div></div>
+  <p class="lede">Grammatical terms used throughout this guide.</p>
+  <dl class="glossary" id="glossaryList"></dl>
+  <div class="note-box">This is the full glossary from Jacobs Education's original document (Appendix 3), listed alphabetically here for ease of reference.</div>
+  <div style="margin-top:16px; font-size:0.7rem; color:var(--muted); text-align:right;">v13.09.26c</div>
+</div>
+
+<script>
+const TYPE = {
+  who:      {label:'who',            bg:'var(--who)',      fg:'#fff', iconSrc:'icons/who.png'},
+  doing:    {label:'doing',          bg:'var(--doing)',    fg:'#3a2c00', iconSrc:'icons/doing.png'},
+  what:     {label:'what',           bg:'var(--what)',     fg:'#fff', iconSrc:'icons/what.png'},
+  where:    {label:'where',          bg:'var(--where)',    fg:'#fff', iconSrc:'icons/where.png'},
+  when:     {label:'when',           bg:'var(--when)',     fg:'#fff', iconSrc:'icons/when.png'},
+  how:      {label:'how',            bg:'var(--how)',      fg:'#fff', iconSrc:'icons/how.png'},
+  describe: {label:'describe',       bg:'var(--describe)', fg:'#fff', iconSrc:'icons/describe.png'},
+  aux:      {label:'',               bg:'var(--doing)', fg:'#222', diamond:true},
+  coord:    {label:'co-ordinating',  bg:'#fff', fg:'var(--coord)', border:'2px solid var(--coord)', iconSrc:'icons/coord.png'},
+  subord:   {label:'subordinating',  bg:'#fff', fg:'var(--subord)', border:'2px solid var(--subord)', iconSrc:'icons/subord.png'},
+  relative: {label:'relative clause',bg:'var(--relative-bg)', fg:'#333', border:'2px solid var(--relative-border)', iconSrc:'icons/relative.png'},
+  lit:      {label:'',               bg:'var(--lit-bg)', fg:'#333'}
+};
+function whoLabel(yearId){ return (yearId==='y1'||yearId==='y2') ? 'who' : 'who (subject)'; }
+function labelFor(type, yearId){
+  if(type==='who') return whoLabel(yearId);
+  if(type==='aux') return '';
+  return TYPE[type].label;
+}
+
+function s(type, def, extra){ return Object.assign({type, default:def}, extra||{}); }
+function comma(){ return {type:'comma'}; }
+function lit(text){ return {type:'lit', text}; }
+
+const YEARS = [
+{
+  id:'y1', label:'Year 1',
+  intro:"Year 1 pupils build a solid foundation in sentence construction: simple sentences with a subject (who) and a verb (doing), and joining words or clauses with 'and'.",
+  structures:[
+    { title:"Simple sentence", note:"who + doing",
+      pattern:[ s('who','The magnet'), s('doing','attracts') ],
+      examples:["The magnet attracts.","The magnet attracted."] },
+    { title:"Simple sentence", note:"who + doing + what",
+      pattern:[ s('who','The seed'), s('doing','needs'), s('what','water') ],
+      examples:["The seed needs water.","The seed needed water."] },
+    { title:"Simple sentence", note:"who + linking verb (is/was) + describe",
+      pattern:[ s('who','The glass'), s('aux','is',{options:['is','was']}), s('describe','transparent') ],
+      examples:["The glass is transparent.","The glass was transparent."] },
+    { title:"Simple sentence using 'and'", note:"who + doing + and + doing",
+      pattern:[ s('who','The bird'), s('doing','flies'), lit('and'), s('doing','sings') ],
+      examples:["The bird flies and sings.","The bird flew and sang."] },
+    { title:"Simple sentence using 'and'", note:"who + doing + what + and + what",
+      pattern:[ s('who','The pupil'), s('doing','locates'), s('what','London'), lit('and'), s('what','Cardiff') ],
+      examples:["The pupil locates London and Cardiff.","The pupil located London and Cardiff."] },
+    { title:"Simple sentence using 'and'", note:"who + linking verb + describe + and + describe",
+      pattern:[ s('who','The weather'), s('aux','is',{options:['is','was']}), s('describe','cold'), lit('and'), s('describe','windy') ],
+      examples:["The weather is cold and windy.","The weather was cold and windy."] },
+    { title:"Compound sentence using 'and'", note:"Joining two main clauses: who + doing + and + who + doing",
+      pattern:[ s('who','The sun'), s('doing','shines'), lit('and'), s('who','the flowers'), s('doing','grow') ],
+      examples:["The sun shines and the flowers grow.","The sun shone and the flowers grew."] },
+    { title:"Compound sentence using 'and'", note:"Vary the structure, e.g. who + doing + what + and + who + doing",
+      pattern:[ s('who','Baird'), s('doing','invented'), s('what','the television'), lit('and'), s('who','the family'), s('doing','watched') ],
+      examples:["Baird invented the television and the family watched.","Baird invents the television and the family watches."] }
+  ]
+},
+{
+  id:'y2', label:'Year 2',
+  intro:"Year 2 pupils expand sentences with adjectives and adverbs of manner ('how'), meet a wider range of co-ordinating conjunctions (but, so, or), start complex sentences with 'because', and use the progressive verb form.",
+  structures:[
+    { title:"Recap compound sentence", note:"Co-ordinating conjunctions: and → but → so → or",
+      pattern:[ s('who','The fire'), s('doing','spread'), s('coord','so',{options:['so','but','or','and']}), s('who','the people'), s('doing','lost'), s('what','their homes') ],
+      examples:["The fire spread so the people lost their homes.","The fire spreads so the people lose their homes."] },
+    { title:"Simple sentence with expanded noun phrase", note:"who + doing + describe + what (add commas for lists of adjectives when ready)",
+      pattern:[ s('who','Brunel'), s('doing','built'), s('describe','incredible'), s('what','the bridge') ],
+      examples:["Brunel built the incredible bridge.","Brunel builds the incredible bridge."] },
+    { title:"Simple sentence", note:"who + doing + how",
+      pattern:[ s('who','The climate'), s('doing','varies'), s('how','greatly') ],
+      examples:["The climate varies greatly.","The climate varied greatly."] },
+    { title:"Simple sentence", note:"who + doing + what + how",
+      pattern:[ s('who','The nurse'), s('doing','treats'), s('what','the patients'), s('how','kindly') ],
+      examples:["The nurse treats the patients kindly.","The nurse treated the patients kindly."] },
+    { title:"Complex sentence using 'because'", note:"Subordinating conjunctions: because → when → if → that",
+      pattern:[ s('who','Animals'), s('doing','disappear'), s('subord','because',{options:['because','when','if','that']}), s('who','people'), s('doing','destroy'), s('what','their habitat') ],
+      examples:["Animals disappear because people destroy their habitat.","Animals disappeared because people destroyed their habitat."] },
+    { title:"Simple progressive sentence", note:"who + is/was (auxiliary) + doing (-ing form)",
+      pattern:[ s('who','The habitat'), s('aux','is',{options:['is','was']}), s('doing','changing') ],
+      examples:["The habitat is changing.","The habitat was changing."] }
+  ]
+},
+{
+  id:'y3', label:'Year 3',
+  intro:"Year 3 pupils recap and extend co-ordinating and subordinating conjunctions (yet, as, while, until, since), add 'where' and 'when' to simple sentences, and meet the present perfect verb form (has/have + past tense).",
+  structures:[
+    { title:"Recap compound sentence", note:"Co-ordinating conjunctions and/but/so/or → introduce 'yet'",
+      pattern:[ s('who','The magnet'), s('doing','attracts'), s('what','the nail'), s('coord','so',{options:['so','yet','and','but','or']}), s('who','the nail'), s('doing','moves') ],
+      examples:["The magnet attracts the nail so the nail moves.","The magnet attracted the nail so the nail moved."] },
+    { title:"Recap complex sentence", note:"Subordinating conjunction 'because' → introduce as/while/until/since",
+      pattern:[ s('who','Magma'), s('doing','rises'), s('subord','while',{options:['while','as','until','since','because']}), s('who','the volcano'), s('doing','builds'), s('what','pressure') ],
+      examples:["Magma rises while the volcano builds pressure.","Magma rose while the volcano built pressure."] },
+    { title:"Simple sentence", note:"who + doing + where",
+      pattern:[ s('who','Cabot'), s('doing','sailed'), s('where','to Newfoundland') ],
+      examples:["Cabot sailed to Newfoundland.","Cabot sails to Newfoundland."] },
+    { title:"Simple sentence", note:"who + doing + what + where",
+      pattern:[ s('who','The geographer'), s('doing','compares'), s('what','biomes'), s('where','in the Mediterranean') ],
+      examples:["The geographer compares biomes in the Mediterranean.","The geographer compared biomes in the Mediterranean."] },
+    { title:"Simple sentence", note:"who + doing + when",
+      pattern:[ s('who','The plotters'), s('doing','met'), s('when','in November') ],
+      examples:["The plotters met in November.","The plotters meet in November."] },
+    { title:"Simple sentence", note:"who + doing + what + when",
+      pattern:[ s('who','The armies'), s('doing','fought'), s('what','the battle'), s('when','in 1642') ],
+      examples:["The armies fought the battle in 1642.","The armies fight the battle in 1642."] },
+    { title:"Simple present perfect sentence", note:"who + has/have (auxiliary) + doing (past participle)",
+      pattern:[ s('who','The caterpillar'), s('aux','has',{options:['has','have']}), s('doing','changed') ],
+      examples:["The caterpillar has changed.","The caterpillars have changed."] }
+  ]
+},
+{
+  id:'y4', label:'Year 4',
+  intro:"Year 4 pupils recap complex sentences and add although/before/after, explore fronted adverbial phrases, move the subordinate clause to the start of a sentence, and expand noun phrases with extra nouns and prepositional phrases.",
+  structures:[
+    { title:"Recap complex sentence", note:"Subordinating conjunctions from Y2/Y3 → introduce although/before/after",
+      pattern:[ s('who','The Anglo-Saxons'), s('doing','settled'), s('subord','before',{options:['before','after','although']}), s('who','the Vikings'), s('doing','raided'), s('what','the coast') ],
+      examples:["The Anglo-Saxons settled before the Vikings raided the coast.","The Anglo-Saxons settle before the Vikings raid the coast."] },
+    { title:"Simple sentence with a fronted adverbial phrase", note:"how / where / when + comma + who + doing + what",
+      pattern:[ s('when','In AD793'), comma(), s('who','the Vikings'), s('doing','raided'), s('what','Lindisfarne') ],
+      examples:["In AD793, the Vikings raided Lindisfarne.","In AD793, the Vikings raid Lindisfarne."] },
+    { title:"Complex sentence", note:"Moving the subordinate clause to the beginning of the sentence",
+      pattern:[ s('subord','As',{options:['As','Before','After','Although']}), s('who','the switch'), s('doing','closes'), s('what','the circuit'), comma(), s('who','the bulb'), s('doing','lights') ],
+      examples:["As the switch closes the circuit, the bulb lights.","As the switch closed the circuit, the bulb lit."] },
+    { title:"Simple sentence with noun phrase expanded by additional nouns", note:"who + doing + what + what",
+      pattern:[ s('who','The scientist'), s('doing','examines'), s('what','an arm'), s('what','bone') ],
+      examples:["The scientist examines an arm bone.","The scientist examined an arm bone."] },
+    { title:"Simple sentence with noun phrase expanded by a prepositional phrase", note:"who + doing + what + where",
+      pattern:[ s('who','The boat'), s('doing','carries'), s('what','goods'), s('where','along the Thames') ],
+      examples:["The boat carries goods along the Thames.","The boat carried goods along the Thames."] }
+  ]
+},
+{
+  id:'y5', label:'Year 5',
+  intro:"Year 5 pupils widen their conjunction range further (for, unless, whenever, whereas), use adverbs of possibility, build modal-verb sentences, and learn to embed subordinate and relative clauses within a sentence — not just at the start or end.",
+  structures:[
+    { title:"Recap compound sentence", note:"Co-ordinating conjunctions from previous years → introduce 'for'",
+      pattern:[ s('who','Boudicca'), s('doing','fought'), s('coord','for',{options:['for','and','but','so','or','yet']}), s('who','the Iceni'), s('aux','were',{options:['were','was']}), s('describe','angry') ],
+      examples:["Boudicca fought for the Iceni were angry.","Boudicca fights for the Iceni are angry."] },
+    { title:"Recap complex sentence", note:"Subordinating conjunctions from Y2-Y4 → introduce unless/whenever/whereas",
+      pattern:[ s('who','Egyptians'), s('doing','celebrated'), s('subord','whenever',{options:['whenever','unless','whereas']}), s('who','a new pharaoh'), s('doing','took'), s('what','the throne') ],
+      examples:["Egyptians celebrated whenever a new pharaoh took the throne.","Egyptians celebrate whenever a new pharaoh takes the throne."] },
+    { title:"Simple sentence with an adverb for possibility", note:"who + linking verb + adverb + describe",
+      pattern:[ s('who','The universe'), s('aux','is',{options:['is','was']}), s('how','truly'), s('describe','enormous') ],
+      examples:["The universe is truly enormous.","The universe was truly enormous."] },
+    { title:"Simple modal sentence", note:"who + modal verb + doing (+ what)",
+      pattern:[ s('who','The pulley'), s('aux','might',{options:['might','can','could','may','must','shall','should','will','would']}), s('doing','lift'), s('what','the weight') ],
+      examples:["The pulley might lift the weight.","The pulley might lift."] },
+    { title:"Complex sentence", note:"Embed the subordinate clause within a sentence",
+      pattern:[ s('who','The river'), comma(), s('subord','as',{options:['as']}), s('who','the current'), s('doing','carries'), s('what','sand'), comma(), s('doing','widens') ],
+      examples:["The river, as the current carries sand, widens.","The river, as the current carried sand, widened."] },
+    { title:"Complex sentence", note:"Embed a relative clause within a sentence",
+      pattern:[ s('who','Tutankhamun'), comma(), s('relative','who was a young pharaoh'), comma(), s('doing','ruled'), s('what','Egypt') ],
+      examples:["Tutankhamun, who was a young pharaoh, ruled Egypt.","Tutankhamun, who is a young pharaoh, rules Egypt."] },
+    { title:"Complex sentence", note:"Include a relative clause at the end of the sentence",
+      pattern:[ s('who','The Romans'), s('doing','built'), s('what','the wall'), s('relative','that protected the empire') ],
+      examples:["The Romans built the wall that protected the empire.","The Romans build the wall that protects the empire."] }
+  ]
+},
+{
+  id:'y6', label:'Year 6',
+  intro:"Year 6 pupils consolidate and refine advanced sentence structures: a final widening of subordinating conjunctions (in order to, provided that, supposing), and the passive voice, where the subject becomes the recipient of the action rather than the one doing it.",
+  structures:[
+    { title:"Recap complex sentence", note:"Subordinating conjunctions from Y2-Y5 → introduce in order to/provided that/supposing",
+      pattern:[ s('who','Alexander'), s('doing','conquered'), s('subord','provided that',{options:['provided that','in order to','supposing']}), s('who','the army'), s('doing','followed'), s('what','the plan') ],
+      examples:["Alexander conquered provided that the army followed the plan.","Alexander conquers provided that the army follows the plan."] },
+    { title:"Simple passive sentence", note:"The object of the active sentence becomes the subject: what (as agent) + is/was + doing (past participle) + by + who",
+      pattern:[ s('what','The animal'), s('aux','is',{options:['is','was']}), s('doing','classified'), lit('by'), s('who','the scientist') ],
+      examples:["The animal is classified by the scientist.","The animal was classified by the scientist."] }
+  ]
+}
+];
+
+/* ---------- Colour key render ---------- */
+const KEY_ORDER = ['who','doing','what','where','when','how','describe','aux','coord','subord','relative'];
+const KEY_LABELS = {who:'who (subject)', aux:'is / was / has / might…', coord:'co-ordinating conjunction', subord:'subordinating conjunction', relative:'relative clause', what:'what (object)'};
+const keyGrid = document.getElementById('keyGrid');
+KEY_ORDER.forEach(t=>{
+  const def = TYPE[t];
+  const item = document.createElement('div');
+  item.className = 'key-item';
+  const sw = document.createElement('div');
+  sw.className = 'key-swatch';
+  sw.style.background = def.bg.startsWith('var')? def.bg : def.bg;
+  if(def.border) sw.style.border = def.border;
+  if(t==='aux'){
+    sw.innerHTML = '<div style="width:26px;height:26px;background:#fff;border:2px solid #222;clip-path:polygon(50% 2%, 98% 50%, 50% 98%, 2% 50%);"></div>';
+  } else if(def.iconSrc){
+    sw.innerHTML = `<img src="${def.iconSrc}">`;
+  }
+  item.appendChild(sw);
+  const text = document.createElement('div');
+  text.className = 'key-text';
+  text.innerHTML = `<b>${KEY_LABELS[t]||def.label}</b>`;
+  item.appendChild(text);
+  keyGrid.appendChild(item);
+});
+
+/* ---------- Structure card render (static, model example only) ---------- */
+function renderCard(structure, yearId){
+  const card = document.createElement('div');
+  card.className = 'structure-card';
+  const h4 = document.createElement('h4'); h4.textContent = structure.title; card.appendChild(h4);
+  const note = document.createElement('p'); note.className='structure-note'; note.textContent = structure.note; card.appendChild(note);
+
+  const row = document.createElement('div'); row.className = 'chip-row';
+  structure.pattern.forEach(tok=>{
+    if(tok.type==='comma'){ const c=document.createElement('div'); c.className='comma-mark'; row.appendChild(c); return; }
+    if(tok.type==='lit'){
+      const w = document.createElement('div'); w.className='slot';
+      const sp = document.createElement('div'); sp.className='slot-label'; sp.innerHTML='&nbsp;'; w.appendChild(sp);
+      const b = document.createElement('div'); b.className='lit-badge'; b.textContent = tok.text; w.appendChild(b);
+      row.appendChild(w); return;
+    }
+    const def = TYPE[tok.type];
+    const wrap = document.createElement('div'); wrap.className = 'slot';
+    const label = document.createElement('div'); label.className = 'slot-label';
+    label.textContent = labelFor(tok.type, yearId);
+    wrap.appendChild(label);
+    const box = document.createElement('div'); box.className = 'slot-box' + (def.diamond?' aux-box':'');
+    box.style.background = def.bg;
+    box.style.color = def.fg;
+    if(def.border) box.style.border = def.border;
+    if(def.diamond){
+      const dia = document.createElement('div'); dia.className='aux-diamond';
+      const word = document.createElement('div'); word.className='word'; word.textContent = tok.default;
+      dia.appendChild(word); box.appendChild(dia);
+    } else {
+      if(def.iconSrc){ const img=document.createElement('img'); img.className='icon'; img.src=def.iconSrc; box.appendChild(img); }
+      const word = document.createElement('div'); word.className='word'; word.textContent = tok.default;
+      box.appendChild(word);
+    }
+    wrap.appendChild(box);
+    row.appendChild(wrap);
+  });
+  const fs = document.createElement('div'); fs.className='fullstop-mark'; row.appendChild(fs);
+  card.appendChild(row);
+
+  const ex = document.createElement('div'); ex.className='written-ex';
+  structure.examples.forEach(t=>{ const d=document.createElement('div'); d.textContent=t; ex.appendChild(d); });
+  card.appendChild(ex);
+  return card;
+}
+
+const yearPagesEl = document.getElementById('yearPages');
+YEARS.forEach(y=>{
+  const page = document.createElement('div');
+  page.className = 'page';
+  const header = document.createElement('div'); header.className='page-header';
+  header.innerHTML = `<h1>${y.label}</h1><div class="tag">Reference Guide</div>`;
+  page.appendChild(header);
+  const band = document.createElement('div'); band.className='year-band';
+  band.innerHTML = `<h1>${y.label}</h1><p>${y.intro}</p>`;
+  page.appendChild(band);
+  y.structures.forEach(structure=> page.appendChild(renderCard(structure, y.id)));
+  yearPagesEl.appendChild(page);
+});
+
+/* ---------- Glossary content ---------- */
+const GLOSSARY = [
+  ["Adjective","A word that describes a noun (e.g., happy, red, tall)."],
+  ["Adverb","A word that modifies a verb, an adjective, or another adverb, often describing how, when, where, or to what extent something happens (e.g., quickly, yesterday, very)."],
+  ["Auxiliary Verb","A particular type of verb which is used alongside a main verb to form different tenses, moods, voices, or aspects."],
+  ["Clause","A group of words containing a subject and a verb. Clauses can be independent (main clauses) or dependent (subordinate clauses)."],
+  ["Colourful Semantics","An approach that breaks down sentences into colour-coded components (e.g., who, doing, what, where). It helps pupils understand sentence structure by focusing on grammatical roles."],
+  ["Complex Sentence","A sentence that includes one main clause and at least one subordinate clause, joined by a subordinating conjunction (e.g., because, when, although)."],
+  ["Compound Sentence","A sentence containing two or more main clauses joined by a co-ordinating conjunction (e.g., and, but, so)."],
+  ["Co-ordinating Conjunction","A word that joins two main clauses of equal importance (e.g., and, but, or, so). They are also used to link elements of equal grammatical importance (e.g., The child eats lollies and fruit.)"],
+  ["Fronted Adverbial","A word or phrase placed at the beginning of a sentence to describe the action that follows (e.g., Before dinner, the child ate a lolly.)."],
+  ["Main Clause","An independent clause that can stand alone as a complete sentence (e.g., The child eats the lolly.)."],
+  ["Modal Verbs","A specific type of auxiliary verb that express possibility, ability, permission, necessity, or obligation."],
+  ["Noun Phrase","A phrase that includes a noun and any modifiers, such as adjectives or determiners (e.g., the big, red ball)."],
+  ["Passive Voice","A sentence structure where the subject is the recipient of the action rather than the object (e.g., The lolly was eaten by the child)."],
+  ["Preposition","A word that shows the relationship between a noun (or pronoun) and other words in a sentence. It often indicates direction, location, time, or how something is related to something else."],
+  ["Prepositional Phrase","A phrase that begins with a preposition and modifies a noun or verb (e.g., on the table, under the bench)."],
+  ["Present Perfect Verb Form","A verb form which describes an action that is completed or linked to another time. It is formed with the auxiliary verb \"to have\" + the past participle of the main verb."],
+  ["Progressive Verb Form","A verb form which describes an action that is ongoing or in progress. It is formed with the auxiliary verb \"to be\" + the -ing form (present participle) of the main verb."],
+  ["Relative Clause","A type of subordinate clause introduced by a relative pronoun (who, which, that) that provides more information about a noun (e.g., The child, who was smiling, ate a lolly)."],
+  ["Sentence","A complete idea, usually containing a subject and a verb. In writing, sentences begin with a capital letter and end with a full stop, question mark, or exclamation mark."],
+  ["Simple Sentence","A sentence that contains only one main clause (e.g., The child eats the lolly)."],
+  ["Subordinate Clause","A clause that depends on the main clause and cannot stand alone. Often introduced by subordinating conjunctions such as because, when, or if (e.g., because the child was hungry)."],
+  ["Subordinating Conjunction","A word or phrase that introduces a subordinate clause, linking it to the main clause (e.g., because, although, unless)."],
+  ["Verb","A word that describes an action, state, or occurrence (e.g., run, is, explains)."]
+];
+const glossaryEl = document.getElementById('glossaryList');
+GLOSSARY.forEach(([term, def])=>{
+  const dt = document.createElement('dt'); dt.textContent = term;
+  const dd = document.createElement('dd'); dd.textContent = def;
+  glossaryEl.appendChild(dt); glossaryEl.appendChild(dd);
+});
+</script>
+</body>
+</html>

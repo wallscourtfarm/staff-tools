@@ -1,0 +1,2400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Colour-Coded Sentence Builder — WFA</title>
+<style>
+  :root{
+    --brand:#1798d3;
+    --dark:#0a0101;
+    --who:#e8792e;
+    --doing:#f2c94c;
+    --what:#4caf6d;
+    --where:#2e74c4;
+    --when:#a35332;
+    --how:#cb79bb;
+    --describe:#a873be;
+    --aux-border:#333333;
+    --coord:#c0392b;
+    --subord:#2e5fa3;
+    --relative-bg:#e9e9f1;
+    --relative-border:#7a7a8c;
+    --lit-bg:#e2e2e2;
+    --bg:#f6f8fa;
+    --card:#ffffff;
+    --ink:#1c1c1c;
+    --muted:#6b7280;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    padding-bottom:60px;
+  }
+  header{
+    background:var(--dark);
+    color:#fff;
+    padding:14px 16px 12px;
+    position:sticky;
+    top:0;
+    z-index:20;
+    box-shadow:0 2px 8px rgba(0,0,0,0.25);
+  }
+  .header-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    max-width:1100px;
+    margin:0 auto;
+  }
+  .header-row img{
+    height:40px;
+    background:#fff;
+    border-radius:6px;
+    padding:3px;
+    flex-shrink:0;
+  }
+  .header-text h1{
+    margin:0;
+    font-size:1.15rem;
+    line-height:1.2;
+  }
+  .header-text p{
+    margin:2px 0 0;
+    font-size:0.75rem;
+    color:#cfe9f7;
+  }
+  .year-tabs{
+    max-width:1100px;
+    margin:10px auto 0;
+    display:flex;
+    gap:6px;
+    overflow-x:auto;
+    padding-bottom:4px;
+    -webkit-overflow-scrolling:touch;
+  }
+  .year-tab{
+    flex:0 0 auto;
+    background:rgba(255,255,255,0.08);
+    color:#fff;
+    border:2px solid transparent;
+    border-radius:8px;
+    padding:8px 16px;
+    font-size:0.95rem;
+    font-weight:600;
+    cursor:pointer;
+    white-space:nowrap;
+    transition:background .15s, border-color .15s;
+  }
+  .year-tab:hover{background:rgba(255,255,255,0.18);}
+  .year-tab.active{
+    background:var(--brand);
+    border-color:#fff;
+  }
+
+  main{
+    max-width:1100px;
+    margin:0 auto;
+    padding:16px;
+  }
+
+  .about-box{
+    background:#eaf6fd;
+    border:1px solid #bfe4f5;
+    border-left:5px solid var(--brand);
+    border-radius:8px;
+    padding:12px 14px;
+    font-size:0.88rem;
+    color:#0a3a52;
+    margin-bottom:16px;
+  }
+  .about-box strong{color:var(--dark);}
+
+  .key-strip{
+    background:var(--card);
+    border-radius:10px;
+    padding:12px;
+    margin-bottom:18px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.08);
+  }
+  .key-strip h2{
+    margin:0 0 8px;
+    font-size:0.85rem;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    color:var(--muted);
+  }
+  .key-grid{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+  }
+  .key-chip{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    font-size:0.72rem;
+    font-weight:700;
+    padding:5px 9px;
+    border-radius:6px;
+    color:#fff;
+  }
+  .key-chip.outline{
+    color:#333;
+    background:#fff;
+    border:2px solid #999;
+  }
+  .key-chip .ico{font-size:0.95rem;}
+  .key-chip .ico-img{height:0.95rem; width:auto; vertical-align:middle; margin-right:3px;}
+
+  .year-intro{
+    background:var(--card);
+    border-radius:10px;
+    padding:14px 16px;
+    margin-bottom:18px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.08);
+    font-size:0.9rem;
+    line-height:1.5;
+    border-top:6px solid var(--brand);
+  }
+  .year-intro h2{margin:0 0 6px; font-size:1.2rem;}
+
+  .structure-card{
+    background:var(--card);
+    border-radius:10px;
+    padding:14px 16px 16px;
+    margin-bottom:16px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.08);
+  }
+  .structure-card h3{
+    margin:0 0 2px;
+    font-size:1.02rem;
+  }
+  .structure-note{
+    margin:0 0 12px;
+    font-size:0.8rem;
+    color:var(--muted);
+  }
+  .structure-note b{color:#333;}
+
+  .chip-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    align-items:flex-end;
+    margin-bottom:10px;
+  }
+  .slot{
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    min-width:90px;
+  }
+  .slot-label{
+    font-size:0.62rem;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    text-align:center;
+    margin-bottom:3px;
+    color:#444;
+  }
+  .slot-label .ico{font-size:0.85rem; margin-right:2px;}
+  .slot-label .ico-img{height:0.85rem; width:auto; vertical-align:middle; margin-right:3px;}
+  .slot-label select{
+    border:none;
+    background:transparent;
+    font-family:inherit;
+    font-size:0.62rem;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    text-align:center;
+    color:#444;
+    cursor:pointer;
+    outline:none;
+    width:100%;
+  }
+  .slot-box{
+    border-radius:7px;
+    padding:6px 4px;
+  }
+  .slot-box input, .slot-box select{
+    width:100%;
+    border:none;
+    background:transparent;
+    text-align:center;
+    font-size:16px;
+    font-weight:600;
+    font-family:inherit;
+    color:inherit;
+    outline:none;
+    padding:2px;
+  }
+  .slot-box select{cursor:pointer;}
+  .slot-box input::placeholder{color:rgba(255,255,255,0.75);}
+
+  .slot-box.aux-box{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    /* Matches a regular slot-box's own measured height (padding + single-line icon/word
+       content, ~62px) so the diamond doesn't sit shorter than the chips beside it. */
+    min-height:62px;
+    padding:6px;
+  }
+  .aux-diamond{
+    width:100%;
+    height:100%;
+    min-height:50px;
+    background:#fff;
+    border:2px solid #222;
+    clip-path: polygon(50% 2%, 98% 50%, 50% 98%, 2% 50%);
+    box-sizing:border-box;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .aux-diamond input, .aux-diamond select{
+    width:68%;
+    border:none;
+    background:transparent;
+    text-align:center;
+    font-size:14px;
+    font-weight:700;
+    color:#222;
+    outline:none;
+    padding:0;
+  }
+  .aux-diamond .word-text{ font-size:0.85rem; }
+
+  .comma-mark{
+    align-self:flex-end;
+    width:16px;
+    height:21px;
+    margin:0 2px 6px -2px;
+    flex-shrink:0;
+    background:url('icons/comma.png') no-repeat center / contain;
+  }
+  .fullstop-mark{
+    align-self:flex-end;
+    width:16px;
+    height:16px;
+    margin:0 0 8px 2px;
+    flex-shrink:0;
+    background:url('icons/fullstop.png') no-repeat center / contain;
+  }
+  .lit-badge{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--lit-bg);
+    color:#333;
+    border-radius:7px;
+    padding:8px 12px;
+    font-weight:700;
+    font-size:0.95rem;
+    /* Matches a regular slot-box's own height (62px) rather than its own unrelated value —
+       see the aux-box fix above for why these need to agree. */
+    min-height:62px;
+    flex:1;
+  }
+
+  .preview{
+    background:#f1f6f2;
+    border:1.5px dashed #9bbf9f;
+    border-radius:8px;
+    padding:10px 12px;
+    font-size:1.05rem;
+    font-weight:600;
+    color:#1c3d22;
+    min-height:1.4em;
+  }
+  .preview .ph{color:#8aa88d; font-weight:500;}
+
+  .card-actions{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:8px;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .btn-small{
+    background:none;
+    border:1px solid #cbd5db;
+    color:#3a4a52;
+    border-radius:6px;
+    padding:5px 10px;
+    font-size:0.75rem;
+    cursor:pointer;
+  }
+  .btn-small:hover{background:#eef3f5;}
+
+  .model-examples{
+    margin-top:8px;
+    padding:8px 10px;
+    background:#fffaf0;
+    border-left:3px solid #e0b04a;
+    border-radius:6px;
+    font-size:0.82rem;
+    font-style:italic;
+    color:#5c4a20;
+    display:none;
+  }
+  .model-examples.show{display:block;}
+  .model-examples div{margin:2px 0;}
+
+  .slot-box .word-ico{
+    font-size:1.05rem;
+    line-height:1;
+    text-align:center;
+    margin-bottom:2px;
+  }
+  .slot-box .word-ico img{ height:1.4rem; width:auto; }
+  .slot-box .word-text{
+    text-align:center;
+    font-weight:700;
+    font-size:0.95rem;
+    padding:2px;
+    word-break:break-word;
+  }
+
+  /* Optional Subject/Verb/Object annotation, shown below the who/doing/what block and
+     joined to it by a short coloured tick. Off by default (a body-level class per category
+     flips each on independently) so toggling is instant everywhere — no re-render needed
+     in the builder cards, free-write chips, or Present Mode, since this element already
+     exists in the DOM.
+
+     Every slot gets one of these (see buildGrammarTermEl) — not just who/doing/what — so
+     that once ANY category's caption is showing, every column in the same row (describe,
+     aux, coordinating, "and", even the punctuation marks that align themselves to the
+     row's bottom edge) reserves the same extra height and nothing shifts out of line.
+     Slots that aren't who/doing/what carry no category class, so the visibility rule below
+     never lights them up — they stay invisible placeholders, matched in height only. */
+  .grammar-term{
+    display:none;
+    visibility:hidden;
+    flex-direction:column;
+    align-items:center;
+    margin-top:4px;
+  }
+  body.show-grammar-term-who .grammar-term,
+  body.show-grammar-term-doing .grammar-term,
+  body.show-grammar-term-what .grammar-term{ display:flex; }
+  body.show-grammar-term-who .grammar-term.who,
+  body.show-grammar-term-doing .grammar-term.doing,
+  body.show-grammar-term-what .grammar-term.what{ visibility:visible; }
+  .grammar-term .tick{ width:1.5px; height:9px; background:currentColor; }
+  .grammar-term .term-text{
+    font-size:0.6rem;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    margin-top:3px;
+    color:currentColor;
+  }
+  .grammar-term.who{ color:var(--who); }
+  .grammar-term.doing{ color:#b98900; }
+  .grammar-term.what{ color:var(--what); }
+
+  .freewrite-box{
+    background:var(--card);
+    border-radius:10px;
+    padding:14px 16px 16px;
+    margin-bottom:16px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.08);
+  }
+  .freewrite-box textarea{
+    width:100%;
+    min-height:64px;
+    border:1.5px solid #cbd5db;
+    border-radius:8px;
+    padding:10px;
+    font-size:16px;
+    font-family:inherit;
+    resize:vertical;
+    box-sizing:border-box;
+  }
+  .freewrite-actions{
+    display:flex;
+    gap:8px;
+    margin-top:8px;
+    flex-wrap:wrap;
+  }
+  .btn-main{
+    background:var(--brand);
+    color:#fff;
+    border:none;
+    border-radius:6px;
+    padding:8px 16px;
+    font-size:0.85rem;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .btn-main:hover{background:#137eb3;}
+  .freewrite-hint{
+    font-size:0.78rem;
+    color:var(--muted);
+    margin-top:10px;
+  }
+  .freewrite-output{
+    margin-top:14px;
+  }
+  .freewrite-empty{
+    color:var(--muted);
+    font-size:0.85rem;
+    font-style:italic;
+  }
+
+  .bank-list{ display:flex; flex-direction:column; gap:10px; }
+  .bank-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    background:#f7f9fa;
+    border:1px solid #dfe6ea;
+    border-radius:8px;
+    padding:10px 12px;
+  }
+  .bank-item-preview{ display:flex; flex-wrap:wrap; gap:5px; flex:1; min-width:200px; }
+  .bank-pill{
+    display:inline-block;
+    padding:4px 9px;
+    border-radius:999px;
+    font-size:0.8rem;
+    font-weight:700;
+  }
+  .bank-item-actions{ display:flex; gap:6px; flex-wrap:wrap; flex-shrink:0; }
+  .bank-item-actions .btn-small{ padding:5px 8px; }
+
+  footer{
+    text-align:center;
+    font-size:0.72rem;
+    color:var(--muted);
+    padding:20px 10px 6px;
+  }
+
+  @media (max-width:480px){
+    .slot{min-width:78px;}
+    .header-text h1{font-size:1rem;}
+  }
+
+  /* ---------- Present mode: full-screen, click/tap-to-reveal ---------- */
+  .present-overlay{
+    position:fixed;
+    inset:0;
+    background:#0a0101;
+    z-index:1000;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:4vh 4vw;
+    cursor:pointer;
+    user-select:none;
+  }
+  .present-overlay.show{ display:flex; }
+  .present-topbar{
+    position:absolute;
+    top:0; left:0; right:0;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:16px 24px;
+    cursor:default;
+  }
+  .present-step{
+    color:#cfe9f7;
+    font-size:1rem;
+    font-weight:700;
+    letter-spacing:0.04em;
+  }
+  .present-close{
+    background:rgba(255,255,255,0.12);
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    padding:10px 16px;
+    font-size:1rem;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .present-close:hover{ background:rgba(255,255,255,0.22); }
+  .present-toggle-group{ display:flex; align-items:center; gap:14px; }
+  .present-toggle{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    color:#cfe9f7;
+    font-size:0.85rem;
+    font-weight:700;
+    cursor:pointer;
+    user-select:none;
+  }
+  .present-toggle input{ width:16px; height:16px; cursor:pointer; accent-color:var(--brand); }
+  .present-toggle.who input{ accent-color:var(--who); }
+  .present-toggle.doing input{ accent-color:var(--doing); }
+  .present-toggle.what input{ accent-color:var(--what); }
+  .present-title{
+    color:#8fb8cc;
+    font-size:1.3vw;
+    min-font-size:14px;
+    font-weight:700;
+    margin-bottom:2vh;
+    text-align:center;
+    cursor:default;
+  }
+  .present-row{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:stretch;
+    justify-content:center;
+    gap:1.4vw;
+    max-width:94vw;
+    cursor:default;
+  }
+  .present-chip{
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    min-width:9vw;
+    max-width:22vw;
+    padding:1.6vh 1.4vw;
+    border-radius:14px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.35);
+    opacity:0;
+    transform:translateY(14px) scale(0.96);
+    transition:opacity .28s ease, transform .28s ease;
+  }
+  .present-chip .p-comma{
+    position:absolute;
+    right:-1.2vw;
+    bottom:-1.6vh;
+    width:1.6vw;
+    height:2.1vw;
+    min-width:16px;
+    min-height:21px;
+    background:url('icons/comma.png') no-repeat center / contain;
+    filter:invert(1) brightness(2);
+  }
+  .present-chip.visible{ opacity:1; transform:translateY(0) scale(1); }
+  .present-chip .p-icon{ font-size:2.2vw; line-height:1; margin-bottom:0.4vh; }
+  .present-chip .p-icon img{ height:3.4vw; min-height:36px; width:auto; }
+  .present-chip .p-label{ font-size:0.9vw; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.4vh; }
+  .present-chip .p-word{ font-size:2vw; font-weight:800; text-align:center; }
+  /* Same padding as a regular chip (not its own value) so the diamond box lands at the
+     same overall height as the who/doing/what chips beside it in the row — the diamond
+     itself is then sized to fill exactly that leftover content height. */
+  .present-chip.aux-box{ background:var(--doing); padding:1.6vh 1.4vw; }
+  .present-chip .aux-diamond{
+    width:8vw; height:8vw; max-width:125px; max-height:125px;
+    background:#fff; border:3px solid #222;
+    clip-path: polygon(50% 2%, 98% 50%, 50% 98%, 2% 50%);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .present-chip .aux-diamond .p-word{ font-size:1.4vw; color:#222; }
+  .present-token{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    opacity:0;
+    transform:translateY(14px) scale(0.96);
+    transition:opacity .28s ease, transform .28s ease;
+  }
+  .present-token.visible{ opacity:1; transform:translateY(0) scale(1); }
+  .present-token .present-chip, .present-token .present-lit{
+    opacity:1; transform:none; transition:none; /* the wrapper now owns the reveal animation */
+  }
+  .present-token .grammar-term{ margin-top:1vh; }
+  .present-token .grammar-term .tick{ width:2px; height:1.4vh; }
+  .present-token .grammar-term .term-text{ font-size:0.85vw; margin-top:0.5vh; }
+  .present-lit{
+    display:flex; align-items:center; justify-content:center;
+    background:#e2e2e2; color:#333; border-radius:14px;
+    /* Extra vertical padding (not just 1.6vh) so a plain one-line word like "and" reaches
+       roughly the same overall height as a who/doing/what chip beside it (icon + label +
+       word stacked) instead of sitting as a noticeably smaller box in the row. */
+    padding:5.6vh 1.4vw; font-size:1.6vw; font-weight:800;
+    opacity:0; transform:translateY(14px) scale(0.96);
+    transition:opacity .28s ease, transform .28s ease;
+  }
+  .present-lit.visible{ opacity:1; transform:translateY(0) scale(1); }
+  .present-comma{
+    align-self:flex-end;
+    color:#fff;
+    font-size:2.4vw;
+    font-weight:800;
+    opacity:0;
+    transition:opacity .28s ease;
+    margin:0 -0.6vw 1.2vh -0.4vw;
+  }
+  .present-comma.visible{ opacity:1; }
+  .present-fullstop{
+    align-self:flex-end;
+    width:1.6vw;
+    height:1.6vw;
+    min-width:14px;
+    min-height:14px;
+    background:url('icons/fullstop.png') no-repeat center / contain;
+    filter:invert(1) brightness(2);
+    margin:0 0 1vh 0.6vw;
+    opacity:0;
+    transition:opacity .28s ease;
+    flex-shrink:0;
+  }
+  .present-fullstop.visible{ opacity:1; }
+  .present-sentence{
+    margin-top:4vh;
+    color:#fff;
+    font-size:2.4vw;
+    font-weight:800;
+    text-align:center;
+    max-width:88vw;
+    opacity:0;
+    transform:translateY(10px);
+    transition:opacity .35s ease, transform .35s ease;
+    cursor:default;
+  }
+  .present-sentence.visible{ opacity:1; transform:translateY(0); }
+  .present-hint{
+    position:absolute;
+    bottom:20px;
+    color:#7f97a3;
+    font-size:0.85rem;
+    cursor:default;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <img src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
+    <div class="header-text">
+      <h1>Colour-Coded Sentence Builder</h1>
+      <p>Whole-school sentence structure progression, Year 1 to Year 6</p>
+    </div>
+  </div>
+  <div class="year-tabs" id="yearTabs"></div>
+</header>
+
+<main>
+  <div class="about-box">
+    <strong>How to use this:</strong> Pick a year group above. Each row shows a sentence structure from the National Curriculum, broken into colour-coded parts using Jacobs Education's <em>Colour-Coded Sentence Progression</em>. Tap any coloured block and type your own word or phrase — the sentence below rebuilds itself as you go. Use a class's own year group for whole-class teaching, or drop down/up a year group to scaffold or stretch individual pupils. Or try the <strong>✏️ My sentence</strong> tab to have any sentence you write auto-coloured. On the whiteboard, use <strong>🎬 Present</strong> on any sentence to reveal it block by block, full screen.
+  </div>
+
+  <div class="key-strip">
+    <h2>Colour key</h2>
+    <div class="key-grid" id="keyGrid"></div>
+  </div>
+
+  <div id="yearContent"></div>
+</main>
+
+<footer>
+  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v13.09.26g
+</footer>
+
+<div class="present-overlay" id="presentOverlay">
+  <div class="present-topbar">
+    <div class="present-step" id="presentStep"></div>
+    <div class="present-toggle-group">
+      <label class="present-toggle who">
+        <input type="checkbox" id="grammarTermToggleWho">
+        Subject
+      </label>
+      <label class="present-toggle doing">
+        <input type="checkbox" id="grammarTermToggleDoing">
+        Verb
+      </label>
+      <label class="present-toggle what">
+        <input type="checkbox" id="grammarTermToggleWhat">
+        Object
+      </label>
+    </div>
+    <button class="present-close" id="presentClose">✕ Close</button>
+  </div>
+  <div class="present-title" id="presentTitle"></div>
+  <div class="present-row" id="presentRow"></div>
+  <div class="present-sentence" id="presentSentence"></div>
+  <div class="present-hint">Click / tap / → to reveal the next block · ← to go back · Esc to close</div>
+</div>
+
+<script src="lib/pptxgenjs.bundle.js"></script>
+<script src="lib/wink-pos-tagger.bundle.js"></script>
+<script>
+/* ---------- Colour / type definitions ---------- */
+const TYPE = {
+  who:      {label:'who',            bg:'var(--who)',      fg:'#fff', iconSrc:'icons/who.png'},
+  doing:    {label:'doing',          bg:'var(--doing)',    fg:'#3a2c00', iconSrc:'icons/doing.png'},
+  what:     {label:'what',           bg:'var(--what)',     fg:'#fff', iconSrc:'icons/what.png'},
+  where:    {label:'where',          bg:'var(--where)',    fg:'#fff', iconSrc:'icons/where.png'},
+  when:     {label:'when',           bg:'var(--when)',     fg:'#fff', iconSrc:'icons/when.png'},
+  how:      {label:'how',            bg:'var(--how)',      fg:'#fff', iconSrc:'icons/how.png'},
+  describe: {label:'describe',       bg:'var(--describe)', fg:'#fff', iconSrc:'icons/describe.png'},
+  aux:      {label:'',               bg:'var(--doing)', fg:'#222', icon:'', diamond:true},
+  coord:    {label:'co-ordinating',  bg:'#fff', fg:'var(--coord)',  border:'2px solid var(--coord)', iconSrc:'icons/coord.png'},
+  subord:   {label:'subordinating',  bg:'#fff', fg:'var(--subord)', border:'2px solid var(--subord)', iconSrc:'icons/subord.png'},
+  relative: {label:'relative clause',bg:'var(--relative-bg)', fg:'#333', border:'2px solid var(--relative-border)', iconSrc:'icons/relative.png'},
+  lit:      {label:'',               bg:'var(--lit-bg)', fg:'#333', icon:''}
+};
+
+/* Returns icon markup for a TYPE def: an <img> when iconSrc is set, else an emoji span. */
+function iconHTML(def, altText){
+  if(def.iconSrc) return `<img class="ico-img" src="${def.iconSrc}" alt="${altText||''}">`;
+  if(def.icon) return `<span class="ico">${def.icon}</span>`;
+  return '';
+}
+function makeIconEl(def, altText){
+  if(def.iconSrc){
+    const img = document.createElement('img');
+    img.src = def.iconSrc;
+    img.alt = altText || '';
+    return img;
+  }
+  if(def.icon){
+    const span = document.createElement('span');
+    span.textContent = def.icon;
+    return span;
+  }
+  return null;
+}
+
+/* Hex fills for PowerPoint export (PptxGenJS needs raw hex, not CSS vars) */
+const HEX_FILL = {
+  who:'E8792E', doing:'F2C94C', what:'4CAF6D', where:'2E74C4', when:'A35332',
+  how:'CB79BB', describe:'A873BE', aux:'F2C94C', coord:'FFFFFF', subord:'FFFFFF',
+  relative:'E9E9F1', lit:'E2E2E2'
+};
+const HEX_TEXT = {
+  who:'FFFFFF', doing:'3A2C00', what:'FFFFFF', where:'FFFFFF', when:'FFFFFF',
+  how:'FFFFFF', describe:'FFFFFF', aux:'222222', coord:'C0392B', subord:'2E5FA3',
+  relative:'333333', lit:'333333'
+};
+const HEX_BORDER = { coord:'C0392B', subord:'2E5FA3', relative:'7A7A8C' };
+
+/* Category list used by the free-write colour picker (order matters for the dropdown) */
+const CATEGORY_ORDER = ['who','doing','what','where','when','how','describe','aux','coord','subord','relative','lit'];
+/* Auxiliary/modal word choices offered in the aux diamond's dropdown, in both the
+   structured builder and the free-write tool. */
+const AUX_OPTIONS = ['is','was','are','were','has','have','might','can','could','may','must','shall','should','will','would'];
+function categoryDisplayName(t){
+  if(t==='aux') return 'is / was / has / might…';
+  if(t==='lit') return 'plain (not coloured)';
+  // "who" is really the grammatical subject, which isn't always a person (e.g. "the ball
+  // deflates") — but that formal term now lives in the separate, optional Subject/Verb/
+  // Object annotation (see GRAMMAR_TERM) rather than being baked into this label, so it
+  // just returns the plain word like every other category.
+  return TYPE[t].label;
+}
+
+const PLACEHOLDER = {
+  who:'the child', doing:'eats', what:'the lolly', where:'at the table',
+  when:'before school', how:'quickly', describe:'happy', relative:'who was smiling'
+};
+
+/* ---------- Optional Subject/Verb/Object annotation ---------- */
+// Who/doing/what always show as they do today; this is an extra, separated layer that a
+// teacher can switch on once pupils are ready for the formal grammar terms. Each of the
+// three has its own independent on/off setting (not one combined switch), toggled from
+// three checkboxes in Present Mode's toolbar and remembered between visits. Every setting
+// applies everywhere at once — year-group builder, free-write, Present Mode — via a
+// body-level class per category, so toggling needs no re-render.
+const GRAMMAR_TERM = { who:'Subject', doing:'Verb', what:'Object' };
+const GRAMMAR_TERM_STORAGE_PREFIX = 'wfa_scp_showGrammarTerm_';
+const GRAMMAR_TERM_TOGGLE_ID = { who:'grammarTermToggleWho', doing:'grammarTermToggleDoing', what:'grammarTermToggleWhat' };
+const showGrammarTerm = {};
+function setShowGrammarTerm(cat, v){
+  showGrammarTerm[cat] = v;
+  document.body.classList.toggle('show-grammar-term-'+cat, v);
+  try { localStorage.setItem(GRAMMAR_TERM_STORAGE_PREFIX+cat, v ? '1' : '0'); } catch(e) {}
+}
+Object.keys(GRAMMAR_TERM).forEach(cat=>{
+  let v = false;
+  try { v = localStorage.getItem(GRAMMAR_TERM_STORAGE_PREFIX+cat) === '1'; } catch(e) {}
+  showGrammarTerm[cat] = v;
+  document.body.classList.toggle('show-grammar-term-'+cat, v);
+  const toggleEl = document.getElementById(GRAMMAR_TERM_TOGGLE_ID[cat]);
+  toggleEl.checked = v;
+  toggleEl.addEventListener('change', ()=> setShowGrammarTerm(cat, toggleEl.checked));
+});
+// Builds the tick + term-text element for a slot. Who/doing/what get their real term and
+// the category class that lets the CSS above make them visible; every other category
+// still gets one (just uncoloured, textless) purely to hold the same height — see the
+// comment on .grammar-term for why every slot needs one, not just these three.
+function buildGrammarTermEl(cat){
+  const term = GRAMMAR_TERM[cat];
+  const el = document.createElement('div');
+  el.className = 'grammar-term' + (term ? ' ' + cat : '');
+  const tick = document.createElement('div');
+  tick.className = 'tick';
+  const text = document.createElement('div');
+  text.className = 'term-text';
+  text.textContent = term || ' ';
+  el.appendChild(tick);
+  el.appendChild(text);
+  return el;
+}
+
+/* ---------- Sentence bank: a persistent library of saved sentences ---------- */
+// Lets a teacher colour several sentences ahead of a lesson (from "My sentence") and save
+// each one, then present the whole set back to back in one continuous Present Mode session
+// instead of closing and reopening between each one. Kept in localStorage so it survives
+// reloads and is still there next lesson, next week.
+const SENTENCE_BANK_KEY = 'wfa_scp_sentenceBank';
+let sentenceBank = [];
+try {
+  const raw = localStorage.getItem(SENTENCE_BANK_KEY);
+  if(raw) sentenceBank = JSON.parse(raw).filter(e => e && Array.isArray(e.items) && e.items.length);
+} catch(e) { sentenceBank = []; }
+function saveSentenceBank(){
+  try { localStorage.setItem(SENTENCE_BANK_KEY, JSON.stringify(sentenceBank)); } catch(e) {}
+}
+function addToSentenceBank(items){
+  const clean = items.filter(it => it.text && it.text.trim());
+  if(!clean.length) return;
+  sentenceBank.push({ id: Date.now()+'-'+Math.random().toString(36).slice(2,7), items: clean });
+  saveSentenceBank();
+}
+function removeFromSentenceBank(id){
+  sentenceBank = sentenceBank.filter(e => e.id !== id);
+  saveSentenceBank();
+}
+function moveInSentenceBank(id, dir){
+  const i = sentenceBank.findIndex(e => e.id === id);
+  const j = i + dir;
+  if(i<0 || j<0 || j>=sentenceBank.length) return;
+  [sentenceBank[i], sentenceBank[j]] = [sentenceBank[j], sentenceBank[i]];
+  saveSentenceBank();
+}
+
+/* ---------- Helper to build a slot token ---------- */
+function s(type, def, extra){ return Object.assign({type, default:def}, extra||{}); }
+function comma(){ return {type:'comma'}; }
+function lit(text){ return {type:'lit', text}; }
+
+/* ---------- Year data ---------- */
+const YEARS = [
+{
+  id:'y1', label:'Year 1',
+  intro:"Year 1 pupils build a solid foundation in sentence construction: simple sentences with a subject (who) and a verb (doing), and joining words or clauses with 'and'.",
+  structures:[
+    { title:"Simple sentence", note:"who + doing",
+      pattern:[ s('who','The magnet'), s('doing','attracts') ],
+      examples:["The magnet attracts.","The magnet attracted."] },
+    { title:"Simple sentence", note:"who + doing + what",
+      pattern:[ s('who','The seed'), s('doing','needs'), s('what','water') ],
+      examples:["The seed needs water.","The seed needed water."] },
+    { title:"Simple sentence", note:"who + linking verb (is/was) + describe",
+      pattern:[ s('who','The glass'), s('aux','is',{options:['is','was']}), s('describe','transparent') ],
+      examples:["The glass is transparent.","The glass was transparent."] },
+    { title:"Simple sentence using 'and'", note:"who + doing + and + doing",
+      pattern:[ s('who','The bird'), s('doing','flies'), lit('and'), s('doing','sings') ],
+      examples:["The bird flies and sings.","The bird flew and sang."] },
+    { title:"Simple sentence using 'and'", note:"who + doing + what + and + what",
+      pattern:[ s('who','The pupil'), s('doing','locates'), s('what','London'), lit('and'), s('what','Cardiff') ],
+      examples:["The pupil locates London and Cardiff.","The pupil located London and Cardiff."] },
+    { title:"Simple sentence using 'and'", note:"who + linking verb + describe + and + describe",
+      pattern:[ s('who','The weather'), s('aux','is',{options:['is','was']}), s('describe','cold'), lit('and'), s('describe','windy') ],
+      examples:["The weather is cold and windy.","The weather was cold and windy."] },
+    { title:"Compound sentence using 'and'", note:"Joining two main clauses: who + doing + and + who + doing",
+      pattern:[ s('who','The sun'), s('doing','shines'), lit('and'), s('who','the flowers'), s('doing','grow') ],
+      examples:["The sun shines and the flowers grow.","The sun shone and the flowers grew."] },
+    { title:"Compound sentence using 'and'", note:"Vary the structure, e.g. who + doing + what + and + who + doing",
+      pattern:[ s('who','Baird'), s('doing','invented'), s('what','the television'), lit('and'), s('who','the family'), s('doing','watched') ],
+      examples:["Baird invented the television and the family watched.","Baird invents the television and the family watches."] }
+  ]
+},
+{
+  id:'y2', label:'Year 2',
+  intro:"Year 2 pupils expand sentences with adjectives and adverbs of manner ('how'), meet a wider range of co-ordinating conjunctions (but, so, or), start complex sentences with 'because', and use the progressive verb form.",
+  structures:[
+    { title:"Recap compound sentence", note:"Co-ordinating conjunctions: and → but → so → or",
+      pattern:[ s('who','The fire'), s('doing','spread'), s('coord','so',{options:['so','but','or','and']}), s('who','the people'), s('doing','lost'), s('what','their homes') ],
+      examples:["The fire spread so the people lost their homes.","The fire spreads so the people lose their homes."] },
+    { title:"Simple sentence with expanded noun phrase", note:"who + doing + describe + what (add commas for lists of adjectives when ready)",
+      pattern:[ s('who','Brunel'), s('doing','built'), s('describe','incredible'), s('what','the bridge') ],
+      examples:["Brunel built the incredible bridge.","Brunel builds the incredible bridge."] },
+    { title:"Simple sentence", note:"who + doing + how",
+      pattern:[ s('who','The climate'), s('doing','varies'), s('how','greatly') ],
+      examples:["The climate varies greatly.","The climate varied greatly."] },
+    { title:"Simple sentence", note:"who + doing + what + how",
+      pattern:[ s('who','The nurse'), s('doing','treats'), s('what','the patients'), s('how','kindly') ],
+      examples:["The nurse treats the patients kindly.","The nurse treated the patients kindly."] },
+    { title:"Complex sentence using 'because'", note:"Subordinating conjunctions: because → when → if → that",
+      pattern:[ s('who','Animals'), s('doing','disappear'), s('subord','because',{options:['because','when','if','that']}), s('who','people'), s('doing','destroy'), s('what','their habitat') ],
+      examples:["Animals disappear because people destroy their habitat.","Animals disappeared because people destroyed their habitat."] },
+    { title:"Simple progressive sentence", note:"who + is/was (auxiliary) + doing (-ing form)",
+      pattern:[ s('who','The habitat'), s('aux','is',{options:['is','was']}), s('doing','changing') ],
+      examples:["The habitat is changing.","The habitat was changing."] }
+  ]
+},
+{
+  id:'y3', label:'Year 3',
+  intro:"Year 3 pupils recap and extend co-ordinating and subordinating conjunctions (yet, as, while, until, since), add 'where' and 'when' to simple sentences, and meet the present perfect verb form (has/have + past tense).",
+  structures:[
+    { title:"Recap compound sentence", note:"Co-ordinating conjunctions and/but/so/or → introduce 'yet'",
+      pattern:[ s('who','The magnet'), s('doing','attracts'), s('what','the nail'), s('coord','so',{options:['so','yet','and','but','or']}), s('who','the nail'), s('doing','moves') ],
+      examples:["The magnet attracts the nail so the nail moves.","The magnet attracted the nail so the nail moved."] },
+    { title:"Recap complex sentence", note:"Subordinating conjunction 'because' → introduce as/while/until/since",
+      pattern:[ s('who','Magma'), s('doing','rises'), s('subord','while',{options:['while','as','until','since','because']}), s('who','the volcano'), s('doing','builds'), s('what','pressure') ],
+      examples:["Magma rises while the volcano builds pressure.","Magma rose while the volcano built pressure."] },
+    { title:"Simple sentence", note:"who + doing + where",
+      pattern:[ s('who','Cabot'), s('doing','sailed'), s('where','to Newfoundland') ],
+      examples:["Cabot sailed to Newfoundland.","Cabot sails to Newfoundland."] },
+    { title:"Simple sentence", note:"who + doing + what + where",
+      pattern:[ s('who','The geographer'), s('doing','compares'), s('what','biomes'), s('where','in the Mediterranean') ],
+      examples:["The geographer compares biomes in the Mediterranean.","The geographer compared biomes in the Mediterranean."] },
+    { title:"Simple sentence", note:"who + doing + when",
+      pattern:[ s('who','The plotters'), s('doing','met'), s('when','in November') ],
+      examples:["The plotters met in November.","The plotters meet in November."] },
+    { title:"Simple sentence", note:"who + doing + what + when",
+      pattern:[ s('who','The armies'), s('doing','fought'), s('what','the battle'), s('when','in 1642') ],
+      examples:["The armies fought the battle in 1642.","The armies fight the battle in 1642."] },
+    { title:"Simple present perfect sentence", note:"who + has/have (auxiliary) + doing (past participle)",
+      pattern:[ s('who','The caterpillar'), s('aux','has',{options:['has','have']}), s('doing','changed') ],
+      examples:["The caterpillar has changed.","The caterpillars have changed."] }
+  ]
+},
+{
+  id:'y4', label:'Year 4',
+  intro:"Year 4 pupils recap complex sentences and add although/before/after, explore fronted adverbial phrases, move the subordinate clause to the start of a sentence, and expand noun phrases with extra nouns and prepositional phrases.",
+  structures:[
+    { title:"Recap complex sentence", note:"Subordinating conjunctions from Y2/Y3 → introduce although/before/after",
+      pattern:[ s('who','The Anglo-Saxons'), s('doing','settled'), s('subord','before',{options:['before','after','although']}), s('who','the Vikings'), s('doing','raided'), s('what','the coast') ],
+      examples:["The Anglo-Saxons settled before the Vikings raided the coast.","The Anglo-Saxons settle before the Vikings raid the coast."] },
+    { title:"Simple sentence with a fronted adverbial phrase", note:"how / where / when + comma + who + doing + what",
+      pattern:[ s('when','In AD793'), comma(), s('who','the Vikings'), s('doing','raided'), s('what','Lindisfarne') ],
+      examples:["In AD793, the Vikings raided Lindisfarne.","In AD793, the Vikings raid Lindisfarne."] },
+    { title:"Complex sentence", note:"Moving the subordinate clause to the beginning of the sentence",
+      pattern:[ s('subord','As',{options:['As','Before','After','Although']}), s('who','the switch'), s('doing','closes'), s('what','the circuit'), comma(), s('who','the bulb'), s('doing','lights') ],
+      examples:["As the switch closes the circuit, the bulb lights.","As the switch closed the circuit, the bulb lit."] },
+    { title:"Simple sentence with noun phrase expanded by additional nouns", note:"who + doing + what + what",
+      pattern:[ s('who','The scientist'), s('doing','examines'), s('what','an arm'), s('what','bone') ],
+      examples:["The scientist examines an arm bone.","The scientist examined an arm bone."] },
+    { title:"Simple sentence with noun phrase expanded by a prepositional phrase", note:"who + doing + what + where",
+      pattern:[ s('who','The boat'), s('doing','carries'), s('what','goods'), s('where','along the Thames') ],
+      examples:["The boat carries goods along the Thames.","The boat carried goods along the Thames."] }
+  ]
+},
+{
+  id:'y5', label:'Year 5',
+  intro:"Year 5 pupils widen their conjunction range further (for, unless, whenever, whereas), use adverbs of possibility, build modal-verb sentences, and learn to embed subordinate and relative clauses within a sentence — not just at the start or end.",
+  structures:[
+    { title:"Recap compound sentence", note:"Co-ordinating conjunctions from previous years → introduce 'for'",
+      pattern:[ s('who','Boudicca'), s('doing','fought'), s('coord','for',{options:['for','and','but','so','or','yet']}), s('who','the Iceni'), s('aux','were',{options:['were','was']}), s('describe','angry') ],
+      examples:["Boudicca fought for the Iceni were angry.","Boudicca fights for the Iceni are angry."] },
+    { title:"Recap complex sentence", note:"Subordinating conjunctions from Y2-Y4 → introduce unless/whenever/whereas",
+      pattern:[ s('who','Egyptians'), s('doing','celebrated'), s('subord','whenever',{options:['whenever','unless','whereas']}), s('who','a new pharaoh'), s('doing','took'), s('what','the throne') ],
+      examples:["Egyptians celebrated whenever a new pharaoh took the throne.","Egyptians celebrate whenever a new pharaoh takes the throne."] },
+    { title:"Simple sentence with an adverb for possibility", note:"who + linking verb + adverb + describe",
+      pattern:[ s('who','The universe'), s('aux','is',{options:['is','was']}), s('how','truly'), s('describe','enormous') ],
+      examples:["The universe is truly enormous.","The universe was truly enormous."] },
+    { title:"Simple modal sentence", note:"who + modal verb + doing (+ what)",
+      pattern:[ s('who','The pulley'), s('aux','might',{options:['might','can','could','may','must','shall','should','will','would']}), s('doing','lift'), s('what','the weight') ],
+      examples:["The pulley might lift the weight.","The pulley might lift."] },
+    { title:"Complex sentence", note:"Embed the subordinate clause within a sentence",
+      pattern:[ s('who','The river'), comma(), s('subord','as',{options:['as']}), s('who','the current'), s('doing','carries'), s('what','sand'), comma(), s('doing','widens') ],
+      examples:["The river, as the current carries sand, widens.","The river, as the current carried sand, widened."] },
+    { title:"Complex sentence", note:"Embed a relative clause within a sentence",
+      pattern:[ s('who','Tutankhamun'), comma(), s('relative','who was a young pharaoh'), comma(), s('doing','ruled'), s('what','Egypt') ],
+      examples:["Tutankhamun, who was a young pharaoh, ruled Egypt.","Tutankhamun, who is a young pharaoh, rules Egypt."] },
+    { title:"Complex sentence", note:"Include a relative clause at the end of the sentence",
+      pattern:[ s('who','The Romans'), s('doing','built'), s('what','the wall'), s('relative','that protected the empire') ],
+      examples:["The Romans built the wall that protected the empire.","The Romans build the wall that protects the empire."] }
+  ]
+},
+{
+  id:'y6', label:'Year 6',
+  intro:"Year 6 pupils consolidate and refine advanced sentence structures: a final widening of subordinating conjunctions (in order to, provided that, supposing), and the passive voice, where the subject becomes the recipient of the action rather than the one doing it.",
+  structures:[
+    { title:"Recap complex sentence", note:"Subordinating conjunctions from Y2-Y5 → introduce in order to/provided that/supposing",
+      pattern:[ s('who','Alexander'), s('doing','conquered'), s('subord','provided that',{options:['provided that','in order to','supposing']}), s('who','the army'), s('doing','followed'), s('what','the plan') ],
+      examples:["Alexander conquered provided that the army followed the plan.","Alexander conquers provided that the army follows the plan."] },
+    { title:"Simple passive sentence", note:"The object of the active sentence becomes the subject: what (as agent) + is/was + doing (past participle) + by + who",
+      pattern:[ s('what','The animal'), s('aux','is',{options:['is','was']}), s('doing','classified'), lit('by'), s('who','the scientist') ],
+      examples:["The animal is classified by the scientist.","The animal was classified by the scientist."] }
+  ]
+}
+];
+
+/* ---------- Key strip render ---------- */
+const KEY_ORDER = ['who','doing','what','where','when','how','describe','aux','coord','subord','relative'];
+const KEY_LABELS = {aux:'is / was / has / might…', coord:'co-ordinating', subord:'subordinating', relative:'relative clause'};
+const keyGrid = document.getElementById('keyGrid');
+KEY_ORDER.forEach(t=>{
+  const def = TYPE[t];
+  const chip = document.createElement('div');
+  const isOutline = def.border;
+  chip.className = 'key-chip' + (isOutline ? ' outline' : '');
+  if(!isOutline){ chip.style.background = def.bg; }
+  else { chip.style.borderColor = def.fg; chip.style.color = def.fg; }
+  chip.innerHTML = iconHTML(def, t) + (KEY_LABELS[t] || def.label);
+  keyGrid.appendChild(chip);
+});
+
+/* ---------- Tabs render ---------- */
+const tabsEl = document.getElementById('yearTabs');
+YEARS.forEach((y,i)=>{
+  const b = document.createElement('button');
+  b.className = 'year-tab' + (i===0?' active':'');
+  b.textContent = y.label;
+  b.dataset.id = y.id;
+  b.addEventListener('click', ()=> selectYear(y.id));
+  tabsEl.appendChild(b);
+});
+const freeTabBtn = document.createElement('button');
+freeTabBtn.className = 'year-tab';
+freeTabBtn.textContent = '✏️ My sentence';
+freeTabBtn.dataset.id = 'free';
+freeTabBtn.addEventListener('click', ()=> selectFreeWrite());
+tabsEl.appendChild(freeTabBtn);
+const bankTabBtn = document.createElement('button');
+bankTabBtn.className = 'year-tab';
+bankTabBtn.textContent = '📚 My sentences';
+bankTabBtn.dataset.id = 'bank';
+bankTabBtn.addEventListener('click', ()=> selectBank());
+tabsEl.appendChild(bankTabBtn);
+
+/* ---------- Shared sentence assembly ---------- */
+function assembleSentenceText(items){
+  let parts = items.map(it => (it.text||'').trim()).filter(Boolean);
+  let sentence = parts.join(' ').replace(/\s+,/g,',').trim();
+  if(sentence){
+    sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
+    if(!/[.!?]$/.test(sentence)) sentence += '.';
+  }
+  return sentence;
+}
+
+/* ---------- PowerPoint export (build-up slide sequence) ---------- */
+function computeSlideLayout(n){
+  const SLIDE_W = 13.33, SLIDE_H = 7.5;
+  const marginX = 0.6, gap = 0.18;
+  const rows = n <= 6 ? 1 : 2;
+  const perRow = Math.ceil(n/rows);
+  const usableW = SLIDE_W - marginX*2;
+  const blockW = Math.min(2.6, (usableW - gap*(perRow-1)) / perRow);
+  const blockH = 1.3, rowGap = 0.35;
+  const startY = rows===1 ? 2.7 : 2.0;
+  const positions = [];
+  for(let idx=0; idx<n; idx++){
+    const row = Math.floor(idx/perRow);
+    const col = idx % perRow;
+    const itemsInRow = Math.min(perRow, n-row*perRow);
+    const rowW = blockW*itemsInRow + gap*(itemsInRow-1);
+    const rowStartX = (SLIDE_W - rowW)/2;
+    positions.push({ x: rowStartX + col*(blockW+gap), y: startY + row*(blockH+rowGap), w: blockW, h: blockH });
+  }
+  return positions;
+}
+
+const ICON_DATA_CACHE = {};
+function getIconDataURI(src){
+  if(ICON_DATA_CACHE[src]) return ICON_DATA_CACHE[src];
+  const p = fetch(src)
+    .then(r => r.blob())
+    .then(blob => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    }))
+    .catch(()=> null);
+  ICON_DATA_CACHE[src] = p;
+  return p;
+}
+
+async function exportItemsToPptx(items, opts){
+  opts = opts || {};
+  const cleanItems = items.filter(it => it.text && it.text.trim());
+  if(!cleanItems.length){ alert('Nothing to export yet — build a sentence first.'); return; }
+  if(typeof PptxGenJS === 'undefined'){ alert('PowerPoint export is unavailable (the pptxgenjs library did not load).'); return; }
+
+  const iconSrcs = [...new Set(cleanItems.map(it => TYPE[it.cat] && TYPE[it.cat].iconSrc).filter(Boolean))];
+  const iconEntries = await Promise.all(iconSrcs.map(async src => [src, await getIconDataURI(src)]));
+  const iconData = Object.fromEntries(iconEntries);
+
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name:'WFA_WIDE', width:13.33, height:7.5 });
+  pptx.layout = 'WFA_WIDE';
+
+  const positions = computeSlideLayout(cleanItems.length);
+  const many = cleanItems.length > 6;
+  const labelSize = many ? 8 : 10;
+  const wordSize = many ? 12 : 15;
+
+  for(let reveal=1; reveal<=cleanItems.length; reveal++){
+    const slide = pptx.addSlide();
+    slide.background = { color:'F6F8FA' };
+    if(opts.title){
+      slide.addText(opts.title, { x:0.4, y:0.2, w:12.5, h:0.5, fontSize:16, bold:true, color:'0A0101', fontFace:'Segoe UI' });
+    }
+    for(let idx=0; idx<reveal; idx++){
+      const it = cleanItems[idx];
+      const pos = positions[idx];
+      const fill = HEX_FILL[it.cat] || 'CCCCCC';
+      const textColor = HEX_TEXT[it.cat] || '000000';
+      const border = HEX_BORDER[it.cat];
+      const catLabel = (it.cat==='aux' || it.cat==='lit') ? '' : categoryDisplayName(it.cat).toUpperCase();
+      slide.addShape('roundRect', {
+        x: pos.x, y: pos.y, w: pos.w, h: pos.h,
+        fill: { color: fill },
+        line: border ? { color: border, width: 1.5 } : { color: fill, width: 0 },
+        rectRadius: 0.08
+      });
+      if(it.cat === 'aux'){
+        // Auxiliary/modal verb (is/was/has/might…): a white diamond inset within the yellow block,
+        // matching the CPD source's own symbol for "verb, but not the action being done".
+        const insetX = pos.w*0.08, insetY = pos.h*0.1;
+        const dpos = { x: pos.x+insetX, y: pos.y+insetY, w: pos.w-insetX*2, h: pos.h-insetY*2 };
+        slide.addShape('diamond', {
+          x: dpos.x, y: dpos.y, w: dpos.w, h: dpos.h,
+          fill: { color: 'FFFFFF' },
+          line: { color: '222222', width: 1.5 }
+        });
+        slide.addText(it.text, { x: dpos.x, y: dpos.y, w: dpos.w, h: dpos.h, align:'center', valign:'middle', fontSize: wordSize, bold:true, color:'222222', fontFace:'Segoe UI' });
+        continue;
+      }
+      const iconSrc = TYPE[it.cat] && TYPE[it.cat].iconSrc;
+      const iconUri = iconSrc ? iconData[iconSrc] : null;
+      if(iconUri){
+        const iconSize = Math.min(pos.w*0.34, pos.h*0.34);
+        slide.addImage({ data: iconUri, x: pos.x + (pos.w-iconSize)/2, y: pos.y + pos.h*0.08, w: iconSize, h: iconSize });
+        const textY = pos.y + pos.h*0.08 + iconSize;
+        const runs = catLabel
+          ? [ { text: catLabel + '\n', options:{ fontSize:labelSize, bold:true, color:textColor } },
+              { text: it.text, options:{ fontSize:wordSize, bold:true, color:textColor } } ]
+          : [ { text: it.text, options:{ fontSize:wordSize, bold:true, color:textColor } } ];
+        slide.addText(runs, { x: pos.x, y: textY, w: pos.w, h: pos.y+pos.h-textY, align:'center', valign:'top', fontFace:'Segoe UI' });
+        continue;
+      }
+      const runs = catLabel
+        ? [ { text: catLabel + '\n', options:{ fontSize:labelSize, bold:true, color:textColor } },
+            { text: it.text, options:{ fontSize:wordSize, bold:true, color:textColor } } ]
+        : [ { text: it.text, options:{ fontSize:wordSize, bold:true, color:textColor } } ];
+      slide.addText(runs, { x: pos.x, y: pos.y, w: pos.w, h: pos.h, align:'center', valign:'middle', fontFace:'Segoe UI' });
+    }
+    if(reveal === cleanItems.length){
+      // A bold black dot after the last block is the source document's own full-stop marker.
+      const lastPos = positions[cleanItems.length-1];
+      const dotSize = 0.18;
+      slide.addShape('ellipse', {
+        x: lastPos.x + lastPos.w + 0.06,
+        y: lastPos.y + lastPos.h - dotSize - 0.1,
+        w: dotSize, h: dotSize,
+        fill: { color: '222222' },
+        line: { color: '222222', width: 0 }
+      });
+      const sentence = assembleSentenceText(cleanItems);
+      const lastRowBottom = Math.max(...positions.map(p=>p.y+p.h));
+      slide.addText(sentence, {
+        x:0.6, y: lastRowBottom + 0.45, w:12.13, h:1,
+        fontSize:24, bold:true, color:'0A0101', align:'center', fontFace:'Segoe UI'
+      });
+    }
+  }
+
+  pptx.writeFile({ fileName: (opts.fileName || 'sentence') + '.pptx' });
+}
+
+function slugify(str){
+  return (str||'sentence').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'').slice(0,60) || 'sentence';
+}
+
+/* ---------- Present mode: full-screen, click/tap-to-reveal ---------- */
+const presentState = { playlist:[], index:0, cleanItems:[], revealed:0, keyHandler:null, fullstopEl:null };
+
+// Presents a single sentence — unchanged behaviour, now just a one-entry playlist.
+function openPresentMode(items, title){
+  openPresentPlaylist([{ items, title }]);
+}
+
+// Presents one or more sentences back to back in one continuous full-screen session —
+// once a sentence is fully revealed, the next click loads straight into the next entry's
+// first block instead of requiring Present Mode to be closed and reopened. Used for both
+// the single-sentence case (entries.length===1, where the title/step text look exactly as
+// before) and the sentence bank's "Present all".
+function openPresentPlaylist(playlist){
+  const entries = playlist
+    .map(e => ({ items: e.items.filter(it => it.text && it.text.trim()), title: e.title }))
+    .filter(e => e.items.length);
+  if(!entries.length){ alert('Nothing to present yet — build a sentence first.'); return; }
+
+  const overlay = document.getElementById('presentOverlay');
+  const row = document.getElementById('presentRow');
+  const titleEl = document.getElementById('presentTitle');
+  const sentenceEl = document.getElementById('presentSentence');
+  const stepEl = document.getElementById('presentStep');
+
+  presentState.playlist = entries;
+
+  function loadEntry(idx){
+    presentState.index = idx;
+    const entry = entries[idx];
+    presentState.cleanItems = entry.items;
+    presentState.revealed = 0;
+
+    titleEl.textContent = entries.length > 1
+      ? `Sentence ${idx+1} of ${entries.length}` + (entry.title ? ` — ${entry.title}` : '')
+      : (entry.title || '');
+    row.innerHTML = '';
+    sentenceEl.classList.remove('visible');
+    sentenceEl.textContent = assembleSentenceText(entry.items);
+
+    entry.items.forEach(it=>{
+      const def = TYPE[it.cat] || TYPE.lit;
+      const hasComma = /,$/.test(it.text);
+      const displayText = hasComma ? it.text.slice(0, -1) : it.text;
+      // Every token gets a wrapper — this is what the reveal animation now targets — so the
+      // optional Subject/Verb/Object annotation can sit below the coloured chip/lit block
+      // (outside it) while still fading in and out together with it.
+      const token = document.createElement('div');
+      token.className = 'present-token';
+      if(it.cat === 'lit'){
+        const chip = document.createElement('div');
+        chip.className = 'present-lit';
+        chip.textContent = displayText;
+        token.appendChild(chip);
+        token.appendChild(buildGrammarTermEl('lit'));
+        row.appendChild(token);
+        return;
+      }
+      const chip = document.createElement('div');
+      chip.className = 'present-chip' + (def.diamond ? ' aux-box' : '');
+      chip.style.background = def.bg;
+      chip.style.color = def.fg;
+      if(def.border) chip.style.border = def.border;
+
+      if(def.diamond){
+        const diamond = document.createElement('div');
+        diamond.className = 'aux-diamond';
+        const word = document.createElement('div');
+        word.className = 'p-word';
+        word.textContent = displayText;
+        diamond.appendChild(word);
+        chip.appendChild(diamond);
+      } else {
+        const icoEl = makeIconEl(def, it.cat);
+        if(icoEl){
+          const ico = document.createElement('div');
+          ico.className = 'p-icon';
+          ico.appendChild(icoEl);
+          chip.appendChild(ico);
+        }
+        const label = document.createElement('div');
+        label.className = 'p-label';
+        label.textContent = categoryDisplayName(it.cat) || '';
+        chip.appendChild(label);
+        const word = document.createElement('div');
+        word.className = 'p-word';
+        word.textContent = displayText;
+        chip.appendChild(word);
+      }
+      if(hasComma){
+        const comma = document.createElement('div');
+        comma.className = 'p-comma';
+        chip.appendChild(comma);
+      }
+      token.appendChild(chip);
+      token.appendChild(buildGrammarTermEl(it.cat));
+      row.appendChild(token);
+    });
+
+    const presentFullstop = document.createElement('div');
+    presentFullstop.className = 'present-fullstop';
+    row.appendChild(presentFullstop);
+    presentState.fullstopEl = presentFullstop;
+  }
+
+  function render(){
+    const chips = row.children;
+    for(let i=0; i<chips.length-1; i++){
+      chips[i].classList.toggle('visible', i < presentState.revealed);
+    }
+    const showSentence = presentState.revealed > presentState.cleanItems.length;
+    sentenceEl.classList.toggle('visible', showSentence);
+    presentState.fullstopEl.classList.toggle('visible', showSentence);
+    const shown = Math.min(presentState.revealed, presentState.cleanItems.length);
+    const blockStep = showSentence
+      ? `${presentState.cleanItems.length} / ${presentState.cleanItems.length} · sentence`
+      : `${shown} / ${presentState.cleanItems.length}`;
+    stepEl.textContent = entries.length > 1
+      ? `Sentence ${presentState.index+1}/${entries.length} · ${blockStep}`
+      : blockStep;
+  }
+
+  function advance(){
+    const maxRevealed = presentState.cleanItems.length + 1;
+    if(presentState.revealed < maxRevealed){
+      presentState.revealed++;
+      render();
+    } else if(presentState.index < entries.length - 1){
+      loadEntry(presentState.index + 1);
+      render();
+    }
+  }
+  function back(){
+    if(presentState.revealed > 0){
+      presentState.revealed--;
+      render();
+    } else if(presentState.index > 0){
+      loadEntry(presentState.index - 1);
+      presentState.revealed = presentState.cleanItems.length + 1;
+      render();
+    }
+  }
+  function close(){
+    overlay.classList.remove('show');
+    if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+    if(presentState.keyHandler) document.removeEventListener('keydown', presentState.keyHandler);
+    overlay.removeEventListener('click', onOverlayClick);
+    document.getElementById('presentClose').removeEventListener('click', onCloseClick);
+  }
+  function onOverlayClick(e){
+    if(e.target.id === 'presentClose' || e.target.closest('.present-toggle')) return;
+    advance();
+  }
+  function onCloseClick(e){ e.stopPropagation(); close(); }
+  function onKey(e){
+    if(e.key==='ArrowRight' || e.key===' '){ e.preventDefault(); advance(); }
+    else if(e.key==='ArrowLeft' || e.key==='Backspace'){ e.preventDefault(); back(); }
+    else if(e.key==='Escape'){ close(); }
+  }
+
+  presentState.keyHandler = onKey;
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('click', onOverlayClick);
+  document.getElementById('presentClose').addEventListener('click', onCloseClick);
+
+  loadEntry(0);
+  render();
+  overlay.classList.add('show');
+  if(overlay.requestFullscreen){ overlay.requestFullscreen().catch(()=>{}); }
+}
+
+/* ---------- Sentence assembly ---------- */
+function buildCard(structure, sIdx, yearId){
+  const card = document.createElement('div');
+  card.className = 'structure-card';
+
+  const h3 = document.createElement('h3');
+  h3.textContent = structure.title;
+  card.appendChild(h3);
+
+  const note = document.createElement('p');
+  note.className = 'structure-note';
+  note.innerHTML = structure.note;
+  card.appendChild(note);
+
+  const row = document.createElement('div');
+  row.className = 'chip-row';
+
+  const values = {};
+
+  structure.pattern.forEach((tok, tIdx)=>{
+    if(tok.type === 'comma'){
+      const c = document.createElement('div');
+      c.className = 'comma-mark';
+      row.appendChild(c);
+      return;
+    }
+    if(tok.type === 'lit'){
+      const litWrap = document.createElement('div');
+      litWrap.className = 'slot';
+      const spacer = document.createElement('div');
+      spacer.className = 'slot-label';
+      spacer.innerHTML = '&nbsp;';
+      litWrap.appendChild(spacer);
+      const b = document.createElement('div');
+      b.className = 'lit-badge';
+      b.textContent = tok.text;
+      litWrap.appendChild(b);
+      litWrap.appendChild(buildGrammarTermEl('lit'));
+      row.appendChild(litWrap);
+      return;
+    }
+
+    const key = 's'+tIdx;
+    values[key] = tok.default;
+
+    const def = TYPE[tok.type];
+    const wrap = document.createElement('div');
+    wrap.className = 'slot';
+
+    const label = document.createElement('div');
+    label.className = 'slot-label';
+    // "who" always shows its plain word here now — the formal "subject" term lives in the
+    // separate, optional annotation below the block instead of being baked into this label.
+    label.textContent = def.label || '';
+    wrap.appendChild(label);
+
+    const box = document.createElement('div');
+    box.className = 'slot-box' + (def.diamond ? ' aux-box' : '');
+    box.style.background = def.bg;
+    box.style.color = def.fg;
+    if(def.border) box.style.border = def.border;
+
+    const boxIcoEl = def.diamond ? null : makeIconEl(def, tok.type);
+    if(boxIcoEl){
+      const boxIco = document.createElement('div');
+      boxIco.className = 'word-ico';
+      boxIco.appendChild(boxIcoEl);
+      box.appendChild(boxIco);
+    }
+
+    let field;
+    if(tok.options){
+      field = document.createElement('select');
+      tok.options.forEach(opt=>{
+        const o = document.createElement('option');
+        o.value = opt; o.textContent = opt;
+        if(opt===tok.default) o.selected = true;
+        field.appendChild(o);
+      });
+      field.addEventListener('change', ()=>{ values[key]=field.value; render(); });
+    } else {
+      field = document.createElement('input');
+      field.type = 'text';
+      field.value = tok.default;
+      field.placeholder = PLACEHOLDER[tok.type] || '';
+      field.autocomplete = 'off';
+      field.autocapitalize = 'off';
+      field.spellcheck = false;
+      field.addEventListener('input', ()=>{ values[key]=field.value; render(); });
+    }
+    if(def.diamond){
+      const diamond = document.createElement('div');
+      diamond.className = 'aux-diamond';
+      diamond.appendChild(field);
+      box.appendChild(diamond);
+    } else {
+      box.appendChild(field);
+    }
+    wrap.appendChild(box);
+    wrap.appendChild(buildGrammarTermEl(tok.type));
+    row.appendChild(wrap);
+  });
+
+  const fullstop1 = document.createElement('div');
+  fullstop1.className = 'fullstop-mark';
+  row.appendChild(fullstop1);
+
+  card.appendChild(row);
+
+  const preview = document.createElement('div');
+  preview.className = 'preview';
+  card.appendChild(preview);
+
+  function currentItems(){
+    const out = [];
+    structure.pattern.forEach((tok, tIdx)=>{
+      if(tok.type==='comma'){
+        if(out.length) out[out.length-1].text += ',';
+        return;
+      }
+      if(tok.type==='lit'){ out.push({cat:'lit', text: tok.text}); return; }
+      const v = (values['s'+tIdx] || '').trim();
+      if(v) out.push({cat: tok.type, text: v});
+    });
+    return out;
+  }
+
+  function render(){
+    const sentence = assembleSentenceText(currentItems());
+    if(sentence){
+      preview.innerHTML = sentence;
+    } else {
+      preview.innerHTML = '<span class="ph">Type words into the blocks above to build your sentence…</span>';
+    }
+  }
+  render();
+
+  const actions = document.createElement('div');
+  actions.className = 'card-actions';
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.className = 'btn-small';
+  toggleBtn.textContent = 'Show model example';
+  const modelBox = document.createElement('div');
+  modelBox.className = 'model-examples';
+  structure.examples.forEach(ex=>{
+    const d = document.createElement('div');
+    d.textContent = ex;
+    modelBox.appendChild(d);
+  });
+  toggleBtn.addEventListener('click', ()=>{
+    modelBox.classList.toggle('show');
+    toggleBtn.textContent = modelBox.classList.contains('show') ? 'Hide model example' : 'Show model example';
+  });
+
+  const resetBtn = document.createElement('button');
+  resetBtn.className = 'btn-small';
+  resetBtn.textContent = 'Reset';
+  resetBtn.addEventListener('click', ()=>{
+    structure.pattern.forEach((tok,tIdx)=>{
+      if(tok.type==='comma'||tok.type==='lit') return;
+      values['s'+tIdx] = tok.default;
+    });
+    const fields = row.querySelectorAll('.slot-box input, .slot-box select');
+    let fieldIdx = 0;
+    structure.pattern.forEach((tok)=>{
+      if(tok.type==='comma'||tok.type==='lit') return;
+      const f = fields[fieldIdx];
+      if(f) f.value = tok.default;
+      fieldIdx++;
+    });
+    render();
+  });
+
+  const exportBtn = document.createElement('button');
+  exportBtn.className = 'btn-small';
+  exportBtn.textContent = '📥 Export to PowerPoint';
+  exportBtn.addEventListener('click', ()=>{
+    exportItemsToPptx(currentItems(), { title: structure.title, fileName: slugify(structure.title) });
+  });
+
+  const presentBtn = document.createElement('button');
+  presentBtn.className = 'btn-small';
+  presentBtn.textContent = '🎬 Present';
+  presentBtn.addEventListener('click', ()=>{
+    openPresentMode(currentItems(), structure.title);
+  });
+
+  actions.appendChild(toggleBtn);
+  actions.appendChild(resetBtn);
+  actions.appendChild(presentBtn);
+  actions.appendChild(exportBtn);
+  card.appendChild(actions);
+  card.appendChild(modelBox);
+
+  return card;
+}
+
+/* ---------- Free-write auto-tagger ---------- */
+// wink-pos-tagger's own statistical model mistags many common-but-less-frequent adjectives
+// as nouns (e.g. "stern", "shrewd", "sombre") when they're not adjacent to a clearer cue —
+// verified by testing a broad set of KS2-appropriate vocabulary outside this tool's curated
+// ADJ list. Seeding its lexicon with them directly (as arrays — a bare string value gets
+// silently truncated by the tagger's internal lemmatiser) fixes the large majority of these
+// without needing a heavier, network-hosted tagger.
+if(typeof winkPOSTagger !== 'undefined'){
+  const EXTRA_ADJECTIVES = ['stern','shrewd','sombre','coarse','morose','sullen','irate','livid','wistful','pensive','prim','svelte','coy','wry','bland','keen','genial','affable','glum','vast','grim','apt','brisk','wan','sly','posh','chic','stark','bleak','dour','tame','meek','vain','smug','crude','lewd','harsh','fierce','timid','docile','placid','surly','testy','irritable','cheery','jovial','merry','somber','dreary','dismal','forlorn','desolate','barren','fertile','lush','arid','damp','humid','murky','hazy','misty','gloomy','radiant','luminous','vivid','pale','faint','dim','garish','gaudy','drab','ornate','elegant','graceful','clumsy','awkward','nimble','agile','sturdy','frail','robust','feeble','vigorous','sluggish','hasty','tardy','punctual','prompt','abrupt','gradual','tender','rough','rugged','jagged','smooth','level','uneven','steep','mild','severe','intense','subtle','obvious','evident','vague','obscure','cryptic','blunt','tactful','candid','frank','sincere','devious','cunning','crafty','naive','gullible','skeptical','wary','cautious','reckless','rash','prudent','thrifty','frugal','lavish','extravagant','modest','arrogant','haughty','conceited','gracious','courteous','civil','impolite','vulgar','refined','polished','tacky','classy','dapper','scruffy','unkempt','tidy','sloppy','meticulous','careless','diligent','industrious','idle','slothful','zealous','apathetic','indifferent','passionate','ardent','fervent','tepid','lukewarm','scorching','sweltering','frigid','balmy','temperate','volatile','stable','erratic','steady','fickle','loyal','faithful','treacherous','devoted','dedicated','half-hearted','earnest','solemn','grave','jocular','witty','droll','comical','absurd','ludicrous','bizarre','peculiar','quaint','exotic','mundane','commonplace','remarkable','notable','distinguished','renowned','illustrious','infamous','notorious','reputable','dubious','suspicious','credible','plausible','implausible','far-fetched','genuine','authentic','fake','bogus','counterfeit','legitimate'];
+  const lex = {};
+  EXTRA_ADJECTIVES.forEach(w => { lex[w] = ['JJ']; });
+  try { winkPOSTagger.updateLexicon(lex); } catch(e) {}
+}
+
+function tokenize(str){
+  // Numbers need their own alternative — without it, a bare digit run (a year like "1642",
+  // a count like "12") isn't a letter sequence, isn't punctuation, and silently vanishes
+  // from the token stream instead of showing up as an unrecognised word.
+  const re = /[A-Za-z][A-Za-z'-]*|[0-9]+|[,.!?;]/g;
+  return str.match(re) || [];
+}
+
+// Runs wink-pos-tagger once over our own token array (tagRawTokens keeps its output aligned
+// 1:1 with whatever tokens we feed it, so there's no re-tokenization to fall out of sync
+// with `raw`) and returns a map from index-in-`raw` to that word's Penn Treebank POS code.
+// Used as a fallback signal for words our own curated lists don't recognise (any adjective
+// or proper-noun the tagger knows) — our own rules still take priority where we've already
+// verified them against this tool's register (e.g. "lolly", participle adjectives like
+// "frightened children").
+function getPosTagsFor(raw){
+  const tagMap = {};
+  if(typeof winkPOSTagger === 'undefined') return tagMap;
+  let tagged;
+  try {
+    tagged = winkPOSTagger.tagRawTokens(raw);
+  } catch(e) { return tagMap; }
+  if(!tagged || tagged.length !== raw.length) return tagMap; // alignment safety: bail out rather than risk mis-mapped tags
+  tagged.forEach((t, idx) => { tagMap[idx] = t.pos; });
+  return tagMap;
+}
+
+function autoTagSentence(str){
+  const raw = tokenize(str);
+  const n = raw.length;
+  const lower = w => w.toLowerCase();
+  const posTags = getPosTagsFor(raw);
+  const posOf = idx => posTags[idx] || '';
+  const isProperNounTag = idx => posOf(idx)==='NNP' || posOf(idx)==='NNPS';
+  // Defensive exclusion, kept from the previous tagger's known blind spot — wink-pos-tagger
+  // hasn't been seen to mistag these as adjectives, but this costs nothing to keep as insurance.
+  const ADJ_TAG_EXCEPT = new Set(['adult','adults','parent','parents','teacher','teachers','baby','babies','current','currents']);
+  const taggerAdj = idx => posOf(idx)==='JJ' && !ADJ_TAG_EXCEPT.has(lower(raw[idx]));
+
+  const DET = new Set(['the','a','an','this','that','these','those','his','her','their','its','my','your','our','some','any','no','every','each']);
+  const COORD = new Set(['and','but','so','or','yet','for']);
+  const SUBORD_MULTI = ['in order to','provided that','as soon as','as long as','even though','such that'];
+  const SUBORD = new Set(['because','if','although','unless','whenever','whereas','though','supposing','as','since','while','until','before','after','when']);
+  const TIME_HINT = new Set(['before','after','since','while','until','when']);
+  const AUX = new Set(['is','was','are','were','am','has','have','had','be','been','being','do','does','did','might','can','could','may','must','shall','should','will','would']);
+  const PREP_WHERE = new Set(['at','in','on','under','over','near','beside','behind','above','below','inside','outside','between','among','through','across','around','from','into','onto','towards','by','along','beyond','beneath','alongside','past','upon','amid','down','up','against']);
+  const PREP_OTHER = new Set(['with','without','of','about','like','than','except','despite','via','per']);
+  const ADV_EXTRA = new Set(['perhaps','maybe','surely','completely','probably','certainly','definitely','possibly','obviously','clearly','actually','really','totally','absolutely','quite','rather','extremely','very','soon','then','now','today','yesterday','tomorrow','later','finally','suddenly','immediately','afterwards','meanwhile','already','still','again','often','always','never','sometimes','hard','fast']);
+  const ADV_EXCEPT = new Set(['family','families','only','early','friendly','lonely','lovely','silly','ugly','holy','lolly','lollies','jelly','jellies','belly','bellies','trolley','trolleys','dolly','dollies','rally','rallies','bully','bullies','gully','gullies','filly','fillies','ally','allies','butterfly','butterflies','dragonfly','dragonflies']);
+  const ADJ = new Set(['happy','sad','excited','delicious','sweet','big','small','round','bright','tall','short','quick','slow','loud','quiet','gentle','careful','sudden','immediate','eager','nervous','calm','content','overwhelmed','hungry','tired','brave','kind','cruel','colourful','delightful','wonderful','amazing','terrible','huge','tiny','ancient','modern','shiny','dull','soft','hard','warm','cold','hot','fresh','old','young','beautiful','ugly','strange','curious','mysterious','clever','silly','funny','serious','proud','shy','angry','worried','confused','surprised','delighted','grumpy','cheerful','friendly','lonely','lovely','pretty','handsome','messy','tidy','neat','dirty','clean','heavy','light','strong','weak','rich','poor','busy','lazy','wild','tame','wise','foolish','honest','polite','rude','patient','impatient','ice',
+    'red','blue','green','yellow','orange','purple','pink','black','white','brown','grey','gray','golden','silver','giant','enormous','massive','gigantic','miniature','sticky','fluffy','smooth','rough','bumpy','silky','furry','slimy','crunchy','squishy','spiky','prickly','noisy','silent','squeaky','screechy','fantastic','magnificent','glorious','spooky','magical','brilliant','fabulous','marvellous','super','awesome','incredible','extraordinary','splendid','dreadful','awful','horrible','nasty','disgusting','gross','yucky','square','circular','triangular','oval','curved','straight','mighty','powerful','fierce','dangerous','safe','empty','full','narrow','wide','deep','shallow','thick','thin','sharp','blunt','dark','sparkly','glittery','misty','foggy','sunny','rainy','windy','stormy','snowy','icy','frosty','chilly','freezing','boiling','scary','transparent','opaque','creepy','frightening','terrifying','tiny','little','tall','wooden','plastic','metal','glass','stone','fresh','stale','ripe','juicy','crispy','chewy','sour','bitter','salty','spicy','tasty','yummy','wet','dry','muddy','sandy','rocky','grassy','fluttering','glowing','flashing','sleepy','exhausted','bored','jealous','embarrassed','ashamed','anxious','relaxed','peaceful','furious','terrified','astonished','puzzled','determined','confident','helpful','generous','selfish','stubborn','loyal','mischievous','naughty']);
+  // A bare time phrase like "this morning" or "every week" has no preposition to trigger
+  // the where/when sweep above, so without this it falls through to the generic noun-phrase
+  // rules and reads as "what" — these two small sets catch the common determiner+time-noun
+  // combinations and route them to "when" instead.
+  const TIME_PHRASE_DET = new Set(['this','that','last','next','every','each']);
+  const TIME_NOUNS = new Set(['morning','afternoon','evening','night','day','week','month','year','weekend']);
+  // A handful of everyday nouns this tool is likely to meet as the second half of a
+  // compound subject ("apple tree", "football team") that are, in practice, never used as
+  // verbs — so they're safe to treat as continuing the subject even on the rare sentence
+  // where the tagger also fumbles the clause's real verb and hasLaterVerb can't confirm it.
+  const SAFE_NOUN = new Set(['tree','trees','house','houses','school','schools','team','teams','officer','officers','teacher','teachers','coach','coaches','army','armies','family','families','building','buildings','garden','gardens','street','streets','river','rivers','mountain','mountains','castle','castles','village','villages','city','cities','country','countries','king','kings','queen','queens','pharaoh','pharaohs','soldier','soldiers','farmer','farmers','doctor','doctors','ship','ships','boat','boats']);
+  const RELPRON = new Set(['who','which','whose']);
+  const SUBJECT_PRONOUNS = new Set(['i','you','he','she','it','we','they']);
+  const TITLES = new Set(['mr','mrs','ms','miss','mx','dr','sir','lord','lady','aunt','uncle','professor','prof','captain','king','queen','prince','princess','saint','st','madam','master']);
+  const PARTICLES = new Set(['out','up','down','away','back']);
+  const ADJ_SUFFIX = /^[a-z]{3,}(ful|ous|ive|able|ible|less|ish|al|ic)$/;
+  const PARTICIPLE_SUFFIX = /^[a-z]{3,}(ed|ing)$/;
+  // Common nouns that happen to end in a suffix ADJ_SUFFIX treats as adjective-shaped
+  // (mostly "-ive" nouns like "detective") — checked here rather than folded into
+  // ADJ_TAG_EXCEPT, since that set only gates the tagger's own signal, not this suffix guess.
+  const SUFFIX_NOUN_EXCEPT = new Set(['detective','detectives','native','natives','relative','relatives','representative','representatives','objective','objectives','narrative','narratives','perspective','perspectives','captive','captives','initiative','initiatives','executive','executives','incentive','incentives','directive','directives','derivative','derivatives','alternative','alternatives','collective','collectives','motive','motives','adjective','adjectives']);
+  const looksAdj = lw2 => ADJ.has(lw2) || (ADJ_SUFFIX.test(lw2) && !SUFFIX_NOUN_EXCEPT.has(lw2));
+  const looksAdjInNP = lw2 => looksAdj(lw2) || PARTICIPLE_SUFFIX.test(lw2);
+  // "to" always starts either a prepositional phrase ("to the shop") or an infinitive
+  // ("to travel") — never the tail end of a noun/adjective phrase already in progress —
+  // so every lookahead loop below should stop there rather than swallowing it.
+  const isBoundaryWord = lw2 => COORD.has(lw2) || SUBORD.has(lw2) || RELPRON.has(lw2) || lw2==='that' || lw2==='to';
+  // Many everyday nouns are spelled exactly like a verb ("sails", "plays", "watches",
+  // "records") and this tagger's statistical model isn't reliable enough to call that
+  // ambiguity correctly word-by-word in a short sentence. The safe question to ask instead
+  // is structural: does a clearer verb turn up later in this same clause? If so, the
+  // current ambiguous word can safely be treated as a noun (the clause already has its
+  // verb). If nothing later looks like a verb before the clause ends, this word must BE
+  // the verb — a clause can't have none — so it's left alone rather than merged away.
+  const startsSubordMulti = idx => SUBORD_MULTI.some(phrase => {
+    const parts = phrase.split(' ');
+    return idx+parts.length<=n && raw.slice(idx, idx+parts.length).map(lower).join(' ')===phrase;
+  });
+  const hasLaterVerb = fromIdx => {
+    let j = fromIdx;
+    while(j<n && !/^[,.!?;]$/.test(raw[j]) && !isBoundaryWord(lower(raw[j])) && !startsSubordMulti(j)){
+      const lw2 = lower(raw[j]);
+      if(DET.has(lw2)){ j++; continue; }
+      if(looksAdj(lw2) || taggerAdj(j)){ j++; continue; } // still inside a modifier run
+      // A word immediately after a bare determiner is functioning inside a noun phrase —
+      // most often a participial adjective ("the fallen leaves") — even when its own tag
+      // looks verb-shaped (VBN/VBG); a genuine clause verb is never preceded by a bare
+      // determiner with nothing in between. Skip it rather than treating it as confirmation.
+      if(j>fromIdx && DET.has(lower(raw[j-1]))){ j++; continue; }
+      // Decide on the first real content word reached rather than scanning further —
+      // hunting deeper risks tripping over an unrelated noun/verb-ambiguous word inside
+      // the object phrase (e.g. "leaves" in "the fallen leaves") and returning a false yes.
+      return /^VB/.test(posOf(j));
+    }
+    return false;
+  };
+
+  const items = [];
+  let i = 0;
+  // vState tracks the current clause's predicate: 'none' (no verb yet), 'aux' (an
+  // auxiliary/modal/linking verb has been seen but the main verb/complement hasn't),
+  // 'full' (a main verb or complement has been tagged).
+  let clauseHasSubject = false, vState = 'none', sentenceStart = true;
+  let skipCommaReset = false;
+  // Non-null while inside a comma-embedded subordinate-clause aside (e.g. "The child, as
+  // the adult tells a joke, laughs.") — holds the outer clause's clauseHasSubject so it can
+  // be restored at the aside's closing comma, rather than losing the outer subject entirely.
+  let embeddedSubordSaved = null;
+
+  while(i < n){
+    const w = raw[i];
+    const lw = lower(w);
+
+    if(/^[,.!?;]$/.test(w)){
+      if(items.length) items[items.length-1].text += w;
+      const nextLw = (i+1<n) ? lower(raw[i+1]) : '';
+      const opensEmbeddedClause = w===',' && (RELPRON.has(nextLw) || nextLw==='that');
+      const opensSubordAside = w===',' && !opensEmbeddedClause && embeddedSubordSaved===null && SUBORD.has(nextLw);
+      if(w === ',' && (skipCommaReset || opensEmbeddedClause)){
+        skipCommaReset = opensEmbeddedClause ? true : false;
+      } else if(w === ',' && opensSubordAside){
+        embeddedSubordSaved = clauseHasSubject;
+        clauseHasSubject = false; vState = 'none';
+      } else if(w === ',' && embeddedSubordSaved !== null){
+        clauseHasSubject = embeddedSubordSaved;
+        vState = 'none';
+        embeddedSubordSaved = null;
+      } else {
+        clauseHasSubject = false; vState = 'none';
+        embeddedSubordSaved = null;
+      }
+      if(w !== ',') sentenceStart = true;
+      i++; continue;
+    }
+
+    let matchedMulti = null;
+    for(const phrase of SUBORD_MULTI){
+      const parts = phrase.split(' ');
+      if(i+parts.length<=n && raw.slice(i,i+parts.length).map(lower).join(' ')===phrase){
+        matchedMulti = parts.length; break;
+      }
+    }
+    if(matchedMulti){
+      items.push({text: raw.slice(i,i+matchedMulti).join(' '), cat:'subord'});
+      i += matchedMulti; clauseHasSubject=false; vState='none'; continue;
+    }
+
+    if(RELPRON.has(lw) && items.length>0 && !sentenceStart){
+      let j=i; const chunk=[];
+      while(j<n && !/^[,.!?;]$/.test(raw[j])){ chunk.push(raw[j]); j++; }
+      items.push({text: chunk.join(' '), cat:'relative'});
+      skipCommaReset = true;
+      i=j; continue;
+    }
+    if(lw==='that' && vState==='full'){
+      let j=i; const chunk=[];
+      while(j<n && !/^[,.!?;]$/.test(raw[j])){ chunk.push(raw[j]); j++; }
+      items.push({text: chunk.join(' '), cat:'relative'});
+      skipCommaReset = true;
+      i=j; continue;
+    }
+
+    if(COORD.has(lw)){
+      // "for" is ambiguous: a co-ordinating conjunction joining two clauses (the Y5
+      // curriculum sense — "eats for they are hungry") vs. an ordinary preposition of
+      // duration or beneficiary ("for thirty years", "for the guests"), which is far more
+      // common in everyday writing. Only treat it as a conjunction when a clause (a
+      // subject-ish word followed by a verb/aux) actually follows shortly after —
+      // otherwise sweep the phrase as a plain, uncoloured preposition phrase.
+      if(lw==='for'){
+        let j=i+1, sawSubjectish=false, looksLikeClause=false;
+        while(j<n && !/^[,.!?;]$/.test(raw[j]) && j<i+7){
+          const lw2 = lower(raw[j]);
+          if(AUX.has(lw2) || /^VB/.test(posOf(j))){ looksLikeClause = sawSubjectish; break; }
+          if(SUBJECT_PRONOUNS.has(lw2) || DET.has(lw2) || isProperNounTag(j)) sawSubjectish = true;
+          j++;
+        }
+        if(!looksLikeClause){
+          let k=i; const chunk=[];
+          while(k<n && !/^[,.!?;]$/.test(raw[k]) && !(k>i && isBoundaryWord(lower(raw[k])))){ chunk.push(raw[k]); k++; }
+          items.push({text: chunk.join(' '), cat:'lit'});
+          i=k; continue;
+        }
+      }
+      items.push({text:w, cat:'coord'});
+      vState='none'; i++; continue;
+    }
+
+    if(SUBORD.has(lw)){
+      if(TIME_HINT.has(lw)){
+        let j=i+1, contentCount=0, looksLikeClause=false, sawHeadNoun=false;
+        while(j<n && !/^[,.!?;]$/.test(raw[j]) && !isBoundaryWord(lower(raw[j]))){
+          const lw2 = lower(raw[j]);
+          if(DET.has(lw2)){ j++; continue; }
+          contentCount++;
+          if(AUX.has(lw2)) looksLikeClause=true;
+          // A run of adjectives ending in one noun is still just a short phrase ("the big
+          // match") — only a SECOND non-adjective word (a real second clause element, like
+          // a verb or another noun) means this is more than a simple noun phrase.
+          if(looksAdj(lw2) || taggerAdj(j)){ j++; continue; }
+          if(sawHeadNoun) looksLikeClause = true;
+          sawHeadNoun = true; j++;
+        }
+        if(!looksLikeClause && contentCount<=2){
+          let k=i; const chunk=[];
+          while(k<n && !/^[,.!?;]$/.test(raw[k]) && !(k>i && isBoundaryWord(lower(raw[k])))){ chunk.push(raw[k]); k++; }
+          items.push({text: chunk.join(' '), cat:'when'});
+          i=k; continue;
+        }
+      }
+      items.push({text:w, cat:'subord'});
+      clauseHasSubject=false; vState='none'; i++; continue;
+    }
+
+    if(AUX.has(lw)){
+      items.push({text:w, cat:'aux'});
+      if(vState==='none') vState='aux';
+      i++; continue;
+    }
+
+    // Passive voice ("The lolly is eaten by the child"): "by" here introduces the agent —
+    // who actually did the action — not a location, so it stays plain and the phrase after
+    // it is tagged as who/subject rather than where.
+    if(lw==='by' && items.length>=2 && items[items.length-1].cat==='doing' && items[items.length-2].cat==='aux'){
+      items.push({text:w, cat:'lit'});
+      clauseHasSubject = false; vState = 'none';
+      i++; continue;
+    }
+
+    if(PREP_WHERE.has(lw)){
+      let k=i; const chunk=[];
+      while(k<n && !/^[,.!?;]$/.test(raw[k]) && !(k>i && isBoundaryWord(lower(raw[k])))){ chunk.push(raw[k]); k++; }
+      items.push({text: chunk.join(' '), cat:'where'});
+      i=k; continue;
+    }
+
+    if(PREP_OTHER.has(lw)){
+      // A preposition that isn't clearly spatial (where) or temporal (when) — e.g. "with",
+      // "of" — doesn't fit any of this tool's categories cleanly, so it's left as a plain,
+      // uncoloured word rather than forced into "what". The noun phrase after it is still
+      // tagged normally by the rules below.
+      items.push({text:w, cat:'lit'});
+      i++; continue;
+    }
+
+    if(lw==='to'){
+      // "to" plays two completely different roles: a preposition of direction ("sails to
+      // Newfoundland", "moved to a school") or an infinitive marker ("wants to travel").
+      // A determiner or a proper noun right after it means direction — sweep it as a
+      // "where" phrase like any other preposition. A bare lower-case word means it's
+      // introducing an infinitive verb, which this tool has no dedicated colour for, so it
+      // reads as the clause's "doing" — much closer to the truth than letting a stray "to"
+      // get mistaken for a fresh subject and the real verb after it fall into "what".
+      const nextLw = (i+1<n) ? lower(raw[i+1]) : '';
+      const nextIsDirectional = i+1<n && (DET.has(nextLw) || isProperNounTag(i+1) || /^[A-Z]/.test(raw[i+1]));
+      if(nextIsDirectional){
+        let k=i; const chunk=[];
+        while(k<n && !/^[,.!?;]$/.test(raw[k]) && !(k>i && isBoundaryWord(lower(raw[k])))){ chunk.push(raw[k]); k++; }
+        items.push({text: chunk.join(' '), cat:'where'});
+        i=k; continue;
+      }
+      if(i+1<n && !/^[,.!?;]$/.test(raw[i+1])){
+        items.push({text: w+' '+raw[i+1], cat:'doing'});
+        vState = 'full';
+        i += 2; sentenceStart=false; continue;
+      }
+      // "to" with nothing usable after it (end of sentence) — leave it uncoloured rather
+      // than guessing.
+      items.push({text:w, cat:'lit'});
+      i++; continue;
+    }
+
+    if(TITLES.has(lw)){
+      // A title (Mr, Dr, Aunt…) introduces a proper name: keep consuming capitalised
+      // words as part of the same name, e.g. "Mr Fox" stays one who/what block.
+      let k=i+1; const chunk=[w];
+      while(k<n && /^[A-Z]/.test(raw[k]) && !isBoundaryWord(lower(raw[k])) && !AUX.has(lower(raw[k]))){ chunk.push(raw[k]); k++; }
+      const cat = (vState==='full' || vState==='aux') ? 'what' : 'who';
+      items.push({text: chunk.join(' '), cat});
+      if(cat==='who') clauseHasSubject=true;
+      i=k; sentenceStart=false; continue;
+    }
+
+    if(DET.has(lw)){
+      // Gather any adjectives (each becomes its own separate "describe" block, matching
+      // the source document), then the noun. The determiner attaches to whichever comes
+      // first — the first adjective if any, otherwise the noun itself — e.g. "the
+      // delicious lolly" -> describe:"the delicious", what:"lolly".
+      let k=i+1; const adjWords=[];
+      while(k<n){
+        const cur = raw[k];
+        if(/^[,.!?;]$/.test(cur)){
+          if(cur===',' && k+1<n && (looksAdjInNP(lower(raw[k+1])) || taggerAdj(k+1))){
+            if(adjWords.length) adjWords[adjWords.length-1] += ',';
+            k++; continue;
+          }
+          break;
+        }
+        if(looksAdjInNP(lower(cur)) || taggerAdj(k)){ adjWords.push(cur); k++; continue; }
+        break;
+      }
+      let hasNoun = k<n && !/^[,.!?;]$/.test(raw[k]) && !isBoundaryWord(lower(raw[k])) && !AUX.has(lower(raw[k]));
+      // If we already gathered adjective(s) and the next word is tagged as a verb, it can't
+      // be this phrase's noun — one of the "adjectives" is actually the noun itself, and
+      // this word is the clause's real verb, still waiting to be tagged by the main loop
+      // (e.g. "The plastic bends": "plastic" mistaken for an adjective, "bends" is not a
+      // noun to swallow, it's the verb).
+      if(hasNoun && adjWords.length && /^VB/.test(posOf(k))){
+        hasNoun = false;
+      }
+      let nounWord = hasNoun ? raw[k] : null;
+      if(hasNoun) k++;
+      // A possessive ("the cat's") isn't complete on its own — it needs the noun it
+      // possesses, so keep that as part of the same block: "the cat's ball", not two blocks.
+      if(hasNoun && /'s$|s'$/.test(nounWord) && k<n && !/^[,.!?;]$/.test(raw[k]) && !isBoundaryWord(lower(raw[k])) && !AUX.has(lower(raw[k]))){
+        nounWord += ' ' + raw[k];
+        k++;
+      }
+      // Safety net: a determiner-led noun phrase must end in a noun. If adjective-gathering
+      // ran out without finding one (e.g. the tagger mistags an ambiguous word like "adult"
+      // as an adjective), the last word gathered was actually the noun, not a describer.
+      if(!hasNoun && adjWords.length){
+        nounWord = adjWords.pop().replace(/,$/, '');
+        hasNoun = true;
+      }
+      let cat = (vState==='full' || vState==='aux') ? 'what' : 'who';
+      if(!adjWords.length && nounWord && TIME_PHRASE_DET.has(lw) && TIME_NOUNS.has(lower(nounWord))){
+        cat = 'when';
+      }
+      // A noun phrase right after a coordinating conjunction, with nothing but the sentence
+      // end following it (e.g. "the lolly and the fruit."), is continuing the previous list
+      // rather than starting a new clause — so it keeps the category from before the
+      // conjunction instead of defaulting to "who". A clause with its own verb still
+      // following (e.g. "...and the adult talks.") is unaffected, since that's not sentence-final.
+      if(cat!=='when' && items.length>=2 && items[items.length-1].cat==='coord'){
+        const isSentenceFinal = k>=n || /^[,.!?;]$/.test(raw[k]);
+        const prevCat = items[items.length-2].cat;
+        if(isSentenceFinal && ['what','where','when','how','describe'].includes(prevCat)){
+          cat = prevCat;
+        }
+      }
+      if(adjWords.length){
+        items.push({cat:'describe', text: w + ' ' + adjWords[0]});
+        for(let ai=1; ai<adjWords.length; ai++) items.push({cat:'describe', text: adjWords[ai]});
+        if(nounWord){ items.push({cat, text: nounWord}); if(cat==='who') clauseHasSubject=true; }
+      } else {
+        items.push({cat, text: nounWord ? (w+' '+nounWord) : w});
+        if(cat==='who') clauseHasSubject=true;
+      }
+      i=k; sentenceStart=false; continue;
+    }
+
+    if((lw.endsWith('ly') && !ADV_EXCEPT.has(lw)) || ADV_EXTRA.has(lw)){
+      items.push({text:w, cat:'how'}); i++; continue;
+    }
+
+    if(looksAdj(lw) || taggerAdj(i)){
+      if(vState==='aux'){
+        items.push({text:w, cat:'describe'});
+        vState='full'; i++; continue;
+      }
+      if(i+1>=n || /^[,.!?;]$/.test(raw[i+1])){
+        items.push({text:w, cat:'describe'}); i++; continue;
+      }
+      // No determiner: each adjective is its own "describe" block, then the noun.
+      let k=i; const adjWords2=[];
+      while(k<n){
+        const cur = raw[k];
+        if(/^[,.!?;]$/.test(cur)){
+          if(cur===',' && k+1<n && (looksAdj(lower(raw[k+1])) || taggerAdj(k+1))){
+            if(adjWords2.length) adjWords2[adjWords2.length-1] += ',';
+            k++; continue;
+          }
+          break;
+        }
+        if(looksAdj(lower(cur)) || taggerAdj(k)){ adjWords2.push(cur); k++; continue; }
+        break;
+      }
+      let hasNoun2 = k<n && !/^[,.!?;]$/.test(raw[k]) && !isBoundaryWord(lower(raw[k])) && !AUX.has(lower(raw[k]));
+      // Same verb guard as the determiner branch: don't swallow the clause's real verb as
+      // if it were this phrase's noun just because an adjective came before it.
+      if(hasNoun2 && adjWords2.length && /^VB/.test(posOf(k))){
+        hasNoun2 = false;
+      }
+      let nounWord2 = hasNoun2 ? raw[k] : null;
+      if(hasNoun2) k++;
+      // Same safety net as the determiner branch above: an adjective run must end in a noun.
+      if(!hasNoun2 && adjWords2.length){
+        nounWord2 = adjWords2.pop().replace(/,$/, '');
+        hasNoun2 = true;
+      }
+      // "last night", "next week": words like "last"/"next" aren't in the determiner set
+      // (they're grammatically adjectives), so they reach this branch rather than the
+      // determiner one — but a bare time phrase like this reads better as one "when" block
+      // than as a separate describe chip plus an object.
+      if(hasNoun2 && adjWords2.length===1 && TIME_PHRASE_DET.has(lower(adjWords2[0])) && TIME_NOUNS.has(lower(nounWord2))){
+        items.push({cat:'when', text: adjWords2[0]+' '+nounWord2});
+        i=k; sentenceStart=false; continue;
+      }
+      adjWords2.forEach(aw => items.push({cat:'describe', text:aw}));
+      if(hasNoun2){
+        const cat = (vState==='full' || vState==='aux') ? 'what':'who';
+        items.push({text: nounWord2, cat});
+        if(cat==='who') clauseHasSubject=true;
+      }
+      i=k; sentenceStart=false; continue;
+    }
+
+    // A bare noun-noun compound subject ("Roman army", "police officer", "football team",
+    // "Thomas Edison"): once a subject is under way with no verb seen yet, a following bare
+    // word that is itself capitalised (virtually always a name continuing) or tagged as a
+    // noun (NN/NNS) by the tagger is continuing that same noun phrase — not introducing a
+    // verb, which is what the position alone would otherwise suggest. This is the single
+    // biggest source of "ordinary noun mistaken for the verb" errors this tagger sees:
+    // without it, "The Roman army built roads" tags "army" as the verb and "built" as its
+    // object, purely because "army" happens to be the first bare word after the subject.
+    if(clauseHasSubject && vState==='none' && items.length && items[items.length-1].cat==='who'
+       && !AUX.has(lw) && (/^[A-Z]/.test(w) ? !sentenceStart : (posOf(i)==='NN' || posOf(i)==='NNS'))
+       && (SAFE_NOUN.has(lw) || hasLaterVerb(i+1))){
+      items[items.length-1].text += ' ' + w;
+      sentenceStart=false; i++; continue;
+    }
+
+    // A subject pronoun right after a coordinating conjunction (e.g. "...for they are
+    // hungry") always introduces a new clause with its own subject, even though
+    // clauseHasSubject is still (correctly) true from the clause before the conjunction —
+    // that flag alone can't tell "eats and plays" (same subject, second verb) apart from
+    // "eats for they are hungry" (new clause), so a pronoun here overrides it.
+    if(items.length && items[items.length-1].cat==='coord' && SUBJECT_PRONOUNS.has(lw)){
+      items.push({text:w, cat:'who'}); clauseHasSubject=true;
+    } else if(items.length>=2 && items[items.length-1].cat==='coord' && items[items.length-2].cat==='who'
+       && vState==='none' && (/^[A-Z]/.test(w) || posOf(i)==='NN' || posOf(i)==='NNS' || isProperNounTag(i))
+       && hasLaterVerb(i+1)){
+      // "Tom and Jerry played chess": a bare noun straight after "and", following an
+      // already-tagged subject with no verb yet, is joining that subject rather than
+      // becoming a stray verb — same reasoning as the compound-subject check above, just
+      // with a conjunction in between.
+      items.push({text:w, cat:'who'});
+      sentenceStart=false; i++; continue;
+    } else if(items.length>=2 && items[items.length-1].cat==='coord'
+       && (i+1>=n || /^[,.!?;]$/.test(raw[i+1])) && ['what','where','when','how','describe'].includes(items[items.length-2].cat)){
+      // "London and Cardiff.": a bare word right before the sentence/clause end, straight
+      // after a conjunction, is continuing that earlier list (of objects, places, etc.)
+      // rather than starting a new clause — mirrors the equivalent determiner-led case above.
+      items.push({text:w, cat: items[items.length-2].cat});
+      sentenceStart=false; i++; continue;
+    } else if(!clauseHasSubject){
+      items.push({text:w, cat:'who'}); clauseHasSubject=true;
+    } else if(vState==='none' || vState==='aux'){
+      let text = w;
+      if(i+1<n && PARTICLES.has(lower(raw[i+1]))){ text += ' ' + raw[i+1]; i++; }
+      items.push({text, cat:'doing'}); vState='full';
+    } else {
+      items.push({text:w, cat:'what'});
+    }
+    sentenceStart=false; i++;
+  }
+
+  return items;
+}
+
+/* ---------- Free-write panel ---------- */
+function renderFreeWriteChips(container, items){
+  container.innerHTML = '';
+  if(!items.length){
+    const p = document.createElement('p');
+    p.className = 'freewrite-empty';
+    p.textContent = 'Type a sentence above and press "Colour it!" to see it here.';
+    container.appendChild(p);
+    return;
+  }
+  const row = document.createElement('div');
+  row.className = 'chip-row';
+
+  items.forEach((item, idx)=>{
+    const def = TYPE[item.cat];
+    const hasComma = /,$/.test(item.text);
+    const displayText = hasComma ? item.text.slice(0, -1) : item.text;
+    const wrap = document.createElement('div');
+    wrap.className = 'slot';
+
+    const label = document.createElement('div');
+    label.className = 'slot-label';
+    const sel = document.createElement('select');
+    CATEGORY_ORDER.forEach(cat=>{
+      const o = document.createElement('option');
+      o.value = cat;
+      o.textContent = (TYPE[cat].icon ? TYPE[cat].icon+' ' : '') + categoryDisplayName(cat);
+      if(cat===item.cat) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', ()=>{
+      items[idx].cat = sel.value;
+      renderFreeWriteChips(container, items);
+    });
+    label.appendChild(sel);
+    wrap.appendChild(label);
+
+    const box = document.createElement('div');
+    box.className = 'slot-box' + (def.diamond ? ' aux-box' : '');
+    box.style.background = def.bg;
+    box.style.color = def.fg;
+    if(def.border) box.style.border = def.border;
+
+    const content = def.diamond ? document.createElement('div') : box;
+    if(def.diamond) content.className = 'aux-diamond';
+
+    if(def.diamond){
+      const auxSel = document.createElement('select');
+      const dtLower = displayText.toLowerCase();
+      const auxOptions = AUX_OPTIONS.some(o=>o.toLowerCase()===dtLower) ? AUX_OPTIONS : [displayText, ...AUX_OPTIONS];
+      auxOptions.forEach(opt=>{
+        const o = document.createElement('option');
+        o.value = opt; o.textContent = opt;
+        if(opt.toLowerCase()===displayText.toLowerCase()) o.selected = true;
+        auxSel.appendChild(o);
+      });
+      auxSel.addEventListener('change', ()=>{
+        items[idx].text = auxSel.value + (hasComma ? ',' : '');
+        renderFreeWriteChips(container, items);
+      });
+      content.appendChild(auxSel);
+    } else {
+      const icoEl = makeIconEl(def, item.cat);
+      if(icoEl){
+        const ico = document.createElement('div');
+        ico.className = 'word-ico';
+        ico.appendChild(icoEl);
+        content.appendChild(ico);
+      }
+      const txt = document.createElement('div');
+      txt.className = 'word-text';
+      txt.textContent = displayText;
+      content.appendChild(txt);
+    }
+    if(def.diamond) box.appendChild(content);
+
+    wrap.appendChild(box);
+    wrap.appendChild(buildGrammarTermEl(item.cat));
+    row.appendChild(wrap);
+
+    if(hasComma){
+      const comma = document.createElement('div');
+      comma.className = 'comma-mark';
+      row.appendChild(comma);
+    }
+  });
+
+  const fullstop2 = document.createElement('div');
+  fullstop2.className = 'fullstop-mark';
+  row.appendChild(fullstop2);
+
+  container.appendChild(row);
+
+  const presentBtn = document.createElement('button');
+  presentBtn.className = 'btn-small';
+  presentBtn.style.marginTop = '10px';
+  presentBtn.textContent = '🎬 Present';
+  presentBtn.addEventListener('click', ()=>{
+    openPresentMode(items, 'My sentence');
+  });
+  container.appendChild(presentBtn);
+
+  const exportBtn = document.createElement('button');
+  exportBtn.className = 'btn-small';
+  exportBtn.style.marginTop = '10px';
+  exportBtn.style.marginLeft = '8px';
+  exportBtn.textContent = '📥 Export to PowerPoint';
+  exportBtn.addEventListener('click', ()=>{
+    exportItemsToPptx(items, { title: 'My sentence', fileName: slugify(assembleSentenceText(items)) });
+  });
+  container.appendChild(exportBtn);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'btn-small';
+  saveBtn.style.marginTop = '10px';
+  saveBtn.style.marginLeft = '8px';
+  saveBtn.textContent = '💾 Save to my sentences';
+  saveBtn.addEventListener('click', ()=>{
+    addToSentenceBank(items);
+    const original = saveBtn.textContent;
+    saveBtn.textContent = '✓ Saved — see the My sentences tab';
+    saveBtn.disabled = true;
+    setTimeout(()=>{ saveBtn.textContent = original; saveBtn.disabled = false; }, 1800);
+  });
+  container.appendChild(saveBtn);
+}
+
+function buildFreeWritePanel(){
+  const wrap = document.createElement('div');
+  wrap.className = 'freewrite-box';
+
+  const h2 = document.createElement('h2');
+  h2.textContent = 'Write your own sentence';
+  h2.style.margin = '0 0 8px';
+  h2.style.fontSize = '1.2rem';
+  wrap.appendChild(h2);
+
+  const p = document.createElement('p');
+  p.style.fontSize = '0.85rem';
+  p.style.color = 'var(--muted)';
+  p.style.margin = '0 0 10px';
+  p.textContent = "Type any sentence and it will be coloured for you automatically. It's a best guess — tap any coloured block's small dropdown to fix its colour if it's wrong.";
+  wrap.appendChild(p);
+
+  const textarea = document.createElement('textarea');
+  textarea.placeholder = 'e.g. The child ate the delicious lolly quickly because they were hungry.';
+  wrap.appendChild(textarea);
+
+  const actions = document.createElement('div');
+  actions.className = 'freewrite-actions';
+  const goBtn = document.createElement('button');
+  goBtn.className = 'btn-main';
+  goBtn.textContent = 'Colour it!';
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'btn-small';
+  clearBtn.textContent = 'Clear';
+  actions.appendChild(goBtn);
+  actions.appendChild(clearBtn);
+  wrap.appendChild(actions);
+
+  const output = document.createElement('div');
+  output.className = 'freewrite-output';
+  wrap.appendChild(output);
+  renderFreeWriteChips(output, []);
+
+  function run(){
+    const items = autoTagSentence(textarea.value);
+    renderFreeWriteChips(output, items);
+  }
+  goBtn.addEventListener('click', run);
+  textarea.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); run(); }
+  });
+  clearBtn.addEventListener('click', ()=>{
+    textarea.value = '';
+    renderFreeWriteChips(output, []);
+  });
+
+  const hint = document.createElement('div');
+  hint.className = 'freewrite-hint';
+  hint.innerHTML = "<strong>Tip:</strong> works best on the kind of sentences practised in the year-group tabs above — a subject, a verb, and simple describing/where/when/how phrases, joined with conjunctions like <em>and, but, because, when, although</em>.";
+  wrap.appendChild(hint);
+
+  return wrap;
+}
+
+function buildBankPanel(){
+  const wrap = document.createElement('div');
+  wrap.className = 'freewrite-box';
+
+  const h2 = document.createElement('h2');
+  h2.textContent = 'My saved sentences';
+  h2.style.margin = '0 0 8px';
+  h2.style.fontSize = '1.2rem';
+  wrap.appendChild(h2);
+
+  const p = document.createElement('p');
+  p.style.fontSize = '0.85rem';
+  p.style.color = 'var(--muted)';
+  p.style.margin = '0 0 10px';
+  p.textContent = "Sentences you save from the ✏️ My sentence tab land here — build up a set ahead of a lesson, then present them all in one go, straight through from one to the next, without closing and reopening each time.";
+  wrap.appendChild(p);
+
+  if(!sentenceBank.length){
+    const empty = document.createElement('p');
+    empty.className = 'freewrite-empty';
+    empty.textContent = 'Nothing saved yet — colour a sentence in ✏️ My sentence, then tap "💾 Save to my sentences".';
+    wrap.appendChild(empty);
+    return wrap;
+  }
+
+  const presentAllBtn = document.createElement('button');
+  presentAllBtn.className = 'btn-main';
+  presentAllBtn.textContent = `🎬 Present all (${sentenceBank.length})`;
+  presentAllBtn.style.marginBottom = '14px';
+  presentAllBtn.addEventListener('click', ()=>{
+    openPresentPlaylist(sentenceBank.map((e,i)=>({ items:e.items, title:`Saved sentence ${i+1}` })));
+  });
+  wrap.appendChild(presentAllBtn);
+
+  const list = document.createElement('div');
+  list.className = 'bank-list';
+
+  sentenceBank.forEach((entry, idx)=>{
+    const row = document.createElement('div');
+    row.className = 'bank-item';
+
+    const preview = document.createElement('div');
+    preview.className = 'bank-item-preview';
+    entry.items.forEach(it=>{
+      const def = TYPE[it.cat] || TYPE.lit;
+      const hasComma = /,$/.test(it.text);
+      const displayText = hasComma ? it.text.slice(0, -1) : it.text;
+      const pill = document.createElement('span');
+      pill.className = 'bank-pill';
+      pill.style.background = def.bg;
+      pill.style.color = def.fg;
+      if(def.border) pill.style.border = def.border;
+      pill.textContent = displayText;
+      preview.appendChild(pill);
+    });
+    row.appendChild(preview);
+
+    const actions = document.createElement('div');
+    actions.className = 'bank-item-actions';
+
+    const upBtn = document.createElement('button');
+    upBtn.className = 'btn-small';
+    upBtn.title = 'Move earlier';
+    upBtn.textContent = '↑';
+    upBtn.disabled = idx === 0;
+    upBtn.addEventListener('click', ()=>{ moveInSentenceBank(entry.id, -1); selectBank(); });
+    actions.appendChild(upBtn);
+
+    const downBtn = document.createElement('button');
+    downBtn.className = 'btn-small';
+    downBtn.title = 'Move later';
+    downBtn.textContent = '↓';
+    downBtn.disabled = idx === sentenceBank.length-1;
+    downBtn.addEventListener('click', ()=>{ moveInSentenceBank(entry.id, 1); selectBank(); });
+    actions.appendChild(downBtn);
+
+    const presentBtn = document.createElement('button');
+    presentBtn.className = 'btn-small';
+    presentBtn.textContent = '🎬 Present';
+    presentBtn.addEventListener('click', ()=>{
+      openPresentMode(entry.items, `Saved sentence ${idx+1}`);
+    });
+    actions.appendChild(presentBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-small';
+    delBtn.textContent = '🗑 Delete';
+    delBtn.addEventListener('click', ()=>{
+      if(confirm('Remove this saved sentence?')){
+        removeFromSentenceBank(entry.id);
+        selectBank();
+      }
+    });
+    actions.appendChild(delBtn);
+
+    row.appendChild(actions);
+    list.appendChild(row);
+  });
+
+  wrap.appendChild(list);
+  return wrap;
+}
+
+function selectBank(){
+  document.querySelectorAll('.year-tab').forEach(t=>{
+    t.classList.toggle('active', t.dataset.id==='bank');
+  });
+  const content = document.getElementById('yearContent');
+  content.innerHTML = '';
+  content.appendChild(buildBankPanel());
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function selectFreeWrite(){
+  document.querySelectorAll('.year-tab').forEach(t=>{
+    t.classList.toggle('active', t.dataset.id==='free');
+  });
+  const content = document.getElementById('yearContent');
+  content.innerHTML = '';
+  content.appendChild(buildFreeWritePanel());
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function selectYear(id){
+  document.querySelectorAll('.year-tab').forEach(t=>{
+    t.classList.toggle('active', t.dataset.id===id);
+  });
+  const y = YEARS.find(x=>x.id===id);
+  const content = document.getElementById('yearContent');
+  content.innerHTML = '';
+
+  const introEl = document.createElement('div');
+  introEl.className = 'year-intro';
+  introEl.innerHTML = `<h2>${y.label}</h2><p>${y.intro}</p>`;
+  content.appendChild(introEl);
+
+  y.structures.forEach((structure, i)=>{
+    content.appendChild(buildCard(structure, i, y.id));
+  });
+
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+selectYear(YEARS[0].id);
+</script>
+</body>
+</html>
