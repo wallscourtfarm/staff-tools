@@ -3,7 +3,19 @@
 
 const PREFIX = 'ts_'; // property key prefix to avoid collisions
 
+// Shared light token (same scheme as every other WFA tool's own backend) —
+// a deterrent, not real access control, but this endpoint previously had
+// none at all.
+function tokenOK_(e) {
+  const want = PropertiesService.getScriptProperties().getProperty('SHARED_TOKEN') || '2013';
+  return !!(e && e.parameter && e.parameter.token && e.parameter.token === want);
+}
+
 function doPost(e) {
+  if (!tokenOK_(e)) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'unauthorised' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   try {
     const payload = JSON.parse(e.postData.contents);
     if (payload.action === 'save' && payload.weekKey) {
@@ -22,6 +34,10 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  if (!tokenOK_(e)) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'unauthorised' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   try {
     const action = e.parameter.action;
     if (action === 'load' && e.parameter.weekKey) {
