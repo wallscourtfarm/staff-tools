@@ -302,7 +302,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · WFA-13.09.26a</div>
+  <div class="version">WFA Book Tracker · WFA-13.09.26b</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -1014,9 +1014,24 @@ function shuffle(arr) {
   return a;
 }
 
+// Read-through cache proxy on the Railway server we already own (see
+// wfa-data/backend/routers/book_tracker.py) — only for the getAll read,
+// which is what every page load calls; every other action (checkout,
+// returnBook, etc.) is a write and keeps going straight through api().
+// Only used when apiUrl is still the real production deployment — a
+// device with a custom/test apiUrl (Settings screen) bypasses the proxy.
+async function getAllViaProxy() {
+  if (apiUrl !== HARDCODED_URL) return api({ action: 'getAll' });
+  const res = await fetch(`https://api.wallscourt-farm-academy.co.uk/book-tracker/getall?token=${WFA_TOKEN}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
 async function loadData() {
   try {
-    const d = await api({ action: 'getAll' });
+    const d = await getAllViaProxy();
     children = d.children || [];
     books    = d.books    || [];
     demographics = d.demographics || demographics;
