@@ -8,6 +8,83 @@ function tokenOK(e) {
   return !!(e && e.parameter && e.parameter.token && e.parameter.token === expected);
 }
 
+// ── Full-dump cache ──────────────────────────────────────────────────────
+// TrackerData has grown to ~3,750+ rows (~240KB as JSON) — every plain
+// doGet (what every client's pullFromCloud() calls each sync) used to
+// re-scan the whole sheet with no caching at all, and under real classroom
+// concurrency this was measured taking 30-50s per request (13.09.26,
+// matching the same request-serialization ceiling already fixed for
+// shared-sync and spelling-games on 11.09.26 — see those for the pattern
+// this mirrors). CacheService caps a single value at 100KB, so the ~240KB
+// payload is split across numbered chunks under one TTL.
+const FULL_DUMP_CACHE_TTL_SECONDS = 20;
+const FULL_DUMP_CHUNK_SIZE = 90000;
+const FULL_DUMP_META_KEY = 'rt_dump_meta';
+
+function readCachedChunks_(cache) {
+  const meta = cache.get(FULL_DUMP_META_KEY);
+  if (meta === null) return null;
+  const n = Number(meta);
+  const keys = [];
+  for (let i = 0; i < n; i++) keys.push('rt_dump_' + i);
+  const got = cache.getAll(keys);
+  let combined = '';
+  for (let i = 0; i < n; i++) {
+    const chunk = got['rt_dump_' + i];
+    if (chunk === undefined) return null; // partial expiry — treat as a miss
+    combined += chunk;
+  }
+  return combined;
+}
+
+function getCachedFullDump_() {
+  const cache = CacheService.getScriptCache();
+  const hit = readCachedChunks_(cache);
+  if (hit !== null) return hit;
+
+  // A cold cache still means every concurrent request misses at the same
+  // instant and would otherwise all hit the sheet together — the exact
+  // contention this exists to avoid. The lock serializes just the actual
+  // sheet read: one request reads and populates the cache, the rest wait
+  // briefly then get it from cache instead of piling onto the sheet too.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const recheck = readCachedChunks_(cache);
+    if (recheck !== null) return recheck;
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet) return '{}';
+    const data = sheet.getDataRange().getValues();
+    const result = {};
+    for (const row of data) {
+      if (row[0]) result[String(row[0])] = String(row[1]);
+    }
+    const json = JSON.stringify(result);
+
+    const cacheValues = {};
+    let n = 0;
+    for (let i = 0; i < json.length; i += FULL_DUMP_CHUNK_SIZE) {
+      cacheValues['rt_dump_' + n] = json.slice(i, i + FULL_DUMP_CHUNK_SIZE);
+      n++;
+    }
+    cacheValues[FULL_DUMP_META_KEY] = String(n);
+    cache.putAll(cacheValues, FULL_DUMP_CACHE_TTL_SECONDS);
+
+    return json;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Called after any real write so the writer's own next pull isn't served a
+// stale cached dump for up to FULL_DUMP_CACHE_TTL_SECONDS — cheap to clear
+// the meta key alone; orphaned chunk entries just expire on their own TTL.
+function invalidateFullDumpCache_() {
+  CacheService.getScriptCache().remove(FULL_DUMP_META_KEY);
+}
+
 // Teacher "backdoor" PIN (logo triple-tap on the tracker) — scoped to this
 // tool only, deliberately separate from shared-sync's STAFF_PIN. The page is
 // already behind Cloudflare Access, so this PIN's job is just to stop a pupil
@@ -231,15 +308,7 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
   }
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) return ContentService.createTextOutput('{}').setMimeType(ContentService.MimeType.JSON);
-  const data = sheet.getDataRange().getValues();
-  const result = {};
-  for (const row of data) {
-    if (row[0]) result[String(row[0])] = String(row[1]);
-  }
-  return ContentService.createTextOutput(JSON.stringify(result))
+  return ContentService.createTextOutput(getCachedFullDump_())
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -299,6 +368,7 @@ function doPost(e) {
         sheet.appendRow([key, value, ts]);
       }
     }
+    if (Object.keys(payload).length) invalidateFullDumpCache_();
     return ContentService.createTextOutput('ok').setMimeType(ContentService.MimeType.TEXT);
   } finally {
     lock.releaseLock();
