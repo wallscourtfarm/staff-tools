@@ -353,7 +353,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">WFA-12.09.26a</span>
+  <span class="version">WFA-13.09.26a</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <div id="yg-bar">
@@ -683,6 +683,10 @@ const YG_CLASSES = {
   Y4: ['4CC','4RB'], Y5: ['5LS','5IM'], Y6: ['6JM','6SD']
 };
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbzwY-2zUMhFsNDdck_hgGswxXgOusGozaogPMR5w9-IWgCy4jmLuLcv88r2vs6OYpmW/exec';
+// Read-through cache proxy on the Railway server we already own (see
+// wfa-data/backend/routers/spellings_tracker.py) — GETs go through here;
+// writes (saveAll) still POST straight to SYNC_URL, unchanged.
+const SYNC_READ_URL = 'https://api.wallscourt-farm-academy.co.uk/spellings-tracker/sync';
 // Shared light token (see shared-sync/sync-script.gs). Sent in the query
 // string, never headers, because these fetches omit Content-Type to avoid
 // CORS preflight. localStorage override for token rotation.
@@ -751,7 +755,7 @@ async function sheetLoadAll() {
   const yg = state.currentYg || 'Y5';
   updateSyncStatus('loading');
   try {
-    const res = await fetch(SYNC_URL + '?action=loadAll&yearGroup=' + encodeURIComponent(yg) + '&token=' + WFA_TOKEN);
+    const res = await fetch(SYNC_READ_URL + '?action=loadAll&yearGroup=' + encodeURIComponent(yg) + '&token=' + WFA_TOKEN);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (!data || !data.pupils) throw new Error('Invalid response');
@@ -1423,7 +1427,7 @@ async function renderDashboard() {
 async function fetchGroupStats() {
   if (!SYNC_URL) return null;
   try {
-    const res = await fetch(SYNC_URL + '?action=getGroupStats&token=' + WFA_TOKEN);
+    const res = await fetch(SYNC_READ_URL + '?action=getGroupStats&token=' + WFA_TOKEN);
     if (!res.ok) return null;
     const data = await res.json();
     if (data.error) { console.error('getGroupStats error:', data.error); return null; }
