@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 11.09.26a</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 13.09.26a</div>
       </div>
     </div>
     <div class="top-bar">
@@ -395,6 +395,10 @@
 <script>
 // ── Config ──────────────────────────────────────────────────────────────────
 const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
+// Distinct from SHARED_TOKEN above (that one's for the shared-sync hub) —
+// this is the light deterrent token this tool's own backend (and
+// fab-rota's, read below) checks; previously neither checked anything.
+const OWN_BACKEND_TOKEN = '2013';
 const GATEWAY_URL     = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
 const SYNC_URL        = 'https://script.google.com/macros/s/AKfycbwzNtos0vdjnUhsFQ_igTtLNXyBd8k9c6rPkA0IZdkM3vJLAoIdSHonTbHAbyFNfH_BWQ/exec';
 // Read-only proxy (fast, cached) in front of the real Apps Script state
@@ -765,7 +769,7 @@ function buildSchoolEvents(rows) {
 async function syncLoad(weekKey) {
   if (!SYNC_URL) return;
   try {
-    const res = await fetch(`${SYNC_URL}?action=loadBookings&weekKey=${encodeURIComponent(weekKey)}`);
+    const res = await fetch(`${SYNC_URL}?action=loadBookings&weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
     if (res.ok) {
       const json = await res.json();
       if (json && json.bookings) {
@@ -788,7 +792,7 @@ async function syncSave() {
   // see syncedWeeks comment above.
   if (!syncedWeeks.has(weekKey)) return;
   try {
-    await fetch(SYNC_URL, {
+    await fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, {
       method: 'POST',
       body: JSON.stringify({ action: 'saveBookings', weekKey, bookings: state.bookings[weekKey] || {} }),
       headers: { 'Content-Type': 'text/plain' }
@@ -818,7 +822,7 @@ async function syncSaveAll() {
     // saving in the background, with no indication anything was still in
     // progress — easy to close the tab before it completed and silently
     // lose whichever weeks hadn't been sent yet. Send them all at once instead.
-    await Promise.all(weekKeys.map(weekKey => fetch(SYNC_URL, {
+    await Promise.all(weekKeys.map(weekKey => fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, {
       method: 'POST',
       body: JSON.stringify({ action: 'saveBookings', weekKey: weekKey, bookings: state.bookings[weekKey] || {} }),
       headers: { 'Content-Type': 'text/plain' }
@@ -1907,7 +1911,7 @@ async function init() {
   // Non-critical: load Cover Plan + FAB Rota for auto-blocking indicators
   Promise.all([
     fetch(COVER_PLAN_URL + '?token=' + SHARED_TOKEN, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
-    fetch(FAB_ROTA_URL,   { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch(FAB_ROTA_URL + '?token=' + OWN_BACKEND_TOKEN, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
   ]).then(([cpJson, fabJson]) => {
     if (cpJson?.weekSlots)     coverPlanData = cpJson;
     if (fabJson?.state?.slots) fabRotaData   = fabJson;
