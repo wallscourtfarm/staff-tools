@@ -4,13 +4,14 @@
 
 // Shared light token (same scheme as every other WFA tool's own backend) —
 // a deterrent, not real access control, but this endpoint previously had
-// none at all. TEMP_NO_ENFORCE: not yet required — see tokenOK_ call sites.
+// none at all.
 function tokenOK_(e) {
   const want = PropertiesService.getScriptProperties().getProperty('SHARED_TOKEN') || '2013';
   return !!(e && e.parameter && e.parameter.token && e.parameter.token === want);
 }
 
 function doGet(e) {
+  if (!tokenOK_(e)) return json({ ok: false, error: 'unauthorised' });
   const action = (e.parameter && e.parameter.action) || '';
 
   if (action === 'load') {
@@ -28,6 +29,7 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  if (!tokenOK_(e)) return json({ ok: false, error: 'unauthorised' });
   try {
     var body = JSON.parse(e.postData.contents);
     if (!body.key || body.key.indexOf('wfa_cp_') !== 0) {
