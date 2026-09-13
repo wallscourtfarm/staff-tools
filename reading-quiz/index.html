@@ -67,7 +67,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 </div>
 
 <div class="wrap" id="app"></div>
-<div class="version">WFA Reading Quiz · 12.09.26c</div>
+<div class="version">WFA Reading Quiz · 13.09.26a</div>
 
 <script>
 // ════════════════════════════════════════════════
@@ -740,43 +740,26 @@ async function nextQuestion() {
   await finishAttempt();
 }
 
+// Not a pass/fail gate — any score still counts as read. The point is an
+// honest signal for the teacher at check-in, not a barrier here.
 async function finishAttempt() {
   const total = quiz.order.length;
-  const passed = quiz.correct >= 4;
   render(`<div class="spinner"></div>`);
   try {
     await apiPost({ action: 'submitQuizAttempt', childId: quiz.childId, bookId: quiz.bookId, checkoutId: quiz.checkoutId,
-      score: quiz.correct, total, passed, override: false, overrideBy: '', overrideReason: '' });
+      score: quiz.correct, total, passed: quiz.correct >= 4, override: false, overrideBy: '', overrideReason: '' });
   } catch (e) { /* still show the result even if logging hiccups */ }
-  if (passed) renderPass(); else renderFail();
+  renderResult();
 }
 
-function renderPass() {
-  render(`
-    <div class="card">
-      <div class="result-icon">🎉</div>
-      <h2 style="text-align:center">Well done, ${esc(quiz.childName)}!</h2>
-      <p style="text-align:center">You got ${quiz.correct}/${quiz.order.length} — great reading!</p>
-      <p style="text-align:center;margin-top:10px">Bring <strong>${esc(quiz.bookTitle)}</strong> back to school and your teacher will add it to your list of completed Reading Challenge Books.</p>
-    </div>`);
-}
-
-function renderFail() {
+function renderResult() {
   render(`
     <div class="card">
       <div class="result-icon">📖</div>
-      <h2 style="text-align:center">Almost there!</h2>
-      <p style="text-align:center">You got ${quiz.correct}/${quiz.order.length} this time.</p>
-      <p style="text-align:center;margin-top:6px">Have another go, or come back to it later.</p>
-      <button class="btn btn-blue" onclick="retryQuiz()">Try Again</button>
-      <button class="btn btn-ghost" onclick="boot()">I'll try later</button>
+      <h2 style="text-align:center">Nice reading, ${esc(quiz.childName)}!</h2>
+      <p style="text-align:center">You scored ${quiz.correct}/${quiz.order.length} on the reading check.</p>
+      <p style="text-align:center;margin-top:10px">Bring <strong>${esc(quiz.bookTitle)}</strong> back to school and your teacher will add it to your list of completed Reading Challenge Books.</p>
     </div>`);
-}
-
-function retryQuiz() {
-  quiz.order = shuffle(QUIZ_DATA[quiz.bookId].questions.map((_, i) => i));
-  quiz.idx = 0; quiz.correct = 0; quiz.optionOrder = [];
-  renderQuizStep();
 }
 
 boot();
