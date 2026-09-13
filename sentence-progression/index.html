@@ -374,6 +374,10 @@
     line-height:1;
     text-align:center;
     margin-bottom:2px;
+    /* An empty word-ico (categories with no icon, e.g. "lit") has no inline content of its
+       own to establish a line box, so line-height alone collapses it to 0 height — min-height
+       reserves the same space a real icon occupies, keeping every chip in a row the same height. */
+    min-height:1.4rem;
   }
   .slot-box .word-ico img{ height:1.4rem; width:auto; }
   .slot-box .word-text{
@@ -723,7 +727,7 @@
 </main>
 
 <footer>
-  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v13.09.26k
+  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v13.09.26l
 </footer>
 
 <div class="present-overlay" id="presentOverlay">
@@ -1466,11 +1470,12 @@ function buildCard(structure, sIdx, yearId){
     box.style.color = def.fg;
     if(def.border) box.style.border = def.border;
 
-    const boxIcoEl = def.diamond ? null : makeIconEl(def, tok.type);
-    if(boxIcoEl){
+    // Same icon-row height reservation as the free-write panel below — see its comment.
+    if(!def.diamond){
+      const boxIcoEl = makeIconEl(def, tok.type);
       const boxIco = document.createElement('div');
       boxIco.className = 'word-ico';
-      boxIco.appendChild(boxIcoEl);
+      if(boxIcoEl) boxIco.appendChild(boxIcoEl);
       box.appendChild(boxIco);
     }
 
@@ -1748,12 +1753,13 @@ function autoTagSentence(str){
   // the adult tells a joke, laughs.") — holds the outer clause's clauseHasSubject so it can
   // be restored at the aside's closing comma, rather than losing the outer subject entirely.
   let embeddedSubordSaved = null;
-  // True while the sentence's opening clause is a FRONTED subordinate clause ("Before you
-  // leave, ..."). The comma ending it is, structurally, a fresh clause boundary exactly like
-  // a full stop — the imperative check below only fires when sentenceStart is true, so
-  // without this an imperative main clause after a fronted subordinate clause ("Before you
-  // leave, tidy your desk.") would silently never be recognised as one.
-  let frontedSubordPending = false;
+  // True while the sentence's opening clause is a fronted subordinate clause OR
+  // prepositional phrase ("Before you leave, ...", "With a heavy heart, ..."). The comma
+  // ending it is, structurally, a fresh clause boundary exactly like a full stop — the
+  // imperative check below only fires when sentenceStart is true, so without this an
+  // imperative main clause after a fronted phrase ("Before you leave, tidy your desk.")
+  // would silently never be recognised as one.
+  let frontedPhrasePending = false;
 
   while(i < n){
     const w = raw[i];
@@ -1776,7 +1782,7 @@ function autoTagSentence(str){
       } else {
         clauseHasSubject = false; vState = 'none';
         embeddedSubordSaved = null;
-        if(frontedSubordPending){ sentenceStart = true; frontedSubordPending = false; }
+        if(frontedPhrasePending){ sentenceStart = true; frontedPhrasePending = false; }
       }
       if(w !== ',') sentenceStart = true;
       i++; continue;
@@ -1790,7 +1796,7 @@ function autoTagSentence(str){
       }
     }
     if(matchedMulti){
-      if(items.length===0) frontedSubordPending = true;
+      if(items.length===0) frontedPhrasePending = true;
       items.push({text: raw.slice(i,i+matchedMulti).join(' '), cat:'subord'});
       i += matchedMulti; clauseHasSubject=false; vState='none'; continue;
     }
@@ -1858,7 +1864,7 @@ function autoTagSentence(str){
           i=k; continue;
         }
       }
-      if(items.length===0) frontedSubordPending = true;
+      if(items.length===0) frontedPhrasePending = true;
       items.push({text:w, cat:'subord'});
       clauseHasSubject=false; vState='none'; i++; continue;
     }
@@ -1904,6 +1910,18 @@ function autoTagSentence(str){
     // can't have none — skip the preposition treatment there so it falls through to the
     // normal doing-assignment below instead of stranding the object with no verb at all.
     if(PREP_OTHER.has(lw) && !(vState==='aux' && lw==='like')){
+      if(sentenceStart && !clauseHasSubject){
+        // Fronted prepositional phrase before the sentence has a subject yet ("With a heavy
+        // heart, the dog walked away."): sweep the WHOLE phrase as one plain chunk rather
+        // than just this one word. Leaving the rest to the normal rules below (as the
+        // mid-clause case does) wrongly promotes the phrase's own noun ("heart") to who,
+        // since those rules assume "no subject yet" can only mean the real subject is next.
+        let k=i; const chunk=[];
+        while(k<n && !/^[,.!?;]$/.test(raw[k]) && !(k>i && isBoundaryWord(lower(raw[k])))){ chunk.push(raw[k]); k++; }
+        items.push({text: chunk.join(' '), cat:'lit'});
+        if(items.length===1) frontedPhrasePending = true;
+        i=k; continue;
+      }
       // A preposition that isn't clearly spatial (where) or temporal (when) — e.g. "with",
       // "of" — doesn't fit any of this tool's categories cleanly, so it's left as a plain,
       // uncoloured word rather than forced into "what". The noun phrase after it is still
@@ -2214,13 +2232,16 @@ function renderFreeWriteChips(container, items){
       });
       content.appendChild(auxSel);
     } else {
+      // Always reserve the icon row's height, even for categories like "lit" that have no
+      // icon (def.icon === '') — appending it only when there's an actual icon to show, as
+      // this used to, left icon-less chips ("With", "like", "by"...) measurably shorter than
+      // every sibling chip in the same row (33px vs 60px), the same box-height mismatch this
+      // tool has already had to fix for the aux diamond and the grammar-term row.
       const icoEl = makeIconEl(def, item.cat);
-      if(icoEl){
-        const ico = document.createElement('div');
-        ico.className = 'word-ico';
-        ico.appendChild(icoEl);
-        content.appendChild(ico);
-      }
+      const ico = document.createElement('div');
+      ico.className = 'word-ico';
+      if(icoEl) ico.appendChild(icoEl);
+      content.appendChild(ico);
       const txt = document.createElement('div');
       txt.className = 'word-text';
       txt.textContent = displayText;
