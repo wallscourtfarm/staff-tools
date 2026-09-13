@@ -533,7 +533,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-interventions" onclick="showTab('interventions')">Interventions</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">WFA-31.08.26b</span>
+      <span class="version">WFA-13.09.26a</span>
     </div>
   </header>
 
@@ -721,8 +721,19 @@ function scoreMeta(v) {
 // ================================================================
 // STATE
 // ================================================================
+const PRODUCTION_API_URL = 'https://script.google.com/macros/s/AKfycbzkr27LBT4SLJ2TsJzqXSN3sWHXIJE0YCqbLqp8tUJgRiBG0AycNUPvD9cWfblaNDaU/exec';
+// Read-through cache proxy on the Railway server we already own (see
+// wfa-data/backend/routers/writing_tracker.py) — GETs go through here
+// instead of straight to Apps Script, which otherwise hits Apps Script's
+// own per-account concurrent-execution ceiling under real classroom load
+// (measured 6.9-60s+/request, two outright failures, 13.09.26). Writes
+// still POST straight to state.apiUrl, unchanged — this proxy is
+// deliberately GET-only. Only used when apiUrl is still the real
+// production deployment — a device with a custom/test apiUrl (see the
+// Settings screen) reads straight from that URL instead, unproxied.
+const API_READ_URL = 'https://api.wallscourt-farm-academy.co.uk/writing-tracker/sync';
 const state = {
-  apiUrl: localStorage.getItem('wfa_api_url') || 'https://script.google.com/macros/s/AKfycbzkr27LBT4SLJ2TsJzqXSN3sWHXIJE0YCqbLqp8tUJgRiBG0AycNUPvD9cWfblaNDaU/exec',
+  apiUrl: localStorage.getItem('wfa_api_url') || PRODUCTION_API_URL,
   classes: [],
   currentClassId: '',
   currentClass: null,
@@ -798,10 +809,11 @@ async function syncHubRoster(dryRun) {
 
 async function apiGet(action, params = {}, timeoutMs = 45000) {
   const qs = new URLSearchParams({ action, token: WFA_TOKEN, ...params }).toString();
+  const base = state.apiUrl === PRODUCTION_API_URL ? API_READ_URL : state.apiUrl;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(`${state.apiUrl}?${qs}`, { signal: ctrl.signal });
+    const res = await fetch(`${base}?${qs}`, { signal: ctrl.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
