@@ -26,13 +26,12 @@ def _build_grid_elements(p, sheet, styles, title_style, info_style, answer_style
 
     elements = []
 
-    # Title line: Name | Skill | Date
-    title = f"{p['firstName']} {p['lastName']} &nbsp;&nbsp;|&nbsp;&nbsp; {sheet['skill_name']} &nbsp;&nbsp;|&nbsp;&nbsp; {date.today().strftime('%d/%m/%y')}"
+    # Title line: Name | Skill | Date — the aim/errors/timing numbers are
+    # teacher information, not shown on the child's working sheet; they
+    # only appear below alongside the answer key.
+    day_label = f" &nbsp;&nbsp;|&nbsp;&nbsp; {sheet['day_label']}" if sheet.get("day_label") else ""
+    title = f"{p['firstName']} {p['lastName']} &nbsp;&nbsp;|&nbsp;&nbsp; {sheet['skill_name']}{day_label} &nbsp;&nbsp;|&nbsp;&nbsp; {date.today().strftime('%d/%m/%y')}"
     elements.append(Paragraph(title, title_style))
-
-    aim = sheet["aim"]
-    info = f"Aim: {aim['correctPerMin']}/min &nbsp;&bull;&nbsp; Max {aim['maxErrors']} errors &nbsp;&bull;&nbsp; {aim['timedSec']}s"
-    elements.append(Paragraph(info, info_style))
     elements.append(Spacer(1, 2*mm))
 
     questions = sheet["questions"]
@@ -54,12 +53,19 @@ def _build_grid_elements(p, sheet, styles, title_style, info_style, answer_style
             right = right_rows[row_i] if row_i < len(right_rows) else ["", "", ""]
             combined.append(left + right)
 
+        # Question column is right-aligned and the answer-blank column is
+        # narrow, so the blank sits right next to the question instead of
+        # across a wide gutter.
         col_w = usable_w / 2 - 2*mm
-        t = Table(combined, colWidths=[8*mm, col_w - 28*mm, 20*mm, 8*mm, col_w - 28*mm, 20*mm])
+        t = Table(combined, colWidths=[8*mm, col_w - 22*mm, 14*mm, 8*mm, col_w - 22*mm, 14*mm])
         t.setStyle(TableStyle([
             ('FONT', (0, 0), (-1, -1), 'Helvetica', 9),
             ('FONT', (0, 0), (0, -1), 'Helvetica-Bold', 9),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('ALIGN', (4, 0), (4, -1), 'RIGHT'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('RIGHTPADDING', (1, 0), (1, -1), 4),
+            ('RIGHTPADDING', (4, 0), (4, -1), 4),
             ('LINEBELOW', (2, 0), (2, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
             ('LINEBELOW', (5, 0), (5, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
             ('TOPPADDING', (0, 0), (-1, -1), 1),
@@ -70,21 +76,27 @@ def _build_grid_elements(p, sheet, styles, title_style, info_style, answer_style
         elements.append(t)
 
         if include_answers:
+            aim = sheet["aim"]
+            info = f"Aim: {aim['correctPerMin']}/min &nbsp;&bull;&nbsp; Max {aim['maxErrors']} errors &nbsp;&bull;&nbsp; {aim['timedSec']}s"
             answers_left = ", ".join(f"{q['question']}={q['answer']}" for q in questions[:half])
             answers_right = ", ".join(f"{q['question']}={q['answer']}" for q in questions[half:])
             elements.append(Spacer(1, 1*mm))
+            elements.append(Paragraph(info, info_style))
             elements.append(Paragraph(f"Answers: {answers_left}", answer_style))
             elements.append(Paragraph(f"Answers: {answers_right}", answer_style))
 
-    elif sheet["subject"] == "phonics":
-        cols = 8
-        gpcs = [q["question"] for q in questions]
-        while len(gpcs) % cols != 0:
-            gpcs.append("")
+    elif sheet["subject"] == "phonics" or sheet.get("display_mode") == "recognition":
+        # Phonics GPCs and CEW word-recognition are both "see it, say it" —
+        # a grid of items to read aloud, not a dictation task. Fewer, wider
+        # columns for words (CEW) than single-letter/digraph GPCs.
+        cols = 8 if sheet["subject"] == "phonics" else 4
+        words = [q["question"] for q in questions]
+        while len(words) % cols != 0:
+            words.append("")
 
         table_data = []
-        for i in range(0, len(gpcs), cols):
-            table_data.append(gpcs[i:i+cols])
+        for i in range(0, len(words), cols):
+            table_data.append(words[i:i+cols])
 
         col_w = usable_w / cols
         t = Table(table_data, colWidths=[col_w]*cols)
@@ -100,7 +112,7 @@ def _build_grid_elements(p, sheet, styles, title_style, info_style, answer_style
         ]))
         elements.append(t)
 
-    else:  # spellings
+    else:  # spelling dictation — teacher reads the word aloud, child writes it
         table_data = []
         for i, q in enumerate(questions):
             review_mark = " *" if q.get("is_review") else ""
@@ -115,6 +127,11 @@ def _build_grid_elements(p, sheet, styles, title_style, info_style, answer_style
             ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
         ]))
         elements.append(t)
+
+        if include_answers:
+            words_list = ", ".join(f"{q['question']}" + (" *" if q.get("is_review") else "") for q in questions)
+            elements.append(Spacer(1, 1*mm))
+            elements.append(Paragraph(f"Words to read aloud: {words_list}", answer_style))
 
     return elements
 
@@ -229,7 +246,8 @@ if query_params.get("mode") == "self_assess":
 
     if skill_id:
         step = get_step(ladders_data, skill_id)
-        sheet = generate_sheet(pupil, skill_id, ladders_data)
+        sa_item_pool = get_active_window(pupil, skill_id, step) if is_windowed(step) else None
+        sheet = generate_sheet(pupil, skill_id, ladders_data, item_pool=sa_item_pool)
 
         # Determine subject for mode-specific UI
         ladder = None
@@ -599,7 +617,7 @@ with st.sidebar:
 # ── Tabs ────────────────────────────────────────────────────────────────────
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "Dashboard", "Pupils", "Skill Ladders", "Probe Entry", "Progress", "Print Grids"
+    "Dashboard", "Pupils", "Skill Ladders", "Daily Check", "Progress", "Print Grids"
 ])
 
 # ── Tab 1: Dashboard ───────────────────────────────────────────────────────
@@ -854,7 +872,7 @@ with tab2:
                             st.info(
                                 f"This is a rolling-list skill — {sp_pupil_data['firstName']} will start with the "
                                 f"first {window_size} items ({', '.join(selected_step_data['items'][:window_size])}). "
-                                f"Run a Baseline Assessment in Probe Entry to record what they already know, then use "
+                                f"Run a Baseline Assessment in Daily Check to record what they already know, then use "
                                 f"'Update rolling list' there as they master items."
                             )
                         elif selected_step_data:
@@ -872,6 +890,15 @@ with tab2:
                                 key=f"known_items_{sp_pupil_id}_{selected_step_id}"
                             )
 
+                        existing_entry = skills.get(selected_step_id)
+                        default_items_per_sheet = existing_entry.get("itemsPerSheet", 25) if isinstance(existing_entry, dict) else 25
+                        items_per_sheet = st.number_input(
+                            "Items per sheet",
+                            min_value=20, max_value=30, value=default_items_per_sheet, step=1,
+                            help="How many questions fill one practice sheet — aim for about a minute's worth.",
+                            key=f"items_per_sheet_{sp_pupil_id}_{selected_step_id}",
+                        )
+
                     if st.button(f"Set starting point", key=f"set_sp_{sp_pupil_id}_{ladder['id']}"):
                         # Clear all skills in this ladder
                         for step in ladder["steps"]:
@@ -886,6 +913,7 @@ with tab2:
 
                             # Set selected step as active
                             set_skill_status(sp_pupil_data, selected_step_id, "active")
+                            sp_pupil_data["currentSkills"][selected_step_id]["itemsPerSheet"] = items_per_sheet
 
                             step_data = None
                             for s in ladder["steps"]:
@@ -895,7 +923,7 @@ with tab2:
 
                             if step_data and is_windowed(step_data):
                                 # Rolling-list skill — initialise the window, real
-                                # per-item baseline happens in Probe Entry.
+                                # per-item baseline happens in Daily Check.
                                 window_size = step_data["windowSize"]
                                 initial_window = step_data["items"][:window_size]
                                 set_active_window(sp_pupil_data, selected_step_id, initial_window, window_size - 1)
@@ -969,7 +997,7 @@ with tab3:
                 if i < len(ladder["steps"]) - 1:
                     st.markdown("↓")
 
-# ── Tab 4: Probe Entry ─────────────────────────────────────────────────────
+# ── Tab 4: Daily Check ──────────────────────────────────────────────────────
 
 with tab4:
     pupils_data = st.session_state.pupils_data
@@ -1483,15 +1511,18 @@ with tab6:
                 # Options
                 col_opt1, col_opt2, col_opt3 = st.columns(3)
                 with col_opt1:
-                    num_questions = st.selectbox("Questions per grid", [20, 25, 30, 35, 40], index=2, key="print_numq")
+                    week_mode = st.radio("Sheets", ["Single sheet", "Whole week (5 days, same set)"], key="print_mode") == "Whole week (5 days, same set)"
                 with col_opt2:
                     grids_per_page = st.selectbox("Grids per page", [1, 2], index=1, key="print_grids")
                 with col_opt3:
                     include_answers = st.checkbox("Include answer key", value=True, key="print_answers")
 
-                st.markdown(f"**{len(sheets_to_generate)} sheet{'s' if len(sheets_to_generate) != 1 else ''}:**")
+                st.caption("Item count per sheet comes from what was set for each pupil/skill in Set Starting Points.")
+                st.markdown(f"**{len(sheets_to_generate)} skill{'s' if len(sheets_to_generate) != 1 else ''}{' × 5 days' if week_mode else ''}:**")
                 for p, skill_id, step in sheets_to_generate:
-                    st.markdown(f"- {p['firstName']} {p['lastName']} — {step['ladder_name']}: {step['name']}")
+                    entry = p.get("currentSkills", {}).get(skill_id)
+                    count = entry.get("itemsPerSheet", 25) if isinstance(entry, dict) else 25
+                    st.markdown(f"- {p['firstName']} {p['lastName']} — {step['ladder_name']}: {step['name']} ({count} items)")
 
                 if st.button("Generate PDF", type="primary", use_container_width=True):
                     try:
@@ -1523,16 +1554,19 @@ with tab6:
                         # Build grids, pair them 2-up on a page
                         grids = []
                         for p, skill_id, step in sheets_to_generate:
-                            # Generate sheet with desired number of questions
-                            sheet = generate_sheet(p, skill_id, ladders_data)
-                            if not sheet:
-                                continue
-                            # Adjust question count
-                            if len(sheet["questions"]) > num_questions:
-                                sheet["questions"] = sheet["questions"][:num_questions]
-                                sheet["total_questions"] = num_questions
-
-                            grids.append((p, sheet))
+                            # Windowed skills only ever practise their current
+                            # window, not the whole step — same set all week.
+                            grid_item_pool = get_active_window(p, skill_id, step) if is_windowed(step) else None
+                            day_count = 5 if week_mode else 1
+                            for day_n in range(1, day_count + 1):
+                                # Each call reshuffles independently — same
+                                # item content, different order per day.
+                                sheet = generate_sheet(p, skill_id, ladders_data, item_pool=grid_item_pool)
+                                if not sheet:
+                                    continue
+                                if week_mode:
+                                    sheet["day_label"] = f"Day {day_n}"
+                                grids.append((p, sheet))
 
                         # Layout grids
                         if grids_per_page == 2:
