@@ -91,6 +91,7 @@ function handleGet_(p) {
     case 'getPupils':       return getPupils_(p);
     case 'getAssessments':  return getAssessments_(p);
     case 'getPupilHistory': return getPupilHistory_(p);
+    case 'getGroupStats':   return getGroupStats_(p);
     case 'getConfig':       return getConfig_();
     case 'ping':            return { ok: true, ts: new Date().toISOString(), codeVersion: 'precedence-fix-3' };
     default:                return { error: 'Unknown GET action: ' + p.action };
@@ -206,11 +207,25 @@ function getClasses_(p) {
 
 // ── Pupils ────────────────────────────────────────────────────
 
+// PP/EAL/SEN are only ever needed at whole-class/cohort level (see
+// getGroupStats_) — strip them before a pupil object leaves this backend,
+// so no individual pupil's flag ever reaches the browser. sex/gender is
+// left alone (not a flag being hidden, used for the existing boys/girls
+// filter).
+function stripPupilFlags_(pupils) {
+  return pupils.map(function (p) {
+    const copy = Object.assign({}, p);
+    delete copy.pp; delete copy.sen; delete copy.eal;
+    return copy;
+  });
+}
+
 function getPupils_(p) {
   let pupils = sheetData_('pupils').filter(r => truthy_(r.active));
   // String coercion: pre-fix rows may hold numeric class_ids.
   if (p.class_id) pupils = pupils.filter(r => String(r.class_id) === String(p.class_id));
-  return pupils.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  pupils = pupils.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  return stripPupilFlags_(pupils);
 }
 
 // Builds a row aligned to the actual sheet headers, so new columns
@@ -257,6 +272,39 @@ function updatePupil_(d) {
   return { success: true };
 }
 
+// One class's average writing score (0-4 scale, non-numeric x/~/blank
+// scores excluded) by PP/EAL/SEN — powers the group-attainment display.
+// Never returns a per-pupil row; the client sums {s,n} across classes for
+// cohort mode, same shape as reading-tracker's getClassGroupStats_.
+function getGroupStats_(p) {
+  let pupils = sheetData_('pupils').filter(r => truthy_(r.active));
+  if (p.class_id) pupils = pupils.filter(r => String(r.class_id) === String(p.class_id));
+  const pupilIds = new Set(pupils.map(r => r.pupil_id));
+  const year = p.academic_year || getConfig_().academic_year;
+
+  const sums = {}, counts = {};
+  for (const a of sheetData_('assessments')) {
+    if (!pupilIds.has(a.pupil_id) || a.academic_year !== year) continue;
+    const n = Number(a.score);
+    if (isNaN(n)) continue; // skip 'x' (not taught) / '~' (genre n/a) / blank
+    sums[a.pupil_id] = (sums[a.pupil_id] || 0) + n;
+    counts[a.pupil_id] = (counts[a.pupil_id] || 0) + 1;
+  }
+
+  const mkGroup = function () { return { s: 0, n: 0 }; };
+  const g = { pp: mkGroup(), nonPp: mkGroup(), eal: mkGroup(), nonEal: mkGroup(), sen: mkGroup(), nonSen: mkGroup() };
+  pupils.forEach(function (pu) {
+    const c = counts[pu.pupil_id];
+    if (!c) return; // no scored assessments yet this year
+    const avg = sums[pu.pupil_id] / c;
+    const isPP = truthy_(pu.pp), isEAL = truthy_(pu.eal), isSEN = truthy_(pu.sen);
+    const ppBucket = isPP ? g.pp : g.nonPp; ppBucket.s += avg; ppBucket.n++;
+    const ealBucket = isEAL ? g.eal : g.nonEal; ealBucket.s += avg; ealBucket.n++;
+    const senBucket = isSEN ? g.sen : g.nonSen; senBucket.s += avg; senBucket.n++;
+  });
+  return g;
+}
+
 // ── Assessments ───────────────────────────────────────────────
 
 function getAssessments_(p) {
@@ -286,7 +334,8 @@ function getPupilHistory_(p) {
     history[a.academic_year][a.skill_id] = String(a.score);
   }
 
-  const pupil = sheetData_('pupils').find(r => r.pupil_id === pupilId) || null;
+  const pupilRaw = sheetData_('pupils').find(r => r.pupil_id === pupilId) || null;
+  const pupil = pupilRaw ? stripPupilFlags_([pupilRaw])[0] : null;
   return { pupil, history };
 }
 

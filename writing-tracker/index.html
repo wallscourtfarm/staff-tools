@@ -533,7 +533,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-interventions" onclick="showTab('interventions')">Interventions</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">WFA-13.09.26a</span>
+      <span class="version">WFA-14.09.26a</span>
     </div>
   </header>
 
@@ -565,13 +565,11 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
     <div class="grid-controls class-filter-bar hidden" id="class-filter-bar"></div>
     <div class="grid-controls profile-filters" id="profile-filter-bar">
       <span class="filter-label">Pupils:</span>
-      <button class="filter-btn profile-btn" id="pfilt-pp"   onclick="toggleProfileFilter('pp')">PP</button>
-      <button class="filter-btn profile-btn" id="pfilt-eal"  onclick="toggleProfileFilter('eal')">EAL</button>
-      <button class="filter-btn profile-btn" id="pfilt-sen"  onclick="toggleProfileFilter('sen')">SEN</button>
       <button class="filter-btn profile-btn" id="pfilt-male" onclick="toggleProfileFilter('male')">Boys</button>
       <button class="filter-btn profile-btn" id="pfilt-female" onclick="toggleProfileFilter('female')">Girls</button>
       <span id="profile-filter-count" class="profile-filter-count"></span>
     </div>
+    <div class="grid-controls" id="group-stats-bar" style="font-size:12px;color:var(--muted,#64748b);"></div>
     <div id="bulk-toolbar" class="bulk-toolbar">
       <span class="bulk-info" id="bulk-info-text"></span>
       <button class="bulk-selall-btn" onclick="selectAllPupils()">Select all</button>
@@ -745,6 +743,7 @@ const state = {
   config: {},
   pupils: [],
   assessments: {},   // {pupil_id: {skill_id: score}}
+  groupStatsByClass: {}, // {class_id: {pp:{s,n}, nonPp:{s,n}, eal:..., sen:...}} — server-computed, no per-pupil flag ever lands in state
   skillFilter: 'all',
   profileFilters: new Set(),
   saving: 0,
@@ -1027,6 +1026,7 @@ async function loadCohortData() {
     sessionStorage.setItem(cacheKey, JSON.stringify({ pupils: state.pupils, assessments: state.assessments }));
     renderGrid();
     updateY6TafButton();
+    loadGroupStats(cohortClasses); // fire-and-forget — never blocks the grid
   } catch (err) {
     if (!cached) {
       const el = document.getElementById('grid-empty');
@@ -1035,6 +1035,47 @@ async function loadCohortData() {
     }
     // If cache was shown, stale data beats blank screen — silently ignore
   }
+}
+
+// PP/EAL/SEN group averages — fetched per class from the backend
+// (getGroupStats never returns a per-pupil flag, only {s,n} sums), then
+// summed client-side across whichever classes are currently in view. This
+// is the whole-cohort/whole-class equivalent of what used to be shown as
+// per-pupil PP/EAL/SEN filter buttons.
+async function loadGroupStats(cohortClasses) {
+  try {
+    const results = await Promise.all(
+      cohortClasses.map(c => apiGet('getGroupStats', { class_id: c.class_id, academic_year: state.currentYear })
+        .then(r => ({ classId: c.class_id, stats: r }))
+        .catch(() => null))
+    );
+    results.forEach(r => { if (r) state.groupStatsByClass[r.classId] = r.stats; });
+    renderGroupStats();
+  } catch (_) { /* group stats are a nice-to-have — never block the grid on this */ }
+}
+
+function renderGroupStats() {
+  const bar = document.getElementById('group-stats-bar');
+  if (!bar) return;
+  const classIds = state.classFilter
+    ? [state.classFilter]
+    : (state.yearGroupClasses.length ? state.yearGroupClasses : state.classes.filter(c => c.year_group === state.currentYearGroup)).map(c => c.class_id);
+  const mkGroup = () => ({ s: 0, n: 0 });
+  const totals = { pp: mkGroup(), nonPp: mkGroup(), eal: mkGroup(), nonEal: mkGroup(), sen: mkGroup(), nonSen: mkGroup() };
+  let haveAny = false;
+  classIds.forEach(cid => {
+    const cs = state.groupStatsByClass[cid];
+    if (!cs) return;
+    haveAny = true;
+    Object.keys(totals).forEach(k => { totals[k].s += (cs[k]?.s || 0); totals[k].n += (cs[k]?.n || 0); });
+  });
+  if (!haveAny) { bar.textContent = ''; return; }
+  const fmt = (label, g) => g.n ? `${label} ${(g.s / g.n).toFixed(1)}/4 avg (${g.n})` : `${label} — (0)`;
+  bar.textContent = [
+    fmt('PP', totals.pp) + ' · ' + fmt('non-PP', totals.nonPp),
+    fmt('EAL', totals.eal) + ' · ' + fmt('non-EAL', totals.nonEal),
+    fmt('SEN', totals.sen) + ' · ' + fmt('non-SEN', totals.nonSen),
+  ].join('   |   ');
 }
 
 function renderClassFilterBar() {
@@ -1067,6 +1108,7 @@ async function setClassFilter(classId) {
   setClassFilterState(classId);
   renderClassFilterBar();
   renderGrid();
+  renderGroupStats();
   updateY6TafButton();
   document.getElementById('pupils-class-label').textContent =
     state.currentClass?.class_name ? `(${state.currentClass.class_name})` : '';
@@ -1098,9 +1140,6 @@ function applyProfileFilters(pupils) {
   if (state.profileFilters.size === 0) return pupils;
   return pupils.filter(p => {
     for (const f of state.profileFilters) {
-      if (f === 'pp'     && !truthy(pupilField(p, 'pp')))  return false;
-      if (f === 'eal'    && !truthy(pupilField(p, 'eal'))) return false;
-      if (f === 'sen'    && !truthy(pupilField(p, 'sen'))) return false;
       const sex = String(pupilField(p, 'sex', 'gender') || '').toLowerCase();
       if (f === 'male'   && sex !== 'm' && sex !== 'male' && sex !== 'boy')   return false;
       if (f === 'female' && sex !== 'f' && sex !== 'female' && sex !== 'girl') return false;
