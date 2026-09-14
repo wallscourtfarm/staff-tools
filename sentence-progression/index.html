@@ -671,6 +671,16 @@
   .present-token.visible{ opacity:1; transform:translateY(0) scale(1); }
   .present-token .present-chip, .present-token .present-lit{
     opacity:1; transform:none; transition:none; /* the wrapper now owns the reveal animation */
+    /* .present-row stretches every token in it to the row's tallest token (e.g. a relative
+       clause long enough to wrap onto two lines) — but that extra height used to land as
+       dead space below the chip, inside the token, instead of on the chip itself. So a short
+       one-line chip ("Mr Fox") stayed its own natural (shorter) height while a two-line
+       neighbour ("whose eyes shone like the moon") stretched the token around it, and the
+       two boxes' bottoms visibly didn't line up. flex-grow lets the chip itself claim that
+       leftover space — its own content-centering (already set above) keeps the text centred
+       inside the now-taller box, so every chip in a row ends up the same visible height.
+    */
+    flex:1 1 auto;
   }
   .present-token .grammar-term{ margin-top:1vh; }
   .present-token .grammar-term .tick{ width:2px; height:1.4vh; }
@@ -760,7 +770,7 @@
 </main>
 
 <footer>
-  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v14.09.26b
+  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v14.09.26c
 </footer>
 
 <div class="present-overlay" id="presentOverlay">
