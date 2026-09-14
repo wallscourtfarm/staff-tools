@@ -139,11 +139,7 @@ def _wrap_line(c, text, font, size, max_w):
     return lines
 
 
-def _pdf_footer_answers(c, margin, usable_w, y_top, aim, questions, subject, display_mode, max_lines=3):
-    c.setFont("Helvetica", 7)
-    c.setFillColorRGB(*_GREY)
-    c.drawString(margin, y_top, f"Aim: {aim['correctPerMin']}/min  •  Max {aim['maxErrors']} errors  •  {aim['timedSec']}s")
-
+def _pdf_footer_answers(c, margin, usable_w, y_top, questions, subject, display_mode, max_lines=3):
     if subject == "maths":
         label = "Answers: "
         body = ", ".join(
@@ -160,8 +156,9 @@ def _pdf_footer_answers(c, margin, usable_w, y_top, aim, questions, subject, dis
 
     lines = _wrap_line(c, label + body, "Helvetica", 6.5, usable_w)
     c.setFont("Helvetica", 6.5)
+    c.setFillColorRGB(*_GREY)
     for i, line in enumerate(lines[:max_lines]):
-        c.drawString(margin, y_top - 9 - i * 8, line)
+        c.drawString(margin, y_top - i * 8, line)
 
 
 def _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, maths_cols=5, recog_cols=8, dict_cols=5):
@@ -213,13 +210,17 @@ def _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, maths_
         gap = 3
         col_w = (usable_w - gap * (cols - 1)) / cols
         row_h = (grid_top - grid_bottom) / rows
-        font_by_width = _fit_font_for_width(c, texts, _WORD_FONT, col_w * 0.86, min_size=7, max_size=20)
-        font_size = max(7, min(20, row_h * 0.42, font_by_width))
+        # Each word gets its own size, capped by row height — NOT a single
+        # size fit to the sheet's longest word, which made short words
+        # ("do", "to") needlessly tiny just because one long outlier
+        # ("different") shared the sheet. _draw_recognition_item shrinks
+        # only the individual item that actually needs it.
+        base_font_size = max(7, min(20, row_h * 0.42))
         for i, q in enumerate(questions):
             row, col = divmod(i, cols)
             x = margin + col * (col_w + gap)
             y_top = grid_top - row * row_h
-            _draw_recognition_item(c, x, y_top, col_w, row_h - 1, q["question"], font_size)
+            _draw_recognition_item(c, x, y_top, col_w, row_h - 1, q["question"], base_font_size)
 
     else:  # dictation
         cols = dict_cols
@@ -270,7 +271,7 @@ def render_compact_sheet_slot(c, margin, usable_w, slot_top, slot_bottom, pupil,
     _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, maths_cols=4)
 
     if include_answers:
-        _pdf_footer_answers(c, margin, usable_w, grid_bottom - 10, sheet["aim"], sheet["questions"], sheet["subject"], sheet.get("display_mode"), max_lines=2)
+        _pdf_footer_answers(c, margin, usable_w, grid_bottom - 10, sheet["questions"], sheet["subject"], sheet.get("display_mode"), max_lines=2)
 
 
 def render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, slot_entries, include_answers=True):
