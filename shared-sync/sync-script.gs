@@ -57,7 +57,6 @@ function doPost(e) {
   try {
     if (!tokenOK(e)) return json({ error: 'unauthorised' });
     const p = e.parameter || {};
-    if (p.action === 'seedPupils') return seedPupils(e);
     if (p.action === 'importPupils') return importPupils(e);
     if (p.action === 'markLeavers') return markLeavers(e);
     if (p.action === 'updateClasses') return updateClasses(e);
@@ -674,32 +673,12 @@ function readHubPupils() {
   return out;
 }
 
-function seedPupils(e) {
-  try {
-    const body = JSON.parse(e.postData.contents);
-    const pupils = body.pupils || [];
-    const ss = SpreadsheetApp.openById(HUB_SHEET_ID);
-    let sh = ss.getSheetByName(PUPILS_TAB);
-    if (!sh) sh = ss.insertSheet(PUPILS_TAB);
-    const rows = [
-      ['id', 'first', 'last', 'class', 'yeargroup', 'sex', 'eal', 'pp', 'sen']
-    ];
-    pupils.forEach(function (p) {
-      rows.push([
-        p.id || '', p.first || '', p.last || '',
-        p.class || '', p.yearGroup || p.yeargroup || '',
-        p.sex || '', p.eal ? 'Y' : 'N', p.pp ? 'Y' : 'N',
-        p.sen || ''
-      ]);
-    });
-    sh.clearContents();
-    sh.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
-    sh.getRange(1, 1, 1, rows[0].length).setFontWeight('bold');
-    return json({ status: 'ok', count: pupils.length });
-  } catch (err) {
-    return json({ status: 'error', message: err.message });
-  }
-}
+// seedPupils() removed 14.09.26 — could silently overwrite the legacy
+// hub Pupils tab (already pseudonymised, kept only as a fallback per the
+// comment above) with real names/PP/EAL/SEN if ever called again. The
+// canonical source has been the WFA Pupil Tracker master sheet for a
+// while; nothing legitimate calls this action any more (confirmed:
+// scripts/seed_pupils.py, its only caller, removed in the same commit).
 
 // One staff PIN for all tools. Set the STAFF_PIN Script Property to change it
 // everywhere at once. No hardcoded fallback — an unset property fails closed.
