@@ -95,6 +95,7 @@ DEFAULT_LADDERS = [
                 "name": "2x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
                 "items": [f"2×{i}" for i in range(1, 13)],
+                "windowSize": 5,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
@@ -102,6 +103,7 @@ DEFAULT_LADDERS = [
                 "name": "5x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
                 "items": [f"5×{i}" for i in range(1, 13)],
+                "windowSize": 5,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
@@ -109,6 +111,7 @@ DEFAULT_LADDERS = [
                 "name": "10x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
                 "items": [f"10×{i}" for i in range(1, 13)],
+                "windowSize": 5,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
@@ -116,6 +119,7 @@ DEFAULT_LADDERS = [
                 "name": "3x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
                 "items": [f"3×{i}" for i in range(1, 13)],
+                "windowSize": 5,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
@@ -123,6 +127,7 @@ DEFAULT_LADDERS = [
                 "name": "4x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
                 "items": [f"4×{i}" for i in range(1, 13)],
+                "windowSize": 5,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
@@ -130,6 +135,7 @@ DEFAULT_LADDERS = [
                 "name": "8x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
                 "items": [f"8×{i}" for i in range(1, 13)],
+                "windowSize": 5,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
@@ -137,6 +143,7 @@ DEFAULT_LADDERS = [
                 "name": "6x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
                 "items": [f"6×{i}" for i in range(1, 13)],
+                "windowSize": 5,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
@@ -144,6 +151,7 @@ DEFAULT_LADDERS = [
                 "name": "7x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
                 "items": [f"7×{i}" for i in range(1, 13)],
+                "windowSize": 5,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
@@ -151,6 +159,7 @@ DEFAULT_LADDERS = [
                 "name": "9x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
                 "items": [f"9×{i}" for i in range(1, 13)],
+                "windowSize": 5,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
@@ -158,6 +167,7 @@ DEFAULT_LADDERS = [
                 "name": "11x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
                 "items": [f"11×{i}" for i in range(1, 13)],
+                "windowSize": 5,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
@@ -165,6 +175,7 @@ DEFAULT_LADDERS = [
                 "name": "12x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
                 "items": [f"12×{i}" for i in range(1, 13)],
+                "windowSize": 5,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
         ],
@@ -615,12 +626,12 @@ def check_aim_met(step, probes_data):
 
 # ── Pupil Helpers ───────────────────────────────────────────────────────────
 
-def add_pupil(pupils_data, upn, first_name, last_name, class_name=""):
+def add_pupil(pupils_data, upn, first_name, last_name, class_name="", year_group=""):
     """Create a locally-tracked pupil record. upn links it back to the
-    Bromcom-sourced roster — first/last/class are a snapshot taken at add
-    time; call sync_pupils_from_roster to refresh them later. The p### id
-    stays the internal key (probe history is filed under it) — upn is the
-    identity link, not a replacement for it."""
+    Bromcom-sourced roster — first/last/class/yearGroup are a snapshot taken
+    at add time; call sync_pupils_from_roster to refresh them later. The
+    p### id stays the internal key (probe history is filed under it) — upn
+    is the identity link, not a replacement for it."""
     pupil_id = f"p{len(pupils_data['pupils']) + 1:03d}"
     while any(p["id"] == pupil_id for p in pupils_data["pupils"]):
         num = int(pupil_id[1:]) + 1
@@ -631,6 +642,7 @@ def add_pupil(pupils_data, upn, first_name, last_name, class_name=""):
         "firstName": first_name,
         "lastName": last_name,
         "class": class_name,
+        "yearGroup": year_group,
         "token": _generate_token(),
         "currentSkills": {},
         "notes": "",
@@ -677,13 +689,16 @@ def sync_pupils_from_roster(pupils_data):
         new_first = hub_p.get("first", pupil["firstName"])
         new_last  = hub_p.get("last", pupil["lastName"])
         new_class = hub_p.get("class", pupil.get("class", ""))
+        new_year_group = hub_p.get("yearGroup", pupil.get("yearGroup", ""))
         changed = (new_first != pupil["firstName"] or new_last != pupil["lastName"]
-                   or new_class != pupil.get("class", ""))
+                   or new_class != pupil.get("class", "") or new_year_group != pupil.get("yearGroup", ""))
         if attaching:
             pupil["upn"] = hub_p.get("upn")
             attached += 1
         if changed:
-            pupil["firstName"], pupil["lastName"], pupil["class"] = new_first, new_last, new_class
+            pupil["firstName"], pupil["lastName"], pupil["class"], pupil["yearGroup"] = (
+                new_first, new_last, new_class, new_year_group,
+            )
             updated += 1
 
     return {"updated": updated, "upnAttached": attached, "unmatched": unmatched}
@@ -984,6 +999,16 @@ def get_progress_summary(probes_data, step):
     else:
         improvement_pct = 0
 
+    # Progress vs. baseline, as Innes defines it: learning as many new items
+    # as you started out knowing = 100% progress. Falls back to new items
+    # as a % of the whole set when baseline knew nothing (avoids /0).
+    baseline_known_count = len(baseline_known_items)
+    progress_pct_is_fallback = baseline_known_count == 0
+    if not progress_pct_is_fallback:
+        progress_pct = round(new_facts / baseline_known_count * 100, 1)
+    else:
+        progress_pct = round(new_facts / total_items * 100, 1) if total_items > 0 else 0
+
     return {
         "baselineDate": baseline_date,
         "baselineCorrect": baseline_correct,
@@ -997,9 +1022,93 @@ def get_progress_summary(probes_data, step):
         "totalFactsKnown": current_known,
         "totalFacts": total_items,
         "improvementPct": improvement_pct,
+        "progressPct": progress_pct,
+        "progressPctIsFallback": progress_pct_is_fallback,
         "probesCount": len(probes),
         "timedProbesCount": len(timed_probes),
     }
+
+
+# ── Rolling Window Helpers ──────────────────────────────────────────────────
+#
+# A step opts into rolling-window practice by setting "windowSize" (e.g. 5).
+# Instead of drilling every item in the step at once, the pupil only ever
+# sees a sliding window of that many items from step["items"] (which must be
+# in a meaningful order — e.g. 2×1..2×12). As items in the window become
+# known, they're dropped and replaced with the next items in the sequence,
+# via suggest_next_window — reviewed and confirmed by the teacher, never
+# applied automatically.
+#
+# Stored on the pupil's currentSkills[skill_id] entry, alongside status/
+# masteredDate/nextReview/reviewStage:
+#   "window": [item, ...]      — the items currently active
+#   "windowFrontier": int      — index into step["items"] of the last item
+#                                 ever introduced into a window for this
+#                                 skill (backfill always moves forward from
+#                                 here, never re-introduces a retired item)
+
+def is_windowed(step):
+    return bool(step.get("windowSize"))
+
+
+def get_active_window(pupil, skill_id, step):
+    """The pupil's current window for a windowed step. Not yet persisted if
+    this is the first time — caller should persist via set_active_window
+    once a probe/assignment actually happens."""
+    entry = pupil.get("currentSkills", {}).get(skill_id)
+    if isinstance(entry, dict) and entry.get("window"):
+        return entry["window"]
+    return step["items"][: step.get("windowSize") or len(step["items"])]
+
+
+def get_window_frontier(pupil, skill_id, step):
+    entry = pupil.get("currentSkills", {}).get(skill_id)
+    if isinstance(entry, dict) and entry.get("windowFrontier") is not None:
+        return entry["windowFrontier"]
+    return (step.get("windowSize") or len(step["items"])) - 1
+
+
+def set_active_window(pupil, skill_id, window, frontier):
+    """Persist a (possibly edited) window as the pupil's active list for
+    this skill. Preserves status/masteredDate/nextReview/reviewStage."""
+    skills = pupil.setdefault("currentSkills", {})
+    entry = skills.get(skill_id)
+    if not isinstance(entry, dict):
+        entry = {"status": "active", "masteredDate": None, "nextReview": None, "reviewStage": None}
+    entry["window"] = window
+    entry["windowFrontier"] = frontier
+    skills[skill_id] = entry
+
+
+def suggest_next_window(pupil, skill_id, step, probes_data):
+    """Suggest the next rolling window based on per-item mastery within the
+    pupil's *current* window: known items are dropped, not-yet-known items
+    are kept, and the window is topped back up to windowSize with the next
+    unseen items in step["items"] order.
+
+    Returns (suggested_window, new_frontier, step_complete) — step_complete
+    is True once every item in the whole step is known and there's nothing
+    left to introduce.
+    """
+    window_size = step.get("windowSize") or len(step["items"])
+    current_window = get_active_window(pupil, skill_id, step)
+    frontier = get_window_frontier(pupil, skill_id, step)
+
+    mastery = get_item_mastery(probes_data, step["items"])
+    keep = [item for item in current_window if not mastery.get(item, {}).get("known")]
+    dropped_count = len(current_window) - len(keep)
+
+    remaining_items = step["items"][frontier + 1:]
+    backfill = remaining_items[:dropped_count]
+    suggested = keep + backfill
+    new_frontier = frontier + len(backfill)
+
+    step_complete = (
+        new_frontier >= len(step["items"]) - 1
+        and all(mastery.get(item, {}).get("known") for item in step["items"])
+    )
+
+    return suggested, new_frontier, step_complete
 
 
 # ── Answer Parsing ──────────────────────────────────────────────────────────
