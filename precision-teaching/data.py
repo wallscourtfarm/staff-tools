@@ -91,6 +91,14 @@ DEFAULT_LADDERS = [
         "description": "Times tables progression from 2x to 12x",
         "steps": [
             {
+                "id": "tt_10",
+                "name": "10x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"10×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
                 "id": "tt_2",
                 "name": "2x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
@@ -103,22 +111,6 @@ DEFAULT_LADDERS = [
                 "name": "5x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
                 "items": [f"5×{i}" for i in range(1, 13)],
-                "windowSize": 5,
-                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
-            },
-            {
-                "id": "tt_10",
-                "name": "10x table",
-                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
-                "items": [f"10×{i}" for i in range(1, 13)],
-                "windowSize": 5,
-                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
-            },
-            {
-                "id": "tt_3",
-                "name": "3x table",
-                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
-                "items": [f"3×{i}" for i in range(1, 13)],
                 "windowSize": 5,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
@@ -139,6 +131,14 @@ DEFAULT_LADDERS = [
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
+                "id": "tt_3",
+                "name": "3x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"3×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
                 "id": "tt_6",
                 "name": "6x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
@@ -147,18 +147,18 @@ DEFAULT_LADDERS = [
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
-                "id": "tt_7",
-                "name": "7x table",
-                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
-                "items": [f"7×{i}" for i in range(1, 13)],
-                "windowSize": 5,
-                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
-            },
-            {
                 "id": "tt_9",
                 "name": "9x table",
                 "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
                 "items": [f"9×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "tt_7",
+                "name": "7x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"7×{i}" for i in range(1, 13)],
                 "windowSize": 5,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
@@ -229,13 +229,18 @@ DEFAULT_LADDERS = [
         "id": "phonics_gpcs",
         "name": "Phonics GPCs",
         "subject": "phonics",
-        "description": "Grapheme-phoneme correspondences by phase",
+        "description": "Grapheme-phoneme correspondences, in Unlocking Letters and Sounds teaching order",
         "steps": [
             {
                 "id": "phase2_gpcs",
                 "name": "Phase 2 GPCs",
                 "aim": {"correctPerMin": 20, "maxErrors": 2, "timedSec": 60},
-                "items": list("satpinmdgockeurhbflfllsss"),
+                "items": [
+                    "s", "a", "t", "p", "i", "n", "m", "d",
+                    "g", "o", "c", "k", "ck", "e", "u", "r",
+                    "h", "b", "f", "ff", "l", "ll", "ss",
+                ],
+                "windowSize": 6,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
@@ -248,17 +253,19 @@ DEFAULT_LADDERS = [
                     "oo", "ar", "or", "ur", "ow", "oi", "ear", "air",
                     "ure", "er",
                 ],
+                "windowSize": 6,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
-                "id": "phase5_gpcs",
-                "name": "Phase 5 GPCs",
+                "id": "phase5a_gpcs",
+                "name": "Phase 5a GPCs",
                 "aim": {"correctPerMin": 15, "maxErrors": 3, "timedSec": 60},
                 "items": [
                     "ay", "ou", "ie", "ea", "oy", "ir", "ue", "aw",
                     "wh", "ph", "ew", "oe", "au", "ey",
                     "a_e", "e_e", "i_e", "o_e", "u_e",
                 ],
+                "windowSize": 6,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
         ],
@@ -267,27 +274,34 @@ DEFAULT_LADDERS = [
         "id": "common_exception_words_y1",
         "name": "Common Exception Words (Y1)",
         "subject": "spellings",
-        "description": "Year 1 common exception words — read/spell fluency",
+        "description": "Common exception words, in Unlocking Letters and Sounds teaching order",
         "steps": [
             {
-                "id": "cew_y1_a",
-                "name": "CEW Y1: the, a, do, to, today, of, said, says, are, was",
+                "id": "cew_reception",
+                "name": "Reception CEW",
                 "aim": {"correctPerMin": 10, "maxErrors": 1, "timedSec": 60},
-                "items": ["the", "a", "do", "to", "today", "of", "said", "says", "are", "was"],
+                "items": [
+                    "the", "to", "into", "no", "I", "go",
+                    "me", "we", "be", "he", "she", "was",
+                    "you", "they", "all", "are", "my", "her",
+                ],
+                "windowSize": 8,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
             {
-                "id": "cew_y1_b",
-                "name": "CEW Y1: is, his, has, I, you, they, were, we, be, he",
+                "id": "cew_y1",
+                "name": "Year 1 CEW",
                 "aim": {"correctPerMin": 10, "maxErrors": 1, "timedSec": 60},
-                "items": ["is", "his", "has", "I", "you", "they", "were", "we", "be", "he"],
-                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
-            },
-            {
-                "id": "cew_y1_c",
-                "name": "CEW Y1: me, she, no, go, so, by, my, all, call, want",
-                "aim": {"correctPerMin": 10, "maxErrors": 1, "timedSec": 60},
-                "items": ["me", "she", "no", "go", "so", "by", "my", "all", "call", "want"],
+                "items": [
+                    "said", "have", "like", "so", "do", "some",
+                    "come", "were", "there", "little", "one", "when",
+                    "out", "what", "oh", "their", "people", "Mr",
+                    "Mrs", "looked", "called", "asked", "water", "where",
+                    "who", "again", "thought", "through", "mouse", "work",
+                    "many", "laughed", "because", "different", "any", "eyes",
+                    "friends", "once", "please",
+                ],
+                "windowSize": 8,
                 "untimedAim": {"accuracyPct": 100, "minTrials": 3},
             },
         ],
@@ -1168,6 +1182,24 @@ def get_answer(item: str, step_id: str = "") -> str:
     return item.lower()
 
 
+def format_bond_item(item):
+    """Number-bonds items ('3+2', meaning 3 and 2 make the bond total) become
+    a missing-addend cloze — e.g. '3 + ? = 5' (answer '2') — instead of
+    asking for the total, which is identical for every item in a 'bonds to
+    N' step and so doesn't actually test which numbers make the bond.
+    Which side gets blanked is randomised per call, so repeats of the same
+    item test recall from both directions."""
+    try:
+        a_s, b_s = item.replace(" ", "").split("+")
+        a, b = int(a_s), int(b_s)
+    except (ValueError, IndexError):
+        return item, get_answer(item)
+    total = a + b
+    if random.random() < 0.5:
+        return f"{a} + ? = {total}", str(b)
+    return f"? + {b} = {total}", str(a)
+
+
 # ── Distributed Review Items ─────────────────────────────────────────────────
 
 def get_review_items(pupil, current_skill_id, ladders_data, max_items=2):
@@ -1225,8 +1257,31 @@ def get_review_items(pupil, current_skill_id, ladders_data, max_items=2):
 
 # ── Sheet Generator ───────────────────────────────────────────────────────────
 
-def generate_sheet(pupil, skill_id, ladders_data, probes_data=None, include_review=True):
+def _sheet_question(item, skill_id, step_name, is_bonds):
+    question, answer = format_bond_item(item) if is_bonds else (item, get_answer(item, skill_id))
+    return {
+        "item": item,
+        "question": question,
+        "answer": answer,
+        "is_review": False,
+        "from_skill": skill_id,
+        "from_skill_name": step_name,
+    }
+
+
+def generate_sheet(pupil, skill_id, ladders_data, probes_data=None, include_review=True,
+                    item_pool=None, target_count=None):
     """Generate a practice sheet for a pupil on a given skill.
+
+    item_pool: the items to draw from — pass the pupil's current rolling
+    window for a windowed step, otherwise defaults to the whole step's
+    items. target_count: how many questions to fill the sheet to — defaults
+    to the pupil's saved itemsPerSheet for this skill (or 25).
+
+    Every subject fills to target_count the same way: repeated shuffled
+    passes over item_pool, then distributed review items dropped in at
+    random positions. (Small pools — e.g. an 8-word CEW window — repeat
+    several times per sheet; that's the point, it's a fluency check.)
 
     Returns a dict with:
       - "pupil_name": str
@@ -1250,93 +1305,51 @@ def generate_sheet(pupil, skill_id, ladders_data, probes_data=None, include_revi
             break
 
     subject = ladder["subject"] if ladder else "maths"
+    is_bonds = ladder is not None and ladder["id"] == "number_bonds"
+    # Common Exception Words are a *reading* recognition task (see the word,
+    # say it) like maths/phonics, not a dictation-spelling task — only the
+    # actual Spelling Rules ladders are "write the word you hear".
+    is_cew = ladder is not None and ladder["id"].startswith("common_exception_words")
+    display_mode = "dictation" if subject == "spellings" and not is_cew else "recognition"
+    pool = item_pool if item_pool is not None else step["items"]
 
-    # Build items with question format and answers
-    skill_items = []
-    for item in step["items"]:
-        answer = get_answer(item, skill_id)
-        if subject == "maths":
-            # For maths, the question IS the item (e.g. "7×3") and the answer is the result
-            skill_items.append({
-                "item": item,
-                "question": item,
-                "answer": answer,
-                "is_review": False,
-                "from_skill": skill_id,
-                "from_skill_name": step["name"],
-            })
-        elif subject == "phonics":
-            # GPCs: show the grapheme, answer is the grapheme itself (for display)
-            skill_items.append({
-                "item": item,
-                "question": item,
-                "answer": answer,
-                "is_review": False,
-                "from_skill": skill_id,
-                "from_skill_name": step["name"],
-            })
-        else:  # spellings
-            # Spelling: question is the word spoken aloud, answer is the spelling
-            skill_items.append({
-                "item": item,
-                "question": item,
-                "answer": item.lower(),
-                "is_review": False,
-                "from_skill": skill_id,
-                "from_skill_name": step["name"],
-            })
+    if target_count is None:
+        entry = pupil.get("currentSkills", {}).get(skill_id)
+        target_count = entry.get("itemsPerSheet", 25) if isinstance(entry, dict) else 25
+
+    skill_items = [_sheet_question(item, skill_id, step["name"], is_bonds) for item in pool]
 
     # Get distributed review items
     review_items = []
     if include_review:
         review_items = get_review_items(pupil, skill_id, ladders_data, max_items=2)
+        if is_bonds:
+            review_items = [{**ri, **dict(zip(("question", "answer"), format_bond_item(ri["item"])))}
+                             for ri in review_items]
 
-    # Build the question list based on subject
-    if subject == "maths":
-        # Maths: repeat items to fill ~25 questions, shuffle
-        all_unique = skill_items + review_items
-        questions = []
-        while len(questions) < 25:
-            shuffled_batch = skill_items[:]
-            random.shuffle(shuffled_batch)
-            questions.extend(shuffled_batch)
-        # Insert review items at random positions
-        for ri in review_items:
-            ri_copy = {**ri, "is_review": True}
-            pos = random.randint(0, min(len(questions), 24))
-            questions.insert(pos, ri_copy)
-        questions = questions[:25]
-        random.shuffle(questions)
+    # Fill to target_count with repeated shuffled passes — re-formatting
+    # bonds items fresh each occurrence so which side is blanked varies.
+    questions = []
+    if pool:
+        while len(questions) < target_count:
+            shuffled_pool = pool[:]
+            random.shuffle(shuffled_pool)
+            questions.extend(_sheet_question(item, skill_id, step["name"], is_bonds) for item in shuffled_pool)
 
-    elif subject == "phonics":
-        # Phonics: show all GPCs, repeat 2-3 times for a 1-min probe, shuffle each batch
-        all_unique = skill_items + review_items
-        questions = []
-        for _ in range(3):
-            batch = skill_items[:]
-            random.shuffle(batch)
-            questions.extend(batch)
-        # Insert review items
-        for ri in review_items:
-            ri_copy = {**ri, "is_review": True}
-            pos = random.randint(0, len(questions))
-            questions.insert(pos, ri_copy)
-        # Trim to ~25
-        questions = questions[:25]
+    for ri in review_items:
+        ri_copy = {**ri, "is_review": True}
+        pos = random.randint(0, min(len(questions), max(target_count - 1, 0))) if questions else 0
+        questions.insert(pos, ri_copy)
 
-    else:  # spellings
-        # Spelling: just the 3-5 words, no repetition, plus review items
-        questions = list(skill_items)
-        for ri in review_items:
-            ri_copy = {**ri, "is_review": True}
-            questions.append(ri_copy)
-        random.shuffle(questions)
+    questions = questions[:target_count]
+    random.shuffle(questions)
 
     return {
         "pupil_name": f"{pupil['firstName']} {pupil['lastName']}",
         "skill_name": step["name"],
         "ladder_name": step["ladder_name"] if "ladder_name" in step else ladder["name"],
         "subject": subject,
+        "display_mode": display_mode,
         "aim": step["aim"],
         "untimedAim": step.get("untimedAim"),
         "items": skill_items,
