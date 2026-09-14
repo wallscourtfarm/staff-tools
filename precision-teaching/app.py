@@ -63,6 +63,8 @@ def _draw_maths_item(c, x, y_top, row_h, number, question, font_size, box_w, box
     c.drawString(x, baseline, f"{number})")
 
     left, right = _split_cloze(question)
+    if "?" not in question:
+        left = left + " ="  # e.g. "10×2" -> "10×2 =" so the box has a "=" before it
     c.setFont("Helvetica-Bold", font_size)
     c.setFillColorRGB(*_WFA_DARK)
     lx = x + num_gutter
@@ -129,7 +131,7 @@ def _pdf_footer_answers(c, margin, usable_w, y_top, aim, questions, subject, dis
     if subject == "maths":
         label = "Answers: "
         body = ", ".join(
-            q["question"].replace("?", q["answer"]) if "?" in q["question"] else f"{q['question']}{q['answer']}"
+            q["question"].replace("?", q["answer"]) if "?" in q["question"] else f"{q['question']} = {q['answer']}"
             for q in questions
         )
     elif subject == "spellings" and display_mode == "dictation":
@@ -146,66 +148,123 @@ def _pdf_footer_answers(c, margin, usable_w, y_top, aim, questions, subject, dis
         c.drawString(margin, y_top - 9 - i * 8, line)
 
 
-def render_single_sheet_pdf(c, page_w, page_h, margin, usable_w, pupil, sheet, include_answers=True):
-    """Draw one full-page 'Clean Cards' sheet. Caller does showPage()."""
-    subtitle = sheet.get("day_label")
-    bits = [f"{pupil['firstName']} {pupil['lastName']}", sheet["skill_name"]] + ([subtitle] if subtitle else [])
-    header_bottom = _pdf_header_band(c, page_w, margin, usable_w, page_h, bits, date.today().strftime("%d/%m/%y"), title_h=13 * _mm)  # 13mm
-    content_top = header_bottom - 8 * _mm  # 8mm
-    content_bottom = margin + (16 * _mm if include_answers else 6 * _mm)
+def _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, maths_cols=5, recog_cols=8, dict_cols=5):
+    """Draw one sheet's items into an arbitrary (grid_top, grid_bottom)
+    region — font/box sizes scale with row height, so this works equally
+    for a thin week-band or a tall half-page slot. Shared by every sheet
+    layout so density stays consistent across single/week/2-per-page."""
     questions = sheet["questions"]
     n = len(questions)
-    if n == 0:
+    if n == 0 or grid_top <= grid_bottom:
         return
 
     if sheet["subject"] == "maths":
-        cols = 2
+        cols = maths_cols
         rows = -(-n // cols)
-        row_h = min((content_top - content_bottom) / rows, 16 * _mm)
-        col_gap = 8 * _mm
-        divider_w = 2.2
-        col_w = (usable_w - col_gap - divider_w) / cols
-        font_size, box_w, box_h = 13, 22, 15
+        gap_x = 4
+        col_w = (usable_w - gap_x * (cols - 1)) / cols
+        row_h = (grid_top - grid_bottom) / rows
+        # Font must be bound by column WIDTH, not just row height — a maths
+        # item ("N)  A + [box] = C") needs real horizontal room, and capping
+        # only by height let columns overlap when rows were tall but narrow.
+        font_by_width = (col_w - 34) / 7.7
+        font_size = max(6.5, min(14, row_h * 0.40, font_by_width))
+        box_h = max(8, min(row_h * 0.62, font_size * 1.15))
+        box_w = box_h * 1.5
         for i, q in enumerate(questions):
-            col, row = divmod(i, rows)
-            x = margin + col * (col_w + col_gap)
-            y_top = content_top - row * row_h
+            row, col = divmod(i, cols)
+            x = margin + col * (col_w + gap_x)
+            y_top = grid_top - row * row_h
             _draw_maths_item(c, x, y_top, row_h, i + 1, q["question"], font_size, box_w, box_h)
-        c.setFillColorRGB(*_DIVIDER)
-        divider_x = margin + col_w + col_gap / 2 - divider_w / 2
-        c.rect(divider_x, content_top - rows * row_h, divider_w, rows * row_h, fill=1, stroke=0)
-        grid_bottom = content_top - rows * row_h
 
     elif sheet["subject"] == "phonics" or sheet.get("display_mode") == "recognition":
-        cols = 8 if sheet["subject"] == "phonics" else 6
+        cols = recog_cols
         rows = -(-n // cols)
-        gap = 4
+        gap = 3
         col_w = (usable_w - gap * (cols - 1)) / cols
-        row_h = min((content_top - content_bottom - gap * (rows - 1)) / rows, col_w)
-        font_size = 18 if col_w > 55 else 14
+        row_h = (grid_top - grid_bottom) / rows
+        font_size = max(7, min(20, row_h * 0.42))
         for i, q in enumerate(questions):
             row, col = divmod(i, cols)
             x = margin + col * (col_w + gap)
-            y_top = content_top - row * (row_h + gap)
-            _draw_recognition_item(c, x, y_top, col_w, row_h, q["question"], font_size)
-        grid_bottom = content_top - rows * (row_h + gap) + gap
+            y_top = grid_top - row * row_h
+            _draw_recognition_item(c, x, y_top, col_w, row_h - 1, q["question"], font_size)
 
-    else:  # spelling dictation
-        cols = 2 if n > 15 else 1
+    else:  # dictation
+        cols = dict_cols
         rows = -(-n // cols)
-        col_gap = 10 * _mm
-        col_w = (usable_w - col_gap * (cols - 1)) / cols
-        row_h = min((content_top - content_bottom) / rows, 12 * _mm)
-        font_size = 12
+        gap_x = 6
+        col_w = (usable_w - gap_x * (cols - 1)) / cols
+        row_h = (grid_top - grid_bottom) / rows
+        font_size = max(6.5, min(12, row_h * 0.35))
         for i, q in enumerate(questions):
-            col, row = divmod(i, rows)
-            x = margin + col * (col_w + col_gap)
-            y_top = content_top - row * row_h
+            row, col = divmod(i, cols)
+            x = margin + col * (col_w + gap_x)
+            y_top = grid_top - row * row_h
             _draw_dictation_item(c, x, y_top, col_w, row_h, i + 1, font_size)
-        grid_bottom = content_top - rows * row_h
+
+
+def _compact_header(c, margin, usable_w, y_top, title_bits, right_text, h):
+    """Slim single-line header (name/skill + Time:/Score: fields to fill
+    in by hand) instead of a big banner — the point is paper density, not
+    branding. A thin blue rule is the only WFA touch."""
+    c.setFont("Helvetica-Bold", min(11, h * 0.5))
+    c.setFillColorRGB(*_WFA_DARK)
+    baseline = y_top - h * 0.62
+    c.drawString(margin, baseline, "  |  ".join(title_bits))
+    if right_text:
+        c.setFont("Helvetica", min(9, h * 0.42))
+        c.setFillColorRGB(*_GREY)
+        rw = c.stringWidth(right_text, "Helvetica", min(9, h * 0.42))
+        c.drawString(margin + usable_w - rw, baseline, right_text)
+    c.setStrokeColorRGB(*_WFA_BLUE)
+    c.setLineWidth(1.3)
+    c.line(margin, y_top - h, margin + usable_w, y_top - h)
+    return y_top - h
+
+
+def render_compact_sheet_slot(c, margin, usable_w, slot_top, slot_bottom, pupil, sheet, include_answers):
+    """One sheet drawn into a given vertical slot (a whole page, or half a
+    page when two are stacked) — the density Innes's old Excel sheets had."""
+    bits = [f"{pupil['firstName']} {pupil['lastName']}", sheet["skill_name"]]
+    if sheet.get("day_label"):
+        bits.append(sheet["day_label"])
+    header_h = min(9 * _mm, (slot_top - slot_bottom) * 0.12)
+    right_text = f"Time: _______   Score: _______   {date.today().strftime('%d/%m/%y')}"
+    header_bottom = _compact_header(c, margin, usable_w, slot_top, bits, right_text, header_h)
+
+    footer_h = (14 * _mm if include_answers else 2 * _mm)
+    grid_top = header_bottom - 2
+    grid_bottom = slot_bottom + footer_h
+    _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, maths_cols=4)
 
     if include_answers:
-        _pdf_footer_answers(c, margin, usable_w, grid_bottom - 10, sheet["aim"], questions, sheet["subject"], sheet.get("display_mode"))
+        _pdf_footer_answers(c, margin, usable_w, grid_bottom - 10, sheet["aim"], sheet["questions"], sheet["subject"], sheet.get("display_mode"), max_lines=2)
+
+
+def render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, slot_entries, include_answers=True):
+    """slot_entries: 1 or 2 (pupil, sheet) pairs — stacked top/bottom on
+    one page with a dashed cut line between, same as printing 2-up used to
+    work in the old Excel sheets. Caller does showPage()."""
+    usable_h = page_h - 2 * margin
+    cut_gap = 6 * _mm
+    half_h = (usable_h - cut_gap) / 2
+    top_top = page_h - margin
+    top_bottom = top_top - half_h
+    bottom_top = top_bottom - cut_gap
+    bottom_bottom = bottom_top - half_h
+
+    render_compact_sheet_slot(c, margin, usable_w, top_top, top_bottom, *slot_entries[0], include_answers)
+
+    cut_y = (top_bottom + bottom_top) / 2
+    c.setDash([4, 3], 0)
+    c.setStrokeColorRGB(0.55, 0.55, 0.55)
+    c.setLineWidth(0.8)
+    c.line(margin, cut_y, margin + usable_w, cut_y)
+    c.setDash()
+
+    if len(slot_entries) > 1:
+        render_compact_sheet_slot(c, margin, usable_w, bottom_top, bottom_bottom, *slot_entries[1], include_answers)
 
 
 def render_week_page_pdf(c, page_w, page_h, margin, usable_w, pupil, day_sheets, include_answers=True):
@@ -232,46 +291,7 @@ def render_week_page_pdf(c, page_w, page_h, margin, usable_w, pupil, day_sheets,
 
         grid_top = band_top - 15
         grid_bottom = band_top - band_h + 2
-        questions = sheet["questions"]
-        n = len(questions)
-        if n == 0:
-            continue
-
-        if sheet["subject"] == "maths":
-            cols = 5
-            rows = -(-n // cols)
-            gap_x = 4
-            col_w = (usable_w - gap_x * (cols - 1)) / cols
-            row_h = (grid_top - grid_bottom) / rows
-            for i, q in enumerate(questions):
-                row, col = divmod(i, cols)
-                x = margin + col * (col_w + gap_x)
-                y_top = grid_top - row * row_h
-                _draw_maths_item(c, x, y_top, row_h, i + 1, q["question"], 7.5, 11, 9)
-
-        elif sheet["subject"] == "phonics" or sheet.get("display_mode") == "recognition":
-            cols = 10
-            rows = -(-n // cols)
-            gap = 2
-            col_w = (usable_w - gap * (cols - 1)) / cols
-            row_h = (grid_top - grid_bottom) / rows
-            for i, q in enumerate(questions):
-                row, col = divmod(i, cols)
-                x = margin + col * (col_w + gap)
-                y_top = grid_top - row * row_h
-                _draw_recognition_item(c, x, y_top, col_w, row_h - 1, q["question"], 9)
-
-        else:  # dictation
-            cols = 5
-            rows = -(-n // cols)
-            gap_x = 6
-            col_w = (usable_w - gap_x * (cols - 1)) / cols
-            row_h = (grid_top - grid_bottom) / rows
-            for i, q in enumerate(questions):
-                row, col = divmod(i, cols)
-                x = margin + col * (col_w + gap_x)
-                y_top = grid_top - row * row_h
-                _draw_dictation_item(c, x, y_top, col_w, row_h, i + 1, 7.5)
+        _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, recog_cols=10)
 
     if include_answers:
         c.setFont("Helvetica", 6.5)
@@ -1660,7 +1680,7 @@ with tab6:
 
                 st.caption(
                     "Item count per sheet comes from what was set for each pupil/skill in Set Starting Points. "
-                    + ("One page per pupil/skill, all 5 days on it." if week_mode else "One page per pupil/skill.")
+                    + ("One page per pupil/skill, all 5 days on it." if week_mode else "2 sheets per page, top/bottom with a cut line.")
                 )
                 st.markdown(f"**{len(sheets_to_generate)} skill{'s' if len(sheets_to_generate) != 1 else ''}{' × 5 days' if week_mode else ''}:**")
                 for p, skill_id, step in sheets_to_generate:
@@ -1679,6 +1699,7 @@ with tab6:
                     usable_w = page_w - 2 * margin
 
                     c = pdfcanvas.Canvas(buf, pagesize=A4)
+                    single_sheets = []  # (pupil, sheet) pairs — paired up 2-per-page below
                     for p, skill_id, step in sheets_to_generate:
                         # Windowed skills only ever practise their current
                         # window, not the whole step — same set all week.
@@ -1694,11 +1715,18 @@ with tab6:
                                     day_sheets.append(sheet)
                             if day_sheets:
                                 render_week_page_pdf(c, page_w, page_h, margin, usable_w, p, day_sheets, include_answers)
+                                c.showPage()
                         else:
                             sheet = generate_sheet(p, skill_id, ladders_data, item_pool=grid_item_pool)
                             if sheet:
-                                render_single_sheet_pdf(c, page_w, page_h, margin, usable_w, p, sheet, include_answers)
+                                single_sheets.append((p, sheet))
+
+                    # Single-sheet mode: 2 per page (top/bottom, cut line
+                    # between), same density as the old Excel sheets.
+                    for i in range(0, len(single_sheets), 2):
+                        render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, single_sheets[i:i + 2], include_answers)
                         c.showPage()
+
                     c.save()
                     buf.seek(0)
 
