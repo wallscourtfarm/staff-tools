@@ -4,6 +4,7 @@ import json
 from datetime import date
 import streamlit as st
 import time
+from reportlab.lib.units import mm as _mm
 from data import (
     ensure_data_files, load_pupils, save_pupils, load_ladders, save_ladders,
     load_probes, add_probe, load_all_probes_for_pupil, get_all_steps, get_step,
@@ -16,124 +17,266 @@ from data import (
     is_windowed, get_active_window, get_window_frontier, set_active_window, suggest_next_window,
 )
 
-# ── PDF Helper ────────────────────────────────────────────────────────────────
+# ── PDF Renderer — "Clean Cards" ──────────────────────────────────────────
+#
+# Canvas-based (not platypus) — needed for precise inline "N)  A + [box] = C"
+# layout and for the fixed 5-day-bands-on-one-page week view. WFA brand blue
+# header band; boxes/borders carry structure so it survives B&W printing.
 
-def _build_grid_elements(p, sheet, styles, title_style, info_style, answer_style, include_answers, usable_w):
-    """Build PDF elements for a single grid."""
-    from reportlab.lib.units import mm
-    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+_WFA_BLUE = (0x17 / 255, 0x98 / 255, 0xd3 / 255)
+_WFA_DARK = (0x0a / 255, 0x01 / 255, 0x01 / 255)
+_GREY = (0.55, 0.55, 0.55)
+_DIVIDER = (0.6, 0.6, 0.6)
+
+
+def _pdf_header_band(c, page_w, margin, usable_w, page_h, title_bits, date_str, title_h, font_size=14):
     from reportlab.lib import colors
+    top = page_h - margin
+    c.setFillColorRGB(*_WFA_BLUE)
+    c.roundRect(margin, top - title_h, usable_w, title_h, 5, fill=1, stroke=0)
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", font_size)
+    ascender = font_size * 0.72
+    baseline = top - title_h + (title_h - ascender) / 2 + ascender * 0.15
+    c.drawString(margin + 10, baseline, "   |   ".join(title_bits))
+    c.setFont("Helvetica", 10)
+    dw = c.stringWidth(date_str, "Helvetica", 10)
+    c.drawString(margin + usable_w - dw - 10, baseline, date_str)
+    return top - title_h
 
-    elements = []
 
-    # Title line: Name | Skill | Date — the aim/errors/timing numbers are
-    # teacher information, not shown on the child's working sheet; they
-    # only appear below alongside the answer key.
-    day_label = f" &nbsp;&nbsp;|&nbsp;&nbsp; {sheet['day_label']}" if sheet.get("day_label") else ""
-    title = f"{p['firstName']} {p['lastName']} &nbsp;&nbsp;|&nbsp;&nbsp; {sheet['skill_name']}{day_label} &nbsp;&nbsp;|&nbsp;&nbsp; {date.today().strftime('%d/%m/%y')}"
-    elements.append(Paragraph(title, title_style))
-    elements.append(Spacer(1, 2*mm))
+def _split_cloze(question):
+    """'3 + ? = 5' -> ('3 + ', ' = 5'); '7×3 =' -> ('7×3 =', '') — the '?'
+    (if any) is where the answer box goes; box goes at the end otherwise."""
+    if "?" in question:
+        left, _, right = question.partition("?")
+        return left, right
+    return question, ""
 
+
+def _draw_maths_item(c, x, y_top, row_h, number, question, font_size, box_w, box_h):
+    ascender = font_size * 0.72
+    baseline = y_top - row_h / 2 - ascender * 0.10
+    num_gutter = max(26, font_size * 2)
+    c.setFont("Helvetica", font_size)
+    c.setFillColorRGB(*_GREY)
+    c.drawString(x, baseline, f"{number})")
+
+    left, right = _split_cloze(question)
+    c.setFont("Helvetica-Bold", font_size)
+    c.setFillColorRGB(*_WFA_DARK)
+    lx = x + num_gutter
+    c.drawString(lx, baseline, left)
+    box_x = lx + c.stringWidth(left, "Helvetica-Bold", font_size) + 4
+
+    box_y = y_top - row_h / 2 - box_h / 2
+    c.setFillColorRGB(1, 1, 1)
+    c.setStrokeColorRGB(*_WFA_DARK)
+    c.setLineWidth(1)
+    c.rect(box_x, box_y, box_w, box_h, fill=1, stroke=1)
+
+    if right:
+        c.setFont("Helvetica-Bold", font_size)
+        c.setFillColorRGB(*_WFA_DARK)
+        c.drawString(box_x + box_w + 4, baseline, right)
+
+
+def _draw_recognition_item(c, x, y_top, w, h, text, font_size):
+    c.setFillColorRGB(1, 1, 1)
+    c.setStrokeColorRGB(0.82, 0.82, 0.82)
+    c.setLineWidth(0.6)
+    c.rect(x, y_top - h, w, h, fill=1, stroke=1)
+    c.setFont("Helvetica-Bold", font_size)
+    c.setFillColorRGB(*_WFA_DARK)
+    tw = c.stringWidth(text, "Helvetica-Bold", font_size)
+    ascender = font_size * 0.72
+    baseline = y_top - h / 2 - ascender * 0.10
+    c.drawCentredString(x + w / 2, baseline, text)
+
+
+def _draw_dictation_item(c, x, y_top, w, row_h, number, font_size):
+    ascender = font_size * 0.72
+    baseline = y_top - row_h / 2 - ascender * 0.10
+    c.setFont("Helvetica", font_size)
+    c.setFillColorRGB(*_GREY)
+    c.drawString(x, baseline, f"{number}.")
+    line_y = y_top - row_h / 2 - 3
+    c.setStrokeColorRGB(0.65, 0.65, 0.65)
+    c.setLineWidth(0.8)
+    c.line(x + 22, line_y, x + w - 4, line_y)
+
+
+def _wrap_line(c, text, font, size, max_w):
+    words = text.split(" ")
+    lines, cur = [], ""
+    for w in words:
+        trial = f"{cur} {w}".strip()
+        if c.stringWidth(trial, font, size) > max_w and cur:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = trial
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+def _pdf_footer_answers(c, margin, usable_w, y_top, aim, questions, subject, display_mode, max_lines=3):
+    c.setFont("Helvetica", 7)
+    c.setFillColorRGB(*_GREY)
+    c.drawString(margin, y_top, f"Aim: {aim['correctPerMin']}/min  •  Max {aim['maxErrors']} errors  •  {aim['timedSec']}s")
+
+    if subject == "maths":
+        label = "Answers: "
+        body = ", ".join(
+            q["question"].replace("?", q["answer"]) if "?" in q["question"] else f"{q['question']}{q['answer']}"
+            for q in questions
+        )
+    elif subject == "spellings" and display_mode == "dictation":
+        label = "Words to read aloud: "
+        body = ", ".join(q["question"] for q in questions)
+    else:
+        # Recognition items (phonics, CEW) ARE their own answer — list once.
+        label = "Items: "
+        body = ", ".join(q["question"] for q in questions)
+
+    lines = _wrap_line(c, label + body, "Helvetica", 6.5, usable_w)
+    c.setFont("Helvetica", 6.5)
+    for i, line in enumerate(lines[:max_lines]):
+        c.drawString(margin, y_top - 9 - i * 8, line)
+
+
+def render_single_sheet_pdf(c, page_w, page_h, margin, usable_w, pupil, sheet, include_answers=True):
+    """Draw one full-page 'Clean Cards' sheet. Caller does showPage()."""
+    subtitle = sheet.get("day_label")
+    bits = [f"{pupil['firstName']} {pupil['lastName']}", sheet["skill_name"]] + ([subtitle] if subtitle else [])
+    header_bottom = _pdf_header_band(c, page_w, margin, usable_w, page_h, bits, date.today().strftime("%d/%m/%y"), title_h=13 * _mm)  # 13mm
+    content_top = header_bottom - 8 * _mm  # 8mm
+    content_bottom = margin + (16 * _mm if include_answers else 6 * _mm)
     questions = sheet["questions"]
+    n = len(questions)
+    if n == 0:
+        return
 
     if sheet["subject"] == "maths":
-        table_data = []
+        cols = 2
+        rows = -(-n // cols)
+        row_h = min((content_top - content_bottom) / rows, 16 * _mm)
+        col_gap = 8 * _mm
+        divider_w = 2.2
+        col_w = (usable_w - col_gap - divider_w) / cols
+        font_size, box_w, box_h = 13, 22, 15
         for i, q in enumerate(questions):
-            num = i + 1
-            review_mark = " *" if q.get("is_review") else ""
-            table_data.append([f"{num}.", f"{q['question']} ={review_mark}", ""])
-
-        half = (len(table_data) + 1) // 2
-        left_rows = table_data[:half]
-        right_rows = table_data[half:]
-
-        combined = []
-        for row_i in range(half):
-            left = left_rows[row_i] if row_i < len(left_rows) else ["", "", ""]
-            right = right_rows[row_i] if row_i < len(right_rows) else ["", "", ""]
-            combined.append(left + right)
-
-        # Question column is right-aligned and the answer-blank column is
-        # narrow, so the blank sits right next to the question instead of
-        # across a wide gutter.
-        col_w = usable_w / 2 - 2*mm
-        t = Table(combined, colWidths=[8*mm, col_w - 22*mm, 14*mm, 8*mm, col_w - 22*mm, 14*mm])
-        t.setStyle(TableStyle([
-            ('FONT', (0, 0), (-1, -1), 'Helvetica', 9),
-            ('FONT', (0, 0), (0, -1), 'Helvetica-Bold', 9),
-            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-            ('ALIGN', (4, 0), (4, -1), 'RIGHT'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('RIGHTPADDING', (1, 0), (1, -1), 4),
-            ('RIGHTPADDING', (4, 0), (4, -1), 4),
-            ('LINEBELOW', (2, 0), (2, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
-            ('LINEBELOW', (5, 0), (5, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
-            ('TOPPADDING', (0, 0), (-1, -1), 1),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-            ('ROWBACKGROUNDS', (0, 0), (2, -1), [colors.white, colors.Color(0.97, 0.97, 0.97)]),
-            ('ROWBACKGROUNDS', (3, 0), (5, -1), [colors.white, colors.Color(0.97, 0.97, 0.97)]),
-        ]))
-        elements.append(t)
-
-        if include_answers:
-            aim = sheet["aim"]
-            info = f"Aim: {aim['correctPerMin']}/min &nbsp;&bull;&nbsp; Max {aim['maxErrors']} errors &nbsp;&bull;&nbsp; {aim['timedSec']}s"
-            answers_left = ", ".join(f"{q['question']}={q['answer']}" for q in questions[:half])
-            answers_right = ", ".join(f"{q['question']}={q['answer']}" for q in questions[half:])
-            elements.append(Spacer(1, 1*mm))
-            elements.append(Paragraph(info, info_style))
-            elements.append(Paragraph(f"Answers: {answers_left}", answer_style))
-            elements.append(Paragraph(f"Answers: {answers_right}", answer_style))
+            col, row = divmod(i, rows)
+            x = margin + col * (col_w + col_gap)
+            y_top = content_top - row * row_h
+            _draw_maths_item(c, x, y_top, row_h, i + 1, q["question"], font_size, box_w, box_h)
+        c.setFillColorRGB(*_DIVIDER)
+        divider_x = margin + col_w + col_gap / 2 - divider_w / 2
+        c.rect(divider_x, content_top - rows * row_h, divider_w, rows * row_h, fill=1, stroke=0)
+        grid_bottom = content_top - rows * row_h
 
     elif sheet["subject"] == "phonics" or sheet.get("display_mode") == "recognition":
-        # Phonics GPCs and CEW word-recognition are both "see it, say it" —
-        # a grid of items to read aloud, not a dictation task. Fewer, wider
-        # columns for words (CEW) than single-letter/digraph GPCs.
-        cols = 8 if sheet["subject"] == "phonics" else 4
-        words = [q["question"] for q in questions]
-        while len(words) % cols != 0:
-            words.append("")
-
-        table_data = []
-        for i in range(0, len(words), cols):
-            table_data.append(words[i:i+cols])
-
-        col_w = usable_w / cols
-        t = Table(table_data, colWidths=[col_w]*cols)
-        t.setStyle(TableStyle([
-            ('FONT', (0, 0), (-1, -1), 'Helvetica', 14),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('BOX', (0, 0), (-1, -1), 0.5, colors.Color(0.7, 0.7, 0.7)),
-            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.Color(0.85, 0.85, 0.85)),
-            ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.Color(0.96, 0.96, 0.96)]),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
-        elements.append(t)
-
-    else:  # spelling dictation — teacher reads the word aloud, child writes it
-        table_data = []
+        cols = 8 if sheet["subject"] == "phonics" else 6
+        rows = -(-n // cols)
+        gap = 4
+        col_w = (usable_w - gap * (cols - 1)) / cols
+        row_h = min((content_top - content_bottom - gap * (rows - 1)) / rows, col_w)
+        font_size = 18 if col_w > 55 else 14
         for i, q in enumerate(questions):
-            review_mark = " *" if q.get("is_review") else ""
-            table_data.append([f"{i+1}.", f"____{review_mark}", ""])
+            row, col = divmod(i, cols)
+            x = margin + col * (col_w + gap)
+            y_top = content_top - row * (row_h + gap)
+            _draw_recognition_item(c, x, y_top, col_w, row_h, q["question"], font_size)
+        grid_bottom = content_top - rows * (row_h + gap) + gap
 
-        t = Table(table_data, colWidths=[10*mm, usable_w - 60*mm, 50*mm])
-        t.setStyle(TableStyle([
-            ('FONT', (0, 0), (-1, -1), 'Helvetica', 10),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LINEBELOW', (1, 0), (2, -1), 0.5, colors.Color(0.75, 0.75, 0.75)),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ]))
-        elements.append(t)
+    else:  # spelling dictation
+        cols = 2 if n > 15 else 1
+        rows = -(-n // cols)
+        col_gap = 10 * _mm
+        col_w = (usable_w - col_gap * (cols - 1)) / cols
+        row_h = min((content_top - content_bottom) / rows, 12 * _mm)
+        font_size = 12
+        for i, q in enumerate(questions):
+            col, row = divmod(i, rows)
+            x = margin + col * (col_w + col_gap)
+            y_top = content_top - row * row_h
+            _draw_dictation_item(c, x, y_top, col_w, row_h, i + 1, font_size)
+        grid_bottom = content_top - rows * row_h
 
-        if include_answers:
-            words_list = ", ".join(f"{q['question']}" + (" *" if q.get("is_review") else "") for q in questions)
-            elements.append(Spacer(1, 1*mm))
-            elements.append(Paragraph(f"Words to read aloud: {words_list}", answer_style))
+    if include_answers:
+        _pdf_footer_answers(c, margin, usable_w, grid_bottom - 10, sheet["aim"], questions, sheet["subject"], sheet.get("display_mode"))
 
-    return elements
+
+def render_week_page_pdf(c, page_w, page_h, margin, usable_w, pupil, day_sheets, include_answers=True):
+    """Draw one page containing all 5 days' sheets for one pupil/skill —
+    same item content each day (by construction), independently reshuffled."""
+    first = day_sheets[0]
+    bits = [f"{pupil['firstName']} {pupil['lastName']}", first["skill_name"], f"Week of {date.today().strftime('%d/%m/%y')}"]
+    header_bottom = _pdf_header_band(c, page_w, margin, usable_w, page_h, bits, "", title_h=13 * _mm, font_size=13)
+
+    n_days = len(day_sheets)
+    band_gap = 3 * _mm
+    top = header_bottom - 4 * _mm
+    bottom = margin + (10 * _mm if include_answers else 3 * _mm)
+    band_h = (top - bottom - band_gap * (n_days - 1)) / n_days
+
+    for d, sheet in enumerate(day_sheets):
+        band_top = top - d * (band_h + band_gap)
+        c.setFont("Helvetica-Bold", 9)
+        c.setFillColorRGB(*_WFA_BLUE)
+        c.drawString(margin, band_top - 9, sheet["day_label"])
+        c.setStrokeColorRGB(0.85, 0.85, 0.85)
+        c.setLineWidth(0.6)
+        c.line(margin, band_top - 12, margin + usable_w, band_top - 12)
+
+        grid_top = band_top - 15
+        grid_bottom = band_top - band_h + 2
+        questions = sheet["questions"]
+        n = len(questions)
+        if n == 0:
+            continue
+
+        if sheet["subject"] == "maths":
+            cols = 5
+            rows = -(-n // cols)
+            gap_x = 4
+            col_w = (usable_w - gap_x * (cols - 1)) / cols
+            row_h = (grid_top - grid_bottom) / rows
+            for i, q in enumerate(questions):
+                row, col = divmod(i, cols)
+                x = margin + col * (col_w + gap_x)
+                y_top = grid_top - row * row_h
+                _draw_maths_item(c, x, y_top, row_h, i + 1, q["question"], 7.5, 11, 9)
+
+        elif sheet["subject"] == "phonics" or sheet.get("display_mode") == "recognition":
+            cols = 10
+            rows = -(-n // cols)
+            gap = 2
+            col_w = (usable_w - gap * (cols - 1)) / cols
+            row_h = (grid_top - grid_bottom) / rows
+            for i, q in enumerate(questions):
+                row, col = divmod(i, cols)
+                x = margin + col * (col_w + gap)
+                y_top = grid_top - row * row_h
+                _draw_recognition_item(c, x, y_top, col_w, row_h - 1, q["question"], 9)
+
+        else:  # dictation
+            cols = 5
+            rows = -(-n // cols)
+            gap_x = 6
+            col_w = (usable_w - gap_x * (cols - 1)) / cols
+            row_h = (grid_top - grid_bottom) / rows
+            for i, q in enumerate(questions):
+                row, col = divmod(i, cols)
+                x = margin + col * (col_w + gap_x)
+                y_top = grid_top - row * row_h
+                _draw_dictation_item(c, x, y_top, col_w, row_h, i + 1, 7.5)
+
+    if include_answers:
+        c.setFont("Helvetica", 6.5)
+        c.setFillColorRGB(*_GREY)
+        c.drawString(margin, bottom - 8, f"Aim: {first['aim']['correctPerMin']}/min  •  Max {first['aim']['maxErrors']} errors  •  {first['aim']['timedSec']}s  (same list all week — see Daily Check for full answers)")
 
 
 # ── Year Group Filter ────────────────────────────────────────────────────────
@@ -1509,15 +1652,16 @@ with tab6:
                 st.info("No active skills to generate sheets for.")
             else:
                 # Options
-                col_opt1, col_opt2, col_opt3 = st.columns(3)
+                col_opt1, col_opt2 = st.columns(2)
                 with col_opt1:
                     week_mode = st.radio("Sheets", ["Single sheet", "Whole week (5 days, same set)"], key="print_mode") == "Whole week (5 days, same set)"
                 with col_opt2:
-                    grids_per_page = st.selectbox("Grids per page", [1, 2], index=1, key="print_grids")
-                with col_opt3:
                     include_answers = st.checkbox("Include answer key", value=True, key="print_answers")
 
-                st.caption("Item count per sheet comes from what was set for each pupil/skill in Set Starting Points.")
+                st.caption(
+                    "Item count per sheet comes from what was set for each pupil/skill in Set Starting Points. "
+                    + ("One page per pupil/skill, all 5 days on it." if week_mode else "One page per pupil/skill.")
+                )
                 st.markdown(f"**{len(sheets_to_generate)} skill{'s' if len(sheets_to_generate) != 1 else ''}{' × 5 days' if week_mode else ''}:**")
                 for p, skill_id, step in sheets_to_generate:
                     entry = p.get("currentSkills", {}).get(skill_id)
@@ -1525,85 +1669,44 @@ with tab6:
                     st.markdown(f"- {p['firstName']} {p['lastName']} — {step['ladder_name']}: {step['name']} ({count} items)")
 
                 if st.button("Generate PDF", type="primary", use_container_width=True):
-                    try:
-                        from reportlab.lib.pagesizes import A4
-                        from reportlab.lib.units import mm, cm
-                        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Frame, PageTemplate
-                        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-                        from reportlab.lib import colors
-                        from reportlab.pdfgen import canvas as pdfcanvas
-                        from io import BytesIO
+                    from reportlab.lib.pagesizes import A4
+                    from reportlab.pdfgen import canvas as pdfcanvas
+                    from io import BytesIO
 
-                        buf = BytesIO()
-                        # Tight margins for maximum space
-                        margin = 10*mm
-                        page_w, page_h = A4
-                        usable_w = page_w - 2 * margin
-                        usable_h = page_h - 2 * margin
+                    buf = BytesIO()
+                    margin = 15 * _mm
+                    page_w, page_h = A4
+                    usable_w = page_w - 2 * margin
 
-                        doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=margin, bottomMargin=margin, leftMargin=margin, rightMargin=margin)
-                        styles = getSampleStyleSheet()
-
-                        # Compact styles
-                        title_style = ParagraphStyle('GridTitle', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', spaceAfter=1, spaceBefore=0, leading=13)
-                        info_style = ParagraphStyle('GridInfo', parent=styles['Normal'], fontSize=8, textColor=colors.Color(0.4, 0.4, 0.4), spaceAfter=2, spaceBefore=0, leading=10)
-                        answer_style = ParagraphStyle('GridAnswer', parent=styles['Normal'], fontSize=6, textColor=colors.Color(0.6, 0.6, 0.6), spaceAfter=0, spaceBefore=0, leading=8)
-
-                        elements = []
-
-                        # Build grids, pair them 2-up on a page
-                        grids = []
-                        for p, skill_id, step in sheets_to_generate:
-                            # Windowed skills only ever practise their current
-                            # window, not the whole step — same set all week.
-                            grid_item_pool = get_active_window(p, skill_id, step) if is_windowed(step) else None
-                            day_count = 5 if week_mode else 1
-                            for day_n in range(1, day_count + 1):
+                    c = pdfcanvas.Canvas(buf, pagesize=A4)
+                    for p, skill_id, step in sheets_to_generate:
+                        # Windowed skills only ever practise their current
+                        # window, not the whole step — same set all week.
+                        grid_item_pool = get_active_window(p, skill_id, step) if is_windowed(step) else None
+                        if week_mode:
+                            day_sheets = []
+                            for day_n in range(1, 6):
                                 # Each call reshuffles independently — same
                                 # item content, different order per day.
                                 sheet = generate_sheet(p, skill_id, ladders_data, item_pool=grid_item_pool)
-                                if not sheet:
-                                    continue
-                                if week_mode:
+                                if sheet:
                                     sheet["day_label"] = f"Day {day_n}"
-                                grids.append((p, sheet))
-
-                        # Layout grids
-                        if grids_per_page == 2:
-                            # Two grids per page
-                            for i in range(0, len(grids), 2):
-                                pair = grids[i:i+2]
-                                grid_elements = []
-
-                                for j, (p, sheet) in enumerate(pair):
-                                    grid_elements.extend(_build_grid_elements(p, sheet, styles, title_style, info_style, answer_style, include_answers, usable_w))
-
-                                # Add spacer between the two grids
-                                if len(pair) == 2:
-                                    # Insert a divider between the two grids
-                                    # We'll use a table layout: top grid and bottom grid
-                                    grid_elements.insert(len(grid_elements) // 2 if len(grid_elements) > 1 else 0, Spacer(1, 4*mm))
-
-                                elements.extend(grid_elements)
-                                if i + 2 < len(grids):
-                                    elements.append(PageBreak())
+                                    day_sheets.append(sheet)
+                            if day_sheets:
+                                render_week_page_pdf(c, page_w, page_h, margin, usable_w, p, day_sheets, include_answers)
                         else:
-                            # One grid per page (full size)
-                            for p, sheet in grids:
-                                elements.extend(_build_grid_elements(p, sheet, styles, title_style, info_style, answer_style, include_answers, usable_w))
-                                if grids.index((p, sheet)) < len(grids) - 1:
-                                    elements.append(PageBreak())
+                            sheet = generate_sheet(p, skill_id, ladders_data, item_pool=grid_item_pool)
+                            if sheet:
+                                render_single_sheet_pdf(c, page_w, page_h, margin, usable_w, p, sheet, include_answers)
+                        c.showPage()
+                    c.save()
+                    buf.seek(0)
 
-                        doc.build(elements)
-                        buf.seek(0)
-
-                        st.success("PDF generated!")
-                        st.download_button(
-                            "Download PDF", buf.getvalue(),
-                            file_name=f"precision-teach-sheets-{date.today().isoformat()}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True,
-                            type="primary",
-                        )
-                    except ImportError:
-                        st.error("Install reportlab for PDF generation: pip install reportlab")
+                    st.success("PDF generated!")
+                    st.download_button(
+                        "Download PDF", buf.getvalue(),
+                        file_name=f"precision-teach-sheets-{date.today().isoformat()}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                        type="primary",
+                    )
