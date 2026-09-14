@@ -114,6 +114,13 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
         <p class="hint">For reference — print this many copies from the PDF.</p>
       </div>
     </div>
+    <div class="row">
+      <div>
+        <label class="lbl">Number of questions</label>
+        <input type="number" id="questionCount" placeholder="Auto" min="5" max="80">
+        <p class="hint">Leave blank for the normal-length paper. Applies to the standard paper and all adapted papers. Unticked topics are left out entirely — the paper only draws from ticked topics, picking a different random subset (and order) each time you generate.</p>
+      </div>
+    </div>
   </div>
 
   <!-- Adapted groups -->
@@ -185,6 +192,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Division"><span class="topic-yg topic-yg-Y5">Y5</span><span>Division</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Decimals"><span class="topic-yg topic-yg-Y5">Y5</span><span>Decimals (add, subtract, ×÷)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Fractions"><span class="topic-yg topic-yg-Y5">Y5</span><span>Fractions (different denominators)</span></label>
+      <label class="topic-item"><input type="checkbox" checked data-topic="y5Percentages"><span class="topic-yg topic-yg-Y5">Y5</span><span>Percentages of amounts</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y5Missing"><span class="topic-yg topic-yg-Y5">Y5</span><span>Missing numbers</span></label>
     </div>
   </div>
@@ -274,7 +282,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     </div>
   </div>
 
-  <div class="version">11.07.26an</div>
+  <div class="version">14.09.26a</div>
 </div>
 
 <script>
@@ -311,6 +319,48 @@ function fracStr(n, d) {
   const rem = rn % rd;
   if (whole > 0) return rem === 0 ? `${whole}` : `${whole} ${rem}/${rd}`;
   return `${rn}/${rd}`;
+}
+
+// ─── TOPIC-POOL QUESTION BUILDER ─────────────────────────────────────────────
+// Powers "variety" (random pick from several question shapes per topic) and
+// "number of questions" (target count) controls shared by every year group.
+function shuffleArr(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+// pools: { topicKey: [fn, fn, ...] } — each fn() returns a fresh question object.
+// topics: { topicKey: boolean } — which topics are ticked (unticked = excluded entirely).
+// targetCount: desired question total; blank/0 = natural total of one pull per pool entry.
+// fillerFn: only used if literally no topic is ticked, so a paper is never empty.
+function buildFromPools(pools, topics, targetCount, fillerFn) {
+  const activeKeys = Object.keys(pools).filter(k => topics[k]);
+  if (activeKeys.length === 0) {
+    const n = targetCount && targetCount > 0 ? targetCount : 20;
+    return Array.from({length: n}, fillerFn);
+  }
+  let natural = [];
+  activeKeys.forEach(k => pools[k].forEach(fn => natural.push(fn)));
+  shuffleArr(natural);
+  const n = targetCount && targetCount > 0 ? targetCount : natural.length;
+  let chosen;
+  if (n <= natural.length) {
+    chosen = natural.slice(0, n);
+  } else {
+    chosen = natural.slice();
+    let i = 0;
+    while (chosen.length < n) {
+      const k = activeKeys[i % activeKeys.length];
+      const pool = pools[k];
+      chosen.push(pool[Math.floor(Math.random() * pool.length)]);
+      i++;
+    }
+  }
+  const qs = chosen.map(fn => fn());
+  shuffleArr(qs);
+  return qs;
 }
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
@@ -402,6 +452,7 @@ function saveSetup() {
     classYear: document.getElementById('classYear').value,
     standardLevel: document.getElementById('standardLevel').value,
     standardCount: document.getElementById('standardCount').value,
+    questionCount: document.getElementById('questionCount').value,
     includeReasoning: document.getElementById('includeReasoning').checked,
     y6SortByYear: y6Sort,
     topics,
@@ -418,6 +469,7 @@ function loadSetup() {
   if (saved.classYear) document.getElementById('classYear').value = saved.classYear;
   if (saved.standardLevel) document.getElementById('standardLevel').value = saved.standardLevel;
   if (saved.standardCount) document.getElementById('standardCount').value = saved.standardCount;
+  if (saved.questionCount) document.getElementById('questionCount').value = saved.questionCount;
   // Always default includeReasoning to checked — don't restore from saved state
   if (saved.y6SortByYear != null) {
     document.getElementById('y6SortByYear').checked = saved.y6SortByYear;
@@ -448,446 +500,425 @@ loadSetup();
 updateTopicCards();
 
 // ─── Y2 ARITHMETIC GENERATOR ─────────────────────────────────────────────────
-function genY2Arith(t) {
-  const qs = [];
+function genY2Arith(t, targetCount) {
   const simple = () => { const a=rand(1,5),b=rand(1,5); return {text:`${a} + ${b} =`,answer:a+b,marks:1}; };
-  if (t.numberBonds){const a=rand(1,9);qs.push({text:`${a} + ${10-a} =`,answer:10,marks:1});}else qs.push(simple());
-  if (t.numberBonds){const a=rand(1,9);qs.push({text:`10 - ${a} =`,answer:10-a,marks:1});}else qs.push(simple());
-  if (t.numberBonds){const a=rand(1,19);qs.push({text:`${a} + ${20-a} =`,answer:20,marks:1});}else qs.push(simple());
-  if (t.countOnOff){const a=rand(10,25),b=rand(1,5);qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1});}else qs.push(simple());
-  if (t.countOnOff){const a=rand(12,30),b=rand(1,5);qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1});}else qs.push(simple());
-  if (t.twoDigitAdd){let a,b;do{a=rand(11,49);b=rand(11,49);}while((a%10)+(b%10)>=10);qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1});}else qs.push(simple());
-  if (t.twoDigitSub){let a,b;do{a=rand(22,79);b=rand(11,a-10);}while((a%10)<(b%10));qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1});}else qs.push(simple());
-  if (t.doublesHalves){const a=rand(2,10);qs.push({text:`double ${a} =`,answer:a*2,marks:1});}else qs.push(simple());
-  if (t.doublesHalves){const a=rand(1,10)*2;qs.push({text:`half of ${a} =`,answer:a/2,marks:1});}else qs.push(simple());
-  {const a=rand(2,6),b=rand(2,6),c=rand(2,6);qs.push({text:`${a} + ${b} + ${c} =`,answer:a+b+c,marks:1});}
-  if (t.y2Missing){const a=rand(1,8);qs.push({text:`${a} + [BOX] = 10`,answer:10-a,box:true,marks:1});}else qs.push(simple());
-  if (t.y2Missing){const a=rand(1,18);qs.push({text:`${a} + [BOX] = 20`,answer:20-a,box:true,marks:1});}else qs.push(simple());
-  if (t.sequences){qs.push({text:`2, 4, 6, [BOX]`,answer:8,box:true,marks:1});}else qs.push(simple());
-  if (t.sequences){const s=rand(1,4)*5;qs.push({text:`${s}, ${s+5}, ${s+10}, [BOX]`,answer:s+15,box:true,marks:1});}else qs.push(simple());
-  if (t.sequences){const s=rand(1,5)*10;qs.push({text:`${s}, ${s+10}, ${s+20}, [BOX]`,answer:s+30,box:true,marks:1});}else qs.push(simple());
-  if (t.y2Tables){const a=rand(1,10);qs.push({text:`${a} × 2 =`,answer:a*2,marks:1});}else qs.push(simple());
-  if (t.y2Tables){const a=rand(1,10);qs.push({text:`${a} × 5 =`,answer:a*5,marks:1});}else qs.push(simple());
-  if (t.y2Tables){const a=rand(1,10);qs.push({text:`${a} × 10 =`,answer:a*10,marks:1});}else qs.push(simple());
-  if (t.y2Tables){const a=rand(1,10);qs.push({text:`${a*2} ÷ 2 =`,answer:a,marks:1});}else qs.push(simple());
-  if (t.y2Tables){const a=rand(1,10);qs.push({text:`${a*5} ÷ 5 =`,answer:a,marks:1});}else qs.push(simple());
-  if (t.y2Tables){const a=rand(1,10);qs.push({text:`${a*10} ÷ 10 =`,answer:a,marks:1});}else qs.push(simple());
-  if (t.twoDigitAdd){const a=rand(20,70),b=pick([10,20,30]);qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1});}else qs.push(simple());
-  if (t.twoDigitSub){const a=rand(40,99),b=pick([10,20,30]);qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1});}else qs.push(simple());
-  if (t.countOnOff){const a=rand(10,89);qs.push({text:`10 more than ${a} =`,answer:a+10,marks:1});}else qs.push(simple());
-  if (t.countOnOff){const a=rand(20,99);qs.push({text:`10 less than ${a} =`,answer:a-10,marks:1});}else qs.push(simple());
-  if (t.y2Fractions){const a=rand(2,20)*2;qs.push({text:`½ of ${a} =`,answer:a/2,marks:1});}else qs.push(simple());
-  if (t.y2Fractions){const a=rand(1,8)*4;qs.push({text:`¼ of ${a} =`,answer:a/4,marks:1});}else qs.push(simple());
-  if (t.twoDigitAdd){let a,b;do{a=rand(15,69);b=rand(15,69);}while((a%10)+(b%10)<10||a+b>99);qs.push({text:`${a} + ${b} =`,answer:a+b,work:true,marks:1});}else qs.push({...simple(),work:true});
-  if (t.twoDigitSub){let a,b;do{a=rand(32,90);b=rand(14,a-10);}while((a%10)>=(b%10));qs.push({text:`${a} - ${b} =`,answer:a-b,work:true,marks:1});}else qs.push({...simple(),work:true});
-  if (t.y2Missing){const a=rand(15,30),b=rand(5,a-5);qs.push({text:`${a} - [BOX] = ${a-b}`,answer:b,box:true,marks:1});}else qs.push(simple());
-  return qs;
+  const pools = {
+    numberBonds: [
+      () => { const a=rand(1,9); return {text:`${a} + ${10-a} =`,answer:10,marks:1}; },
+      () => { const a=rand(1,9); return {text:`10 - ${a} =`,answer:10-a,marks:1}; },
+      () => { const a=rand(1,19); return {text:`${a} + ${20-a} =`,answer:20,marks:1}; },
+    ],
+    countOnOff: [
+      () => { const a=rand(10,25),b=rand(1,5); return {text:`${a} + ${b} =`,answer:a+b,marks:1}; },
+      () => { const a=rand(12,30),b=rand(1,5); return {text:`${a} - ${b} =`,answer:a-b,marks:1}; },
+      () => { const a=rand(10,89); return {text:`10 more than ${a} =`,answer:a+10,marks:1}; },
+      () => { const a=rand(20,99); return {text:`10 less than ${a} =`,answer:a-10,marks:1}; },
+    ],
+    twoDigitAdd: [
+      () => { let a,b;do{a=rand(11,49);b=rand(11,49);}while((a%10)+(b%10)>=10); return {text:`${a} + ${b} =`,answer:a+b,marks:1}; },
+      () => { const a=rand(20,70),b=pick([10,20,30]); return {text:`${a} + ${b} =`,answer:a+b,marks:1}; },
+      () => { let a,b;do{a=rand(15,69);b=rand(15,69);}while((a%10)+(b%10)<10||a+b>99); return {text:`${a} + ${b} =`,answer:a+b,work:true,marks:1}; },
+    ],
+    twoDigitSub: [
+      () => { let a,b;do{a=rand(22,79);b=rand(11,a-10);}while((a%10)<(b%10)); return {text:`${a} - ${b} =`,answer:a-b,marks:1}; },
+      () => { const a=rand(40,99),b=pick([10,20,30]); return {text:`${a} - ${b} =`,answer:a-b,marks:1}; },
+      () => { let a,b;do{a=rand(32,90);b=rand(14,a-10);}while((a%10)>=(b%10)); return {text:`${a} - ${b} =`,answer:a-b,work:true,marks:1}; },
+    ],
+    doublesHalves: [
+      () => { const a=rand(2,10); return {text:`double ${a} =`,answer:a*2,marks:1}; },
+      () => { const a=rand(1,10)*2; return {text:`half of ${a} =`,answer:a/2,marks:1}; },
+    ],
+    y2Missing: [
+      () => { const a=rand(1,8); return {text:`${a} + [BOX] = 10`,answer:10-a,box:true,marks:1}; },
+      () => { const a=rand(1,18); return {text:`${a} + [BOX] = 20`,answer:20-a,box:true,marks:1}; },
+      () => { const a=rand(15,30),b=rand(5,a-5); return {text:`${a} - [BOX] = ${a-b}`,answer:b,box:true,marks:1}; },
+    ],
+    sequences: [
+      () => ({text:`2, 4, 6, [BOX]`,answer:8,box:true,marks:1}),
+      () => { const s=rand(1,4)*5; return {text:`${s}, ${s+5}, ${s+10}, [BOX]`,answer:s+15,box:true,marks:1}; },
+      () => { const s=rand(1,5)*10; return {text:`${s}, ${s+10}, ${s+20}, [BOX]`,answer:s+30,box:true,marks:1}; },
+    ],
+    y2Tables: [
+      () => { const a=rand(1,10); return {text:`${a} × 2 =`,answer:a*2,marks:1}; },
+      () => { const a=rand(1,10); return {text:`${a} × 5 =`,answer:a*5,marks:1}; },
+      () => { const a=rand(1,10); return {text:`${a} × 10 =`,answer:a*10,marks:1}; },
+      () => { const a=rand(1,10); return {text:`${a*2} ÷ 2 =`,answer:a,marks:1}; },
+      () => { const a=rand(1,10); return {text:`${a*5} ÷ 5 =`,answer:a,marks:1}; },
+      () => { const a=rand(1,10); return {text:`${a*10} ÷ 10 =`,answer:a,marks:1}; },
+    ],
+    y2Fractions: [
+      () => { const a=rand(2,20)*2; return {text:`½ of ${a} =`,answer:a/2,marks:1}; },
+      () => { const a=rand(1,8)*4; return {text:`¼ of ${a} =`,answer:a/4,marks:1}; },
+    ],
+    _core: [
+      () => { const a=rand(2,6),b=rand(2,6),c=rand(2,6); return {text:`${a} + ${b} + ${c} =`,answer:a+b+c,marks:1}; },
+    ],
+  };
+  return buildFromPools(pools, {...t, _core:true}, targetCount, simple);
 }
 
-// ─── Y3 ARITHMETIC GENERATOR (30 questions, /30) ──────────────────────────────
-function genY3Arith(t) {
-  const qs = [];
+// ─── Y3 ARITHMETIC GENERATOR ─────────────────────────────────────────────────
+function genY3Arith(t, targetCount) {
   const tt = () => { const a=rand(2,8),b=rand(2,8); return {text:`${a} × ${b} =`,answer:a*b,marks:1}; };
-  // Mental add/subtract
-  if (t.y3Mental){const a=rand(100,499),b=rand(10,99);qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1});}else qs.push(tt());
-  if (t.y3Mental){const a=rand(150,499),b=rand(10,99);qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1});}else qs.push(tt());
-  if (t.y3Mental){const h=pick([200,300,400,500,600,700]),j=pick([50,100,150,200]);qs.push({text:`${h} + ${j} =`,answer:h+j,marks:1});}else qs.push(tt());
-  // Place value ×÷ 10/100
-  if (t.y3PlaceValue){const a=rand(2,50);qs.push({text:`${a} × 10 =`,answer:a*10,marks:1});}else qs.push(tt());
-  if (t.y3PlaceValue){const a=pick([20,30,40,50,60,70,80,90,120,150,200,250,300]);qs.push({text:`${a} ÷ 10 =`,answer:a/10,marks:1});}else qs.push(tt());
-  if (t.y3PlaceValue){const a=rand(2,9);qs.push({text:`${a} × 100 =`,answer:a*100,marks:1});}else qs.push(tt());
-  // Column add (3-digit, exchange)
-  if (t.y3Column){let a,b;do{a=rand(100,499);b=rand(100,499);}while(!hasRegroup(a,b,'add')||a+b>999);qs.push({text:`${a} + ${b} =`,answer:a+b,col:true,marks:1});}else qs.push({...tt(),col:true});
-  if (t.y3Column){let a,b;do{a=rand(200,799);b=rand(100,499);}while(!hasRegroup(a,b,'add')||a+b>999);qs.push({text:`${a} + ${b} =`,answer:a+b,col:true,marks:1});}else qs.push({...tt(),col:true});
-  // Column subtract (3-digit, exchange)
-  if (t.y3Column){let a,b;do{a=rand(300,999);b=rand(100,a-100);}while(!hasRegroup(a,b,'sub'));qs.push({text:`${a} - ${b} =`,answer:a-b,col:true,marks:1});}else qs.push({...tt(),col:true});
-  if (t.y3Column){let a,b;do{a=rand(300,999);b=rand(100,a-100);}while(!hasRegroup(a,b,'sub'));qs.push({text:`${a} - ${b} =`,answer:a-b,col:true,marks:1});}else qs.push({...tt(),col:true});
-  // Missing numbers
-  if (t.y3Missing){const p=rand(20,100),q=rand(p+50,p+300);qs.push({text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1});}else qs.push(tt());
-  if (t.y3Missing){const a=rand(100,400),b=rand(20,80);qs.push({text:`${a} - [BOX] = ${a-b}`,answer:b,box:true,marks:1});}else qs.push(tt());
-  // Times tables ×2,4,5,8,10 only (Y3 curriculum — ×3,6,7,9,11,12 reserved for Y4)
-  if (t.y3Tables){const a=rand(2,12);qs.push({text:`${a} × 4 =`,answer:a*4,marks:1});}else qs.push(tt());
-  if (t.y3Tables){const a=rand(2,12);qs.push({text:`${a} × 8 =`,answer:a*8,marks:1});}else qs.push(tt());
-  if (t.y3Tables){const a=rand(2,12);qs.push({text:`${a} × 2 =`,answer:a*2,marks:1});}else qs.push(tt());
-  if (t.y3Tables){const a=rand(2,12);qs.push({text:`${a} × 5 =`,answer:a*5,marks:1});}else qs.push(tt());
-  if (t.y3Tables){const a=rand(2,12);qs.push({text:`${a} × 10 =`,answer:a*10,marks:1});}else qs.push(tt());
-  if (t.y3Tables){const f=pick([4,8]),a=rand(2,12);qs.push({text:`${a} × ${f} =`,answer:a*f,marks:1});}else qs.push(tt());
-  if (t.y3Tables){const f=pick([2,5,10]),a=rand(2,12);qs.push({text:`${a} × ${f} =`,answer:a*f,marks:1});}else qs.push(tt());
-  // Division — within Y3 table facts only (quotient ≤12, divisors 2/4/5/8/10)
-  if (t.y3Division){const b=pick([2,4,5,8,10]),q=rand(2,10);qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1});}else qs.push(tt());
-  if (t.y3Division){const b=pick([2,4,5,8,10]),q=rand(2,10);qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1});}else qs.push(tt());
-  // ×1 and ×0
-  {const a=rand(3,20);qs.push({text:`${a} × 1 =`,answer:a,marks:1});}
-  {const a=rand(10,99);qs.push({text:`${a} × 0 =`,answer:0,marks:1});}
-  // Short multiplication (2-digit × 1-digit)
-  if (t.y3ShortMult){const a=rand(12,49),b=rand(3,9);qs.push({text:`${a} × ${b} =`,answer:a*b,marks:1});}else qs.push(tt());
-  if (t.y3ShortMult){const a=rand(12,49),b=rand(3,9);qs.push({text:`${a} × ${b} =`,answer:a*b,work:true,marks:1});}else qs.push({...tt(),work:true});
-  // Short division — within known facts
-  if (t.y3Division){const d=pick([2,4,5,8,10]),q=rand(2,12);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1});}else qs.push(tt());
-  // Partition-friendly division (e.g. 64÷4: 40÷4 + 24÷4) — quotient 12–20, dividend ≤200
-  if (t.y3Division){const d=pick([2,4,5,8,10]),q=rand(12,20);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
-  // Fractions
-  if (t.y3Fractions){const n=1,d=pick([2,3,4,5,8,10]),a=d*rand(2,10);qs.push({text:`1/${d} of ${a} =`,answer:a/d,marks:1});}else qs.push(tt());
-  if (t.y3Fractions){const d=pick([3,4,5,6,8]),n1=rand(1,d-2),n2=rand(1,d-n1-1);qs.push({frac:[[n1,d],[n2,d]],answer:`${n1+n2}/${d}`,marks:1});}else qs.push(tt());
-  // Mental: 100 more and three-number add
-  if (t.y3Mental){const a=rand(100,800);qs.push({text:`100 more than ${a} =`,answer:a+100,marks:1});}else qs.push(tt());
-  if (t.y3Mental){const a=rand(10,50),b=rand(10,50),c=rand(10,50);qs.push({text:`${a} + ${b} + ${c} =`,answer:a+b+c,marks:1});}else qs.push(tt());
-  return qs;
+  const pools = {
+    y3Mental: [
+      () => { const a=rand(100,499),b=rand(10,99); return {text:`${a} + ${b} =`,answer:a+b,marks:1}; },
+      () => { const a=rand(150,499),b=rand(10,99); return {text:`${a} - ${b} =`,answer:a-b,marks:1}; },
+      () => { const h=pick([200,300,400,500,600,700]),j=pick([50,100,150,200]); return {text:`${h} + ${j} =`,answer:h+j,marks:1}; },
+      () => { const a=rand(100,800); return {text:`100 more than ${a} =`,answer:a+100,marks:1}; },
+      () => { const a=rand(10,50),b=rand(10,50),c=rand(10,50); return {text:`${a} + ${b} + ${c} =`,answer:a+b+c,marks:1}; },
+    ],
+    y3PlaceValue: [
+      () => { const a=rand(2,50); return {text:`${a} × 10 =`,answer:a*10,marks:1}; },
+      () => { const a=pick([20,30,40,50,60,70,80,90,120,150,200,250,300]); return {text:`${a} ÷ 10 =`,answer:a/10,marks:1}; },
+      () => { const a=rand(2,9); return {text:`${a} × 100 =`,answer:a*100,marks:1}; },
+    ],
+    y3Column: [
+      () => { let a,b;do{a=rand(100,499);b=rand(100,499);}while(!hasRegroup(a,b,'add')||a+b>999); return {text:`${a} + ${b} =`,answer:a+b,col:true,marks:1}; },
+      () => { let a,b;do{a=rand(200,799);b=rand(100,499);}while(!hasRegroup(a,b,'add')||a+b>999); return {text:`${a} + ${b} =`,answer:a+b,col:true,marks:1}; },
+      () => { let a,b;do{a=rand(300,999);b=rand(100,a-100);}while(!hasRegroup(a,b,'sub')); return {text:`${a} - ${b} =`,answer:a-b,col:true,marks:1}; },
+      () => { let a,b;do{a=rand(300,999);b=rand(100,a-100);}while(!hasRegroup(a,b,'sub')); return {text:`${a} - ${b} =`,answer:a-b,col:true,marks:1}; },
+    ],
+    y3Missing: [
+      () => { const p=rand(20,100),q=rand(p+50,p+300); return {text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1}; },
+      () => { const a=rand(100,400),b=rand(20,80); return {text:`${a} - [BOX] = ${a-b}`,answer:b,box:true,marks:1}; },
+    ],
+    // Y3 curriculum ×2,4,5,8,10 only — ×3,6,7,9,11,12 reserved for Y4
+    y3Tables: [
+      () => { const a=rand(2,12); return {text:`${a} × 4 =`,answer:a*4,marks:1}; },
+      () => { const a=rand(2,12); return {text:`${a} × 8 =`,answer:a*8,marks:1}; },
+      () => { const a=rand(2,12); return {text:`${a} × 2 =`,answer:a*2,marks:1}; },
+      () => { const a=rand(2,12); return {text:`${a} × 5 =`,answer:a*5,marks:1}; },
+      () => { const a=rand(2,12); return {text:`${a} × 10 =`,answer:a*10,marks:1}; },
+      () => { const f=pick([4,8]),a=rand(2,12); return {text:`${a} × ${f} =`,answer:a*f,marks:1}; },
+      () => { const f=pick([2,5,10]),a=rand(2,12); return {text:`${a} × ${f} =`,answer:a*f,marks:1}; },
+    ],
+    // Divisors 2/4/5/8/10 only, quotient ≤20 (within Y3 table facts)
+    y3Division: [
+      () => { const b=pick([2,4,5,8,10]),q=rand(2,10); return {text:`${b*q} ÷ ${b} =`,answer:q,marks:1}; },
+      () => { const b=pick([2,4,5,8,10]),q=rand(2,10); return {text:`${b*q} ÷ ${b} =`,answer:q,marks:1}; },
+      () => { const d=pick([2,4,5,8,10]),q=rand(2,12); return {text:`${d*q} ÷ ${d} =`,answer:q,marks:1}; },
+      () => { const d=pick([2,4,5,8,10]),q=rand(12,20); return {text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1}; },
+    ],
+    y3ShortMult: [
+      () => { const a=rand(12,49),b=rand(3,9); return {text:`${a} × ${b} =`,answer:a*b,marks:1}; },
+      () => { const a=rand(12,49),b=rand(3,9); return {text:`${a} × ${b} =`,answer:a*b,work:true,marks:1}; },
+    ],
+    y3Fractions: [
+      () => { const d=pick([2,3,4,5,8,10]),a=d*rand(2,10); return {text:`1/${d} of ${a} =`,answer:a/d,marks:1}; },
+      () => { const d=pick([3,4,5,6,8]),n1=rand(1,d-2),n2=rand(1,d-n1-1); return {frac:[[n1,d],[n2,d]],answer:`${n1+n2}/${d}`,marks:1}; },
+    ],
+    _core: [
+      () => { const a=rand(3,20); return {text:`${a} × 1 =`,answer:a,marks:1}; },
+      () => { const a=rand(10,99); return {text:`${a} × 0 =`,answer:0,marks:1}; },
+    ],
+  };
+  return buildFromPools(pools, {...t, _core:true}, targetCount, tt);
 }
 
-// ─── Y4 ARITHMETIC GENERATOR (31–38 questions depending on prior content) ─────
-function genY4Arith(t) {
-  const qs = [];
+// ─── Y4 ARITHMETIC GENERATOR ───────────────────────────────────────────────────
+function genY4Arith(t, targetCount) {
   const tt = () => { const a=rand(2,12),b=rand(2,12); return {text:`${a} × ${b} =`,answer:a*b,marks:1}; };
 
-  // ── Y3 prior content (7 questions) ──────────────────────────────────────────
+  const pools = {
+    placeValue: [
+      () => { const a=pick([2,3,4,5,6,7,8,9,12,15,20,25]); return {text:`${a} × 1000 =`,answer:a*1000,marks:1}; },
+      () => { const b=pick([30,40,50,60,70,80,90,120,150,200,350,700]); return {text:`${b} ÷ 10 =`,answer:b/10,marks:1}; },
+      () => { const c=rand(2,99); return {text:`${c} × 100 =`,answer:c*100,marks:1}; },
+      () => { const a=rand(2,99); return {text:`${a} × 10 =`,answer:a*10,marks:1}; },
+      () => { const th=rand(1,9),h=rand(1,9),t_=rand(10,99);const total=th*1000+h*100+t_; return {text:`${total.toLocaleString()} = ${th},000 + [BOX] + ${t_}`,answer:h*100,box:true,marks:1}; },
+    ],
+    mentalCalc: [
+      () => { const a=rand(10,40),b=rand(10,40),c=rand(10,40); return {text:`${a} + ${b} + ${c} =`,answer:a+b+c,marks:1}; },
+      () => { const g=rand(1001,8999); return {text:`${g} + 1000 =`,answer:g+1000,marks:1}; },
+      () => { const h=pick([500,600,700,800,900,1000,1200]),j=pick([100,200,300,400]); return {text:`${h} - ${j} =`,answer:h-j,marks:1}; },
+      () => { const k=rand(20,90),l=rand(3,Math.floor(k/3)); return {text:`${k} - ${l} - ${l} =`,answer:k-2*l,marks:1}; },
+      () => { const m=rand(1,8)*100,n=rand(1,8)*100; return {text:`${m} + ${n} =`,answer:m+n,marks:1}; },
+      () => { const a=rand(3,9)*1000,b=rand(1,a/1000-1)*1000; return {text:`${a} - ${b} =`,answer:a-b,marks:1}; },
+    ],
+    columnCalc: [
+      () => { let a,b;do{a=rand(1000,8999);b=rand(1000,9999-a);}while(!hasRegroup(a,b,'add')); return {text:`${a} + ${b} =`,answer:a+b,col:true,marks:1}; },
+      () => { let a,b;do{a=rand(2000,9999);b=rand(1000,a-500);}while(!hasRegroup(a,b,'sub')); return {text:`${a} - ${b} =`,answer:a-b,col:true,marks:1}; },
+    ],
+    timesTables: [
+      () => { const a=rand(2,12); return {text:`${a} × 12 =`,answer:a*12,marks:1}; },
+      () => { const f=pick([11,12]),a=rand(2,12); return {text:`${a} × ${f} =`,answer:a*f,marks:1}; },
+      () => { let a,b,c;do{a=rand(2,5);b=rand(2,5);c=rand(2,4);}while(a*b*c>=100); return {text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1}; },
+      () => { let a,b,c;do{a=rand(2,4);b=rand(2,4);c=rand(2,4);}while(a*b*c>=100||a*b*c<8); return {text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1}; },
+    ],
+    shortMult: [
+      () => { const ab=rand(11,49),f=pick([3,4,5,6,7,8]); return {text:`${ab} × ${f} =`,answer:ab*f,work:true,marks:1}; },
+      () => { let abc,f;do{abc=rand(101,499);f=pick([3,4,5,6]);}while(abc*f>=1000); return {text:`${abc} × ${f} =`,answer:abc*f,work:true,marks:1}; },
+    ],
+    division: [
+      () => { const b=pick([6,7,8,9]),q=rand(2,12); return {text:`${b*q} ÷ ${b} =`,answer:q,marks:1}; },
+      () => { const b=pick([6,7,8,9]),q=rand(2,12); return {text:`${b*q} ÷ ${b} =`,answer:q,marks:1}; },
+      () => { const d=pick([6,7,8,9]),q=rand(11,30); return {text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1}; },
+      () => { const d=pick([6,7,8,9]),q=rand(11,99); return {text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1}; },
+    ],
+    fractions: [
+      () => { const d=pick([2,3,4,5,8,10]),n=rand(1,d-1),a=d*rand(2,12); return {text:`${n}/${d} of ${a} =`,answer:n*a/d,marks:1}; },
+      () => {
+        const denoms=[2,3,4,5,6,8,10],d=pick(denoms);
+        const n1=rand(1,d-2),n2=rand(1,d-n1-1);
+        const sum=n1+n2,g=gcd(sum,d);
+        const ans=sum===d?'1':(d/g===1?`${sum/g}`:`${sum/g}/${d/g}`);
+        return {frac:[[n1,d],[n2,d]],answer:ans,marks:1};
+      },
+    ],
+    missingNumbers: [
+      () => { const p=rand(10,100),q=rand(p+10,p+200); return {text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1}; },
+      () => { const p=rand(100,500),q=rand(p+10,p+1000); return {text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1}; },
+      () => { const r=rand(200,999),s=rand(50,r-50); return {text:`${r} - [BOX] = ${s}`,answer:r-s,box:true,col:true,marks:1}; },
+    ],
+    _core: [
+      () => { const a=rand(3,20); return {text:`${a} × 1 =`,answer:a,marks:1}; },
+      () => tt(),
+    ],
+  };
+
+  let qs = buildFromPools(pools, {...t, _core:true}, targetCount, tt);
+
+  // ── Y3 prior content (7 fixed revision questions, prepended) ────────────────
   if (t.y4Y3content) {
-    const a=rand(200,899),b=rand(11,89); qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'});
-    const d1=pick([2,4,5,8,10]),q1=rand(2,12); qs.push({text:`${d1*q1} ÷ ${d1} =`,answer:q1,marks:1,yg:'Y3'});
-    const ax=pick([2,4,5,8,10]),bx=rand(11,49); qs.push({text:`${ax} × ${bx} =`,answer:ax*bx,marks:1,yg:'Y3'});
-    const s=rand(200,999),r=rand(3,99); qs.push({text:`${s} − ${r} =`,answer:s-r,marks:1,yg:'Y3'});
-    const bt=rand(10,200),tot=rand(bt+100,bt+600); qs.push({text:`[BOX] + ${bt} = ${tot}`,answer:tot-bt,box:true,marks:1,yg:'Y3'});
-    const az=rand(10,999); qs.push({text:`${az} × 0 =`,answer:0,marks:1,yg:'Y3'});
-    const d2=pick([2,4,5,8,10]),q2=rand(2,10); qs.push({text:`${d2*q2} ÷ ${d2} =`,answer:q2,marks:1,yg:'Y3'});
+    const rev = [];
+    const a=rand(200,899),b=rand(11,89); rev.push({text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'});
+    const d1=pick([2,4,5,8,10]),q1=rand(2,12); rev.push({text:`${d1*q1} ÷ ${d1} =`,answer:q1,marks:1,yg:'Y3'});
+    const ax=pick([2,4,5,8,10]),bx=rand(11,49); rev.push({text:`${ax} × ${bx} =`,answer:ax*bx,marks:1,yg:'Y3'});
+    const s=rand(200,999),r=rand(3,99); rev.push({text:`${s} − ${r} =`,answer:s-r,marks:1,yg:'Y3'});
+    const bt=rand(10,200),tot=rand(bt+100,bt+600); rev.push({text:`[BOX] + ${bt} = ${tot}`,answer:tot-bt,box:true,marks:1,yg:'Y3'});
+    const az=rand(10,999); rev.push({text:`${az} × 0 =`,answer:0,marks:1,yg:'Y3'});
+    const d2=pick([2,4,5,8,10]),q2=rand(2,10); rev.push({text:`${d2*q2} ÷ ${d2} =`,answer:q2,marks:1,yg:'Y3'});
+    qs = shuffleArr(qs.map(q => q.yg ? q : {...q, yg:'Y4'}).concat(rev));
   }
-
-  // ── Y4 content ──────────────────────────────────────────────────────────────
-  if (t.placeValue){const a=pick([2,3,4,5,6,7,8,9,12,15,20,25]);qs.push({text:`${a} × 1000 =`,answer:a*1000,marks:1});}else qs.push(tt());
-  if (t.placeValue){const b=pick([30,40,50,60,70,80,90,120,150,200,350,700]);qs.push({text:`${b} ÷ 10 =`,answer:b/10,marks:1});}else qs.push(tt());
-  if (t.placeValue){const c=rand(2,99);qs.push({text:`${c} × 100 =`,answer:c*100,marks:1});}else qs.push(tt());
-  if (t.mentalCalc){const a=rand(10,40),b=rand(10,40),c=rand(10,40);qs.push({text:`${a} + ${b} + ${c} =`,answer:a+b+c,marks:1});}else qs.push(tt());
-  if (t.mentalCalc){const g=rand(1001,8999);qs.push({text:`${g} + 1000 =`,answer:g+1000,marks:1});}else qs.push(tt());
-  if (t.mentalCalc){const h=pick([500,600,700,800,900,1000,1200]),j=pick([100,200,300,400]);qs.push({text:`${h} - ${j} =`,answer:h-j,marks:1});}else qs.push(tt());
-  if (t.mentalCalc){const k=rand(20,90),l=rand(3,Math.floor(k/3));qs.push({text:`${k} - ${l} - ${l} =`,answer:k-2*l,marks:1});}else qs.push(tt());
-  if (t.mentalCalc){const m=rand(1,8)*100,n=rand(1,8)*100;qs.push({text:`${m} + ${n} =`,answer:m+n,marks:1});}else qs.push(tt());
-  if (t.missingNumbers){const p=rand(10,100),q=rand(p+10,p+200);qs.push({text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1});}else qs.push(tt());
-  if (t.missingNumbers&&t.columnCalc){const r=rand(200,999),s=rand(50,r-50);qs.push({text:`${r} - [BOX] = ${s}`,answer:r-s,box:true,col:true,marks:1});}
-  else if (t.columnCalc){let a,b;do{a=rand(1000,8999);b=rand(1000,9999-a);}while(!hasRegroup(a,b,'add'));qs.push({text:`${a} + ${b} =`,answer:a+b,col:true,marks:1});}
-  else qs.push(tt());
-  if (t.columnCalc){let a,b;do{a=rand(1000,8999);b=rand(1000,9999-a);}while(!hasRegroup(a,b,'add'));qs.push({text:`${a} + ${b} =`,answer:a+b,col:true,marks:1});}else qs.push(tt());
-  if (t.columnCalc){let a,b;do{a=rand(2000,9999);b=rand(1000,a-500);}while(!hasRegroup(a,b,'sub'));qs.push({text:`${a} - ${b} =`,answer:a-b,col:true,marks:1});}else qs.push(tt());
-  if (t.timesTables){const a=rand(2,12);qs.push({text:`${a} × 12 =`,answer:a*12,marks:1});}else qs.push(tt());
-  {const a=rand(3,20);qs.push({text:`${a} × 1 =`,answer:a,marks:1});}
-  if (t.fractions){const d=pick([2,3,4,5,8,10]),n=rand(1,d-1),a=d*rand(2,12);qs.push({text:`${n}/${d} of ${a} =`,answer:n*a/d,marks:1});}else qs.push(tt());
-  if (t.timesTables){const f=pick([11,12]),a=rand(2,12);qs.push({text:`${a} × ${f} =`,answer:a*f,marks:1});}else qs.push(tt());
-  if (t.placeValue){const a=rand(2,99);qs.push({text:`${a} × 10 =`,answer:a*10,marks:1});}else qs.push(tt());
-  qs.push(tt());
-  if (t.timesTables){let a,b,c;do{a=rand(2,5);b=rand(2,5);c=rand(2,4);}while(a*b*c>=100);qs.push({text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1});}else qs.push(tt());
-  if (t.timesTables){let a,b,c;do{a=rand(2,4);b=rand(2,4);c=rand(2,4);}while(a*b*c>=100||a*b*c<8);qs.push({text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1});}else qs.push(tt());
-  if (t.shortMult){const ab=rand(11,49),f=pick([3,4,5,6,7,8]);qs.push({text:`${ab} × ${f} =`,answer:ab*f,work:true,marks:1});}else qs.push({...tt(),work:true});
-  if (t.shortMult){let abc,f;do{abc=rand(101,499);f=pick([3,4,5,6]);}while(abc*f>=1000);qs.push({text:`${abc} × ${f} =`,answer:abc*f,work:true,marks:1});}else qs.push({...tt(),work:true});
-  if (t.division){const b=pick([6,7,8,9]),q=rand(2,12);qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1});}else qs.push(tt());
-  if (t.division){const b=pick([6,7,8,9]),q=rand(2,12);qs.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1});}else qs.push(tt());
-  if (t.division){const d=pick([6,7,8,9]),q=rand(11,30);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
-  if (t.division){const d=pick([6,7,8,9]),q=rand(11,99);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
-  if (t.fractions){
-    const denoms=[2,3,4,5,6,8,10],d=pick(denoms);
-    const n1=rand(1,d-2),n2=rand(1,d-n1-1);
-    const sum=n1+n2,g=gcd(sum,d);
-    const ans=sum===d?'1':(d/g===1?`${sum/g}`:`${sum/g}/${d/g}`);
-    qs.push({frac:[[n1,d],[n2,d]],answer:ans,marks:1});
-  } else qs.push(tt());
-  if (t.missingNumbers){const p=rand(100,500),q=rand(p+10,p+1000);qs.push({text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1});}else qs.push(tt());
-  if (t.mentalCalc){const a=rand(3,9)*1000,b=rand(1,a/1000-1)*1000;qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1});}else qs.push(tt());
-  // Place value decomposition: 4-digit number with missing hundreds (matches Y6 Y4-band slot)
-  if (t.placeValue){const th=rand(1,9),h=rand(1,9),t_=rand(10,99);const total=th*1000+h*100+t_;qs.push({text:`${total.toLocaleString()} = ${th},000 + [BOX] + ${t_}`,answer:h*100,box:true,marks:1});}else qs.push(tt());
-  if (t.y4Y3content) return qs.map(q => q.yg ? q : {...q, yg:'Y4'});
   return qs;
 }
 
-// ─── Y5 ARITHMETIC GENERATOR (38–55 questions depending on prior content) ─────
-function genY5Arith(t) {
-  const qs = [];
+// ─── Y5 ARITHMETIC GENERATOR ────────────────────────────────────────────────
+function genY5Arith(t, targetCount) {
   const tt = () => { const a=rand(2,12),b=rand(2,12); return {text:`${a} × ${b} =`,answer:a*b,marks:1}; };
 
-  // ── Y3 prior content (7 questions) ──────────────────────────────────────────
+  const pools = {
+    y5PlaceValue: [
+      () => { const a=rand(2,99); return {text:`${a} × 10 =`,answer:a*10,marks:1}; },
+      () => { const a=pick([3,4,5,6,7,8,12,15,20,25,50]); return {text:`${a} × 1000 =`,answer:a*1000,marks:1}; },
+      () => { const a=rand(2,9); return {text:`${a} × 100 =`,answer:a*100,marks:1}; },
+      () => { const a=pick([3.2,4.5,6.1,7.8,12.5,20.4,0.35,1.2]); return {text:`${a} × 10 =`,answer:parseFloat((a*10).toFixed(4)),marks:1}; },
+      () => { const a=pick([320,450,610,780,1250,2040]); return {text:`${a} ÷ 100 =`,answer:parseFloat((a/100).toFixed(4)),marks:1}; },
+      () => { const a=rand(2,9)*1000; return {text:`${a} ÷ 1000 =`,answer:a/1000,marks:1}; },
+    ],
+    y5Mental: [
+      () => { const a=rand(10000,49999),b=rand(1000,9999); return {text:`${a} + ${b} =`,answer:a+b,marks:1}; },
+      () => { const a=rand(20000,79999),b=rand(1000,9999); return {text:`${a} - ${b} =`,answer:a-b,marks:1}; },
+    ],
+    y5Column: [
+      () => { const a=rand(20000,79999),b=rand(10000,20000); return {text:`${a} + ${b} =`,answer:a+b,col:true,marks:1}; },
+      () => { const a=rand(30000,99999),b=rand(10000,a-5000); return {text:`${a} - ${b} =`,answer:a-b,col:true,marks:1}; },
+    ],
+    y5ShortMult: [
+      () => { const a=rand(1002,3999),b=rand(3,9); return {text:`${a} × ${b} =`,answer:a*b,work:true,marks:1}; },
+      () => { const a=rand(1002,2499),b=rand(3,4); return {text:`${a} × ${b} =`,answer:a*b,work:true,marks:1}; },
+    ],
+    y5LongMult: [
+      () => { const a=rand(100,999),b=rand(11,99); return {longMult:{a,b},answer:a*b,marks:2}; },
+      () => { const a=rand(1000,9999),b=rand(12,79); return {longMult:{a,b},answer:a*b,marks:2}; },
+    ],
+    y5Division: [
+      () => { const d=pick([6,7,8,9]),q=rand(12,99); return {text:`${d*q} ÷ ${d} =`,answer:q,marks:1}; },
+      () => { const d=pick([6,7,8,9]),q=rand(100,400); return {text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1}; },
+    ],
+    y5Decimals: [
+      () => { const a=rand(10,99)/10,b=rand(100,999)/1000; return {text:`${a.toFixed(1)} + ${b.toFixed(3)} =`,answer:parseFloat((a+b).toFixed(3)),marks:1}; },
+      () => { const a=rand(10,50),b=rand(100,999)/1000; return {text:`${a} - ${b.toFixed(3)} =`,answer:parseFloat((a-b).toFixed(3)),marks:1}; },
+      () => { const a=rand(2,9),b=rand(11,99)/10; return {text:`${a} × ${b.toFixed(1)} =`,answer:parseFloat((a*b).toFixed(1)),marks:1}; },
+      () => { const a=pick([3.2,4.5,6.1,7.8,9.6,12.5]); return {text:`${a} ÷ 10 =`,answer:parseFloat((a/10).toFixed(3)),marks:1}; },
+    ],
+    y5Fractions: [
+      () => {
+        const pairs=[[1,2,1,4],[1,3,1,6],[1,4,1,8],[2,3,1,6],[3,4,1,8],[1,2,1,3]];
+        const [n1,d1,n2,d2]=pick(pairs);
+        const lcd=d1*d2/gcd(d1,d2),an=n1*(lcd/d1)+n2*(lcd/d2);
+        return {frac:[[n1,d1],[n2,d2]],fracOp:'+',answer:fracStr(an,lcd),marks:1};
+      },
+      () => {
+        const pairs=[[3,4,1,2],[5,6,1,3],[7,8,1,4],[2,3,1,6]];
+        const [n1,d1,n2,d2]=pick(pairs);
+        const lcd=d1*d2/gcd(d1,d2),an=n1*(lcd/d1)-n2*(lcd/d2);
+        return {frac:[[n1,d1],[n2,d2]],fracOp:'-',answer:fracStr(an,lcd),marks:1};
+      },
+      () => { const d=pick([3,4,5,6,8]),n=rand(1,d-1),m=rand(2,6); return {text:`${n}/${d} × ${m} =`,answer:fracStr(n*m,d),marks:1}; },
+      () => { const d=pick([3,4,5,6,8]),n=rand(1,d-1),m=rand(2,4); return {text:`${n}/${d} ÷ ${m} =`,answer:fracStr(n,d*m),marks:1}; },
+      () => { const w1=rand(1,4),w2=rand(1,4),d=pick([3,4,5,6]),n1=rand(1,d-1),n2=rand(1,d-1);const sn=n1+n2,sw=w1+w2+Math.floor(sn/d);const sr=sn%d; return {text:`${w1} ${n1}/${d} + ${w2} ${n2}/${d} =`,answer:sr===0?`${sw}`:`${sw} ${sr}/${d}`,marks:1}; },
+      () => { const d=pick([3,4,5,6,8,10]),n=rand(2,d-1),a=d*rand(5,15); return {text:`${n}/${d} of ${a} =`,answer:n*a/d,marks:1}; },
+      () => {
+        const pairs=[[3,4],[4,5],[3,5],[2,3],[2,5]];
+        const [d1,d2]=pick(pairs);
+        const lcd=d1*d2/gcd(d1,d2),n1=rand(1,d1-1),n2=rand(1,d2-1);
+        const w1=rand(3,8),w2=rand(1,w1-1);
+        const fn1=n1*(lcd/d1),fn2=n2*(lcd/d2);
+        let rw,rn;
+        if(fn1>=fn2){rw=w1-w2;rn=fn1-fn2;}else{rw=w1-w2-1;rn=fn1+lcd-fn2;}
+        const g2=gcd(rn,lcd);
+        const ans=rn===0?`${rw}`:`${rw} ${rn/g2}/${lcd/g2}`;
+        return {text:`${w1} ${n1}/${d1} − ${w2} ${n2}/${d2} =`,answer:ans,marks:1};
+      },
+    ],
+    y5Percentages: [
+      () => { const a=rand(2,20)*10; return {text:`50% of ${a} =`,answer:a/2,marks:1}; },
+      () => { const a=rand(2,20)*4; return {text:`25% of ${a} =`,answer:a/4,marks:1}; },
+      () => { const a=rand(2,20)*10; return {text:`10% of ${a} =`,answer:a/10,marks:1}; },
+      () => { const a=rand(2,20)*4; return {text:`75% of ${a} =`,answer:a*3/4,marks:1}; },
+    ],
+    y5Missing: [
+      () => { const p=rand(100,999),q=rand(p+100,p+5000); return {text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1}; },
+    ],
+    _core: [
+      () => tt(),
+      () => { let a,b,c;do{a=rand(2,6);b=rand(2,6);c=rand(2,6);}while(a*b*c>200); return {text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1}; },
+      () => tt(),
+    ],
+  };
+
+  let qs = buildFromPools(pools, {...t, _core:true}, targetCount, tt);
+
+  // ── Y3/Y4 prior content (7 + 10 fixed revision questions, prepended) ────────
+  const rev = [];
   if (t.y5Y3content) {
-    const a=rand(200,899),b=rand(11,89); qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'});
-    const d1=pick([2,4,5,8,10]),q1=rand(2,12); qs.push({text:`${d1*q1} ÷ ${d1} =`,answer:q1,marks:1,yg:'Y3'});
-    const ax=pick([2,4,5,8,10]),bx=rand(11,49); qs.push({text:`${ax} × ${bx} =`,answer:ax*bx,marks:1,yg:'Y3'});
-    const s=rand(200,999),r=rand(3,99); qs.push({text:`${s} − ${r} =`,answer:s-r,marks:1,yg:'Y3'});
-    const bt=rand(10,200),tot=rand(bt+100,bt+600); qs.push({text:`[BOX] + ${bt} = ${tot}`,answer:tot-bt,box:true,marks:1,yg:'Y3'});
-    const az=rand(10,999); qs.push({text:`${az} × 0 =`,answer:0,marks:1,yg:'Y3'});
-    const d2=pick([2,4,5,8,10]),q2=rand(2,10); qs.push({text:`${d2*q2} ÷ ${d2} =`,answer:q2,marks:1,yg:'Y3'});
+    const a=rand(200,899),b=rand(11,89); rev.push({text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'});
+    const d1=pick([2,4,5,8,10]),q1=rand(2,12); rev.push({text:`${d1*q1} ÷ ${d1} =`,answer:q1,marks:1,yg:'Y3'});
+    const ax=pick([2,4,5,8,10]),bx=rand(11,49); rev.push({text:`${ax} × ${bx} =`,answer:ax*bx,marks:1,yg:'Y3'});
+    const s=rand(200,999),r=rand(3,99); rev.push({text:`${s} − ${r} =`,answer:s-r,marks:1,yg:'Y3'});
+    const bt=rand(10,200),tot=rand(bt+100,bt+600); rev.push({text:`[BOX] + ${bt} = ${tot}`,answer:tot-bt,box:true,marks:1,yg:'Y3'});
+    const az=rand(10,999); rev.push({text:`${az} × 0 =`,answer:0,marks:1,yg:'Y3'});
+    const d2=pick([2,4,5,8,10]),q2=rand(2,10); rev.push({text:`${d2*q2} ÷ ${d2} =`,answer:q2,marks:1,yg:'Y3'});
   }
-
-  // ── Y4 prior content (10 questions) ─────────────────────────────────────────
   if (t.y5Y4content) {
-    const a=rand(1000,9999),b=rand(1000,9999); qs.push({text:`${a.toLocaleString()} + ${b.toLocaleString()} =`,answer:a+b,marks:1,yg:'Y4'});
+    const a=rand(1000,9999),b=rand(1000,9999); rev.push({text:`${a.toLocaleString()} + ${b.toLocaleString()} =`,answer:a+b,marks:1,yg:'Y4'});
     let aa,bb; do{aa=rand(1000,9999);bb=rand(1000,aa-100);}while(!hasRegroup(aa,bb,'sub'));
-    qs.push({text:`${aa} - ${bb} =`,answer:aa-bb,marks:1,yg:'Y4'});
-    const m=rand(12,99),n=pick([10,100,1000]); qs.push({text:`${m} × ${n} =`,answer:m*n,marks:1,yg:'Y4'});
+    rev.push({text:`${aa} - ${bb} =`,answer:aa-bb,marks:1,yg:'Y4'});
+    const m=rand(12,99),n=pick([10,100,1000]); rev.push({text:`${m} × ${n} =`,answer:m*n,marks:1,yg:'Y4'});
     let fa,fb,fc; do{fa=rand(2,5);fb=rand(2,5);fc=rand(2,5);}while(fa*fb*fc>=100);
-    qs.push({text:`${fa} × ${fb} × ${fc} =`,answer:fa*fb*fc,marks:1,yg:'Y4'});
-    const sa=rand(100,499),sb=rand(3,9); qs.push({text:`${sa} × ${sb} =`,answer:sa*sb,marks:1,yg:'Y4'});
-    const db=rand(3,12),dq=rand(10,99); qs.push({text:`${db*dq} ÷ ${db} =`,answer:dq,marks:1,yg:'Y4'});
-    const p=rand(50,500),qv=rand(p+10,p+500); qs.push({text:`[BOX] + ${p} = ${qv}`,answer:qv-p,box:true,marks:1,yg:'Y4'});
-    const ta=rand(2,12),tb=rand(8,12); qs.push({text:`${ta} × ${tb} =`,answer:ta*tb,marks:1,yg:'Y4'});
+    rev.push({text:`${fa} × ${fb} × ${fc} =`,answer:fa*fb*fc,marks:1,yg:'Y4'});
+    const sa=rand(100,499),sb=rand(3,9); rev.push({text:`${sa} × ${sb} =`,answer:sa*sb,marks:1,yg:'Y4'});
+    const db=rand(3,12),dq=rand(10,99); rev.push({text:`${db*dq} ÷ ${db} =`,answer:dq,marks:1,yg:'Y4'});
+    const p=rand(50,500),qv=rand(p+10,p+500); rev.push({text:`[BOX] + ${p} = ${qv}`,answer:qv-p,box:true,marks:1,yg:'Y4'});
+    const ta=rand(2,12),tb=rand(8,12); rev.push({text:`${ta} × ${tb} =`,answer:ta*tb,marks:1,yg:'Y4'});
     const th=rand(1,9),h=rand(1,9),t_=rand(10,99),ptot=th*1000+h*100+t_;
-    qs.push({text:`${ptot.toLocaleString()} = ${th},000 + [BOX] + ${t_}`,answer:h*100,box:true,marks:1,yg:'Y4'});
-    const dd=rand(3,9),dqq=rand(11,50); qs.push({text:`${dd*dqq} ÷ ${dd} =`,answer:dqq,marks:1,yg:'Y4'});
+    rev.push({text:`${ptot.toLocaleString()} = ${th},000 + [BOX] + ${t_}`,answer:h*100,box:true,marks:1,yg:'Y4'});
+    const dd=rand(3,9),dqq=rand(11,50); rev.push({text:`${dd*dqq} ÷ ${dd} =`,answer:dqq,marks:1,yg:'Y4'});
   }
-
-  // ── Y5 content ──────────────────────────────────────────────────────────────
-  // Place value & powers of 10
-  if (t.y5PlaceValue){const a=rand(2,99);qs.push({text:`${a} × 10 =`,answer:a*10,marks:1});}else qs.push(tt());
-  if (t.y5PlaceValue){const a=pick([3,4,5,6,7,8,12,15,20,25,50]);qs.push({text:`${a} × 1000 =`,answer:a*1000,marks:1});}else qs.push(tt());
-  if (t.y5PlaceValue){const a=rand(2,9);qs.push({text:`${a} × 100 =`,answer:a*100,marks:1});}else qs.push(tt());
-  if (t.y5PlaceValue){const a=pick([3.2,4.5,6.1,7.8,12.5,20.4,0.35,1.2]);qs.push({text:`${a} × 10 =`,answer:parseFloat((a*10).toFixed(4)),marks:1});}else qs.push(tt());
-  if (t.y5PlaceValue){const a=pick([320,450,610,780,1250,2040]);qs.push({text:`${a} ÷ 100 =`,answer:parseFloat((a/100).toFixed(4)),marks:1});}else qs.push(tt());
-  if (t.y5PlaceValue){const a=rand(2,9)*1000;qs.push({text:`${a} ÷ 1000 =`,answer:a/1000,marks:1});}else qs.push(tt());
-  // Mental (large numbers)
-  if (t.y5Mental){const a=rand(10000,49999),b=rand(1000,9999);qs.push({text:`${a} + ${b} =`,answer:a+b,marks:1});}else qs.push(tt());
-  if (t.y5Mental){const a=rand(20000,79999),b=rand(1000,9999);qs.push({text:`${a} - ${b} =`,answer:a-b,marks:1});}else qs.push(tt());
-  // Column methods (5-digit)
-  if (t.y5Column){const a=rand(20000,79999),b=rand(10000,20000);qs.push({text:`${a} + ${b} =`,answer:a+b,col:true,marks:1});}else qs.push({...tt(),col:true});
-  if (t.y5Column){const a=rand(30000,99999),b=rand(10000,a-5000);qs.push({text:`${a} - ${b} =`,answer:a-b,col:true,marks:1});}else qs.push({...tt(),col:true});
-  // Short multiplication (4-digit × 1-digit)
-  if (t.y5ShortMult){const a=rand(1002,3999),b=rand(3,9);qs.push({text:`${a} × ${b} =`,answer:a*b,work:true,marks:1});}else qs.push({...tt(),work:true});
-  if (t.y5ShortMult){const a=rand(1002,2499),b=rand(3,4);qs.push({text:`${a} × ${b} =`,answer:a*b,work:true,marks:1});}else qs.push({...tt(),work:true});
-  // Long multiplication (2D×3D and 2D×4D, 2 marks each)
-  if (t.y5LongMult){const a=rand(100,999),b=rand(11,99);qs.push({longMult:{a,b},answer:a*b,marks:2});}else qs.push({...tt(),work:true});
-  if (t.y5LongMult){const a=rand(1000,9999),b=rand(12,79);qs.push({longMult:{a,b},answer:a*b,marks:2});}else qs.push({...tt(),work:true});
-  // Division
-  if (t.y5Division){const d=pick([6,7,8,9]),q=rand(12,99);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1});}else qs.push(tt());
-  if (t.y5Division){const d=pick([6,7,8,9]),q=rand(100,400);qs.push({text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1});}else qs.push({...tt(),work:true});
-  // Decimals
-  if (t.y5Decimals){const a=rand(10,99)/10,b=rand(100,999)/1000;qs.push({text:`${a.toFixed(1)} + ${b.toFixed(3)} =`,answer:parseFloat((a+b).toFixed(3)),marks:1});}else qs.push(tt());
-  if (t.y5Decimals){const a=rand(10,50),b=rand(100,999)/1000;qs.push({text:`${a} - ${b.toFixed(3)} =`,answer:parseFloat((a-b).toFixed(3)),marks:1});}else qs.push(tt());
-  if (t.y5Decimals){const a=rand(2,9),b=rand(11,99)/10;qs.push({text:`${a} × ${b.toFixed(1)} =`,answer:parseFloat((a*b).toFixed(1)),marks:1});}else qs.push(tt());
-  if (t.y5Decimals){const a=pick([3.2,4.5,6.1,7.8,9.6,12.5]);qs.push({text:`${a} ÷ 10 =`,answer:parseFloat((a/10).toFixed(3)),marks:1});}else qs.push(tt());
-  // Fractions (different denominators)
-  if (t.y5Fractions){
-    const pairs=[[1,2,1,4],[1,3,1,6],[1,4,1,8],[2,3,1,6],[3,4,1,8],[1,2,1,3]];
-    const [n1,d1,n2,d2]=pick(pairs);
-    const lcd=d1*d2/gcd(d1,d2),an=n1*(lcd/d1)+n2*(lcd/d2);
-    qs.push({frac:[[n1,d1],[n2,d2]],fracOp:'+',answer:fracStr(an,lcd),marks:1});
-  } else qs.push(tt());
-  if (t.y5Fractions){
-    const pairs=[[3,4,1,2],[5,6,1,3],[7,8,1,4],[2,3,1,6]];
-    const [n1,d1,n2,d2]=pick(pairs);
-    const lcd=d1*d2/gcd(d1,d2),an=n1*(lcd/d1)-n2*(lcd/d2);
-    qs.push({frac:[[n1,d1],[n2,d2]],fracOp:'-',answer:fracStr(an,lcd),marks:1});
-  } else qs.push(tt());
-  if (t.y5Fractions){const d=pick([3,4,5,6,8]),n=rand(1,d-1),m=rand(2,6);qs.push({text:`${n}/${d} × ${m} =`,answer:fracStr(n*m,d),marks:1});}else qs.push(tt());
-  if (t.y5Fractions){const d=pick([3,4,5,6,8]),n=rand(1,d-1),m=rand(2,4);qs.push({text:`${n}/${d} ÷ ${m} =`,answer:fracStr(n,d*m),marks:1});}else qs.push(tt());
-  // Mixed numbers
-  if (t.y5Fractions){const w1=rand(1,4),w2=rand(1,4),d=pick([3,4,5,6]),n1=rand(1,d-1),n2=rand(1,d-1);const sn=n1+n2,sw=w1+w2+Math.floor(sn/d);const sr=sn%d;qs.push({text:`${w1} ${n1}/${d} + ${w2} ${n2}/${d} =`,answer:sr===0?`${sw}`:`${sw} ${sr}/${d}`,marks:1});}else qs.push(tt());
-  // Percentages
-  if (t.y5Percentages){const a=rand(2,20)*10;qs.push({text:`50% of ${a} =`,answer:a/2,marks:1});}else qs.push(tt());
-  if (t.y5Percentages){const a=rand(2,20)*4;qs.push({text:`25% of ${a} =`,answer:a/4,marks:1});}else qs.push(tt());
-  if (t.y5Percentages){const a=rand(2,20)*10;qs.push({text:`10% of ${a} =`,answer:a/10,marks:1});}else qs.push(tt());
-  if (t.y5Percentages){const a=rand(2,20)*4;qs.push({text:`75% of ${a} =`,answer:a*3/4,marks:1});}else qs.push(tt());
-  // Fraction of amount — non-unit fractions with substantial amounts (Y5 level)
-  if (t.y5Fractions){const d=pick([3,4,5,6,8,10]),n=rand(2,d-1),a=d*rand(5,15);qs.push({text:`${n}/${d} of ${a} =`,answer:n*a/d,marks:1});}else qs.push(tt());
-  // Missing numbers
-  if (t.y5Missing){const p=rand(100,999),q=rand(p+100,p+5000);qs.push({text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1});}else qs.push(tt());
-  // Times tables extended
-  {const a=rand(2,12),b=rand(2,12);qs.push({text:`${a} × ${b} =`,answer:a*b,marks:1});}
-  // Three-factor
-  {let a,b,c;do{a=rand(2,6);b=rand(2,6);c=rand(2,6);}while(a*b*c>200);qs.push({text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1});}
-  // Mixed number subtraction with unlike denominators (e.g. 3 1/4 − 2 4/5)
-  if (t.y5Fractions){
-    const pairs=[[3,4],[4,5],[3,5],[2,3],[2,5]];
-    const [d1,d2]=pick(pairs);
-    const lcd=d1*d2/gcd(d1,d2),n1=rand(1,d1-1),n2=rand(1,d2-1);
-    const w1=rand(3,8),w2=rand(1,w1-1);
-    const fn1=n1*(lcd/d1),fn2=n2*(lcd/d2);
-    let rw,rn;
-    if(fn1>=fn2){rw=w1-w2;rn=fn1-fn2;}else{rw=w1-w2-1;rn=fn1+lcd-fn2;}
-    const g2=gcd(rn,lcd);
-    const ans=rn===0?`${rw}`:`${rw} ${rn/g2}/${lcd/g2}`;
-    qs.push({text:`${w1} ${n1}/${d1} − ${w2} ${n2}/${d2} =`,answer:ans,marks:1});
-  }else qs.push(tt());
-  // Equivalent fractions removed — belongs in reasoning, not arithmetic
-  qs.push(tt());
-  if (t.y5Y3content || t.y5Y4content) return qs.map(q => q.yg ? q : {...q, yg:'Y5'});
+  if (rev.length) qs = shuffleArr(qs.map(q => q.yg ? q : {...q, yg:'Y5'}).concat(rev));
   return qs;
 }
 
 // ─── Y6 ARITHMETIC GENERATOR (36 questions, /40) ──────────────────────────────
-function genY6Arith(t, sortByYear) {
-  const slots = [];
-  const tf = (yg) => { const a=rand(2,12),b=rand(2,12); return {text:`${a} × ${b} =`,answer:a*b,marks:1,yg}; };
+function genY6Arith(t, sortByYear, targetCount) {
+  const tf = () => { const a=rand(2,12),b=rand(2,12); return {text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y6'}; };
 
-  // ── Y3 slots (7 questions, 7 marks) ──────────────────────────────────────
-  if (t.y6Y3content) {
-    const a=rand(200,899),b=rand(11,89); slots.push({text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'});
-  } else slots.push(tf('Y3'));
-  if (t.y6Y3content) {
-    const d=pick([2,4,5,8,10]),q=rand(2,12); slots.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1,yg:'Y3'});
-  } else slots.push(tf('Y3'));
-  if (t.y6Y3content) {
-    const a=pick([2,4,5,8,10]),b=rand(11,49); slots.push({text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y3'});
-  } else slots.push(tf('Y3'));
-  if (t.y6Y3content) {
-    const a=rand(200,999),b=rand(3,99); slots.push({text:`${a} − ${b} =`,answer:a-b,marks:1,yg:'Y3'});
-  } else slots.push(tf('Y3'));
-  if (t.y6Y3content) {
-    const b=rand(10,200),total=rand(b+100,b+600); slots.push({text:`[BOX] + ${b} = ${total}`,answer:total-b,box:true,marks:1,yg:'Y3'});
-  } else slots.push(tf('Y3'));
-  if (t.y6Y3content) {
-    const a=rand(10,999); slots.push({text:`${a} × 0 =`,answer:0,marks:1,yg:'Y3'});
-  } else slots.push(tf('Y3'));
-  if (t.y6Y3content) {
-    const d=pick([2,4,5,8,10]),q=rand(2,10);
-    slots.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1,yg:'Y3'});
-  } else slots.push(tf('Y3'));
+  const pools = {
+    y6Y3content: [
+      () => { const a=rand(200,899),b=rand(11,89); return {text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'}; },
+      () => { const d=pick([2,4,5,8,10]),q=rand(2,12); return {text:`${d*q} ÷ ${d} =`,answer:q,marks:1,yg:'Y3'}; },
+      () => { const a=pick([2,4,5,8,10]),b=rand(11,49); return {text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y3'}; },
+      () => { const a=rand(200,999),b=rand(3,99); return {text:`${a} − ${b} =`,answer:a-b,marks:1,yg:'Y3'}; },
+      () => { const b=rand(10,200),total=rand(b+100,b+600); return {text:`[BOX] + ${b} = ${total}`,answer:total-b,box:true,marks:1,yg:'Y3'}; },
+      () => { const a=rand(10,999); return {text:`${a} × 0 =`,answer:0,marks:1,yg:'Y3'}; },
+      () => { const d=pick([2,4,5,8,10]),q=rand(2,10); return {text:`${d*q} ÷ ${d} =`,answer:q,marks:1,yg:'Y3'}; },
+    ],
+    y6Y4content: [
+      () => { const a=rand(1000,9999),b=rand(1000,9999); return {text:`${a.toLocaleString()} + ${b.toLocaleString()} =`,answer:a+b,marks:1,yg:'Y4'}; },
+      () => { let aa,bb;do{aa=rand(1000,9999);bb=rand(1000,aa-100);}while(!hasRegroup(aa,bb,'sub')); return {text:`${aa} - ${bb} =`,answer:aa-bb,marks:1,yg:'Y4'}; },
+      () => { const a=rand(12,99),b=pick([10,100,1000]); return {text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y4'}; },
+      () => { let a,b,c;do{a=rand(2,5);b=rand(2,5);c=rand(2,5);}while(a*b*c>=100); return {text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1,yg:'Y4'}; },
+      () => { const a=rand(100,499),b=rand(3,9); return {text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y4'}; },
+      () => { const b=rand(3,12),q=rand(10,99); return {text:`${b*q} ÷ ${b} =`,answer:q,marks:1,yg:'Y4'}; },
+      () => { const p=rand(50,500),q=rand(p+10,p+500); return {text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1,yg:'Y4'}; },
+      () => { const a=rand(2,12),b=rand(8,12); return {text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y4'}; },
+      () => { const th=rand(1,9),h=rand(1,9),t_=rand(10,99);const total=th*1000+h*100+t_; return {text:`${total.toLocaleString()} = ${th},000 + [BOX] + ${t_}`,answer:h*100,box:true,marks:1,yg:'Y4'}; },
+      () => { const d=rand(3,9),q=rand(11,50); return {text:`${d*q} ÷ ${d} =`,answer:q,marks:1,yg:'Y4'}; },
+    ],
+    y6Y5decimals: [
+      () => { const a=rand(10,99)/10,b=rand(100,999)/1000; return {text:`${a.toFixed(1)} + ${b.toFixed(3)} =`,answer:parseFloat((a+b).toFixed(3)),marks:1,yg:'Y5'}; },
+      () => { const a=rand(10,50),b=rand(100,999)/1000; return {text:`${a} - ${b.toFixed(3)} =`,answer:parseFloat((a-b).toFixed(3)),marks:1,yg:'Y5'}; },
+      () => { const b=pick([10,100,1000]),c=rand(10,99)/100; return {text:`${c.toFixed(2)} × ${b} =`,answer:parseFloat((c*b).toFixed(2)),marks:1,yg:'Y5'}; },
+    ],
+    y6Y5fractions: [
+      () => {
+        const pairs=[[5,12,1,3],[2,5,1,2],[3,4,2,5],[5,6,3,4],[2,3,1,5],[3,5,3,4]];
+        const [n1,d1,n2,d2]=pick(pairs);
+        const lcd=d1*d2/gcd(d1,d2),an=n1*(lcd/d1)+n2*(lcd/d2);
+        return {frac:[[n1,d1],[n2,d2]],fracOp:'+',answer:fracStr(an,lcd),marks:1,yg:'Y5'};
+      },
+      () => {
+        const pairs=[[5,6,1,4],[7,8,2,5],[3,4,2,7],[5,6,3,10],[7,10,1,4],[2,3,1,5]];
+        const [n1,d1,n2,d2]=pick(pairs);
+        const lcd=d1*d2/gcd(d1,d2),an=n1*(lcd/d1)-n2*(lcd/d2);
+        return {frac:[[n1,d1],[n2,d2]],fracOp:'-',answer:fracStr(an,lcd),marks:1,yg:'Y5'};
+      },
+      () => { const d=pick([3,4,5,6,8,10]),n=rand(2,d-1),a=d*rand(5,15); return {text:`${n}/${d} of ${a} =`,answer:n*a/d,marks:1,yg:'Y5'}; },
+    ],
+    y6Y5percentages: [
+      () => { const pct=pick([5,15,20,30,35,40]),a=pick([120,160,180,200,240,250,280,300,320,360,400,450,480,500,600,720,860,900]); return {text:`${pct}% of ${a} =`,answer:a*pct/100,marks:1,yg:'Y6'}; },
+      () => { const big=rand(20000,99999),small=rand(1000,9999); return {text:`${big.toLocaleString()} - ${small.toLocaleString()} =`,answer:big-small,marks:1,yg:'Y5'}; },
+    ],
+    // Long multiplication is Y5 curriculum — tagged Y5
+    y6LongMult: [
+      () => { const a=rand(100,999),b=rand(11,99); return {longMult:{a,b},answer:a*b,marks:2,yg:'Y5'}; },
+      () => { const a=rand(1000,9999),b=rand(12,79); return {longMult:{a,b},answer:a*b,marks:2,yg:'Y5'}; },
+    ],
+    y6LongDiv: [
+      () => { let d,q;do{d=rand(11,49);q=rand(12,99);}while(d*q>9999||d*q<300); return {longDiv:{divisor:d,dividend:d*q},answer:q,marks:2,yg:'Y6'}; },
+      () => { let d,q;do{d=rand(13,79);q=rand(11,150);}while(d*q>99999||d*q<1000); return {longDiv:{divisor:d,dividend:d*q},answer:q,marks:2,yg:'Y6'}; },
+    ],
+    y6Bodmas: [
+      () => {
+        const pat=pick(['sq_add','cube_sub','sq_mult']);
+        let bt,ba;
+        if(pat==='sq_add'){const a=rand(2,9),b=rand(2,7),c=rand(2,8);bt=`${a} + ${b}<sup>2</sup> × ${c} =`;ba=a+b*b*c;}
+        else if(pat==='cube_sub'){const a=pick([2,3,4]),b=rand(2,9),c=rand(2,9);bt=`${a}<sup>3</sup> − ${b} × ${c} =`;ba=a*a*a-b*c;}
+        else{const a=rand(2,6),b=pick([2,3,4,5]),c=rand(1,9);bt=`${a} × ${b}<sup>2</sup> − ${c} =`;ba=a*b*b-c;}
+        return {text:bt,answer:ba,marks:1,yg:'Y6'};
+      },
+      () => {
+        const pat=pick(['brk_mult','brk_sq','brk_div_sq']);
+        let bt,ba;
+        if(pat==='brk_mult'){const a=rand(2,9),b=rand(2,9),c=rand(2,12);bt=`(${a} + ${b}) × ${c} =`;ba=(a+b)*c;}
+        else if(pat==='brk_sq'){const a=rand(2,6),b=pick([2,3,4]),c=rand(2,6);bt=`(${a} + ${b}<sup>2</sup>) × ${c} =`;ba=(a+b*b)*c;}
+        else{const b=pick([2,3,4]),div=pick([3,5,7]);const minQ=Math.ceil((b*b+1)/div);const q=rand(Math.max(2,minQ),Math.min(9,minQ+4));const x=div*q-b*b;bt=`(${b}<sup>2</sup> + ${x}) ÷ ${div} =`;ba=q;}
+        return {text:bt,answer:ba,marks:1,yg:'Y6'};
+      },
+    ],
+    y6PctComplex: [
+      () => { const pct=pick([20,30,35,40,45,60,65,70,75,80]),a=pick([120,150,200,240,250,300,360,400,500,600,700,800,900]); return {text:`${pct}% of ${a} =`,answer:a*pct/100,marks:1,yg:'Y6'}; },
+    ],
+    y6FracOps: [
+      () => { const n1=rand(1,4),d1=pick([3,4,5,6]),n2=rand(1,4),d2=pick([3,4,5,6]);const rn=n1*n2,rd=d1*d2,g=gcd(rn,rd); return {text:`${n1}/${d1} × ${n2}/${d2} =`,answer:fracStr(rn/g,rd/g),marks:1,yg:'Y6'}; },
+      () => { const d=pick([3,4,5,6,8]),n=rand(1,d-1),m=rand(2,6); return {text:`${n}/${d} ÷ ${m} =`,answer:fracStr(n,d*m),marks:1,yg:'Y6'}; },
+    ],
+    y6MixedNums: [
+      () => { const d=pick([4,5,8,10]),n1=rand(1,d-1),n2=rand(1,d-1),w1=rand(2,8),w2=rand(1,3);const an=n1+n2,aw=w1+w2+Math.floor(an/d),ar=an%d; return {text:`${w1} ${n1}/${d} + ${w2} ${n2}/${d} =`,answer:ar===0?`${aw}`:`${aw} ${ar}/${d}`,marks:1,yg:'Y6'}; },
+      () => { const d=pick([3,5,7,9]),n=rand(1,d-1),w=rand(1,4),m=rand(2,6); return {text:`${w} ${n}/${d} × ${m} =`,answer:fracStr((w*d+n)*m,d),marks:1,yg:'Y6'}; },
+    ],
+  };
 
-  // ── Y4 slots (10 questions, 10 marks) ────────────────────────────────────
-  if (t.y6Y4content) {
-    const a=rand(1000,9999),b=rand(1000,9999); slots.push({text:`${a.toLocaleString()} + ${b.toLocaleString()} =`,answer:a+b,marks:1,yg:'Y4'});
-  } else slots.push(tf('Y4'));
-  if (t.y6Y4content) {
-    const a=rand(1001,9999),b=rand(1000,a-100); let aa,bb;do{aa=rand(1000,9999);bb=rand(1000,aa-100);}while(!hasRegroup(aa,bb,'sub'));
-    slots.push({text:`${aa} - ${bb} =`,answer:aa-bb,marks:1,yg:'Y4'});
-  } else slots.push(tf('Y4'));
-  if (t.y6Y4content) {
-    const a=rand(12,99),b=pick([10,100,1000]);
-    slots.push({text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y4'});
-  } else slots.push(tf('Y4'));
-  if (t.y6Y4content) {
-    let a,b,c;do{a=rand(2,5);b=rand(2,5);c=rand(2,5);}while(a*b*c>=100);
-    slots.push({text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1,yg:'Y4'});
-  } else slots.push(tf('Y4'));
-  if (t.y6Y4content) {
-    const a=rand(100,499),b=rand(3,9); slots.push({text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y4'});
-  } else slots.push(tf('Y4'));
-  if (t.y6Y4content) {
-    const b=rand(3,12),q=rand(10,99); slots.push({text:`${b*q} ÷ ${b} =`,answer:q,marks:1,yg:'Y4'});
-  } else slots.push(tf('Y4'));
-  if (t.y6Y4content) {
-    const p=rand(50,500),q=rand(p+10,p+500); slots.push({text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1,yg:'Y4'});
-  } else slots.push(tf('Y4'));
-  if (t.y6Y4content) {
-    const a=rand(2,12),b=rand(8,12); slots.push({text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y4'});
-  } else slots.push(tf('Y4'));
-  if (t.y6Y4content) {
-    // Place value: 4-digit number decomposition (Y4 = numbers to 10,000)
-    const th=rand(1,9),h=rand(1,9),t_=rand(10,99);
-    const total=th*1000+h*100+t_;
-    slots.push({text:`${total.toLocaleString()} = ${th},000 + [BOX] + ${t_}`,answer:h*100,box:true,marks:1,yg:'Y4'});
-  } else slots.push(tf('Y4'));
-  if (t.y6Y4content) {
-    const d=rand(3,9),q=rand(11,50); slots.push({text:`${d*q} ÷ ${d} =`,answer:q,marks:1,yg:'Y4'});
-  } else slots.push(tf('Y4'));
+  let slots = buildFromPools(pools, t, targetCount, tf);
 
-  // ── Y5 slots (8 questions, 8 marks) ──────────────────────────────────────
-  if (t.y6Y5decimals) {
-    const a=rand(10,99)/10,b=rand(100,999)/1000;
-    slots.push({text:`${a.toFixed(1)} + ${b.toFixed(3)} =`,answer:parseFloat((a+b).toFixed(3)),marks:1,yg:'Y5'});
-  } else slots.push(tf('Y5'));
-  if (t.y6Y5decimals) {
-    const a=rand(10,50),b=rand(100,999)/1000;
-    slots.push({text:`${a} - ${b.toFixed(3)} =`,answer:parseFloat((a-b).toFixed(3)),marks:1,yg:'Y5'});
-  } else slots.push(tf('Y5'));
-  if (t.y6Y5decimals) {
-    const a=rand(2,9),b=pick([10,100,1000]),c=rand(10,99)/100;
-    slots.push({text:`${c.toFixed(2)} × ${b} =`,answer:parseFloat((c*b).toFixed(2)),marks:1,yg:'Y5'});
-  } else slots.push(tf('Y5'));
-  if (t.y6Y5fractions) {
-    const pairs=[[5,12,1,3],[2,5,1,2],[3,4,2,5],[5,6,3,4],[2,3,1,5],[3,5,3,4]];
-    const [n1,d1,n2,d2]=pick(pairs);
-    const lcd=d1*d2/gcd(d1,d2),an=n1*(lcd/d1)+n2*(lcd/d2);
-    slots.push({frac:[[n1,d1],[n2,d2]],fracOp:'+',answer:fracStr(an,lcd),marks:1,yg:'Y5'});
-  } else slots.push(tf('Y5'));
-  if (t.y6Y5fractions) {
-    const pairs=[[5,6,1,4],[7,8,2,5],[3,4,2,7],[5,6,3,10],[7,10,1,4],[2,3,1,5]];
-    const [n1,d1,n2,d2]=pick(pairs);
-    const lcd=d1*d2/gcd(d1,d2),an=n1*(lcd/d1)-n2*(lcd/d2);
-    slots.push({frac:[[n1,d1],[n2,d2]],fracOp:'-',answer:fracStr(an,lcd),marks:1,yg:'Y5'});
-  } else slots.push(tf('Y5'));
-  if (t.y6Y5fractions) {
-    const d=pick([3,4,5,6,8,10]),n=rand(2,d-1),a=d*rand(5,15);
-    slots.push({text:`${n}/${d} of ${a} =`,answer:n*a/d,marks:1,yg:'Y5'});
-  } else slots.push(tf('Y5'));
-  if (t.y6Y5percentages) {
-    const pct=pick([5,15,20,30,35,40]);
-    const a=pick([120,160,180,200,240,250,280,300,320,360,400,450,480,500,600,720,860,900]);
-    slots.push({text:`${pct}% of ${a} =`,answer:a*pct/100,marks:1,yg:'Y6'});
-  } else slots.push(tf('Y6'));
-  if (t.y6Y5percentages) {
-    const a=rand(10000,99999);
-    slots.push({text:`${a.toLocaleString()} - ${rand(10,999).toString().padStart(3,'0')} =`,answer:null,marks:1,yg:'Y5'});
-    // Fix: do a clean large subtraction
-    const big=rand(20000,99999),small=rand(1000,9999);
-    slots[slots.length-1]={text:`${big.toLocaleString()} - ${small.toLocaleString()} =`,answer:big-small,marks:1,yg:'Y5'};
-  } else slots.push(tf('Y5'));
-
-  // ── Y6 slots (long div + BODMAS + dividing fractions = true Y6 content) ────
-  // Long multiplication is Y5 curriculum — tagged Y5
-  if (t.y6LongMult) {
-    const a=rand(100,999),b=rand(11,99); slots.push({longMult:{a,b},answer:a*b,marks:2,yg:'Y5'});
-  } else slots.push({...tf('Y5'),work:true,marks:1});
-  if (t.y6LongMult) {
-    const a=rand(1000,9999),b=rand(12,79); slots.push({longMult:{a,b},answer:a*b,marks:2,yg:'Y5'});
-  } else slots.push({...tf('Y5'),work:true,marks:1});
-  if (t.y6LongDiv) {
-    let d,q;do{d=rand(11,49);q=rand(12,99);}while(d*q>9999||d*q<300);
-    slots.push({longDiv:{divisor:d,dividend:d*q},answer:q,marks:2,yg:'Y6'});
-  } else slots.push({...tf('Y6'),work:true,marks:1});
-  if (t.y6LongDiv) {
-    let d,q;do{d=rand(13,79);q=rand(11,150);}while(d*q>99999||d*q<1000);
-    slots.push({longDiv:{divisor:d,dividend:d*q},answer:q,marks:2,yg:'Y6'});
-  } else slots.push({...tf('Y6'),work:true,marks:1});
-  if (t.y6Bodmas) {
-    const pat=pick(['sq_add','cube_sub','sq_mult']);
-    let bt,ba;
-    if(pat==='sq_add'){const a=rand(2,9),b=rand(2,7),c=rand(2,8);bt=`${a} + ${b}<sup>2</sup> × ${c} =`;ba=a+b*b*c;}
-    else if(pat==='cube_sub'){const a=pick([2,3,4]),b=rand(2,9),c=rand(2,9);bt=`${a}<sup>3</sup> − ${b} × ${c} =`;ba=a*a*a-b*c;}
-    else{const a=rand(2,6),b=pick([2,3,4,5]),c=rand(1,9);bt=`${a} × ${b}<sup>2</sup> − ${c} =`;ba=a*b*b-c;}
-    slots.push({text:bt,answer:ba,marks:1,yg:'Y6'});
-  } else slots.push(tf('Y6'));
-  if (t.y6PctComplex) {
-    const pct=pick([20,30,35,40,45,60,65,70,75,80]);
-    const a=pick([120,150,200,240,250,300,360,400,500,600,700,800,900]);
-    slots.push({text:`${pct}% of ${a} =`,answer:a*pct/100,marks:1,yg:'Y6'});
-  } else slots.push(tf('Y6'));
-  if (t.y6Bodmas) {
-    const pat=pick(['brk_mult','brk_sq','brk_div_sq']);
-    let bt,ba;
-    if(pat==='brk_mult'){const a=rand(2,9),b=rand(2,9),c=rand(2,12);bt=`(${a} + ${b}) × ${c} =`;ba=(a+b)*c;}
-    else if(pat==='brk_sq'){const a=rand(2,6),b=pick([2,3,4]),c=rand(2,6);bt=`(${a} + ${b}<sup>2</sup>) × ${c} =`;ba=(a+b*b)*c;}
-    else{const b=pick([2,3,4]),div=pick([3,5,7]);const minQ=Math.ceil((b*b+1)/div);const q=rand(Math.max(2,minQ),Math.min(9,minQ+4));const x=div*q-b*b;bt=`(${b}<sup>2</sup> + ${x}) ÷ ${div} =`;ba=q;}
-    slots.push({text:bt,answer:ba,marks:1,yg:'Y6'});
-  } else slots.push(tf('Y6'));
-  if (t.y6FracOps) {
-    const n1=rand(1,4),d1=pick([3,4,5,6]),n2=rand(1,4),d2=pick([3,4,5,6]);
-    const rn=n1*n2,rd=d1*d2,g=gcd(rn,rd);
-    slots.push({text:`${n1}/${d1} × ${n2}/${d2} =`,answer:fracStr(rn/g,rd/g),marks:1,yg:'Y6'});
-  } else slots.push(tf('Y6'));
-  if (t.y6FracOps) {
-    const d=pick([3,4,5,6,8]),n=rand(1,d-1),m=rand(2,6);
-    slots.push({text:`${n}/${d} ÷ ${m} =`,answer:fracStr(n,d*m),marks:1,yg:'Y6'});
-  } else slots.push(tf('Y6'));
-  if (t.y6MixedNums) {
-    const d=pick([4,5,8,10]),n1=rand(1,d-1),n2=rand(1,d-1),w1=rand(2,8),w2=rand(1,3);
-    const an=n1+n2,aw=w1+w2+Math.floor(an/d),ar=an%d;
-    slots.push({text:`${w1} ${n1}/${d} + ${w2} ${n2}/${d} =`,answer:ar===0?`${aw}`:`${aw} ${ar}/${d}`,marks:1,yg:'Y6'});
-  } else slots.push(tf('Y6'));
-  if (t.y6MixedNums) {
-    const d=pick([3,5,7,9]),n=rand(1,d-1),w=rand(1,4),m=rand(2,6);
-    slots.push({text:`${w} ${n}/${d} × ${m} =`,answer:fracStr((w*d+n)*m,d),marks:1,yg:'Y6'});
-  } else slots.push(tf('Y6'));
-
-  // Sort by year group if requested
   if (sortByYear) {
     const order = {Y3:0, Y4:1, Y5:2, Y6:3};
     slots.sort((a, b) => order[a.yg] - order[b.yg]);
   }
-
   return slots;
 }
 
 // ─── DISPATCH TO CORRECT GENERATOR ───────────────────────────────────────────
-function genArith(level) {
+function genArith(level, targetCount) {
   const sortByYear = level === 'Y6' && (document.getElementById('y6SortByYear')?.checked || false);
-  if (level === 'Y2') return genY2Arith(getTopics('topicsY2'));
-  if (level === 'Y3') return genY3Arith(getTopics('topicsY3'));
-  if (level === 'Y4') return genY4Arith(getTopics('topicsY4'));
-  if (level === 'Y5') return genY5Arith(getTopics('topicsY5'));
-  if (level === 'Y6') return genY6Arith(getTopics('topicsY6'), sortByYear);
-  return genY4Arith(getTopics('topicsY4'));
+  if (level === 'Y2') return genY2Arith(getTopics('topicsY2'), targetCount);
+  if (level === 'Y3') return genY3Arith(getTopics('topicsY3'), targetCount);
+  if (level === 'Y4') return genY4Arith(getTopics('topicsY4'), targetCount);
+  if (level === 'Y5') return genY5Arith(getTopics('topicsY5'), targetCount);
+  if (level === 'Y6') return genY6Arith(getTopics('topicsY6'), sortByYear, targetCount);
+  return genY4Arith(getTopics('topicsY4'), targetCount);
 }
 
 // ─── REASONING — API CALL ────────────────────────────────────────────────────
@@ -1017,9 +1048,10 @@ async function generateAll() {
   const classYear = document.getElementById('classYear').value;
   const standardLevel = document.getElementById('standardLevel').value;
   const includeReasoning = document.getElementById('includeReasoning').checked;
+  const questionCount = parseInt(document.getElementById('questionCount').value, 10) || 0;
 
   setStatus('generating', 'Generating arithmetic questions…');
-  const standardArith = genArith(standardLevel);
+  const standardArith = genArith(standardLevel, questionCount);
   const totalMarks = standardArith.reduce((s,q)=>s+(q.marks||1),0);
 
   const adapted = [];
@@ -1027,7 +1059,7 @@ async function generateAll() {
     const id = g.id.replace('group_', '');
     const level = document.getElementById(`groupLevel_${id}`)?.value || 'Y2';
     const names = document.getElementById(`groupNames_${id}`)?.value || '';
-    const arithQs = genArith(level);
+    const arithQs = genArith(level, questionCount);
     adapted.push({level, names: names.trim().split('\n').filter(Boolean), arithQs});
   });
 
