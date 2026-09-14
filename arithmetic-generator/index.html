@@ -282,7 +282,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     </div>
   </div>
 
-  <div class="version">14.09.26a</div>
+  <div class="version">14.09.26b</div>
 </div>
 
 <script>
@@ -671,6 +671,15 @@ function genY4Arith(t, targetCount) {
       () => { const p=rand(100,500),q=rand(p+10,p+1000); return {text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1}; },
       () => { const r=rand(200,999),s=rand(50,r-50); return {text:`${r} - [BOX] = ${s}`,answer:r-s,box:true,col:true,marks:1}; },
     ],
+    y4Y3content: [
+      () => { const a=rand(200,899),b=rand(11,89); return {text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'}; },
+      () => { const d1=pick([2,4,5,8,10]),q1=rand(2,12); return {text:`${d1*q1} ÷ ${d1} =`,answer:q1,marks:1,yg:'Y3'}; },
+      () => { const ax=pick([2,4,5,8,10]),bx=rand(11,49); return {text:`${ax} × ${bx} =`,answer:ax*bx,marks:1,yg:'Y3'}; },
+      () => { const s=rand(200,999),r=rand(3,99); return {text:`${s} − ${r} =`,answer:s-r,marks:1,yg:'Y3'}; },
+      () => { const bt=rand(10,200),tot=rand(bt+100,bt+600); return {text:`[BOX] + ${bt} = ${tot}`,answer:tot-bt,box:true,marks:1,yg:'Y3'}; },
+      () => { const az=rand(10,999); return {text:`${az} × 0 =`,answer:0,marks:1,yg:'Y3'}; },
+      () => { const d2=pick([2,4,5,8,10]),q2=rand(2,10); return {text:`${d2*q2} ÷ ${d2} =`,answer:q2,marks:1,yg:'Y3'}; },
+    ],
     _core: [
       () => { const a=rand(3,20); return {text:`${a} × 1 =`,answer:a,marks:1}; },
       () => tt(),
@@ -678,19 +687,7 @@ function genY4Arith(t, targetCount) {
   };
 
   let qs = buildFromPools(pools, {...t, _core:true}, targetCount, tt);
-
-  // ── Y3 prior content (7 fixed revision questions, prepended) ────────────────
-  if (t.y4Y3content) {
-    const rev = [];
-    const a=rand(200,899),b=rand(11,89); rev.push({text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'});
-    const d1=pick([2,4,5,8,10]),q1=rand(2,12); rev.push({text:`${d1*q1} ÷ ${d1} =`,answer:q1,marks:1,yg:'Y3'});
-    const ax=pick([2,4,5,8,10]),bx=rand(11,49); rev.push({text:`${ax} × ${bx} =`,answer:ax*bx,marks:1,yg:'Y3'});
-    const s=rand(200,999),r=rand(3,99); rev.push({text:`${s} − ${r} =`,answer:s-r,marks:1,yg:'Y3'});
-    const bt=rand(10,200),tot=rand(bt+100,bt+600); rev.push({text:`[BOX] + ${bt} = ${tot}`,answer:tot-bt,box:true,marks:1,yg:'Y3'});
-    const az=rand(10,999); rev.push({text:`${az} × 0 =`,answer:0,marks:1,yg:'Y3'});
-    const d2=pick([2,4,5,8,10]),q2=rand(2,10); rev.push({text:`${d2*q2} ÷ ${d2} =`,answer:q2,marks:1,yg:'Y3'});
-    qs = shuffleArr(qs.map(q => q.yg ? q : {...q, yg:'Y4'}).concat(rev));
-  }
+  if (qs.some(q => q.yg)) qs = qs.map(q => q.yg ? q : {...q, yg:'Y4'});
   return qs;
 }
 
@@ -772,6 +769,27 @@ function genY5Arith(t, targetCount) {
     y5Missing: [
       () => { const p=rand(100,999),q=rand(p+100,p+5000); return {text:`[BOX] + ${p} = ${q}`,answer:q-p,box:true,marks:1}; },
     ],
+    y5Y3content: [
+      () => { const a=rand(200,899),b=rand(11,89); return {text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'}; },
+      () => { const d1=pick([2,4,5,8,10]),q1=rand(2,12); return {text:`${d1*q1} ÷ ${d1} =`,answer:q1,marks:1,yg:'Y3'}; },
+      () => { const ax=pick([2,4,5,8,10]),bx=rand(11,49); return {text:`${ax} × ${bx} =`,answer:ax*bx,marks:1,yg:'Y3'}; },
+      () => { const s=rand(200,999),r=rand(3,99); return {text:`${s} − ${r} =`,answer:s-r,marks:1,yg:'Y3'}; },
+      () => { const bt=rand(10,200),tot=rand(bt+100,bt+600); return {text:`[BOX] + ${bt} = ${tot}`,answer:tot-bt,box:true,marks:1,yg:'Y3'}; },
+      () => { const az=rand(10,999); return {text:`${az} × 0 =`,answer:0,marks:1,yg:'Y3'}; },
+      () => { const d2=pick([2,4,5,8,10]),q2=rand(2,10); return {text:`${d2*q2} ÷ ${d2} =`,answer:q2,marks:1,yg:'Y3'}; },
+    ],
+    y5Y4content: [
+      () => { const a=rand(1000,9999),b=rand(1000,9999); return {text:`${a.toLocaleString()} + ${b.toLocaleString()} =`,answer:a+b,marks:1,yg:'Y4'}; },
+      () => { let aa,bb; do{aa=rand(1000,9999);bb=rand(1000,aa-100);}while(!hasRegroup(aa,bb,'sub')); return {text:`${aa} - ${bb} =`,answer:aa-bb,marks:1,yg:'Y4'}; },
+      () => { const m=rand(12,99),n=pick([10,100,1000]); return {text:`${m} × ${n} =`,answer:m*n,marks:1,yg:'Y4'}; },
+      () => { let fa,fb,fc; do{fa=rand(2,5);fb=rand(2,5);fc=rand(2,5);}while(fa*fb*fc>=100); return {text:`${fa} × ${fb} × ${fc} =`,answer:fa*fb*fc,marks:1,yg:'Y4'}; },
+      () => { const sa=rand(100,499),sb=rand(3,9); return {text:`${sa} × ${sb} =`,answer:sa*sb,marks:1,yg:'Y4'}; },
+      () => { const db=rand(3,12),dq=rand(10,99); return {text:`${db*dq} ÷ ${db} =`,answer:dq,marks:1,yg:'Y4'}; },
+      () => { const p=rand(50,500),qv=rand(p+10,p+500); return {text:`[BOX] + ${p} = ${qv}`,answer:qv-p,box:true,marks:1,yg:'Y4'}; },
+      () => { const ta=rand(2,12),tb=rand(8,12); return {text:`${ta} × ${tb} =`,answer:ta*tb,marks:1,yg:'Y4'}; },
+      () => { const th=rand(1,9),h=rand(1,9),t_=rand(10,99),ptot=th*1000+h*100+t_; return {text:`${ptot.toLocaleString()} = ${th},000 + [BOX] + ${t_}`,answer:h*100,box:true,marks:1,yg:'Y4'}; },
+      () => { const dd=rand(3,9),dqq=rand(11,50); return {text:`${dd*dqq} ÷ ${dd} =`,answer:dqq,marks:1,yg:'Y4'}; },
+    ],
     _core: [
       () => tt(),
       () => { let a,b,c;do{a=rand(2,6);b=rand(2,6);c=rand(2,6);}while(a*b*c>200); return {text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1}; },
@@ -780,34 +798,7 @@ function genY5Arith(t, targetCount) {
   };
 
   let qs = buildFromPools(pools, {...t, _core:true}, targetCount, tt);
-
-  // ── Y3/Y4 prior content (7 + 10 fixed revision questions, prepended) ────────
-  const rev = [];
-  if (t.y5Y3content) {
-    const a=rand(200,899),b=rand(11,89); rev.push({text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y3'});
-    const d1=pick([2,4,5,8,10]),q1=rand(2,12); rev.push({text:`${d1*q1} ÷ ${d1} =`,answer:q1,marks:1,yg:'Y3'});
-    const ax=pick([2,4,5,8,10]),bx=rand(11,49); rev.push({text:`${ax} × ${bx} =`,answer:ax*bx,marks:1,yg:'Y3'});
-    const s=rand(200,999),r=rand(3,99); rev.push({text:`${s} − ${r} =`,answer:s-r,marks:1,yg:'Y3'});
-    const bt=rand(10,200),tot=rand(bt+100,bt+600); rev.push({text:`[BOX] + ${bt} = ${tot}`,answer:tot-bt,box:true,marks:1,yg:'Y3'});
-    const az=rand(10,999); rev.push({text:`${az} × 0 =`,answer:0,marks:1,yg:'Y3'});
-    const d2=pick([2,4,5,8,10]),q2=rand(2,10); rev.push({text:`${d2*q2} ÷ ${d2} =`,answer:q2,marks:1,yg:'Y3'});
-  }
-  if (t.y5Y4content) {
-    const a=rand(1000,9999),b=rand(1000,9999); rev.push({text:`${a.toLocaleString()} + ${b.toLocaleString()} =`,answer:a+b,marks:1,yg:'Y4'});
-    let aa,bb; do{aa=rand(1000,9999);bb=rand(1000,aa-100);}while(!hasRegroup(aa,bb,'sub'));
-    rev.push({text:`${aa} - ${bb} =`,answer:aa-bb,marks:1,yg:'Y4'});
-    const m=rand(12,99),n=pick([10,100,1000]); rev.push({text:`${m} × ${n} =`,answer:m*n,marks:1,yg:'Y4'});
-    let fa,fb,fc; do{fa=rand(2,5);fb=rand(2,5);fc=rand(2,5);}while(fa*fb*fc>=100);
-    rev.push({text:`${fa} × ${fb} × ${fc} =`,answer:fa*fb*fc,marks:1,yg:'Y4'});
-    const sa=rand(100,499),sb=rand(3,9); rev.push({text:`${sa} × ${sb} =`,answer:sa*sb,marks:1,yg:'Y4'});
-    const db=rand(3,12),dq=rand(10,99); rev.push({text:`${db*dq} ÷ ${db} =`,answer:dq,marks:1,yg:'Y4'});
-    const p=rand(50,500),qv=rand(p+10,p+500); rev.push({text:`[BOX] + ${p} = ${qv}`,answer:qv-p,box:true,marks:1,yg:'Y4'});
-    const ta=rand(2,12),tb=rand(8,12); rev.push({text:`${ta} × ${tb} =`,answer:ta*tb,marks:1,yg:'Y4'});
-    const th=rand(1,9),h=rand(1,9),t_=rand(10,99),ptot=th*1000+h*100+t_;
-    rev.push({text:`${ptot.toLocaleString()} = ${th},000 + [BOX] + ${t_}`,answer:h*100,box:true,marks:1,yg:'Y4'});
-    const dd=rand(3,9),dqq=rand(11,50); rev.push({text:`${dd*dqq} ÷ ${dd} =`,answer:dqq,marks:1,yg:'Y4'});
-  }
-  if (rev.length) qs = shuffleArr(qs.map(q => q.yg ? q : {...q, yg:'Y5'}).concat(rev));
+  if (qs.some(q => q.yg)) qs = qs.map(q => q.yg ? q : {...q, yg:'Y5'});
   return qs;
 }
 
