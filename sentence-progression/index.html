@@ -727,7 +727,7 @@
 </main>
 
 <footer>
-  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v13.09.26m
+  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v14.09.26a
 </footer>
 
 <div class="present-overlay" id="presentOverlay">
@@ -792,6 +792,17 @@ function makeIconEl(def, altText){
     span.textContent = def.icon;
     return span;
   }
+  return null;
+}
+
+// Key Stage handwriting fonts for the WRITTEN SENTENCE line only (PowerPoint export and
+// Present mode) — never the word-block text/labels, which always stay Segoe UI. Both fonts
+// are installed as regular-weight-only handwriting/guide fonts (no true bold face), so
+// wherever one of these applies the sentence is set unbolded rather than faking a bold.
+const KS_FONT = { ks1: 'Sassoon Infant', ks2: 'Twinkl Cursive Looped' };
+function ksForYear(yearId){
+  if(yearId==='y1' || yearId==='y2') return 'ks1';
+  if(yearId && /^y[3-6]$/.test(yearId)) return 'ks2';
   return null;
 }
 
@@ -1159,9 +1170,16 @@ async function exportItemsToPptx(items, opts){
   const labelSize = many ? 8 : 10;
   const wordSize = many ? 12 : 15;
 
+  const ksFont = KS_FONT[opts.ks];
+
   for(let reveal=1; reveal<=cleanItems.length; reveal++){
     const slide = pptx.addSlide();
-    slide.background = { color:'F6F8FA' };
+    slide.background = { color:'DEEFFB' };
+    slide.addShape('rect', {
+      x:0.15, y:0.15, w:13.33-0.3, h:7.5-0.3,
+      fill:{ type:'none' },
+      line:{ color:'1B4F91', width:3 }
+    });
     if(opts.title){
       slide.addText(opts.title, { x:0.4, y:0.2, w:12.5, h:0.5, fontSize:16, bold:true, color:'0A0101', fontFace:'Segoe UI' });
     }
@@ -1225,7 +1243,8 @@ async function exportItemsToPptx(items, opts){
       const lastRowBottom = Math.max(...positions.map(p=>p.y+p.h));
       slide.addText(sentence, {
         x:0.6, y: lastRowBottom + 0.45, w:12.13, h:1,
-        fontSize:24, bold:true, color:'0A0101', align:'center', fontFace:'Segoe UI'
+        fontSize: ksFont ? (opts.ks==='ks1' ? 32 : 26) : 24,
+        bold: !ksFont, color:'0A0101', align:'center', fontFace: ksFont || 'Segoe UI'
       });
     }
   }
@@ -1241,8 +1260,8 @@ function slugify(str){
 const presentState = { playlist:[], index:0, cleanItems:[], revealed:0, keyHandler:null, fullstopEl:null };
 
 // Presents a single sentence — unchanged behaviour, now just a one-entry playlist.
-function openPresentMode(items, title){
-  openPresentPlaylist([{ items, title }]);
+function openPresentMode(items, title, ks){
+  openPresentPlaylist([{ items, title, ks }]);
 }
 
 // Presents one or more sentences back to back in one continuous full-screen session —
@@ -1252,7 +1271,7 @@ function openPresentMode(items, title){
 // before) and the sentence bank's "Present all".
 function openPresentPlaylist(playlist){
   const entries = playlist
-    .map(e => ({ items: e.items.filter(it => it.text && it.text.trim()), title: e.title }))
+    .map(e => ({ items: e.items.filter(it => it.text && it.text.trim()), title: e.title, ks: e.ks }))
     .filter(e => e.items.length);
   if(!entries.length){ alert('Nothing to present yet — build a sentence first.'); return; }
 
@@ -1276,6 +1295,12 @@ function openPresentPlaylist(playlist){
     row.innerHTML = '';
     sentenceEl.classList.remove('visible');
     sentenceEl.textContent = assembleSentenceText(entry.items);
+    // Key Stage handwriting font for the written sentence line only — see KS_FONT. Neither
+    // font has a true bold face, so it's set unbolded rather than a synthetic fake bold.
+    const ksFont = KS_FONT[entry.ks];
+    sentenceEl.style.fontFamily = ksFont ? `'${ksFont}', 'Segoe UI', sans-serif` : '';
+    sentenceEl.style.fontWeight = ksFont ? '400' : '';
+    sentenceEl.style.fontSize = entry.ks === 'ks1' ? '3.4vw' : '';
 
     entry.items.forEach(it=>{
       const def = TYPE[it.cat] || TYPE.lit;
@@ -1410,6 +1435,7 @@ function openPresentPlaylist(playlist){
 
 /* ---------- Sentence assembly ---------- */
 function buildCard(structure, sIdx, yearId){
+  const ks = ksForYear(yearId);
   const card = document.createElement('div');
   card.className = 'structure-card';
 
@@ -1587,14 +1613,14 @@ function buildCard(structure, sIdx, yearId){
   exportBtn.className = 'btn-small';
   exportBtn.textContent = '📥 Export to PowerPoint';
   exportBtn.addEventListener('click', ()=>{
-    exportItemsToPptx(currentItems(), { title: structure.title, fileName: slugify(structure.title) });
+    exportItemsToPptx(currentItems(), { title: structure.title, fileName: slugify(structure.title), ks });
   });
 
   const presentBtn = document.createElement('button');
   presentBtn.className = 'btn-small';
   presentBtn.textContent = '🎬 Present';
   presentBtn.addEventListener('click', ()=>{
-    openPresentMode(currentItems(), structure.title);
+    openPresentMode(currentItems(), structure.title, ks);
   });
 
   actions.appendChild(toggleBtn);
