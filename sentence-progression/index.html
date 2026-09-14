@@ -770,7 +770,7 @@
 </main>
 
 <footer>
-  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v14.09.26c
+  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v14.09.26d
 </footer>
 
 <div class="present-overlay" id="presentOverlay">
@@ -1272,16 +1272,22 @@ async function exportItemsToPptx(items, opts){
       slide.addText(runs, { x: pos.x, y: pos.y, w: pos.w, h: pos.h, align:'center', valign:'middle', fontFace:'Segoe UI' });
     }
     if(reveal === cleanItems.length){
-      // A bold black dot after the last block is the source document's own full-stop marker.
-      const lastPos = positions[cleanItems.length-1];
-      const dotSize = 0.18;
-      slide.addShape('ellipse', {
-        x: lastPos.x + lastPos.w + 0.06,
-        y: lastPos.y + lastPos.h - dotSize - 0.1,
-        w: dotSize, h: dotSize,
-        fill: { color: '222222' },
-        line: { color: '222222', width: 0 }
-      });
+      // A bold black dot after the last block is the source document's own full-stop marker
+      // — only for the year-group builder, whose curriculum pattern text never carries its
+      // own trailing punctuation. Free-write/saved sentences (opts.autoPunct===false) use
+      // whatever punctuation the teacher actually typed, so this stays off for those —
+      // otherwise a typed "." plus this dot renders as two full stops.
+      if(opts.autoPunct !== false){
+        const lastPos = positions[cleanItems.length-1];
+        const dotSize = 0.18;
+        slide.addShape('ellipse', {
+          x: lastPos.x + lastPos.w + 0.06,
+          y: lastPos.y + lastPos.h - dotSize - 0.1,
+          w: dotSize, h: dotSize,
+          fill: { color: '222222' },
+          line: { color: '222222', width: 0 }
+        });
+      }
       const sentence = assembleSentenceText(cleanItems);
       const lastRowBottom = Math.max(...positions.map(p=>p.y+p.h));
       slide.addText(sentence, {
@@ -1303,8 +1309,13 @@ function slugify(str){
 const presentState = { playlist:[], index:0, cleanItems:[], revealed:0, keyHandler:null, fullstopEl:null };
 
 // Presents a single sentence — unchanged behaviour, now just a one-entry playlist.
-function openPresentMode(items, title, ks){
-  openPresentPlaylist([{ items, title, ks }]);
+// autoPunct: whether to draw the source document's own bold-dot full-stop marker after the
+// last block. True for the year-group builder, whose curriculum pattern text never includes
+// its own trailing punctuation. False for free-write/saved sentences, where the teacher's own
+// typed sentence — full stop, exclamation mark, or nothing at all — is what should show,
+// rather than the tool silently adding a second, possibly-duplicate one of its own.
+function openPresentMode(items, title, ks, autoPunct){
+  openPresentPlaylist([{ items, title, ks, autoPunct }]);
 }
 
 // Presents one or more sentences back to back in one continuous full-screen session —
@@ -1314,7 +1325,7 @@ function openPresentMode(items, title, ks){
 // before) and the sentence bank's "Present all".
 function openPresentPlaylist(playlist){
   const entries = playlist
-    .map(e => ({ items: e.items.filter(it => it.text && it.text.trim()), title: e.title, ks: e.ks }))
+    .map(e => ({ items: e.items.filter(it => it.text && it.text.trim()), title: e.title, ks: e.ks, autoPunct: e.autoPunct !== false }))
     .filter(e => e.items.length);
   if(!entries.length){ alert('Nothing to present yet — build a sentence first.'); return; }
 
@@ -1404,20 +1415,24 @@ function openPresentPlaylist(playlist){
       row.appendChild(token);
     });
 
-    const presentFullstop = document.createElement('div');
-    presentFullstop.className = 'present-fullstop';
-    row.appendChild(presentFullstop);
-    presentState.fullstopEl = presentFullstop;
+    if(entry.autoPunct){
+      const presentFullstop = document.createElement('div');
+      presentFullstop.className = 'present-fullstop';
+      row.appendChild(presentFullstop);
+      presentState.fullstopEl = presentFullstop;
+    } else {
+      presentState.fullstopEl = null;
+    }
   }
 
   function render(){
     const chips = row.children;
-    for(let i=0; i<chips.length-1; i++){
+    for(let i=0; i<chips.length-(presentState.fullstopEl?1:0); i++){
       chips[i].classList.toggle('visible', i < presentState.revealed);
     }
     const showSentence = presentState.revealed > presentState.cleanItems.length;
     sentenceEl.classList.toggle('visible', showSentence);
-    presentState.fullstopEl.classList.toggle('visible', showSentence);
+    if(presentState.fullstopEl) presentState.fullstopEl.classList.toggle('visible', showSentence);
     const shown = Math.min(presentState.revealed, presentState.cleanItems.length);
     const blockStep = showSentence
       ? `${presentState.cleanItems.length} / ${presentState.cleanItems.length} · sentence`
@@ -2337,10 +2352,8 @@ function renderFreeWriteChips(container, items, yearId){
     }
   });
 
-  const fullstop2 = document.createElement('div');
-  fullstop2.className = 'fullstop-mark';
-  row.appendChild(fullstop2);
-
+  // No auto-added full-stop mark here — free-write shows exactly the punctuation the
+  // teacher typed (or didn't), same reasoning as Present mode/PowerPoint below.
   container.appendChild(row);
 
   const ks = ksForYear(yearId);
@@ -2350,7 +2363,7 @@ function renderFreeWriteChips(container, items, yearId){
   presentBtn.style.marginTop = '10px';
   presentBtn.textContent = '🎬 Present';
   presentBtn.addEventListener('click', ()=>{
-    openPresentMode(items, 'My sentence', ks);
+    openPresentMode(items, 'My sentence', ks, false);
   });
   container.appendChild(presentBtn);
 
@@ -2360,7 +2373,7 @@ function renderFreeWriteChips(container, items, yearId){
   exportBtn.style.marginLeft = '8px';
   exportBtn.textContent = '📥 Export to PowerPoint';
   exportBtn.addEventListener('click', ()=>{
-    exportItemsToPptx(items, { title: 'My sentence', fileName: slugify(assembleSentenceText(items)), ks });
+    exportItemsToPptx(items, { title: 'My sentence', fileName: slugify(assembleSentenceText(items)), ks, autoPunct:false });
   });
   container.appendChild(exportBtn);
 
@@ -2491,7 +2504,7 @@ function buildBankPanel(){
   presentAllBtn.textContent = `🎬 Present all (${sentenceBank.length})`;
   presentAllBtn.style.marginBottom = '14px';
   presentAllBtn.addEventListener('click', ()=>{
-    openPresentPlaylist(sentenceBank.map((e,i)=>({ items:e.items, title:`Saved sentence ${i+1}`, ks:ksForYear(e.yearId) })));
+    openPresentPlaylist(sentenceBank.map((e,i)=>({ items:e.items, title:`Saved sentence ${i+1}`, ks:ksForYear(e.yearId), autoPunct:false })));
   });
   wrap.appendChild(presentAllBtn);
 
@@ -2549,7 +2562,7 @@ function buildBankPanel(){
     presentBtn.className = 'btn-small';
     presentBtn.textContent = '🎬 Present';
     presentBtn.addEventListener('click', ()=>{
-      openPresentMode(entry.items, `Saved sentence ${idx+1}`, ksForYear(entry.yearId));
+      openPresentMode(entry.items, `Saved sentence ${idx+1}`, ksForYear(entry.yearId), false);
     });
     actions.appendChild(presentBtn);
 
