@@ -1,10 +1,24 @@
 """WFA Precision Teaching Grids — Streamlit app for fluency assessment and tracking."""
 
 import json
+import os
 from datetime import date
 import streamlit as st
 import time
 from reportlab.lib.units import mm as _mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+# Sassoon Infant is the house font for child-facing reading content across
+# WFA tools (handwriting sheets, being-a-reader-web, etc.) — used here for
+# the actual items a child reads (maths terms, GPCs, CEW words), never for
+# admin/teacher text (headers, answer keys), per that convention.
+_WORD_FONT = "Helvetica-Bold"
+try:
+    pdfmetrics.registerFont(TTFont("SassoonInfant", os.path.join(os.path.dirname(__file__), "fonts", "SassoonInfant.ttf")))
+    _WORD_FONT = "SassoonInfant"
+except Exception:
+    pass
 from data import (
     ensure_data_files, load_pupils, save_pupils, load_ladders, save_ladders,
     load_probes, add_probe, load_all_probes_for_pupil, get_all_steps, get_step,
@@ -26,23 +40,6 @@ from data import (
 _WFA_BLUE = (0x17 / 255, 0x98 / 255, 0xd3 / 255)
 _WFA_DARK = (0x0a / 255, 0x01 / 255, 0x01 / 255)
 _GREY = (0.55, 0.55, 0.55)
-_DIVIDER = (0.6, 0.6, 0.6)
-
-
-def _pdf_header_band(c, page_w, margin, usable_w, page_h, title_bits, date_str, title_h, font_size=14):
-    from reportlab.lib import colors
-    top = page_h - margin
-    c.setFillColorRGB(*_WFA_BLUE)
-    c.roundRect(margin, top - title_h, usable_w, title_h, 5, fill=1, stroke=0)
-    c.setFillColorRGB(1, 1, 1)
-    c.setFont("Helvetica-Bold", font_size)
-    ascender = font_size * 0.72
-    baseline = top - title_h + (title_h - ascender) / 2 + ascender * 0.15
-    c.drawString(margin + 10, baseline, "   |   ".join(title_bits))
-    c.setFont("Helvetica", 10)
-    dw = c.stringWidth(date_str, "Helvetica", 10)
-    c.drawString(margin + usable_w - dw - 10, baseline, date_str)
-    return top - title_h
 
 
 def _split_cloze(question):
@@ -65,20 +62,23 @@ def _draw_maths_item(c, x, y_top, row_h, number, question, font_size, box_w, box
     left, right = _split_cloze(question)
     if "?" not in question:
         left = left + " ="  # e.g. "10×2" -> "10×2 =" so the box has a "=" before it
-    c.setFont("Helvetica-Bold", font_size)
+    c.setFont(_WORD_FONT, font_size)
     c.setFillColorRGB(*_WFA_DARK)
     lx = x + num_gutter
     c.drawString(lx, baseline, left)
-    box_x = lx + c.stringWidth(left, "Helvetica-Bold", font_size) + 4
+    box_x = lx + c.stringWidth(left, _WORD_FONT, font_size) + 4
 
-    box_y = y_top - row_h / 2 - box_h / 2
+    # Anchor the box to the text baseline (not the row's geometric middle)
+    # so it visually lines up with "+" and "=" instead of floating relative
+    # to them when the row is taller than the text itself.
+    box_y = baseline - box_h * 0.22
     c.setFillColorRGB(1, 1, 1)
     c.setStrokeColorRGB(*_WFA_DARK)
     c.setLineWidth(1)
     c.rect(box_x, box_y, box_w, box_h, fill=1, stroke=1)
 
     if right:
-        c.setFont("Helvetica-Bold", font_size)
+        c.setFont(_WORD_FONT, font_size)
         c.setFillColorRGB(*_WFA_DARK)
         c.drawString(box_x + box_w + 4, baseline, right)
 
@@ -88,9 +88,14 @@ def _draw_recognition_item(c, x, y_top, w, h, text, font_size):
     c.setStrokeColorRGB(0.82, 0.82, 0.82)
     c.setLineWidth(0.6)
     c.rect(x, y_top - h, w, h, fill=1, stroke=1)
-    c.setFont("Helvetica-Bold", font_size)
+    # Per-item safety net: a longer word than the sheet's font size was
+    # sized for (e.g. "different" mixed in with short CEW words) shrinks
+    # itself rather than overflowing into the next cell.
+    pad = w * 0.9
+    if c.stringWidth(text, _WORD_FONT, font_size) > pad:
+        font_size = max(5, pad / max(c.stringWidth(text, _WORD_FONT, 1.0), 0.01))
+    c.setFont(_WORD_FONT, font_size)
     c.setFillColorRGB(*_WFA_DARK)
-    tw = c.stringWidth(text, "Helvetica-Bold", font_size)
     ascender = font_size * 0.72
     baseline = y_top - h / 2 - ascender * 0.10
     c.drawCentredString(x + w / 2, baseline, text)
@@ -106,6 +111,17 @@ def _draw_dictation_item(c, x, y_top, w, row_h, number, font_size):
     c.setStrokeColorRGB(0.65, 0.65, 0.65)
     c.setLineWidth(0.8)
     c.line(x + 22, line_y, x + w - 4, line_y)
+
+
+def _fit_font_for_width(c, texts, font, max_w, min_size=6, max_size=20):
+    """Largest font size at which every string in texts fits within max_w —
+    takes the longest/widest word as the limiting case so a whole sheet of
+    mixed-length words (e.g. CEW: 'to' next to 'different') shares one
+    consistent, non-overflowing size."""
+    if not texts:
+        return max_size
+    limiting = min(max_w / max(c.stringWidth(t, font, 1.0), 0.01) for t in texts)
+    return max(min_size, min(max_size, limiting))
 
 
 def _wrap_line(c, text, font, size, max_w):
@@ -167,7 +183,15 @@ def _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, maths_
         # Font must be bound by column WIDTH, not just row height — a maths
         # item ("N)  A + [box] = C") needs real horizontal room, and capping
         # only by height let columns overlap when rows were tall but narrow.
-        font_by_width = (col_w - 34) / 7.7
+        # Measured against the actual text (not an estimate), so it also
+        # copes with longer strings (e.g. bonds-to-20's "16 + ? = 20").
+        term_texts = []
+        for q in questions:
+            l, r = _split_cloze(q["question"])
+            if "?" not in q["question"]:
+                l = l + " ="
+            term_texts.append(l + r)
+        font_by_width = _fit_font_for_width(c, term_texts, _WORD_FONT, max(col_w - 52, 10))
         font_size = max(6.5, min(14, row_h * 0.40, font_by_width))
         box_h = max(8, min(row_h * 0.62, font_size * 1.15))
         box_w = box_h * 1.5
@@ -178,12 +202,19 @@ def _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, maths_
             _draw_maths_item(c, x, y_top, row_h, i + 1, q["question"], font_size, box_w, box_h)
 
     elif sheet["subject"] == "phonics" or sheet.get("display_mode") == "recognition":
-        cols = recog_cols
+        texts = [q["question"] for q in questions]
+        max_len = max((len(t) for t in texts), default=1)
+        # Phonics items are single letters/digraphs — the caller's column
+        # count is fine. CEW words vary a lot in length ("to" vs
+        # "different"), so narrow the columns as the longest word in this
+        # set grows, rather than squeezing everything to fit 8 columns.
+        cols = recog_cols if sheet["subject"] == "phonics" else max(3, min(recog_cols, 10 - max_len))
         rows = -(-n // cols)
         gap = 3
         col_w = (usable_w - gap * (cols - 1)) / cols
         row_h = (grid_top - grid_bottom) / rows
-        font_size = max(7, min(20, row_h * 0.42))
+        font_by_width = _fit_font_for_width(c, texts, _WORD_FONT, col_w * 0.86, min_size=7, max_size=20)
+        font_size = max(7, min(20, row_h * 0.42, font_by_width))
         for i, q in enumerate(questions):
             row, col = divmod(i, cols)
             x = margin + col * (col_w + gap)
@@ -265,38 +296,6 @@ def render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, slot_entries, i
 
     if len(slot_entries) > 1:
         render_compact_sheet_slot(c, margin, usable_w, bottom_top, bottom_bottom, *slot_entries[1], include_answers)
-
-
-def render_week_page_pdf(c, page_w, page_h, margin, usable_w, pupil, day_sheets, include_answers=True):
-    """Draw one page containing all 5 days' sheets for one pupil/skill —
-    same item content each day (by construction), independently reshuffled."""
-    first = day_sheets[0]
-    bits = [f"{pupil['firstName']} {pupil['lastName']}", first["skill_name"], f"Week of {date.today().strftime('%d/%m/%y')}"]
-    header_bottom = _pdf_header_band(c, page_w, margin, usable_w, page_h, bits, "", title_h=13 * _mm, font_size=13)
-
-    n_days = len(day_sheets)
-    band_gap = 3 * _mm
-    top = header_bottom - 4 * _mm
-    bottom = margin + (10 * _mm if include_answers else 3 * _mm)
-    band_h = (top - bottom - band_gap * (n_days - 1)) / n_days
-
-    for d, sheet in enumerate(day_sheets):
-        band_top = top - d * (band_h + band_gap)
-        c.setFont("Helvetica-Bold", 9)
-        c.setFillColorRGB(*_WFA_BLUE)
-        c.drawString(margin, band_top - 9, sheet["day_label"])
-        c.setStrokeColorRGB(0.85, 0.85, 0.85)
-        c.setLineWidth(0.6)
-        c.line(margin, band_top - 12, margin + usable_w, band_top - 12)
-
-        grid_top = band_top - 15
-        grid_bottom = band_top - band_h + 2
-        _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, recog_cols=10)
-
-    if include_answers:
-        c.setFont("Helvetica", 6.5)
-        c.setFillColorRGB(*_GREY)
-        c.drawString(margin, bottom - 8, f"Aim: {first['aim']['correctPerMin']}/min  •  Max {first['aim']['maxErrors']} errors  •  {first['aim']['timedSec']}s  (same list all week — see Daily Check for full answers)")
 
 
 # ── Year Group Filter ────────────────────────────────────────────────────────
@@ -1680,7 +1679,8 @@ with tab6:
 
                 st.caption(
                     "Item count per sheet comes from what was set for each pupil/skill in Set Starting Points. "
-                    + ("One page per pupil/skill, all 5 days on it." if week_mode else "2 sheets per page, top/bottom with a cut line.")
+                    + "2 sheets per page, top/bottom with a cut line."
+                    + (" A week is 5 day-sheets, so ~3 pages per skill." if week_mode else "")
                 )
                 st.markdown(f"**{len(sheets_to_generate)} skill{'s' if len(sheets_to_generate) != 1 else ''}{' × 5 days' if week_mode else ''}:**")
                 for p, skill_id, step in sheets_to_generate:
@@ -1699,32 +1699,29 @@ with tab6:
                     usable_w = page_w - 2 * margin
 
                     c = pdfcanvas.Canvas(buf, pagesize=A4)
-                    single_sheets = []  # (pupil, sheet) pairs — paired up 2-per-page below
+                    # Every sheet — single or one per day of a week — goes
+                    # through the same 2-per-page compact layout (top/bottom,
+                    # cut line between). A cramped 5-in-a-page week view
+                    # left boxes too small to write in, so week mode is now
+                    # just "5 day-labelled sheets" fed into the same pipeline
+                    # single-sheet mode uses, just spanning more pages.
+                    all_sheets = []
                     for p, skill_id, step in sheets_to_generate:
                         # Windowed skills only ever practise their current
                         # window, not the whole step — same set all week.
                         grid_item_pool = get_active_window(p, skill_id, step) if is_windowed(step) else None
-                        if week_mode:
-                            day_sheets = []
-                            for day_n in range(1, 6):
-                                # Each call reshuffles independently — same
-                                # item content, different order per day.
-                                sheet = generate_sheet(p, skill_id, ladders_data, item_pool=grid_item_pool)
-                                if sheet:
-                                    sheet["day_label"] = f"Day {day_n}"
-                                    day_sheets.append(sheet)
-                            if day_sheets:
-                                render_week_page_pdf(c, page_w, page_h, margin, usable_w, p, day_sheets, include_answers)
-                                c.showPage()
-                        else:
+                        day_count = 5 if week_mode else 1
+                        for day_n in range(1, day_count + 1):
+                            # Each call reshuffles independently — same
+                            # item content, different order per day.
                             sheet = generate_sheet(p, skill_id, ladders_data, item_pool=grid_item_pool)
                             if sheet:
-                                single_sheets.append((p, sheet))
+                                if week_mode:
+                                    sheet["day_label"] = f"Day {day_n}"
+                                all_sheets.append((p, sheet))
 
-                    # Single-sheet mode: 2 per page (top/bottom, cut line
-                    # between), same density as the old Excel sheets.
-                    for i in range(0, len(single_sheets), 2):
-                        render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, single_sheets[i:i + 2], include_answers)
+                    for i in range(0, len(all_sheets), 2):
+                        render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, all_sheets[i:i + 2], include_answers)
                         c.showPage()
 
                     c.save()
