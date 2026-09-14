@@ -424,8 +424,8 @@ if query_params.get("mode") == "self_assess":
         if subject == "maths":
             st.subheader(f"🔢 {step['name']}")
             aim = step["aim"]
-            st.markdown(f"**Aim:** {aim['correctPerMin']} correct per minute, max {aim['maxErrors']} errors")
-            st.caption(f"You'll have {aim['timedSec']} seconds. Type your answer for each question.")
+            st.markdown(f"**Try to get {aim['correctPerMin']} correct in {aim['timedSec']} seconds!**")
+            st.caption(f"Up to {aim['maxErrors']} mistake{'s' if aim['maxErrors'] != 1 else ''} is OK. Type your answer for each question.")
 
             if "maths_start" not in st.session_state:
                 if st.button("Start! 🚀", use_container_width=True, type="primary"):
@@ -467,7 +467,7 @@ if query_params.get("mode") == "self_assess":
 
                     if aim_met:
                         st.balloons()
-                        st.success(f"🎯 Well done {pupil['firstName']}! Aim achieved!")
+                        st.success(f"🎯 Well done {pupil['firstName']}! Target hit!")
                     else:
                         st.info(f"Keep practising — you got {correct} right. You'll get there!")
 
@@ -481,7 +481,7 @@ if query_params.get("mode") == "self_assess":
                     if st.button("Save my result", use_container_width=True, type="primary"):
                         add_probe(pupil["id"], skill_id, "timed", correct, errors, len(questions), duration, "", item_results)
                         filepath = str(PROBES_DIR / pupil["id"] / f"{skill_id}.json")
-                        git_add_commit_push(filepath, f"Maths probe: {pupil['firstName']} {step['name']}")
+                        git_add_commit_push(filepath, f"Maths check: {pupil['firstName']} {step['name']}")
                         # Clean up session state
                         for key in ["maths_start", "maths_questions", "maths_answers", "maths_idx"]:
                             st.session_state.pop(key, None)
@@ -535,7 +535,7 @@ if query_params.get("mode") == "self_assess":
         elif subject == "phonics":
             st.subheader(f"📖 {step['name']}")
             aim = step["aim"]
-            st.markdown(f"**Aim:** {aim['correctPerMin']} correct per minute, max {aim['maxErrors']} errors")
+            st.markdown(f"**Target:** {aim['correctPerMin']} correct in {aim['timedSec']}s (up to {aim['maxErrors']} mistake{'s' if aim['maxErrors'] != 1 else ''})")
             st.caption("Adult: listen to the child read each grapheme and mark correct or incorrect.")
 
             if "phonics_start" not in st.session_state:
@@ -567,7 +567,7 @@ if query_params.get("mode") == "self_assess":
 
                     if aim_met:
                         st.balloons()
-                        st.success(f"🎯 Well done {pupil['firstName']}! Aim achieved!")
+                        st.success(f"🎯 Well done {pupil['firstName']}! Target hit!")
                     else:
                         st.info(f"Keep practising — you got {correct} right!")
 
@@ -580,7 +580,7 @@ if query_params.get("mode") == "self_assess":
                             idx += 1
                         add_probe(pupil["id"], skill_id, "timed", correct, errors, len(results), duration, "", item_results)
                         filepath = str(PROBES_DIR / pupil["id"] / f"{skill_id}.json")
-                        git_add_commit_push(filepath, f"Phonics probe: {pupil['firstName']} {step['name']}")
+                        git_add_commit_push(filepath, f"Phonics check: {pupil['firstName']} {step['name']}")
                         for key in ["phonics_start", "phonics_questions", "phonics_results", "phonics_idx"]:
                             st.session_state.pop(key, None)
                         st.rerun()
@@ -1035,7 +1035,7 @@ with tab2:
                             st.info(
                                 f"This is a rolling-list skill — {sp_pupil_data['firstName']} will start with the "
                                 f"first {window_size} items ({', '.join(selected_step_data['items'][:window_size])}). "
-                                f"Run a Baseline Assessment in Daily Check to record what they already know, then use "
+                                f"Run a Starting Point Check in Daily Check to record what they already know, then use "
                                 f"'Update rolling list' there as they master items."
                             )
                         elif selected_step_data:
@@ -1155,7 +1155,7 @@ with tab3:
             for i, step in enumerate(ladder["steps"]):
                 aim = step["aim"]
                 status_emoji = "✅" if i == 0 else "🔵"
-                st.markdown(f"**{step['name']}** — Aim: {aim['correctPerMin']}/min, max {aim['maxErrors']} errors, {aim['timedSec']}s")
+                st.markdown(f"**{step['name']}** — Target: {aim['correctPerMin']} correct in {aim['timedSec']}s (up to {aim['maxErrors']} mistake{'s' if aim['maxErrors'] != 1 else ''})")
                 st.caption(f"{len(step['items'])} items: {', '.join(step['items'][:8])}{'...' if len(step['items']) > 8 else ''}")
                 if i < len(ladder["steps"]) - 1:
                     st.markdown("↓")
@@ -1199,7 +1199,7 @@ with tab4:
                     if skill_id:
                         step = get_step(ladders_data, skill_id)
                         aim = step["aim"]
-                        st.markdown(f"**Aim:** {aim['correctPerMin']} correct/min, max {aim['maxErrors']} errors, {aim['timedSec']}s")
+                        st.markdown(f"**Target:** {aim['correctPerMin']} correct in {aim['timedSec']}s (up to {aim['maxErrors']} mistake{'s' if aim['maxErrors'] != 1 else ''})")
 
                         windowed = is_windowed(step)
                         # Rolling-list skills only ever drill the pupil's current
@@ -1213,9 +1213,9 @@ with tab4:
                         probes_data = load_probes(pupil_id, skill_id)
                         has_baseline = any(p.get("mode") == "baseline" for p in probes_data.get("probes", []))
 
-                        mode = st.radio("Assessment mode:", ["Timed Probe", "Untimed Check", "Baseline Assessment"], horizontal=True)
+                        mode = st.radio("Check type:", ["Timed Check", "Untimed Check", "Starting Point Check"], horizontal=True)
 
-                        if mode == "Baseline Assessment":
+                        if mode == "Starting Point Check":
                             if has_baseline:
                                 st.warning("A baseline already exists for this skill. Recording a new baseline will replace the old one's position.")
                             st.markdown(f"**Items ({len(probe_items)}):** Mark each item the pupil already knows.")
@@ -1259,11 +1259,11 @@ with tab4:
                                 st.success("Baseline saved!")
                                 st.rerun()
 
-                        elif mode == "Timed Probe":
+                        elif mode == "Timed Check":
                             st.markdown(f"**Items ({len(probe_items)}):** {', '.join(probe_items[:12])}{'...' if len(probe_items) > 12 else ''}")
 
                             if "probe_active" not in st.session_state:
-                                if st.button("Start Probe", use_container_width=True, type="primary"):
+                                if st.button("Start Check", use_container_width=True, type="primary"):
                                     st.session_state.probe_active = True
                                     st.session_state.probe_start = time.time()
                                     st.session_state.probe_results = {}
@@ -1284,20 +1284,20 @@ with tab4:
                                     cpm = round(correct / (duration / 60), 1) if duration > 0 else 0
                                     aim_met = cpm >= aim["correctPerMin"] and errors <= aim["maxErrors"]
 
-                                    st.markdown(f"### Probe Complete!")
+                                    st.markdown(f"### Check Complete!")
                                     st.metric("Correct per minute", f"{cpm}", f"{correct} correct, {errors} errors")
 
                                     if aim_met:
-                                        st.markdown('<div class="aim-met">🎯 <strong>Aim met!</strong> Consider progressing to the next skill.</div>', unsafe_allow_html=True)
+                                        st.markdown('<div class="aim-met">🎯 <strong>Target hit!</strong> Consider progressing to the next skill.</div>', unsafe_allow_html=True)
                                     else:
-                                        st.markdown('<div class="aim-not-met">Keep practising — not at aim yet.</div>', unsafe_allow_html=True)
+                                        st.markdown('<div class="aim-not-met">Keep practising — not quite there yet.</div>', unsafe_allow_html=True)
 
                                     notes = st.text_input("Notes (optional)", key="probe_notes")
-                                    if st.button("Save Probe", use_container_width=True, type="primary"):
+                                    if st.button("Save Check", use_container_width=True, type="primary"):
                                         item_results = {k: v for k, v in st.session_state.probe_results.items() if v is not None}
                                         add_probe(pupil_id, skill_id, "timed", correct, errors, len(probe_items), duration, notes, item_results)
                                         filepath = str(PROBES_DIR / pupil_id / f"{skill_id}.json")
-                                        git_add_commit_push(filepath, f"Timed probe: {pupil['firstName']} {step['name']}")
+                                        git_add_commit_push(filepath, f"Timed check: {pupil['firstName']} {step['name']}")
 
                                         # Rolling-list skills graduate via "Update rolling list"
                                         # below (once the whole step is known), not from
@@ -1355,7 +1355,7 @@ with tab4:
                                                 st.session_state.probe_results[item] = False
                                                 st.rerun()
 
-                                    if st.button("End Probe Early", type="secondary"):
+                                    if st.button("End Check Early", type="secondary"):
                                         st.session_state.probe_start = time.time() - aim["timedSec"]
                                         st.rerun()
 
@@ -1406,7 +1406,7 @@ with tab4:
                             st.markdown("#### Update rolling list")
                             wprobes_data = load_probes(pupil_id, skill_id)
                             if not wprobes_data.get("probes"):
-                                st.caption("Record a probe above first, then come back here to move the list on.")
+                                st.caption("Record a check above first, then come back here to move the list on.")
                             else:
                                 current_window = get_active_window(pupil, skill_id, step)
                                 frontier = get_window_frontier(pupil, skill_id, step)
@@ -1500,7 +1500,7 @@ with tab5:
                         "Known": f"{summary['totalFactsKnown']}/{summary['totalFacts']}",
                         "New facts": f"+{summary['newFactsLearned']}" if summary["newFactsLearned"] > 0 else "—",
                         "Progress %": f"{summary['progressPct']}%" if summary["baselineDate"] else "—",
-                        "Probes": summary["probesCount"],
+                        "Checks": summary["probesCount"],
                     })
                 st.dataframe(overview_rows, use_container_width=True, hide_index=True)
 
@@ -1605,11 +1605,11 @@ with tab5:
 
                             # Celeration chart
                             aim = step["aim"]
-                            st.markdown(f"**Aim:** {aim['correctPerMin']}/min, max {aim['maxErrors']} errors")
+                            st.markdown(f"**Target:** {aim['correctPerMin']} correct in {aim['timedSec']}s (up to {aim['maxErrors']} mistake{'s' if aim['maxErrors'] != 1 else ''})")
 
                             try:
                                 from charts import celeration_chart
-                                fig = celeration_chart(probes, aim, step["name"], pupil["firstName"])
+                                fig = celeration_chart(probes, aim, step["name"], pupil['firstName'])
                                 st.plotly_chart(fig, use_container_width=True)
                             except ImportError:
                                 st.warning("Install plotly for charts: pip install plotly")
@@ -1631,9 +1631,9 @@ with tab5:
                             st.dataframe(rows, use_container_width=True, hide_index=True)
 
                             if check_aim_met(step, probes_data):
-                                st.success(f"🎯 {step['name']} — Aim achieved!")
+                                st.success(f"🎯 {step['name']} — Target reached!")
                         else:
-                            st.info("No probes recorded yet. Run a baseline assessment to set the starting point.")
+                            st.info("No checks recorded yet. Run a Starting Point Check to set where they begin.")
 
 # ── Tab 6: Print Grids ─────────────────────────────────────────────────────
 
@@ -1721,8 +1721,25 @@ with tab6:
                                     sheet["day_label"] = f"Day {day_n}"
                                 all_sheets.append((p, sheet))
 
-                    for i in range(0, len(all_sheets), 2):
-                        render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, all_sheets[i:i + 2], include_answers)
+                    # Recognition sheets (phonics/CEW — read it, say it, no
+                    # box to write in) get a full page each: at the item
+                    # counts these actually run (20-30 words), squeezing them
+                    # into a half-page made every word small regardless of
+                    # per-word sizing — there just isn't the room. Maths and
+                    # spelling dictation keep 2-per-page since those have a
+                    # real minimum writable-box size to hit, not a text-size
+                    # one.
+                    recognition_sheets, boxed_sheets = [], []
+                    for p, sheet in all_sheets:
+                        is_recognition = sheet["subject"] == "phonics" or sheet.get("display_mode") == "recognition"
+                        (recognition_sheets if is_recognition else boxed_sheets).append((p, sheet))
+
+                    for p, sheet in recognition_sheets:
+                        render_compact_sheet_slot(c, margin, usable_w, page_h - margin, margin, p, sheet, include_answers)
+                        c.showPage()
+
+                    for i in range(0, len(boxed_sheets), 2):
+                        render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, boxed_sheets[i:i + 2], include_answers)
                         c.showPage()
 
                     c.save()
