@@ -13,6 +13,7 @@ from data import (
     migrate_skills_format, skill_status, active_skills_for, count_by_status,
     generate_sheet, get_answer, get_review_items,
     fetch_hub_pupils, sync_pupils_from_roster,
+    is_windowed, get_active_window, get_window_frontier, set_active_window, suggest_next_window,
 )
 
 # ── PDF Helper ────────────────────────────────────────────────────────────────
@@ -116,6 +117,22 @@ def _build_grid_elements(p, sheet, styles, title_style, info_style, answer_style
         elements.append(t)
 
     return elements
+
+
+# ── Year Group Filter ────────────────────────────────────────────────────────
+
+def year_group_filtered_pupils(pupils_data, key):
+    """Render a 'Year group' selectbox and return (pupil_options, year_group)
+    filtered to it. pupil_options is the usual [(id, "First Last"), ...] list
+    used to build the pupil selectbox right below it. Pupils with no stored
+    yearGroup (added before this field existed) fall under 'Unknown'."""
+    year_groups = sorted({p.get("yearGroup") or "Unknown" for p in pupils_data["pupils"]})
+    selected = st.selectbox("Year group", ["All"] + year_groups, key=f"yg_{key}")
+    if selected == "All":
+        filtered = pupils_data["pupils"]
+    else:
+        filtered = [p for p in pupils_data["pupils"] if (p.get("yearGroup") or "Unknown") == selected]
+    return [(p["id"], f"{p['firstName']} {p['lastName']}") for p in filtered], selected
 
 
 st.set_page_config(page_title="WFA Precision Teaching", page_icon="📊", layout="wide")
@@ -760,7 +777,7 @@ with tab2:
             for p in matches:
                 label = f"{p.get('first','')} {p.get('last','')} — {p.get('yearGroup','')} {p.get('class','')}"
                 if st.button(f"+ {label}", key=f"addroster_{p.get('upn')}"):
-                    pupil = add_pupil(pupils_data, p.get("upn"), p.get("first", ""), p.get("last", ""), p.get("class", ""))
+                    pupil = add_pupil(pupils_data, p.get("upn"), p.get("first", ""), p.get("last", ""), p.get("class", ""), p.get("yearGroup", ""))
                     save_pupils(pupils_data)
                     git_add_commit_push("data/pupils.json", f"Track pupil: {p.get('first')} {p.get('last')}")
                     st.success(f"Now tracking {p.get('first')} {p.get('last')} (token: **{pupil['token']}**)")
@@ -775,9 +792,13 @@ with tab2:
     if not pupils_data["pupils"]:
         st.info("Add pupils first, then set their starting points.")
     else:
-        pupil_options = [(p["id"], f"{p['firstName']} {p['lastName']}") for p in pupils_data["pupils"]]
-        sp_pupil = st.selectbox("Select pupil", pupil_options, format_func=lambda x: x[1], key="sp_pupil")
-        sp_pupil_id = sp_pupil[0] if sp_pupil else None
+        pupil_options, _ = year_group_filtered_pupils(pupils_data, "sp")
+        if not pupil_options:
+            st.info("No pupils in this year group.")
+            sp_pupil_id = None
+        else:
+            sp_pupil = st.selectbox("Select pupil", pupil_options, format_func=lambda x: x[1], key="sp_pupil")
+            sp_pupil_id = sp_pupil[0] if sp_pupil else None
 
         if sp_pupil_id:
             sp_pupil_data = get_pupil(pupils_data, sp_pupil_id)
@@ -828,7 +849,15 @@ with tab2:
                                 selected_step_data = s
                                 break
 
-                        if selected_step_data:
+                        if selected_step_data and is_windowed(selected_step_data):
+                            window_size = selected_step_data["windowSize"]
+                            st.info(
+                                f"This is a rolling-list skill — {sp_pupil_data['firstName']} will start with the "
+                                f"first {window_size} items ({', '.join(selected_step_data['items'][:window_size])}). "
+                                f"Run a Baseline Assessment in Probe Entry to record what they already know, then use "
+                                f"'Update rolling list' there as they master items."
+                            )
+                        elif selected_step_data:
                             st.markdown(f"**Items in {selected_step_data['name']}:** Tick the ones {sp_pupil_data['firstName']} already knows confidently.")
                             # Load any existing baseline for this skill
                             existing_probes = load_probes(sp_pupil_id, selected_step_id)
@@ -858,13 +887,20 @@ with tab2:
                             # Set selected step as active
                             set_skill_status(sp_pupil_data, selected_step_id, "active")
 
-                            # Save a baseline probe for this skill with per-item data
                             step_data = None
                             for s in ladder["steps"]:
                                 if s["id"] == selected_step_id:
                                     step_data = s
                                     break
-                            if step_data:
+
+                            if step_data and is_windowed(step_data):
+                                # Rolling-list skill — initialise the window, real
+                                # per-item baseline happens in Probe Entry.
+                                window_size = step_data["windowSize"]
+                                initial_window = step_data["items"][:window_size]
+                                set_active_window(sp_pupil_data, selected_step_id, initial_window, window_size - 1)
+                            elif step_data:
+                                # Save a baseline probe for this skill with per-item data
                                 known_set = set(known_items) if selected_step_id != "none" else set()
                                 item_results = {item: (item in known_set) for item in step_data["items"]}
                                 correct = sum(1 for v in item_results.values() if v)
@@ -874,7 +910,7 @@ with tab2:
                         save_pupils(pupils_data)
                         # Commit both pupils.json and any probe files
                         git_add_commit_push("data/pupils.json", f"Set starting point for {sp_pupil_data['firstName']}: {ladder['name']}")
-                        if selected_step_id != "none":
+                        if selected_step_id != "none" and step_data and not is_windowed(step_data):
                             filepath = str(PROBES_DIR / sp_pupil_id / f"{selected_step_id}.json")
                             git_add_commit_push(filepath, f"Baseline for {sp_pupil_data['firstName']}: {selected_step_id}")
                         st.success(f"Updated {ladder['name']} for {sp_pupil_data['firstName']}!")
@@ -942,9 +978,13 @@ with tab4:
     if not pupils_data["pupils"]:
         st.info("Add pupils first in the Pupils tab.")
     else:
-        pupil_options = [(p["id"], f"{p['firstName']} {p['lastName']}") for p in pupils_data["pupils"]]
-        selected_pupil = st.selectbox("Select pupil", pupil_options, format_func=lambda x: x[1])
-        pupil_id = selected_pupil[0] if selected_pupil else None
+        pupil_options, _ = year_group_filtered_pupils(pupils_data, "pe")
+        if not pupil_options:
+            st.info("No pupils in this year group.")
+            pupil_id = None
+        else:
+            selected_pupil = st.selectbox("Select pupil", pupil_options, format_func=lambda x: x[1])
+            pupil_id = selected_pupil[0] if selected_pupil else None
 
         if pupil_id:
             pupil = get_pupil(pupils_data, pupil_id)
@@ -970,6 +1010,14 @@ with tab4:
                         aim = step["aim"]
                         st.markdown(f"**Aim:** {aim['correctPerMin']} correct/min, max {aim['maxErrors']} errors, {aim['timedSec']}s")
 
+                        windowed = is_windowed(step)
+                        # Rolling-list skills only ever drill the pupil's current
+                        # window, not the whole step — the window moves forward
+                        # via "Update rolling list" below, not by acing it all at once.
+                        probe_items = get_active_window(pupil, skill_id, step) if windowed else step["items"]
+                        if windowed:
+                            st.caption(f"🔁 Rolling list — currently: {', '.join(probe_items)}")
+
                         # Check if baseline exists
                         probes_data = load_probes(pupil_id, skill_id)
                         has_baseline = any(p.get("mode") == "baseline" for p in probes_data.get("probes", []))
@@ -979,14 +1027,14 @@ with tab4:
                         if mode == "Baseline Assessment":
                             if has_baseline:
                                 st.warning("A baseline already exists for this skill. Recording a new baseline will replace the old one's position.")
-                            st.markdown(f"**Items ({len(step['items'])}):** Mark each item the pupil already knows.")
+                            st.markdown(f"**Items ({len(probe_items)}):** Mark each item the pupil already knows.")
                             st.caption("This records their starting point. Only items they can do confidently and quickly should be marked correct.")
 
                             if "baseline_results" not in st.session_state:
-                                st.session_state.baseline_results = {item: None for item in step["items"]}
+                                st.session_state.baseline_results = {item: None for item in probe_items}
 
                             results = st.session_state.baseline_results
-                            for item in step["items"]:
+                            for item in probe_items:
                                 current = results.get(item)
                                 col1, col2, col3 = st.columns([4, 1, 1])
                                 with col1:
@@ -1005,14 +1053,14 @@ with tab4:
                             if answered:
                                 correct = sum(1 for v in answered.values() if v)
                                 total = len(answered)
-                                st.metric("Known items", f"{correct}/{len(step['items'])}", f"{correct}/{total} assessed")
+                                st.metric("Known items", f"{correct}/{len(probe_items)}", f"{correct}/{total} assessed")
 
                             if st.button("Save Baseline", use_container_width=True, type="primary"):
                                 answered = {k: v for k, v in results.items() if v is not None}
                                 correct = sum(1 for v in answered.values() if v)
                                 errors = sum(1 for v in answered.values() if not v)
                                 item_results = {k: v for k, v in results.items() if v is not None}
-                                add_probe(pupil_id, skill_id, "baseline", correct, errors, len(step["items"]), 0, "", item_results)
+                                add_probe(pupil_id, skill_id, "baseline", correct, errors, len(probe_items), 0, "", item_results)
                                 filepath = str(PROBES_DIR / pupil_id / f"{skill_id}.json")
                                 git_add_commit_push(filepath, f"Baseline: {pupil['firstName']} {step['name']}")
                                 if "baseline_results" in st.session_state:
@@ -1021,14 +1069,14 @@ with tab4:
                                 st.rerun()
 
                         elif mode == "Timed Probe":
-                            st.markdown(f"**Items ({len(step['items'])}):** {', '.join(step['items'][:12])}{'...' if len(step['items']) > 12 else ''}")
+                            st.markdown(f"**Items ({len(probe_items)}):** {', '.join(probe_items[:12])}{'...' if len(probe_items) > 12 else ''}")
 
                             if "probe_active" not in st.session_state:
                                 if st.button("Start Probe", use_container_width=True, type="primary"):
                                     st.session_state.probe_active = True
                                     st.session_state.probe_start = time.time()
                                     st.session_state.probe_results = {}
-                                    for item in step["items"]:
+                                    for item in probe_items:
                                         st.session_state.probe_results[item] = None
                                     st.rerun()
 
@@ -1056,11 +1104,14 @@ with tab4:
                                     notes = st.text_input("Notes (optional)", key="probe_notes")
                                     if st.button("Save Probe", use_container_width=True, type="primary"):
                                         item_results = {k: v for k, v in st.session_state.probe_results.items() if v is not None}
-                                        add_probe(pupil_id, skill_id, "timed", correct, errors, len(step["items"]), duration, notes, item_results)
+                                        add_probe(pupil_id, skill_id, "timed", correct, errors, len(probe_items), duration, notes, item_results)
                                         filepath = str(PROBES_DIR / pupil_id / f"{skill_id}.json")
                                         git_add_commit_push(filepath, f"Timed probe: {pupil['firstName']} {step['name']}")
 
-                                        if aim_met:
+                                        # Rolling-list skills graduate via "Update rolling list"
+                                        # below (once the whole step is known), not from
+                                        # acing a single window's probe.
+                                        if aim_met and not windowed:
                                             next_step = get_next_step(ladders_data, skill_id)
                                             if next_step:
                                                 set_skill_status(pupil, skill_id, "mastered")
@@ -1098,7 +1149,7 @@ with tab4:
                                     with col_info2:
                                         st.metric("Errors", error_count)
 
-                                    for item in step["items"]:
+                                    for item in probe_items:
                                         current = results.get(item)
                                         col1, col2, col3 = st.columns([4, 1, 1])
                                         with col1:
@@ -1119,12 +1170,12 @@ with tab4:
 
                         else:  # Untimed Check
                             if "untimed_results" not in st.session_state:
-                                st.session_state.untimed_results = {item: None for item in step["items"]}
+                                st.session_state.untimed_results = {item: None for item in probe_items}
 
-                            st.markdown(f"**Items ({len(step['items'])}):** Mark each as correct or incorrect.")
+                            st.markdown(f"**Items ({len(probe_items)}):** Mark each as correct or incorrect.")
 
                             results = st.session_state.untimed_results
-                            for item in step["items"]:
+                            for item in probe_items:
                                 current = results.get(item)
                                 col1, col2, col3 = st.columns([4, 1, 1])
                                 with col1:
@@ -1151,13 +1202,63 @@ with tab4:
                                 correct = sum(1 for v in answered.values() if v)
                                 errors = sum(1 for v in answered.values() if not v)
                                 item_results = dict(answered)
-                                add_probe(pupil_id, skill_id, "untimed", correct, errors, len(step["items"]), 0, "", item_results)
+                                add_probe(pupil_id, skill_id, "untimed", correct, errors, len(probe_items), 0, "", item_results)
                                 filepath = str(PROBES_DIR / pupil_id / f"{skill_id}.json")
                                 git_add_commit_push(filepath, f"Untimed check: {pupil['firstName']} {step['name']}")
                                 if "untimed_results" in st.session_state:
                                     del st.session_state.untimed_results
                                 st.success("Check saved!")
                                 st.rerun()
+
+                        if windowed:
+                            st.divider()
+                            st.markdown("#### Update rolling list")
+                            wprobes_data = load_probes(pupil_id, skill_id)
+                            if not wprobes_data.get("probes"):
+                                st.caption("Record a probe above first, then come back here to move the list on.")
+                            else:
+                                current_window = get_active_window(pupil, skill_id, step)
+                                frontier = get_window_frontier(pupil, skill_id, step)
+                                suggested, _, _ = suggest_next_window(pupil, skill_id, step, wprobes_data)
+                                mastery = get_item_mastery(wprobes_data, current_window)
+
+                                st.caption("Tick which items should stay in the list — pre-ticked from the latest results. Untick to keep practising an item, or tick a known one to keep reviewing it.")
+                                chosen = []
+                                for item in current_window:
+                                    known = mastery.get(item, {}).get("known", False)
+                                    keep = st.checkbox(
+                                        f"{item}{' — known' if known else ''}",
+                                        value=(item in suggested),
+                                        key=f"keep_{pupil_id}_{skill_id}_{item}",
+                                    )
+                                    if keep:
+                                        chosen.append(item)
+
+                                drop_count = len(current_window) - len(chosen)
+                                backfill = step["items"][frontier + 1: frontier + 1 + drop_count]
+                                next_window = chosen + backfill
+                                next_frontier = frontier + len(backfill)
+                                full_mastery = get_item_mastery(wprobes_data, step["items"])
+                                step_complete = (
+                                    next_frontier >= len(step["items"]) - 1
+                                    and all(full_mastery.get(i, {}).get("known") for i in step["items"])
+                                )
+
+                                st.markdown(f"**Next list:** {', '.join(next_window) if next_window else '— nothing left, step complete —'}")
+                                if step_complete:
+                                    st.success("Every item in this step is known — confirming will mark it mastered and move on to the next step.")
+
+                                if st.button("Confirm list", type="primary", key=f"confirm_window_{pupil_id}_{skill_id}"):
+                                    set_active_window(pupil, skill_id, next_window, next_frontier)
+                                    if step_complete:
+                                        set_skill_status(pupil, skill_id, "mastered")
+                                        next_step = get_next_step(ladders_data, skill_id)
+                                        if next_step:
+                                            set_skill_status(pupil, next_step["id"], "active")
+                                    save_pupils(pupils_data)
+                                    git_add_commit_push("data/pupils.json", f"Update rolling list for {pupil['firstName']}: {step['name']}")
+                                    st.success("List updated!")
+                                    st.rerun()
 
 # ── Tab 5: Progress ────────────────────────────────────────────────────────
 
@@ -1168,9 +1269,13 @@ with tab5:
     if not pupils_data["pupils"]:
         st.info("Add pupils first.")
     else:
-        pupil_options = [(p["id"], f"{p['firstName']} {p['lastName']}") for p in pupils_data["pupils"]]
-        selected_pupil = st.selectbox("Select pupil", pupil_options, format_func=lambda x: x[1], key="progress_pupil")
-        pupil_id = selected_pupil[0] if selected_pupil else None
+        pupil_options, _ = year_group_filtered_pupils(pupils_data, "progress")
+        if not pupil_options:
+            st.info("No pupils in this year group.")
+            pupil_id = None
+        else:
+            selected_pupil = st.selectbox("Select pupil", pupil_options, format_func=lambda x: x[1], key="progress_pupil")
+            pupil_id = selected_pupil[0] if selected_pupil else None
 
         if pupil_id:
             pupil = get_pupil(pupils_data, pupil_id)
@@ -1203,6 +1308,7 @@ with tab5:
                         "Latest": f"{summary['latestCorrect']}/{summary['latestTotal']}" if summary["latestDate"] else "—",
                         "Known": f"{summary['totalFactsKnown']}/{summary['totalFacts']}",
                         "New facts": f"+{summary['newFactsLearned']}" if summary["newFactsLearned"] > 0 else "—",
+                        "Progress %": f"{summary['progressPct']}%" if summary["baselineDate"] else "—",
                         "Probes": summary["probesCount"],
                     })
                 st.dataframe(overview_rows, use_container_width=True, hide_index=True)
@@ -1231,7 +1337,7 @@ with tab5:
                         summary = get_progress_summary(probes_data, step)
 
                         # Progress metrics
-                        col1, col2, col3, col4, col5 = st.columns(5)
+                        col1, col2, col3, col4, col5, col6 = st.columns(6)
                         with col1:
                             st.metric("Total facts", f"{summary['totalFactsKnown']}/{summary['totalFacts']}")
                         with col2:
@@ -1243,6 +1349,15 @@ with tab5:
                         with col5:
                             improvement = summary["improvementPct"]
                             st.metric("Improvement", f"+{improvement}%" if improvement > 0 else f"{improvement}%")
+                        with col6:
+                            progress = summary["progressPct"]
+                            progress_label = "Progress vs baseline"
+                            progress_help = (
+                                "Started knowing 0, so this is new facts as a % of the whole set instead."
+                                if summary["progressPctIsFallback"] else
+                                "New facts learned, as a % of how many they knew at baseline (100% = learned as many new facts as they started with)."
+                            )
+                            st.metric(progress_label, f"+{progress}%" if progress > 0 else f"{progress}%", help=progress_help)
 
                         # Item-level mastery
                         if probes:
