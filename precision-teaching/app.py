@@ -424,8 +424,7 @@ if query_params.get("mode") == "self_assess":
         if subject == "maths":
             st.subheader(f"🔢 {step['name']}")
             aim = step["aim"]
-            st.markdown(f"**Try to get {aim['correctPerMin']} correct in {aim['timedSec']} seconds!**")
-            st.caption(f"Up to {aim['maxErrors']} mistake{'s' if aim['maxErrors'] != 1 else ''} is OK. Type your answer for each question.")
+            st.caption("Type your answer for each question.")
 
             if "maths_start" not in st.session_state:
                 if st.button("Start! 🚀", use_container_width=True, type="primary"):
@@ -535,7 +534,6 @@ if query_params.get("mode") == "self_assess":
         elif subject == "phonics":
             st.subheader(f"📖 {step['name']}")
             aim = step["aim"]
-            st.markdown(f"**Target:** {aim['correctPerMin']} correct in {aim['timedSec']}s (up to {aim['maxErrors']} mistake{'s' if aim['maxErrors'] != 1 else ''})")
             st.caption("Adult: listen to the child read each grapheme and mark correct or incorrect.")
 
             if "phonics_start" not in st.session_state:
@@ -1035,7 +1033,7 @@ with tab2:
                             st.info(
                                 f"This is a rolling-list skill — {sp_pupil_data['firstName']} will start with the "
                                 f"first {window_size} items ({', '.join(selected_step_data['items'][:window_size])}). "
-                                f"Run a Starting Point Check in Daily Check to record what they already know, then use "
+                                f"Run a Baseline in Daily Check to record what they already know, then use "
                                 f"'Update rolling list' there as they master items."
                             )
                         elif selected_step_data:
@@ -1153,9 +1151,8 @@ with tab3:
     for ladder in ladders_data["ladders"]:
         with st.expander(f"{ladder['name']} ({ladder['subject']})"):
             for i, step in enumerate(ladder["steps"]):
-                aim = step["aim"]
                 status_emoji = "✅" if i == 0 else "🔵"
-                st.markdown(f"**{step['name']}** — Target: {aim['correctPerMin']} correct in {aim['timedSec']}s (up to {aim['maxErrors']} mistake{'s' if aim['maxErrors'] != 1 else ''})")
+                st.markdown(f"**{step['name']}**")
                 st.caption(f"{len(step['items'])} items: {', '.join(step['items'][:8])}{'...' if len(step['items']) > 8 else ''}")
                 if i < len(ladder["steps"]) - 1:
                     st.markdown("↓")
@@ -1199,7 +1196,6 @@ with tab4:
                     if skill_id:
                         step = get_step(ladders_data, skill_id)
                         aim = step["aim"]
-                        st.markdown(f"**Target:** {aim['correctPerMin']} correct in {aim['timedSec']}s (up to {aim['maxErrors']} mistake{'s' if aim['maxErrors'] != 1 else ''})")
 
                         windowed = is_windowed(step)
                         # Rolling-list skills only ever drill the pupil's current
@@ -1213,9 +1209,9 @@ with tab4:
                         probes_data = load_probes(pupil_id, skill_id)
                         has_baseline = any(p.get("mode") == "baseline" for p in probes_data.get("probes", []))
 
-                        mode = st.radio("Check type:", ["Timed Check", "Untimed Check", "Starting Point Check"], horizontal=True)
+                        mode = st.radio("Check type:", ["Timed Check", "Untimed Check", "Baseline"], horizontal=True)
 
-                        if mode == "Starting Point Check":
+                        if mode == "Baseline":
                             if has_baseline:
                                 st.warning("A baseline already exists for this skill. Recording a new baseline will replace the old one's position.")
                             st.markdown(f"**Items ({len(probe_items)}):** Mark each item the pupil already knows.")
@@ -1605,7 +1601,6 @@ with tab5:
 
                             # Celeration chart
                             aim = step["aim"]
-                            st.markdown(f"**Target:** {aim['correctPerMin']} correct in {aim['timedSec']}s (up to {aim['maxErrors']} mistake{'s' if aim['maxErrors'] != 1 else ''})")
 
                             try:
                                 from charts import celeration_chart
@@ -1633,7 +1628,7 @@ with tab5:
                             if check_aim_met(step, probes_data):
                                 st.success(f"🎯 {step['name']} — Target reached!")
                         else:
-                            st.info("No checks recorded yet. Run a Starting Point Check to set where they begin.")
+                            st.info("No checks recorded yet. Run a Baseline to set where they begin.")
 
 # ── Tab 6: Print Grids ─────────────────────────────────────────────────────
 
