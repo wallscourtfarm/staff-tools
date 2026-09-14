@@ -118,7 +118,16 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
       <div>
         <label class="lbl">Number of questions</label>
         <input type="number" id="questionCount" placeholder="Auto" min="5" max="80">
-        <p class="hint">Leave blank for the normal-length paper. Applies to the standard paper and all adapted papers. Unticked topics are left out entirely — the paper only draws from ticked topics, picking a different random subset (and order) each time you generate.</p>
+        <p class="hint">Leave blank for the normal-length paper. Applies to the standard paper and all adapted papers. Unticked topics are left out entirely — the paper only draws from ticked topics.</p>
+      </div>
+      <div>
+        <label class="lbl">Question order</label>
+        <select id="questionOrder">
+          <option value="shuffle" selected>Shuffled (default) — different subset & order each time</option>
+          <option value="year">Grouped by year group — Y3, then Y4, then Y5, then Y6</option>
+          <option value="topic">Grouped by topic — e.g. all place value, then all addition…</option>
+        </select>
+        <p class="hint">"Grouped by year group" only has an effect when prior-year revision content is included.</p>
       </div>
     </div>
   </div>
@@ -197,14 +206,9 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     </div>
   </div>
 
-  <!-- Y6 topics + sort toggle -->
+  <!-- Y6 topics -->
   <div class="card" id="topicCardY6" style="display:none">
     <h2>✅ Y6 Arithmetic Topics</h2>
-    <div class="toggle-row" style="border-top:none;padding-top:0;margin-bottom:14px">
-      <input type="checkbox" id="y6SortByYear">
-      <label for="y6SortByYear">Sort questions: Y3 first, then Y4, Y5, Y6</label>
-      <small>(helps see prior-year confidence week by week)</small>
-    </div>
     <div class="topic-grid" id="topicsY6">
       <label class="topic-item"><input type="checkbox" checked data-topic="y6Y3content"><span class="topic-yg topic-yg-Y3">Y3</span><span>Content (add/subtract/×÷)</span></label>
       <label class="topic-item"><input type="checkbox" checked data-topic="y6Y4content"><span class="topic-yg topic-yg-Y4">Y4</span><span>Content (column, tables)</span></label>
@@ -282,7 +286,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     </div>
   </div>
 
-  <div class="version">14.09.26b</div>
+  <div class="version">14.09.26c</div>
 </div>
 
 <script>
@@ -339,10 +343,10 @@ function buildFromPools(pools, topics, targetCount, fillerFn) {
   const activeKeys = Object.keys(pools).filter(k => topics[k]);
   if (activeKeys.length === 0) {
     const n = targetCount && targetCount > 0 ? targetCount : 20;
-    return Array.from({length: n}, fillerFn);
+    return Array.from({length: n}, () => ({...fillerFn(), _topic:'_core'}));
   }
   let natural = [];
-  activeKeys.forEach(k => pools[k].forEach(fn => natural.push(fn)));
+  activeKeys.forEach(k => pools[k].forEach(fn => natural.push({key:k, fn})));
   shuffleArr(natural);
   const n = targetCount && targetCount > 0 ? targetCount : natural.length;
   let chosen;
@@ -354,12 +358,28 @@ function buildFromPools(pools, topics, targetCount, fillerFn) {
     while (chosen.length < n) {
       const k = activeKeys[i % activeKeys.length];
       const pool = pools[k];
-      chosen.push(pool[Math.floor(Math.random() * pool.length)]);
+      chosen.push({key:k, fn: pool[Math.floor(Math.random() * pool.length)]});
       i++;
     }
   }
-  const qs = chosen.map(fn => fn());
+  const qs = chosen.map(({key, fn}) => ({...fn(), _topic:key}));
   shuffleArr(qs);
+  return qs;
+}
+
+// Reorder a built question list — 'year' groups by yg (Y3→Y4→Y5→Y6, own year last/undefined
+// treated as the paper's native year), 'topic' groups by the topic each question was drawn
+// from, in the order that topic's checkbox appears in the UI. Default (anything else) leaves
+// the existing shuffled order alone. Sort is stable, so order *within* a group stays randomised.
+const YG_ORDER = {Y3:0, Y4:1, Y5:2, Y6:3};
+function orderQuestions(qs, mode, topicOrder, ownYg) {
+  if (mode === 'year') {
+    return qs.slice().sort((a,b) => (YG_ORDER[a.yg || ownYg] ?? 99) - (YG_ORDER[b.yg || ownYg] ?? 99));
+  }
+  if (mode === 'topic') {
+    const idx = k => { const i = topicOrder.indexOf(k); return i === -1 ? topicOrder.length : i; };
+    return qs.slice().sort((a,b) => idx(a._topic) - idx(b._topic));
+  }
   return qs;
 }
 
@@ -446,15 +466,14 @@ function saveSetup() {
   document.querySelectorAll('#topicsY2 input,#topicsY3 input,#topicsY4 input,#topicsY4R input,#topicsY5R input,#topicsY6R input,#topicsY5 input,#topicsY6 input').forEach(cb => {
     topics[cb.dataset.topic] = cb.checked;
   });
-  const y6Sort = document.getElementById('y6SortByYear')?.checked || false;
   localStorage.setItem(SETUP_KEY, JSON.stringify({
     weekRef: document.getElementById('weekRef').value,
     classYear: document.getElementById('classYear').value,
     standardLevel: document.getElementById('standardLevel').value,
     standardCount: document.getElementById('standardCount').value,
     questionCount: document.getElementById('questionCount').value,
+    questionOrder: document.getElementById('questionOrder').value,
     includeReasoning: document.getElementById('includeReasoning').checked,
-    y6SortByYear: y6Sort,
     topics,
     groups
   }));
@@ -470,10 +489,8 @@ function loadSetup() {
   if (saved.standardLevel) document.getElementById('standardLevel').value = saved.standardLevel;
   if (saved.standardCount) document.getElementById('standardCount').value = saved.standardCount;
   if (saved.questionCount) document.getElementById('questionCount').value = saved.questionCount;
+  if (saved.questionOrder) document.getElementById('questionOrder').value = saved.questionOrder;
   // Always default includeReasoning to checked — don't restore from saved state
-  if (saved.y6SortByYear != null) {
-    document.getElementById('y6SortByYear').checked = saved.y6SortByYear;
-  }
   if (saved.topics) {
     document.querySelectorAll('#topicsY2 input,#topicsY3 input,#topicsY4 input,#topicsY4R input,#topicsY5R input,#topicsY6R input,#topicsY5 input,#topicsY6 input').forEach(cb => {
       if (cb.dataset.topic in saved.topics) cb.checked = saved.topics[cb.dataset.topic];
@@ -500,7 +517,8 @@ loadSetup();
 updateTopicCards();
 
 // ─── Y2 ARITHMETIC GENERATOR ─────────────────────────────────────────────────
-function genY2Arith(t, targetCount) {
+const Y2_TOPIC_ORDER = ['numberBonds','countOnOff','twoDigitAdd','twoDigitSub','doublesHalves','y2Missing','sequences','y2Tables','y2Fractions','_core'];
+function genY2Arith(t, targetCount, sortMode) {
   const simple = () => { const a=rand(1,5),b=rand(1,5); return {text:`${a} + ${b} =`,answer:a+b,marks:1}; };
   const pools = {
     numberBonds: [
@@ -554,11 +572,13 @@ function genY2Arith(t, targetCount) {
       () => { const a=rand(2,6),b=rand(2,6),c=rand(2,6); return {text:`${a} + ${b} + ${c} =`,answer:a+b+c,marks:1}; },
     ],
   };
-  return buildFromPools(pools, {...t, _core:true}, targetCount, simple);
+  const qs = buildFromPools(pools, {...t, _core:true}, targetCount, simple);
+  return orderQuestions(qs, sortMode, Y2_TOPIC_ORDER);
 }
 
 // ─── Y3 ARITHMETIC GENERATOR ─────────────────────────────────────────────────
-function genY3Arith(t, targetCount) {
+const Y3_TOPIC_ORDER = ['y3Mental','y3PlaceValue','y3Column','y3Missing','y3Tables','y3Division','y3ShortMult','y3Fractions','_core'];
+function genY3Arith(t, targetCount, sortMode) {
   const tt = () => { const a=rand(2,8),b=rand(2,8); return {text:`${a} × ${b} =`,answer:a*b,marks:1}; };
   const pools = {
     y3Mental: [
@@ -613,11 +633,13 @@ function genY3Arith(t, targetCount) {
       () => { const a=rand(10,99); return {text:`${a} × 0 =`,answer:0,marks:1}; },
     ],
   };
-  return buildFromPools(pools, {...t, _core:true}, targetCount, tt);
+  const qs = buildFromPools(pools, {...t, _core:true}, targetCount, tt);
+  return orderQuestions(qs, sortMode, Y3_TOPIC_ORDER);
 }
 
 // ─── Y4 ARITHMETIC GENERATOR ───────────────────────────────────────────────────
-function genY4Arith(t, targetCount) {
+const Y4_TOPIC_ORDER = ['y4Y3content','placeValue','mentalCalc','columnCalc','timesTables','shortMult','division','fractions','missingNumbers','_core'];
+function genY4Arith(t, targetCount, sortMode) {
   const tt = () => { const a=rand(2,12),b=rand(2,12); return {text:`${a} × ${b} =`,answer:a*b,marks:1}; };
 
   const pools = {
@@ -688,11 +710,12 @@ function genY4Arith(t, targetCount) {
 
   let qs = buildFromPools(pools, {...t, _core:true}, targetCount, tt);
   if (qs.some(q => q.yg)) qs = qs.map(q => q.yg ? q : {...q, yg:'Y4'});
-  return qs;
+  return orderQuestions(qs, sortMode, Y4_TOPIC_ORDER, 'Y4');
 }
 
 // ─── Y5 ARITHMETIC GENERATOR ────────────────────────────────────────────────
-function genY5Arith(t, targetCount) {
+const Y5_TOPIC_ORDER = ['y5Y3content','y5Y4content','y5PlaceValue','y5Mental','y5Column','y5ShortMult','y5LongMult','y5Division','y5Decimals','y5Fractions','y5Percentages','y5Missing','_core'];
+function genY5Arith(t, targetCount, sortMode) {
   const tt = () => { const a=rand(2,12),b=rand(2,12); return {text:`${a} × ${b} =`,answer:a*b,marks:1}; };
 
   const pools = {
@@ -799,11 +822,12 @@ function genY5Arith(t, targetCount) {
 
   let qs = buildFromPools(pools, {...t, _core:true}, targetCount, tt);
   if (qs.some(q => q.yg)) qs = qs.map(q => q.yg ? q : {...q, yg:'Y5'});
-  return qs;
+  return orderQuestions(qs, sortMode, Y5_TOPIC_ORDER, 'Y5');
 }
 
 // ─── Y6 ARITHMETIC GENERATOR (36 questions, /40) ──────────────────────────────
-function genY6Arith(t, sortByYear, targetCount) {
+const Y6_TOPIC_ORDER = ['y6Y3content','y6Y4content','y6Y5decimals','y6Y5fractions','y6Y5percentages','y6LongMult','y6LongDiv','y6Bodmas','y6PctComplex','y6FracOps','y6MixedNums'];
+function genY6Arith(t, targetCount, sortMode) {
   const tf = () => { const a=rand(2,12),b=rand(2,12); return {text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y6'}; };
 
   const pools = {
@@ -892,24 +916,18 @@ function genY6Arith(t, sortByYear, targetCount) {
     ],
   };
 
-  let slots = buildFromPools(pools, t, targetCount, tf);
-
-  if (sortByYear) {
-    const order = {Y3:0, Y4:1, Y5:2, Y6:3};
-    slots.sort((a, b) => order[a.yg] - order[b.yg]);
-  }
-  return slots;
+  const slots = buildFromPools(pools, t, targetCount, tf);
+  return orderQuestions(slots, sortMode, Y6_TOPIC_ORDER, 'Y6');
 }
 
 // ─── DISPATCH TO CORRECT GENERATOR ───────────────────────────────────────────
-function genArith(level, targetCount) {
-  const sortByYear = level === 'Y6' && (document.getElementById('y6SortByYear')?.checked || false);
-  if (level === 'Y2') return genY2Arith(getTopics('topicsY2'), targetCount);
-  if (level === 'Y3') return genY3Arith(getTopics('topicsY3'), targetCount);
-  if (level === 'Y4') return genY4Arith(getTopics('topicsY4'), targetCount);
-  if (level === 'Y5') return genY5Arith(getTopics('topicsY5'), targetCount);
-  if (level === 'Y6') return genY6Arith(getTopics('topicsY6'), sortByYear, targetCount);
-  return genY4Arith(getTopics('topicsY4'), targetCount);
+function genArith(level, targetCount, sortMode) {
+  if (level === 'Y2') return genY2Arith(getTopics('topicsY2'), targetCount, sortMode);
+  if (level === 'Y3') return genY3Arith(getTopics('topicsY3'), targetCount, sortMode);
+  if (level === 'Y4') return genY4Arith(getTopics('topicsY4'), targetCount, sortMode);
+  if (level === 'Y5') return genY5Arith(getTopics('topicsY5'), targetCount, sortMode);
+  if (level === 'Y6') return genY6Arith(getTopics('topicsY6'), targetCount, sortMode);
+  return genY4Arith(getTopics('topicsY4'), targetCount, sortMode);
 }
 
 // ─── REASONING — API CALL ────────────────────────────────────────────────────
@@ -1040,9 +1058,10 @@ async function generateAll() {
   const standardLevel = document.getElementById('standardLevel').value;
   const includeReasoning = document.getElementById('includeReasoning').checked;
   const questionCount = parseInt(document.getElementById('questionCount').value, 10) || 0;
+  const questionOrder = document.getElementById('questionOrder').value;
 
   setStatus('generating', 'Generating arithmetic questions…');
-  const standardArith = genArith(standardLevel, questionCount);
+  const standardArith = genArith(standardLevel, questionCount, questionOrder);
   const totalMarks = standardArith.reduce((s,q)=>s+(q.marks||1),0);
 
   const adapted = [];
@@ -1050,7 +1069,7 @@ async function generateAll() {
     const id = g.id.replace('group_', '');
     const level = document.getElementById(`groupLevel_${id}`)?.value || 'Y2';
     const names = document.getElementById(`groupNames_${id}`)?.value || '';
-    const arithQs = genArith(level, questionCount);
+    const arithQs = genArith(level, questionCount, questionOrder);
     adapted.push({level, names: names.trim().split('\n').filter(Boolean), arithQs});
   });
 
