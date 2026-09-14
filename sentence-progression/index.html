@@ -433,6 +433,28 @@
     margin-bottom:16px;
     box-shadow:0 1px 3px rgba(0,0,0,0.08);
   }
+  .freewrite-year-row{
+    margin-bottom:8px;
+  }
+  .freewrite-year-label{
+    font-size:0.82rem;
+    font-weight:700;
+    color:#444;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .freewrite-year-select{
+    font-family:inherit;
+    font-size:0.85rem;
+    font-weight:700;
+    padding:4px 8px;
+    border:1.5px solid #cbd5db;
+    border-radius:6px;
+    background:#fff;
+    cursor:pointer;
+  }
   .freewrite-box textarea{
     width:100%;
     min-height:64px;
@@ -486,6 +508,17 @@
     border:1px solid #dfe6ea;
     border-radius:8px;
     padding:10px 12px;
+  }
+  .bank-item-year{
+    font-size:0.68rem;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+    color:#fff;
+    background:var(--brand);
+    border-radius:5px;
+    padding:3px 7px;
+    flex-shrink:0;
   }
   .bank-item-preview{ display:flex; flex-wrap:wrap; gap:5px; flex:1; min-width:200px; }
   .bank-pill{
@@ -727,7 +760,7 @@
 </main>
 
 <footer>
-  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v14.09.26a
+  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v14.09.26b
 </footer>
 
 <div class="present-overlay" id="presentOverlay">
@@ -896,10 +929,10 @@ try {
 function saveSentenceBank(){
   try { localStorage.setItem(SENTENCE_BANK_KEY, JSON.stringify(sentenceBank)); } catch(e) {}
 }
-function addToSentenceBank(items){
+function addToSentenceBank(items, yearId){
   const clean = items.filter(it => it.text && it.text.trim());
   if(!clean.length) return;
-  sentenceBank.push({ id: Date.now()+'-'+Math.random().toString(36).slice(2,7), items: clean });
+  sentenceBank.push({ id: Date.now()+'-'+Math.random().toString(36).slice(2,7), items: clean, yearId });
   saveSentenceBank();
 }
 function removeFromSentenceBank(id){
@@ -2205,7 +2238,7 @@ function autoTagSentence(str){
 }
 
 /* ---------- Free-write panel ---------- */
-function renderFreeWriteChips(container, items){
+function renderFreeWriteChips(container, items, yearId){
   container.innerHTML = '';
   if(!items.length){
     const p = document.createElement('p');
@@ -2300,12 +2333,14 @@ function renderFreeWriteChips(container, items){
 
   container.appendChild(row);
 
+  const ks = ksForYear(yearId);
+
   const presentBtn = document.createElement('button');
   presentBtn.className = 'btn-small';
   presentBtn.style.marginTop = '10px';
   presentBtn.textContent = '🎬 Present';
   presentBtn.addEventListener('click', ()=>{
-    openPresentMode(items, 'My sentence');
+    openPresentMode(items, 'My sentence', ks);
   });
   container.appendChild(presentBtn);
 
@@ -2315,7 +2350,7 @@ function renderFreeWriteChips(container, items){
   exportBtn.style.marginLeft = '8px';
   exportBtn.textContent = '📥 Export to PowerPoint';
   exportBtn.addEventListener('click', ()=>{
-    exportItemsToPptx(items, { title: 'My sentence', fileName: slugify(assembleSentenceText(items)) });
+    exportItemsToPptx(items, { title: 'My sentence', fileName: slugify(assembleSentenceText(items)), ks });
   });
   container.appendChild(exportBtn);
 
@@ -2325,7 +2360,7 @@ function renderFreeWriteChips(container, items){
   saveBtn.style.marginLeft = '8px';
   saveBtn.textContent = '💾 Save to my sentences';
   saveBtn.addEventListener('click', ()=>{
-    addToSentenceBank(items);
+    addToSentenceBank(items, yearId);
     const original = saveBtn.textContent;
     saveBtn.textContent = '✓ Saved — see the My sentences tab';
     saveBtn.disabled = true;
@@ -2351,6 +2386,29 @@ function buildFreeWritePanel(){
   p.textContent = "Type any sentence and it will be coloured for you automatically. It's a best guess — tap any coloured block's small dropdown to fix its colour if it's wrong.";
   wrap.appendChild(p);
 
+  // The sentence itself can be any structure regardless of year group — a teacher might
+  // want a Year 1-style simple sentence shown to a Year 6 class. This only picks which
+  // Key Stage handwriting font the PowerPoint/Present sentence line uses, same as picking
+  // a year-group tab does for the structured builder.
+  const yearRow = document.createElement('div');
+  yearRow.className = 'freewrite-year-row';
+  const yearLabel = document.createElement('label');
+  yearLabel.className = 'freewrite-year-label';
+  yearLabel.textContent = 'Year group (sets the handwriting font for Present/PowerPoint):';
+  const yearSelect = document.createElement('select');
+  yearSelect.className = 'freewrite-year-select';
+  YEARS.forEach(y=>{
+    const o = document.createElement('option');
+    o.value = y.id; o.textContent = y.label;
+    yearSelect.appendChild(o);
+  });
+  yearLabel.appendChild(yearSelect);
+  yearRow.appendChild(yearLabel);
+  wrap.appendChild(yearRow);
+  yearSelect.addEventListener('change', ()=>{
+    if(textarea.value.trim()) run();
+  });
+
   const textarea = document.createElement('textarea');
   textarea.placeholder = 'e.g. The child ate the delicious lolly quickly because they were hungry.';
   wrap.appendChild(textarea);
@@ -2374,7 +2432,7 @@ function buildFreeWritePanel(){
 
   function run(){
     const items = autoTagSentence(textarea.value);
-    renderFreeWriteChips(output, items);
+    renderFreeWriteChips(output, items, yearSelect.value);
   }
   goBtn.addEventListener('click', run);
   textarea.addEventListener('keydown', (e)=>{
@@ -2423,7 +2481,7 @@ function buildBankPanel(){
   presentAllBtn.textContent = `🎬 Present all (${sentenceBank.length})`;
   presentAllBtn.style.marginBottom = '14px';
   presentAllBtn.addEventListener('click', ()=>{
-    openPresentPlaylist(sentenceBank.map((e,i)=>({ items:e.items, title:`Saved sentence ${i+1}` })));
+    openPresentPlaylist(sentenceBank.map((e,i)=>({ items:e.items, title:`Saved sentence ${i+1}`, ks:ksForYear(e.yearId) })));
   });
   wrap.appendChild(presentAllBtn);
 
@@ -2433,6 +2491,14 @@ function buildBankPanel(){
   sentenceBank.forEach((entry, idx)=>{
     const row = document.createElement('div');
     row.className = 'bank-item';
+
+    const yearInfo = YEARS.find(y=>y.id===entry.yearId);
+    if(yearInfo){
+      const yearTag = document.createElement('div');
+      yearTag.className = 'bank-item-year';
+      yearTag.textContent = yearInfo.label;
+      row.appendChild(yearTag);
+    }
 
     const preview = document.createElement('div');
     preview.className = 'bank-item-preview';
@@ -2473,7 +2539,7 @@ function buildBankPanel(){
     presentBtn.className = 'btn-small';
     presentBtn.textContent = '🎬 Present';
     presentBtn.addEventListener('click', ()=>{
-      openPresentMode(entry.items, `Saved sentence ${idx+1}`);
+      openPresentMode(entry.items, `Saved sentence ${idx+1}`, ksForYear(entry.yearId));
     });
     actions.appendChild(presentBtn);
 
