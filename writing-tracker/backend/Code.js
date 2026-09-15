@@ -252,9 +252,9 @@ function buildPupilRow_(sh, id, d) {
       case 'admission_no':    return d.admission_no || '';
       case 'upn':             return d.upn || '';
       case 'sex':             return d.sex || '';
-      case 'pp':              return d.pp || '';
+      case 'pp':              return !!d.pp;
       case 'sen':             return d.sen || '';
-      case 'eal':             return d.eal || '';
+      case 'eal':             return !!d.eal;
       default:                return '';
     }
   });
