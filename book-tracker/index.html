@@ -267,7 +267,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · WFA-15.09.26a</div>
+  <div class="version">WFA Book Tracker · WFA-15.09.26b</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -698,8 +698,8 @@ const QUIZ_DATA = {
   },
   'BK178353742278510': { // Boy In The Tower — Polly Ho-Yen — source: BookTrust, LoveReading4Kids
     questions: [
-      { q: "Where does the main character, Ade, live at the start of the story?", options: ["A tower block flat high above a city", "A village school", "A ship at sea", "A countryside farmhouse"], correct: 0 },
       { q: "What is the name of the main character?", options: ["Obi", "Ade", "Ben", "Jeevan"], correct: 1 },
+      { q: "Where does Ade live at the start of the story?", options: ["A tower block flat high above a city", "A village school", "A ship at sea", "A countryside farmhouse"], correct: 0 },
       { q: "What is the name of Ade's friend who helps him during the crisis?", options: ["Dory", "Nina", "Gaia", "Audrey"], correct: 2 },
       { q: "What is the name of the mysterious, dangerous plant that begins destroying the city?", options: ["The Trykes", "The Spindles", "The Vynes", "The Bluchers"], correct: 3 },
       { q: "What is Ade's mother's problem that stops her leaving the flat?", options: ["She has broken her leg", "She has lost her memory", "She is too afraid to leave the flat (agoraphobia)", "She has gone away for work"], correct: 2 }
@@ -1324,14 +1324,27 @@ function renderChildDetail() {
   const c = selChild;
   const activeHtml = c.activeCheckouts.map(co => {
     const already = homeQuizScores.get(co.checkoutId);
+    const quiz = QUIZ_DATA[co.bookId];
+    const hasQuiz = quiz && quiz.questions && quiz.questions.length >= 5;
+    const primaryLabel = already
+      ? `✓ Confirm returned — scored ${already.score}/${already.total} at home`
+      : hasQuiz ? `📝 Take the reading check` : `✓ Mark as read (no quiz yet)`;
+
     return `
       <div class="alert alert-warn" style="margin-top:14px">
         📖 Currently reading: <strong>${esc(bookTitle(co.bookId))}</strong> (Copy ${co.copyNum})
         <div style="font-size:12px;color:var(--muted);margin-top:2px">Since ${fmtDate(co.checkoutDate)}</div>
-        ${already ? `<div style="margin-top:6px;font-size:13px">📊 Already scored ${already.score}/${already.total} on the reading check at home</div>` : ''}
       </div>
-      <div class="modal-btns" style="flex-direction:column;gap:8px">
-        <button class="btn btn-green" style="width:100%" onclick="doReturn('${co.checkoutId}',true,'${escJs(c.name)}','${c.id}','${co.bookId}')">✓ Completed &amp; Returned</button>
+      <div style="margin-top:14px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📝 Reading Check</div>
+        ${already
+          ? `<div style="font-size:13px;color:var(--green)">✓ Already scored ${already.score}/${already.total} at home</div>`
+          : hasQuiz
+            ? `<div style="font-size:13px;color:var(--muted)">Not taken yet — do it with ${esc(c.name.split(' ')[0])} below.</div>`
+            : `<div style="font-size:13px;color:var(--muted)">No quiz written yet for this book.</div>`}
+      </div>
+      <div class="modal-btns" style="flex-direction:column;gap:8px;margin-top:10px">
+        <button class="btn btn-green" style="width:100%" onclick="doReturn('${co.checkoutId}',true,'${escJs(c.name)}','${c.id}','${co.bookId}')">${primaryLabel}</button>
         <button class="btn btn-ghost" style="width:100%" onclick="doReturn('${co.checkoutId}',false,'${escJs(c.name)}','${c.id}')">↩ Returned (not finished)</button>
       </div>`;
   }).join('');
@@ -1508,14 +1521,17 @@ async function finishReturn(checkoutId, childId, childName, completed, msg) {
 // return. This is not a pass/fail gate: completing it always marks the
 // book as read, regardless of score. The point is to surface an honest
 // signal for staff — a low score on a book a child says they've finished
-// is worth a quick conversation, not an automatic block. Question order
-// and each question's option order are shuffled per attempt, and a wrong
-// answer never reveals which option was correct.
+// is worth a quick conversation, not an automatic block. Questions stay
+// in their authored order (16.09.26: shuffling them could put a
+// later-answer-revealing question before the one it gives away — e.g.
+// "Where does Ade live?" before "What is the main character's name?").
+// Each question's own option order is still shuffled per attempt, and a
+// wrong answer never reveals which option was correct.
 // ════════════════════════════════════════════════
 function openQuiz(checkoutId, childId, childName, bookId) {
   activeQuiz = {
     checkoutId, childId, childName, bookId,
-    order: shuffle(QUIZ_DATA[bookId].questions.map((_, i) => i)),
+    order: QUIZ_DATA[bookId].questions.map((_, i) => i),
     idx: 0, correct: 0, optionOrder: [], overrideReason: null
   };
   document.getElementById('quizOverlay').classList.remove('hidden');
