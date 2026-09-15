@@ -5,6 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Colour-Coded Sentence Builder — WFA</title>
 <style>
+  /* Key Stage handwriting fonts for the written sentence line (Present mode) — pinned to
+     the exact Regular face via its unique internal name, not the shared family name every
+     style variant (Regular/Line/Dotted for Sassoon) is registered under. See the KS_FONT_CSS
+     comment in the script below for why this exists — referencing the shared family name
+     picked an unwanted ruled variant in testing. Falls back to the shared name (then Segoe
+     UI) if this exact file isn't the one installed on a given machine. */
+  @font-face{
+    font-family:'WFA Sassoon Infant';
+    src: local('SassoonInfantRg'), local('Sassoon Infant Rg');
+    font-weight:400; font-style:normal;
+  }
+  @font-face{
+    font-family:'WFA Twinkl Cursive';
+    src: local('TwinklCursiveLooped-Regular'), local('Twinkl Cursive Looped Regular');
+    font-weight:400; font-style:normal;
+  }
   :root{
     --brand:#1798d3;
     --dark:#0a0101;
@@ -770,7 +786,7 @@
 </main>
 
 <footer>
-  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v14.09.26d
+  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v14.09.26e
 </footer>
 
 <div class="present-overlay" id="presentOverlay">
@@ -842,7 +858,22 @@ function makeIconEl(def, altText){
 // Present mode) — never the word-block text/labels, which always stay Segoe UI. Both fonts
 // are installed as regular-weight-only handwriting/guide fonts (no true bold face), so
 // wherever one of these applies the sentence is set unbolded rather than faking a bold.
-const KS_FONT = { ks1: 'Sassoon Infant', ks2: 'Twinkl Cursive Looped' };
+//
+// Sassoon (and some Twinkl families) ship several styles — Regular, a ruled "Line" guide
+// variant, a "Dotted" variant — all registered under the SAME shared font-family name
+// ("Sassoon Infant"). Referencing that shared name directly is ambiguous: which installed
+// style a browser (or PowerPoint) actually picks is undefined, and in testing it silently
+// picked the ruled "Line" variant instead of Regular — the sentence rendered in the right
+// font family but with an unwanted baseline rule under every word. KS_FONT_CSS pins the
+// exact Regular face via its unique internal PostScript name (`local('SassoonInfantRg')`,
+// from the font's own name table — not something to guess, extract with a tool like
+// fontTools if a font is ever swapped), only falling back to the ambiguous shared name if
+// that exact file isn't present. KS_FONT_PPTX is separate because PowerPoint has no
+// equivalent to @font-face/local() — it just resolves a plain name against installed
+// fonts — so it uses the precise sub-family name instead, which Windows/Office typically
+// list as a distinct selectable font rather than grouping by family the way macOS does.
+const KS_FONT_CSS = { ks1: "'WFA Sassoon Infant', 'Sassoon Infant'", ks2: "'WFA Twinkl Cursive', 'Twinkl Cursive Looped'" };
+const KS_FONT = { ks1: 'Sassoon Infant Rg', ks2: 'Twinkl Cursive Looped Regular' };
 function ksForYear(yearId){
   if(yearId==='y1' || yearId==='y2') return 'ks1';
   if(yearId && /^y[3-6]$/.test(yearId)) return 'ks2';
@@ -1349,10 +1380,10 @@ function openPresentPlaylist(playlist){
     row.innerHTML = '';
     sentenceEl.classList.remove('visible');
     sentenceEl.textContent = assembleSentenceText(entry.items);
-    // Key Stage handwriting font for the written sentence line only — see KS_FONT. Neither
-    // font has a true bold face, so it's set unbolded rather than a synthetic fake bold.
-    const ksFont = KS_FONT[entry.ks];
-    sentenceEl.style.fontFamily = ksFont ? `'${ksFont}', 'Segoe UI', sans-serif` : '';
+    // Key Stage handwriting font for the written sentence line only — see KS_FONT_CSS.
+    // Neither font has a true bold face, so it's set unbolded rather than a synthetic bold.
+    const ksFont = KS_FONT_CSS[entry.ks];
+    sentenceEl.style.fontFamily = ksFont ? `${ksFont}, 'Segoe UI', sans-serif` : '';
     sentenceEl.style.fontWeight = ksFont ? '400' : '';
     sentenceEl.style.fontSize = entry.ks === 'ks1' ? '3.4vw' : '';
 
