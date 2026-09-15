@@ -343,10 +343,12 @@ st.markdown("""
 
 # ── Initialise ──────────────────────────────────────────────────────────────
 
+if "pupils_data" not in st.session_state:
+    git_pull()
+
 ensure_data_files()
 
 if "pupils_data" not in st.session_state:
-    git_pull()
     st.session_state.pupils_data = load_pupils()
     st.session_state.ladders_data = load_ladders()
     # Migrate old string-format currentSkills to new object format
