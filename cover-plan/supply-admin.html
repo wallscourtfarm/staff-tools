@@ -76,7 +76,7 @@
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Supply Booking <span style="color:#64748b;font-weight:normal;font-size:12px">(11.09.26c)</span></div>
+    <div class="header-title">Supply Booking <span style="color:#64748b;font-weight:normal;font-size:12px">(15.09.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy — booked against the <a href="planner.html" style="color:#1798d3">Release Schedule</a></div>
   </div>
   <div class="week-nav">
@@ -204,7 +204,13 @@ function setSyncBadge(state) {
 async function fetchLiveState() {
   const res = await fetch(SYNC_URL, { signal: AbortSignal.timeout(10000) });
   if (!res.ok) throw new Error('sync fetch failed');
-  return res.json();
+  const body = await res.json();
+  // {"error":...} is a normal 200 response (e.g. bad/missing token), not a
+  // fetch failure — must not be treated as valid state. See planner.html's
+  // stateLoad() fix, 15.09.26: the same oversight there wiped the live
+  // cover-plan data.
+  if (body && body.error) throw new Error(body.error);
+  return body;
 }
 // Re-fetch fresh state, patch one field on one slot, push straight back.
 // Deliberately does NOT keep a long-lived local copy of the whole state to edit —
