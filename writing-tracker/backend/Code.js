@@ -20,9 +20,16 @@ const SHEET_HEADERS = {
 // and pupils only ever enter this sheet via syncRosterFromHub below; the
 // permanent link is tutor_group (class) / upn (pupil), both Bromcom-sourced
 // and immune to a display-name or name-spelling change.
+//
+// HUB_TOKEN is deliberately its own Script Property, separate from
+// SHARED_TOKEN (which gates requests INTO this tool's own backend from
+// index.html). The hub rotated its token off the public '2013' default on
+// 2026-09-08; this tool's own SHARED_TOKEN was never meant to track that
+// rotation, since index.html still authenticates to us with the old
+// constant. Set HUB_TOKEN as a Script Property to the hub's current token.
 const HUB_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
 function hubToken_() {
-  return PropertiesService.getScriptProperties().getProperty('SHARED_TOKEN') || '2013';
+  return PropertiesService.getScriptProperties().getProperty('HUB_TOKEN') || '2013';
 }
 
 // ── Entry points ──────────────────────────────────────────────
@@ -93,7 +100,7 @@ function handleGet_(p) {
     case 'getPupilHistory': return getPupilHistory_(p);
     case 'getGroupStats':   return getGroupStats_(p);
     case 'getConfig':       return getConfig_();
-    case 'ping':            return { ok: true, ts: new Date().toISOString(), codeVersion: 'precedence-fix-3' };
+    case 'ping':            return { ok: true, ts: new Date().toISOString(), codeVersion: 'hub-token-fix-1' };
     default:                return { error: 'Unknown GET action: ' + p.action };
   }
 }
@@ -696,9 +703,9 @@ function repairWritingTracker() {
   const result = { classIdsFixed: 0, classesDeactivated: [], pupilsReattached: 0,
                    pupilsDeactivated: 0, nameVariantsDeactivated: [], notInHubLeftActive: [] };
 
-  // Reference data from the hub (same shared token scheme).
-  const HUB = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
-  const token = PropertiesService.getScriptProperties().getProperty('SHARED_TOKEN') || '2013';
+  // Reference data from the hub (same HUB_TOKEN scheme as syncRosterFromHub_).
+  const HUB = HUB_URL;
+  const token = hubToken_();
   const hubClasses = JSON.parse(UrlFetchApp.fetch(HUB + '?action=getClasses&token=' + token).getContentText()).classes || [];
   const hubDisplayNames = hubClasses.map(c => String(c.display || '').trim());
   const hubPupils = JSON.parse(UrlFetchApp.fetch(HUB + '?action=getPupils&token=' + token).getContentText()).pupils || [];
