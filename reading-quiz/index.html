@@ -67,7 +67,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 </div>
 
 <div class="wrap" id="app"></div>
-<div class="version">WFA Reading Quiz · 13.09.26a</div>
+<div class="version">WFA Reading Quiz · 15.09.26a</div>
 
 <script>
 // ════════════════════════════════════════════════
@@ -378,8 +378,8 @@ const QUIZ_DATA = {
   },
   'BK178353742278510': { // Boy In The Tower — Polly Ho-Yen — source: BookTrust, LoveReading4Kids
     questions: [
-      { q: "Where does the main character, Ade, live at the start of the story?", options: ["A tower block flat high above a city", "A village school", "A ship at sea", "A countryside farmhouse"], correct: 0 },
       { q: "What is the name of the main character?", options: ["Obi", "Ade", "Ben", "Jeevan"], correct: 1 },
+      { q: "Where does Ade live at the start of the story?", options: ["A tower block flat high above a city", "A village school", "A ship at sea", "A countryside farmhouse"], correct: 0 },
       { q: "What is the name of Ade's friend who helps him during the crisis?", options: ["Dory", "Nina", "Gaia", "Audrey"], correct: 2 },
       { q: "What is the name of the mysterious, dangerous plant that begins destroying the city?", options: ["The Trykes", "The Spindles", "The Vynes", "The Bluchers"], correct: 3 },
       { q: "What is Ade's mother's problem that stops her leaving the flat?", options: ["She has broken her leg", "She has lost her memory", "She is too afraid to leave the flat (agoraphobia)", "She has gone away for work"], correct: 2 }
@@ -701,7 +701,10 @@ function startQuiz(i) {
   }
   quiz = {
     bookId, bookTitle: window.__bookTitle, childId: c.childId, childName: c.name, checkoutId: c.checkoutId,
-    order: shuffle(data.questions.map((_, idx) => idx)), idx: 0, correct: 0, optionOrder: []
+    // Questions stay in authored order — shuffling could put a later
+    // question before the one it gives the answer away for (16.09.26, see
+    // book-tracker/index.html's openQuiz()). Option order is still shuffled.
+    order: data.questions.map((_, idx) => idx), idx: 0, correct: 0, optionOrder: []
   };
   renderQuizStep();
 }
