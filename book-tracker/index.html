@@ -267,7 +267,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · WFA-15.09.26c</div>
+  <div class="version">WFA Book Tracker · WFA-15.09.26d</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -1532,7 +1532,7 @@ function openQuiz(checkoutId, childId, childName, bookId) {
   activeQuiz = {
     checkoutId, childId, childName, bookId,
     order: QUIZ_DATA[bookId].questions.map((_, i) => i),
-    idx: 0, correct: 0, optionOrder: [], overrideReason: null
+    idx: 0, correct: 0, optionOrder: [], overrideReason: null, submitted: false
   };
   document.getElementById('quizOverlay').classList.remove('hidden');
   renderQuizStep();
@@ -1549,7 +1549,7 @@ function renderQuizStep() {
     <div id="quizOpts">${optOrder.map((oi, pos) => `
       <button class="btn btn-ghost quiz-opt" onclick="selectQuizOption(${pos})">${esc(q.options[oi])}</button>`).join('')}</div>
     <div id="quizFeedback" class="qz-feedback"></div>
-    <div class="modal-btns hidden" id="quizNextWrap"><button class="btn btn-blue" style="flex:1" onclick="quizNext()">Next</button></div>
+    <div class="modal-btns hidden" id="quizNextWrap"><button class="btn btn-blue" style="flex:1" onclick="this.disabled=true;quizNext()">Next</button></div>
     <div style="text-align:center;margin-top:14px"><a href="#" class="qz-override-link" onclick="event.preventDefault();activeQuiz.overrideReason='staff_override';showOverrideForm()">Reading support needed? (staff)</a></div>`;
 }
 
@@ -1568,6 +1568,15 @@ function selectQuizOption(pos) {
 async function quizNext() {
   activeQuiz.idx++;
   if (activeQuiz.idx < activeQuiz.order.length) { renderQuizStep(); return; }
+  // A fast double-tap on the last question's "Next" button used to fire this
+  // branch twice — idx keeps incrementing past order.length either way, so
+  // the length check alone doesn't stop a second call, and finishQuizAttempt()
+  // would log the same score to QuizAttempts a second time (15.09.26, seen
+  // live: two identical-score submitQuizAttempt calls a few seconds apart).
+  // This flag is set synchronously before the first await, so a second click
+  // handler — which can't run until this one yields — always sees it.
+  if (activeQuiz.submitted) return;
+  activeQuiz.submitted = true;
   await finishQuizAttempt();
 }
 
