@@ -500,6 +500,14 @@ def _git_auth_url():
 
 
 def git_pull():
+    if not (REPO_DIR / ".git").exists():
+        try:
+            REPO_DIR.parent.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "clone", _git_auth_url(), str(REPO_DIR)],
+                            capture_output=True, timeout=30)
+        except Exception:
+            return False
+        return (REPO_DIR / ".git").exists()
     ensure_remote_auth()
     try:
         subprocess.run(["git", "pull", "--rebase"], cwd=REPO_DIR, capture_output=True, timeout=15)
