@@ -35,7 +35,7 @@ def fetch_hub_pupils():
     """Live pupil list from the hub. Returns [] on any failure — callers
     should treat that as 'roster unavailable right now', not 'no pupils'."""
     try:
-        r = requests.get(HUB_URL, params={"action": "getPupils", "token": HUB_TOKEN}, timeout=10)
+        r = requests.get(HUB_URL, params={"action": "getPupils", "token": HUB_TOKEN}, timeout=20)
         r.raise_for_status()
         data = r.json()
     except Exception:

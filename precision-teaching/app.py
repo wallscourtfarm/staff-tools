@@ -33,6 +33,24 @@ from data import (
     is_windowed, get_active_window, get_window_frontier, set_active_window, suggest_next_window,
 )
 
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _cached_roster():
+    return fetch_hub_pupils()
+
+
+def get_roster():
+    """Roster search re-runs on every keystroke (Streamlit reruns the whole
+    script), so without caching each character typed re-fetches the full
+    hub roster over the network. Cached for 5 minutes; the "Refresh names"
+    button bypasses this and hits the live roster directly. A failed fetch
+    isn't cached — clearing it immediately means the next keystroke retries
+    instead of being stuck showing "unavailable" for the rest of the TTL."""
+    result = _cached_roster()
+    if not result:
+        _cached_roster.clear()
+    return result
+
 # ── PDF Renderer — "Clean Cards" ──────────────────────────────────────────
 #
 # Canvas-based (not platypus) — needed for precise inline "N)  A + [box] = C"
@@ -910,7 +928,12 @@ with tab2:
     st.markdown("**Add a pupil to track** — search the school roster, no typing a name")
     tracked_upns = {p.get("upn") for p in pupils_data["pupils"] if p.get("upn")}
 
-    search_col, refresh_col = st.columns([4, 1])
+    year_col, search_col, refresh_col = st.columns([1, 3, 1])
+    with year_col:
+        year_filter = st.selectbox(
+            "Year group", ["All years", "EYFS", "Y1", "Y2", "Y3", "Y4", "Y5", "Y6"],
+            key="roster_year_filter", label_visibility="collapsed",
+        )
     with search_col:
         roster_query = st.text_input("Search by name", key="roster_search", label_visibility="collapsed", placeholder="Type a name…")
     with refresh_col:
@@ -930,10 +953,13 @@ with tab2:
                 st.rerun()
 
     if roster_query.strip():
-        hub_pupils = fetch_hub_pupils()
+        with st.spinner("Searching roster…"):
+            hub_pupils = get_roster()
         if not hub_pupils:
             st.warning("Could not reach the roster right now — try again shortly.")
         else:
+            if year_filter != "All years":
+                hub_pupils = [p for p in hub_pupils if p.get("yearGroup") == year_filter]
             q = roster_query.strip().lower()
             matches = [p for p in hub_pupils
                        if q in f"{p.get('first','')} {p.get('last','')}".lower()
