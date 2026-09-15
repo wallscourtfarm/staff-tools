@@ -405,7 +405,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(11.09.26c)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(15.09.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -994,7 +994,12 @@ async function stateLoad() {
   try {
     const res = await fetch(SYNC_URL, { signal: AbortSignal.timeout(8000) });
     const remote = await res.json();
-    if (remote) { localStorage.setItem('wfa_planner_state', JSON.stringify(remote)); setSyncStatus('ok'); return remote; }
+    // remote.error (e.g. {"error":"unauthorised"}) is a normal HTTP 200 JSON
+    // response, not a fetch failure — treating it as valid-but-empty state
+    // wiped the real server data on 15.09.26 (a stale cached tab with no
+    // token got "unauthorised", saved that as an empty week, and clobbered
+    // everything). Must be excluded here, not just checked truthy.
+    if (remote && !remote.error) { localStorage.setItem('wfa_planner_state', JSON.stringify(remote)); setSyncStatus('ok'); return remote; }
   } catch(e) {}
   setSyncStatus('offline');
   try { const s = localStorage.getItem('wfa_planner_state'); return s ? JSON.parse(s) : null; }
