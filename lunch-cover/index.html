@@ -195,7 +195,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunch Cover Rota · WFA-11.09.26c</footer>
+<footer>Wallscourt Farm Academy · Lunch Cover Rota · WFA-15.09.26a</footer>
 
 <script>
 // ── Duties config ─────────────────────────────────────────────────────────────
@@ -993,7 +993,12 @@ async function init() {
     // Only trust local state enough to sync it back once we've actually confirmed the remote
     // state (remoteRaw !== null means the SYNC_URL fetch itself succeeded, even if it was '{}').
     // If the fetch failed, leave syncReady false so save() never overwrites unconfirmed data.
-    if (remoteRaw !== null) syncReady = true;
+    // A {"error":"unauthorised"} response (missing/bad token) is also NOT confirmed remote
+    // state — must be excluded too, or save() would push stale local state over the real
+    // remote data. See cover-plan's 15.09.26 incident, same bug class.
+    let remoteWasError = false;
+    try { remoteWasError = !!(remoteRaw && JSON.parse(remoteRaw).error); } catch(e) {}
+    if (remoteRaw !== null && !remoteWasError) syncReady = true;
 
     localStorage.setItem('wfa_lc_state', JSON.stringify(state));
     localStorage.setItem('wfa_lc_staff', JSON.stringify(STAFF));
