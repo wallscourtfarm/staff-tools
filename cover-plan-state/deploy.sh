@@ -20,6 +20,10 @@ cd "$(dirname "$0")"
 DEPLOYMENT_ID="AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg"
 DESC="${1:-Deploy $(date '+%d %b %Y %H:%M')}"
 BASE_URL="https://script.google.com/macros/s/${DEPLOYMENT_ID}/exec"
+# Same token every real client sends — the endpoint requires it since
+# 13.09.26, so an unauthenticated health-check curl would otherwise always
+# get {"error":"unauthorised"} and wrongly report "Unexpected response".
+TOKEN="050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05"
 
 grep -q '"access": "ANYONE_ANONYMOUS"' appsscript.json || {
   echo "✗ appsscript.json does not say ANYONE_ANONYMOUS — refusing to deploy (would break anonymous callers). Fix it first."
@@ -44,7 +48,7 @@ echo "  POST -> body replaces the whole state; no partial update, no auth of any
 echo ""
 echo "→ Verifying deployment is publicly reachable..."
 sleep 3
-RESPONSE=$(curl -sL "${BASE_URL}" 2>/dev/null)
+RESPONSE=$(curl -sL "${BASE_URL}?token=${TOKEN}" 2>/dev/null)
 if echo "$RESPONSE" | grep -q "accounts.google.com"; then
   echo "  ⚠️  BROKEN — the deployment is redirecting to Google sign-in, not serving JSON."
   echo "      Fix: confirm appsscript.json says ANYONE_ANONYMOUS, then re-run this script."
