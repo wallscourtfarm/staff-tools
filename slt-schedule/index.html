@@ -251,7 +251,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · WFA-11.09.26c</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · WFA-15.09.26a</footer>
 
 <script>
 // ── Activity types ─────────────────────────────────────────────────────────────
@@ -937,15 +937,20 @@ async function init() {
     if (plannerCsv) PLANNER_SLOTS = buildPlannerLookup(plannerCsv);
     if (remoteRaw !== null) {
       // SYNC_URL responded — we now have the real shared state (even if it happens to be
-      // empty), so it's safe to let save() start POSTing local changes back to it.
+      // empty), so it's safe to let save() start POSTing local changes back to it. But a
+      // {"error":"unauthorised"} response (missing/bad token) is NOT real shared state —
+      // must not flip syncReady on that, or save() would push local state over the real
+      // remote data. See cover-plan's 15.09.26 incident, same bug class.
+      let remoteWasError = false;
       if (remoteRaw !== '{}') {
         try {
           const remote = JSON.parse(remoteRaw);
+          if (remote.error) remoteWasError = true;
           if (remote.state)        { state.slots=remote.state.slots??state.slots; state.weekIdx=remote.state.weekIdx??state.weekIdx; }
           if (remote.termTemplate !== undefined) termTemplate=remote.termTemplate;
         } catch(e) {}
       }
-      syncReady = true;
+      if (!remoteWasError) syncReady = true;
     }
     localStorage.setItem('wfa_slt_state', JSON.stringify(state));
     localStorage.setItem('wfa_slt_slt',   JSON.stringify(SLT));

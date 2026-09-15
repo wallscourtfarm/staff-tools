@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 13.09.26a</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 15.09.26a</div>
       </div>
     </div>
     <div class="top-bar">
@@ -776,11 +776,13 @@ async function syncLoad(weekKey) {
         state.bookings[weekKey] = json.bookings;
         renderSidebar();
         renderGrid();
+        // Only mark this weekKey safe to save once we've actually confirmed its
+        // real remote state (json.bookings present — an error response like
+        // {status:'error',message:'unauthorised'} has no bookings field, so it
+        // falls through here rather than being wrongly treated as confirmed
+        // empty state. See cover-plan's 15.09.26 incident, same bug class).
+        syncedWeeks.add(weekKey);
       }
-      // Only mark this weekKey safe to save once we've actually confirmed its
-      // real remote state (success path only — a failed/thrown request below
-      // leaves it out of syncedWeeks, so we never POST unconfirmed data over it).
-      syncedWeeks.add(weekKey);
     }
   } catch {}
 }
