@@ -81,18 +81,6 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .card{background:#fff;border-radius:var(--r);padding:15px;margin-bottom:10px;box-shadow:var(--sh)}
 
 /* ── CHILD CARD (checkout list) ── */
-.c-card{background:#fff;border-radius:var(--r);padding:13px 15px;margin-bottom:8px;box-shadow:var(--sh);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;transition:transform .1s,box-shadow .1s}
-.c-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.14)}
-.c-card:active{transform:scale(.98)}
-.c-name{font-weight:700;font-size:15px}
-.c-meta{font-size:12px;color:var(--muted);margin-top:2px}
-.c-book-warn{font-size:11px;color:var(--amber);margin-top:3px}
-.c-reads{text-align:right;min-width:56px}
-.c-reads .num{font-size:18px;font-weight:800;color:var(--blue);line-height:1}
-.c-reads .lbl{font-size:10px;color:var(--muted)}
-
-/* ── SELECTED CHILD PANEL ── */
-.sel-panel{border-left:4px solid var(--blue)}
 .reads-dots{display:flex;gap:3px;flex-wrap:wrap;margin:8px 0 5px}
 .dot{width:11px;height:11px;border-radius:50%;background:var(--border);flex-shrink:0}
 .dot.f{background:var(--blue)}
@@ -115,16 +103,10 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .copy-btn.avail:hover{background:var(--blue-dk)}
 .copy-btn.taken{background:var(--border);color:var(--muted);cursor:default;font-size:11px}
 
-/* ── CHECKOUT RECORDS (returns) ── */
-.co-card{background:#fff;border-radius:var(--r);padding:14px 15px;margin-bottom:8px;box-shadow:var(--sh)}
-.co-child{font-weight:700;font-size:15px}
-.co-book{font-size:13px;color:var(--muted);margin-top:2px}
-.co-date{font-size:11px;color:var(--muted);margin-top:2px}
-.ret-btns{display:flex;gap:8px;margin-top:11px}
-.ret-btns .btn{flex:1;font-size:13px;padding:10px 12px;text-align:center}
-
 /* ── CHILDREN TAB ── */
-.ch-card{background:#fff;border-radius:var(--r);padding:13px 15px;margin-bottom:8px;box-shadow:var(--sh)}
+.ch-card{background:#fff;border-radius:var(--r);padding:13px 15px;margin-bottom:8px;box-shadow:var(--sh);cursor:pointer;transition:transform .1s,box-shadow .1s}
+.ch-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.14)}
+.ch-card:active{transform:scale(.98)}
 .ch-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .ch-info .name{font-weight:700;font-size:15px}
 .ch-info .meta{font-size:12px;color:var(--muted);margin-top:2px}
@@ -242,9 +224,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
   </div>
 
   <div class="tabs">
-    <button class="tab on" id="tab-co" onclick="showTab('co')"><span>📤</span>Check Out</button>
-    <button class="tab" id="tab-ret" onclick="showTab('ret')"><span>📥</span>Returns</button>
-    <button class="tab" id="tab-ch" onclick="showTab('ch')"><span>👧</span>Children</button>
+    <button class="tab on" id="tab-ch" onclick="showTab('ch')"><span>👧</span>Children</button>
     <button class="tab" id="tab-bk" onclick="showTab('bk')"><span>📖</span>Books</button>
     <button class="tab" id="tab-dash" onclick="showTab('dash')"><span>📊</span>Dashboard</button>
     <button class="tab" id="tab-certs" onclick="showTab('certs')"><span>🎖️</span>Certificates</button>
@@ -258,23 +238,8 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
 
   <div class="content">
 
-    <!-- CHECK OUT TAB -->
-    <div id="view-co">
-      <input class="inp" id="childSearch" type="text" placeholder="🔍  Search by name…" oninput="filterChildren()" autocomplete="off" style="margin-bottom:8px">
-      <div class="letter-bar" id="coLetters" style="margin-bottom:10px"></div>
-      <div id="selPanel" class="hidden"></div>
-      <div id="childList"></div>
-      <div id="bookPicker" class="hidden"></div>
-    </div>
-
-    <!-- RETURNS TAB -->
-    <div id="view-ret" class="hidden">
-      <div id="retStats"></div>
-      <div id="retList"></div>
-    </div>
-
     <!-- CHILDREN TAB -->
-    <div id="view-ch" class="hidden">
+    <div id="view-ch">
       <div class="letter-bar" id="chLetters"></div>
       <div id="chList"></div>
     </div>
@@ -302,7 +267,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · WFA-13.09.26b</div>
+  <div class="version">WFA Book Tracker · WFA-15.09.26a</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -388,6 +353,13 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
   </div>
 </div>
 
+<!-- ══ CHILD DETAIL MODAL ══ -->
+<div class="overlay hidden" id="childDetailOverlay" onclick="if(event.target===this)closeChildDetail()">
+  <div class="modal" style="max-width:480px">
+    <div id="childDetailBody"></div>
+  </div>
+</div>
+
 <!-- ══ QUIZ MODAL ══ -->
 <div class="overlay hidden" id="quizOverlay">
   <div class="modal" style="max-width:460px">
@@ -421,9 +393,8 @@ let pickPhase  = 'LKS2'; // phase used inside the book picker (can differ from h
 let yrFilter   = 'all';
 let chLetterFilter = 'all';
 let bkLetterFilter = 'all';
-let coLetterFilter = 'all';
 let bookPickerSearch = '';
-let curTab  = 'co';
+let curTab  = 'ch';
 let selChild = null;
 let pendingCert = null;
 let activeQuiz = null; // {checkoutId, childId, childName, bookId, order, idx, correct, optionOrder, overrideMode, overrideReason, attempt}
@@ -1243,7 +1214,7 @@ async function syncHubRoster() {
 // ════════════════════════════════════════════════
 function showTab(t) {
   curTab = t;
-  ['co','ret','ch','bk','dash','certs','quiz'].forEach(id => {
+  ['ch','bk','dash','certs','quiz'].forEach(id => {
     document.getElementById(`tab-${id}`).classList.toggle('on', id === t);
     document.getElementById(`view-${id}`).classList.toggle('hidden', id !== t);
   });
@@ -1263,13 +1234,10 @@ function setPhase(p) {
   selChild = null;
   chLetterFilter = 'all';
   bkLetterFilter = 'all';
-  coLetterFilter = 'all';
   render();
 }
 
 function render() {
-  if (curTab === 'co')   renderCheckout();
-  if (curTab === 'ret')  renderReturns();
   if (curTab === 'ch')   renderChildren();
   if (curTab === 'bk')   renderBooks();
   if (curTab === 'dash') renderDashboard();
@@ -1330,109 +1298,69 @@ function renderQuizReview() {
 function filterQuizReview() { renderQuizReview(); }
 
 // ════════════════════════════════════════════════
-// CHECK OUT TAB
+// CHILD DETAIL MODAL — the whole per-child workflow (check out, check in,
+// run the quiz) lives here now, entered by tapping a child's card on the
+// Children tab. Replaces the old separate Check Out/Returns tabs, which
+// made staff hunt across tabs for one child instead of doing everything
+// for them in one place.
 // ════════════════════════════════════════════════
-function phaseChildren() {
-  const yrs = [phase];
-  return children.filter(c => yrs.includes(c.yearGroup));
-}
-
-function renderCheckout() {
-  document.getElementById('selPanel').classList.add('hidden');
-  document.getElementById('bookPicker').classList.add('hidden');
-  document.getElementById('childSearch').classList.remove('hidden');
-  document.getElementById('coLetters').classList.remove('hidden');
-  document.getElementById('childList').classList.remove('hidden');
-  renderChildList(phaseChildren());
-}
-
-function setCoLetter(l) {
-  coLetterFilter = l;
-  filterChildren();
-}
-
-function buildCoLetterBar(list) {
-  const letters = [...new Set(list.map(c => c.name.trim()[0]?.toUpperCase()).filter(Boolean))].sort();
-  buildLetterBar('coLetters', letters, coLetterFilter, 'setCoLetter');
-}
-
-function renderChildList(list) {
-  const el = document.getElementById('childList');
-  const sorted = [...list].sort((a,b) => a.name.localeCompare(b.name));
-  buildCoLetterBar(sorted);
-  const filtered = coLetterFilter === 'all' ? sorted : sorted.filter(c => c.name.trim()[0]?.toUpperCase() === coLetterFilter);
-  if (!filtered.length) { el.innerHTML = empty('👦','No children in this phase yet'); return; }
-  el.innerHTML = filtered.map(c => {
-    const bk = c.activeCheckouts[0] ? bookTitle(c.activeCheckouts[0].bookId) : null;
-    return `<div class="c-card" onclick="selectChild('${c.id}')">
-      <div>
-        <div class="c-name">${esc(c.name)}</div>
-        <div class="c-meta">${c.yearGroup}${c.class ? ' · '+c.class : ''}</div>
-        ${bk ? `<div class="c-book-warn">📖 Has: ${esc(bk)}</div>` : ''}
-      </div>
-      <div class="c-reads">
-        <div class="num">${c.totalReads}</div>
-        <div class="lbl">${c.lks2Reads > 0 ? 'UKS2 reads' : 'reads'}</div>
-        ${milestoneBadge(c.totalReads)}
-        ${c.lks2Reads > 0 ? `<div style="font-size:10px;color:var(--muted);margin-top:3px">${milestoneBadgeIcon(c.lks2Reads)} LKS2: ${c.lks2Reads}</div>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function filterChildren() {
-  const q = document.getElementById('childSearch').value.toLowerCase();
-  renderChildList(phaseChildren().filter(c => c.name.toLowerCase().includes(q)));
-}
-
-function selectChild(id) {
+function openChildDetail(id) {
   selChild = children.find(c => c.id === id);
   if (!selChild) return;
-  // Default book picker to the child's natural phase
+  // Default the book picker to the child's natural phase
   pickPhase = ['Y3','Y4'].includes(selChild.yearGroup) ? 'LKS2' : 'UKS2';
   bookPickerSearch = '';
-  document.getElementById('childList').classList.add('hidden');
-  document.getElementById('childSearch').classList.add('hidden');
-  document.getElementById('coLetters').classList.add('hidden');
-
-  const hasBook = selChild.activeCheckouts.length > 0;
-  const panel = document.getElementById('selPanel');
-  panel.classList.remove('hidden');
-  panel.className = 'card sel-panel';
-  panel.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-      <div>
-        <div style="font-weight:800;font-size:18px">${esc(selChild.name)}</div>
-        <div style="font-size:13px;color:var(--muted)">${selChild.yearGroup}${selChild.class ? ' · '+selChild.class : ''}</div>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="deselect()">✕ Back</button>
-    </div>
-    <div style="margin-top:14px">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Reading Progress</div>
-      <div class="reads-dots">${readDots(selChild.totalReads)}</div>
-      <div style="font-size:14px;font-weight:700;color:var(--blue)">${selChild.totalReads} / 25 ${selChild.lks2Reads > 0 ? 'UKS2 reads' : 'reads'}</div>
-      ${selChild.lks2Reads > 0 ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">LKS2 challenge: ${selChild.lks2Reads} reads</div>` : ''}
-    </div>
-    ${hasBook ? `<div class="alert alert-warn" style="margin-top:12px">⚠️ Currently has: <strong>${esc(bookTitle(selChild.activeCheckouts[0].bookId))}</strong> (Copy ${selChild.activeCheckouts[0].copyNum})</div>` : ''}
-  `;
-  renderBookPicker();
+  document.getElementById('childDetailOverlay').classList.remove('hidden');
+  renderChildDetail();
 }
 
-function deselect() {
+function closeChildDetail() {
+  document.getElementById('childDetailOverlay').classList.add('hidden');
   selChild = null;
-  document.getElementById('childList').classList.remove('hidden');
-  document.getElementById('childSearch').classList.remove('hidden');
-  document.getElementById('coLetters').classList.remove('hidden');
-  document.getElementById('selPanel').classList.add('hidden');
-  document.getElementById('bookPicker').classList.add('hidden');
+}
+
+function renderChildDetail() {
+  if (!selChild) return;
+  const c = selChild;
+  const activeHtml = c.activeCheckouts.map(co => {
+    const already = homeQuizScores.get(co.checkoutId);
+    return `
+      <div class="alert alert-warn" style="margin-top:14px">
+        📖 Currently reading: <strong>${esc(bookTitle(co.bookId))}</strong> (Copy ${co.copyNum})
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">Since ${fmtDate(co.checkoutDate)}</div>
+        ${already ? `<div style="margin-top:6px;font-size:13px">📊 Already scored ${already.score}/${already.total} on the reading check at home</div>` : ''}
+      </div>
+      <div class="modal-btns" style="flex-direction:column;gap:8px">
+        <button class="btn btn-green" style="width:100%" onclick="doReturn('${co.checkoutId}',true,'${escJs(c.name)}','${c.id}','${co.bookId}')">✓ Completed &amp; Returned</button>
+        <button class="btn btn-ghost" style="width:100%" onclick="doReturn('${co.checkoutId}',false,'${escJs(c.name)}','${c.id}')">↩ Returned (not finished)</button>
+      </div>`;
+  }).join('');
+
+  document.getElementById('childDetailBody').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div>
+        <div style="font-weight:800;font-size:19px">${esc(c.name)}</div>
+        <div style="font-size:13px;color:var(--muted)">${c.yearGroup}${c.class ? ' · '+c.class : ''}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeChildDetail()" style="font-size:18px;line-height:1;padding:4px 10px">✕</button>
+    </div>
+    <div style="margin-top:14px">
+      <div class="reads-dots">${readDots(c.totalReads)}</div>
+      <div style="font-size:14px;font-weight:700;color:var(--blue)">${c.totalReads} / 25 ${c.lks2Reads > 0 ? 'UKS2 reads' : 'reads'}</div>
+      ${c.lks2Reads > 0 ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">LKS2 challenge: ${c.lks2Reads} reads</div>` : ''}
+    </div>
+    ${activeHtml}
+    ${c.activeCheckouts.length === 0 ? '<div id="childBookPicker" style="margin-top:16px"></div>' : ''}
+  `;
+  if (!c.activeCheckouts.length) renderBookPicker();
 }
 
 function renderBookPicker() {
   const phBooks = books.filter(b => b.phase === pickPhase).sort((a,b) => a.title.localeCompare(b.title));
   const avail   = phBooks.filter(b => b.available > 0);
   const out     = phBooks.filter(b => b.available === 0);
-  const picker  = document.getElementById('bookPicker');
-  picker.classList.remove('hidden');
+  const picker  = document.getElementById('childBookPicker');
+  if (!picker) return; // book picker isn't in the DOM while the child has an active checkout
 
   const otherPhase = pickPhase === 'LKS2' ? 'UKS2' : 'LKS2';
   const childPhase = ['Y3','Y4'].includes(selChild?.yearGroup) ? 'LKS2' : 'UKS2';
@@ -1517,49 +1445,10 @@ async function doCheckout(bookId, copyNum, title) {
     const child = children.find(c => c.id === selChild.id);
     if (child) child.activeCheckouts.push({ checkoutId: r.checkoutId, bookId, copyNum, checkoutDate: new Date().toLocaleDateString('en-GB') });
     toast(`✓ Checked out to ${selChild.name}`);
-    deselect();
-    renderChildList(phaseChildren());
+    renderChildDetail();
+    renderChildren();
     scheduleSync(); // background sync, coalesced
   } catch(e) { toast('Error: '+e.message); }
-}
-
-// ════════════════════════════════════════════════
-// RETURNS TAB
-// ════════════════════════════════════════════════
-function renderReturns() {
-  const cos = [];
-  children.forEach(c => {
-    if (c.yearGroup !== phase) return;
-    c.activeCheckouts.forEach(co => {
-      const bk = books.find(b => b.id === co.bookId);
-      cos.push({ ...co, child: c, book: bk });
-    });
-  });
-  cos.sort((a,b) => a.child.name.localeCompare(b.child.name));
-
-  const totalAvail = books.filter(b => b.phase === phaseToBookPhase(phase)).reduce((s,b) => s+b.available, 0);
-  const totalCh    = children.filter(c => c.yearGroup === phase).length;
-
-  document.getElementById('retStats').innerHTML = `
-    <div class="stats">
-      <div class="stat"><div class="n">${cos.length}</div><div class="l">Books Out</div></div>
-      <div class="stat"><div class="n">${totalAvail}</div><div class="l">Available</div></div>
-      <div class="stat"><div class="n">${totalCh}</div><div class="l">Children</div></div>
-    </div>`;
-
-  const el = document.getElementById('retList');
-  if (!cos.length) { el.innerHTML = empty('📚','No books currently checked out'); return; }
-  el.innerHTML = cos.map(co => `
-    <div class="co-card">
-      <div class="co-child">${esc(co.child.name)}</div>
-      <div class="co-book">${esc(co.book?.title||'Unknown')} · Copy ${co.copyNum}</div>
-      <div class="co-date">Since ${fmtDate(co.checkoutDate)}</div>
-      ${homeQuizScores.has(co.checkoutId) ? `<div class="qz-score-badge">📊 Scored ${homeQuizScores.get(co.checkoutId).score}/${homeQuizScores.get(co.checkoutId).total} at home</div>` : ''}
-      <div class="ret-btns">
-        <button class="btn btn-green" onclick="doReturn('${co.checkoutId}',true,'${escJs(co.child.name)}','${co.child.id}','${co.bookId}')">✓ Completed &amp; Returned</button>
-        <button class="btn btn-ghost" onclick="doReturn('${co.checkoutId}',false,'${escJs(co.child.name)}','${co.child.id}')">↩ Returned</button>
-      </div>
-    </div>`).join('');
 }
 
 // A "completed" return must pass (or be staff-overridden on) the book's
@@ -1608,7 +1497,8 @@ async function finishReturn(checkoutId, childId, childName, completed, msg) {
     } else {
       toast(msg || (completed ? `✓ Great reading, ${childName}!` : `↩ Book returned`));
     }
-    renderReturns();
+    if (selChild && selChild.id === childId) renderChildDetail();
+    renderChildren();
     scheduleSync(); // background sync, coalesced
   } catch(e) { toast('Error: '+e.message); }
 }
@@ -1960,7 +1850,7 @@ function renderChildren() {
     const next = [5,10,15,20,25].find(m => m > c.totalReads) || 25;
     const pct  = Math.min((c.totalReads / 25) * 100, 100);
     const cur  = c.activeCheckouts[0] ? bookTitle(c.activeCheckouts[0].bookId) : null;
-    return `<div class="ch-card">
+    return `<div class="ch-card" onclick="openChildDetail('${c.id}')">
       <div class="ch-row">
         <div class="ch-info">
           <div class="name">${esc(c.name)}</div>
@@ -1979,7 +1869,7 @@ function renderChildren() {
           : `${next - c.totalReads} more to next milestone (${next})`}
       </div>
       ${cur ? `<div style="font-size:12px;color:var(--amber);margin-top:6px">📖 Currently reading: ${esc(cur)}</div>` : ''}
-      ${c.totalReads >= 5 ? `<button class="btn btn-ghost btn-sm" style="margin-top:10px;font-size:12px" onclick="printCertForChild('${c.id}')">🖨️ Print certificate</button>` : ''}
+      ${c.totalReads >= 5 ? `<button class="btn btn-ghost btn-sm" style="margin-top:10px;font-size:12px" onclick="event.stopPropagation();printCertForChild('${c.id}')">🖨️ Print certificate</button>` : ''}
     </div>`;
   }).join('');
 }
@@ -2069,7 +1959,8 @@ async function printCertForChild(childId) {
 function closeCert() {
   document.getElementById('certOverlay').classList.add('hidden');
   pendingCert = null;
-  renderReturns();
+  if (selChild) renderChildDetail();
+  renderChildren();
 }
 
 async function printCert() {
