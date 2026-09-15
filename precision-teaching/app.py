@@ -8,6 +8,8 @@ import time
 from reportlab.lib.units import mm as _mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from wfa_shared.logo import logo_html
+from wfa_shared.streamlit_css import inject_wfa_css
 
 # Sassoon Infant is the house font for child-facing reading content across
 # WFA tools (handwriting sheets, being-a-reader-web, etc.) — used here for
@@ -317,27 +319,15 @@ def year_group_filtered_pupils(pupils_data, key):
 
 st.set_page_config(page_title="WFA Precision Teaching", page_icon="📊", layout="wide")
 
-# ── Custom CSS ──────────────────────────────────────────────────────────────
+# ── WFA-branded styling ──────────────────────────────────────────────────────
+# Same shared CSS injector every other WFA Streamlit tool uses (buttons,
+# inputs, download buttons), plus this app's own extras that aren't part of
+# the shared package's scope (dashboard metric cards, the aim-met banners).
+
+inject_wfa_css(buttons=True, inputs=True, download=True)
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
-
-    .main { font-family: 'Nunito', sans-serif; }
-    h1, h2, h3, h4 { font-family: 'Nunito', sans-serif !important; font-weight: 700 !important; }
-    .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; }
-
-    .stButton>button {
-        background-color: #1798d3 !important; color: white !important;
-        border: none !important; border-radius: 8px !important;
-        font-weight: 600 !important; padding: 0.5rem 1.5rem !important;
-        transition: all 0.2s !important;
-    }
-    .stButton>button:hover {
-        background-color: #0d7bb8 !important;
-        box-shadow: 0 4px 12px rgba(23, 152, 211, 0.3) !important;
-    }
-
     .metric-card {
         background: linear-gradient(135deg, #1798d3 0%, #0d7bb8 100%);
         color: white; padding: 1.5rem; border-radius: 12px; text-align: center;
@@ -345,11 +335,6 @@ st.markdown("""
     }
     .metric-card h2 { color: white !important; margin: 0 !important; font-size: 2.5rem !important; font-weight: 800 !important; }
     .metric-card p { margin: 0.5rem 0 0 0 !important; font-size: 1rem !important; opacity: 0.9; }
-
-    .status-mastered { color: #43A047; font-weight: 700; }
-    .status-active { color: #1798d3; font-weight: 600; }
-    .status-upcoming { color: #757575; }
-    .status-below-aim { color: #E53935; font-weight: 600; }
 
     .aim-met { background: #E8F5E9; border-left: 4px solid #43A047; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
     .aim-not-met { background: #FFF3E0; border-left: 4px solid #FF9800; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
@@ -738,10 +723,6 @@ if query_params.get("mode") == "self_assess":
 
 # Sidebar
 with st.sidebar:
-    st.image("https://wallscourtfarm.github.io/staff-tools/logo.png", width=120)
-    st.markdown("### Precision Teaching Grids")
-    st.caption("Wallscourt Farm Academy")
-
     pending = git_pending_commits()
     if pending > 0:
         st.warning(f"{pending} unsynced change{'s' if pending != 1 else ''}")
@@ -774,6 +755,10 @@ with st.sidebar:
 
         pupils_json = json.dumps(st.session_state.pupils_data, indent=2)
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
+
+st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
+st.caption("Wallscourt Farm Academy")
+st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
 
