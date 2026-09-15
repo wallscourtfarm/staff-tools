@@ -43,6 +43,7 @@ function doGet(e) {
     if (p.action === 'checkPin') return json(checkPin(p));
     if (p.action === 'getSheetTab') return json(getSheetTab(p));
     if (p.action === 'getSheetTabs') return json(getSheetTabs(p));
+    if (p.action === 'listBackups') return json({ backups: listSyncBackups_() });
     const key = p.key;
     if (!key) return json({ error: 'missing key' });
     const data = props().getProperty(key);
@@ -60,13 +61,63 @@ function doPost(e) {
     if (p.action === 'importPupils') return importPupils(e);
     if (p.action === 'markLeavers') return markLeavers(e);
     if (p.action === 'updateClasses') return updateClasses(e);
+    if (p.action === 'restoreBackup') return restoreSyncBackup_(p);
     const key = p.key;
     if (!key) return json({ error: 'missing key' });
+    backupSyncKey_(key);
     props().setProperty(key, e.postData.contents);
     return json({ status: 'ok' });
   } catch (err) {
     return json({ status: 'error', message: err.message });
   }
+}
+
+// ── Backups for the plain key/value state store (wfa_slt / wfa_lc / wfa_ll)
+// ──────────────────────────────────────────────────────────────────────────
+// Added 15.09.26 after cover-plan-state's data-wipe incident (see that
+// project's Code.js for the full story) — this key store had the same
+// no-history exposure. Does NOT touch getPupils/getClasses/checkPin/
+// getSheetTab(s)/importPupils/markLeavers/updateClasses, which read/write
+// the actual hub spreadsheet and already have Sheets version history.
+// Backup keys deliberately don't collide with any real `key` value or other
+// Script Property name in use (SHARED_TOKEN, STAFF_PIN, etc).
+const SYNC_BACKUP_PREFIX = 'bak_sync_';
+const SYNC_BACKUP_COUNT = 30;
+const SYNC_BACKUP_CURSOR_KEY = 'bak_sync_cursor';
+
+function backupSyncKey_(key) {
+  const p = props();
+  const current = p.getProperty(key);
+  if (!current) return; // nothing to lose yet for this key
+  const cursor = parseInt(p.getProperty(SYNC_BACKUP_CURSOR_KEY) || '0', 10);
+  p.setProperty(SYNC_BACKUP_PREFIX + cursor, JSON.stringify({ ts: new Date().toISOString(), key: key, data: current }));
+  p.setProperty(SYNC_BACKUP_CURSOR_KEY, String((cursor + 1) % SYNC_BACKUP_COUNT));
+}
+
+function listSyncBackups_() {
+  const p = props();
+  const out = [];
+  for (let i = 0; i < SYNC_BACKUP_COUNT; i++) {
+    const raw = p.getProperty(SYNC_BACKUP_PREFIX + i);
+    if (!raw) continue;
+    try {
+      const b = JSON.parse(raw);
+      out.push({ index: i, ts: b.ts, key: b.key, size: (b.data || '').length });
+    } catch (e) { /* skip a corrupt slot rather than failing the whole list */ }
+  }
+  out.sort(function (a, b) { return a.ts < b.ts ? -1 : (a.ts > b.ts ? 1 : 0); });
+  return out;
+}
+
+function restoreSyncBackup_(p) {
+  const props_ = props();
+  const idx = parseInt(p.index, 10);
+  const raw = props_.getProperty(SYNC_BACKUP_PREFIX + idx);
+  if (!raw) return json({ status: 'error', message: 'no backup at index ' + idx });
+  const backup = JSON.parse(raw);
+  backupSyncKey_(backup.key); // keep the pre-restore state recoverable too
+  props_.setProperty(backup.key, backup.data);
+  return json({ status: 'ok', restoredKey: backup.key, restoredFrom: backup.ts });
 }
 
 // ── Canonical pupil roster ──────────────────────────────────────────────────
