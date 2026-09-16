@@ -13,6 +13,7 @@ const SHEET_HEADERS = {
   pupils:      ['pupil_id','name','year_group','class_id','working_at_level','active','added_date','notes',
                  'admission_no','upn','sex','pp','sen','eal'],
   assessments: ['assess_id','pupil_id','skill_id','academic_year','term','score','assessed_date','assessed_by'],
+  weights:     ['skill_id','weight'],
   config:      ['key','value']
 };
 
@@ -99,8 +100,10 @@ function handleGet_(p) {
     case 'getAssessments':  return getAssessments_(p);
     case 'getPupilHistory': return getPupilHistory_(p);
     case 'getGroupStats':   return getGroupStats_(p);
+    case 'getWeights':      return getWeights_();
+    case 'getWeightedScores': return getWeightedScores_(p);
     case 'getConfig':       return getConfig_();
-    case 'ping':            return { ok: true, ts: new Date().toISOString(), codeVersion: 'hub-token-fix-1' };
+    case 'ping':            return { ok: true, ts: new Date().toISOString(), codeVersion: 'skill-weighting-1' };
     default:                return { error: 'Unknown GET action: ' + p.action };
   }
 }
@@ -109,6 +112,7 @@ function handlePost_(d) {
   switch (d.action) {
     case 'saveScore':   return saveScore_(d);
     case 'saveScores':  return saveScores_(d);
+    case 'setWeight':   return setWeight_(d);
     case 'updatePupil': return updatePupil_(d);
     case 'setConfig':   return setConfig_(d);
     case 'syncRoster':  return syncRosterFromHub_(!!d.dryRun);
@@ -144,7 +148,8 @@ function initSheets_() {
     ['pupils', 'pupil_id'],
     ['pupils', 'class_id'],
     ['assessments', 'assess_id'],
-    ['assessments', 'pupil_id']
+    ['assessments', 'pupil_id'],
+    ['weights', 'skill_id']
   ];
   for (const [name, header] of TEXT_COLUMNS) {
     const sh = spreadsheet.getSheetByName(name);
@@ -343,7 +348,80 @@ function getPupilHistory_(p) {
 
   const pupilRaw = sheetData_('pupils').find(r => r.pupil_id === pupilId) || null;
   const pupil = pupilRaw ? stripPupilFlags_([pupilRaw])[0] : null;
-  return { pupil, history };
+
+  // Weighted score per academic year, using today's live weights (weight
+  // isn't versioned historically — same convention as RTP tracker).
+  const weights = getWeights_();
+  const weightedByYear = {};
+  Object.keys(history).forEach(year => {
+    weightedByYear[year] = weightedScore_(history[year], weights);
+  });
+
+  return { pupil, history, weightedByYear };
+}
+
+// ── Skill weights ─────────────────────────────────────────────
+// Mirrors the RTP tracker's weighting mechanism: every skill defaults to
+// weight 1; a teacher raises the weight of skills that matter more (e.g.
+// full stops/capital letters in Y1) via the Weights admin screen. Rows are
+// only written to the sheet when a weight is actually set away from the
+// default, so this sheet starts empty and grows as weights get tuned.
+
+function getWeights_() {
+  const weights = {};
+  sheetData_('weights').forEach(r => { weights[r.skill_id] = Number(r.weight) || 1; });
+  return weights;
+}
+
+function setWeight_(d) {
+  const sh = ss_().getSheetByName('weights');
+  const vals = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const idCol = headers.indexOf('skill_id');
+  const weightCol = headers.indexOf('weight');
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][idCol]) === String(d.skill_id)) {
+      sh.getRange(i + 1, weightCol + 1).setValue(Number(d.weight) || 1);
+      return { success: true };
+    }
+  }
+  sh.appendRow([d.skill_id, Number(d.weight) || 1]);
+  return { success: true };
+}
+
+// Weighted % secure = sum(weight where score==='4') / sum(weight where taught) * 100.
+// "Taught" = score is 0-4 (a real judgement was made); scores 'x' (not
+// taught), '~' (genre not covered), and unreviewed/missing are excluded
+// from both numerator and denominator, so gaps in coverage neither help
+// nor hurt the figure. Returns null (not 0) when nothing has been assessed
+// yet, so the client can render "not yet assessed" rather than a
+// misleading 0%. Same shape as RTP tracker's weightedScore_.
+function weightedScore_(scoreMap, weights) {
+  let assessedWeight = 0, secureWeight = 0, assessedCount = 0;
+  Object.keys(scoreMap || {}).forEach(skillId => {
+    const score = String(scoreMap[skillId]);
+    if (['0', '1', '2', '3', '4'].indexOf(score) === -1) return;
+    const w = weights[skillId] || 1;
+    assessedWeight += w;
+    assessedCount++;
+    if (score === '4') secureWeight += w;
+  });
+  if (assessedCount === 0) return { pct: null, assessedCount: 0 };
+  return { pct: Math.round((secureWeight / assessedWeight) * 1000) / 10, assessedCount };
+}
+
+// Bulk weighted scores for a class or year group — {pupil_id: {pct, assessedCount}}.
+// This is the endpoint an external aggregator (e.g. the DOOYA tracker) should
+// call for a class's writing headline figures, rather than recomputing the
+// formula itself from raw assessments.
+function getWeightedScores_(p) {
+  const { pupils, assessments } = getAssessments_(p);
+  const weights = getWeights_();
+  const scores = {};
+  pupils.forEach(pu => {
+    scores[pu.pupil_id] = weightedScore_(assessments[pu.pupil_id] || {}, weights);
+  });
+  return { pupils, scores };
 }
 
 // ── Score saving ──────────────────────────────────────────────
