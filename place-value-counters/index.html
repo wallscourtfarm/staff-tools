@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Place Value Counters</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brand:#1798d3;
+    --brand-dark:#0f6ea3;
+    --ink:#0a0101;
+    --bg:#eef6fb;
+    --card:#ffffff;
+    --line:#d8e6ee;
+    --ok:#2e8b57;
+    --warn:#e08a1e;
+    --danger:#c94b4b;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    font-family:'Baloo 2', 'Segoe UI', Roboto, sans-serif;
+    color:var(--ink);
+    min-height:100vh;
+    padding-bottom:100px;
+  }
+  header{
+    background:linear-gradient(135deg, var(--brand), var(--brand-dark));
+    color:#fff;
+    padding:16px 18px 20px;
+    text-align:center;
+    border-bottom-left-radius:22px;
+    border-bottom-right-radius:22px;
+    box-shadow:0 4px 14px rgba(10,1,1,0.15);
+  }
+  header h1{margin:0;font-size:clamp(22px, 5vw, 32px);font-weight:800;}
+  header p{margin:4px 0 0;font-size:clamp(12px, 2.6vw, 15px);opacity:0.92;font-weight:600;}
+
+  .wrap{max-width:1200px;margin:0 auto;padding:0 12px;}
+
+  .topbar{
+    background:var(--card);
+    border-radius:16px;
+    box-shadow:0 3px 10px rgba(10,1,1,0.08);
+    padding:12px 16px;
+    margin-top:-14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:center;
+    justify-content:center;
+  }
+  button{
+    font-family:inherit;
+    font-weight:700;
+    font-size:13.5px;
+    border:none;
+    border-radius:10px;
+    padding:9px 14px;
+    cursor:pointer;
+    color:#fff;
+    transition:transform .08s ease, filter .15s ease;
+    white-space:nowrap;
+  }
+  button:active{transform:scale(0.94);}
+  button:disabled{opacity:0.3;cursor:not-allowed;transform:none;}
+  button:not(:disabled):hover{filter:brightness(1.08);}
+  .btn-clear{background:var(--danger);}
+  .btn-undo{background:#6b7280;}
+  .btn-columns{background:var(--brand-dark);}
+  .btn-panel-toggle{background:#5a6169;}
+
+  #topControls[hidden]{display:none;}
+
+  .toggle-row{font-size:13px;font-weight:700;color:#3a4046;}
+  .toggle-row input{transform:scale(1.15);vertical-align:middle;margin-right:5px;}
+
+  .col-panel[hidden]{display:none;}
+  .col-panel{
+    background:var(--card);
+    border-radius:14px;
+    box-shadow:0 3px 10px rgba(10,1,1,0.08);
+    padding:10px 14px;
+    margin:8px 0 0;
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px;
+    justify-content:center;
+  }
+  .col-panel-lbl{font-weight:800;font-size:13px;color:#3a4046;margin-right:2px;}
+  .col-chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;}
+  .col-chip{
+    padding:6px 11px;
+    border:1.5px solid rgba(10,1,1,0.12);
+    border-radius:8px;
+    font-weight:800;
+    font-size:12.5px;
+    color:#fff;
+    opacity:1;
+    transition:opacity .15s ease, transform .1s ease;
+  }
+  .col-chip.is-hidden{opacity:0.3;}
+  .btn-showall{background:#6b7280;}
+
+  .totals-bar{
+    display:flex;
+    justify-content:center;
+    align-items:flex-end;
+    gap:18px;
+    margin:16px 0 4px;
+    flex-wrap:wrap;
+  }
+  .total-box{text-align:center;}
+  .total-box .lbl{display:block;font-size:12px;font-weight:700;color:#5a6169;}
+  .total-box .num{display:block;font-size:clamp(20px,4vw,28px);font-weight:800;}
+  .total-box.grand .num{font-size:clamp(34px,7vw,50px);color:var(--ink);}
+
+  .board-msg{
+    text-align:center;
+    min-height:18px;
+    font-size:13px;
+    font-weight:700;
+    color:var(--danger);
+    margin-bottom:6px;
+  }
+
+  /* row controls now sit ABOVE the grid, not inside it, so the colour columns run unbroken */
+  .row-controls{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    justify-content:center;
+    margin:6px 4px 12px;
+  }
+  .row-bar{
+    background:var(--card);
+    border:2px solid var(--line);
+    border-radius:12px;
+    padding:8px 10px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex-wrap:wrap;
+    box-shadow:0 2px 6px rgba(10,1,1,0.08);
+  }
+  .row-tag{font-weight:800;font-size:13px;color:var(--brand-dark);margin-right:2px;}
+  .rowNumInput{
+    font-family:inherit;font-size:16px;font-weight:700;
+    width:100px;padding:6px 8px;border:2px solid var(--line);border-radius:8px;
+    text-align:center;color:var(--ink);
+  }
+  .rowNumInput:focus{outline:none;border-color:var(--brand);}
+  .btn-set{background:var(--brand);padding:7px 12px;}
+  .btn-clearrow{background:#8a939b;padding:7px 10px;}
+  .btn-shift{background:var(--brand-dark);padding:7px 10px;font-size:12px;}
+  .row-status{font-size:11.5px;font-weight:700;color:var(--danger);width:100%;}
+
+  .board-scroll{
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    padding:4px 4px 16px;
+    border-radius:14px;
+  }
+  #gridBoard{
+    display:grid;
+    justify-content:center;
+    justify-content:safe center; /* falls back to start alignment instead of clipping columns off-screen when the grid is wider than its container */
+    background:transparent;
+    column-gap:3px;
+    row-gap:3px;
+  }
+
+  /* header cells */
+  .head-cell{
+    padding:8px 4px;
+    text-align:center;
+    color:#fff;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    border-radius:10px 10px 0 0;
+    min-height:58px;
+  }
+  .head-cell .hcode{font-size:19px;font-weight:800;line-height:1;}
+  .head-cell .hname{font-size:9.5px;font-weight:700;line-height:1.15;margin-top:2px;}
+  .head-cell .hfrac{font-size:8.5px;font-weight:600;opacity:0.9;margin-top:1px;}
+  .point-band{
+    background:#dde2e6;
+    border-left:2px solid rgba(10,1,1,0.35);
+    border-right:2px solid rgba(10,1,1,0.35);
+  }
+  .head-cell.point-head{
+    font-size:9px;
+    font-weight:800;
+    color:#5a6169;
+    line-height:1.15;
+    padding:8px 2px;
+  }
+
+  /* one whole column-cell: tinted background, holds the add-strip + counter grid */
+  .bucket{
+    display:flex;
+    flex-direction:column;
+    padding:4px;
+  }
+  .bucket.row1{border-radius:0;}
+  .bucket.row2{border-radius:0 0 10px 10px;}
+  .bucket.needs-exchange{box-shadow:inset 0 0 0 3px var(--warn);}
+  .bucket.drop-hover{filter:brightness(0.93);box-shadow:inset 0 0 0 3px var(--brand);}
+
+  .add-row{
+    height:18px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:800;color:#8a939b;
+    cursor:pointer;
+    border-bottom:1.5px dashed rgba(10,1,1,0.15);
+    margin-bottom:4px;
+    flex:0 0 auto;
+    transition:color .15s ease;
+  }
+  .add-row:hover{color:var(--brand-dark);}
+  .add-row:active{transform:scale(0.96);}
+
+  .counter-grid{
+    flex:1;
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:5px;
+    align-content:start;
+    justify-items:center;
+    min-height:186px; /* fits 5 rows x 2 = 10 counters with no scrolling */
+  }
+
+  .counter{
+    width:30px;height:30px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:800;
+    line-height:1;
+    cursor:grab;
+    border:2px solid rgba(255,255,255,0.7);
+    box-shadow:0 1px 3px rgba(0,0,0,0.25);
+    user-select:none;touch-action:none;
+    transition:opacity .1s ease;
+  }
+  .counter.dragging-origin{opacity:0.25;}
+  .counter-ghost{
+    transform:scale(1.2);
+    box-shadow:0 8px 16px rgba(0,0,0,0.35);
+    opacity:0.96;
+  }
+
+  .point-col{display:flex;flex-direction:column;align-items:stretch;}
+  .point-cell{
+    flex:1;
+    min-height:96px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .point-dot{
+    width:16px;height:16px;
+    border-radius:50%;
+    background:var(--ink);
+    box-shadow:0 1px 2px rgba(0,0,0,0.3);
+  }
+
+  .totals-cell{
+    text-align:center;
+    font-size:11px;
+    font-weight:800;
+    color:#5a6169;
+    padding:4px 2px 2px;
+  }
+  .totals-cell.blank{visibility:hidden;}
+
+  .trash-zone{
+    position:fixed;
+    right:16px;
+    bottom:16px;
+    z-index:500;
+    background:#fff;
+    border:3px solid var(--danger);
+    border-radius:16px;
+    padding:8px 14px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    box-shadow:0 4px 10px rgba(0,0,0,0.2);
+    transition:transform .15s ease, background .15s ease;
+    pointer-events:auto;
+  }
+  .trash-zone .icon{font-size:22px;line-height:1;}
+  .trash-zone .lbl{font-size:10px;font-weight:800;color:var(--danger);margin-top:2px;}
+  .trash-zone.drop-hover{transform:scale(1.18);background:#fde3e3;}
+
+  .help{
+    background:var(--card);
+    border-radius:14px;
+    box-shadow:0 2px 8px rgba(10,1,1,0.07);
+    margin:14px 4px 0;
+    padding:2px 16px;
+  }
+  .help summary{cursor:pointer;font-weight:700;padding:10px 0;font-size:14px;color:var(--brand-dark);}
+  .help ul{margin:0 0 12px;padding-left:20px;font-size:13.5px;line-height:1.6;}
+
+  footer{text-align:center;font-size:11px;color:#9aa3ab;font-weight:700;margin-top:18px;}
+
+  @media (max-width:520px){
+    .rowNumInput{width:78px;}
+    .btn-shift{font-size:10.5px;padding:6px 7px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Place Value Counters</h1>
+  <p>Wallscourt Farm Academy &middot; build, add, remove and exchange</p>
+</header>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <button class="btn-clear" id="clearAllBtn">Clear All</button>
+    <button class="btn-undo" id="undoBtn" disabled>&#8630; Undo</button>
+    <button class="btn-columns" id="columnsBtn">Columns &#9662;</button>
+    <button class="btn-panel-toggle" id="panelToggleBtn">Hide numbers &amp; controls &#9650;</button>
+    <label class="toggle-row"><input type="checkbox" id="workToggle" checked> Show column totals</label>
+  </div>
+
+  <div class="col-panel" id="colPanel" hidden>
+    <span class="col-panel-lbl">Show columns:</span>
+    <div class="col-chips" id="colChips"></div>
+    <button class="btn-showall" id="showAllColsBtn">Show all</button>
+  </div>
+
+  <div id="topControls">
+    <div class="totals-bar">
+      <div class="total-box"><span class="lbl">Row 1</span><span class="num" id="row1TotalNum">0</span></div>
+      <div class="total-box grand"><span class="lbl">Total</span><span class="num" id="grandTotalNum">0</span></div>
+      <div class="total-box"><span class="lbl">Row 2</span><span class="num" id="row2TotalNum">0</span></div>
+    </div>
+
+    <div class="board-msg" id="boardMsg"></div>
+
+    <div class="row-controls">
+      <div class="row-bar" id="rowBar0">
+        <span class="row-tag">Row 1</span>
+        <input type="text" class="rowNumInput" inputmode="decimal" placeholder="e.g. 3452.6">
+        <button class="btn-set">Set</button>
+        <button class="btn-clearrow">Clear</button>
+        <button class="btn-shift" data-dir="-1" title="Shift every counter in this row one column left (×10)">&larr; &times;10</button>
+        <button class="btn-shift" data-dir="1" title="Shift every counter in this row one column right (÷10)">&divide;10 &rarr;</button>
+        <span class="row-status"></span>
+      </div>
+      <div class="row-bar" id="rowBar1">
+        <span class="row-tag">Row 2</span>
+        <input type="text" class="rowNumInput" inputmode="decimal" placeholder="e.g. 3452.6">
+        <button class="btn-set">Set</button>
+        <button class="btn-clearrow">Clear</button>
+        <button class="btn-shift" data-dir="-1" title="Shift every counter in this row one column left (×10)">&larr; &times;10</button>
+        <button class="btn-shift" data-dir="1" title="Shift every counter in this row one column right (÷10)">&divide;10 &rarr;</button>
+        <span class="row-status"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="board-scroll">
+    <div id="gridBoard"></div>
+  </div>
+
+  <details class="help">
+    <summary>How to use this tool</summary>
+    <ul>
+      <li>Type a number into <strong>Row 1</strong> or <strong>Row 2</strong> and press <em>Set</em> to build it from counters (decimals allowed, e.g. <code>3452.6</code>).</li>
+      <li><strong>Drag a counter sideways into the next column</strong> to exchange/regroup it: drag it right (into the smaller-value neighbour) and it becomes 10 of that value; drag it left (into the bigger-value neighbour) and, if there are 10 or more of that counter in its column, they combine into 1.</li>
+      <li><strong>Drag a counter up or down</strong> between Row 1 and Row 2 to reposition it without changing its value &mdash; useful for lining up a calculation across both rows.</li>
+      <li><strong>Double-click or double-tap a counter</strong> to remove it &mdash; useful for modelling subtraction. (You can also drag it onto the bin, bottom right.)</li>
+      <li>Tap the dashed <strong>+</strong> strip at the top of any column to add another counter there &mdash; useful for modelling addition.</li>
+      <li><strong>Tap a tenths/hundredths/thousandths counter</strong> to flip it, just like the real ones &mdash; it swaps between the decimal (e.g. 0.01) and fraction (e.g. 1&frasl;100) side.</li>
+      <li>The <strong>&times;10 / &divide;10</strong> buttons shift every counter in a row one column at once &mdash; great for showing what happens to a number when you multiply or divide by 10.</li>
+      <li>A column glows orange once it holds 10 or more counters &mdash; a hint it's time to exchange.</li>
+      <li>Use <strong>Columns</strong> to show only the place-value range a class needs (e.g. just Hundreds/Tens/Ones for a younger group) &mdash; your choice is remembered next time you open this page on the same device.</li>
+      <li>Use <strong>Hide numbers &amp; controls</strong> to tuck away the totals and Row 1/Row 2 panel once you've set your numbers up, so the board is just the counters &mdash; handy for a clean whiteboard display.</li>
+    </ul>
+  </details>
+
+  <footer>v16.09.26b</footer>
+</div>
+
+<div class="trash-zone" id="trashZone" title="Drag a counter here to remove it">
+  <span class="icon">&#128465;&#65039;</span>
+  <span class="lbl">Remove</span>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // Colours match the school's physical place value counters (1 - 10,000, tenths & hundredths).
+  // Millions, Hundred Thousands and thousandths aren't in the physical set, so those three are
+  // reasonable extensions of the same palette - easy to swap below if you'd rather match something else.
+  var PLACES = [
+    {id:'M',   name:'Millions',          color:'#c8397e', cell:'#f7dcec', text:'#fff',    th:1000000000, num:'1000000'},
+    {id:'HTH', name:'Hundred Thousands', color:'#7c4fa0', cell:'#e9dff0', text:'#fff',    th:100000000,  num:'100000'},
+    {id:'TTH', name:'Ten Thousands',     color:'#1fae9c', cell:'#d7f1ec', text:'#fff',    th:10000000,   num:'10000'},
+    {id:'TH',  name:'Thousands',         color:'#f6d43a', cell:'#fdf3c9', text:'#0a0101', th:1000000,    num:'1000'},
+    {id:'H',   name:'Hundreds',          color:'#ef8a2e', cell:'#fce0c4', text:'#fff',    th:100000,     num:'100'},
+    {id:'T',   name:'Tens',              color:'#e8615c', cell:'#fbd7d5', text:'#fff',    th:10000,      num:'10'},
+    {id:'O',   name:'Ones',              color:'#ffffff', cell:'#f2f4f5', text:'#0a0101', th:1000,       num:'1', border:'#aab4bc'},
+    {id:'t',   name:'tenths',            color:'#5c5b22', cell:'#e6e5d2', text:'#fff',    th:100,        num:'0.1',   dec:'0.1',   frac:'1⁄10'},
+    {id:'h',   name:'hundredths',        color:'#7cc93f', cell:'#e6f5d4', text:'#0a0101', th:10,         num:'0.01',  dec:'0.01',  frac:'1⁄100'},
+    {id:'th',  name:'thousandths',       color:'#7a3b2e', cell:'#ecdad5', text:'#fff',    th:1,          num:'0.001', dec:'0.001', frac:'1⁄1000'}
+  ];
+
+  // which columns the teacher has chosen to show (persisted so it survives a reload)
+  var hiddenCols = loadHiddenCols();
+
+  function loadHiddenCols(){
+    try{
+      var raw = localStorage.getItem('pvc_hiddenCols');
+      if(!raw) return {};
+      var arr = JSON.parse(raw);
+      var obj = {};
+      arr.forEach(function(i){ obj[i] = true; });
+      return obj;
+    }catch(e){ return {}; }
+  }
+
+  function saveHiddenCols(){
+    try{
+      var arr = [];
+      for(var i=0;i<PLACES.length;i++){ if(hiddenCols[i]) arr.push(i); }
+      localStorage.setItem('pvc_hiddenCols', JSON.stringify(arr));
+    }catch(e){ /* ignore - e.g. private browsing */ }
+  }
+
+  // builds the visible column order fresh each time, with a thin decimal-point marker
+  // inserted after Ones only when there's an actual whole/decimal boundary still showing
+  function computeGridOrder(){
+    var visible = [];
+    for(var i=0;i<PLACES.length;i++){ if(!hiddenCols[i]) visible.push(i); }
+    var hasWhole = visible.some(function(i){ return i<=6; });
+    var hasDec = visible.some(function(i){ return i>=7; });
+    var order = [];
+    visible.forEach(function(i){
+      order.push({type:'col', idx:i});
+      if(i===6 && hasWhole && hasDec) order.push({type:'point'});
+    });
+    return order;
+  }
+
+  // no regrouping across the decimal point boundary (Ones <-> tenths)
+  function isBridgeBlocked(a,b){
+    return (a===6 && b===7) || (a===7 && b===6);
+  }
+
+  function fontSizeFor(text){
+    var len = text.length;
+    if(len<=1) return '12px';
+    if(len===2) return '10.5px';
+    if(len===3) return '9.5px';
+    if(len===4) return '8.5px';
+    if(len===5) return '7.3px';
+    if(len===6) return '6.4px';
+    return '5.6px';
+  }
+
+  var counters = []; // {id, row(0|1), col(0-9), flipped}
+  var nextId = 1;
+  var history = [];
+  var MAX_HISTORY = 80;
+
+  var counterGridEls = {}, bucketEls = {}, totalsEls = {}, rowInputs = {}, rowStatusEls = {};
+
+  var board = document.getElementById('gridBoard');
+  var undoBtn = document.getElementById('undoBtn');
+  var workToggle = document.getElementById('workToggle');
+  var trashZone = document.getElementById('trashZone');
+  var boardMsg = document.getElementById('boardMsg');
+
+  function snapshot(){
+    if(history.length >= MAX_HISTORY) history.shift();
+    history.push(counters.map(function(c){ return {id:c.id, row:c.row, col:c.col, flipped:c.flipped}; }));
+    undoBtn.disabled = false;
+  }
+
+  function undo(){
+    if(!history.length) return;
+    counters = history.pop();
+    undoBtn.disabled = history.length === 0;
+    render();
+  }
+
+  function showBoardMsg(msg){
+    boardMsg.textContent = msg || '';
+    clearTimeout(showBoardMsg._t);
+    if(msg) showBoardMsg._t = setTimeout(function(){ boardMsg.textContent=''; }, 4000);
+  }
+
+  function formatValue(thousandths){
+    var sign = thousandths < 0 ? '-' : '';
+    thousandths = Math.abs(thousandths);
+    var whole = Math.floor(thousandths/1000);
+    var frac = thousandths % 1000;
+    var wholeStr = whole.toLocaleString('en-GB');
+    if(frac === 0) return sign + wholeStr;
+    var fracStr = String(frac).padStart(3,'0').replace(/0+$/,'');
+    return sign + wholeStr + '.' + fracStr;
+  }
+
+  function sumRowThousandths(row){
+    var t = 0;
+    counters.forEach(function(c){ if(c.row===row) t += PLACES[c.col].th; });
+    return t;
+  }
+
+  function countAt(row,col){
+    var n = 0;
+    for(var i=0;i<counters.length;i++){ if(counters[i].row===row && counters[i].col===col) n++; }
+    return n;
+  }
+
+  function parseNumberString(raw){
+    var cleaned = (raw||'').replace(/[^0-9.]/g,'');
+    if(cleaned === '') return null;
+    var parts = cleaned.split('.');
+    var wholeStr = (parts[0]||'').slice(0,7);
+    var decStr = (parts.length>1 ? parts[1] : '').slice(0,3);
+    if(wholeStr==='' && decStr==='') return null;
+    wholeStr = wholeStr.padStart(7,'0');
+    decStr = (decStr+'000').slice(0,3);
+    return (wholeStr+decStr).split('').map(Number);
+  }
+
+  function showRowStatus(row,msg){
+    var el = rowStatusEls[row];
+    el.textContent = msg || '';
+    clearTimeout(el._t);
+    if(msg) el._t = setTimeout(function(){ el.textContent=''; }, 4000);
+  }
+
+  // ---- mutations ----
+  function addCounter(row,col){
+    snapshot();
+    counters.push({id:nextId++, row:row, col:col});
+    render();
+  }
+
+  function removeCounterObj(obj){
+    snapshot();
+    counters = counters.filter(function(c){ return c.id !== obj.id; });
+    render();
+  }
+
+  function shiftRow(row,dir){
+    var rowCounters = counters.filter(function(c){ return c.row===row; });
+    if(rowCounters.length === 0){ showRowStatus(row,'Row is empty — nothing to shift.'); return; }
+    var blocked = rowCounters.some(function(c){ var nc=c.col+dir; return nc<0 || nc>PLACES.length-1; });
+    if(blocked){
+      showRowStatus(row, dir<0 ? "Already at Millions — can't shift further left." : "Already at thousandths — can't shift further right.");
+      return;
+    }
+    snapshot();
+    counters.forEach(function(c){ if(c.row===row) c.col += dir; });
+    render();
+  }
+
+  function setRowFromInput(row){
+    var digits = parseNumberString(rowInputs[row].value);
+    if(!digits){ showRowStatus(row,'Enter a valid number, e.g. 3452 or 6.75'); return; }
+    snapshot();
+    counters = counters.filter(function(c){ return c.row!==row; });
+    digits.forEach(function(d, idx){
+      for(var k=0;k<d;k++) counters.push({id:nextId++, row:row, col:idx});
+    });
+    render();
+  }
+
+  function clearRow(row){
+    snapshot();
+    counters = counters.filter(function(c){ return c.row!==row; });
+    render();
+  }
+
+  function clearAll(){
+    snapshot();
+    counters = [];
+    render();
+  }
+
+  // ---- drag ----
+  function attachDrag(el, counterObj){
+    el.addEventListener('pointerdown', function(e){
+      if(e.button !== undefined && e.button !== 0) return;
+      e.preventDefault();
+      startDrag(e, counterObj, el);
+    });
+    el.addEventListener('dblclick', function(e){
+      e.preventDefault();
+      clearTimeout(counterObj._flipTimer);
+      removeCounterObj(counterObj);
+    });
+  }
+
+  function findDropTarget(x,y){
+    var el = document.elementFromPoint(x,y);
+    if(!el) return null;
+    var bucket = el.closest('.bucket');
+    if(bucket) return {type:'bucket', row:parseInt(bucket.dataset.row,10), col:parseInt(bucket.dataset.col,10)};
+    var trash = el.closest('.trash-zone');
+    if(trash) return {type:'trash'};
+    return null;
+  }
+
+  function clearHoverHighlights(){
+    document.querySelectorAll('.drop-hover').forEach(function(e){ e.classList.remove('drop-hover'); });
+  }
+
+  function updateHoverTarget(x,y){
+    clearHoverHighlights();
+    var t = findDropTarget(x,y);
+    if(t && t.type==='bucket'){
+      var bel = bucketEls[t.row+'_'+t.col];
+      if(bel) bel.classList.add('drop-hover');
+    } else if(t && t.type==='trash'){
+      trashZone.classList.add('drop-hover');
+    }
+  }
+
+  // A drop can: move within its own column (row change only, value unchanged), split into
+  // the adjacent smaller column, combine (if >=10 present) into the adjacent bigger column,
+  // or be rejected if it isn't one of those single, physically-sensible moves.
+  function handleDrop(counterObj, target){
+    if(!target) return;
+    if(target.type==='trash'){ removeCounterObj(counterObj); return; }
+    if(target.type!=='bucket') return;
+
+    var sameCol = target.col === counterObj.col;
+    var sameRow = target.row === counterObj.row;
+    if(sameCol && sameRow) return;
+
+    if(sameCol){
+      snapshot();
+      counterObj.row = target.row;
+      render();
+      return;
+    }
+
+    var diff = target.col - counterObj.col;
+    if(Math.abs(diff) === 1 && !isBridgeBlocked(counterObj.col, target.col)){
+      if(diff === 1){
+        // split: this one counter becomes 10 of the smaller neighbouring value
+        snapshot();
+        counters = counters.filter(function(c){ return c.id !== counterObj.id; });
+        for(var k=0;k<10;k++) counters.push({id:nextId++, row:target.row, col:target.col});
+        render();
+        return;
+      }
+      // diff === -1: combine, but only if this column already has 10+ counters to merge
+      var siblings = counters.filter(function(c){ return c.row===counterObj.row && c.col===counterObj.col; });
+      if(siblings.length < 10){
+        showBoardMsg('You need 10 '+PLACES[counterObj.col].id+' counters together before they can exchange for 1 '+PLACES[target.col].id+'.');
+        return;
+      }
+      snapshot();
+      var toRemove = {};
+      siblings.slice(0,10).forEach(function(c){ toRemove[c.id]=true; });
+      counters = counters.filter(function(c){ return !toRemove[c.id]; });
+      counters.push({id:nextId++, row:target.row, col:target.col});
+      render();
+      return;
+    }
+
+    showBoardMsg('Counters can only exchange with the column right next door.');
+  }
+
+  function startDrag(e, counterObj, el){
+    var startX = e.clientX, startY = e.clientY;
+    var moved = false, ghost = null;
+
+    function onMove(ev){
+      var dx = ev.clientX-startX, dy = ev.clientY-startY;
+      if(!moved && Math.hypot(dx,dy) > 6){
+        moved = true;
+        el.classList.add('dragging-origin');
+        ghost = el.cloneNode(true);
+        ghost.classList.add('counter-ghost');
+        ghost.style.position='fixed';
+        ghost.style.pointerEvents='none';
+        ghost.style.zIndex='9999';
+        ghost.style.margin='0';
+        document.body.appendChild(ghost);
+      }
+      if(moved && ghost){
+        ghost.style.left = (ev.clientX-15)+'px';
+        ghost.style.top = (ev.clientY-38)+'px';
+        updateHoverTarget(ev.clientX, ev.clientY);
+      }
+    }
+
+    function onUp(ev){
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onCancel);
+      el.classList.remove('dragging-origin');
+      if(ghost) ghost.remove();
+      clearHoverHighlights();
+      if(moved){
+        var target = findDropTarget(ev.clientX, ev.clientY);
+        handleDrop(counterObj, target);
+      } else if(PLACES[counterObj.col].frac){
+        // a plain tap (no drag) flips a decimal counter to show its other, fraction side —
+        // delayed slightly so a fast double-tap/double-click removes instead of flipping first
+        clearTimeout(counterObj._flipTimer);
+        counterObj._flipTimer = setTimeout(function(){
+          counterObj.flipped = !counterObj.flipped;
+          render();
+        }, 260);
+      }
+    }
+    function onCancel(){
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onCancel);
+      el.classList.remove('dragging-origin');
+      if(ghost) ghost.remove();
+      clearHoverHighlights();
+    }
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onCancel);
+  }
+
+  function makeCounterEl(counterObj){
+    var p = PLACES[counterObj.col];
+    var el = document.createElement('div');
+    el.className = 'counter';
+    el.style.background = p.color;
+    el.style.color = p.text;
+    if(p.border) el.style.borderColor = p.border;
+    var showFrac = p.frac && counterObj.flipped;
+    var label = showFrac ? p.frac : p.num;
+    el.textContent = label;
+    el.style.fontSize = fontSizeFor(label);
+    el.title = p.frac
+      ? 'Drag to move or exchange — double-click/double-tap to remove — tap once to flip to the '+(showFrac?'decimal':'fraction')+' side'
+      : 'Drag to move or exchange — double-click/double-tap to remove';
+    attachDrag(el, counterObj);
+    return el;
+  }
+
+  // ---- skeleton (rebuilt whenever column visibility changes) ----
+  function buildSkeleton(){
+    var GRID_ORDER = computeGridOrder();
+    counterGridEls = {}; bucketEls = {}; totalsEls = {};
+    board.innerHTML = '';
+    board.style.gridTemplateColumns = GRID_ORDER.map(function(e){
+      return e.type==='point' ? '28px' : '100px';
+    }).join(' ');
+
+    // header row
+    GRID_ORDER.forEach(function(e){
+      var cell = document.createElement('div');
+      if(e.type==='col'){
+        var p = PLACES[e.idx];
+        cell.className = 'head-cell';
+        cell.style.background = p.color;
+        cell.style.color = p.text;
+        cell.innerHTML = '<span class="hcode">'+p.id+'</span><span class="hname">'+p.name+'</span>'+
+          (p.dec ? '<span class="hfrac">'+p.dec+'&nbsp;=&nbsp;'+p.frac+'</span>' : '');
+      } else {
+        cell.className = 'head-cell point-head point-band';
+        cell.textContent = 'point';
+      }
+      board.appendChild(cell);
+    });
+
+    // two counter rows, directly adjacent (no control bar breaking the colour columns)
+    [0,1].forEach(function(row){
+      GRID_ORDER.forEach(function(e){
+        if(e.type==='point'){
+          var pointCell = document.createElement('div');
+          pointCell.className = 'point-col point-band';
+          var dotWrap = document.createElement('div');
+          dotWrap.className = 'point-cell';
+          var dot = document.createElement('div');
+          dot.className = 'point-dot';
+          dotWrap.appendChild(dot);
+          pointCell.appendChild(dotWrap);
+          board.appendChild(pointCell);
+          return;
+        }
+        var idx = e.idx, p = PLACES[idx];
+        var bucket = document.createElement('div');
+        bucket.className = 'bucket row'+(row+1);
+        bucket.style.background = p.cell;
+        bucket.dataset.row = row; bucket.dataset.col = idx;
+        bucketEls[row+'_'+idx] = bucket;
+
+        var addRow = document.createElement('div');
+        addRow.className = 'add-row';
+        addRow.textContent = '+';
+        addRow.title = 'Add one '+p.id+' counter';
+        addRow.addEventListener('click', function(){ addCounter(row, idx); });
+        bucket.appendChild(addRow);
+
+        var grid = document.createElement('div');
+        grid.className = 'counter-grid';
+        counterGridEls[row+'_'+idx] = grid;
+        bucket.appendChild(grid);
+
+        board.appendChild(bucket);
+      });
+    });
+
+    // totals row
+    GRID_ORDER.forEach(function(e){
+      var cell = document.createElement('div');
+      if(e.type==='col'){
+        cell.className = 'totals-cell';
+        totalsEls[e.idx] = cell;
+      } else {
+        cell.className = 'totals-cell point-band';
+      }
+      board.appendChild(cell);
+    });
+  }
+
+  function buildRowControls(){
+    [0,1].forEach(function(row){
+      var bar = document.getElementById('rowBar'+row);
+      var input = bar.querySelector('.rowNumInput');
+      rowInputs[row] = input;
+      rowStatusEls[row] = bar.querySelector('.row-status');
+      bar.querySelector('.btn-set').addEventListener('click', function(){ setRowFromInput(row); });
+      bar.querySelector('.btn-clearrow').addEventListener('click', function(){ clearRow(row); });
+      bar.querySelectorAll('.btn-shift').forEach(function(b){
+        b.addEventListener('click', function(){ shiftRow(row, parseInt(b.dataset.dir,10)); });
+      });
+      input.addEventListener('keydown', function(e){ if(e.key==='Enter') setRowFromInput(row); });
+    });
+  }
+
+  function render(){
+    for(var row=0; row<2; row++){
+      for(var col=0; col<PLACES.length; col++){
+        var grid = counterGridEls[row+'_'+col];
+        if(!grid) continue; // column is currently hidden
+        var list = counters.filter(function(c){ return c.row===row && c.col===col; });
+        bucketEls[row+'_'+col].classList.toggle('needs-exchange', list.length >= 10);
+        grid.innerHTML = '';
+        list.forEach(function(c){ grid.appendChild(makeCounterEl(c)); });
+      }
+    }
+
+    var showWork = workToggle.checked;
+    for(var col2=0; col2<PLACES.length; col2++){
+      var tcell = totalsEls[col2];
+      if(!tcell) continue; // column is currently hidden
+      var cnt = countAt(0,col2) + countAt(1,col2);
+      tcell.style.visibility = showWork ? 'visible' : 'hidden';
+      tcell.textContent = formatValue(cnt*PLACES[col2].th);
+    }
+
+    var r0 = sumRowThousandths(0), r1 = sumRowThousandths(1);
+    document.getElementById('row1TotalNum').textContent = formatValue(r0);
+    document.getElementById('row2TotalNum').textContent = formatValue(r1);
+    document.getElementById('grandTotalNum').textContent = formatValue(r0+r1);
+
+    undoBtn.disabled = history.length === 0;
+  }
+
+  // ---- column show/hide (so a class can see only the place-value range it needs) ----
+  function buildColumnPanel(){
+    var chipsWrap = document.getElementById('colChips');
+    chipsWrap.innerHTML = '';
+    PLACES.forEach(function(p, i){
+      var chip = document.createElement('button');
+      chip.className = 'col-chip' + (hiddenCols[i] ? ' is-hidden' : '');
+      chip.style.background = p.color;
+      chip.style.color = p.text;
+      chip.textContent = p.id;
+      chip.title = (hiddenCols[i] ? 'Show' : 'Hide') + ' the ' + p.name + ' column';
+      chip.addEventListener('click', function(){ toggleColumn(i); });
+      chipsWrap.appendChild(chip);
+    });
+  }
+
+  function toggleColumn(i){
+    if(hiddenCols[i]) delete hiddenCols[i]; else hiddenCols[i] = true;
+    saveHiddenCols();
+    buildColumnPanel();
+    buildSkeleton();
+    render();
+  }
+
+  function showAllColumns(){
+    hiddenCols = {};
+    saveHiddenCols();
+    buildColumnPanel();
+    buildSkeleton();
+    render();
+  }
+
+  document.getElementById('columnsBtn').addEventListener('click', function(){
+    var panel = document.getElementById('colPanel');
+    panel.hidden = !panel.hidden;
+  });
+  document.getElementById('showAllColsBtn').addEventListener('click', showAllColumns);
+
+  // ---- hide the numbers/Row-1/Row-2 panel so the grid can be the whole focus ----
+  var topControls = document.getElementById('topControls');
+  var panelToggleBtn = document.getElementById('panelToggleBtn');
+
+  function loadPanelHidden(){
+    try{ return localStorage.getItem('pvc_panelHidden') === '1'; }catch(e){ return false; }
+  }
+  function savePanelHidden(val){
+    try{ localStorage.setItem('pvc_panelHidden', val ? '1' : '0'); }catch(e){ /* ignore */ }
+  }
+  function setPanelHidden(hide){
+    topControls.hidden = hide;
+    panelToggleBtn.textContent = hide ? 'Show numbers & controls ▼' : 'Hide numbers & controls ▲';
+    savePanelHidden(hide);
+  }
+  panelToggleBtn.addEventListener('click', function(){ setPanelHidden(!topControls.hidden); });
+  setPanelHidden(loadPanelHidden());
+
+  document.getElementById('clearAllBtn').addEventListener('click', clearAll);
+  undoBtn.addEventListener('click', undo);
+  workToggle.addEventListener('change', render);
+
+  buildRowControls();
+  buildColumnPanel();
+  buildSkeleton();
+  render();
+})();
+</script>
+
+</body>
+</html>
