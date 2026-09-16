@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-15.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-16.09.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -559,6 +559,14 @@ const OWN_BACKEND_TOKEN = '2013';
 const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
 const LUNCH_COVER_URL = GATEWAY_URL + '&key=wfa_lc';
 const BOOKING_SYNC_URL = 'https://script.google.com/macros/s/AKfycbwzNtos0vdjnUhsFQ_igTtLNXyBd8k9c6rPkA0IZdkM3vJLAoIdSHonTbHAbyFNfH_BWQ/exec';
+// Read-only proxies (fast, cached), same pattern as COVER_SYNC_URL above —
+// this page's own week/booking loads (syncLoad/loadBookingOverlay) were
+// measured 16.09.26 hitting 0.9-12.5s under concurrent load direct against
+// Apps Script, with occasional outright failures. Writes (syncSave, the
+// term-copy actions) still go straight to SYNC_URL/BOOKING_SYNC_URL above,
+// unchanged.
+const TEACHING_SCHEDULE_READ_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/teachingschedule';
+const BOOKING_READ_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/bookingstate';
 
 // FAB zone definitions (must match FAB tool)
 const FAB_GROUPS = {
@@ -1416,7 +1424,7 @@ function getBookingRowIndexes(booking) {
 async function loadBookingOverlay(weekKey) {
   if (!BOOKING_SYNC_URL) return;
   try {
-    const res = await fetch(`${BOOKING_SYNC_URL}?action=loadBookings&weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
+    const res = await fetch(`${BOOKING_READ_URL}?weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
     if (!res.ok) return;
     const json = await res.json();
     if (json && json.bookings) {
@@ -1783,7 +1791,7 @@ async function syncSave() {
 async function syncLoad(weekKey) {
   if (!SYNC_URL) return;
   try {
-    const res = await fetch(`${SYNC_URL}?action=load&yearGroup=${encodeURIComponent(YEAR_GROUP)}&weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
+    const res = await fetch(`${TEACHING_SCHEDULE_READ_URL}?yearGroup=${encodeURIComponent(YEAR_GROUP)}&weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
     if (!res.ok) return;
     const json = await res.json();
     if (json && json.data && json.data.master) {
