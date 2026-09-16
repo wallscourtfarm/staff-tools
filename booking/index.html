@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 15.09.26a</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 16.09.26a</div>
       </div>
     </div>
     <div class="top-bar">
@@ -408,6 +408,12 @@ const SYNC_URL        = 'https://script.google.com/macros/s/AKfycbwzNtos0vdjnUhs
 // still go straight to the real backend, unchanged.
 const COVER_PLAN_URL  = 'https://api.wallscourt-farm-academy.co.uk/planning/coverstate';
 const FAB_ROTA_URL    = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
+// Read-only proxy (fast, cached), same pattern as COVER_PLAN_URL above —
+// this page's own week loads (syncLoad) were measured 16.09.26 hitting
+// 0.9-12.5s under concurrent load direct against Apps Script, with an
+// outright failure. Writes (syncSave/syncSaveAll) still go straight to
+// SYNC_URL above, unchanged.
+const BOOKING_READ_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/bookingstate';
 
 // Cover Plan session → resource booking time range
 const CP_SESSION_TIMES = { 'AM': ['09:00','12:15'], 'PM': ['13:25','15:00'], 'Lunch': ['12:15','13:20'] };
@@ -769,7 +775,7 @@ function buildSchoolEvents(rows) {
 async function syncLoad(weekKey) {
   if (!SYNC_URL) return;
   try {
-    const res = await fetch(`${SYNC_URL}?action=loadBookings&weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
+    const res = await fetch(`${BOOKING_READ_URL}?weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
     if (res.ok) {
       const json = await res.json();
       if (json && json.bookings) {
