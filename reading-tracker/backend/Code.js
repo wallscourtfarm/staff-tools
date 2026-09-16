@@ -286,6 +286,26 @@ function getClassGroupStats_(e) {
   return { term: termG, week: weekG };
 }
 
+// Per-pupil term totals for a whole year group, keyed by class then pupil
+// name — the one place this backend deliberately returns a per-pupil
+// figure (a score only, never PP/EAL/SEN), for an external aggregator
+// (the DOOYA tracker) to pull and join against its own UPN-keyed roster by
+// name. Every other endpoint here stays aggregate-only on purpose; this is
+// a narrow, additive exception scoped to one year group's term totals.
+function getPupilTermTotals_(e) {
+  const yr = e.parameter.yr;
+  const term = e.parameter.term || 'Term 1';
+  if (!yr) return { error: 'yr parameter required' };
+  const roster = fetchRosterFlags_();
+  const scores = readScoreTree_();
+  const classes = Object.keys(roster[yr] || {});
+  const out = {};
+  classes.forEach(function (cls) {
+    out[cls] = pupilTermTotals_(scores, yr, cls, term);
+  });
+  return { yr: yr, term: term, classes: out };
+}
+
 function doGet(e) {
   if (!tokenOK(e)) {
     return ContentService.createTextOutput('{"error":"unauthorised"}')
@@ -306,6 +326,15 @@ function doGet(e) {
   if (e.parameter && e.parameter.action === 'getClassGroupStats') {
     try {
       return ContentService.createTextOutput(JSON.stringify(getClassGroupStats_(e)))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ error: String(err), stack: err.stack || '' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+  if (e.parameter && e.parameter.action === 'getPupilTermTotals') {
+    try {
+      return ContentService.createTextOutput(JSON.stringify(getPupilTermTotals_(e)))
         .setMimeType(ContentService.MimeType.JSON);
     } catch (err) {
       return ContentService.createTextOutput(JSON.stringify({ error: String(err), stack: err.stack || '' }))
