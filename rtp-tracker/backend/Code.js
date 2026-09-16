@@ -13,6 +13,7 @@ const SHEET_HEADERS = {
   pupils:      ['pupil_id','name','year_group','class_id','active','added_date','upn','sex','pp','sen','eal'],
   criteria:    ['code','strand','year_group','order','description','weight','active'],
   assessments: ['assess_id','pupil_id','code','rating','academic_year','assessed_date','assessed_by'],
+  taught:      ['class_id','code','academic_year','taught_date','marked_by'],
   config:      ['key','value']
 };
 
@@ -169,8 +170,9 @@ function handleGet_(p) {
     case 'getAssessments':  return getAssessments_(p);
     case 'getPupilProfile': return getPupilProfile_(p);
     case 'getCohortStats':  return getCohortStats_(p);
+    case 'getTaught':       return { codes: [...getTaughtSet_(p.class_id)] };
     case 'getConfig':       return getConfig_();
-    case 'ping':            return { ok: true, ts: new Date().toISOString(), codeVersion: 'rtp-1' };
+    case 'ping':            return { ok: true, ts: new Date().toISOString(), codeVersion: 'rtp-2' };
     default:                return { error: 'Unknown GET action: ' + p.action };
   }
 }
@@ -180,6 +182,8 @@ function handlePost_(d) {
     case 'saveRating':          return saveRating_(d);
     case 'saveRatings':         return saveRatings_(d);
     case 'setCriterionWeight':  return setCriterionWeight_(d);
+    case 'setTaught':           return setTaught_(d);
+    case 'setTaughtBulk':       return setTaughtBulk_(d);
     case 'setConfig':           return setConfig_(d);
     case 'syncRoster':          return syncRosterFromHub_(!!d.dryRun);
     default:                    return { error: 'Unknown POST action: ' + d.action };
@@ -218,7 +222,9 @@ function initSheets_() {
     ['criteria', 'code'],
     ['assessments', 'assess_id'],
     ['assessments', 'pupil_id'],
-    ['assessments', 'code']
+    ['assessments', 'code'],
+    ['taught', 'class_id'],
+    ['taught', 'code']
   ];
   for (const [name, header] of TEXT_COLUMNS) {
     const sh = spreadsheet.getSheetByName(name);
@@ -344,9 +350,88 @@ function setCriterionWeight_(d) {
   return { error: 'Criterion not found: ' + d.code };
 }
 
+// ── Taught coverage ──────────────────────────────────────────
+//
+// A criterion counting toward a pupil's score is a curriculum decision
+// ("has this class actually been taught it yet"), separate from whether it
+// has been individually rated. Kept per class (two classes in the same
+// year group can be at different points), one row per (class, code) =
+// taught; absence = not yet taught.
+
+function getTaughtSet_(classId) {
+  if (!classId) return new Set();
+  const year = getConfig_().academic_year;
+  const set = new Set();
+  sheetData_('taught').forEach(r => {
+    if (String(r.class_id) === String(classId) && r.academic_year === year) set.add(r.code);
+  });
+  return set;
+}
+
+function setTaught_(d) {
+  const academicYear = d.academic_year || getConfig_().academic_year;
+  const sh = ss_().getSheetByName('taught');
+  const vals = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const col = name => headers.indexOf(name);
+
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][col('class_id')]) === String(d.class_id) &&
+        vals[i][col('code')] === d.code &&
+        vals[i][col('academic_year')] === academicYear) {
+      if (!d.taught) sh.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  if (d.taught) {
+    const nextRow = sh.getLastRow() + 1;
+    sh.getRange(nextRow, col('class_id') + 1).setNumberFormat('@');
+    sh.getRange(nextRow, col('code') + 1).setNumberFormat('@');
+    sh.getRange(nextRow, 1, 1, headers.length)
+      .setValues([[d.class_id, d.code, academicYear, new Date().toISOString(), d.marked_by || '']]);
+  }
+  return { success: true };
+}
+
+// Bulk mark/unmark many criteria taught at once for one class — the normal
+// workflow (e.g. "we've now finished the Y1 Number Facts unit") rather than
+// clicking 78 rows one at a time.
+function setTaughtBulk_(d) {
+  const academicYear = d.academic_year || getConfig_().academic_year;
+  const sh = ss_().getSheetByName('taught');
+  const vals = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const col = name => headers.indexOf(name);
+  const codes = d.codes || [];
+
+  const existingRowByCode = {};
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][col('class_id')]) === String(d.class_id) && vals[i][col('academic_year')] === academicYear) {
+      existingRowByCode[vals[i][col('code')]] = i + 1;
+    }
+  }
+
+  if (d.taught) {
+    const toAppend = codes
+      .filter(code => !existingRowByCode[code])
+      .map(code => [d.class_id, code, academicYear, new Date().toISOString(), d.marked_by || '']);
+    if (toAppend.length) {
+      const nextRow = sh.getLastRow() + 1;
+      sh.getRange(nextRow, col('class_id') + 1, toAppend.length, 1).setNumberFormat('@');
+      sh.getRange(nextRow, col('code') + 1, toAppend.length, 1).setNumberFormat('@');
+      sh.getRange(nextRow, 1, toAppend.length, headers.length).setValues(toAppend);
+    }
+    return { success: true, added: toAppend.length };
+  }
+
+  const rowsToDelete = codes.filter(c => existingRowByCode[c]).map(c => existingRowByCode[c]).sort((a, b) => b - a);
+  rowsToDelete.forEach(r => sh.deleteRow(r));
+  return { success: true, removed: rowsToDelete.length };
+}
+
 // ── Assessments / ratings ────────────────────────────────────
 
-// {pupils, criteria, assessments: {pupil_id: {code: rating}}} for one class.
+// {pupils, criteria, taught, assessments: {pupil_id: {code: rating}}} for one class.
 function getAssessments_(p) {
   const pupils = getPupils_({ class_id: p.class_id });
   const pupilIds = new Set(pupils.map(r => r.pupil_id));
@@ -361,7 +446,7 @@ function getAssessments_(p) {
     }
   }
 
-  return { pupils, criteria: getCriteria_(), assessments };
+  return { pupils, criteria: getCriteria_(), assessments, taught: [...getTaughtSet_(p.class_id)] };
 }
 
 // One pupil's full RTP profile: every criterion's current rating, plus a
@@ -381,47 +466,66 @@ function getPupilProfile_(p) {
   }
 
   const criteria = getCriteria_();
-  const overall = weightedScore_(criteria, ratings);
+  const taughtSet = pupilRaw ? getTaughtSet_(pupilRaw.class_id) : new Set();
+  const overall = weightedScore_(criteria, ratings, taughtSet);
   const byStrand = {};
   const strands = [...new Set(criteria.map(c => c.strand))];
   strands.forEach(s => {
-    byStrand[s] = weightedScore_(criteria.filter(c => c.strand === s), ratings);
+    byStrand[s] = weightedScore_(criteria.filter(c => c.strand === s), ratings, taughtSet);
   });
 
-  return { pupil, ratings, criteria, overallScore: overall, strandScores: byStrand };
+  return { pupil, ratings, criteria, taught: [...taughtSet], overallScore: overall, strandScores: byStrand };
 }
 
-// Weighted % secure = sum(weight where rating===3) / sum(weight where assessed) * 100.
-// Rewards being secure specifically in higher-weighted (priority) criteria.
-// Returns null (not 0) when nothing in the given criteria set has been assessed,
-// so the client can render "not yet assessed" rather than a misleading 0%.
-function weightedScore_(criteria, ratings) {
-  let assessedWeight = 0, secureWeight = 0, assessedCount = 0;
-  criteria.forEach(c => {
+// Weighted security score, out of 100 — scoped to criteria actually TAUGHT
+// to this pupil's class (see getTaughtSet_ above), not merely rated. A
+// taught-but-unrated criterion still counts in the denominator (as 0
+// credit), so the score can't look inflated just because only one or two
+// things have been individually assessed so far while the rest of the unit
+// has already been covered.
+//
+// Each rating gives partial credit rather than all-or-nothing, matching the
+// sheet's own rating definitions (1 = little/no security, 2 = some
+// security, 3 = secure): credit = (rating-1)/2, i.e. 1->0%, 2->50%, 3->100%.
+// So a 2 on a heavily-weighted priority skill can lift the score more than
+// a 3 on an unweighted one — reflecting real partial progress, not just a
+// secure/not-secure cliff edge.
+function weightedScore_(criteria, ratings, taughtSet) {
+  const taught = criteria.filter(c => taughtSet.has(c.code));
+  if (!taught.length) return { pct: null, taughtCount: 0, ratedCount: 0, totalCount: criteria.length };
+  let taughtWeight = 0, creditWeight = 0, ratedCount = 0;
+  taught.forEach(c => {
+    taughtWeight += c.weight;
     const r = ratings[c.code];
-    if (r === undefined) return;
-    assessedWeight += c.weight;
-    assessedCount++;
-    if (r === 3) secureWeight += c.weight;
+    if (r !== undefined) {
+      ratedCount++;
+      creditWeight += c.weight * ((r - 1) / 2);
+    }
   });
-  if (assessedCount === 0) return { pct: null, assessedCount: 0, totalCount: criteria.length };
   return {
-    pct: Math.round((secureWeight / assessedWeight) * 1000) / 10,
-    assessedCount,
+    pct: Math.round((creditWeight / taughtWeight) * 1000) / 10,
+    taughtCount: taught.length,
+    ratedCount,
     totalCount: criteria.length
   };
 }
 
 // Per-criterion cohort breakdown for a class or a whole year group —
 // % of assessed pupils rated 3 (secure), plus the class's overall weighted
-// security score. Powers the cohort dashboard / gap-finding view.
+// security score. Powers the cohort dashboard / gap-finding view. Each
+// pupil's score is scoped to their OWN class's taught set (a "whole year
+// group" scope can span two classes at different points in the curriculum).
 function getCohortStats_(p) {
   const pupils = getPupils_({ class_id: p.class_id, year_group: p.year_group });
   const pupilIds = new Set(pupils.map(r => r.pupil_id));
   const year = p.academic_year || getConfig_().academic_year;
   const criteria = getCriteria_();
 
-  const byCode = {}; // code -> {ratings:[]}
+  const classIds = [...new Set(pupils.map(pu => pu.class_id))];
+  const taughtByClass = {};
+  classIds.forEach(cid => { taughtByClass[cid] = getTaughtSet_(cid); });
+
+  const byCode = {}; // code -> [ratings]
   criteria.forEach(c => { byCode[c.code] = []; });
 
   const ratingsByPupil = {};
@@ -437,9 +541,11 @@ function getCohortStats_(p) {
   const criteriaStats = criteria.map(c => {
     const ratings = byCode[c.code];
     const secure = ratings.filter(r => r === 3).length;
+    const taughtCount = pupils.filter(pu => (taughtByClass[pu.class_id] || new Set()).has(c.code)).length;
     return {
       code: c.code, strand: c.strand, year_group: c.year_group, weight: c.weight, description: c.description,
       assessedCount: ratings.length,
+      taughtCount,
       pupilCount: pupils.length,
       pctSecure: ratings.length ? Math.round((secure / ratings.length) * 1000) / 10 : null
     };
@@ -448,7 +554,7 @@ function getCohortStats_(p) {
   const pupilScores = pupils.map(pu => ({
     pupil_id: pu.pupil_id,
     name: pu.name,
-    score: weightedScore_(criteria, ratingsByPupil[pu.pupil_id] || {})
+    score: weightedScore_(criteria, ratingsByPupil[pu.pupil_id] || {}, taughtByClass[pu.class_id] || new Set())
   }));
 
   const assessedPupilScores = pupilScores.filter(ps => ps.score.pct !== null);

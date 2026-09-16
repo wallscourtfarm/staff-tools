@@ -102,6 +102,10 @@ table.rtp-grid thead tr.strand-row th { background: var(--blue); color: #fff; fo
 .crit-head { width: 46px; min-width: 46px; padding: 4px 2px !important; cursor: pointer; }
 .crit-head:hover { background: #dbeafe !important; }
 .crit-head.selected { background: #bfdbfe !important; }
+.crit-head.not-taught { background: #e2e8f0 !important; }
+.crit-head.not-taught .crit-code, .crit-head.not-taught .crit-year { color: #94a3b8; }
+.crit-head .taught-mark { color: #16a34a; font-size: 9px; }
+.rating-blank.not-taught-col { background: repeating-linear-gradient(45deg, #f1f5f9, #f1f5f9 4px, #e9edf2 4px, #e9edf2 8px); }
 .crit-code { font-size: 10px; font-weight: 700; }
 .crit-year { font-size: 9px; color: #888; display: block; }
 .crit-weight { color: #d97706; font-size: 9px; }
@@ -126,6 +130,7 @@ table.rtp-grid thead tr.strand-row th { background: var(--blue); color: #fff; fo
 .strand-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
 .strand-card summary { padding: 10px 14px; font-weight: 700; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
 .strand-crit-row { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-top: 1px solid var(--border); }
+.strand-crit-row.not-taught-row { opacity: .55; }
 .strand-crit-row .code { font-size: 11px; font-weight: 700; width: 70px; flex-shrink: 0; }
 .strand-crit-row .desc { flex: 1; font-size: 12px; color: #444; }
 .rating-dot { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; flex-shrink: 0; }
@@ -145,6 +150,7 @@ table.rtp-grid thead tr.strand-row th { background: var(--blue); color: #fff; fo
 .bar-track { flex: 1; height: 10px; background: #f1f5f9; border-radius: 5px; overflow: hidden; }
 .bar-fill { height: 100%; background: var(--g-bg); }
 .bar-pct { width: 40px; text-align: right; font-weight: 700; flex-shrink: 0; }
+.bar-taught { width: 78px; text-align: right; color: #888; font-size: 10px; flex-shrink: 0; }
 .pupil-row { display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
 .pupil-row .name { flex: 1; }
 
@@ -209,6 +215,13 @@ footer {
       <div class="spacer"></div>
       <span class="sync-status" id="grid-save-status"></span>
     </div>
+    <div class="toolbar">
+      <label>Taught coverage</label>
+      <span id="taught-summary" style="font-size:12px;color:#666;"></span>
+      <button class="btn secondary" id="mark-taught-btn">Mark shown columns as taught</button>
+      <button class="btn secondary" id="mark-untaught-btn">Mark shown columns as not taught</button>
+      <span style="font-size:11px;color:#888;">Only skills marked as taught count toward a pupil's security score — untaught columns are greyed out below.</span>
+    </div>
     <div class="criterion-info hidden" id="criterion-info">
       <button class="ci-close" id="criterion-info-close" title="Close">✕</button>
       <div id="criterion-info-body"></div>
@@ -267,12 +280,13 @@ footer {
 
 <footer>
   <div class="legend">
-    <span><span class="legend-sw" style="background:var(--r-bg)"></span>1 — little/no security</span>
-    <span><span class="legend-sw" style="background:var(--a-bg)"></span>2 — some security</span>
-    <span><span class="legend-sw" style="background:var(--g-bg)"></span>3 — secure</span>
+    <span><span class="legend-sw" style="background:var(--r-bg)"></span>1 — little/no security (0% credit)</span>
+    <span><span class="legend-sw" style="background:var(--a-bg)"></span>2 — some security (50% credit)</span>
+    <span><span class="legend-sw" style="background:var(--g-bg)"></span>3 — secure (100% credit)</span>
+    <span style="margin-left:6px;">Score = weighted average across taught skills only</span>
     <button class="btn secondary" id="sync-roster-btn" style="margin-left:14px;">Sync roster</button>
   </div>
-  <span class="version">WFA-16.09.26b</span>
+  <span class="version">WFA-16.09.26c</span>
 </footer>
 
 <div id="toast"></div>
@@ -285,7 +299,7 @@ const STRAND_ORDER = ['Number and Place Value','Number Facts','Addition and Subt
 const state = {
   classes: [], criteria: [], config: {},
   currentClassId: null, currentView: 'grid',
-  pupils: [], assessments: {},
+  pupils: [], assessments: {}, taughtCodes: new Set(),
   yearFilter: new Set(), strandFilter: '',
   profilePupilId: null,
   cohortScope: 'class', cohortSort: 'weakest',
@@ -406,6 +420,7 @@ async function loadAssessments() {
   const data = await apiGet('getAssessments', { class_id: state.currentClassId });
   state.pupils = data.pupils;
   state.assessments = data.assessments;
+  state.taughtCodes = new Set(data.taught || []);
   setSaveStatus('');
 }
 
@@ -480,18 +495,27 @@ document.getElementById('strand-filter').addEventListener('change', e => {
   renderGrid();
 });
 
+// Mirrors the backend's weightedScore_: scoped to TAUGHT criteria only (not
+// merely rated — see state.taughtCodes), with partial credit per rating
+// (1->0%, 2->50%, 3->100%) rather than an all-or-nothing "secure" cliff edge.
+function scoreForCriteria(criteria, ratings) {
+  const taught = criteria.filter(c => state.taughtCodes.has(c.code));
+  if (!taught.length) return { pct: null, taughtCount: 0, ratedCount: 0, totalCount: criteria.length };
+  let taughtWeight = 0, creditWeight = 0, ratedCount = 0;
+  taught.forEach(c => {
+    taughtWeight += c.weight;
+    const r = ratings[c.code];
+    if (r !== undefined) { ratedCount++; creditWeight += c.weight * ((Number(r) - 1) / 2); }
+  });
+  return {
+    pct: Math.round((creditWeight / taughtWeight) * 1000) / 10,
+    taughtCount: taught.length, ratedCount, totalCount: criteria.length
+  };
+}
+
 function weightedPupilScore(pupilId) {
   const ratings = state.assessments[pupilId] || {};
-  const crit = state.criteria;
-  let aw = 0, sw = 0, n = 0;
-  crit.forEach(c => {
-    const r = ratings[c.code];
-    if (r === undefined) return;
-    n++; aw += c.weight;
-    if (Number(r) === 3) sw += c.weight;
-  });
-  if (!n) return null;
-  return Math.round((sw / aw) * 1000) / 10;
+  return scoreForCriteria(state.criteria, ratings).pct;
 }
 
 function renderGrid() {
@@ -514,7 +538,10 @@ function renderGrid() {
   let html = '<thead><tr class="strand-row"><th class="pupil-col"></th>' +
     groups.map(g => `<th colspan="${g.count}">${g.strand}</th>`).join('') +
     '<th>Score</th></tr><tr><th class="pupil-col">Pupil</th>' +
-    cols.map(c => `<th class="crit-head" data-code="${c.code}" title="Click for the full skill"><span class="crit-code">${c.code.replace('–','-')}</span><span class="crit-year">${c.year_group}${c.weight > 1 ? ' <span class=\"crit-weight\">'+'★'.repeat(c.weight-1)+'</span>' : ''}</span></th>`).join('') +
+    cols.map(c => {
+      const taught = state.taughtCodes.has(c.code);
+      return `<th class="crit-head${taught ? '' : ' not-taught'}" data-code="${c.code}" title="Click for the full skill"><span class="crit-code">${c.code.replace('–','-')}</span><span class="crit-year">${c.year_group}${c.weight > 1 ? ' <span class=\"crit-weight\">'+'★'.repeat(c.weight-1)+'</span>' : ''}${taught ? ' <span class=\"taught-mark\">✓</span>' : ''}</span></th>`;
+    }).join('') +
     '<th>Score</th></tr></thead><tbody>';
 
   state.pupils.forEach(p => {
@@ -525,7 +552,8 @@ function renderGrid() {
       const key = `${p.pupil_id}|${c.code}`;
       const r = state.dirty[key] !== undefined ? state.dirty[key] : (ratings[c.code] || '');
       const cls = r ? 'rating-' + r : 'rating-blank';
-      html += `<td class="rating-cell ${cls}" data-pupil="${p.pupil_id}" data-code="${c.code}">${r || ''}</td>`;
+      const taughtCls = state.taughtCodes.has(c.code) ? '' : ' not-taught-col';
+      html += `<td class="rating-cell ${cls}${taughtCls}" data-pupil="${p.pupil_id}" data-code="${c.code}">${r || ''}</td>`;
     });
     html += `<td class="score-col">${score === null ? '—' : score + '%'}</td></tr>`;
   });
@@ -535,6 +563,7 @@ function renderGrid() {
   table.querySelectorAll('.rating-cell').forEach(td => {
     td.addEventListener('click', () => cycleRating(td));
   });
+  updateTaughtSummary();
   table.querySelectorAll('.crit-head').forEach(th => {
     th.addEventListener('click', () => showCriterionInfo(th.dataset.code, th));
   });
@@ -545,16 +574,56 @@ function showCriterionInfo(code, headEl) {
   if (!c) return;
   document.querySelectorAll('.crit-head.selected').forEach(el => el.classList.remove('selected'));
   if (headEl) headEl.classList.add('selected');
+  const taught = state.taughtCodes.has(code);
   const body = document.getElementById('criterion-info-body');
   body.innerHTML = `<strong>${c.code.replace('–','-')}</strong> — ${escapeHtml(c.description)}` +
-    `<span class="ci-meta">${c.strand} · ${c.year_group}${c.weight > 1 ? ' · weight x' + c.weight : ''}</span>`;
+    `<span class="ci-meta">${c.strand} · ${c.year_group}${c.weight > 1 ? ' · weight x' + c.weight : ''}</span>` +
+    `<div style="margin-top:8px;"><button class="btn ${taught ? 'secondary' : ''}" id="ci-taught-toggle">${taught ? '✓ Taught to this class — click to unmark' : 'Not yet taught — mark as taught'}</button></div>`;
   document.getElementById('criterion-info').classList.remove('hidden');
+  document.getElementById('ci-taught-toggle').addEventListener('click', () => toggleTaught(code));
 }
 
 document.getElementById('criterion-info-close').addEventListener('click', () => {
   document.getElementById('criterion-info').classList.add('hidden');
   document.querySelectorAll('.crit-head.selected').forEach(el => el.classList.remove('selected'));
 });
+
+async function toggleTaught(code) {
+  const nowTaught = !state.taughtCodes.has(code);
+  if (nowTaught) state.taughtCodes.add(code); else state.taughtCodes.delete(code);
+  renderGrid();
+  const th = document.querySelector(`.crit-head[data-code="${code}"]`);
+  showCriterionInfo(code, th);
+  try {
+    await apiPost({ action: 'setTaught', class_id: state.currentClassId, code, taught: nowTaught, marked_by: document.getElementById('assessed-by').value.trim() });
+  } catch (err) {
+    toast('Failed to save taught status: ' + err.message);
+  }
+}
+
+function updateTaughtSummary() {
+  const cols = visibleCriteria();
+  const taughtCount = cols.filter(c => state.taughtCodes.has(c.code)).length;
+  document.getElementById('taught-summary').textContent = `${taughtCount} of ${cols.length} shown marked as taught`;
+}
+
+document.getElementById('mark-taught-btn').addEventListener('click', () => bulkSetTaught(true));
+document.getElementById('mark-untaught-btn').addEventListener('click', () => bulkSetTaught(false));
+
+async function bulkSetTaught(taught) {
+  const cols = visibleCriteria();
+  if (!cols.length) return;
+  if (!confirm(`${taught ? 'Mark' : 'Unmark'} all ${cols.length} currently shown skills as taught for this class?`)) return;
+  const codes = cols.map(c => c.code);
+  codes.forEach(code => { if (taught) state.taughtCodes.add(code); else state.taughtCodes.delete(code); });
+  renderGrid();
+  try {
+    await apiPost({ action: 'setTaughtBulk', class_id: state.currentClassId, codes, taught, marked_by: document.getElementById('assessed-by').value.trim() });
+    toast(`${codes.length} skills marked ${taught ? 'taught' : 'not taught'}.`);
+  } catch (err) {
+    toast('Failed to save: ' + err.message);
+  }
+}
 
 function cycleRating(td) {
   const pupilId = td.dataset.pupil, code = td.dataset.code;
@@ -645,27 +714,27 @@ function renderProfileMain() {
   const main = document.getElementById('profile-main');
   if (!pupil) { main.innerHTML = '<p style="color:#888;padding:20px;">Select a pupil to see their full RTP profile.</p>'; return; }
   const ratings = state.assessments[pupil.pupil_id] || {};
-  const overall = weightedPupilScore(pupil.pupil_id);
+  const overall = scoreForCriteria(state.criteria, ratings);
 
   let html = `<div class="summary-cards">
-    <div class="summary-card"><div class="num">${overall === null ? '—' : overall + '%'}</div><div class="lbl">Weighted security score</div></div>
-    <div class="summary-card"><div class="num">${Object.keys(ratings).length}</div><div class="lbl">of ${state.criteria.length} criteria assessed</div></div>
+    <div class="summary-card"><div class="num">${overall.pct === null ? '—' : overall.pct + '%'}</div><div class="lbl">Weighted security score</div></div>
+    <div class="summary-card"><div class="num">${overall.taughtCount}</div><div class="lbl">of ${overall.totalCount} criteria taught so far</div></div>
+    <div class="summary-card"><div class="num">${overall.ratedCount}</div><div class="lbl">of ${overall.taughtCount} taught criteria individually rated</div></div>
   </div>`;
 
   STRAND_ORDER.forEach(strand => {
     const crit = sortedCriteria().filter(c => c.strand === strand);
-    const assessedInStrand = crit.filter(c => ratings[c.code] !== undefined);
-    let sw = 0, aw = 0;
-    assessedInStrand.forEach(c => { aw += c.weight; if (Number(ratings[c.code]) === 3) sw += c.weight; });
-    const strandPct = aw ? Math.round((sw/aw)*1000)/10 : null;
-    html += `<details class="strand-card" open><summary>${strand} <span class="score-pill">${strandPct === null ? 'not yet assessed' : strandPct + '% secure'}</span></summary>`;
+    const strandScore = scoreForCriteria(crit, ratings);
+    const pillLabel = strandScore.pct === null ? 'not yet taught' : strandScore.pct + '% secure';
+    html += `<details class="strand-card" open><summary>${strand} <span class="score-pill">${pillLabel}</span></summary>`;
     crit.forEach(c => {
+      const taught = state.taughtCodes.has(c.code);
       const r = ratings[c.code];
       const dotCls = r ? 'rating-' + r : 'rating-blank';
-      html += `<div class="strand-crit-row">
-        <span class="rating-dot ${dotCls}">${r || '–'}</span>
+      html += `<div class="strand-crit-row${taught ? '' : ' not-taught-row'}">
+        <span class="rating-dot ${dotCls}">${taught ? (r || '–') : '·'}</span>
         <span class="code">${c.code.replace('–','-')} <small style="color:#888;">${c.year_group}${c.weight>1?' ★'.repeat(c.weight-1)+'':''}</small></span>
-        <span class="desc">${escapeHtml(c.description)}</span>
+        <span class="desc">${escapeHtml(c.description)}${taught ? '' : ' <em style=\"color:#94a3b8;\">(not yet taught)</em>'}</span>
       </div>`;
     });
     html += '</details>';
@@ -724,6 +793,7 @@ function renderCohort(data) {
       <span class="code">${c.code.replace('–','-')}${c.weight>1?' <span class="weight-star">'+'★'.repeat(c.weight-1)+'</span>':''}</span>
       <span class="bar-track"><span class="bar-fill" style="width:${c.pctSecure || 0}%;"></span></span>
       <span class="bar-pct">${c.pctSecure === null ? '—' : c.pctSecure + '%'}</span>
+      <span class="bar-taught" title="taught to this many pupils in scope">${c.taughtCount}/${c.pupilCount} taught</span>
     </div>`).join('');
 
   const pupils = [...data.pupilScores].sort((a, b) => {
@@ -733,7 +803,7 @@ function renderCohort(data) {
   document.getElementById('cohort-pupils-body').innerHTML = pupils.map(p => `
     <div class="pupil-row">
       <span class="name">${escapeHtml(p.name)}</span>
-      <span class="score-pill">${p.score.pct === null ? 'not assessed' : p.score.pct + '% (' + p.score.assessedCount + '/' + p.score.totalCount + ')'}</span>
+      <span class="score-pill">${p.score.pct === null ? 'nothing taught yet' : p.score.pct + '% (' + p.score.ratedCount + '/' + p.score.taughtCount + ' taught rated)'}</span>
     </div>`).join('');
 }
 
