@@ -77,6 +77,18 @@ main { flex: 1; overflow: auto; padding: 14px; }
 .spacer { flex: 1; }
 
 /* ── Grid view ──────────────────────────────────────────────── */
+.grid-hint { font-size: 11px; color: #888; margin-bottom: 6px; }
+.criterion-info {
+  background: #eef7fc; border: 1px solid var(--blue); border-radius: var(--radius);
+  padding: 10px 40px 10px 14px; margin-bottom: 10px; font-size: 13px; position: relative; line-height: 1.5;
+}
+.criterion-info strong { color: var(--blue-dark); }
+.criterion-info .ci-meta { color: #666; font-size: 11px; margin-left: 6px; }
+.ci-close {
+  position: absolute; top: 6px; right: 8px; border: none; background: transparent;
+  color: #888; font-size: 13px; padding: 4px 6px; border-radius: 4px;
+}
+.ci-close:hover { background: rgba(0,0,0,.06); }
 .grid-wrap { overflow: auto; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); max-height: calc(100dvh - 210px); }
 table.rtp-grid { border-collapse: collapse; font-size: 12px; }
 table.rtp-grid th, table.rtp-grid td { border: 1px solid var(--border); text-align: center; }
@@ -87,7 +99,9 @@ table.rtp-grid th.pupil-col, table.rtp-grid td.pupil-col {
 table.rtp-grid thead th { position: sticky; top: 25px; background: #f1f5f9; z-index: 1; padding: 4px; }
 table.rtp-grid thead th.pupil-col { z-index: 3; }
 table.rtp-grid thead tr.strand-row th { background: var(--blue); color: #fff; font-size: 11px; height: 25px; padding: 5px; position: sticky; top: 0; z-index: 4; }
-.crit-head { width: 46px; min-width: 46px; padding: 4px 2px !important; cursor: help; }
+.crit-head { width: 46px; min-width: 46px; padding: 4px 2px !important; cursor: pointer; }
+.crit-head:hover { background: #dbeafe !important; }
+.crit-head.selected { background: #bfdbfe !important; }
 .crit-code { font-size: 10px; font-weight: 700; }
 .crit-year { font-size: 9px; color: #888; display: block; }
 .crit-weight { color: #d97706; font-size: 9px; }
@@ -195,6 +209,11 @@ footer {
       <div class="spacer"></div>
       <span class="sync-status" id="grid-save-status"></span>
     </div>
+    <div class="criterion-info hidden" id="criterion-info">
+      <button class="ci-close" id="criterion-info-close" title="Close">✕</button>
+      <div id="criterion-info-body"></div>
+    </div>
+    <p class="grid-hint">Click a column heading to see the full skill it assesses.</p>
     <div class="grid-wrap"><table class="rtp-grid" id="rtp-table"></table></div>
   </section>
 
@@ -253,7 +272,7 @@ footer {
     <span><span class="legend-sw" style="background:var(--g-bg)"></span>3 — secure</span>
     <button class="btn secondary" id="sync-roster-btn" style="margin-left:14px;">Sync roster</button>
   </div>
-  <span class="version">WFA-16.09.26a</span>
+  <span class="version">WFA-16.09.26b</span>
 </footer>
 
 <div id="toast"></div>
@@ -495,7 +514,7 @@ function renderGrid() {
   let html = '<thead><tr class="strand-row"><th class="pupil-col"></th>' +
     groups.map(g => `<th colspan="${g.count}">${g.strand}</th>`).join('') +
     '<th>Score</th></tr><tr><th class="pupil-col">Pupil</th>' +
-    cols.map(c => `<th class="crit-head" title="${c.code} — ${escapeHtml(c.description)}"><span class="crit-code">${c.code.replace('–','-')}</span><span class="crit-year">${c.year_group}${c.weight > 1 ? ' <span class=\"crit-weight\">'+'★'.repeat(c.weight-1)+'</span>' : ''}</span></th>`).join('') +
+    cols.map(c => `<th class="crit-head" data-code="${c.code}" title="Click for the full skill"><span class="crit-code">${c.code.replace('–','-')}</span><span class="crit-year">${c.year_group}${c.weight > 1 ? ' <span class=\"crit-weight\">'+'★'.repeat(c.weight-1)+'</span>' : ''}</span></th>`).join('') +
     '<th>Score</th></tr></thead><tbody>';
 
   state.pupils.forEach(p => {
@@ -516,7 +535,26 @@ function renderGrid() {
   table.querySelectorAll('.rating-cell').forEach(td => {
     td.addEventListener('click', () => cycleRating(td));
   });
+  table.querySelectorAll('.crit-head').forEach(th => {
+    th.addEventListener('click', () => showCriterionInfo(th.dataset.code, th));
+  });
 }
+
+function showCriterionInfo(code, headEl) {
+  const c = state.criteria.find(x => x.code === code);
+  if (!c) return;
+  document.querySelectorAll('.crit-head.selected').forEach(el => el.classList.remove('selected'));
+  if (headEl) headEl.classList.add('selected');
+  const body = document.getElementById('criterion-info-body');
+  body.innerHTML = `<strong>${c.code.replace('–','-')}</strong> — ${escapeHtml(c.description)}` +
+    `<span class="ci-meta">${c.strand} · ${c.year_group}${c.weight > 1 ? ' · weight x' + c.weight : ''}</span>`;
+  document.getElementById('criterion-info').classList.remove('hidden');
+}
+
+document.getElementById('criterion-info-close').addEventListener('click', () => {
+  document.getElementById('criterion-info').classList.add('hidden');
+  document.querySelectorAll('.crit-head.selected').forEach(el => el.classList.remove('selected'));
+});
 
 function cycleRating(td) {
   const pupilId = td.dataset.pupil, code = td.dataset.code;
