@@ -20,6 +20,53 @@ function props() {
   return PropertiesService.getScriptProperties();
 }
 
+// ── State storage for the plain key/value store (wfa_slt / wfa_lc / wfa_ll)
+// ──────────────────────────────────────────────────────────────────────────
+// Moved off PropertiesService onto a dedicated Google Sheet 16.09.26, for
+// real Google-maintained version history — same reasoning and same sheet as
+// cover-plan-state/teaching-schedule-backend/resource-booking-backend's
+// migrations (see cover-plan-state's Code.js for the full story). One row
+// per key, column A = key, column B = JSON value. Unlike those three
+// backends, this script already has full Sheets access (it already reads
+// HUB_SHEET_ID/MASTER_SHEET_ID above), so this needed no fresh owner
+// authorization. Does NOT touch getPupils/getClasses/checkPin/getSheetTab(s)/
+// importPupils/markLeavers/updateClasses, which read/write the actual hub
+// spreadsheet directly and already have their own Sheets version history.
+const STATE_SHEET_ID = '1DBO1GERb_BRq-cnn1rousFtkVn9ajFnurzqitgknelc';
+const STATE_TAB_NAME = 'SharedSyncState';
+
+function getStateSheet_() {
+  const ss = SpreadsheetApp.openById(STATE_SHEET_ID);
+  let sh = ss.getSheetByName(STATE_TAB_NAME);
+  if (!sh) sh = ss.insertSheet(STATE_TAB_NAME);
+  return sh;
+}
+
+function findRow_(sh, key) {
+  const lastRow = sh.getLastRow();
+  if (lastRow < 1) return -1;
+  const keys = sh.getRange(1, 1, lastRow, 1).getValues();
+  for (let i = 0; i < keys.length; i++) {
+    if (keys[i][0] === key) return i + 1;
+  }
+  return -1;
+}
+
+function readByKey_(key) {
+  const sh = getStateSheet_();
+  const row = findRow_(sh, key);
+  if (row === -1) return null;
+  const val = sh.getRange(row, 2).getValue();
+  return val ? String(val) : null;
+}
+
+function writeByKey_(key, text) {
+  const sh = getStateSheet_();
+  const row = findRow_(sh, key);
+  if (row === -1) sh.appendRow([key, text]);
+  else sh.getRange(row, 2).setValue(text);
+}
+
 // Token gate. Token arrives in the query string (not a header) because client
 // fetches deliberately omit Content-Type to avoid the Apps Script CORS
 // preflight, and bulk-sync client POSTs opaque {key:value} maps. Still a
@@ -46,7 +93,7 @@ function doGet(e) {
     if (p.action === 'listBackups') return json({ backups: listSyncBackups_() });
     const key = p.key;
     if (!key) return json({ error: 'missing key' });
-    const data = props().getProperty(key);
+    const data = readByKey_(key);
     return ContentService.createTextOutput(data || '{}')
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
@@ -64,8 +111,8 @@ function doPost(e) {
     if (p.action === 'restoreBackup') return restoreSyncBackup_(p);
     const key = p.key;
     if (!key) return json({ error: 'missing key' });
-    backupSyncKey_(key);
-    props().setProperty(key, e.postData.contents);
+    backupSyncKey_(key, readByKey_(key));
+    writeByKey_(key, e.postData.contents);
     return json({ status: 'ok' });
   } catch (err) {
     return json({ status: 'error', message: err.message });
@@ -85,10 +132,9 @@ const SYNC_BACKUP_PREFIX = 'bak_sync_';
 const SYNC_BACKUP_COUNT = 30;
 const SYNC_BACKUP_CURSOR_KEY = 'bak_sync_cursor';
 
-function backupSyncKey_(key) {
-  const p = props();
-  const current = p.getProperty(key);
+function backupSyncKey_(key, current) {
   if (!current) return; // nothing to lose yet for this key
+  const p = props();
   const cursor = parseInt(p.getProperty(SYNC_BACKUP_CURSOR_KEY) || '0', 10);
   p.setProperty(SYNC_BACKUP_PREFIX + cursor, JSON.stringify({ ts: new Date().toISOString(), key: key, data: current }));
   p.setProperty(SYNC_BACKUP_CURSOR_KEY, String((cursor + 1) % SYNC_BACKUP_COUNT));
@@ -115,8 +161,8 @@ function restoreSyncBackup_(p) {
   const raw = props_.getProperty(SYNC_BACKUP_PREFIX + idx);
   if (!raw) return json({ status: 'error', message: 'no backup at index ' + idx });
   const backup = JSON.parse(raw);
-  backupSyncKey_(backup.key); // keep the pre-restore state recoverable too
-  props_.setProperty(backup.key, backup.data);
+  backupSyncKey_(backup.key, readByKey_(backup.key)); // keep the pre-restore state recoverable too
+  writeByKey_(backup.key, backup.data);
   return json({ status: 'ok', restoredKey: backup.key, restoredFrom: backup.ts });
 }
 
