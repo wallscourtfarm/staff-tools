@@ -475,6 +475,22 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
 .loading-state { padding: 40px; text-align: center; color: #94a3b8; }
 .empty-state { padding: 40px; text-align: center; color: #94a3b8; font-size: 14px; }
 
+/* ── Weights view ────────────────────────────────────────────── */
+.weight-score-banner { background: #fff; border-radius: 12px; padding: 14px 18px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.08); display: flex; align-items: center; gap: 16px; }
+.weight-score-banner .num { font-size: 26px; font-weight: 800; color: var(--blue); }
+.weight-score-banner .lbl { font-size: 12px; color: #666; }
+.weight-category { background: #fff; border-radius: 12px; margin-bottom: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.weight-category > .hd { padding: 10px 14px; font-weight: 700; background: #f8fafc; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: var(--dark); }
+.weight-row { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-top: 1px solid #f1f5f9; }
+.weight-row .tier-tag { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 999px; flex-shrink: 0; text-transform: uppercase; }
+.weight-row .tier-non_neg { background: var(--c-3); color: var(--ct-3); }
+.weight-row .tier-expected { background: var(--c-0); color: var(--ct-0); }
+.weight-row .tier-greater_depth { background: var(--c-4); color: var(--ct-4); }
+.weight-row .desc { flex: 1; font-size: 12px; color: #444; }
+.weight-btns { display: flex; gap: 4px; flex-shrink: 0; }
+.wbtn { width: 32px; height: 28px; border: 2px solid #e2e8f0; background: #fff; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.wbtn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
 /* ── Version ─────────────────────────────────────────────────── */
 .version { font-size: 10px; color: rgba(255,255,255,.5); white-space: nowrap; }
 
@@ -531,9 +547,10 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
       <div class="header-nav">
         <button class="header-nav-link active" id="nav-grid" onclick="showTab('grid')">Grid</button>
         <button class="header-nav-link" id="nav-interventions" onclick="showTab('interventions')">Interventions</button>
+        <button class="header-nav-link" id="nav-weights" onclick="showTab('weights')">⭐ Weights</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">WFA-15.09.26b</span>
+      <span class="version">WFA-16.09.26a</span>
     </div>
   </header>
 
@@ -634,6 +651,13 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
   <!-- INTERVENTIONS TAB -->
   <div id="tab-interventions" class="tab-content">
     <div class="interventions-wrapper" id="int-wrapper">
+      <div class="empty-state">Select a class on the Grid tab first.</div>
+    </div>
+  </div>
+
+  <!-- WEIGHTS TAB -->
+  <div id="tab-weights" class="tab-content">
+    <div class="weights-wrapper" id="weights-wrapper">
       <div class="empty-state">Select a class on the Grid tab first.</div>
     </div>
   </div>
@@ -1946,8 +1970,104 @@ function renderInterventions() {
 }
 
 // ================================================================
-// PUPIL PROFILE
+// WEIGHTS
 // ================================================================
+// Same weighted-security formula as backend/Code.js's weightedScore_ —
+// duplicated client-side for instant reactive display, same convention as
+// RTP tracker's weightedPupilScore. Server-side stays the source of truth
+// for any external caller (e.g. the DOOYA tracker pulling this figure).
+function weightedScore(scoreMap, weights) {
+  let assessedWeight = 0, secureWeight = 0, assessedCount = 0;
+  Object.keys(scoreMap || {}).forEach(skillId => {
+    const score = String(scoreMap[skillId]);
+    if (['0', '1', '2', '3', '4'].indexOf(score) === -1) return;
+    const w = weights[skillId] || 1;
+    assessedWeight += w;
+    assessedCount++;
+    if (score === '4') secureWeight += w;
+  });
+  if (assessedCount === 0) return { pct: null, assessedCount: 0 };
+  return { pct: Math.round((secureWeight / assessedWeight) * 1000) / 10, assessedCount };
+}
+
+async function renderWeights() {
+  const wrap = document.getElementById('weights-wrapper');
+  if (!state.currentClass || state.pupils.length === 0) {
+    wrap.innerHTML = '<div class="empty-state">Select a class on the Grid tab first.</div>';
+    return;
+  }
+  const yg = state.currentClass.year_group;
+  if (!state.weights) {
+    wrap.innerHTML = '<div class="empty-state">Loading weights…</div>';
+    try {
+      state.weights = await apiGet('getWeights');
+    } catch (err) {
+      wrap.innerHTML = `<div class="empty-state">Failed to load weights: ${err.message}</div>`;
+      return;
+    }
+  }
+
+  const skills = SKILLS[yg] || [];
+  const categories = [...new Set(skills.map(s => s.category))];
+
+  // Cohort weighted security score across every pupil currently loaded for
+  // this class/year group, from whatever assessment data is already in state.
+  const pupilScores = Object.values(state.assessments)
+    .map(scoreMap => weightedScore(scoreMap, state.weights))
+    .filter(s => s.pct !== null);
+  const cohortAvg = pupilScores.length
+    ? Math.round((pupilScores.reduce((sum, s) => sum + s.pct, 0) / pupilScores.length) * 10) / 10
+    : null;
+
+  const banner = `<div class="weight-score-banner">
+    <div><div class="num">${cohortAvg === null ? '—' : cohortAvg + '%'}</div><div class="lbl">${yg} weighted security (this class/cohort)</div></div>
+    <div style="flex:1;font-size:12px;color:#666">Mark specific skills as higher priority — a x2 or x3 weight makes that skill count more in the weighted security score. Default is x1 for every skill.</div>
+  </div>`;
+
+  const body = categories.map(cat => {
+    const catSkills = skills.filter(s => s.category === cat);
+    return `<div class="weight-category">
+      <div class="hd">${cat}</div>
+      ${catSkills.map(s => {
+        const w = state.weights[s.id] || 1;
+        return `<div class="weight-row" data-skill="${s.id}">
+          <span class="tier-tag tier-${s.tier}">${s.tier.replace('_', ' ')}</span>
+          <span class="desc">${s.group ? s.group + ' — ' + s.skill : s.skill}</span>
+          <div class="weight-btns">
+            ${[1, 2, 3].map(n => `<button class="wbtn ${w === n ? 'active' : ''}" data-w="${n}">x${n}</button>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+
+  wrap.innerHTML = banner + body;
+
+  wrap.querySelectorAll('.weight-row').forEach(row => {
+    const skillId = row.dataset.skill;
+    row.querySelectorAll('.wbtn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const w = Number(btn.dataset.w);
+        const prevW = state.weights[skillId] || 1;
+        row.querySelectorAll('.wbtn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.weights[skillId] = w;
+        showSaving(true);
+        try {
+          await apiPost({ action: 'setWeight', skill_id: skillId, weight: w });
+          hideSaveError();
+        } catch (err) {
+          state.weights[skillId] = prevW;
+          row.querySelectorAll('.wbtn').forEach(b => b.classList.toggle('active', Number(b.dataset.w) === prevW));
+          showSaveError(`Weight save failed (${err.message}) — change was not kept.`, () => btn.click());
+        } finally {
+          showSaving(false);
+        }
+      });
+    });
+  });
+}
+
 // ================================================================
 // ADMIN
 // ================================================================
@@ -2341,6 +2461,7 @@ function showTab(name) {
   if (navBtn) navBtn.classList.add('active');
 
   if (name === 'interventions') renderInterventions();
+  if (name === 'weights') renderWeights();
   if (name === 'admin') { renderAdminPupils(); }
 }
 
