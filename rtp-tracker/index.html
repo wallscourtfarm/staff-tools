@@ -286,7 +286,7 @@ footer {
     <span style="margin-left:6px;">Score = weighted average across taught skills only</span>
     <button class="btn secondary" id="sync-roster-btn" style="margin-left:14px;">Sync roster</button>
   </div>
-  <span class="version">WFA-16.09.26c</span>
+  <span class="version">WFA-16.09.26d</span>
 </footer>
 
 <div id="toast"></div>
@@ -465,10 +465,20 @@ function visibleCriteria() {
   });
 }
 
+// A class can never see criteria ABOVE its own year group — RTP is
+// cumulative, and a Y1 class hasn't been taught Y2+ content, so those
+// skills aren't a meaningful filter option here (below-year catch-up
+// content stays selectable, since that's exactly where gaps get found).
+function maxSelectableYear() {
+  const cls = currentClass();
+  return (cls && yearNum(cls.year_group)) || 6;
+}
+
 function buildYearChips() {
   const wrap = document.getElementById('year-chips');
   wrap.innerHTML = '';
-  for (let y = 1; y <= 6; y++) {
+  const maxYear = maxSelectableYear();
+  for (let y = 1; y <= maxYear; y++) {
     const b = document.createElement('button');
     b.className = 'chip' + (state.yearFilter.has(y) ? ' active' : '');
     b.textContent = 'Y' + y;
@@ -481,9 +491,9 @@ function buildYearChips() {
   }
   const allBtn = document.createElement('button');
   allBtn.className = 'chip';
-  allBtn.textContent = 'All';
+  allBtn.textContent = maxYear < 6 ? `All (up to Y${maxYear})` : 'All';
   allBtn.addEventListener('click', () => {
-    state.yearFilter = new Set([1,2,3,4,5,6]);
+    state.yearFilter = new Set(Array.from({ length: maxYear }, (_, i) => i + 1));
     buildYearChips();
     renderGrid();
   });
