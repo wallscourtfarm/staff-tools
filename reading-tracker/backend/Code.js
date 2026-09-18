@@ -109,7 +109,17 @@ const RT_YEAR_GROUPS = ['Y3', 'Y4', 'Y5', 'Y6'];
 const TERMS = ['Term 1', 'Term 2', 'Term 3', 'Term 4', 'Term 5', 'Term 6'];
 const TW = { 'Term 1': 8, 'Term 2': 8, 'Term 3': 8, 'Term 4': 8, 'Term 5': 6, 'Term 6': 7 };
 
+// Added 18.09.26 — a plain UrlFetchApp round-trip to shared-sync on every
+// single call from getDashboardStats_/getClassGroupStats_/getPupilTermTotals_,
+// even though the roster only changes via a termly admin import. Short cache
+// avoids paying the network round-trip 3x whenever the stats modal opens
+// (dashboard + class breakdown + term totals typically fire together).
+const ROSTER_FLAGS_CACHE_TTL_SECONDS = 30;
 function fetchRosterFlags_() {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'rt_rosterFlags_v1';
+  const cached = cache.get(cacheKey);
+  if (cached !== null) return JSON.parse(cached);
   const res = UrlFetchApp.fetch(HUB_ROSTER_URL + '?action=getPupils&token=' + HUB_TOKEN, { muteHttpExceptions: true });
   const d = JSON.parse(res.getContentText());
   const byYr = {};
@@ -122,33 +132,37 @@ function fetchRosterFlags_() {
     byYr[yg][cls] = byYr[yg][cls] || {};
     byYr[yg][cls][key] = { eal: !!p.eal, pp: !!p.pp, sen: p.sen || null };
   });
+  try { cache.put(cacheKey, JSON.stringify(byYr), ROSTER_FLAGS_CACHE_TTL_SECONDS); } catch (err) { /* too large — skip */ }
   return byYr;
 }
 
 // { yr: { cls: { term: { pupilKey: { week: value } } } } } — parsed straight
 // from this tool's own rt2:yr:cls:term:pupil:week rows.
+//
+// Added 18.09.26 — this used to run its own getDataRange().getValues() scan
+// of the ~3,750-row TrackerData sheet, on top of the *same sheet* already
+// being read and chunk-cached by getCachedFullDump_() for the plain doGet
+// path. Building the tree from that existing cached dump instead means the
+// three stats endpoints (getDashboardStats/getClassGroupStats/
+// getPupilTermTotals) never scan the sheet themselves at all.
 function readScoreTree_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
+  const flat = JSON.parse(getCachedFullDump_());
   const tree = {};
-  if (!sheet) return tree;
-  const data = sheet.getDataRange().getValues();
-  for (let i = 0; i < data.length; i++) {
-    const key = String(data[i][0] || '');
-    if (key.indexOf('rt2:') !== 0) continue;
+  Object.keys(flat).forEach(function (key) {
+    if (key.indexOf('rt2:') !== 0) return;
     const parts = key.split(':');
-    if (parts.length < 6) continue;
+    if (parts.length < 6) return;
     const yr = parts[1], cls = parts[2], term = parts[3], pupil = parts[4], week = parts[5];
-    const raw = data[i][1];
-    if (raw === '' || raw === null || raw === undefined) continue;
+    const raw = flat[key];
+    if (raw === '' || raw === null || raw === undefined) return;
     const val = Number(raw);
-    if (isNaN(val)) continue;
+    if (isNaN(val)) return;
     tree[yr] = tree[yr] || {};
     tree[yr][cls] = tree[yr][cls] || {};
     tree[yr][cls][term] = tree[yr][cls][term] || {};
     tree[yr][cls][term][pupil] = tree[yr][cls][term][pupil] || {};
     tree[yr][cls][term][pupil][week] = val;
-  }
+  });
   return tree;
 }
 

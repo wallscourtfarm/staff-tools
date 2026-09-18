@@ -123,10 +123,25 @@ function denied_() {
   return json_({ error: 'unauthorised' });
 }
 
+// Added 18.09.26 — initSheets_() ran its full 6-sheet header/format check on
+// EVERY request, including a plain `ping`, with no gating at all — pure
+// self-inflicted overhead, not concurrency-driven, since it's a schema check
+// that only actually needs to run again after this file is redeployed. A
+// short cache flag skips it on every request but the first in the window.
+const INIT_CACHE_KEY = 'rtp_init_done_v1';
+const INIT_CACHE_TTL_SECONDS = 300;
+
+function ensureInitialized_() {
+  const cache = CacheService.getScriptCache();
+  if (cache.get(INIT_CACHE_KEY) !== null) return;
+  initSheets_();
+  try { cache.put(INIT_CACHE_KEY, '1', INIT_CACHE_TTL_SECONDS); } catch (err) { /* ignore */ }
+}
+
 function doGet(e) {
   try {
     if (!tokenOK(e)) return denied_();
-    initSheets_();
+    ensureInitialized_();
     return json_(handleGet_(e.parameter || {}));
   } catch (err) {
     return json_({ error: err.message });
@@ -136,7 +151,7 @@ function doGet(e) {
 function doPost(e) {
   try {
     if (!tokenOK(e)) return denied_();
-    initSheets_();
+    ensureInitialized_();
     const data = JSON.parse(e.postData.contents);
     const lock = LockService.getScriptLock();
     try {

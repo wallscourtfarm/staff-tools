@@ -251,7 +251,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · WFA-15.09.26a</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · WFA-18.09.26a</footer>
 
 <script>
 // ── Activity types ─────────────────────────────────────────────────────────────
@@ -536,7 +536,20 @@ function save() {
   localStorage.setItem('wfa_slt_slt',   JSON.stringify(SLT));
   localStorage.setItem('wfa_slt_term',  JSON.stringify(termTemplate));
   if (SYNC_URL && syncReady) {
-    fetch(SYNC_URL, { method:'POST', body: JSON.stringify({ state, termTemplate }) }).catch(()=>{});
+    // Found 18.09.26 (cover-plan-state incident): this was fire-and-forget
+    // with no response checking at all — a resolved fetch isn't the same as
+    // a successful save, since the backend can reject one with a normal 200
+    // and a {"status":"error",...} body (a write-verification failure). Now
+    // reflected in the existing sheetStatus badge instead of being silent.
+    const el = document.getElementById('sheetStatus');
+    fetch(SYNC_URL, { method:'POST', body: JSON.stringify({ state, termTemplate }) })
+      .then(async res => {
+        let json = null;
+        try { json = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
+        if (!res.ok || !json || json.status === 'error') throw new Error('rejected');
+        if (el) { el.textContent = 'Synced'; el.className = 'sheet-status ok'; }
+      })
+      .catch(() => { if (el) { el.textContent = 'Save failed — retry'; el.className = 'sheet-status err'; } });
   }
 }
 

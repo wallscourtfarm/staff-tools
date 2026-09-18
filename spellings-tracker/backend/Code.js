@@ -118,8 +118,22 @@ function doGet(e) {
 }
 
 // ── POST handler ─────────────────────────────────────────────────────────────
+// Added 18.09.26 — writeYearScoped_ is read-the-whole-tab, filter out this
+// year group's rows, clearContents(), write the merged result back. Every
+// year group shares the same tab, so two concurrent saves for DIFFERENT year
+// groups (e.g. a Y3 and a Y5 teacher saving around the same moment) could
+// each read the tab before either writes, and whichever writes last would
+// silently overwrite the other's year group with the stale copy it read —
+// not just a slowness bug, a real data-loss race. No lock existed at all
+// before this. Same LockService fix already applied to the other backends.
 function doPost(e) {
   if (!tokenOK(e)) return denied();
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+  } catch (lockErr) {
+    return json_({ error: 'locked, try again' });
+  }
   try {
     const data = JSON.parse(e.postData.contents);
     const action = data.action || 'saveAll';
@@ -132,6 +146,8 @@ function doPost(e) {
     return json_({ error: 'Unknown action' });
   } catch (err) {
     return json_({ error: err.message });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -268,13 +284,22 @@ function nameKey_(first, last) {
   return String(first || '').trim().toLowerCase() + ' ' + String(last || '').trim().toLowerCase();
 }
 
+// Added 18.09.26 — a live network round-trip to shared-sync on every
+// getGroupStats_ call, though the roster only changes via a termly admin
+// import. GET-only (never called from doPost), so no lock-nesting risk.
+const ROSTER_FLAGS_CACHE_TTL_SECONDS = 30;
 function fetchRosterFlags_() {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'st_rosterFlags_v1';
+  const cached = cache.get(cacheKey);
+  if (cached !== null) return JSON.parse(cached);
   const res = UrlFetchApp.fetch(HUB_ROSTER_URL + '?action=getPupils&token=' + HUB_TOKEN, { muteHttpExceptions: true });
   const d = JSON.parse(res.getContentText());
   const byName = {};
   (d.pupils || []).forEach(function (p) {
     byName[nameKey_(p.first, p.last)] = { eal: !!p.eal, pp: !!p.pp, sen: p.sen || null };
   });
+  try { cache.put(cacheKey, JSON.stringify(byName), ROSTER_FLAGS_CACHE_TTL_SECONDS); } catch (err) { /* too large — skip */ }
   return byName;
 }
 

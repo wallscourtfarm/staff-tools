@@ -48,10 +48,25 @@ function denied_() {
   return json_({ error: 'unauthorised' });
 }
 
+// Added 18.09.26 — initSheets_() ran its full header/format check on every
+// request including `ping`, with no gating at all. Same fix as
+// rtp-tracker/backend/Code.js: a short cache flag skips it on every request
+// but the first in the window, since schema only actually changes on
+// redeploy.
+const INIT_CACHE_KEY = 'wt_init_done_v1';
+const INIT_CACHE_TTL_SECONDS = 300;
+
+function ensureInitialized_() {
+  const cache = CacheService.getScriptCache();
+  if (cache.get(INIT_CACHE_KEY) !== null) return;
+  initSheets_();
+  try { cache.put(INIT_CACHE_KEY, '1', INIT_CACHE_TTL_SECONDS); } catch (err) { /* ignore */ }
+}
+
 function doGet(e) {
   try {
     if (!tokenOK(e)) return denied_();
-    initSheets_();
+    ensureInitialized_();
     return json_(handleGet_(e.parameter || {}));
   } catch (err) {
     return json_({ error: err.message });
@@ -61,7 +76,7 @@ function doGet(e) {
 function doPost(e) {
   try {
     if (!tokenOK(e)) return denied_();
-    initSheets_();
+    ensureInitialized_();
     const data = JSON.parse(e.postData.contents);
     // saveScore_/saveScores_/upsert_ read all rows, index by (pupil, skill,
     // year), then setValue or appendRow based on that index — with no lock,
@@ -76,7 +91,9 @@ function doPost(e) {
       return json_({ error: 'locked, try again' });
     }
     try {
-      return json_(handlePost_(data));
+      const result = handlePost_(data);
+      invalidateSheetDataCache_();
+      return json_(result);
     } finally {
       lock.releaseLock();
     }
@@ -175,7 +192,15 @@ function ensureColumns_(sheet, expectedHeaders) {
   }
 }
 
-function sheetData_(name) {
+// Added 18.09.26 — sheetData_ backs every GET action (getClasses/getPupils/
+// getGroupStats/getAssessments/getPupilHistory/getWeights/getWeightedScores/
+// getConfig) and read the sheet fresh every single call, same shape as the
+// cover-plan-state slowness bug. Only ever called from the GET path (never
+// from a doPost write function), so caching it can't nest inside doPost's
+// own script-lock hold. Cache invalidates on every successful doPost.
+const SHEETDATA_CACHE_TTL_SECONDS = 20;
+
+function sheetDataUncached_(name) {
   const sh = ss_().getSheetByName(name);
   if (!sh || sh.getLastRow() < 2) return [];
   const vals = sh.getDataRange().getValues();
@@ -185,6 +210,31 @@ function sheetData_(name) {
     headers.forEach((h, i) => { obj[h] = row[i]; });
     return obj;
   });
+}
+
+function sheetData_(name) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'wt_sheet_' + name;
+  const cached = cache.get(cacheKey);
+  if (cached !== null) return JSON.parse(cached);
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const recheck = cache.get(cacheKey);
+    if (recheck !== null) return JSON.parse(recheck);
+    const rows = sheetDataUncached_(name);
+    try { cache.put(cacheKey, JSON.stringify(rows), SHEETDATA_CACHE_TTL_SECONDS); }
+    catch (err) { /* too large for the cache — fall through uncached */ }
+    return rows;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function invalidateSheetDataCache_() {
+  const cache = CacheService.getScriptCache();
+  Object.keys(SHEET_HEADERS).forEach(function (name) { cache.remove('wt_sheet_' + name); });
 }
 
 function findRow_(name, matchFn) {
