@@ -33,7 +33,9 @@ function tokenOK(e) {
   return (((e || {}).parameter || {}).token || '') === want;
 }
 
-function doGet(e) {
+// alreadyLocked is true only when doPost calls this having already taken the
+// script lock — see dispatch()/getAllCached_() for why that matters.
+function doGet(e, alreadyLocked) {
   try {
     if (!tokenOK(e)) return outJson_({ error: 'unauthorised' });
     const params = e.parameter;
@@ -45,7 +47,7 @@ function doGet(e) {
       payload = Object.assign({}, params);
       if (!payload.action) payload.action = 'getAll';
     }
-    const result = dispatch(payload);
+    const result = dispatch(payload, !!alreadyLocked);
     return outJson_(result);
   } catch(err) {
     return outJson_({ error: err.message });
@@ -76,7 +78,12 @@ function doPost(e) {
   }
   try {
     const body = (e && e.postData && e.postData.contents) ? JSON.parse(e.postData.contents) : {};
-    return doGet({ parameter: Object.assign({}, (e && e.parameter) || {}, body) });
+    const result = doGet({ parameter: Object.assign({}, (e && e.parameter) || {}, body) }, true);
+    // Cheap and always-safe: clear the getAll cache after every POST so the
+    // next read (this device's own, or anyone else's) isn't served a stale
+    // pre-write snapshot. Harmless no-op when the action was itself a read.
+    invalidateGetAllCache_();
+    return result;
   } catch(err) {
     return outJson_({ error: err.message });
   } finally {
@@ -84,9 +91,15 @@ function doPost(e) {
   }
 }
 
-function dispatch(p) {
+// alreadyLocked (see doGet) is threaded through to getAllCached_ so it never
+// tries to take the script lock a second time from inside doPost's own hold
+// of it — LockService is not reentrant within one execution, so that would
+// deadlock for the full waitLock timeout (found and fixed live in
+// shared-sync/sync-script.gs the same day — see its readMasterPupilsUncached_
+// comment for the full story).
+function dispatch(p, alreadyLocked) {
   switch(p.action) {
-    case 'getAll':           return getAll();
+    case 'getAll':           return getAllCached_(alreadyLocked);
     case 'checkout':         return checkout(p);
     case 'returnBook':       return returnBook(p);
     case 'addBook':          return addBook(p);
@@ -167,6 +180,75 @@ function getCertsIssued() {
     out.push({ childId: String(row[iId]), ms: String(row[iMs] || ''), issuedOn: String(row[iOn] || '') });
   }
   return { ok: true, certIssues: out };
+}
+
+// ── Full-dump cache ──────────────────────────────────────────────────────
+// getAll() opened 5 sheets fresh (plus a live UrlFetchApp roster call) on
+// every plain doGet, same shape as the cover-plan-state slowness bug —
+// added 18.09.26. The response measures ~137KB as JSON, over CacheService's
+// 100KB per-key cap, so it's split across numbered chunks under one TTL —
+// same pattern already proven in reading-tracker/backend/Code.js.
+const GETALL_CACHE_TTL_SECONDS = 15;
+const GETALL_CHUNK_SIZE = 90000;
+const GETALL_META_KEY = 'bt_getall_meta';
+
+function readCachedGetAllChunks_(cache) {
+  const meta = cache.get(GETALL_META_KEY);
+  if (meta === null) return null;
+  const n = Number(meta);
+  const keys = [];
+  for (let i = 0; i < n; i++) keys.push('bt_getall_' + i);
+  const got = cache.getAll(keys);
+  let combined = '';
+  for (let i = 0; i < n; i++) {
+    const chunk = got['bt_getall_' + i];
+    if (chunk === undefined) return null; // partial expiry — treat as a miss
+    combined += chunk;
+  }
+  return combined;
+}
+
+function invalidateGetAllCache_() {
+  CacheService.getScriptCache().remove(GETALL_META_KEY);
+}
+
+// alreadyLocked: true when the caller (doPost) already holds the script
+// lock — skip taking a second one (see the dispatch() comment above).
+function getAllCached_(alreadyLocked) {
+  const cache = CacheService.getScriptCache();
+  const hit = readCachedGetAllChunks_(cache);
+  if (hit !== null) return JSON.parse(hit);
+
+  function computeAndCache() {
+    const recheck = readCachedGetAllChunks_(cache);
+    if (recheck !== null) return JSON.parse(recheck);
+    const result = getAll();
+    const json = JSON.stringify(result);
+    const cacheValues = {};
+    let n = 0;
+    for (let i = 0; i < json.length; i += GETALL_CHUNK_SIZE) {
+      cacheValues['bt_getall_' + n] = json.slice(i, i + GETALL_CHUNK_SIZE);
+      n++;
+    }
+    cacheValues[GETALL_META_KEY] = String(n);
+    cache.putAll(cacheValues, GETALL_CACHE_TTL_SECONDS);
+    return result;
+  }
+
+  if (alreadyLocked) return computeAndCache();
+
+  // A cold cache still means every concurrent request misses at the same
+  // instant and would otherwise all hit the sheets together — the exact
+  // contention this exists to avoid. The lock serializes just the actual
+  // read: one request reads and populates the cache, the rest wait briefly
+  // then get it from cache instead of piling on too.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    return computeAndCache();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ════════════════════════════════════════════════

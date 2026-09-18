@@ -53,11 +53,44 @@ function writeByKey_(key, text) {
   else sh.getRange(row, 2).setValue(text);
 }
 
+// Reads a key straight back after writing it and compares — the only way to
+// actually know a save reached the Sheet, rather than trusting that "no
+// exception was thrown" means it worked. Returns null on success, or an
+// error string. Added 18.09.26 after a cover-plan-state incident showed a
+// save can fail with no write ever happening and no client-visible signal
+// of it — see cover-plan-state/Code.js for the full story.
+function verifyWrite_(key, expected) {
+  const actual = readByKey_(key);
+  if (actual !== expected) {
+    return 'write verification failed: Sheet does not contain what was just written for key ' + key;
+  }
+  return null;
+}
+
 function listKeys_() {
   const sh = getStateSheet_();
   const lastRow = sh.getLastRow();
   if (lastRow < 1) return [];
   return sh.getRange(1, 1, lastRow, 1).getValues().map(r => r[0]).filter(k => k);
+}
+
+// ── Response cache ───────────────────────────────────────────────────────
+// Added 18.09.26 — `load` opened the Spreadsheet fresh on every call, same
+// shape as the cover-plan-state slowness bug (this tool polls it heavily
+// across classroom devices). Cache the exact response text per key so a
+// repeat read within the TTL never touches Sheets; every write updates the
+// cache immediately so a poller right after a save still sees the new value.
+const CACHE_PREFIX = 'tscache_';
+const CACHE_TTL_SECONDS = 20;
+
+function getCachedResponse_(key) {
+  const hit = CacheService.getScriptCache().get(CACHE_PREFIX + key);
+  return hit !== null ? hit : null;
+}
+
+function setCachedResponse_(key, text) {
+  try { CacheService.getScriptCache().put(CACHE_PREFIX + key, text, CACHE_TTL_SECONDS); }
+  catch (err) { /* value too large for the cache — fall through uncached */ }
 }
 
 // Run this manually from the Apps Script editor (select it in the function
@@ -77,14 +110,35 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'unauthorised' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+  // Added 18.09.26 — writeByKey_ is read-then-write (findRow_ then
+  // appendRow/setValue) against a shared Sheet, and multiple devices can
+  // save the same (yearGroup, weekKey) close together. Without a lock, two
+  // concurrent doPost calls for a brand-new key could both see findRow_
+  // return -1 and both appendRow, leaving a duplicate row whose second copy
+  // silently stops being read. Same fix already applied to
+  // cover-plan-state/resource-booking-backend/shared-sync.
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'locked, try again' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   try {
     const payload = JSON.parse(e.postData.contents);
     if (payload.action === 'save' && payload.weekKey) {
       const yg = payload.yearGroup || 'Y4';
       const key = PREFIX + yg + '_' + payload.weekKey;
-      const props = PropertiesService.getScriptProperties();
-      backupBeforeWrite_(props, key, readByKey_(key));
-      writeByKey_(key, JSON.stringify(payload.data));
+      const newValue = JSON.stringify(payload.data);
+      backupBeforeWrite_(key, readByKey_(key));
+      writeByKey_(key, newValue);
+      const writeErr = verifyWrite_(key, newValue);
+      if (writeErr) {
+        CacheService.getScriptCache().remove(CACHE_PREFIX + key);
+        return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: writeErr }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      setCachedResponse_(key, JSON.stringify({ data: payload.data }));
       return ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -96,6 +150,8 @@ function doPost(e) {
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.message }))
       .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -109,9 +165,15 @@ function doGet(e) {
     if (action === 'load' && e.parameter.weekKey) {
       const yg = e.parameter.yearGroup || 'Y4';
       const key = PREFIX + yg + '_' + e.parameter.weekKey;
+      const cached = getCachedResponse_(key);
+      if (cached !== null) {
+        return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+      }
       const raw = readByKey_(key);
       const data = raw ? JSON.parse(raw) : null;
-      return ContentService.createTextOutput(JSON.stringify({ data }))
+      const out = JSON.stringify({ data });
+      setCachedResponse_(key, out);
+      return ContentService.createTextOutput(out)
         .setMimeType(ContentService.MimeType.JSON);
     }
     // List all stored weeks (for debugging)
@@ -133,54 +195,82 @@ function doGet(e) {
 }
 
 // ── Backups ──────────────────────────────────────────────────────────────
-// Added 15.09.26 after cover-plan-state's data-wipe incident (see that
-// project's Code.js for the full story) — this store had the same no-history
-// exposure. One global ring buffer records the previous value of whichever
-// week/yearGroup key is about to be overwritten, so any bad save (this bug
-// class or a future one) is recoverable via listBackups/restoreBackup.
-// BACKUP_PREFIX deliberately does NOT start with PREFIX ('ts_'), so the
-// `list` debug action above (which matches on PREFIX) never shows backup
-// slots as if they were real saved weeks. Stays on PropertiesService even
-// after the 16.09.26 Sheets migration — it's small metadata, and the Sheet
-// itself is now the primary durability layer; this ring buffer is just the
-// fast, no-UI undo lever on top.
-const BACKUP_PREFIX = 'bak_ts_';
-const BACKUP_COUNT = 30;
-const BACKUP_CURSOR_KEY = 'bak_ts_cursor';
+// Added 15.09.26 after cover-plan-state's first data-wipe incident — this
+// store had the same no-history exposure. Records the previous value of
+// whichever week/yearGroup key is about to be overwritten, so any bad save
+// (this bug class or a future one) is recoverable via
+// listBackups/restoreBackup.
+//
+// REWRITTEN 18.09.26 — this ring buffer originally stayed on
+// PropertiesService as "just metadata, low risk" even after the 16.09.26
+// Sheets migration. That exact reasoning, applied to cover-plan-state,
+// caused a real multi-hour silent save failure on 18.09.26 once its state
+// grew past PropertiesService's 9KB-per-value cap: a backup step run BEFORE
+// the real write threw, and the whole write was lost with no error
+// surfaced anywhere. This store's payloads are much smaller per key
+// (checked live: a few KB) so the immediate risk was lower, but the failure
+// class is identical and would be just as silent when it eventually hit.
+// Moved onto a dedicated Sheet tab (TeachingScheduleBackups) instead — a
+// Sheets cell holds up to 50,000 characters, so there's no realistic size
+// ceiling left to hit. See cover-plan-state/Code.js for the full incident
+// writeup.
+const BACKUP_TAB_NAME = 'TeachingScheduleBackups';
+const BACKUP_COUNT = 100; // generous — Sheets rows are cheap, unlike PropertiesService's 9KB/500KB quota
 
-function backupBeforeWrite_(props, key, current) {
+function getBackupSheet_() {
+  const ss = SpreadsheetApp.openById(STATE_SHEET_ID);
+  let sh = ss.getSheetByName(BACKUP_TAB_NAME);
+  if (!sh) sh = ss.insertSheet(BACKUP_TAB_NAME);
+  return sh;
+}
+
+function backupBeforeWrite_(key, current) {
   if (!current) return; // nothing to lose yet for this key
-  const cursor = parseInt(props.getProperty(BACKUP_CURSOR_KEY) || '0', 10);
-  props.setProperty(BACKUP_PREFIX + cursor, JSON.stringify({ ts: new Date().toISOString(), key: key, data: current }));
-  props.setProperty(BACKUP_CURSOR_KEY, String((cursor + 1) % BACKUP_COUNT));
+  try {
+    const sh = getBackupSheet_();
+    sh.appendRow([new Date().toISOString(), key, current]);
+    const lastRow = sh.getLastRow();
+    if (lastRow > BACKUP_COUNT) sh.deleteRows(1, lastRow - BACKUP_COUNT);
+  } catch (err) { /* never let a failed backup block the real write */ }
 }
 
 function listBackups_() {
-  const props = PropertiesService.getScriptProperties();
+  const sh = getBackupSheet_();
+  const lastRow = sh.getLastRow();
+  if (lastRow < 1) return [];
+  const rows = sh.getRange(1, 1, lastRow, 3).getValues();
   const out = [];
-  for (let i = 0; i < BACKUP_COUNT; i++) {
-    const raw = props.getProperty(BACKUP_PREFIX + i);
-    if (!raw) continue;
-    try {
-      const b = JSON.parse(raw);
-      out.push({ index: i, ts: b.ts, key: b.key, size: (b.data || '').length });
-    } catch (e) { /* skip a corrupt slot rather than failing the whole list */ }
+  for (let i = 0; i < rows.length; i++) {
+    const ts = rows[i][0], key = rows[i][1], data = rows[i][2];
+    if (!ts) continue;
+    out.push({ row: i + 1, ts: (ts instanceof Date) ? ts.toISOString() : String(ts), key: String(key || ''), size: String(data || '').length });
   }
-  out.sort(function (a, b) { return a.ts < b.ts ? -1 : (a.ts > b.ts ? 1 : 0); });
+  out.sort((a, b) => a.ts < b.ts ? 1 : (a.ts > b.ts ? -1 : 0)); // newest first
   return out;
 }
 
-function restoreBackup_(index) {
-  const props = PropertiesService.getScriptProperties();
-  const idx = parseInt(index, 10);
-  const raw = props.getProperty(BACKUP_PREFIX + idx);
-  if (!raw) {
-    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'no backup at index ' + idx }))
+function readBackupRow_(rowNum) {
+  const sh = getBackupSheet_();
+  if (rowNum < 1 || rowNum > sh.getLastRow()) return null;
+  const vals = sh.getRange(rowNum, 1, 1, 3).getValues()[0];
+  if (!vals[0]) return null;
+  return { ts: (vals[0] instanceof Date) ? vals[0].toISOString() : String(vals[0]), key: String(vals[1] || ''), data: String(vals[2] || '') };
+}
+
+function restoreBackup_(rowNum) {
+  const backup = readBackupRow_(parseInt(rowNum, 10));
+  if (!backup) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'no backup at row ' + rowNum }))
       .setMimeType(ContentService.MimeType.JSON);
   }
-  const backup = JSON.parse(raw);
-  backupBeforeWrite_(props, backup.key, readByKey_(backup.key)); // keep the pre-restore state recoverable too
+  backupBeforeWrite_(backup.key, readByKey_(backup.key)); // keep the pre-restore state recoverable too
   writeByKey_(backup.key, backup.data);
+  const writeErr = verifyWrite_(backup.key, backup.data);
+  if (writeErr) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: writeErr }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  setCachedResponse_(backup.key, JSON.stringify({ data: backup.data ? JSON.parse(backup.data) : null }));
   return ContentService.createTextOutput(JSON.stringify({ status: 'ok', restoredKey: backup.key, restoredFrom: backup.ts }))
     .setMimeType(ContentService.MimeType.JSON);
 }
