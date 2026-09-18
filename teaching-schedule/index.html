@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-16.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-18.09.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1778,13 +1778,43 @@ function loadLocal() {
 // this session rather than risk overwriting unconfirmed backend data.
 const syncedWeeks = new Set();
 
+// Shared response-checking POST used by copyWeekToNext/copyWeekToTerm below —
+// same fix as syncSave() just above: a resolved fetch is not the same as a
+// successful save, since the backend can reject one with a normal 200 and a
+// {"status":"error",...} body.
+async function postScheduleSave_(weekKey, data) {
+  try {
+    const res = await fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'save', yearGroup: YEAR_GROUP, weekKey, data: data || {} }),
+      headers: { 'Content-Type': 'text/plain' }
+    });
+    let json = null;
+    try { json = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
+    return !!(res.ok && json && json.status !== 'error');
+  } catch (err) {
+    return false;
+  }
+}
+
 async function syncSave() {
   if (!SYNC_URL) return;
   const wk = schedKey();
   if (!syncedWeeks.has(wk)) return; // haven't confirmed the real backend state for this week yet — don't risk overwriting it
   const body = JSON.stringify({ action:'save', yearGroup: YEAR_GROUP, weekKey: wk, data: state.schedule[wk] || {} });
+  // Found 18.09.26 (cover-plan-state incident): `.then(() => updateSyncStatus('ok'))`
+  // treated ANY resolved fetch as success — the backend can reject a save
+  // with a normal 200 and a {"status":"error",...} body (a write-verification
+  // failure), which was being silently shown as synced. Must inspect the body.
   fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, { method:'POST', body, headers:{'Content-Type':'text/plain'} })
-    .then(() => updateSyncStatus('ok'))
+    .then(async res => {
+      let json = null;
+      try { json = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
+      if (!res.ok || !json || json.status === 'error') {
+        throw new Error((json && json.message) || ('save rejected (HTTP ' + res.status + ')'));
+      }
+      updateSyncStatus('ok');
+    })
     .catch(() => updateSyncStatus('err'));
 }
 
@@ -1819,18 +1849,16 @@ async function syncLoad(weekKey) {
 
 async function syncPushAll() {
   if (!SYNC_URL) return;
+  let anyFailed = false;
   for (const weekKey of Object.keys(state.schedule)) {
     const data = state.schedule[weekKey];
     if (!data || !Object.keys(data).length) continue;
-    try {
-      await fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, {
-        method:'POST',
-        body: JSON.stringify({ action:'save', yearGroup: YEAR_GROUP, weekKey, data }),
-        headers:{'Content-Type':'text/plain'}
-      });
-    } catch {}
+    const ok = await postScheduleSave_(weekKey, data);
+    if (!ok) anyFailed = true;
   }
-  updateSyncStatus('ok');
+  // Found 18.09.26: this used to report 'ok' unconditionally regardless of
+  // whether any of the pushes actually succeeded.
+  updateSyncStatus(anyFailed ? 'err' : 'ok');
 }
 
 function updateSyncStatus(status) {
@@ -3179,16 +3207,9 @@ async function copyWeekToNext() {
   state.schedule[nextKey] = JSON.parse(JSON.stringify(state.schedule[wk] || {}));
   persistLocal();
   // Sync next week to cloud (syncSave only syncs current week)
-  if (SYNC_URL) {
-    try {
-      await fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'save', yearGroup: YEAR_GROUP, weekKey: nextKey, data: state.schedule[nextKey] || {} }),
-        headers: { 'Content-Type': 'text/plain' }
-      });
-    } catch {}
-  }
-  alert(`${wk} copied to next week.`);
+  let copyOk = true;
+  if (SYNC_URL) copyOk = await postScheduleSave_(nextKey, state.schedule[nextKey]);
+  alert(copyOk ? `${wk} copied to next week.` : `${wk} copied locally, but the save to the cloud FAILED — it has not synced to other devices. Try again.`);
 }
 
 async function copyWeekToTerm() {
@@ -3212,18 +3233,18 @@ async function copyWeekToTerm() {
   persistLocal();
 
   // Sync all copied weeks to cloud
+  let failedWeeks = [];
   if (SYNC_URL) {
     for (const week of weeksToCopy) {
-      try {
-        await fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, {
-          method: 'POST',
-          body: JSON.stringify({ action: 'save', yearGroup: YEAR_GROUP, weekKey: week.key, data: state.schedule[week.key] || {} }),
-          headers: { 'Content-Type': 'text/plain' }
-        });
-      } catch {}
+      const ok = await postScheduleSave_(week.key, state.schedule[week.key]);
+      if (!ok) failedWeeks.push(week.key);
     }
   }
-  alert(`${wk} copied to ${weeksToCopy.length} week${weeksToCopy.length > 1 ? 's' : ''} in Term ${currentTerm}.`);
+  if (failedWeeks.length) {
+    alert(`${wk} copied locally, but ${failedWeeks.length} week(s) FAILED to save to the cloud: ${failedWeeks.join(', ')}. Those have not synced to other devices — try again.`);
+  } else {
+    alert(`${wk} copied to ${weeksToCopy.length} week${weeksToCopy.length > 1 ? 's' : ''} in Term ${currentTerm}.`);
+  }
 }
 
 function clearActiveView() {

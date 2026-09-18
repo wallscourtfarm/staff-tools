@@ -67,6 +67,39 @@ function writeByKey_(key, text) {
   else sh.getRange(row, 2).setValue(text);
 }
 
+// Reads a key straight back after writing it and compares — the only way to
+// actually know a save reached the Sheet, rather than trusting that "no
+// exception was thrown" means it worked. Returns null on success, or an
+// error string. Added 18.09.26 after a cover-plan-state incident showed a
+// save can fail with no write ever happening and no client-visible signal
+// of it — see cover-plan-state/Code.js for the full story.
+function verifyWrite_(key, expected) {
+  const actual = readByKey_(key);
+  if (actual !== expected) {
+    return 'write verification failed: Sheet does not contain what was just written for key ' + key;
+  }
+  return null;
+}
+
+// ── KV response cache ────────────────────────────────────────────────────
+// Added 18.09.26 — the plain key/value branch (wfa_slt/wfa_lc/wfa_ll) opened
+// the Spreadsheet fresh on every doGet, same shape as the cover-plan-state
+// slowness bug this mirrors. Cache the exact response text per key so a
+// repeat read within the TTL never touches Sheets; every write updates the
+// cache immediately so a poller right after a save still sees the new value.
+const KV_CACHE_PREFIX = 'kv_';
+const KV_CACHE_TTL_SECONDS = 20;
+
+function getCachedKv_(key) {
+  const hit = CacheService.getScriptCache().get(KV_CACHE_PREFIX + key);
+  return hit !== null ? hit : null;
+}
+
+function setCachedKv_(key, text) {
+  try { CacheService.getScriptCache().put(KV_CACHE_PREFIX + key, text, KV_CACHE_TTL_SECONDS); }
+  catch (err) { /* value too large for the cache — fall through uncached */ }
+}
+
 // Token gate. Token arrives in the query string (not a header) because client
 // fetches deliberately omit Content-Type to avoid the Apps Script CORS
 // preflight, and bulk-sync client POSTs opaque {key:value} maps. Still a
@@ -93,8 +126,14 @@ function doGet(e) {
     if (p.action === 'listBackups') return json({ backups: listSyncBackups_() });
     const key = p.key;
     if (!key) return json({ error: 'missing key' });
+    const cached = getCachedKv_(key);
+    if (cached !== null) {
+      return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+    }
     const data = readByKey_(key);
-    return ContentService.createTextOutput(data || '{}')
+    const out = data || '{}';
+    setCachedKv_(key, out);
+    return ContentService.createTextOutput(out)
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return json({ error: err.message });
@@ -111,9 +150,31 @@ function doPost(e) {
     if (p.action === 'restoreBackup') return restoreSyncBackup_(p);
     const key = p.key;
     if (!key) return json({ error: 'missing key' });
-    backupSyncKey_(key, readByKey_(key));
-    writeByKey_(key, e.postData.contents);
-    return json({ status: 'ok' });
+    // Added 18.09.26 — writeByKey_ is read-then-write (findRow_ then
+    // appendRow/setValue). wfa_slt/wfa_lc/wfa_ll can each be POSTed from
+    // multiple devices; without a lock two concurrent first-time writes to
+    // the same key could both see findRow_ return -1 and both appendRow,
+    // leaving a duplicate row whose second copy silently stops being read.
+    // Same fix already applied to resource-booking-backend/reading-tracker.
+    const lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(20000);
+    } catch (err) {
+      return json({ status: 'error', message: 'locked, try again' });
+    }
+    try {
+      backupSyncKey_(key, readByKey_(key));
+      writeByKey_(key, e.postData.contents);
+      const writeErr = verifyWrite_(key, e.postData.contents);
+      if (writeErr) {
+        CacheService.getScriptCache().remove(KV_CACHE_PREFIX + key);
+        return json({ status: 'error', message: writeErr });
+      }
+      setCachedKv_(key, e.postData.contents);
+      return json({ status: 'ok' });
+    } finally {
+      lock.releaseLock();
+    }
   } catch (err) {
     return json({ status: 'error', message: err.message });
   }
@@ -121,48 +182,75 @@ function doPost(e) {
 
 // ── Backups for the plain key/value state store (wfa_slt / wfa_lc / wfa_ll)
 // ──────────────────────────────────────────────────────────────────────────
-// Added 15.09.26 after cover-plan-state's data-wipe incident (see that
-// project's Code.js for the full story) — this key store had the same
-// no-history exposure. Does NOT touch getPupils/getClasses/checkPin/
-// getSheetTab(s)/importPupils/markLeavers/updateClasses, which read/write
-// the actual hub spreadsheet and already have Sheets version history.
-// Backup keys deliberately don't collide with any real `key` value or other
-// Script Property name in use (SHARED_TOKEN, STAFF_PIN, etc).
-const SYNC_BACKUP_PREFIX = 'bak_sync_';
-const SYNC_BACKUP_COUNT = 30;
-const SYNC_BACKUP_CURSOR_KEY = 'bak_sync_cursor';
+// Added 15.09.26 after cover-plan-state's first data-wipe incident — this
+// key store had the same no-history exposure. Does NOT touch getPupils/
+// getClasses/checkPin/getSheetTab(s)/importPupils/markLeavers/
+// updateClasses, which read/write the actual hub spreadsheet and already
+// have Sheets version history.
+//
+// REWRITTEN 18.09.26 — this ring buffer originally stayed on
+// PropertiesService as "just metadata, low risk" even after the 16.09.26
+// Sheets migration. That exact reasoning, applied to cover-plan-state,
+// caused a real multi-hour silent save failure on 18.09.26 once its state
+// grew past PropertiesService's 9KB-per-value cap: a backup step run BEFORE
+// the real write threw, and the whole write was lost with no error
+// surfaced anywhere. wfa_slt/wfa_lc/wfa_ll are each their own key (checked
+// live: well under 9KB) so the immediate risk was lower, but the failure
+// class is identical and would be just as silent when it eventually hit.
+// Moved onto a dedicated Sheet tab (SharedSyncBackups) instead — a Sheets
+// cell holds up to 50,000 characters, so there's no realistic size ceiling
+// left to hit. See cover-plan-state/Code.js for the full incident writeup.
+const SYNC_BACKUP_TAB_NAME = 'SharedSyncBackups';
+const SYNC_BACKUP_COUNT = 100; // generous — Sheets rows are cheap, unlike PropertiesService's 9KB/500KB quota
+
+function getSyncBackupSheet_() {
+  const ss = SpreadsheetApp.openById(STATE_SHEET_ID);
+  let sh = ss.getSheetByName(SYNC_BACKUP_TAB_NAME);
+  if (!sh) sh = ss.insertSheet(SYNC_BACKUP_TAB_NAME);
+  return sh;
+}
 
 function backupSyncKey_(key, current) {
   if (!current) return; // nothing to lose yet for this key
-  const p = props();
-  const cursor = parseInt(p.getProperty(SYNC_BACKUP_CURSOR_KEY) || '0', 10);
-  p.setProperty(SYNC_BACKUP_PREFIX + cursor, JSON.stringify({ ts: new Date().toISOString(), key: key, data: current }));
-  p.setProperty(SYNC_BACKUP_CURSOR_KEY, String((cursor + 1) % SYNC_BACKUP_COUNT));
+  try {
+    const sh = getSyncBackupSheet_();
+    sh.appendRow([new Date().toISOString(), key, current]);
+    const lastRow = sh.getLastRow();
+    if (lastRow > SYNC_BACKUP_COUNT) sh.deleteRows(1, lastRow - SYNC_BACKUP_COUNT);
+  } catch (err) { /* never let a failed backup block the real write */ }
 }
 
 function listSyncBackups_() {
-  const p = props();
+  const sh = getSyncBackupSheet_();
+  const lastRow = sh.getLastRow();
+  if (lastRow < 1) return [];
+  const rows = sh.getRange(1, 1, lastRow, 3).getValues();
   const out = [];
-  for (let i = 0; i < SYNC_BACKUP_COUNT; i++) {
-    const raw = p.getProperty(SYNC_BACKUP_PREFIX + i);
-    if (!raw) continue;
-    try {
-      const b = JSON.parse(raw);
-      out.push({ index: i, ts: b.ts, key: b.key, size: (b.data || '').length });
-    } catch (e) { /* skip a corrupt slot rather than failing the whole list */ }
+  for (let i = 0; i < rows.length; i++) {
+    const ts = rows[i][0], key = rows[i][1], data = rows[i][2];
+    if (!ts) continue;
+    out.push({ row: i + 1, ts: (ts instanceof Date) ? ts.toISOString() : String(ts), key: String(key || ''), size: String(data || '').length });
   }
-  out.sort(function (a, b) { return a.ts < b.ts ? -1 : (a.ts > b.ts ? 1 : 0); });
+  out.sort(function (a, b) { return a.ts < b.ts ? 1 : (a.ts > b.ts ? -1 : 0); }); // newest first
   return out;
 }
 
+function readSyncBackupRow_(rowNum) {
+  const sh = getSyncBackupSheet_();
+  if (rowNum < 1 || rowNum > sh.getLastRow()) return null;
+  const vals = sh.getRange(rowNum, 1, 1, 3).getValues()[0];
+  if (!vals[0]) return null;
+  return { ts: (vals[0] instanceof Date) ? vals[0].toISOString() : String(vals[0]), key: String(vals[1] || ''), data: String(vals[2] || '') };
+}
+
 function restoreSyncBackup_(p) {
-  const props_ = props();
-  const idx = parseInt(p.index, 10);
-  const raw = props_.getProperty(SYNC_BACKUP_PREFIX + idx);
-  if (!raw) return json({ status: 'error', message: 'no backup at index ' + idx });
-  const backup = JSON.parse(raw);
+  const backup = readSyncBackupRow_(parseInt(p.index, 10));
+  if (!backup) return json({ status: 'error', message: 'no backup at row ' + p.index });
   backupSyncKey_(backup.key, readByKey_(backup.key)); // keep the pre-restore state recoverable too
   writeByKey_(backup.key, backup.data);
+  const writeErr = verifyWrite_(backup.key, backup.data);
+  if (writeErr) return json({ status: 'error', message: writeErr });
+  setCachedKv_(backup.key, backup.data);
   return json({ status: 'ok', restoredKey: backup.key, restoredFrom: backup.ts });
 }
 
@@ -225,7 +313,40 @@ function filterPupils(all, p, source) {
 // When a teacher changes, edit display_name (+teacher_initials) here and
 // every tool follows. Bromcom codes are stable and never need editing.
 
+// Added 18.09.26 — readClassMap/readMasterPupils each opened MASTER_SHEET_ID
+// fresh on every getPupils/getClasses call, with no cache at all (unlike the
+// hub-tab reads below, which already got this treatment for the same
+// contention reason — see getCachedTabRows). Classes/pupils are edited by
+// hand or via a single admin import, not written by concurrent pollers, so a
+// short cache is free accuracy-wise and absorbs the "every tool polls at
+// once" case. Same lock-then-recheck pattern as getCachedTabRows so a cold
+// cache doesn't let every concurrent request pile onto the sheet together.
+const ROSTER_CACHE_TTL_SECONDS = 30;
 function readClassMap() {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'classMap_v1';
+  const cached = cache.get(cacheKey);
+  if (cached !== null) return JSON.parse(cached);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const recheck = cache.get(cacheKey);
+    if (recheck !== null) return JSON.parse(recheck);
+    const map = readClassMapUncached_();
+    try { cache.put(cacheKey, JSON.stringify(map), ROSTER_CACHE_TTL_SECONDS); } catch (err) { /* too large — skip */ }
+    return map;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function clearRosterCache_() {
+  const cache = CacheService.getScriptCache();
+  cache.remove('classMap_v1');
+  cache.remove('masterPupils_v1');
+}
+
+function readClassMapUncached_() {
   const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
   const sh = ss.getSheetByName(MASTER_CLASSES_TAB);
   if (!sh) return [];
@@ -313,6 +434,7 @@ function updateClasses(e) {
     updated++;
   });
 
+  if (updated > 0) clearRosterCache_();
   return json({ status: 'ok', updated: updated, unknownCodes: unknownCodes });
 }
 
@@ -384,6 +506,24 @@ function rekeyPupilsToCodes() {
 }
 
 function readMasterPupils() {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'masterPupils_v1';
+  const cached = cache.get(cacheKey);
+  if (cached !== null) return JSON.parse(cached);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const recheck = cache.get(cacheKey);
+    if (recheck !== null) return JSON.parse(recheck);
+    const pupils = readMasterPupilsUncached_();
+    try { cache.put(cacheKey, JSON.stringify(pupils), ROSTER_CACHE_TTL_SECONDS); } catch (err) { /* too large — skip */ }
+    return pupils;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function readMasterPupilsUncached_() {
   const ss = SpreadsheetApp.openById(MASTER_SHEET_ID);
   const sh = ss.getSheetByName(MASTER_PUPILS_TAB);
   if (!sh) throw new Error(MASTER_PUPILS_TAB + ' tab missing from master sheet');
@@ -391,10 +531,18 @@ function readMasterPupils() {
   if (rows.length < 2) return [];
   const hdr = rows[0].map(function (h) { return String(h).trim().toLowerCase(); });
   const ix = function (name) { return hdr.indexOf(name); };
-  // Bromcom code → class map (best effort; unmapped codes pass through)
+  // Bromcom code → class map (best effort; unmapped codes pass through).
+  // Deliberately calls the UNCACHED reader — this function runs inside
+  // readMasterPupils()'s own script-lock hold (added 18.09.26), and calling
+  // the cached readClassMap() here would try to acquire that same script
+  // lock again from within the same execution and deadlock for the full
+  // waitLock timeout (found immediately after deploying: getPupils/getClasses
+  // started timing out at ~15s). The cache built by a direct top-level
+  // getClasses call still serves this data cached; this path just always
+  // does the (cheap, one Sheet) read itself.
   let cmap = {};
   try {
-    const cm = readClassMap();
+    const cm = readClassMapUncached_();
     Object.keys(cm).forEach(function (code) { cmap[code.toUpperCase()] = cm[code]; });
   } catch (err) { /* mapping tab missing — serve raw codes */ }
   const display = function (code) {
@@ -661,6 +809,7 @@ function importPupils(e) {
     }
   }
 
+  clearRosterCache_();
   return json({
     status: 'ok',
     added: added,
@@ -730,6 +879,7 @@ function markLeavers(e) {
 
   upns.forEach(function (u) { if (!foundUpns[u]) notFound.push(u); });
 
+  if (leftMarked > 0) clearRosterCache_();
   return json({
     status: 'ok',
     leftMarked: leftMarked,

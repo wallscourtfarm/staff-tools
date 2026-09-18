@@ -26,46 +26,82 @@
 // lunch-cover, slt-schedule, lunch-leaders, booking). All 3 updated to
 // send the token in the same push that added this check.
 //
-// Backups added 15.09.26. This store had NO history of any kind — unlike
-// every sibling backend that's a Google Sheet (reading-tracker, fab-rota
-// have both been recovered from Sheets version history after real data-loss
-// incidents), this one was a single Script Property with nothing behind it.
-// Every write still snapshots the value it's about to replace into a small
-// rolling buffer BEFORE overwriting the live value (below) — a fast, no-UI
-// undo lever.
-//
 // Live state moved off PropertiesService onto a dedicated Google Sheet
-// 16.09.26, for real, Google-maintained version history as a second,
-// independent layer of protection (the ring buffer only protects against
-// bugs in THIS script's own write path — this protects against everything
-// else too, e.g. someone directly editing Script Properties). Deliberately
-// a NEW, dedicated spreadsheet rather than reusing the busy "WFA Planning
+// 16.09.26, for real, Google-maintained version history. Deliberately a
+// NEW, dedicated spreadsheet rather than reusing the busy "WFA Planning
 // Data" hub sheet, which already has documented contention problems from
 // other tools hammering it (see project_shared_gateway_apps_script_ceiling
 // in Claude's memory) — this sheet has no other traffic. Sharing is left at
 // its private-by-default setting (not "anyone with link"); the script can
 // still read/write it because it always executes as the deploying account
 // regardless of the sheet's sharing settings, same model as fab-rota's
-// existing Sheets-backed state. The backup ring buffer stays on
-// PropertiesService — it's small metadata, not the primary record.
+// existing Sheets-backed state.
+//
+// REWRITTEN 18.09.26 after a real data-loss incident: the backup ring
+// buffer (added 15.09.26) stayed on PropertiesService as "just metadata,
+// low risk" even after the main-store Sheets migration — and PropertiesService
+// caps each value at 9KB. Once the live state grew past that (today, ~18KB),
+// EVERY backup attempt threw "Argument too large", and because that ran
+// BEFORE the real write, every single save silently failed for over 5
+// hours — including a real edit (a teacher's Wednesday/Friday absence) that
+// was never recovered, because nothing captured it anywhere before the
+// write it was part of ever happened. Three structural changes fix the
+// whole failure class, not just this one bug:
+//   1. Backups now live on THIS SAME SHEET (a second tab, CoverPlanBackups)
+//      instead of PropertiesService — a Sheets cell holds up to 50,000
+//      characters, so there is no realistic size ceiling to hit again.
+//   2. A write is verified by reading it back immediately after — if the
+//      Sheet doesn't reflect what was just sent, the client gets a real
+//      error instead of a false "ok: true". No more silent failures, ever,
+//      regardless of what future bug might cause one.
+//   3. An incoming save is validated to actually look like release-plan
+//      state (has a weekSlots object) before it's allowed to overwrite the
+//      live store — this is what let a stray `{"action":"listBackups"}`
+//      test payload wipe the real data during today's incident; a
+//      malformed body is now rejected outright instead of accepted.
 
 var STATE_SHEET_ID = '1DBO1GERb_BRq-cnn1rousFtkVn9ajFnurzqitgknelc';
 var STATE_TAB_NAME = 'CoverPlanState';
+var BACKUP_TAB_NAME = 'CoverPlanBackups';
 
 var TOKEN = '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
 
-// Ring buffer sized to stay well inside Apps Script's PropertiesService
-// quota (500KB total, 9KB per value) even as the live state grows — 40
-// slots at up to ~9KB each is 360KB, leaving headroom under the 500KB
-// total. Widened from 20 to 40 (15.09.26) after the first real recovery
-// test: the backup taken immediately before a bad save is always safe
-// until BACKUP_COUNT more saves happen after it, so this is really "how
-// many edits can land before someone notices and restores", not a time
-// window — 40 gives real same-day margin even during a busy editing
-// session.
-var BACKUP_COUNT = 40;
-var BACKUP_PREFIX = 'wfa_planner_v1_bak_';
-var BACKUP_CURSOR_KEY = 'wfa_planner_v1_bak_cursor';
+// CacheService fronting the Sheet read, added 18.09.26 — this single
+// deployment backs planner.html + supply-admin.html directly plus 6 more
+// tools via wfa-data's Railway proxy (see file header above), and every
+// doGet was opening the Spreadsheet fresh with no caching at all. Under
+// concurrent load from that many pollers, Apps Script serializes the
+// executions and requests were measured queuing up to 19s and timing out
+// past clients' fetch timeouts (same "gateway ceiling" pattern already
+// fixed on spelling-games and reading-tracker — see
+// project_shared_gateway_apps_script_ceiling in Claude's memory). A short
+// TTL is enough to absorb a burst of simultaneous reads with one Sheet hit
+// instead of N. Every write updates the cache immediately (not just on
+// expiry) so a poller right after a save still sees the new value rather
+// than a stale cached one.
+var CACHE_KEY = 'coverPlanState_v1';
+var CACHE_TTL_SECONDS = 20;
+
+function getCachedState_() {
+  var hit = CacheService.getScriptCache().get(CACHE_KEY);
+  return hit !== null ? hit : null;
+}
+
+function setCachedState_(text) {
+  // CacheService caps values at 100KB; live state is ~18KB as of 18.09.26.
+  // If it ever grows past the cap, just skip caching that write rather than
+  // erroring the whole request — the Sheet read is still the source of truth.
+  try { CacheService.getScriptCache().put(CACHE_KEY, text, CACHE_TTL_SECONDS); }
+  catch (err) { /* value too large for the cache — fall through uncached */ }
+}
+
+function clearCachedState_() {
+  try { CacheService.getScriptCache().remove(CACHE_KEY); } catch (err) { /* ignore */ }
+}
+
+// Kept generous — Sheets rows cost nothing like PropertiesService's 9KB/500KB
+// quota did, so there's no reason to keep this tight.
+var BACKUP_COUNT = 100;
 
 function checkToken(e) {
   return e && e.parameter && e.parameter.token === TOKEN;
@@ -88,6 +124,13 @@ function getStateSheet_() {
   return sh;
 }
 
+function getBackupSheet_() {
+  var ss = SpreadsheetApp.openById(STATE_SHEET_ID);
+  var sh = ss.getSheetByName(BACKUP_TAB_NAME);
+  if (!sh) sh = ss.insertSheet(BACKUP_TAB_NAME);
+  return sh;
+}
+
 function readState_() {
   var val = getStateSheet_().getRange('A1').getValue();
   return val ? String(val) : null;
@@ -95,6 +138,31 @@ function readState_() {
 
 function writeState_(text) {
   getStateSheet_().getRange('A1').setValue(text);
+}
+
+// Reads the value straight back after a write and compares it to what was
+// sent — the only way to actually know a save reached the Sheet, rather
+// than trusting that "no exception was thrown" means it worked. Returns
+// null on success, or an error string to surface to the client.
+function verifyWrite_(expected) {
+  var actual = readState_();
+  if (actual !== expected) {
+    return 'write verification failed: Sheet does not contain what was just written';
+  }
+  return null;
+}
+
+// A real release-plan state is always a JSON object with a weekSlots
+// object in it — every genuine save from planner.html/supply-admin.html
+// has this shape. Rejecting anything else outright is what would have
+// stopped the 18.09.26 incident, where a stray test payload
+// (`{"action":"listBackups"}`) had no weekSlots at all and still silently
+// overwrote the real data because nothing checked its shape first.
+function isValidState_(text) {
+  if (!text) return false;
+  var obj;
+  try { obj = JSON.parse(text); } catch (err) { return false; }
+  return !!(obj && typeof obj === 'object' && obj.weekSlots && typeof obj.weekSlots === 'object');
 }
 
 // Run this manually from the Apps Script editor (select it in the function
@@ -106,61 +174,101 @@ function writeState_(text) {
 // Apps Script hides "private" (trailing-underscore) functions from the
 // editor's manual-run dropdown, which would defeat the point of this one.
 function authorizeSheetsAccess() {
-  return getStateSheet_().getName();
+  return getStateSheet_().getName() + ', ' + getBackupSheet_().getName();
 }
 
 // Snapshot the state about to be overwritten. No-op the first time this
-// script ever runs (nothing live yet to lose).
-function backupCurrentState(props, current) {
+// script ever runs (nothing live yet to lose). Appends a timestamped row to
+// the CoverPlanBackups tab rather than a PropertiesService slot — a Sheets
+// cell holds up to 50,000 characters, so there is no realistic size ceiling
+// to hit here, unlike the 9KB-per-value PropertiesService cap that caused
+// the 18.09.26 incident. Still wrapped in try/catch on principle: a backup
+// step must NEVER be able to block the real write that follows it,
+// regardless of what kind of failure it hits.
+function backupCurrentState(current) {
   if (!current) return;
-  var cursor = parseInt(props.getProperty(BACKUP_CURSOR_KEY) || '0', 10);
-  props.setProperty(BACKUP_PREFIX + cursor, JSON.stringify({ ts: new Date().toISOString(), data: current }));
-  props.setProperty(BACKUP_CURSOR_KEY, String((cursor + 1) % BACKUP_COUNT));
+  try {
+    var sh = getBackupSheet_();
+    sh.appendRow([new Date().toISOString(), current]);
+    var lastRow = sh.getLastRow();
+    if (lastRow > BACKUP_COUNT) {
+      sh.deleteRows(1, lastRow - BACKUP_COUNT);
+    }
+  } catch (err) {
+    // Never let a failed backup block the real write.
+  }
 }
 
-function listBackups(props) {
+function listBackups() {
+  var sh = getBackupSheet_();
+  var lastRow = sh.getLastRow();
+  if (lastRow < 1) return [];
+  var rows = sh.getRange(1, 1, lastRow, 2).getValues();
   var out = [];
-  for (var i = 0; i < BACKUP_COUNT; i++) {
-    var raw = props.getProperty(BACKUP_PREFIX + i);
-    if (!raw) continue;
-    try {
-      var b = JSON.parse(raw);
-      out.push({ index: i, ts: b.ts, size: (b.data || '').length });
-    } catch (err) { /* skip a corrupt slot rather than failing the whole list */ }
+  for (var i = 0; i < rows.length; i++) {
+    var ts = rows[i][0], data = rows[i][1];
+    if (!ts) continue;
+    out.push({ row: i + 1, ts: (ts instanceof Date) ? ts.toISOString() : String(ts), size: String(data || '').length });
   }
-  out.sort(function (a, b) { return a.ts < b.ts ? -1 : (a.ts > b.ts ? 1 : 0); });
+  out.sort(function (a, b) { return a.ts < b.ts ? 1 : (a.ts > b.ts ? -1 : 0); }); // newest first
   return out;
+}
+
+function readBackupRow_(rowNum) {
+  var sh = getBackupSheet_();
+  if (rowNum < 1 || rowNum > sh.getLastRow()) return null;
+  var vals = sh.getRange(rowNum, 1, 1, 2).getValues()[0];
+  if (!vals[0]) return null;
+  return { ts: (vals[0] instanceof Date) ? vals[0].toISOString() : String(vals[0]), data: String(vals[1] || '') };
 }
 
 function doGet(e) {
   if (!checkToken(e)) return errorJson('unauthorised');
-  var props = PropertiesService.getScriptProperties();
 
   if (e.parameter.action === 'listBackups') {
-    return json({ backups: listBackups(props) });
+    return json({ backups: listBackups() });
+  }
+
+  var cached = getCachedState_();
+  if (cached !== null) {
+    return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
   }
 
   var data = readState_();
-  return ContentService.createTextOutput(data || 'null')
+  var out = data || 'null';
+  setCachedState_(out);
+  return ContentService.createTextOutput(out)
     .setMimeType(ContentService.MimeType.JSON);
 }
 
 function doPost(e) {
   if (!checkToken(e)) return errorJson('unauthorised');
-  var props = PropertiesService.getScriptProperties();
 
   if (e.parameter.action === 'restoreBackup') {
-    var idx = parseInt(e.parameter.index, 10);
-    var raw = props.getProperty(BACKUP_PREFIX + idx);
-    if (!raw) return errorJson('no backup at index ' + idx);
-    var backup = JSON.parse(raw);
-    // Keep the pre-restore state recoverable too, in case the wrong index gets restored.
-    backupCurrentState(props, readState_());
+    var rowNum = parseInt(e.parameter.index, 10);
+    var backup = readBackupRow_(rowNum);
+    if (!backup) return errorJson('no backup at row ' + rowNum);
+    // Keep the pre-restore state recoverable too, in case the wrong row gets restored.
+    backupCurrentState(readState_());
     writeState_(backup.data);
+    var restoreErr = verifyWrite_(backup.data);
+    if (restoreErr) return errorJson(restoreErr);
+    setCachedState_(backup.data);
     return json({ ok: true, restoredFrom: backup.ts });
   }
 
-  backupCurrentState(props, readState_());
-  writeState_(e.postData.contents);
+  var incoming = e.postData.contents;
+  if (!isValidState_(incoming)) {
+    return errorJson('rejected: payload does not look like valid release-plan state (missing weekSlots)');
+  }
+
+  backupCurrentState(readState_());
+  writeState_(incoming);
+  var writeErr = verifyWrite_(incoming);
+  if (writeErr) {
+    clearCachedState_(); // don't serve a cached value that may now disagree with the Sheet
+    return errorJson(writeErr);
+  }
+  setCachedState_(incoming);
   return json({ ok: true });
 }

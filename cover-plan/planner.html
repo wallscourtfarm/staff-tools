@@ -94,7 +94,11 @@
     body.present-mode .week-grid th, body.present-mode .week-grid td { font-size:12px; }
     body.present-mode .slot-item { font-size:12px; }
     body.present-mode .slot-name { font-size:12.5px; }
-    /* Row heights */
+    /* Row heights. AM/PM are a default/minimum here — adjustSessionRowHeights()
+       grows a row's actual height (via inline style, which overrides this) to
+       fit whichever cell in it has the most stacked slots, since .slots-row is
+       absolutely positioned to fill the cell exactly and won't push the row
+       taller on its own. */
     .srow-before, .srow-after { height:40px; }
     .srow-lunch { height:50px; }
     .srow-am, .srow-pm { height:260px; }
@@ -405,7 +409,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(16.09.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(18.09.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -972,6 +976,30 @@ function setSyncStatus(state) {
   else                      { el.textContent = 'Offline';  el.style.background='#fff7ed'; el.style.color='#c2410c'; }
 }
 
+// A save failure used to be visible only as the small corner badge flipping
+// to "Offline" — easy to miss entirely, which is exactly how a real edit
+// went unsaved for over 5 hours on 18.09.26 with nobody noticing (see
+// cover-plan-state/Code.js for the incident). This is a full-width banner
+// that stays on screen (no auto-dismiss) until a save actually succeeds, so
+// a failed save can no longer go unnoticed by whoever is sat at the screen
+// when it happens.
+function showSaveFailureBanner_(message) {
+  let banner = document.getElementById('saveFailBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'saveFailBanner';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;padding:12px 20px;text-align:center;font-weight:bold;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    document.body.prepend(banner);
+  }
+  banner.innerHTML = '⚠ Your last change was NOT saved — ' + (message || 'connection problem') +
+    '. Do not close this tab. <button type="button" style="margin-left:12px;padding:4px 14px;border-radius:4px;border:none;background:#fff;color:#dc2626;font-weight:bold;cursor:pointer">Retry now</button>';
+  banner.querySelector('button').onclick = stateSave;
+}
+function hideSaveFailureBanner_() {
+  const banner = document.getElementById('saveFailBanner');
+  if (banner) banner.remove();
+}
+
 // ── State persistence ─────────────────────────────────────────────────────────
 function stateSave() {
   // sportsSchedule is deliberately NOT rebuilt from wsEvents here. It used to
@@ -986,9 +1014,26 @@ function stateSave() {
   const json = JSON.stringify({ weekSlots: state.weekSlots, cellNotes: state.cellNotes, nextId: state.nextId, sportsSchedule: SERVER_SPORTS_SCHEDULE });
   try { localStorage.setItem('wfa_planner_state', json); } catch(e) {}
   setSyncStatus('syncing');
+  // Found 18.09.26: `.then(() => setSyncStatus('ok'))` treated ANY resolved
+  // fetch as success — fetch() only rejects on a true network failure, never
+  // on a non-2xx status or an {"error":...} body, so a backend rejecting the
+  // save (the new payload-shape check, a write-verification failure, an
+  // auth error) was silently shown as "Synced ✓". Must actually check the
+  // response before declaring success.
   fetch(SYNC_URL, { method:'POST', body:json, signal: AbortSignal.timeout(8000) })
-    .then(() => setSyncStatus('ok'))
-    .catch(() => setSyncStatus('offline'));
+    .then(async res => {
+      let body = null;
+      try { body = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
+      if (!res.ok || !body || body.error || body.ok !== true) {
+        throw new Error((body && body.error) || ('save rejected (HTTP ' + res.status + ')'));
+      }
+      setSyncStatus('ok');
+      hideSaveFailureBanner_();
+    })
+    .catch(err => {
+      setSyncStatus('offline');
+      showSaveFailureBanner_(err && err.message);
+    });
 }
 async function stateLoad() {
   try {
@@ -1450,8 +1495,36 @@ function renderGrid() {
 
   document.getElementById('centerPane').innerHTML = `<div class="grid-wrap"><table class="week-grid">${html}</table><div class="span-strips" id="spanStrips"></div></div>`;
 
-  // Position spanning strips after DOM is ready
-  requestAnimationFrame(() => positionSpanStrips(spans));
+  // Grow AM/PM rows to fit their content, then position spanning strips —
+  // must happen in that order since positionSpanStrips measures row
+  // boundaries via getBoundingClientRect, which would be stale if row
+  // heights hadn't already settled.
+  requestAnimationFrame(() => {
+    adjustSessionRowHeights();
+    positionSpanStrips(spans);
+  });
+}
+
+// .slots-row is absolutely positioned (top:5px; bottom:5px) to exactly fill
+// its cell, so a cell with more stacked slots than the row's default 260px
+// can hold doesn't grow the row — the slots just overflow/overlap instead.
+// Measures each AM/PM row's tallest cell (via scrollHeight, which reports
+// the full content height even when it currently overflows a
+// smaller/stretched container) and grows the row's actual rendered height
+// to fit, via inline style (which overrides the CSS default/minimum).
+function adjustSessionRowHeights() {
+  ['srow-am', 'srow-pm'].forEach(cls => {
+    document.querySelectorAll('.week-grid tbody tr.' + cls).forEach(row => {
+      let maxNeeded = 260;
+      row.querySelectorAll('.slots-row').forEach(sr => {
+        // +10 restores the 5px top + 5px bottom inset .slots-row carves out
+        // of the cell it fills, which scrollHeight alone doesn't include.
+        const needed = sr.scrollHeight + 10;
+        if (needed > maxNeeded) maxNeeded = needed;
+      });
+      row.style.height = maxNeeded + 'px';
+    });
+  });
 }
 
 function positionSpanStrips(spans) {

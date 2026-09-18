@@ -76,7 +76,7 @@
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Supply Booking <span style="color:#64748b;font-weight:normal;font-size:12px">(15.09.26a)</span></div>
+    <div class="header-title">Supply Booking <span style="color:#64748b;font-weight:normal;font-size:12px">(18.09.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy — booked against the <a href="planner.html" style="color:#1798d3">Release Schedule</a></div>
   </div>
   <div class="week-nav">
@@ -227,7 +227,17 @@ async function patchSlot(wIdx, slotId, patch, rowId) {
     Object.assign(arr[idx], patch);
     fresh.weekSlots[wIdx] = arr;
     const res = await fetch(SYNC_URL, { method:'POST', body: JSON.stringify(fresh), signal: AbortSignal.timeout(10000) });
-    if (!res.ok) throw new Error('save failed');
+    // Found 18.09.26: `res.ok` only checks HTTP status, but the backend
+    // rejects a bad save (a payload-shape check, a write-verification
+    // failure) with a normal 200 and an {"error":...} body — must inspect
+    // the body too, or a rejected save silently looks successful here.
+    // See cover-plan-state/Code.js and planner.html's stateSave() for the
+    // full incident and matching fix.
+    let saveBody = null;
+    try { saveBody = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
+    if (!res.ok || !saveBody || saveBody.error || saveBody.ok !== true) {
+      throw new Error((saveBody && saveBody.error) || ('save rejected (HTTP ' + res.status + ')'));
+    }
     weekSlotsCache[wIdx] = arr;
     setRowStatus(rowId, 'ok');
     setSyncBadge('ok');
