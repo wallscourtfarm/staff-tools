@@ -786,7 +786,7 @@
 </main>
 
 <footer>
-  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v14.09.26e
+  Colour-Coded Sentence Builder · Wallscourt Farm Academy · based on Jacobs Education's Colour-Coded Sentence Progression · v14.09.26f
 </footer>
 
 <div class="present-overlay" id="presentOverlay">
@@ -874,6 +874,22 @@ function makeIconEl(def, altText){
 // list as a distinct selectable font rather than grouping by family the way macOS does.
 const KS_FONT_CSS = { ks1: "'WFA Sassoon Infant', 'Sassoon Infant'", ks2: "'WFA Twinkl Cursive', 'Twinkl Cursive Looped'" };
 const KS_FONT = { ks1: 'Sassoon Infant Rg', ks2: 'Twinkl Cursive Looped Regular' };
+
+// PowerPoint slide background/border per year group, in the school's own Y1-Y6 brand
+// colours (wallscourtfarm/wfa-shared's wfa.css --y1..--y6 — Y1/Y5 and Y2/Y6 share a colour
+// there already, not a bug introduced here). Each pair is that colour's own hue at a very
+// pale fill and a dark border, the same "pale fill, dark border" relationship as the plain
+// pale-blue scheme this replaces — computed once via HSL (fill: same hue, S70/L91; border:
+// same hue, S70/L34), not picked by eye per year, so all six stay visually consistent.
+const YEAR_SLIDE_COLOR = {
+  y1: { fill:'F8E7D8', border:'93521A' },
+  y2: { fill:'D8F8E5', border:'1A934D' },
+  y3: { fill:'F8D8EB', border:'931A62' },
+  y4: { fill:'D8EEF8', border:'1A6D93' },
+  y5: { fill:'F8E7D8', border:'93521A' },
+  y6: { fill:'D8F8E5', border:'1A934D' },
+};
+const DEFAULT_SLIDE_COLOR = { fill:'DEEFFB', border:'1B4F91' };
 function ksForYear(yearId){
   if(yearId==='y1' || yearId==='y2') return 'ks1';
   if(yearId && /^y[3-6]$/.test(yearId)) return 'ks2';
@@ -1245,14 +1261,15 @@ async function exportItemsToPptx(items, opts){
   const wordSize = many ? 12 : 15;
 
   const ksFont = KS_FONT[opts.ks];
+  const slideColor = YEAR_SLIDE_COLOR[opts.yearId] || DEFAULT_SLIDE_COLOR;
 
   for(let reveal=1; reveal<=cleanItems.length; reveal++){
     const slide = pptx.addSlide();
-    slide.background = { color:'DEEFFB' };
+    slide.background = { color: slideColor.fill };
     slide.addShape('rect', {
       x:0.15, y:0.15, w:13.33-0.3, h:7.5-0.3,
       fill:{ type:'none' },
-      line:{ color:'1B4F91', width:3 }
+      line:{ color: slideColor.border, width:3 }
     });
     if(opts.title){
       slide.addText(opts.title, { x:0.4, y:0.2, w:12.5, h:0.5, fontSize:16, bold:true, color:'0A0101', fontFace:'Segoe UI' });
@@ -1702,7 +1719,7 @@ function buildCard(structure, sIdx, yearId){
   exportBtn.className = 'btn-small';
   exportBtn.textContent = '📥 Export to PowerPoint';
   exportBtn.addEventListener('click', ()=>{
-    exportItemsToPptx(currentItems(), { title: structure.title, fileName: slugify(structure.title), ks });
+    exportItemsToPptx(currentItems(), { title: structure.title, fileName: slugify(structure.title), ks, yearId });
   });
 
   const presentBtn = document.createElement('button');
@@ -2404,7 +2421,7 @@ function renderFreeWriteChips(container, items, yearId){
   exportBtn.style.marginLeft = '8px';
   exportBtn.textContent = '📥 Export to PowerPoint';
   exportBtn.addEventListener('click', ()=>{
-    exportItemsToPptx(items, { title: 'My sentence', fileName: slugify(assembleSentenceText(items)), ks, autoPunct:false });
+    exportItemsToPptx(items, { title: 'My sentence', fileName: slugify(assembleSentenceText(items)), ks, yearId, autoPunct:false });
   });
   container.appendChild(exportBtn);
 
