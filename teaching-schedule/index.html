@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-18.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-19.09.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -481,6 +481,7 @@
   <button class="action-btn danger" onclick="clearActiveView()">Clear view</button>
   <span class="sheet-status" id="sheetStatus">Loading…</span>
   <span class="sheet-status" id="syncStatus"></span>
+  <span class="sheet-status err" id="overlayStatus" style="display:none"></span>
 </div>
 <div class="view-tabs" id="viewTabs"></div>
 </div>
@@ -1425,14 +1426,24 @@ async function loadBookingOverlay(weekKey) {
   if (!BOOKING_SYNC_URL) return;
   try {
     const res = await fetch(`${BOOKING_READ_URL}?weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
-    if (!res.ok) return;
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json();
+    if (json && (json.error || json.status === 'error')) throw new Error(json.error || json.message || 'backend error');
     if (json && json.bookings) {
       BOOKINGS = json.bookings;
       BOOKINGS_WEEK_KEY = weekKey;
       renderGrid();
     }
-  } catch {}
+  } catch (err) {
+    // Same silent-failure class as the overlaysPromise fetches below — see
+    // fetchOverlay_ comment (19.09.26). Runs before OVERLAY_FAILURES/
+    // reportOverlayFailures_ are defined further down the file, but both are
+    // hoisted (const at module scope is fine here since this only runs
+    // inside init(), well after the whole script has parsed).
+    OVERLAY_FAILURES.push('resource booking');
+    console.error('Overlay load failed: resource booking', err);
+    reportOverlayFailures_();
+  }
 }
 
 // ── Cover-plan integration helpers ─────────────────────────────────────────────
@@ -1867,6 +1878,43 @@ function updateSyncStatus(status) {
   if (status === 'ok') { el.textContent = '● Synced'; el.className = 'sheet-status ok'; }
   else if (status === 'err') { el.textContent = '● Sync failed'; el.className = 'sheet-status err'; }
   else { el.textContent = '● Syncing…'; el.className = 'sheet-status'; }
+}
+
+// Found 19.09.26: the four "overlay" reads below (activity exceptions, FAB
+// rota, release schedule/cover-plan — this is where PPA/SENCO tags come
+// from — and lunch cover) all used `.then(r => r.ok ? r.json() : null)
+// .catch(() => null)`. Any failure (backend down, timeout, or a 200 with an
+// {"error":...} body — this exact cover-plan proxy returns that shape on
+// its own upstream failure, see wfa-data/backend/routers/cover_state.py)
+// was indistinguishable from "this teacher genuinely has nothing on for
+// that day" — a PPA slot set on cover-plan could silently fail to appear
+// here with no indication anything was wrong. This is read-only: it never
+// touches state.schedule/syncedWeeks, so there is no save/data-loss risk —
+// it only makes a failure visible instead of silent.
+const OVERLAY_FAILURES = [];
+function fetchOverlay_(label, url, fetchUrl, opts, emptyFallback) {
+  if (!url) return Promise.resolve(emptyFallback);
+  return fetch(fetchUrl, opts).then(r => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(json => {
+    if (json && (json.error || json.status === 'error')) {
+      throw new Error(json.error || json.message || 'backend error');
+    }
+    return json;
+  }).catch(err => {
+    OVERLAY_FAILURES.push(label);
+    console.error('Overlay load failed:', label, err);
+    return emptyFallback;
+  });
+}
+function reportOverlayFailures_() {
+  const el = document.getElementById('overlayStatus');
+  if (!el) return;
+  if (!OVERLAY_FAILURES.length) { el.style.display = 'none'; return; }
+  el.textContent = '⚠ Could not load: ' + OVERLAY_FAILURES.join(', ') + ' — reload to retry';
+  el.title = 'These come from other WFA tools and failed to load just now. Nothing on this page was lost or overwritten — retry by reloading.';
+  el.style.display = '';
 }
 
 // ── Sheet loading ────────────────────────────────────────────────────────────
@@ -3725,10 +3773,10 @@ async function init() {
   const syncLoadPromise = syncLoad(initialWeekKey);
   const bookingPromise = loadBookingOverlay(initialWeekKey);
   const overlaysPromise = Promise.all([
-    EXCEPTIONS_URL ? fetch(EXCEPTIONS_URL + '?action=exceptions&token=' + OWN_BACKEND_TOKEN).then(r => r.ok ? r.json() : {exceptions:[]}).then(d => d.exceptions || []).catch(() => []) : Promise.resolve([]),
-    FAB_SYNC_URL ? fetch(FAB_SYNC_URL + '?token=' + OWN_BACKEND_TOKEN).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
-    COVER_SYNC_URL ? fetch(COVER_SYNC_URL + '?token=' + SHARED_TOKEN).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
-    fetch(LUNCH_COVER_URL, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetchOverlay_('activity exceptions', EXCEPTIONS_URL, EXCEPTIONS_URL + '?action=exceptions&token=' + OWN_BACKEND_TOKEN, undefined, {exceptions:[]}).then(d => d.exceptions || []),
+    fetchOverlay_('FAB rota', FAB_SYNC_URL, FAB_SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, undefined, null),
+    fetchOverlay_('release schedule (PPA/cover)', COVER_SYNC_URL, COVER_SYNC_URL + '?token=' + SHARED_TOKEN, undefined, null),
+    fetchOverlay_('lunch cover', LUNCH_COVER_URL, LUNCH_COVER_URL, { signal: AbortSignal.timeout(8000) }, null),
   ]);
 
   try {
@@ -3861,6 +3909,7 @@ async function init() {
   // out — the difference is the timetable itself no longer waits for them.
   try {
     const [exceptionsData, fabDataRaw, coverDataRaw, lcDataRaw] = await overlaysPromise;
+    reportOverlayFailures_();
 
     if (exceptionsData && Array.isArray(exceptionsData)) {
       ACTIVITY_EXCEPTIONS = exceptionsData;
@@ -3916,7 +3965,10 @@ async function init() {
     renderGrid();
   } catch (err) {
     // Overlays are supplementary (cover/FAB/lunch tags) — a failure here
-    // shouldn't disturb the core timetable already on screen.
+    // shouldn't disturb the core timetable already on screen. Still surface
+    // it rather than staying silent (19.09.26).
+    OVERLAY_FAILURES.push('release schedule/FAB/lunch cover (unexpected error)');
+    reportOverlayFailures_();
   }
 
   await Promise.all([syncLoadPromise, bookingPromise]);
