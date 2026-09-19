@@ -97,6 +97,71 @@ function doPost(e) {
 // deadlock for the full waitLock timeout (found and fixed live in
 // shared-sync/sync-script.gs the same day — see its readMasterPupilsUncached_
 // comment for the full story).
+// ── Write verification (19.09.26 reliability sweep) ──────────────────────
+// The other staff-tools backends touched in that sweep all learned the same
+// lesson: a bare {ok:true} after setValue/appendRow only means "no exception
+// was thrown", not that the Sheet actually holds the new value. These wrap
+// the pupil/staff-facing single-record writes below (checkout, return, add/
+// update book, copy status, cover override, copy counts, quiz attempts) so
+// a silent Sheets-side failure comes back as a real error instead of a
+// false "ok:true" — the shared client-side sync code already retries on an
+// {"error":...} response. Bulk import/admin actions (importChildren,
+// importBooks, bulkImportReads, clearData) are left as-is: lower frequency,
+// already visible when they fail, and a per-row verify would meaningfully
+// slow down imports of hundreds of rows.
+const WRITE_BACKUP_CAP = 100;
+
+function getWriteBackupSheet_() {
+  let sh = SS.getSheetByName('WriteBackupLog');
+  if (!sh) sh = SS.insertSheet('WriteBackupLog');
+  return sh;
+}
+
+// Snapshots the row/cell about to be overwritten. Never called for a plain
+// append (checkout, addBook, submitQuizAttempt) — nothing existing is at
+// risk there. Wrapped in try/catch on principle: a failed backup must never
+// block the real write that follows it.
+function backupPreviousValue_(sheetName, a1Notation, previousValue) {
+  try {
+    const sh = getWriteBackupSheet_();
+    sh.appendRow([new Date().toISOString(), sheetName, a1Notation, previousValue]);
+    const lastRow = sh.getLastRow();
+    if (lastRow > WRITE_BACKUP_CAP) sh.deleteRows(1, lastRow - WRITE_BACKUP_CAP);
+  } catch (err) {
+    // Never let a failed backup block the real write.
+  }
+}
+
+function valueMatches_(actual, expected) {
+  return actual === expected || String(actual) === String(expected);
+}
+
+// setValue, then read straight back and compare — the only way to know the
+// write actually reached the Sheet. Throws on mismatch, which doPost's
+// existing try/catch already turns into {"error": ...} for the client.
+function setValueVerified_(sheetName, range, value, previousValue) {
+  if (previousValue !== undefined) backupPreviousValue_(sheetName, range.getA1Notation(), previousValue);
+  range.setValue(value);
+  const actual = range.getValue();
+  if (!valueMatches_(actual, value)) {
+    throw new Error('write verification failed: ' + sheetName + '!' + range.getA1Notation() + ' does not contain what was just written');
+  }
+}
+
+// appendRow, then read the row straight back and compare every cell.
+// Returns the appended row number.
+function appendRowVerified_(sheet, sheetName, values) {
+  sheet.appendRow(values);
+  const lastRow = sheet.getLastRow();
+  const actual = sheet.getRange(lastRow, 1, 1, values.length).getValues()[0];
+  for (let i = 0; i < values.length; i++) {
+    if (!valueMatches_(actual[i], values[i])) {
+      throw new Error('write verification failed: ' + sheetName + ' row ' + lastRow + ' does not match what was sent');
+    }
+  }
+  return lastRow;
+}
+
 function dispatch(p, alreadyLocked) {
   switch(p.action) {
     case 'getAll':           return getAllCached_(alreadyLocked);
@@ -136,7 +201,7 @@ function dispatch(p, alreadyLocked) {
 function submitQuizAttempt(p) {
   const sh = SS.getSheetByName('QuizAttempts') || SS.insertSheet('QuizAttempts');
   if (sh.getLastRow() === 0) sh.appendRow(['id', 'childId', 'bookId', 'checkoutId', 'score', 'total', 'passed', 'override', 'overrideBy', 'overrideReason', 'timestamp']);
-  sh.appendRow([
+  appendRowVerified_(sh, 'QuizAttempts', [
     'QA' + Date.now(),
     String(p.childId || ''),
     String(p.bookId || ''),
@@ -521,7 +586,7 @@ function checkout(p) {
   const sheet = SS.getSheetByName('Checkouts');
   const id    = 'CO' + Date.now();
   const date  = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
-  sheet.appendRow([id, p.childId, p.bookId, p.copyNum, date, '', false, false]);
+  appendRowVerified_(sheet, 'Checkouts', [id, p.childId, p.bookId, p.copyNum, date, '', false, false]);
   return { ok: true, checkoutId: id };
 }
 
@@ -541,8 +606,8 @@ function returnBook(p) {
   for (let r = 1; r < rows.length; r++) {
     if (String(rows[r][iId]) === String(p.checkoutId)) {
       const date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
-      coSheet.getRange(r + 1, iRt + 1).setValue(date);
-      coSheet.getRange(r + 1, iCm + 1).setValue(p.completed === true);
+      setValueVerified_('Checkouts', coSheet.getRange(r + 1, iRt + 1), date, rows[r][iRt]);
+      setValueVerified_('Checkouts', coSheet.getRange(r + 1, iCm + 1), p.completed === true, rows[r][iCm]);
 
       let milestone = null;
       if (p.completed) {
@@ -554,7 +619,7 @@ function returnBook(p) {
         for (let cr = 1; cr < chRows.length; cr++) {
           if (String(chRows[cr][ciId]) === childId) {
             const newTotal = Number(chRows[cr][ciTR] || 0) + 1;
-            chSheet.getRange(cr + 1, ciTR + 1).setValue(newTotal);
+            setValueVerified_('Children', chSheet.getRange(cr + 1, ciTR + 1), newTotal, chRows[cr][ciTR]);
             if ([5, 10, 15, 20, 25].indexOf(newTotal) !== -1) milestone = newTotal;
             break;
           }
@@ -579,7 +644,7 @@ function returnBook(p) {
 function addBook(p) {
   const sheet = SS.getSheetByName('Books');
   const id    = 'BK' + Date.now();
-  sheet.appendRow([id, p.title, p.author || '', p.phase || 'LKS2', p.copies || 1]);
+  appendRowVerified_(sheet, 'Books', [id, p.title, p.author || '', p.phase || 'LKS2', p.copies || 1]);
   return { ok: true, id };
 }
 
@@ -596,10 +661,10 @@ function updateBook(p) {
         iPh = hdr.indexOf('phase'), iCo = hdr.indexOf('copies');
   for (let r = 1; r < rows.length; r++) {
     if (String(rows[r][iId]) !== bookId) continue;
-    if (p.title  !== undefined) sheet.getRange(r + 1, iTi + 1).setValue(p.title);
-    if (p.author !== undefined) sheet.getRange(r + 1, iAu + 1).setValue(p.author);
-    if (p.phase  !== undefined) sheet.getRange(r + 1, iPh + 1).setValue(p.phase);
-    if (p.copies !== undefined) sheet.getRange(r + 1, iCo + 1).setValue(Number(p.copies));
+    if (p.title  !== undefined) setValueVerified_('Books', sheet.getRange(r + 1, iTi + 1), p.title, rows[r][iTi]);
+    if (p.author !== undefined) setValueVerified_('Books', sheet.getRange(r + 1, iAu + 1), p.author, rows[r][iAu]);
+    if (p.phase  !== undefined) setValueVerified_('Books', sheet.getRange(r + 1, iPh + 1), p.phase, rows[r][iPh]);
+    if (p.copies !== undefined) setValueVerified_('Books', sheet.getRange(r + 1, iCo + 1), Number(p.copies), rows[r][iCo]);
     return { ok: true };
   }
   return { error: 'Book not found' };
@@ -618,13 +683,13 @@ function setCopyStatus(p) {
   const iRt     = hdr.indexOf('returndate');
   for (let r = 1; r < rows.length; r++) {
     if (String(rows[r][iBk]) === String(p.bookId) && Number(rows[r][iCp]) === Number(p.copyNum) && !rows[r][iRt]) {
-      coSheet.getRange(r + 1, iLst + 1).setValue(p.lost === true);
+      setValueVerified_('Checkouts', coSheet.getRange(r + 1, iLst + 1), p.lost === true, rows[r][iLst]);
       return { ok: true };
     }
   }
   if (p.lost) {
     const date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
-    coSheet.appendRow(['CO' + Date.now(), '', p.bookId, p.copyNum, date, '', false, true]);
+    appendRowVerified_(coSheet, 'Checkouts', ['CO' + Date.now(), '', p.bookId, p.copyNum, date, '', false, true]);
   }
   return { ok: true };
 }
@@ -637,12 +702,18 @@ function setCoverOverride(p) {
   const rows  = sheet.getDataRange().getValues();
   for (let r = 1; r < rows.length; r++) {
     if (String(rows[r][0]) === String(p.bookId)) {
-      if (p.url) sheet.getRange(r + 1, 2).setValue(p.url);
-      else sheet.deleteRow(r + 1);
+      if (p.url) {
+        setValueVerified_('CoverOverrides', sheet.getRange(r + 1, 2), p.url, rows[r][1]);
+      } else {
+        backupPreviousValue_('CoverOverrides', 'row ' + (r + 1) + ' (' + p.bookId + ')', rows[r][1]);
+        sheet.deleteRow(r + 1);
+        const stillThere = sheet.getDataRange().getValues().some(function (row) { return String(row[0]) === String(p.bookId); });
+        if (stillThere) throw new Error('write verification failed: CoverOverrides row for ' + p.bookId + ' was not removed');
+      }
       return { ok: true };
     }
   }
-  if (p.url) sheet.appendRow([p.bookId, p.url]);
+  if (p.url) appendRowVerified_(sheet, 'CoverOverrides', [p.bookId, p.url]);
   return { ok: true };
 }
 
@@ -658,7 +729,7 @@ function saveCopyCounts(p) {
   const counts = p.counts || {};
   for (let r = 1; r < rows.length; r++) {
     const id = String(rows[r][iId]);
-    if (counts[id] !== undefined) sheet.getRange(r + 1, iCo + 1).setValue(Number(counts[id]));
+    if (counts[id] !== undefined) setValueVerified_('Books', sheet.getRange(r + 1, iCo + 1), Number(counts[id]), rows[r][iCo]);
   }
   return { ok: true };
 }
