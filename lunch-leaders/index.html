@@ -185,8 +185,9 @@ footer { text-align: center; font-size: 10px; color: #94a3b8; padding: 10px; bor
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunchtime Leaders · WFA-19.09.26a</footer>
+<footer>Wallscourt Farm Academy · Lunchtime Leaders · WFA-19.09.26b</footer>
 
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/reliability.js"></script>
 <script>
 const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
 const GATEWAY_URL     = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
@@ -788,30 +789,16 @@ function printCards() {
   setTimeout(() => window.print(), 100);
 }
 
-// Found 19.09.26 (same class as teaching-schedule's overlaysPromise fix,
-// same day): the TermDates/cover-plan reads below used `.catch(() => null)`
-// with no response-ok check, so a backend hiccup was indistinguishable from
-// "nothing scheduled" — no error shown anywhere. Read-only: never touches
-// saved state, so no data-loss risk.
-const OVERLAY_FAILURES = [];
+// Migrated onto the shared reliability module 19.09.26 — see
+// teaching-schedule/index.html's migration commit and
+// project_staff_tools_reliability_sweep_19_09_26 in Claude's memory. Kept
+// as thin shims so every call site below is unchanged.
+const OVERLAY_FAILURES = { push: label => window.wfaReliability.setOverlayIssue(label, true, 'overlayStatus') };
 function fetchOverlay_(label, url, opts, emptyFallback) {
-  if (!url) return Promise.resolve(emptyFallback);
-  return fetch(url, opts).then(r => {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
-  }).catch(err => {
-    OVERLAY_FAILURES.push(label);
-    console.error('Overlay load failed:', label, err);
-    return emptyFallback;
-  });
+  return window.wfaReliability.fetchOverlay(label, url, opts, r => r.json(), emptyFallback, 'overlayStatus');
 }
 function reportOverlayFailures_() {
-  const el = document.getElementById('overlayStatus');
-  if (!el) return;
-  if (!OVERLAY_FAILURES.length) { el.style.display = 'none'; return; }
-  el.textContent = '⚠ Could not load: ' + OVERLAY_FAILURES.join(', ') + ' — reload to retry';
-  el.title = 'These come from other WFA tools and failed to load just now. Nothing on this page was lost or overwritten — retry by reloading.';
-  el.style.display = '';
+  /* no-op: the shared module renders on every setOverlayIssue call */
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
