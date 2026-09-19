@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-19.09.26b</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-19.09.26c</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1473,6 +1473,26 @@ const COVER_SESSION_MAP = {
   'After School': { start: 'after', end: 'after' }
 };
 
+// Found 19.09.26, a real live incident: Y5 and Y6 have no 'wash' row in the
+// DayTimings sheet at all (checked live — Wash Hands is only defined per-
+// year-group for Y1-Y4; the "5,6" combined Session 2 row runs straight into
+// lunch with nothing between them). ROWS.findIndex(r => r.id === 'wash')
+// returned -1 for these two year groups, and the code silently dropped the
+// ENTIRE staff-out entry for any AM-session cover-plan slot as a result —
+// exactly what happened to a real PPA entry, with zero indication anything
+// was wrong. 'wash' was never really the intent here; "the row right
+// before lunch" was — so resolve it that way, which is correct whether or
+// not a wash row happens to exist for this year group.
+function coverRowIdx_(rowId) {
+  const idx = ROWS.findIndex(r => r.id === rowId);
+  if (idx >= 0) return idx;
+  if (rowId === 'wash') {
+    const lunchIdx = ROWS.findIndex(r => r.id === 'lunch');
+    if (lunchIdx > 0) return lunchIdx - 1;
+  }
+  return -1;
+}
+
 function getCoverPlanStaffOut(weekIdx, dayIdx, staffId) {
   // Get staff-out spans from cover-plan data for a specific week/day/staff
   // Returns array of {start, end, label, cover, colour, source: 'cover-plan'}
@@ -1968,14 +1988,22 @@ function buildWeeks(rows) {
 }
 
 // ── Week helpers ─────────────────────────────────────────────────────────────
+// Found 19.09.26: this used a Mon-through-Sunday window (start+6 days), so
+// on a Saturday/Sunday it kept showing the week that had just finished.
+// cover-plan/planner.html's currentWeekIdx() uses a Mon-through-Friday
+// window instead, so it had already rolled over to the *next* week by
+// Saturday — the two tools disagreed about what "this week" meant on a
+// weekend, with no indication either was wrong, which is exactly the shape
+// of bug that makes data look missing when you're just looking at
+// different weeks in each tool. Matched to cover-plan's definition here so
+// both tools agree by default, every day of the week.
 function currentWeekIdx() {
   if (!WEEKS.length) return 0;
   const today = new Date(); today.setHours(0,0,0,0);
   for (let i=0; i<WEEKS.length; i++) {
-    const end = new Date(WEEKS[i].start); end.setDate(end.getDate()+6);
-    if (today >= WEEKS[i].start && today <= end) return i;
+    const end = new Date(WEEKS[i].start); end.setDate(end.getDate()+4);
+    if (today <= end) return i;
   }
-  for (let i=0; i<WEEKS.length; i++) { if (WEEKS[i].start > today) return i; }
   return WEEKS.length - 1;
 }
 
@@ -2216,8 +2244,8 @@ function renderBody() {
         const endMap = COVER_SESSION_MAP[endSession];
         if (!startMap || !endMap) return;
 
-        const startIdx = ROWS.findIndex(r => r.id === startMap.start);
-        const endIdx = ROWS.findIndex(r => r.id === endMap.end);
+        const startIdx = coverRowIdx_(startMap.start);
+        const endIdx = coverRowIdx_(endMap.end);
         if (startIdx < 0 || endIdx < 0) return;
 
         const staffInfo = COVER_STAFF_LOOKUP[slot.tid] || {};
@@ -2293,8 +2321,8 @@ function renderBody() {
       if (fixture && !nsd[fixture.day]) {
         const sessionMap = COVER_SESSION_MAP[fixture.session];
         if (sessionMap) {
-          const startIdx = ROWS.findIndex(r => r.id === sessionMap.start);
-          const endIdx = ROWS.findIndex(r => r.id === sessionMap.end);
+          const startIdx = coverRowIdx_(sessionMap.start);
+          const endIdx = coverRowIdx_(sessionMap.end);
           if (startIdx >= 0 && endIdx >= 0) {
             const providerName = SPORTS_PROVIDER_NAMES[fixture.provider] || '';
             ROWS.forEach((row, ri) => {
