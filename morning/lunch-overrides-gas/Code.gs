@@ -30,14 +30,15 @@ function adminTokenOK_(body) {
 
 function getData_() {
   var raw = PropertiesService.getScriptProperties().getProperty(PROP_KEY);
-  if (!raw) return { overrides: {}, swaps: {} };
+  if (!raw) return { overrides: {}, swaps: {}, updatedAt: null };
   try {
     var d = JSON.parse(raw);
     if (!d.overrides) d.overrides = {};
     if (!d.swaps) d.swaps = {};
+    if (!d.updatedAt) d.updatedAt = null;
     return d;
   } catch (e) {
-    return { overrides: {}, swaps: {} };
+    return { overrides: {}, swaps: {}, updatedAt: null };
   }
 }
 
@@ -109,6 +110,7 @@ function doPost(e) {
     return json_({ ok: false, error: 'unknown action' });
   }
 
+  data.updatedAt = new Date().toISOString();
   pruneOld_(data);
   saveData_(data);
   return json_({ ok: true, data: data });

@@ -479,7 +479,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Willow</span><span id="version-tag">w.11.09.26a</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Willow</span><span id="version-tag">w.19.09.26a</span></div>
   </div>
   <div id="lunch-bar" class="with-imgs">
     <div class="lc lc-r" id="lc0">—</div>
@@ -489,6 +489,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
     <div class="lc lc-roll" id="lc-roll"><img class="food-img" src="../img/filled-roll.png" alt="">Filled Roll</div>
     <div class="lc lc-b"><img class="food-img" src="../img/packed-lunch.png" alt="">Packed Lunch</div>
   </div>
+  <div id="menu-updated" style="text-align:right;font-size:0.55rem;color:#AAA;padding-right:0.3em;margin-top:-0.3em"></div>
   <div id="main">
     <div id="puzzle-panel"></div>
     <div id="right-panel">
@@ -543,9 +544,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
 <div class="overlay" id="ov-overlay" onclick="if(event.target===this)closeOverride()">
   <div class="obox">
     <h2>Override today's display</h2>
-    <p style="font-size:0.82rem;color:#666;margin-bottom:12px">Leave any field blank to use the automatic value.</p>
-    <div class="ov-field"><label>Hot option 1 (red)</label><input id="ov-meal1" placeholder="Leave blank to use rotation"></div>
-    <div class="ov-field"><label>Hot option 2 (green)</label><input id="ov-meal2" placeholder="Leave blank to use rotation"></div>
+    <p style="font-size:0.82rem;color:#666;margin-bottom:12px">Leave any field blank to use the automatic value. The lunch menu itself is set centrally — see the shared menu admin tool, not here.</p>
     <div class="ov-field">
       <label>Morning message</label>
       <textarea id="ov-msg" placeholder="Leave blank for automatic message (Thu/Fri) or no message"></textarea>
@@ -572,9 +571,8 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div class="obox">
     <h2>Setup</h2>
 
-    <h3>Lunch menu — 3-week rotation</h3>
-    <p style="font-size:0.82rem;color:#666;margin-bottom:10px">Tomato Pasta, Jacket Potato and Packed Lunch are fixed.</p>
-    <div id="menu-form"></div>
+    <h3>Lunch menu</h3>
+    <p style="font-size:0.82rem;color:#666;margin-bottom:10px">Set centrally for every board — see the shared menu admin tool. Nothing to edit here.</p>
 
     <h3 style="margin-top:1.5rem">Default weekday messages</h3>
     <p style="font-size:0.82rem;color:#666;margin-bottom:10px">Shown automatically each day unless overridden for today. Leave a day blank for no automatic message.</p>
@@ -2766,15 +2764,9 @@ function getMenu(){
   if(!['Mon','Tue','Wed','Thu','Fri'].includes(dk))return['No school today',''];
   if(CENTRAL_OVERRIDES[ts])return CENTRAL_OVERRIDES[ts];
   const lookupDate=CENTRAL_SWAPS[ts]||ts,lookupDk=getDK(lookupDate);
-  const ov=JSON.parse(localStorage.getItem('y2_ov_'+ts)||'{}');
-  const saved=JSON.parse(localStorage.getItem('y2_menu')||'{}');
   const mon=getMon(lookupDate);
-  // check saved overrides first, then new menu, then fallback
-  let base;
-  if(saved[mon]&&saved[mon][lookupDk])base=saved[mon][lookupDk];
-  else if(MENU_BY_WEEK[mon])base=MENU_BY_WEEK[mon][lookupDk]||['Menu not set',''];
-  else base=['Menu not yet set',''];
-  return[ov.meal1||base[0],ov.meal2||base[1]];
+  if(MENU_BY_WEEK[mon])return MENU_BY_WEEK[mon][lookupDk]||['Menu not set',''];
+  return['Menu not yet set',''];
 }
 function getMsg(){
   const ts=todayStr(),dk=getDK(ts);
@@ -2806,6 +2798,7 @@ const ALL_TYPES=['y2combined','y2literacy','y2cew','boggle','number'];
 // Falls back silently to in-file MENU_BY_WEEK on any error.
 // ═══════════════════════════════════════════════════════════
 let CENTRAL_OVERRIDES={}, CENTRAL_SWAPS={};
+let MENU_LAST_UPDATED=null, OVERRIDES_LAST_UPDATED=null;
 const LUNCH_OVERRIDE_URL='https://script.google.com/macros/s/AKfycbz0yYbvPGa7csQYwJAQg7NTRYrbNjt-wgz4XYjdSEJ1GxuV2rQornoKicohiKDoBbhC/exec';
 async function loadSharedMenu(){
   try{
@@ -2819,6 +2812,7 @@ async function loadSharedMenu(){
       Object.assign(MENU_BY_WEEK, data.weeks);
       console.log('[SharedMenu] Loaded', Object.keys(MENU_BY_WEEK).length, 'weeks');
     }
+    MENU_LAST_UPDATED=data&&data._lastUpdated||null;
   } catch(e){
     console.log('[SharedMenu] Using in-file fallback:', e.message);
   }
@@ -2830,6 +2824,7 @@ async function loadSharedMenu(){
     const od = await or.json();
     CENTRAL_OVERRIDES = od.overrides || {};
     CENTRAL_SWAPS = od.swaps || {};
+    OVERRIDES_LAST_UPDATED = od.updatedAt || null;
   } catch(e){
     console.log('[LunchOverride] none available:', e.message);
   }
@@ -2951,6 +2946,10 @@ function renderLunch(){
   setLunchCell('lc1',m2);
   setPastaCell();
   setRollCell();
+  const stamps=[MENU_LAST_UPDATED,OVERRIDES_LAST_UPDATED].filter(Boolean).sort();
+  const latest=stamps[stamps.length-1];
+  const stampEl=document.getElementById('menu-updated');
+  if(stampEl)stampEl.textContent=latest?('Menu updated '+new Date(latest).toLocaleDateString('en-GB',{day:'numeric',month:'short'})):'';
 }
 function renderMsg(){
   const text=getMsg();
@@ -4448,8 +4447,6 @@ function loadImg(){try{const s=sessionStorage.getItem('y2_img');if(s)showImg(s)}
 function openOverride(){
   const ts=todayStr(),dk=getDK(ts);
   const ov=JSON.parse(localStorage.getItem('y2_ov_'+ts)||'{}');
-  document.getElementById('ov-meal1').value=ov.meal1||'';
-  document.getElementById('ov-meal2').value=ov.meal2||'';
   document.getElementById('ov-msg').value=ov.hasOwnProperty('msg')?ov.msg:'';
   const tt=ov.tt||{};
   document.getElementById('ov-tt-topic').value=tt.topic||'';
@@ -4465,10 +4462,6 @@ function closeOverride(){document.getElementById('ov-overlay').classList.remove(
 function saveOverride(){
   const ts=todayStr();
   const ov=JSON.parse(localStorage.getItem('y2_ov_'+ts)||'{}');
-  const m1=document.getElementById('ov-meal1').value.trim();
-  const m2=document.getElementById('ov-meal2').value.trim();
-  if(m1)ov.meal1=m1; else delete ov.meal1;
-  if(m2)ov.meal2=m2; else delete ov.meal2;
   ov.msg=document.getElementById('ov-msg').value;
   const topic=document.getElementById('ov-tt-topic').value.trim();
   if(topic){
@@ -4486,20 +4479,6 @@ function updateDot(){const ts=todayStr();const ov=JSON.parse(localStorage.getIte
 let pendingTTBank=[];
 
 function openSetup(){
-  const saved=JSON.parse(localStorage.getItem('y2_menu')||'{}');
-  const days=['Mon','Tue','Wed','Thu','Fri'];
-  const weeks=Object.keys(MENU_BY_WEEK).sort();
-  let html='';
-  for(const mon of weeks){
-    const d=new Date(mon+'T12:00:00');
-    const label=`w/c ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-    html+=`<div class="menu-wk">${label}</div><div class="mrow"><div></div><div class="col-hdr">Hot option 1 (red)</div><div class="col-hdr">Hot option 2 (green)</div></div>`;
-    for(const day of days){
-      const v=(saved[mon]&&saved[mon][day])||MENU_BY_WEEK[mon][day]||['',''];
-      html+=`<div class="mrow"><label>${day}</label><input id="mn_${mon}_${day}_0" value="${(v[0]||'').replace(/"/g,'&quot;')}"><input id="mn_${mon}_${day}_1" value="${(v[1]||'').replace(/"/g,'&quot;')}"></div>`;
-    }
-  }
-  document.getElementById('menu-form').innerHTML=html;
   // Load grapheme picker state and mode
   pendingGraphemes=new Set(JSON.parse(localStorage.getItem('y2_graphemes')||'[]'));
   pendingPhonicsMode=localStorage.getItem('y2_phonics_mode')||'real';
@@ -4603,16 +4582,6 @@ function addTTSet(){
   renderTTBank();
 }
 function saveSetup(){
-  const saved={};
-  const days=['Mon','Tue','Wed','Thu','Fri'];
-  const weeks=Object.keys(MENU_BY_WEEK).sort();
-  for(const mon of weeks){
-    saved[mon]={};
-    for(const day of days){
-      saved[mon][day]=[document.getElementById(`mn_${mon}_${day}_0`)?.value||'',document.getElementById(`mn_${mon}_${day}_1`)?.value||''];
-    }
-  }
-  localStorage.setItem('y2_menu',JSON.stringify(saved));
   localStorage.setItem('y2_tt_bank',JSON.stringify(pendingTTBank));
   localStorage.setItem('y2_graphemes',JSON.stringify([...pendingGraphemes]));
   localStorage.setItem('y2_phonics_mode',pendingPhonicsMode);

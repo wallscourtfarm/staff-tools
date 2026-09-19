@@ -45,7 +45,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Oak</span><span id="version-tag">EYFS-11.09.26a</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Oak</span><span id="version-tag">EYFS-19.09.26a</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -55,6 +55,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
     <div class="lc lc-roll" id="lc-roll"><img class="food-img" src="../img/filled-roll.png" alt="">Filled Roll</div>
     <div class="lc lc-b"><img class="food-img" src="../img/packed-lunch.png" alt="">Packed Lunch</div>
   </div>
+  <div id="menu-updated" style="text-align:right;font-size:0.55rem;color:#AAA;padding-right:0.3em;margin-top:-0.3em"></div>
   <div id="main">
     <div id="feeling-title">How are you feeling today?</div>
     <div id="img-grid">
@@ -155,6 +156,7 @@ function getMenu(){
 }
 
 let CENTRAL_OVERRIDES={}, CENTRAL_SWAPS={};
+let MENU_LAST_UPDATED=null, OVERRIDES_LAST_UPDATED=null;
 const LUNCH_OVERRIDE_URL='https://script.google.com/macros/s/AKfycbz0yYbvPGa7csQYwJAQg7NTRYrbNjt-wgz4XYjdSEJ1GxuV2rQornoKicohiKDoBbhC/exec';
 async function loadSharedMenu(){
   try{
@@ -166,6 +168,7 @@ async function loadSharedMenu(){
       Object.assign(MENU_BY_WEEK,data.weeks);
       console.log('[SharedMenu] Loaded',Object.keys(MENU_BY_WEEK).length,'weeks');
     }
+    MENU_LAST_UPDATED=data&&data._lastUpdated||null;
   }catch(e){console.log('[SharedMenu] Using in-file fallback:',e.message);}
   try{
     const or=await fetch(LUNCH_OVERRIDE_URL,{cache:'no-cache'});
@@ -173,6 +176,7 @@ async function loadSharedMenu(){
     const od=await or.json();
     CENTRAL_OVERRIDES=od.overrides||{};
     CENTRAL_SWAPS=od.swaps||{};
+    OVERRIDES_LAST_UPDATED=od.updatedAt||null;
   }catch(e){console.log('[LunchOverride] none available:',e.message);}
 }
 
@@ -244,6 +248,10 @@ function renderLunch(){
   setLunchCell('lc1',m2);
   setPastaCell();
   setRollCell();
+  const stamps=[MENU_LAST_UPDATED,OVERRIDES_LAST_UPDATED].filter(Boolean).sort();
+  const latest=stamps[stamps.length-1];
+  const stampEl=document.getElementById('menu-updated');
+  if(stampEl)stampEl.textContent=latest?('Menu updated '+new Date(latest).toLocaleDateString('en-GB',{day:'numeric',month:'short'})):'';
 }
 function renderDate(){
   const n=new Date();
