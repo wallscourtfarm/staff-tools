@@ -119,7 +119,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title">Fresh Air Break Rota</div>
-    <div class="app-subtitle">Wallscourt Farm Academy · 19.09.26c</div>
+    <div class="app-subtitle">Wallscourt Farm Academy · 19.09.26d</div>
   </div>
 </div>
 
@@ -314,16 +314,16 @@ function buildWeeks(rows) {
 }
 
 // ── Week helpers ──────────────────────────────────────────────────────────────
+// Found 19.09.26: matched to cover-plan/planner.html's Mon-Fri window (was
+// Mon-Sun here) — the two disagreed about what "this week" meant on a
+// Saturday/Sunday, with no indication either was wrong. See
+// project_staff_tools_reliability_sweep_19_09_26 in Claude's memory.
 function currentWeekIdx() {
   if (!WEEKS.length) return 0;
   const today = new Date(); today.setHours(0,0,0,0);
   for (let i = 0; i < WEEKS.length; i++) {
-    const end = new Date(WEEKS[i].start); end.setDate(end.getDate() + 6);
-    if (today >= WEEKS[i].start && today <= end) return i;
-  }
-  // Return nearest future week, or last if all past
-  for (let i = 0; i < WEEKS.length; i++) {
-    if (WEEKS[i].start > today) return i;
+    const end = new Date(WEEKS[i].start); end.setDate(end.getDate() + 4);
+    if (today <= end) return i;
   }
   return WEEKS.length - 1;
 }
