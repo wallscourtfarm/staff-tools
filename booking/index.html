@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 19.09.26a</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 19.09.26b</div>
       </div>
     </div>
     <div class="top-bar">
@@ -393,6 +393,7 @@
     </div>
   </div>
 
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/reliability.js"></script>
 <script>
 // ── Config ──────────────────────────────────────────────────────────────────
 const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
@@ -773,33 +774,16 @@ function buildSchoolEvents(rows) {
 }
 
 // ── Sync ─────────────────────────────────────────────────────────────────────
-// Tracks which named overlay/read-path is currently failing, so a repeated
-// per-navigation read (syncLoad, called on every week change) can clear its
-// own entry on the next successful load rather than a failure banner
-// sticking around forever. Read-only bookkeeping — never touches
-// state.bookings/syncedWeeks itself. Added 19.09.26, same incident class as
-// teaching-schedule's overlaysPromise fix earlier the same day.
-const ACTIVE_OVERLAY_ISSUES = new Set();
+// Migrated onto the shared reliability module 19.09.26 — this file's own
+// Set-based tracking (built for syncLoad's per-navigation calls) is what
+// the shared module's design was modeled on. See teaching-schedule/index.html's
+// migration commit and project_staff_tools_reliability_sweep_19_09_26 in
+// Claude's memory. Kept as thin shims so every call site below is unchanged.
 function setOverlayIssue_(key, hasIssue) {
-  if (hasIssue) ACTIVE_OVERLAY_ISSUES.add(key); else ACTIVE_OVERLAY_ISSUES.delete(key);
-  const el = document.getElementById('overlayStatus');
-  if (!el) return;
-  if (!ACTIVE_OVERLAY_ISSUES.size) { el.style.display = 'none'; return; }
-  el.textContent = '⚠ Could not load: ' + [...ACTIVE_OVERLAY_ISSUES].join(', ') + ' — reload to retry';
-  el.title = 'These come from other WFA tools and failed to load just now. Nothing on this page was lost or overwritten — retry by reloading.';
-  el.style.display = '';
+  window.wfaReliability.setOverlayIssue(key, hasIssue, 'overlayStatus');
 }
 function fetchOverlay_(label, url, opts, extract, emptyFallback) {
-  if (!url) return Promise.resolve(emptyFallback);
-  return fetch(url, opts).then(r => {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return extract(r);
-  }).then(v => { setOverlayIssue_(label, false); return v; })
-    .catch(err => {
-      setOverlayIssue_(label, true);
-      console.error('Overlay load failed:', label, err);
-      return emptyFallback;
-    });
+  return window.wfaReliability.fetchOverlay(label, url, opts, extract, emptyFallback, 'overlayStatus');
 }
 
 // Found 19.09.26: this had a bare `catch {}` and, worse, a non-2xx or a
