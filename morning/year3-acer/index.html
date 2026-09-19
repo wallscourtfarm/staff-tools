@@ -636,7 +636,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Acer</span><span id="version-tag">a.11.09.26a</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Acer</span><span id="version-tag">a.19.09.26a</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -646,6 +646,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
     <div class="lc lc-roll" id="lc-roll"><img class="food-img" src="../img/filled-roll.png" alt="">Filled Roll</div>
     <div class="lc lc-b"><img class="food-img" src="../img/packed-lunch.png" alt="">Packed Lunch</div>
   </div>
+  <div id="menu-updated" style="text-align:right;font-size:0.55rem;color:#AAA;padding-right:0.3em;margin-top:-0.3em"></div>
   <div id="main">
     <div id="puzzle-panel"></div>
     <div id="right-panel">
@@ -700,9 +701,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
 <div class="overlay" id="ov-overlay" onclick="if(event.target===this)closeOverride()">
   <div class="obox">
     <h2>Override today's display</h2>
-    <p style="font-size:0.82rem;color:#666;margin-bottom:12px">Leave any field blank to use the automatic value.</p>
-    <div class="ov-field"><label>Hot option 1 (red)</label><input id="ov-meal1" placeholder="Leave blank to use rotation"></div>
-    <div class="ov-field"><label>Hot option 2 (green)</label><input id="ov-meal2" placeholder="Leave blank to use rotation"></div>
+    <p style="font-size:0.82rem;color:#666;margin-bottom:12px">Leave any field blank to use the automatic value. The lunch menu itself is set centrally — see the shared menu admin tool, not here.</p>
     <div class="ov-field">
       <label>Morning message</label>
       <textarea id="ov-msg" placeholder="Leave blank for automatic message (Thu/Fri) or no message"></textarea>
@@ -729,8 +728,8 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div class="obox">
     <h2>Setup</h2>
 
-    <h3>Lunch menu — 3-week rotation</h3>
-    <p style="font-size:0.82rem;color:#666;margin-bottom:10px">Tomato Pasta, Jacket Potato and Packed Lunch are fixed.</p>
+    <h3>Lunch menu — 3-week rotation (read-only)</h3>
+    <p style="font-size:0.82rem;color:#666;margin-bottom:10px">Set centrally for every board — see the shared menu admin tool to change it. Tomato Pasta, Jacket Potato and Packed Lunch are fixed.</p>
     <label style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;cursor:pointer;margin-bottom:10px"><input type="checkbox" id="setup-lunch-imgs" style="width:18px;height:18px;accent-color:#1798d3;cursor:pointer"> Show food images on lunch bar</label>
     <div id="menu-form"></div>
 
@@ -1853,11 +1852,10 @@ function getMenu(){
   const d=lookupDate.getDay();
   const mon=new Date(lookupDate);mon.setDate(lookupDate.getDate()-(d===0?6:d-1));
   const wk=`${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
-  const ov=JSON.parse(localStorage.getItem('overrides')||'{}');
   const menu=MENU_BY_WEEK[wk];
   const dayKey=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d];
   const opts=menu&&menu[dayKey]?menu[dayKey]:['—','—'];
-  return[ov.red||opts[0],ov.green||opts[1]];
+  return opts;
 }
 function getPastaForToday(){
   const wk=getMenuWeekStr();const menu=MENU_BY_WEEK[wk];
@@ -1885,6 +1883,10 @@ function renderLunch(){
   setLunchCell('lc1',m2);
   setPastaCell();
   setRollCell();
+  const stamps=[MENU_LAST_UPDATED,OVERRIDES_LAST_UPDATED].filter(Boolean).sort();
+  const latest=stamps[stamps.length-1];
+  const stampEl=document.getElementById('menu-updated');
+  if(stampEl)stampEl.textContent=latest?('Menu updated '+new Date(latest).toLocaleDateString('en-GB',{day:'numeric',month:'short'})):'';
 }
 function renderMsg(){
   const ov=JSON.parse(localStorage.getItem('overrides')||'{}');
@@ -1973,15 +1975,14 @@ function closeImgModal(){document.getElementById('img-overlay').classList.remove
 // ══════════════════════════════════════════════════════════════
 function openOverride(){
   const ov=JSON.parse(localStorage.getItem('overrides')||'{}');
-  document.getElementById('ov-meal1').value=ov.red||'';document.getElementById('ov-meal2').value=ov.green||'';
   document.getElementById('ov-msg').value=(ov.msg||'').replace(/<br>/g,'\n');
   document.getElementById('ov-tt-topic').value='';['1','2','3'].forEach(n=>document.getElementById('ov-tt-'+n).value='');
   document.getElementById('ov-overlay').classList.add('on');
 }
 function closeOverride(){document.getElementById('ov-overlay').classList.remove('on');}
 function saveOverride(){
-  const ov={};const red=document.getElementById('ov-meal1').value.trim();const green=document.getElementById('ov-meal2').value.trim();const msg=document.getElementById('ov-msg').value;
-  if(red)ov.red=red;if(green)ov.green=green;if(msg.trim())ov.msg=msg.replace(/\n/g,'<br>');
+  const ov={};const msg=document.getElementById('ov-msg').value;
+  if(msg.trim())ov.msg=msg.replace(/\n/g,'<br>');
   localStorage.setItem('overrides',JSON.stringify(ov));renderLunch();renderMsg();
   document.getElementById('override-dot').style.display=Object.keys(ov).length?'inline-block':'none';closeOverride();
 }
@@ -2027,6 +2028,7 @@ function saveSetup(){if(document.getElementById('setup-lunch-imgs').checked)loca
 // Falls back silently to in-file MENU_BY_WEEK on any error.
 // ═══════════════════════════════════════════════════════════
 let CENTRAL_OVERRIDES={}, CENTRAL_SWAPS={};
+let MENU_LAST_UPDATED=null, OVERRIDES_LAST_UPDATED=null;
 const LUNCH_OVERRIDE_URL='https://script.google.com/macros/s/AKfycbz0yYbvPGa7csQYwJAQg7NTRYrbNjt-wgz4XYjdSEJ1GxuV2rQornoKicohiKDoBbhC/exec';
 async function loadSharedMenu(){
   try{
@@ -2040,6 +2042,7 @@ async function loadSharedMenu(){
       Object.assign(MENU_BY_WEEK, data.weeks);
       console.log('[SharedMenu] Loaded', Object.keys(MENU_BY_WEEK).length, 'weeks');
     }
+    MENU_LAST_UPDATED=data&&data._lastUpdated||null;
   } catch(e){
     console.log('[SharedMenu] Using in-file fallback:', e.message);
   }
@@ -2051,6 +2054,7 @@ async function loadSharedMenu(){
     const od = await or.json();
     CENTRAL_OVERRIDES = od.overrides || {};
     CENTRAL_SWAPS = od.swaps || {};
+    OVERRIDES_LAST_UPDATED = od.updatedAt || null;
   } catch(e){
     console.log('[LunchOverride] none available:', e.message);
   }
