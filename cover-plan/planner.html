@@ -409,7 +409,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(19.09.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(19.09.26b)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -1000,6 +1000,56 @@ function showSaveFailureBanner_(message) {
 }
 function hideSaveFailureBanner_() {
   const banner = document.getElementById('saveFailBanner');
+  if (banner) banner.remove();
+}
+
+// ── Calendar/term event writes (add/update/delete via notify-script.gs) ────────
+// Found 19.09.26: every one of these 5 call sites used
+// `fetch(..., {mode:'no-cors'}).catch(()=>{})` — no-cors makes the response
+// permanently opaque by design (status/body unreadable), so a rejected write
+// (bad payload, quota, a real backend error) was completely invisible. Local
+// state (FRONT_END_EVENTS etc.) still updates optimistically so this device
+// keeps showing the edit, but it silently never reached the shared calendar
+// for anyone else. Checked live: this endpoint actually sends
+// access-control-allow-origin:* and returns a real {success,error} JSON body
+// (see handleEventWrite in notify-script.gs) — no-cors was never necessary.
+// Failures are now queued and retryable via a banner instead of vanishing.
+let _pendingEventWrites = [];
+function writeEvent_(payload) {
+  return fetch(EVENT_WRITE_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload)))
+    .then(async res => {
+      let json = null;
+      try { json = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
+      if (!res.ok || !json || json.success === false) {
+        throw new Error((json && json.error) || ('HTTP ' + res.status));
+      }
+    })
+    .catch(err => {
+      console.error('Calendar event write failed:', payload.action, err);
+      _pendingEventWrites.push(payload);
+      showEventSyncFailBanner_();
+    });
+}
+function retryPendingEventWrites_() {
+  const pending = _pendingEventWrites;
+  _pendingEventWrites = [];
+  hideEventSyncFailBanner_();
+  Promise.all(pending.map(writeEvent_));
+}
+function showEventSyncFailBanner_() {
+  let banner = document.getElementById('eventSyncFailBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'eventSyncFailBanner';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;background:#f97316;color:#fff;padding:10px 20px;text-align:center;font-weight:bold;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    document.body.prepend(banner);
+  }
+  banner.innerHTML = '⚠ ' + _pendingEventWrites.length + ' calendar event change(s) saved on this device but not yet synced to the shared calendar — other devices won\'t see them yet. ' +
+    '<button type="button" style="margin-left:12px;padding:4px 14px;border-radius:4px;border:none;background:#fff;color:#f97316;font-weight:bold;cursor:pointer">Retry sync</button>';
+  banner.querySelector('button').onclick = retryPendingEventWrites_;
+}
+function hideEventSyncFailBanner_() {
+  const banner = document.getElementById('eventSyncFailBanner');
   if (banner) banner.remove();
 }
 
@@ -2671,7 +2721,7 @@ function saveTermEvent(mode, date, id) {
       if (seriesId) ev.seriesId = seriesId;
       FRONT_END_EVENTS.push(ev);
       const payload = { type:'event_write', action:'add', event: ev };
-      fetch(EVENT_WRITE_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
+      writeEvent_(payload);
     });
   } else {
     const existing = FRONT_END_EVENTS.find(f=>f.id===id);
@@ -2680,7 +2730,7 @@ function saveTermEvent(mode, date, id) {
     const idx = FRONT_END_EVENTS.findIndex(f=>f.id===id);
     if (idx>=0) FRONT_END_EVENTS[idx]=ev; else FRONT_END_EVENTS.push(ev);
     const payload = { type:'event_write', action:'update', event: ev };
-    fetch(EVENT_WRITE_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
+    writeEvent_(payload);
   }
   _syncFrontEndToInfoEvents();
   renderTermView();
@@ -2803,7 +2853,7 @@ function _deleteSheetEventAll(id) {
   });
   if (id) {
     const payload = { type:'event_write', action:'delete', event:{ id } };
-    fetch(EVENT_WRITE_URL+'?payload='+encodeURIComponent(JSON.stringify(payload)), {mode:'no-cors'}).catch(()=>{});
+    writeEvent_(payload);
   }
   renderTermView();
 }
@@ -2812,7 +2862,7 @@ function _deleteFESingle(id) {
   FRONT_END_EVENTS = FRONT_END_EVENTS.filter(f=>f.id!==id);
   _syncFrontEndToInfoEvents();
   renderTermView();
-  fetch(EVENT_WRITE_URL+'?payload='+encodeURIComponent(JSON.stringify({type:'event_write',action:'delete',event:{id}})), {mode:'no-cors'}).catch(()=>{});
+  writeEvent_({type:'event_write',action:'delete',event:{id}});
 }
 
 function _deleteFESeries(seriesId) {
@@ -2821,7 +2871,7 @@ function _deleteFESeries(seriesId) {
   _syncFrontEndToInfoEvents();
   renderTermView();
   toDelete.forEach(ev => {
-    fetch(EVENT_WRITE_URL+'?payload='+encodeURIComponent(JSON.stringify({type:'event_write',action:'delete',event:{id:ev.id}})), {mode:'no-cors'}).catch(()=>{});
+    writeEvent_({type:'event_write',action:'delete',event:{id:ev.id}});
   });
 }
 
