@@ -33,21 +33,65 @@ const SHEET_ID = '1XsP5yEGnf8sJyXk8iEXqHEtw-NtCsMUFZLaHW4TWNhw';
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  // Found 19.09.26, live repeat of the 18.09.26 cover-plan-state incident:
+  // this had no lock, no backup, and no write-verification at all — just
+  // setValue() then an unconditional 'ok', with the client not even reading
+  // the response. A rejected/interrupted write was indistinguishable from a
+  // real save. Mirrors shared-sync/sync-script.gs's doPost pattern.
   function doPost(e) {
     if (!tokenOK_(e)) {
-      return ContentService.createTextOutput(JSON.stringify({ error: 'unauthorised' }))
-        .setMimeType(ContentService.MimeType.JSON);
+      return json_({ error: 'unauthorised' });
     }
-    const sheet = getOrCreateTab();
-    sheet.getRange('A1').setValue(e.postData.contents);
-    try { CacheService.getScriptCache().put(CACHE_KEY, e.postData.contents, CACHE_TTL_SECONDS); } catch (err) { /* too large — skip */ }
-    return ContentService.createTextOutput('ok')
-      .setMimeType(ContentService.MimeType.TEXT);
+    const lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(20000);
+    } catch (err) {
+      return json_({ status: 'error', message: 'locked, try again' });
+    }
+    try {
+      const sheet = getOrCreateTab();
+      const range = sheet.getRange('A1');
+      backupFabState_(String(range.getValue() || ''));
+      range.setValue(e.postData.contents);
+      const actual = String(sheet.getRange('A1').getValue() || '');
+      if (actual !== e.postData.contents) {
+        CacheService.getScriptCache().remove(CACHE_KEY);
+        return json_({ status: 'error', message: 'write verification failed: sheet does not contain what was just written' });
+      }
+      try { CacheService.getScriptCache().put(CACHE_KEY, e.postData.contents, CACHE_TTL_SECONDS); } catch (err) { /* too large — skip */ }
+      return json_({ status: 'ok' });
+    } finally {
+      lock.releaseLock();
+    }
   }
-                                                            
+
+  function json_(obj) {
+    return ContentService.createTextOutput(JSON.stringify(obj))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Sheets cell (50,000 chars/cell) — no PropertiesService 9KB ceiling to
+  // hit, unlike the original cover-plan-state bug. Same ring-buffer shape as
+  // shared-sync's backupSyncKey_.
+  const BACKUP_TAB_NAME = 'FABStateBackups';
+  const BACKUP_COUNT = 100;
+  function backupFabState_(current) {
+    if (!current) return; // nothing to lose yet
+    try {
+      const ss = SpreadsheetApp.openById(SHEET_ID);
+      let sh = ss.getSheetByName(BACKUP_TAB_NAME);
+      if (!sh) sh = ss.insertSheet(BACKUP_TAB_NAME);
+      let pretty;
+      try { pretty = JSON.stringify(JSON.parse(current), null, 2); } catch (err) { pretty = current; }
+      sh.appendRow([new Date().toISOString(), pretty]);
+      const lastRow = sh.getLastRow();
+      if (lastRow > BACKUP_COUNT) sh.deleteRows(1, lastRow - BACKUP_COUNT);
+    } catch (err) { /* never let a failed backup block the real write */ }
+  }
+
   function getOrCreateTab() {
     const ss = SpreadsheetApp.openById(SHEET_ID);
-    let sheet = ss.getSheetByName(TAB_NAME);                                                                       
+    let sheet = ss.getSheetByName(TAB_NAME);
     if (!sheet) sheet = ss.insertSheet(TAB_NAME);
-    return sheet;                                                                                                  
+    return sheet;
   }

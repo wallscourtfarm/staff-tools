@@ -409,7 +409,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(18.09.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(19.09.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -569,6 +569,9 @@ const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzf
 // forwarding logic, so it must NOT be used for CalendarEvents CRUD (see
 // EVENT_WRITE_URL below).
 const NOTIFY_URL = 'https://api.wallscourt-farm-academy.co.uk/notify';
+// Found 19.09.26: this endpoint sent real Twilio SMS with no token check at
+// all. Now gated the same way as every other backend here — SHARED_TOKEN in
+// the query string (see both fetch(NOTIFY_URL...) call sites below).
 
 // CalendarEvents CRUD (add/update/delete term events) goes straight to the
 // notify-script.gs Apps Script web app — these are one-way, fire-and-forget
@@ -2380,7 +2383,7 @@ async function sendNotification() {
 
   try {
     console.log('sendNotification payload changes: ' + JSON.stringify(payload.changes));
-    const resp = await fetch(NOTIFY_URL, {
+    const resp = await fetch(NOTIFY_URL + '?token=' + SHARED_TOKEN, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -2450,7 +2453,7 @@ async function submitConcern() {
     recipients: CONCERN_RECIPIENTS.map(e => ({ email: e }))
   };
   try {
-    const resp = await fetch(NOTIFY_URL, {
+    const resp = await fetch(NOTIFY_URL + '?token=' + SHARED_TOKEN, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
