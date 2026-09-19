@@ -125,7 +125,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title">Lunch Cover Rota</div>
-    <div class="app-subtitle">Wallscourt Farm Academy</div>
+    <div class="app-subtitle">Wallscourt Farm Academy · 19.09.26a</div>
   </div>
 </div>
 
@@ -145,6 +145,7 @@
     </select>
   </div>
   <span class="sheet-status" id="sheetStatus">Loading…</span>
+  <span class="sheet-status err" id="overlayStatus" style="display:none"></span>
 </div>
 
 <div class="app-body">
@@ -947,6 +948,32 @@ function addDuty() {
   renderDutyMgr();
 }
 
+// Found 19.09.26 (same class as teaching-schedule's overlaysPromise fix,
+// same day): the cover-plan/own-state reads below used to swallow failures
+// with `.catch(() => null)` and no response-ok check on one of them, so a
+// backend hiccup was indistinguishable from "nothing scheduled" — no error
+// shown anywhere. Read-only: never touches saved state, so no data-loss risk.
+const OVERLAY_FAILURES = [];
+function fetchOverlay_(label, url, opts, extract, emptyFallback) {
+  if (!url) return Promise.resolve(emptyFallback);
+  return fetch(url, opts).then(r => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return extract(r);
+  }).catch(err => {
+    OVERLAY_FAILURES.push(label);
+    console.error('Overlay load failed:', label, err);
+    return emptyFallback;
+  });
+}
+function reportOverlayFailures_() {
+  const el = document.getElementById('overlayStatus');
+  if (!el) return;
+  if (!OVERLAY_FAILURES.length) { el.style.display = 'none'; return; }
+  el.textContent = '⚠ Could not load: ' + OVERLAY_FAILURES.join(', ') + ' — reload to retry';
+  el.title = 'These come from other WFA tools and failed to load just now. Nothing on this page was lost or overwritten — retry by reloading.';
+  el.style.display = '';
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   loadAll();
@@ -967,11 +994,12 @@ async function init() {
       .then(j => { if (j.error) throw new Error(j.error); return j.tabs || {}; });
     const fetches = [
       tabsPromise,
-      fetch(COVER_PLAN_URL + '?token=' + SHARED_TOKEN, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.text() : null).catch(() => null),
+      fetchOverlay_('release schedule (cover-plan)', COVER_PLAN_URL + '?token=' + SHARED_TOKEN, { signal: AbortSignal.timeout(8000) }, r => r.text(), null),
     ];
-    if (SYNC_URL) fetches.push(fetch(SYNC_URL).then(r => r.text()).catch(() => null));
+    if (SYNC_URL) fetches.push(fetchOverlay_('lunch cover own state', SYNC_URL, undefined, r => r.text(), null));
 
     const [tabs, plannerCsv, remoteRaw] = await Promise.all(fetches);
+    reportOverlayFailures_();
     if (!tabs.Staff || tabs.Staff.error) throw new Error('Staff');
     if (!tabs.TermDates || tabs.TermDates.error) throw new Error('Terms');
     const staffRows = tabs.Staff.rows;

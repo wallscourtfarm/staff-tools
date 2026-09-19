@@ -149,6 +149,7 @@ footer { text-align: center; font-size: 10px; color: #94a3b8; padding: 10px; bor
   <input type="date" id="dateInput" onchange="onDateChange()">
   <span class="spacer"></span>
   <span class="sheet-status" id="sheetStatus">Loading…</span>
+  <span class="sheet-status err" id="overlayStatus" style="display:none"></span>
 </div>
 
 <div id="coverAlert"></div>
@@ -184,7 +185,7 @@ footer { text-align: center; font-size: 10px; color: #94a3b8; padding: 10px; bor
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunchtime Leaders · WFA-18.09.26a</footer>
+<footer>Wallscourt Farm Academy · Lunchtime Leaders · WFA-19.09.26a</footer>
 
 <script>
 const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
@@ -787,6 +788,32 @@ function printCards() {
   setTimeout(() => window.print(), 100);
 }
 
+// Found 19.09.26 (same class as teaching-schedule's overlaysPromise fix,
+// same day): the TermDates/cover-plan reads below used `.catch(() => null)`
+// with no response-ok check, so a backend hiccup was indistinguishable from
+// "nothing scheduled" — no error shown anywhere. Read-only: never touches
+// saved state, so no data-loss risk.
+const OVERLAY_FAILURES = [];
+function fetchOverlay_(label, url, opts, emptyFallback) {
+  if (!url) return Promise.resolve(emptyFallback);
+  return fetch(url, opts).then(r => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).catch(err => {
+    OVERLAY_FAILURES.push(label);
+    console.error('Overlay load failed:', label, err);
+    return emptyFallback;
+  });
+}
+function reportOverlayFailures_() {
+  const el = document.getElementById('overlayStatus');
+  if (!el) return;
+  if (!OVERLAY_FAILURES.length) { el.style.display = 'none'; return; }
+  el.textContent = '⚠ Could not load: ' + OVERLAY_FAILURES.join(', ') + ' — reload to retry';
+  el.title = 'These come from other WFA tools and failed to load just now. Nothing on this page was lost or overwritten — retry by reloading.';
+  el.style.display = '';
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   loadLocal();
@@ -801,9 +828,10 @@ async function init() {
       // Railway read-through proxy rather than Apps Script directly — see
       // project_shared_gateway_apps_script_ceiling in Claude's memory. This
       // file never writes to TermDates, only reads it.
-      fetch('https://api.wallscourt-farm-academy.co.uk/planning/tab?token=' + SHARED_TOKEN + '&tab=TermDates').then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(COVER_PLAN_URL + '?token=' + SHARED_TOKEN, { signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetchOverlay_('TermDates', 'https://api.wallscourt-farm-academy.co.uk/planning/tab?token=' + SHARED_TOKEN + '&tab=TermDates', undefined, null),
+      fetchOverlay_('release schedule (cover-plan)', COVER_PLAN_URL + '?token=' + SHARED_TOKEN, { signal: AbortSignal.timeout(8000) }, null),
     ]);
+    reportOverlayFailures_();
     // A {"error":"unauthorised"} response (missing/bad token) must not flip
     // syncReady below — it's not confirmed remote state, and none of
     // absences/LEADERS/scheduleRows get touched in that case, so save() would
