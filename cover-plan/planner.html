@@ -409,7 +409,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(19.09.26b)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(19.09.26c)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -1054,6 +1054,9 @@ function hideEventSyncFailBanner_() {
 }
 
 // ── State persistence ─────────────────────────────────────────────────────────
+let _saveInFlight = false;
+let _saveQueued = false;
+
 function stateSave() {
   // sportsSchedule is deliberately NOT rebuilt from wsEvents here. It used to
   // be, which meant every unrelated edit (marking cover, PPA, anything) sent
@@ -1064,9 +1067,32 @@ function stateSave() {
   // SERVER_SPORTS_SCHEDULE is the last-known-good copy (from stateLoad(), or
   // updated in lockstep by updateSport() when an admin actually changes a
   // fixture) — every save just echoes it straight back unchanged.
-  const json = JSON.stringify({ weekSlots: state.weekSlots, cellNotes: state.cellNotes, nextId: state.nextId, sportsSchedule: SERVER_SPORTS_SCHEDULE });
-  try { localStorage.setItem('wfa_planner_state', json); } catch(e) {}
+  try {
+    localStorage.setItem('wfa_planner_state', JSON.stringify({ weekSlots: state.weekSlots, cellNotes: state.cellNotes, nextId: state.nextId, sportsSchedule: SERVER_SPORTS_SCHEDULE }));
+  } catch(e) {}
   setSyncStatus('syncing');
+  // Found 19.09.26 — a real live incident: a genuine PPA entry vanished with
+  // "Synced ✓" showing throughout, while a different edit on the same page
+  // synced correctly. Root cause: several edits made in quick succession
+  // (add a slot, assign cover, name the supply teacher) each fired their own
+  // POST of the FULL weekSlots blob. These are independent network requests
+  // and can arrive at the server out of order — a slightly slower one
+  // completing after a faster one silently overwrites it with older data,
+  // even though each individual request reports success correctly for
+  // itself (it did save exactly what it was carrying, just not last).
+  // Fixed by never having more than one save in flight at a time: a save
+  // triggered while one is already in flight is queued rather than fired
+  // immediately, and the queued follow-up captures state fresh — as it
+  // stands once the in-flight request finishes, not as it stood when it was
+  // queued — guaranteeing the server only ever receives saves in the order
+  // they were actually made.
+  if (_saveInFlight) { _saveQueued = true; return; }
+  _fireStateSave();
+}
+
+function _fireStateSave() {
+  _saveInFlight = true;
+  const json = JSON.stringify({ weekSlots: state.weekSlots, cellNotes: state.cellNotes, nextId: state.nextId, sportsSchedule: SERVER_SPORTS_SCHEDULE });
   // Found 18.09.26: `.then(() => setSyncStatus('ok'))` treated ANY resolved
   // fetch as success — fetch() only rejects on a true network failure, never
   // on a non-2xx status or an {"error":...} body, so a backend rejecting the
@@ -1086,6 +1112,13 @@ function stateSave() {
     .catch(err => {
       setSyncStatus('offline');
       showSaveFailureBanner_(err && err.message);
+    })
+    .finally(() => {
+      _saveInFlight = false;
+      if (_saveQueued) {
+        _saveQueued = false;
+        _fireStateSave();
+      }
     });
 }
 async function stateLoad() {
