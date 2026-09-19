@@ -119,7 +119,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title">Fresh Air Break Rota</div>
-    <div class="app-subtitle">Wallscourt Farm Academy · 15.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy · 19.09.26a</div>
   </div>
 </div>
 
@@ -461,7 +461,21 @@ function save() {
   if (!syncReady) return; // don't POST until init() has merged the real remote state in — otherwise a save this early would overwrite the shared backend with incomplete local data
   const staffColours = {};
   STAFF.forEach(s => { staffColours[s.id] = s.col; });
-  fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, { method:'POST', body: JSON.stringify({ state, termTemplate, staffColours }) }).catch(() => {});
+  // Found 19.09.26, live repeat of the 18.09.26 cover-plan-state incident:
+  // this was fire-and-forget with no response checking at all — a resolved
+  // fetch isn't the same as a successful save, since the backend can reject
+  // one with a normal 200 and a {"status":"error",...} body (a
+  // write-verification failure). Now reflected in the sheetStatus badge
+  // instead of being silent. Same fix already applied to lunch-cover.
+  const el = document.getElementById('sheetStatus');
+  fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, { method:'POST', body: JSON.stringify({ state, termTemplate, staffColours }) })
+    .then(async res => {
+      let json = null;
+      try { json = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
+      if (!res.ok || !json || json.status === 'error') throw new Error('rejected');
+      if (el) { el.textContent = 'Synced'; el.className = 'sheet-status ok'; }
+    })
+    .catch(() => { if (el) { el.textContent = 'Save failed — retry'; el.className = 'sheet-status err'; } });
 }
 
 function loadAll() {
