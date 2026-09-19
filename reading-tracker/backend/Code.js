@@ -359,6 +359,43 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// ── Write verification (19.09.26 reliability sweep) ─────────────────────
+// Every other tool touched in the sweep learned the same lesson: "no
+// exception was thrown" is not proof a write actually reached the Sheet.
+// These wrap doPost's row writes so a silent Sheets-side failure comes
+// back to the client as a real {"error":...} — which flushSync() in
+// index.html already knows how to detect and retry (see its res.text()
+// check) — instead of being reported "✓ Synced" when nothing landed.
+var BACKUP_COUNT = 100;
+
+function getBackupSheet_(ss) {
+  var sh = ss.getSheetByName('TrackerBackupLog');
+  if (!sh) sh = ss.insertSheet('TrackerBackupLog');
+  return sh;
+}
+
+// Snapshots the row about to be overwritten, never the appended (new) case
+// — there's nothing existing to lose there. Wrapped in try/catch on
+// principle: a backup step must never block the real write that follows.
+function backupPreviousRow_(ss, key, previousValue, previousTs) {
+  try {
+    var sh = getBackupSheet_(ss);
+    sh.appendRow([new Date().toISOString(), key, previousValue, previousTs]);
+    var lastRow = sh.getLastRow();
+    if (lastRow > BACKUP_COUNT) sh.deleteRows(1, lastRow - BACKUP_COUNT);
+  } catch (err) {
+    // Never let a failed backup block the real write.
+  }
+}
+
+function rowMatches_(sheet, row, expected) {
+  var actual = sheet.getRange(row, 1, 1, expected.length).getValues()[0];
+  for (var i = 0; i < expected.length; i++) {
+    if (String(actual[i]) !== String(expected[i])) return false;
+  }
+  return true;
+}
+
 function doPost(e) {
   if (!tokenOK(e)) {
     return ContentService.createTextOutput('{"error":"unauthorised"}')
@@ -391,6 +428,7 @@ function doPost(e) {
     // sheet's size.
     const lastRow = sheet.getLastRow();
     const keyCol = lastRow > 0 ? sheet.getRange(1, 1, lastRow, 1) : null;
+    const failedKeys = [];
     for (const [key, entry] of Object.entries(payload)) {
       // Every write carries the timestamp of the moment it was actually
       // made (set client-side when the user's edit happens, not when the
@@ -408,14 +446,23 @@ function doPost(e) {
       const ts = hasTs ? (Number(entry.t) || 0) : 0;
       const found = keyCol ? keyCol.createTextFinder(key).matchEntireCell(true).matchCase(true).findNext() : null;
       if (found) {
-        const existingTs = Number(sheet.getRange(found.getRow(), 3).getValue()) || 0;
+        const row = found.getRow();
+        const prevRow = sheet.getRange(row, 1, 1, 3).getValues()[0];
+        const existingTs = Number(prevRow[2]) || 0;
         if (ts < existingTs) continue;
-        sheet.getRange(found.getRow(), 2, 1, 2).setValues([[value, ts]]);
+        backupPreviousRow_(ss, key, prevRow[1], prevRow[2]);
+        sheet.getRange(row, 2, 1, 2).setValues([[value, ts]]);
+        if (!rowMatches_(sheet, row, [key, value, ts])) failedKeys.push(key);
       } else {
         sheet.appendRow([key, value, ts]);
+        if (!rowMatches_(sheet, sheet.getLastRow(), [key, value, ts])) failedKeys.push(key);
       }
     }
     if (Object.keys(payload).length) invalidateFullDumpCache_();
+    if (failedKeys.length) {
+      return ContentService.createTextOutput(JSON.stringify({ error: 'write verification failed for: ' + failedKeys.join(', ') }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     return ContentService.createTextOutput('ok').setMimeType(ContentService.MimeType.TEXT);
   } finally {
     lock.releaseLock();
