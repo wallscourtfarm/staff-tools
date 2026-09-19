@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-19.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-19.09.26b</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -540,6 +540,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/reliability.js"></script>
 <script>
 // ── Config ──────────────────────────────────────────────────────────────────
 const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbxKhzKMmoVbU1V_cXJla5wom1VCtXWA72IllygNX4XZffCBxt5kdt_wKYZ0YLyMopN0/exec';
@@ -1880,41 +1881,22 @@ function updateSyncStatus(status) {
   else { el.textContent = '● Syncing…'; el.className = 'sheet-status'; }
 }
 
-// Found 19.09.26: the four "overlay" reads below (activity exceptions, FAB
-// rota, release schedule/cover-plan — this is where PPA/SENCO tags come
-// from — and lunch cover) all used `.then(r => r.ok ? r.json() : null)
-// .catch(() => null)`. Any failure (backend down, timeout, or a 200 with an
-// {"error":...} body — this exact cover-plan proxy returns that shape on
-// its own upstream failure, see wfa-data/backend/routers/cover_state.py)
-// was indistinguishable from "this teacher genuinely has nothing on for
-// that day" — a PPA slot set on cover-plan could silently fail to appear
-// here with no indication anything was wrong. This is read-only: it never
-// touches state.schedule/syncedWeeks, so there is no save/data-loss risk —
-// it only makes a failure visible instead of silent.
-const OVERLAY_FAILURES = [];
+// Found 19.09.26, moved onto the shared module 19.09.26 (same day): this
+// was the first of six files found with the identical "silent failure"
+// bug — a fetch failing with `.catch(() => null)` and nothing on screen to
+// say so, which is exactly how a real PPA entry went missing with no
+// explanation. Now delegates to wfa-shared's reliability.js (see
+// project_staff_tools_reliability_sweep_19_09_26 in Claude's memory) so a
+// future fix here reaches every tool that loads it, not just this one.
+// Kept as thin shims so every existing call site below is unchanged.
+const OVERLAY_FAILURES = { push: label => window.wfaReliability.setOverlayIssue(label, true, 'overlayStatus') };
+function reportOverlayFailures_() { /* no-op: the shared module renders on every setOverlayIssue call */ }
 function fetchOverlay_(label, url, fetchUrl, opts, emptyFallback) {
   if (!url) return Promise.resolve(emptyFallback);
-  return fetch(fetchUrl, opts).then(r => {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
-  }).then(json => {
-    if (json && (json.error || json.status === 'error')) {
-      throw new Error(json.error || json.message || 'backend error');
-    }
-    return json;
-  }).catch(err => {
-    OVERLAY_FAILURES.push(label);
-    console.error('Overlay load failed:', label, err);
-    return emptyFallback;
-  });
-}
-function reportOverlayFailures_() {
-  const el = document.getElementById('overlayStatus');
-  if (!el) return;
-  if (!OVERLAY_FAILURES.length) { el.style.display = 'none'; return; }
-  el.textContent = '⚠ Could not load: ' + OVERLAY_FAILURES.join(', ') + ' — reload to retry';
-  el.title = 'These come from other WFA tools and failed to load just now. Nothing on this page was lost or overwritten — retry by reloading.';
-  el.style.display = '';
+  return window.wfaReliability.fetchOverlay(label, fetchUrl, opts, r => r.json().then(j => {
+    if (j && (j.error || j.status === 'error')) throw new Error(j.error || j.message || 'backend error');
+    return j;
+  }), emptyFallback, 'overlayStatus');
 }
 
 // ── Sheet loading ────────────────────────────────────────────────────────────
