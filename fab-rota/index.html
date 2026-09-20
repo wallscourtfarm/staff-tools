@@ -203,7 +203,16 @@ const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b
 // previously it checked nothing at all.
 const OWN_BACKEND_TOKEN = '2013';
 const GATEWAY_URL     = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
-const SYNC_URL        = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
+// Opt-in test mode (?dbtest=1) points saves/loads at the new Postgres-backed
+// pilot instead of the old Apps Script store — everyone without that link
+// keeps using the old backend exactly as before. Not the real switchover;
+// just a safe way to try the new one side by side. See Claude's memory:
+// project_db_migration_fab_rota_pilot_20_09_26.
+const DB_TEST_MODE    = new URLSearchParams(location.search).get('dbtest') === '1';
+const SYNC_URL        = DB_TEST_MODE
+  ? 'https://api.wallscourt-farm-academy.co.uk/planning/fab-rota/sync'
+  : 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
+const SYNC_TOKEN      = DB_TEST_MODE ? SHARED_TOKEN : OWN_BACKEND_TOKEN;
 // Read-only proxy (fast, cached) in front of the real Apps Script state
 // store — see project_shared_gateway_apps_script_ceiling in Claude's
 // memory. This file never writes to cover-plan state, only reads it, so
@@ -470,7 +479,7 @@ function save() {
   // write-verification failure). Now reflected in the sheetStatus badge
   // instead of being silent. Same fix already applied to lunch-cover.
   const el = document.getElementById('sheetStatus');
-  fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, { method:'POST', body: JSON.stringify({ state, termTemplate, staffColours }) })
+  fetch(SYNC_URL + '?token=' + SYNC_TOKEN, { method:'POST', body: JSON.stringify({ state, termTemplate, staffColours }) })
     .then(async res => {
       let json = null;
       try { json = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
@@ -880,7 +889,7 @@ async function init() {
       fetch('https://api.wallscourt-farm-academy.co.uk/planning/tabs?token=' + SHARED_TOKEN + '&tabs=Staff,TermDates', { signal: AbortSignal.timeout(30000) })
         .then(r => { if (!r.ok) throw new Error('getSheetTabs request failed'); return r.json(); })
         .then(j => { if (j.error) throw new Error(j.error); return j.tabs || {}; }),
-      fetchOverlay_('FAB own state', SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, undefined, r => r.text(), null),
+      fetchOverlay_('FAB own state', SYNC_URL + '?token=' + SYNC_TOKEN, undefined, r => r.text(), null),
       fetchOverlay_('release schedule (cover-plan)', COVER_PLAN_URL + '?token=' + SHARED_TOKEN, { signal: AbortSignal.timeout(8000) }, r => r.json(), null),
     ]);
     reportOverlayFailures_();
