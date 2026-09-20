@@ -45,7 +45,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Oak</span><span id="version-tag">EYFS-19.09.26a</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Oak</span><span id="version-tag">EYFS-20.09.26a</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -104,6 +104,9 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
 </div>
 <input type="file" id="slot-input" class="slot-input" accept="image/*" onchange="handleImgFile(event)">
 
+<!-- Shared plumbing for menu/override/setup/images/puzzle-freshness across
+     all 7 morning boards — see wallscourtfarm/wfa-shared web/morning.js. -->
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/morning.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
 // MENU DATA — in-file fallback, mirrors year1-beech (shared via menu.json)
@@ -137,48 +140,15 @@ const MENU_BY_WEEK={
   '2026-10-12':{Mon:['Cheese & Tomato Pizza','Macaroni Cheese'],Tue:['Creamy Swedish Meatballs','Creamy Veggie Sausage'],Wed:['Roast Pork','Med Veg Wellington'],Thu:['Jerk Chicken Wrap','Sweet Potato Coconut Bean Stew'],Fri:['Golden Fish Fingers','Vegetable Fingers']},
   '2026-10-19':{Mon:['Macaroni Cheese','Mixed Bean Fajitas'],Tue:['Homemade Sausage Roll','Veggie Sausage Roll'],Wed:['Roast Chicken','Cauliflower & Broccoli Cheese Bake'],Thu:['Cottage Pie','Shepherdless Pie'],Fri:['Golden Fish Fingers','BBQ Veggie Wrap']},
 };
-const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const DAYNAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
-
-function todayStr(){const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`}
-function getMon(ds){const dt=new Date(ds+'T12:00:00');const d=dt.getDay();dt.setDate(dt.getDate()-(d===0?6:d-1));return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`}
-function getDK(ds){return DAYS[new Date(ds+'T12:00:00').getDay()]}
-
-function getMenu(){
-  const ts=todayStr(),dk=getDK(ts);
-  if(!['Mon','Tue','Wed','Thu','Fri'].includes(dk))return['No school today',''];
-  if(CENTRAL_OVERRIDES[ts])return CENTRAL_OVERRIDES[ts];
-  const lookupDate=CENTRAL_SWAPS[ts]||ts,lookupDk=getDK(lookupDate);
-  const mon=getMon(lookupDate);
-  const base=(MENU_BY_WEEK[mon]&&MENU_BY_WEEK[mon][lookupDk])||['Menu not yet set',''];
-  return base;
-}
-
-let CENTRAL_OVERRIDES={}, CENTRAL_SWAPS={};
-let MENU_LAST_UPDATED=null, OVERRIDES_LAST_UPDATED=null;
-const LUNCH_OVERRIDE_URL='https://script.google.com/macros/s/AKfycbz0yYbvPGa7csQYwJAQg7NTRYrbNjt-wgz4XYjdSEJ1GxuV2rQornoKicohiKDoBbhC/exec';
-async function loadSharedMenu(){
-  try{
-    const res=await fetch('https://staff.wallscourt-farm-academy.co.uk/menu.json',{cache:'no-cache'});
-    if(!res.ok)throw new Error('fetch failed');
-    const data=await res.json();
-    if(data&&data.weeks&&typeof data.weeks==='object'){
-      Object.keys(MENU_BY_WEEK).forEach(k=>delete MENU_BY_WEEK[k]);
-      Object.assign(MENU_BY_WEEK,data.weeks);
-      console.log('[SharedMenu] Loaded',Object.keys(MENU_BY_WEEK).length,'weeks');
-    }
-    MENU_LAST_UPDATED=data&&data._lastUpdated||null;
-  }catch(e){console.log('[SharedMenu] Using in-file fallback:',e.message);}
-  try{
-    const or=await fetch(LUNCH_OVERRIDE_URL,{cache:'no-cache'});
-    if(!or.ok)throw new Error('fetch failed');
-    const od=await or.json();
-    CENTRAL_OVERRIDES=od.overrides||{};
-    CENTRAL_SWAPS=od.swaps||{};
-    OVERRIDES_LAST_UPDATED=od.updatedAt||null;
-  }catch(e){console.log('[LunchOverride] none available:',e.message);}
-}
+// ═══════════════════════════════════════════════════════════
+// SHARED ENGINE — see wallscourtfarm/wfa-shared web/morning.js and
+// year5-hazel.html's proof of concept for the full explanation. EYFS has
+// no Setup/override/messages/quiz-bank features, so only the menu piece
+// of the shared engine applies here.
+// ═══════════════════════════════════════════════════════════
+const board=wfaMorning.createBoard({prefix:'eyfs'});
+const{todayStr,getMon,getDK,DAYS,DAYNAMES,MONTHS,getMenu,getMenuByWeek}=board;
+async function loadSharedMenu(){await board.fetchSharedMenu(MENU_BY_WEEK)}
 
 const MEAL_IMG={
   'Margherita Pizza with Wedges':'pizza.png',
@@ -227,7 +197,7 @@ function getPastaForToday(){
   const ts=todayStr(),dk=getDK(ts);
   if(!['Mon','Tue','Wed','Thu','Fri'].includes(dk))return'';
   const mon=getMon(ts);
-  const week=MENU_BY_WEEK[mon];
+  const week=getMenuByWeek()[mon];
   return(week&&week[dk]&&week[dk][2])||'Pasta';
 }
 function setPastaCell(){
@@ -248,10 +218,7 @@ function renderLunch(){
   setLunchCell('lc1',m2);
   setPastaCell();
   setRollCell();
-  const stamps=[MENU_LAST_UPDATED,OVERRIDES_LAST_UPDATED].filter(Boolean).sort();
-  const latest=stamps[stamps.length-1];
-  const stampEl=document.getElementById('menu-updated');
-  if(stampEl)stampEl.textContent=latest?('Menu updated '+new Date(latest).toLocaleDateString('en-GB',{day:'numeric',month:'short'})):'';
+  board.renderMenuStamp();
 }
 function renderDate(){
   const n=new Date();
