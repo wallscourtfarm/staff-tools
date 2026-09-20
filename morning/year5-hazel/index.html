@@ -330,7 +330,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
 .mq-est-exp{font-size:clamp(0.85rem,1.85vh,1.15rem);color:#555;font-weight:600;line-height:1.4;margin-top:0.2vh}
 
 /* ─── Humanities Quad ─── */
-#humanities-panel{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:2fr 1fr;min-height:0;overflow:hidden}
+#humanities-panel{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;min-height:0;overflow:hidden}
 #humanities-panel .cpanel-body{overflow-y:auto}
 .hq-map-country{font-size:clamp(1.3rem,3.4vh,2.2rem);font-weight:900;color:#e67e22;text-align:center;margin-bottom:0.3vh}
 .hq-map-fact{font-size:clamp(0.9rem,1.95vh,1.25rem);color:#333;line-height:1.45;margin-bottom:0.15vh}
@@ -359,7 +359,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Hazel</span><span id="version-tag">h.20.09.26a</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Hazel</span><span id="version-tag">h.20.09.26b</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -3225,6 +3225,17 @@ function revealOddOneOut(btn){
 // NEW PUZZLE RENDERERS
 // ═══════════════════════════════════════════════════════════
 
+// Builds "X spelling, Y punctuation, Z grammar" from the actual errors,
+// instead of a fixed "2 spelling, 2 punctuation, 2 grammar" that only
+// happened to be true for entries with exactly that split — wrong for
+// every other split (Innes spotted an 8-error paragraph still labelled
+// 2/2/2, which only adds to 6).
+function stmBreakdown(errors){
+  const order=['spelling','punctuation','grammar'];
+  const counts={};
+  errors.forEach(er=>{counts[er.type]=(counts[er.type]||0)+1;});
+  return order.filter(t=>counts[t]).map(t=>`${counts[t]} ${t}`).join(', ');
+}
 function stmAnswerHtml(e){
   return '<strong style="color:#E03030">Mistakes found:</strong><br>'+
     e.errors.map((er,i)=>`<div class="stm-ans-item"><b>${i+1}.</b> <span style="background:#FFDDDD;border-radius:3px;padding:0 3px">"${er.wrong}"</span> → <span style="background:#DDFFDD;border-radius:3px;padding:0 3px">"${er.correct}"</span><br><span style="color:#555;font-size:0.9em">${er.exp}</span></div>`).join('');
@@ -3574,7 +3585,7 @@ function renderSpotMistakeCombo(eStm,eLad,ePs){
     <div class="cpanel stm-full">
       <div class="cpanel-hdr"><span class="cpanel-hdr-title">Spot the Mistake</span><button class="reveal-btn" onclick="revealStmcAns(this)">👁 Reveal</button></div>
       <div class="cpanel-body" style="justify-content:flex-start;align-items:stretch">
-        <div class="stmc-instr">There are <span class="stmc-instr-num">${eStm.count}</span> mistakes hidden in this paragraph (2 spelling, 2 punctuation, 2 grammar). Find them all and rewrite the paragraph correctly.</div>
+        <div class="stmc-instr">There are <span class="stmc-instr-num">${eStm.count}</span> mistakes hidden in this paragraph (${stmBreakdown(eStm.errors)}). Find them all and rewrite the paragraph correctly.</div>
         <div class="stmc-para">${eStm.para}</div>
         <div class="stmc-ans" id="stmc-ans">${stmAnswerHtml(eStm)}</div>
       </div>
@@ -4022,7 +4033,7 @@ function toggleSols(){
   } else if(cur.type==='spotmistakecombo'){
     t.textContent='Literacy 2 — Spot the Mistake · Word Ladder · Prefix & Suffix';
     const ladPath=cur.ladder.path.join(' → ');
-    c.innerHTML=`<p style="font-weight:800;margin-bottom:4px">Spot the Mistake — ${cur.stm.count} errors (2 spelling, 2 punctuation, 2 grammar)</p>
+    c.innerHTML=`<p style="font-weight:800;margin-bottom:4px">Spot the Mistake — ${cur.stm.count} errors (${stmBreakdown(cur.stm.errors)})</p>
       ${cur.stm.errors.map((er,i)=>`<p style="font-size:0.88rem;margin-bottom:6px;line-height:1.6"><b>${i+1}.</b> [${er.type||'-'}] "${er.wrong}" → "${er.correct}"<br><span style="color:#555">${er.exp}</span></p>`).join('')}
       <p style="font-weight:800;margin-top:14px;margin-bottom:4px">Word Ladder</p>
       <p style="font-size:0.95rem;font-weight:700;color:#e67e22;margin-bottom:6px">${ladPath}</p>
