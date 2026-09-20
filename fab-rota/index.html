@@ -203,16 +203,15 @@ const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b
 // previously it checked nothing at all.
 const OWN_BACKEND_TOKEN = '2013';
 const GATEWAY_URL     = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
-// Opt-in test mode (?dbtest=1) points saves/loads at the new Postgres-backed
-// pilot instead of the old Apps Script store — everyone without that link
-// keeps using the old backend exactly as before. Not the real switchover;
-// just a safe way to try the new one side by side. See Claude's memory:
+// Cut over 20.09.26 to the new Postgres-backed store, verified live via
+// ?dbtest=1 with real backfilled data (byte-identical round-trip) and
+// confirmed by Innes directly. Old Apps Script backend deliberately left
+// running, untouched, unused — one-line revert if ever needed:
+//   'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec'
+// with SYNC_TOKEN back to OWN_BACKEND_TOKEN. See Claude's memory:
 // project_db_migration_fab_rota_pilot_20_09_26.
-const DB_TEST_MODE    = new URLSearchParams(location.search).get('dbtest') === '1';
-const SYNC_URL        = DB_TEST_MODE
-  ? 'https://api.wallscourt-farm-academy.co.uk/planning/fab-rota/sync'
-  : 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
-const SYNC_TOKEN      = DB_TEST_MODE ? SHARED_TOKEN : OWN_BACKEND_TOKEN;
+const SYNC_URL        = 'https://api.wallscourt-farm-academy.co.uk/planning/fab-rota/sync';
+const SYNC_TOKEN      = SHARED_TOKEN;
 // Read-only proxy (fast, cached) in front of the real Apps Script state
 // store — see project_shared_gateway_apps_script_ceiling in Claude's
 // memory. This file never writes to cover-plan state, only reads it, so
