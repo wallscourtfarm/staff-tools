@@ -359,7 +359,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Hazel</span><span id="version-tag">h.19.09.26a</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Hazel</span><span id="version-tag">h.20.09.26a</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -485,6 +485,9 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   </div>
 </div>
 
+<!-- Shared plumbing for menu/override/setup/images/puzzle-freshness across
+     all 7 morning boards — see wallscourtfarm/wfa-shared web/morning.js. -->
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/morning.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
 // MENU DATA
@@ -523,14 +526,36 @@ const MENU_BY_WEEK={
   '2026-10-19':{Mon:['Macaroni Cheese','Mixed Bean Fajitas'],Tue:['Homemade Sausage Roll','Veggie Sausage Roll'],Wed:['Roast Chicken','Cauliflower & Broccoli Cheese Bake'],Thu:['Cottage Pie','Shepherdless Pie'],Fri:['Golden Fish Fingers','BBQ Veggie Wrap']},
 };
 const AUTO_MSGS={Thu:'Hand in your home learning\nPaired Spelling Bee',Fri:'Stick in your home learning\nLeave last week\'s to be checked'};
-function getDefaultMsgs(){
-  const raw=localStorage.getItem('y5_default_msgs');
-  if(raw===null)return{...AUTO_MSGS};
-  try{return JSON.parse(raw)}catch(e){return{...AUTO_MSGS}}
-}
-const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const DAYNAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+// ═══════════════════════════════════════════════════════════
+// SHARED ENGINE — everything below this board is the same code every
+// board runs (menu, override/setup overlays, image handling, puzzle-
+// freshness tracking). See wallscourtfarm/wfa-shared web/morning.js.
+// Aliased to the bare names the rest of this file already uses, so
+// nothing below this block needed to change.
+// ═══════════════════════════════════════════════════════════
+const board=wfaMorning.createBoard({prefix:'y5',yearNum:5,AUTO_MSGS});
+const{todayStr,getMon,getDK,shuffle,DAYS,DAYNAMES,MONTHS,getSchoolPhase,pickPhased,SCHOOL_PHASE,PHASE_LABELS,CURR_WT,getMenu,getMenuByWeek,getDefaultMsgs,getMsg}=board;
+function pickFresh(bank,key){return board.pickFresh(bank,key)}
+function getTTSet(){return board.getTTSet(DEFAULT_TT)}
+async function loadSharedMenu(){await board.fetchSharedMenu(MENU_BY_WEEK)}
+function openOverride(){board.openOverride()}
+function closeOverride(){board.closeOverride()}
+function saveOverride(){board.saveOverride(()=>{renderLunch();renderMsg()})}
+function clearOverride(){board.clearOverride(()=>{renderLunch();renderMsg()})}
+function updateDot(){board.updateDot()}
+function renderTTBank(){board.ttBank.render()}
+function addTTSet(){board.ttBank.addFromForm()}
+function openImgOverlay(){board.openImgOverlay()}
+function closeImgOverlay(){board.closeImgOverlay()}
+function handleImgFile(e){board.handleImgFile(e)}
+function handleImgUrl(){board.handleImgUrl()}
+function showImg(src){board.showImg(src)}
+function removeImg(){board.removeImg()}
+function loadImg(){board.loadImg()}
+// ═══════════════════════════════════════════════════════════
+// END SHARED ENGINE ALIASES
+// ═══════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════
 // BOGGLE BANK
@@ -2786,136 +2811,16 @@ function genSequences(){
 function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a}
 
 // ═══════════════════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════════════════
-function todayStr(){const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`}
-function getMon(ds){const dt=new Date(ds+'T12:00:00');const d=dt.getDay();dt.setDate(dt.getDate()-(d===0?6:d-1));return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`}
-function getDK(ds){return DAYS[new Date(ds+'T12:00:00').getDay()]}
-function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
-
-function getMenu(){
-  const ts=todayStr(),dk=getDK(ts);
-  if(!['Mon','Tue','Wed','Thu','Fri'].includes(dk))return['No school today',''];
-  if(CENTRAL_OVERRIDES[ts])return CENTRAL_OVERRIDES[ts];
-  const lookupDate=CENTRAL_SWAPS[ts]||ts,lookupDk=getDK(lookupDate);
-  const mon=getMon(lookupDate);
-  if(MENU_BY_WEEK[mon])return MENU_BY_WEEK[mon][lookupDk]||['Menu not set',''];
-  return['Menu not yet set',''];
-}
-function getMsg(){
-  const ts=todayStr(),dk=getDK(ts);
-  const ov=JSON.parse(localStorage.getItem('y5_ov_'+ts)||'{}');
-  if(ov.hasOwnProperty('msg'))return ov.msg;
-  return getDefaultMsgs()[dk]||'';
-}
-function getTTSet(){
-  const ts=todayStr();
-  const ov=JSON.parse(localStorage.getItem('y5_ov_'+ts)||'{}');
-  if(ov.tt&&ov.tt.topic){return ov.tt}
-  const userBank=JSON.parse(localStorage.getItem('y5_tt_bank')||'[]');
-  const all=[...DEFAULT_TT,...userBank];
-  const ttPrev=all.filter(x=>x.yr!==5);
-  const ttCurr=all.filter(x=>x.yr===5);
-  return pickPhased(ttPrev,ttCurr);
-}
-
-// ═══════════════════════════════════════════════════════════
 // STATE & INIT
 // ═══════════════════════════════════════════════════════════
 let pType='boggle',cur=null,solsOpen=false;
 const ALL_TYPES=['boggle','number','combined','literacy','spotmistakecombo','maths','humanities'];
-
-
-// ═══════════════════════════════════════════════════════════
-// SHARED MENU LOADER — added by patch_shared_menu.py
-// Fetches menu.json from the central repo on page load.
-// Falls back silently to in-file MENU_BY_WEEK on any error.
-// ═══════════════════════════════════════════════════════════
-let CENTRAL_OVERRIDES={}, CENTRAL_SWAPS={};
-// menu.json's own _lastUpdated plus the overrides feed's updatedAt — shown
-// under the lunch bar so staff can tell at a glance whether what's on
-// screen reflects a recent change, without having to go check either
-// admin tool. Whichever changed more recently wins (19.09.26: local
-// per-board menu overrides removed — one shared menu, one shared
-// freshness stamp, per Innes's call).
-let MENU_LAST_UPDATED=null, OVERRIDES_LAST_UPDATED=null;
-const LUNCH_OVERRIDE_URL='https://script.google.com/macros/s/AKfycbz0yYbvPGa7csQYwJAQg7NTRYrbNjt-wgz4XYjdSEJ1GxuV2rQornoKicohiKDoBbhC/exec';
-async function loadSharedMenu(){
-  try{
-    const res = await fetch('https://staff.wallscourt-farm-academy.co.uk/menu.json', {cache:'no-cache'});
-    if(!res.ok) throw new Error('fetch failed');
-    const data = await res.json();
-    if(data && data.weeks && typeof data.weeks === 'object'){
-      // Replace the in-file MENU_BY_WEEK keys with shared ones.
-      // Don't replace the variable itself (it's const) — mutate in place.
-      Object.keys(MENU_BY_WEEK).forEach(k=>delete MENU_BY_WEEK[k]);
-      Object.assign(MENU_BY_WEEK, data.weeks);
-      console.log('[SharedMenu] Loaded', Object.keys(MENU_BY_WEEK).length, 'weeks');
-    }
-    MENU_LAST_UPDATED=data&&data._lastUpdated||null;
-  } catch(e){
-    console.log('[SharedMenu] Using in-file fallback:', e.message);
-  }
-  // Central, date-keyed lunch overrides/swaps set by the admin team.
-  // Reverts automatically — nothing here persists past its own date.
-  try{
-    const or = await fetch(LUNCH_OVERRIDE_URL, {cache:'no-cache'});
-    if(!or.ok) throw new Error('fetch failed');
-    const od = await or.json();
-    CENTRAL_OVERRIDES = od.overrides || {};
-    CENTRAL_SWAPS = od.swaps || {};
-    OVERRIDES_LAST_UPDATED = od.updatedAt || null;
-  } catch(e){
-    console.log('[LunchOverride] none available:', e.message);
-  }
-}
-
-// ── School year phase ──────────────────────────────────────────────────────
-// Auto-calculates which phase of the school year we are in (1=Sep start, 5=Jul)
-// Drives content weighting: phase 1 = mostly prior year; phase 5 = current year
-function getSchoolPhase(){
-  const now=new Date();
-  const yr=now.getMonth()>=8?now.getFullYear():now.getFullYear()-1;
-  const wks=Math.max(0,Math.floor((now-new Date(yr,8,1))/6048e5));
-  if(wks<8)return 1;   // Aut1: ~Sep to Oct half-term
-  if(wks<14)return 2;  // Aut2: ~Nov to Dec
-  if(wks<21)return 3;  // Spr1: ~Jan to Feb
-  if(wks<28)return 4;  // Spr2: ~Mar to Apr
-  return 5;            // Sum1+2: ~May to Jul
-}
-const SCHOOL_PHASE=getSchoolPhase();
-const PHASE_LABELS=['','Aut1','Aut2','Spr1','Spr2','Sum'];
-// Probability of picking current-year (Y5) content at each phase
-const CURR_WT=[0,0.15,0.35,0.55,0.75,0.95][SCHOOL_PHASE];
-function pickPhased(prev,curr){
-  if(!prev.length)return curr[Math.floor(Math.random()*curr.length)];
-  if(!curr.length)return prev[Math.floor(Math.random()*prev.length)];
-  const pool=Math.random()<CURR_WT?curr:prev;
-  return pool[Math.floor(Math.random()*pool.length)];
-}
 
 // ── Activity pool (no assessment boost for Y5 — hook ready for future) ────
 function getActivityPool(){
   return ALL_TYPES;
 }
 
-
-// ── Recently-seen avoidance ───────────────────────────────────────────────
-// Tracks the last SEEN_W picks from each bank in localStorage.
-// The same item won't appear again until at least SEEN_W other items have
-// been shown — making even a 20-item bank feel much larger.
-// No API calls, no credits: purely client-side localStorage.
-const SEEN_W=15;
-function pickFresh(bank,key){
-  const k='y5_'+key;
-  let seen;try{seen=JSON.parse(localStorage.getItem(k)||'[]')}catch(e){seen=[]}
-  const avail=bank.map((_,i)=>i).filter(i=>!seen.includes(i));
-  const pool=avail.length?avail:bank.map((_,i)=>i); // reset when all seen
-  const idx=pool[Math.floor(Math.random()*pool.length)];
-  const ns=[...seen.filter(i=>i!==idx),idx].slice(-SEEN_W);
-  try{localStorage.setItem(k,JSON.stringify(ns))}catch(e){}
-  return bank[idx];
-}
 function init(){
   renderDate();renderLunch();renderMsg();loadImg();
   pType='combined'; // Always show combined view (4 puzzles at once)
@@ -2975,7 +2880,7 @@ function getPastaForToday(){
   const ts=todayStr(),dk=getDK(ts);
   if(!['Mon','Tue','Wed','Thu','Fri'].includes(dk))return'';
   const mon=getMon(ts);
-  const week=MENU_BY_WEEK[mon];
+  const week=getMenuByWeek()[mon];
   return(week&&week[dk]&&week[dk][2])||'Pasta';
 }
 function setPastaCell(){
@@ -2998,9 +2903,7 @@ function renderLunch(){
   setLunchCell('lc1',m2);
   setPastaCell();
   setRollCell();
-  const stamps=[MENU_LAST_UPDATED,OVERRIDES_LAST_UPDATED].filter(Boolean).sort();
-  const latest=stamps[stamps.length-1];
-  document.getElementById('menu-updated').textContent=latest?('Menu updated '+new Date(latest).toLocaleDateString('en-GB',{day:'numeric',month:'short'})):'';
+  board.renderMenuStamp();
 }
 function renderMsg(){
   const text=getMsg();
@@ -3009,9 +2912,9 @@ function renderMsg(){
   else el.innerHTML='';
   el.onblur=()=>{
     const ts=todayStr();
-    const ov=JSON.parse(localStorage.getItem('y5_ov_'+ts)||'{}');
+    const ov=board.getOverride(ts);
     ov.msg=el.innerText.trim();
-    localStorage.setItem('y5_ov_'+ts,JSON.stringify(ov));updateDot();
+    board.setOverride(ts,ov);updateDot();
   };
 }
 
@@ -4155,95 +4058,22 @@ function toggleSols(){
 function closeSols(){document.getElementById('sol-ov').classList.remove('on');document.getElementById('solbtn').textContent='Solutions';solsOpen=false}
 
 // ═══════════════════════════════════════════════════════════
-// IMAGE
+// SETUP (board-specific bits only — TT bank / default messages / image
+// overlay / override modal all come from the shared engine above)
 // ═══════════════════════════════════════════════════════════
-function openImgOverlay(){document.getElementById('img-overlay').classList.add('on');document.getElementById('img-url-input').value=''}
-function closeImgOverlay(){document.getElementById('img-overlay').classList.remove('on')}
-function handleImgFile(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>showImg(ev.target.result);r.readAsDataURL(f);e.target.value='';}
-function handleImgUrl(){const url=document.getElementById('img-url-input').value.trim();if(!url)return;fetch(url).then(r=>r.blob()).then(blob=>{const r=new FileReader();r.onload=ev=>{showImg(ev.target.result);closeImgOverlay()};r.readAsDataURL(blob)}).catch(()=>{showImg(url);closeImgOverlay()})}
-function showImg(src){document.getElementById('img-el').src=src;document.getElementById('img-pane').classList.add('visible');try{sessionStorage.setItem('y5_img',src)}catch(e){}}
-function removeImg(){document.getElementById('img-el').src='';document.getElementById('img-pane').classList.remove('visible');try{sessionStorage.removeItem('y5_img')}catch(e){}}
-function loadImg(){try{const s=sessionStorage.getItem('y5_img');if(s)showImg(s)}catch(e){}}
-
-// ═══════════════════════════════════════════════════════════
-// OVERRIDE
-// ═══════════════════════════════════════════════════════════
-function openOverride(){
-  const ts=todayStr(),dk=getDK(ts);
-  const ov=JSON.parse(localStorage.getItem('y5_ov_'+ts)||'{}');
-  document.getElementById('ov-msg').value=ov.hasOwnProperty('msg')?ov.msg:'';
-  const tt=ov.tt||{};
-  document.getElementById('ov-tt-topic').value=tt.topic||'';
-  document.getElementById('ov-tt-1').value=tt.stmts?tt.stmts[0]:'';
-  document.getElementById('ov-tt-2').value=tt.stmts?tt.stmts[1]:'';
-  document.getElementById('ov-tt-3').value=tt.stmts?tt.stmts[2]:'';
-  document.getElementById('ov-tt-lie').value=tt.lie||1;
-  const auto=getDefaultMsgs()[dk];
-  document.getElementById('ov-auto-preview').textContent=auto?`Auto for ${DAYNAMES[new Date(ts+'T12:00:00').getDay()]}: "${auto}"`:'No automatic message today.';
-  document.getElementById('ov-overlay').classList.add('on');
-}
-function closeOverride(){document.getElementById('ov-overlay').classList.remove('on')}
-function saveOverride(){
-  const ts=todayStr();
-  const ov=JSON.parse(localStorage.getItem('y5_ov_'+ts)||'{}');
-  ov.msg=document.getElementById('ov-msg').value;
-  const topic=document.getElementById('ov-tt-topic').value.trim();
-  if(topic){
-    ov.tt={topic,stmts:[document.getElementById('ov-tt-1').value,document.getElementById('ov-tt-2').value,document.getElementById('ov-tt-3').value],lie:parseInt(document.getElementById('ov-tt-lie').value)};
-  } else delete ov.tt;
-  localStorage.setItem('y5_ov_'+ts,JSON.stringify(ov));
-  closeOverride();renderLunch();renderMsg();updateDot();
-}
-function clearOverride(){localStorage.removeItem('y5_ov_'+todayStr());closeOverride();renderLunch();renderMsg();updateDot();}
-function updateDot(){const ts=todayStr();const ov=JSON.parse(localStorage.getItem('y5_ov_'+ts)||'{}');const central=CENTRAL_OVERRIDES[ts]||CENTRAL_SWAPS[ts];document.getElementById('override-dot').style.display=(Object.keys(ov).length||central)?'inline-block':'none';}
-
-// ═══════════════════════════════════════════════════════════
-// SETUP (menu + TT bank)
-// ═══════════════════════════════════════════════════════════
-let pendingTTBank=[];
-
 function openSetup(){
-  pendingTTBank=JSON.parse(JSON.stringify(JSON.parse(localStorage.getItem('y5_tt_bank')||'[]')));
-  renderTTBank();
+  board.ttBank.load();
+  board.ttBank.render();
   document.getElementById('setup-lunch-imgs').checked=localStorage.getItem('y5_lunch_imgs')==='1';
-  const dm=getDefaultMsgs();['Mon','Tue','Wed','Thu','Fri'].forEach(d=>{document.getElementById('dm-'+d).value=dm[d]||'';});
+  board.loadDefaultMsgsIntoForm();
   document.getElementById('setup-ov').classList.add('on');
 }
 function closeSetup(){document.getElementById('setup-ov').classList.remove('on')}
 
-function renderTTBank(){
-  const el=document.getElementById('tt-bank-list');
-  if(pendingTTBank.length===0){el.innerHTML=`<p style="font-size:0.82rem;color:#AAA;margin-bottom:8px">No custom sets yet — 62 built-in sets are always available.</p>`;return}
-  el.innerHTML=pendingTTBank.map((s,i)=>`
-    <div class="tt-bank-item">
-      <button class="tt-bank-del" onclick="deleteTT(${i})">✕</button>
-      <div class="tt-bank-topic">${s.topic}</div>
-      <div class="tt-bank-stmts">
-        ${s.stmts.map((st,j)=>`<span class="${j+1===s.lie?'tt-bank-lie':''}">• ${st}</span>`).join('<br>')}
-        <br><span style="font-size:0.78rem;color:#AAA">Lie: statement ${s.lie}</span>
-      </div>
-    </div>`).join('');
-}
-function deleteTT(i){pendingTTBank.splice(i,1);renderTTBank()}
-function addTTSet(){
-  const topic=document.getElementById('tt-new-topic').value.trim();
-  const s1=document.getElementById('tt-new-1').value.trim();
-  const s2=document.getElementById('tt-new-2').value.trim();
-  const s3=document.getElementById('tt-new-3').value.trim();
-  const lie=parseInt(document.getElementById('tt-new-lie').value);
-  if(!topic||!s1||!s2||!s3){alert('Please fill in all fields.');return}
-  pendingTTBank.push({topic,stmts:[s1,s2,s3],lie});
-  document.getElementById('tt-new-topic').value='';
-  document.getElementById('tt-new-1').value='';
-  document.getElementById('tt-new-2').value='';
-  document.getElementById('tt-new-3').value='';
-  renderTTBank();
-}
 function saveSetup(){
-  localStorage.setItem('y5_tt_bank',JSON.stringify(pendingTTBank));
+  board.ttBank.save();
   if(document.getElementById('setup-lunch-imgs').checked)localStorage.setItem('y5_lunch_imgs','1');else localStorage.removeItem('y5_lunch_imgs');
-  const dm={};['Mon','Tue','Wed','Thu','Fri'].forEach(d=>{dm[d]=document.getElementById('dm-'+d).value;});
-  localStorage.setItem('y5_default_msgs',JSON.stringify(dm));
+  board.saveDefaultMsgsFromForm();
   closeSetup();renderLunch();renderMsg();
 }
 
