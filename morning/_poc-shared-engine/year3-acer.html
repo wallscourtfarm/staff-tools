@@ -636,7 +636,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Acer</span><span id="version-tag">a.19.09.26a</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Acer</span><span id="version-tag">a.20.09.26b</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -728,10 +728,9 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div class="obox">
     <h2>Setup</h2>
 
-    <h3>Lunch menu — 3-week rotation (read-only)</h3>
-    <p style="font-size:0.82rem;color:#666;margin-bottom:10px">Set centrally for every board — see the shared menu admin tool to change it. Tomato Pasta, Jacket Potato and Packed Lunch are fixed.</p>
+    <h3>Lunch menu</h3>
+    <p style="font-size:0.82rem;color:#666;margin-bottom:10px">Set centrally for every board — see the shared menu admin tool. Nothing to edit here.</p>
     <label style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;cursor:pointer;margin-bottom:10px"><input type="checkbox" id="setup-lunch-imgs" style="width:18px;height:18px;accent-color:#1798d3;cursor:pointer"> Show food images on lunch bar</label>
-    <div id="menu-form"></div>
 
     <h3 style="margin-top:1.5rem">Default weekday messages</h3>
     <p style="font-size:0.82rem;color:#666;margin-bottom:10px">Shown automatically each day unless overridden for today. Leave a day blank for no automatic message.</p>
@@ -763,8 +762,8 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   </div>
 </div>
 
-<!-- PROOF OF CONCEPT: not linked from anywhere live. See year5-hazel.html's
-     proof of concept in this same folder for the full explanation. -->
+<!-- Shared plumbing for menu/override/setup/images/puzzle-freshness across
+     all 7 morning boards — see wallscourtfarm/wfa-shared web/morning.js. -->
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/morning.js"></script>
 <script>
 
@@ -1968,7 +1967,6 @@ function closeSols(){solsOpen=false;document.getElementById('sol-ov').classList.
 // image overlay / override modal all come from the shared engine above)
 // ══════════════════════════════════════════════════════════════
 function openSetup(){
-  renderMenuForm();
   board.ttBank.load();
   board.ttBank.render();
   document.getElementById('setup-lunch-imgs').checked=localStorage.getItem('y3_lunch_imgs')==='1';
@@ -1976,11 +1974,6 @@ function openSetup(){
   document.getElementById('setup-ov').classList.add('on');
 }
 function closeSetup(){document.getElementById('setup-ov').classList.remove('on');}
-function renderMenuForm(){
-  const cont=document.getElementById('menu-form');if(!cont)return;let h='';
-  for(const[wk,days] of Object.entries(MENU_BY_WEEK)){h+=`<div class="menu-wk">Week of ${wk}</div><div style="display:grid;grid-template-columns:60px 1fr 1fr;gap:4px 8px;margin-bottom:4px"><span></span><span class="col-hdr">Red option</span><span class="col-hdr">Green option</span></div>`;for(const d of['Mon','Tue','Wed','Thu','Fri']){const opts=days[d]||['',''];h+=`<div class="mrow"><label>${d}</label><input value="${opts[0]}" readonly><input value="${opts[1]}" readonly></div>`;}}
-  cont.innerHTML=h||'<p style="color:#999;font-size:0.85rem">No menu data.</p>';
-}
 function saveSetup(){
   board.ttBank.save();
   if(document.getElementById('setup-lunch-imgs').checked)localStorage.setItem('y3_lunch_imgs','1');else localStorage.removeItem('y3_lunch_imgs');
