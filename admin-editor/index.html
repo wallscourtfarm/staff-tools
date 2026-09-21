@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>School Info · WFA</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f1f5f9; min-height: 100vh; font-size: 16px; }
+  .app-header { background: white; border-bottom: 3px solid #1798d3; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
+  .app-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 22px; color: #1798d3; }
+  .app-subtitle { font-size: 13px; color: #64748b; margin-top: 2px; }
+  .container { max-width: 720px; margin: 0 auto; padding: 20px; }
+
+  .home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 560px) { .home-grid { grid-template-columns: 1fr; } }
+  .home-card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.08); cursor: pointer; border: 2px solid transparent; text-align: left; }
+  .home-card:hover { border-color: #1798d3; }
+  .home-card .icon { font-size: 32px; margin-bottom: 10px; }
+  .home-card .name { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 18px; color: #1e293b; margin-bottom: 4px; }
+  .home-card .desc { font-size: 13px; color: #64748b; }
+
+  .back-btn { background: none; border: none; color: #1798d3; font-size: 15px; font-weight: bold; cursor: pointer; margin-bottom: 16px; padding: 8px 0; }
+  .section-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 20px; color: #1e293b; margin-bottom: 4px; }
+  .section-desc { font-size: 14px; color: #64748b; margin-bottom: 16px; }
+
+  .add-btn { background: #1798d3; color: white; border: none; border-radius: 8px; padding: 12px 20px; font-size: 15px; font-weight: bold; cursor: pointer; margin-bottom: 16px; }
+  .add-btn:hover { background: #1483ba; }
+
+  .list-card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; }
+  .list-row { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f1f5f9; }
+  .list-row:last-child { border-bottom: none; }
+  .list-row .main { flex: 1; min-width: 0; }
+  .list-row .primary { font-weight: bold; font-size: 15px; color: #1e293b; }
+  .list-row .secondary { font-size: 13px; color: #64748b; margin-top: 2px; }
+  .row-btn { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; font-size: 13px; cursor: pointer; color: #475569; flex-shrink: 0; }
+  .row-btn:hover { background: #f1f5f9; }
+  .row-btn.danger { color: #dc2626; }
+  .empty-msg { padding: 30px 18px; text-align: center; color: #94a3b8; font-size: 14px; }
+  .colour-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; border: 1px solid rgba(0,0,0,.1); }
+
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
+  .modal-bg.open { display: flex; }
+  .modal { background: white; border-radius: 12px; padding: 24px; width: 100%; max-width: 420px; max-height: 85vh; overflow-y: auto; }
+  .modal h3 { font-family: 'Nunito', sans-serif; font-weight: 900; color: #1798d3; font-size: 18px; margin-bottom: 18px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; font-weight: bold; color: #475569; margin-bottom: 6px; }
+  .field input[type=text], .field input[type=date], .field input[type=number], .field select {
+    width: 100%; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; font-size: 16px; font-family: inherit;
+  }
+  .field input[type=color] { width: 60px; height: 40px; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 2px; cursor: pointer; }
+  .day-checks { display: flex; gap: 10px; flex-wrap: wrap; }
+  .day-checks label { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: normal; color: #1e293b; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .btn-primary { flex: 1; background: #1798d3; color: white; border: none; border-radius: 8px; padding: 12px; font-size: 15px; font-weight: bold; cursor: pointer; }
+  .btn-primary:hover { background: #1483ba; }
+  .btn-cancel { background: #f1f5f9; color: #475569; border: none; border-radius: 8px; padding: 12px 18px; font-size: 15px; cursor: pointer; }
+
+  .confirm-modal p { font-size: 15px; color: #1e293b; margin-bottom: 4px; }
+  .confirm-modal .warn { font-size: 13px; color: #dc2626; margin-top: 8px; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 14px 22px; border-radius: 8px; font-size: 14px; z-index: 2000; display: none; max-width: 90%; text-align: center; }
+  .toast.show { display: block; }
+  .toast.error { background: #dc2626; }
+
+  .loading { text-align: center; padding: 40px; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div>
+    <div class="app-title">School Info</div>
+    <div class="app-subtitle">Term dates, calendar events, meetings, and the staff list</div>
+  </div>
+</div>
+
+<div class="container" id="app"></div>
+
+<div class="modal-bg" id="formModalBg">
+  <div class="modal" id="formModal"></div>
+</div>
+
+<div class="modal-bg" id="confirmModalBg">
+  <div class="modal confirm-modal" id="confirmModal"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API_BASE = 'https://api.wallscourt-farm-academy.co.uk/planning/admin';
+const TOKEN = '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
+
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const YEAR_GROUPS = ['', 'Reception', 'Y1', 'Y2', 'Y3', 'Y4', 'Y5', 'Y6'];
+const YG_TO_CODE = { 'Reception': 'YR', 'Y1': 'Y1', 'Y2': 'Y2', 'Y3': 'Y3', 'Y4': 'Y4', 'Y5': 'Y5', 'Y6': 'Y6', '': '' };
+const CODE_TO_YG = Object.fromEntries(Object.entries(YG_TO_CODE).map(([k, v]) => [v, k]));
+
+const SECTIONS = {
+  TermDates: {
+    icon: '📅', name: 'Term Dates', desc: 'When each week of term starts',
+    primary: r => r.Label, secondary: r => 'Starts ' + r.StartDate,
+    fields: [
+      { key: 'Term', label: 'Term', type: 'select', options: ['1','2','3','4','5','6'] },
+      { key: 'Week', label: 'Week number', type: 'number', min: 1, max: 10 },
+      { key: 'StartDate', label: 'Start date', type: 'date' },
+    ],
+    beforeSave: v => ({ ...v, Label: 'T' + v.Term + 'W' + v.Week }),
+  },
+  CalendarEvents: {
+    icon: '🎉', name: 'Calendar Events', desc: 'Holidays, INSET days, and other events',
+    primary: r => r.Label || r.Type, secondary: r => r.StartDate + (r.EndDate && r.EndDate !== r.StartDate ? ' – ' + r.EndDate : ''),
+    fields: [
+      { key: 'Label', label: 'What is it? (e.g. "Half Term", "INSET Day")', type: 'text' },
+      { key: 'Type', label: 'Category', type: 'text', list: ['Bank Holiday','Christmas','Easter','Event','Half Term','INSET 1','INSET 2','INSET 3','INSET 4','INSET 5','Off-Site','Summer Holiday'] },
+      { key: 'StartDate', label: 'Start date', type: 'date' },
+      { key: 'EndDate', label: 'End date (leave blank if just one day)', type: 'date', optional: true },
+    ],
+  },
+  EventsMeetings: {
+    icon: '👥', name: 'Meetings', desc: 'Weekly staff meetings',
+    primary: r => r.Label, secondary: r => r.Day + ' · ' + r.Session,
+    fields: [
+      { key: 'Label', label: 'Meeting name', type: 'text' },
+      { key: 'Day', label: 'Day', type: 'select', options: DAY_NAMES.map(d => ({Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday'}[d])) },
+      { key: 'Session', label: 'When', type: 'text', list: ['After School', 'Lunchtime', 'Morning'] },
+      { key: 'Colour', label: 'Colour', type: 'color' },
+    ],
+  },
+  Staff: {
+    icon: '🧑‍🏫', name: 'Staff List', desc: 'Add, remove, or update staff',
+    primary: r => r.Name, secondary: r => [CODE_TO_YG[r.YearGroup] || r.YearGroup, workingDaysLabel(r.WorkingDays)].filter(Boolean).join(' · '),
+    fields: [
+      { key: 'Name', label: 'Name', type: 'text' },
+      { key: 'YearGroup', label: 'Year group', type: 'select', options: YEAR_GROUPS.map(yg => yg || '(none / support staff)'), valueMap: YG_TO_CODE, displayMap: CODE_TO_YG },
+      { key: 'WorkingDays', label: 'Working days', type: 'days' },
+    ],
+  },
+};
+
+function workingDaysLabel(wd) {
+  if (!wd) return '';
+  const nums = wd.split(',').map(n => n.trim()).filter(Boolean);
+  if (nums.length === 5) return 'Every day';
+  return nums.map(n => DAY_NAMES[parseInt(n, 10) - 1]).filter(Boolean).join(', ');
+}
+
+let state = { view: 'home', tab: null, rows: [], editingIndex: null };
+
+async function api(path, opts = {}) {
+  const url = API_BASE + path + (path.includes('?') ? '&' : '?') + 'token=' + TOKEN;
+  const res = await fetch(url, opts);
+  const json = await res.json();
+  return json;
+}
+
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => { t.className = 'toast'; }, 3500);
+}
+
+async function loadTab(tab) {
+  state.view = 'list';
+  state.tab = tab;
+  state.rows = [];
+  render();
+  const res = await api('/tab?tab=' + tab);
+  if (res.error) {
+    showToast('Could not load this list: ' + res.error, true);
+    state.rows = [];
+  } else {
+    state.rows = res.rows || [];
+  }
+  render();
+}
+
+function goHome() {
+  state.view = 'home';
+  state.tab = null;
+  render();
+}
+
+function openAddForm() {
+  openForm(null);
+}
+
+function openEditForm(index) {
+  openForm(index);
+}
+
+function openForm(editIndex) {
+  const section = SECTIONS[state.tab];
+  const row = editIndex !== null ? state.rows[editIndex] : {};
+  state.editingIndex = editIndex;
+
+  let html = '<h3>' + (editIndex !== null ? 'Edit' : 'Add') + ' — ' + section.name + '</h3><form id="entryForm">';
+  section.fields.forEach(f => {
+    const rawVal = row[f.key] || '';
+    html += '<div class="field"><label>' + f.label + '</label>';
+    if (f.type === 'select') {
+      const display = f.displayMap ? (f.displayMap[rawVal] || '') : rawVal;
+      html += '<select name="' + f.key + '">';
+      f.options.forEach(opt => {
+        const optVal = typeof opt === 'string' ? opt : opt;
+        const selected = optVal === display || optVal === rawVal ? 'selected' : '';
+        html += '<option value="' + optVal + '" ' + selected + '>' + optVal + '</option>';
+      });
+      html += '</select>';
+    } else if (f.type === 'days') {
+      const active = new Set((rawVal || '').split(',').map(n => n.trim()));
+      html += '<div class="day-checks">';
+      DAY_NAMES.forEach((d, i) => {
+        const num = String(i + 1);
+        html += '<label><input type="checkbox" name="day_' + num + '" ' + (active.has(num) ? 'checked' : '') + '> ' + d + '</label>';
+      });
+      html += '</div>';
+    } else if (f.type === 'color') {
+      html += '<input type="color" name="' + f.key + '" value="' + (rawVal || '#1798d3') + '">';
+    } else if (f.list) {
+      html += '<input type="' + f.type + '" name="' + f.key + '" value="' + rawVal.replace(/"/g, '&quot;') + '" list="dl_' + f.key + '">';
+      html += '<datalist id="dl_' + f.key + '">' + f.list.map(o => '<option value="' + o + '">').join('') + '</datalist>';
+    } else {
+      html += '<input type="' + f.type + '" name="' + f.key + '" value="' + rawVal.replace(/"/g, '&quot;') + '"' + (f.min ? ' min="' + f.min + '"' : '') + (f.max ? ' max="' + f.max + '"' : '') + '>';
+    }
+    html += '</div>';
+  });
+  html += '<div class="modal-actions"><button type="button" class="btn-cancel" onclick="closeForm()">Cancel</button><button type="submit" class="btn-primary">Save</button></div>';
+  html += '</form>';
+
+  document.getElementById('formModal').innerHTML = html;
+  document.getElementById('formModalBg').classList.add('open');
+  document.getElementById('entryForm').addEventListener('submit', handleFormSubmit);
+}
+
+function closeForm() {
+  document.getElementById('formModalBg').classList.remove('open');
+}
+
+async function handleFormSubmit(e) {
+  e.preventDefault();
+  const section = SECTIONS[state.tab];
+  const formData = new FormData(e.target);
+  let values = {};
+
+  section.fields.forEach(f => {
+    if (f.type === 'days') {
+      const days = [];
+      DAY_NAMES.forEach((d, i) => { if (formData.get('day_' + (i + 1))) days.push(String(i + 1)); });
+      values['WorkingDays'] = days.join(',');
+    } else if (f.valueMap) {
+      const display = formData.get(f.key);
+      values[f.key] = f.valueMap[display] !== undefined ? f.valueMap[display] : display;
+    } else {
+      values[f.key] = formData.get(f.key) || '';
+    }
+  });
+
+  if (section.beforeSave) values = section.beforeSave(values);
+
+  const submitBtn = e.target.querySelector('button[type=submit]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saving…';
+
+  let res;
+  if (state.editingIndex !== null) {
+    res = await api('/tab/update', {
+      method: 'POST',
+      body: JSON.stringify({ tab: state.tab, row_index: state.editingIndex, values }),
+    });
+  } else {
+    res = await api('/tab/add', {
+      method: 'POST',
+      body: JSON.stringify({ tab: state.tab, values }),
+    });
+  }
+
+  if (res.status === 'ok') {
+    closeForm();
+    showToast('Saved');
+    loadTab(state.tab);
+  } else {
+    showToast(res.message || 'Something went wrong — nothing was changed', true);
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Save';
+  }
+}
+
+function openDeleteConfirm(index) {
+  const section = SECTIONS[state.tab];
+  const row = state.rows[index];
+  const html = '<p>Remove <strong>' + section.primary(row) + '</strong>?</p>' +
+    '<p class="warn">This can\'t be undone.</p>' +
+    '<div class="modal-actions">' +
+    '<button type="button" class="btn-cancel" onclick="closeConfirm()">Cancel</button>' +
+    '<button type="button" class="btn-primary" style="background:#dc2626" onclick="doDelete(' + index + ')">Remove</button>' +
+    '</div>';
+  document.getElementById('confirmModal').innerHTML = html;
+  document.getElementById('confirmModalBg').classList.add('open');
+}
+
+function closeConfirm() {
+  document.getElementById('confirmModalBg').classList.remove('open');
+}
+
+async function doDelete(index) {
+  closeConfirm();
+  const res = await api('/tab/delete', {
+    method: 'POST',
+    body: JSON.stringify({ tab: state.tab, row_index: index }),
+  });
+  if (res.status === 'ok') {
+    showToast('Removed');
+    loadTab(state.tab);
+  } else {
+    showToast(res.message || 'Something went wrong — nothing was removed', true);
+  }
+}
+
+function render() {
+  const app = document.getElementById('app');
+
+  if (state.view === 'home') {
+    let html = '<div class="home-grid">';
+    Object.entries(SECTIONS).forEach(([key, s]) => {
+      html += '<div class="home-card" onclick="loadTab(\'' + key + '\')">' +
+        '<div class="icon">' + s.icon + '</div>' +
+        '<div class="name">' + s.name + '</div>' +
+        '<div class="desc">' + s.desc + '</div></div>';
+    });
+    html += '</div>';
+    app.innerHTML = html;
+    return;
+  }
+
+  const section = SECTIONS[state.tab];
+  let html = '<button class="back-btn" onclick="goHome()">← Back</button>';
+  html += '<div class="section-title">' + section.icon + ' ' + section.name + '</div>';
+  html += '<div class="section-desc">' + section.desc + '</div>';
+  html += '<button class="add-btn" onclick="openAddForm()">+ Add new</button>';
+
+  if (state.rows.length === 0 && state.view === 'list') {
+    html += '<div class="list-card"><div class="loading">Loading…</div></div>';
+  } else {
+    html += '<div class="list-card">';
+    const sorted = state.rows.map((r, i) => ({ r, i }));
+    if (state.tab === 'Staff') sorted.sort((a, b) => (a.r.Name || '').localeCompare(b.r.Name || ''));
+    if (sorted.length === 0) {
+      html += '<div class="empty-msg">Nothing here yet — use "+ Add new" above.</div>';
+    } else {
+      sorted.forEach(({ r, i }) => {
+        html += '<div class="list-row">';
+        if (r.Colour) html += '<span class="colour-dot" style="background:' + r.Colour + '"></span>';
+        html += '<div class="main"><div class="primary">' + (section.primary(r) || '(untitled)') + '</div>' +
+          '<div class="secondary">' + (section.secondary(r) || '') + '</div></div>' +
+          '<button class="row-btn" onclick="openEditForm(' + i + ')">Edit</button>' +
+          '<button class="row-btn danger" onclick="openDeleteConfirm(' + i + ')">Remove</button>' +
+          '</div>';
+      });
+    }
+    html += '</div>';
+  }
+  app.innerHTML = html;
+}
+
+render();
+</script>
+</body>
+</html>
