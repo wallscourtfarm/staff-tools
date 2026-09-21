@@ -582,6 +582,7 @@ let VIEWS = ['master','tp','lp'];
 
 // ── Day structure (ROWS) — dynamic per year group ────────────────────────────────
 const DEFAULT_ROWS = [
+  { type:'before',  id:'before', label:'Before School',       time:'-08:45', hideTime:true, beforeSchool:true, order:0 },
   { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
   { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:45', order:3 },
   { type:'fixed',   id:'fab',    label:'Fresh Air Break',        time:'10:45-11:00', cls:'fab-row', order:4 },
@@ -597,6 +598,7 @@ const DEFAULT_ROWS = [
 
 const FALLBACK_DAY_STRUCTURES = {
   Reception: [
+    { type:'before',  id:'before', label:'Before School',       time:'-08:45', hideTime:true, beforeSchool:true, order:0 },
     { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
     { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:15', order:2 },
     { type:'fixed',   id:'lrsnack',label:'Learning Review Snack', time:'10:15-10:30', cls:'fab-row', order:3 },
@@ -610,6 +612,7 @@ const FALLBACK_DAY_STRUCTURES = {
     { type:'fixed',   id:'after',  label:'After School',           time:'15:15-17:00', afterSchool:true, order:11 },
   ],
   Y1: [
+    { type:'before',  id:'before', label:'Before School',       time:'-08:45', hideTime:true, beforeSchool:true, order:0 },
     { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
     { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:30', order:2 },
     { type:'fixed',   id:'fab',    label:'Fresh Air Break',        time:'10:30-10:45', cls:'fab-row', order:3 },
@@ -623,6 +626,7 @@ const FALLBACK_DAY_STRUCTURES = {
     { type:'fixed',   id:'after',  label:'After School',           time:'15:15-17:00', afterSchool:true, order:11 },
   ],
   Y2: [
+    { type:'before',  id:'before', label:'Before School',       time:'-08:45', hideTime:true, beforeSchool:true, order:0 },
     { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
     { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:30', order:2 },
     { type:'fixed',   id:'fab',    label:'Fresh Air Break',        time:'10:30-10:45', cls:'fab-row', order:3 },
@@ -636,6 +640,7 @@ const FALLBACK_DAY_STRUCTURES = {
     { type:'fixed',   id:'after',  label:'After School',           time:'15:15-17:00', afterSchool:true, order:11 },
   ],
   Y3: [
+    { type:'before',  id:'before', label:'Before School',       time:'-08:45', hideTime:true, beforeSchool:true, order:0 },
     { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
     { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:30', order:2 },
     { type:'fixed',   id:'fab',    label:'Fresh Air Break',        time:'10:30-10:45', cls:'fab-row', order:3 },
@@ -650,6 +655,7 @@ const FALLBACK_DAY_STRUCTURES = {
   ],
   Y4: DEFAULT_ROWS.map(r => ({...r})),
   Y5: [
+    { type:'before',  id:'before', label:'Before School',       time:'-08:45', hideTime:true, beforeSchool:true, order:0 },
     { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
     { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:45', order:2 },
     { type:'fixed',   id:'fab',    label:'Fresh Air Break',        time:'10:45-11:00', cls:'fab-row', order:3 },
@@ -663,6 +669,7 @@ const FALLBACK_DAY_STRUCTURES = {
     { type:'fixed',   id:'after',  label:'After School',           time:'15:15-17:00', afterSchool:true, order:11 },
   ],
   Y6: [
+    { type:'before',  id:'before', label:'Before School',       time:'-08:45', hideTime:true, beforeSchool:true, order:0 },
     { type:'fixed',   id:'reg-am', label:'Morning Registration', time:'08:45-09:00', order:1 },
     { type:'session', id:'s1',     label:'Session 1',              time:'09:00-10:45', order:2 },
     { type:'fixed',   id:'fab',    label:'Fresh Air Break',        time:'10:45-11:00', cls:'fab-row', order:3 },
@@ -1103,6 +1110,7 @@ function buildDayStructure(rows, yearGroup) {
     time: (r.Time || '').trim(),
     cls: (r.Class || '').trim() || ROW_ID_CLASSES[(r.ID || '').trim().toLowerCase()] || undefined,
     afterSchool: (r.ID || '').trim().toLowerCase() === 'after',
+    beforeSchool: (r.ID || '').trim().toLowerCase() === 'before',
     hideTime: (r.HideTime || '').trim().toLowerCase() === 'true',
     order: parseInt(r.Order) || 99,
   });
@@ -2452,13 +2460,16 @@ function renderBody() {
           // Cell date for checking events and TP activities
           const cellDate = new Date(mon); cellDate.setDate(mon.getDate() + di);
           const dk = dateKey(cellDate);
-          // After-school: show sheet events as read-only chips
+          // After/before-school: show sheet events as read-only chips
           let afterEvents = '';
           if (row.afterSchool) {
             const evts = state.afterSchoolEvents[dk] || [];
             const recurring = recurringAfterSchool.filter(r => r.dayIdx === di);
             const allEvts = [...recurring.map(r => ({ label: r.label, bg: r.bg })), ...evts.map(e => ({ label: e.label, bg: e.bg }))];
             afterEvents = allEvts.map(ev => `<div class="cell-chip" style="background:${ev.bg}25"><div class="chip-top"><span class="chip-colour" style="background:${ev.bg}"></span><span class="chip-name" style="color:${ev.bg}">${escHtml(ev.label)}</span></div></div>`).join('');
+          } else if (row.beforeSchool) {
+            const recurring = recurringBeforeSchool.filter(r => r.dayIdx === di);
+            afterEvents = recurring.map(ev => `<div class="cell-chip" style="background:${ev.bg}25"><div class="chip-top"><span class="chip-colour" style="background:${ev.bg}"></span><span class="chip-name" style="color:${ev.bg}">${escHtml(ev.label)}</span></div></div>`).join('');
           }
           // Staff-out colour strips + tag badges (supports overlapping spans)
           const soList = staffOutMap[`${di}-${ri}`] || [];
@@ -2500,7 +2511,7 @@ function renderBody() {
 
           // Build cell content
           let cellContent;
-          if (isStaffView && !row.afterSchool) {
+          if (isStaffView && !row.afterSchool && !row.beforeSchool) {
             cellContent = afterEvents + tpActHtml;
             if (ownItems.length === 0 && !afterEvents && !tpActs.length && !n) cellContent = '<div class="drop-hint">drop here</div>';
             else cellContent += renderStaffCell(ownItems, wk, view, day, row.id);
@@ -3556,6 +3567,7 @@ function setView(view) {
 // ── After-school events from sheet ──────────────────────────────────────────
 const DAY_NAME_MAP = {'monday':0,'tuesday':1,'wednesday':2,'thursday':3,'friday':4,'saturday':5,'sunday':6};
 let recurringAfterSchool = []; // [{dayIdx, label, bg}]
+let recurringBeforeSchool = []; // [{dayIdx, label, bg}]
 
 function buildAfterSchoolEvents(rows) {
   const events = {};
@@ -3580,6 +3592,17 @@ function buildAfterSchoolEvents(rows) {
 function buildRecurringAfterSchool(rows) {
   return rows
     .filter(r => r.Session && String(r.Session).trim() === 'After School' && r.Day)
+    .map(r => ({
+      dayIdx: DAY_NAME_MAP[String(r.Day).trim().toLowerCase()],
+      label: r.Label,
+      bg: r.Colour || '#1e3a8a'
+    }))
+    .filter(r => r.dayIdx !== undefined && r.label);
+}
+
+function buildRecurringBeforeSchool(rows) {
+  return rows
+    .filter(r => r.Session && String(r.Session).trim() === 'Before School' && r.Day)
     .map(r => ({
       dayIdx: DAY_NAME_MAP[String(r.Day).trim().toLowerCase()],
       label: r.Label,
@@ -3833,6 +3856,7 @@ async function init() {
       state.schoolEvents = buildSchoolEvents(evtRows);
     }
     if (schoolEventsRows.length) recurringAfterSchool = buildRecurringAfterSchool(schoolEventsRows);
+    if (schoolEventsRows.length) recurringBeforeSchool = buildRecurringBeforeSchool(schoolEventsRows);
 
     // NEW: Staff tab
     if (staffRows0.length) {
