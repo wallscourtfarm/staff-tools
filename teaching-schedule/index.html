@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-19.09.26c</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-21.09.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -543,7 +543,12 @@
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/reliability.js"></script>
 <script>
 // ── Config ──────────────────────────────────────────────────────────────────
-const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbxKhzKMmoVbU1V_cXJla5wom1VCtXWA72IllygNX4XZffCBxt5kdt_wKYZ0YLyMopN0/exec';
+// CUT OVER 21.09.26 to the Postgres-backed store (wfa-data) — real live
+// data (all 44 weeks) backfilled and verified byte-identical first. Old
+// Apps Script backend deliberately left running, untouched, as an instant
+// one-line rollback if ever needed:
+//   'https://script.google.com/macros/s/AKfycbxKhzKMmoVbU1V_cXJla5wom1VCtXWA72IllygNX4XZffCBxt5kdt_wKYZ0YLyMopN0/exec'
+const SYNC_URL   = 'https://api.wallscourt-farm-academy.co.uk/planning/teachingschedule-db';
 const EXCEPTIONS_URL = 'https://script.google.com/macros/s/AKfycbwRTXlq_kqfstCk_lF6qVdoBBZeXdlWV2Gvja1d0H3rYEyCZvPPi2XNhCp3spOsXn3W/exec';
 const FAB_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
 // Read-only proxy (fast, cached) in front of the real Apps Script state
@@ -567,13 +572,15 @@ const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqru
 // See Claude's memory: project_lunch_cover_load_failures_21_09_26.
 const LUNCH_COVER_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/kv?key=wfa_lc&token=' + SHARED_TOKEN;
 const BOOKING_SYNC_URL = 'https://script.google.com/macros/s/AKfycbwzNtos0vdjnUhsFQ_igTtLNXyBd8k9c6rPkA0IZdkM3vJLAoIdSHonTbHAbyFNfH_BWQ/exec';
-// Read-only proxies (fast, cached), same pattern as COVER_SYNC_URL above —
-// this page's own week/booking loads (syncLoad/loadBookingOverlay) were
-// measured 16.09.26 hitting 0.9-12.5s under concurrent load direct against
-// Apps Script, with occasional outright failures. Writes (syncSave, the
-// term-copy actions) still go straight to SYNC_URL/BOOKING_SYNC_URL above,
-// unchanged.
-const TEACHING_SCHEDULE_READ_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/teachingschedule';
+// CUT OVER 21.09.26 along with SYNC_URL above, same Postgres-backed store —
+// the old cache-proxy (teaching_schedule_state.py) still exists but would
+// now be reading a Sheet nothing writes to any more, so it had to move too.
+const TEACHING_SCHEDULE_READ_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/teachingschedule-db';
+// Read-only proxy, same pattern as COVER_SYNC_URL above — this page's own
+// booking loads (loadBookingOverlay) were measured 16.09.26 hitting
+// 0.9-12.5s under concurrent load direct against Apps Script, with
+// occasional outright failures. Writes still go straight to
+// BOOKING_SYNC_URL above, unchanged.
 const BOOKING_READ_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/bookingstate';
 
 // FAB zone definitions (must match FAB tool)
