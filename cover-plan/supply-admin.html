@@ -93,7 +93,7 @@
   <div class="empty-week"><strong>Loading…</strong></div>
 </div>
 
-<footer>Wallscourt Farm Academy · Supply Booking</footer>
+<footer>Wallscourt Farm Academy · Supply Booking · 21.09.26a</footer>
 
 <script>
 // ── Shared config (same source as planner.html) ─────────────────────────────
@@ -103,7 +103,14 @@ const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqru
 // have no authentication at all — anyone with the URL could read or
 // overwrite the entire cover-plan state). Same SHARED_TOKEN value as
 // everywhere else in this codebase.
-const SYNC_URL   = 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec?token=' + SHARED_TOKEN;
+const SYNC_URL   = new URLSearchParams(location.search).get('dbtest') === '1'
+  // Opt-in only — DB-backed migration target for the release-plan state,
+  // proven with a real backfilled+verified copy of the live data 21.09.26
+  // (see project_db_migration_full_tool_inventory_20_09_26 in Claude's
+  // memory). Everyone without ?dbtest=1 in the URL keeps using the real
+  // Apps Script backend below, completely unaffected.
+  ? 'https://api.wallscourt-farm-academy.co.uk/planning/coverstate-db?token=' + SHARED_TOKEN
+  : 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec?token=' + SHARED_TOKEN;
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const SESSION_IDX = { 'Before School': 0, 'AM': 1, 'Lunch': 2, 'PM': 3, 'After School': 4 };
