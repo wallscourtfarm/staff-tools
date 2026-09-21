@@ -636,8 +636,14 @@
         }
         .mtc-name-row input:focus { border-color: #1798d3; outline: none; }
         .mtc-name-error { color: #d4351c; font-size: 0.9em; margin-top: 8px; }
-        .mtc-teacher-link { margin-top: 16px; }
-        .mtc-teacher-link a { color: #505a5f; font-size: 0.85em; text-decoration: underline; }
+        .mtc-header { cursor: default; }
+
+        .mtc-pin-content { text-align: center; padding: 60px 20px; max-width: 400px; margin: 0 auto; }
+        .mtc-pin-content h2 { font-size: 1.6em; color: #0a0101; margin-bottom: 24px; }
+        .mtc-pin-dots { display: flex; justify-content: center; gap: 14px; margin-bottom: 16px; }
+        .mtc-pin-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #0b0c0c; }
+        .mtc-pin-dot.filled { background: #0b0c0c; }
+        .mtc-pin-error { color: #d4351c; font-size: 0.95em; margin-bottom: 20px; min-height: 1.2em; }
 
         .mtc-save-status { text-align: center; font-size: 1em; margin: 10px 0; font-weight: 600; }
         .mtc-save-status.saved { color: #1798d3; }
@@ -797,7 +803,7 @@
 
         <!-- MTC Welcome Screen -->
         <div id="mtc-welcome-screen" class="screen">
-            <div class="mtc-header">
+            <div class="mtc-header" onclick="handleLogoTripleTap()">
                 <span class="gov-logo">GOV.UK</span>
                 <span class="school-name">Wallscourt Farm Academy</span>
             </div>
@@ -825,8 +831,39 @@
                     <div class="mtc-name-error" id="mtc-name-error" style="display:none;">Enter the child's name first.</div>
                 </div>
                 <button class="start-btn" onclick="startMTC()">Start now</button>
-                <div class="mtc-teacher-link">
-                    <a href="#" onclick="showClassResults(); return false;">Teacher: view class results</a>
+            </div>
+        </div>
+
+        <!-- MTC Staff PIN Screen (hidden trigger: triple-tap the GOV.UK header above) -->
+        <div id="mtc-pin-screen" class="screen">
+            <div class="mtc-header">
+                <span class="gov-logo">GOV.UK</span>
+                <span class="school-name">Staff access</span>
+            </div>
+            <div class="mtc-pin-content">
+                <h2>Staff PIN</h2>
+                <div class="mtc-pin-dots">
+                    <span class="mtc-pin-dot" id="pin-dot-0"></span>
+                    <span class="mtc-pin-dot" id="pin-dot-1"></span>
+                    <span class="mtc-pin-dot" id="pin-dot-2"></span>
+                    <span class="mtc-pin-dot" id="pin-dot-3"></span>
+                </div>
+                <div class="mtc-pin-error" id="mtc-pin-error" style="display:none;">Wrong PIN, try again.</div>
+                <div class="mtc-numpad-wrapper">
+                    <div class="mtc-numpad">
+                        <button class="mtc-key" onclick="pinKeyPress('1')">1</button>
+                        <button class="mtc-key" onclick="pinKeyPress('2')">2</button>
+                        <button class="mtc-key" onclick="pinKeyPress('3')">3</button>
+                        <button class="mtc-key" onclick="pinKeyPress('4')">4</button>
+                        <button class="mtc-key" onclick="pinKeyPress('5')">5</button>
+                        <button class="mtc-key" onclick="pinKeyPress('6')">6</button>
+                        <button class="mtc-key" onclick="pinKeyPress('7')">7</button>
+                        <button class="mtc-key" onclick="pinKeyPress('8')">8</button>
+                        <button class="mtc-key" onclick="pinKeyPress('9')">9</button>
+                        <button class="mtc-key mtc-back" onclick="pinBack()">⌫</button>
+                        <button class="mtc-key mtc-zero" onclick="pinKeyPress('0')">0</button>
+                        <button class="mtc-key mtc-enter" onclick="pinCancel()">Cancel</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -903,7 +940,7 @@
             <button class="btn-home" id="btn-home" onclick="goHome()">Change Tables</button>
         </div>
 
-        <div class="version-footer">21.09.26d</div>
+        <div class="version-footer">21.09.26e</div>
     </div>
 
     <script>
@@ -928,6 +965,15 @@
 
         const MTC_BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwRLnz_jXJcyLVZvjMq65fmcaxDi0og07oLpGCW8B6fGuTZcRNLIzaiif4ejaJp1ETP/exec';
         const MTC_TOKEN = 'b57e5f3b0231b8f161cdfa0a9b53d7a343bae6288e18091c';
+
+        // Triple-tap the MTC header to reach class results — a deterrent for
+        // curious pupils, not real security (same as every other staff-only
+        // gate in this school's tools; the token above is the actual guard
+        // on the data itself).
+        const TEACHER_PIN = '2006';
+        let logoTaps = 0;
+        let logoTapTimer = null;
+        let pinValue = '';
 
         // Build table selection grid
         const grid = document.getElementById('table-grid');
@@ -1239,6 +1285,52 @@
             mtcTeacherMode = document.getElementById('mtc-teacher-mode').checked;
             document.getElementById('mtc-name-row').style.display = mtcTeacherMode ? 'flex' : 'none';
             document.getElementById('mtc-name-error').style.display = 'none';
+        }
+
+        function handleLogoTripleTap() {
+            logoTaps++;
+            clearTimeout(logoTapTimer);
+            if (logoTaps >= 3) {
+                logoTaps = 0;
+                pinValue = '';
+                document.getElementById('mtc-pin-error').style.display = 'none';
+                updatePinDots();
+                showScreen('mtc-pin-screen');
+            } else {
+                logoTapTimer = setTimeout(() => { logoTaps = 0; }, 1000);
+            }
+        }
+
+        function updatePinDots() {
+            for (let i = 0; i < 4; i++) {
+                document.getElementById('pin-dot-' + i).classList.toggle('filled', i < pinValue.length);
+            }
+        }
+
+        function pinKeyPress(digit) {
+            if (pinValue.length >= 4) return;
+            pinValue += digit;
+            updatePinDots();
+            if (pinValue.length === 4) {
+                if (pinValue === TEACHER_PIN) {
+                    showClassResults();
+                } else {
+                    document.getElementById('mtc-pin-error').style.display = 'block';
+                    pinValue = '';
+                    updatePinDots();
+                }
+            }
+        }
+
+        function pinBack() {
+            pinValue = pinValue.slice(0, -1);
+            updatePinDots();
+            document.getElementById('mtc-pin-error').style.display = 'none';
+        }
+
+        function pinCancel() {
+            pinValue = '';
+            showScreen('mtc-welcome-screen');
         }
 
         function showClassResults() {
