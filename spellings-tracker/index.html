@@ -353,7 +353,7 @@
 <body>
 <header>
   <h1>WFA Spellings &amp; Tables Tracker</h1>
-  <span class="version">WFA-13.09.26a</span>
+  <span class="version">WFA-21.09.26a</span>
   <span id="syncStatus" class="version" style="margin-left:8px;">● Offline</span>
 </header>
 <div id="yg-bar">
@@ -2447,6 +2447,12 @@ function downloadPDF(element, filename, orientation) {
 // pairs, TT sets) is always preserved, and nobody is auto-removed.
 const HUB_ROSTER_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
 const HUB_TOKEN = '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05'; // shared-sync gateway token (rotated 2026-09-08) — distinct from this tool's own SYNC_URL token above
+// Read-through proxy on wfa-data's Railway service, same data as HUB_ROSTER_URL's
+// getPupils/getClasses actions — cuts request volume against the shared-sync
+// Apps Script deployment (its own per-account concurrency ceiling can queue a
+// burst of these page-load reads for tens of seconds). Verified byte-identical
+// to HUB_ROSTER_URL before switching over, 21.09.26.
+const PUPIL_ROSTER_URL = 'https://api.wallscourt-farm-academy.co.uk/planning';
 const HUB_CLASSES_KEY = 'wfa-spellings-classes';
 const nameKey = p => (p.firstName || p.first || '').trim().toLowerCase() + ' ' + (p.lastName || p.last || '').trim().toLowerCase();
 
@@ -2460,7 +2466,7 @@ let HUB_CLASSES = (() => {
 
 async function hubRefreshClasses() {
   try {
-    const res = await fetch(HUB_ROSTER_URL + '?action=getClasses&t=' + Date.now() + '&token=' + HUB_TOKEN);
+    const res = await fetch(PUPIL_ROSTER_URL + '/classes?t=' + Date.now() + '&token=' + HUB_TOKEN);
     if (!res.ok) return;
     const data = await res.json();
     const byYg = {};
@@ -2482,7 +2488,7 @@ async function hubRefreshClasses() {
 async function hubRefreshPupils() {
   try {
     const yg = state.currentYg || 'Y5';
-    const res = await fetch(HUB_ROSTER_URL + '?action=getPupils&yeargroup=' + yg + '&t=' + Date.now() + '&token=' + HUB_TOKEN);
+    const res = await fetch(PUPIL_ROSTER_URL + '/pupils?yeargroup=' + yg + '&t=' + Date.now() + '&token=' + HUB_TOKEN);
     if (!res.ok) return;
     const data = await res.json();
     const list = (data.pupils || []).filter(p => p.first || p.first === '');

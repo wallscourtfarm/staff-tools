@@ -135,11 +135,17 @@ input[type=file]{display:none}
   </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-09.09.26b</div>
+<div class="version">WFA Roster Import · WFA-21.09.26a</div>
 
 <script>
 const HUB_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
 const WFA_TOKEN = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
+// Read-through proxy on wfa-data's Railway service, same data as HUB_URL's
+// getPupils/getClasses actions (reads only — importPupils/markLeavers/
+// updateClasses below stay on HUB_URL, unchanged). Cuts request volume
+// against the shared-sync Apps Script deployment. Verified byte-identical
+// before switching, 21.09.26.
+const PUPIL_ROSTER_URL = 'https://api.wallscourt-farm-academy.co.uk/planning';
 // No client-side PIN gate — this path is gated by Cloudflare Access (per-person
 // login), which supersedes the old shared '2013' PIN as the real access control.
 
@@ -259,7 +265,7 @@ async function handleFile(e){
 }
 
 async function fetchHubPupils(){
-  const url = HUB_URL + '?action=getPupils&token=' + encodeURIComponent(WFA_TOKEN) + '&v=' + Date.now();
+  const url = PUPIL_ROSTER_URL + '/pupils?token=' + encodeURIComponent(WFA_TOKEN) + '&v=' + Date.now();
   const r = await fetch(url, { cache: 'no-store' });
   const data = await r.json();
   if (data.error) throw new Error('Hub error: ' + data.error);
@@ -456,7 +462,7 @@ let originalClasses = [];
 async function loadClasses(){
   const statusEl2 = document.getElementById('classesStatus');
   try {
-    const url = HUB_URL + '?action=getClasses&token=' + encodeURIComponent(WFA_TOKEN) + '&v=' + Date.now();
+    const url = PUPIL_ROSTER_URL + '/classes?token=' + encodeURIComponent(WFA_TOKEN) + '&v=' + Date.now();
     const r = await fetch(url, { cache: 'no-store' });
     const data = await r.json();
     if (data.error) throw new Error(data.error);
