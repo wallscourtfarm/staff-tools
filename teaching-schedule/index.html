@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-21.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-21.09.26b</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -576,12 +576,12 @@ const BOOKING_SYNC_URL = 'https://script.google.com/macros/s/AKfycbwzNtos0vdjnUh
 // the old cache-proxy (teaching_schedule_state.py) still exists but would
 // now be reading a Sheet nothing writes to any more, so it had to move too.
 const TEACHING_SCHEDULE_READ_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/teachingschedule-db';
-// Read-only proxy, same pattern as COVER_SYNC_URL above — this page's own
-// booking loads (loadBookingOverlay) were measured 16.09.26 hitting
-// 0.9-12.5s under concurrent load direct against Apps Script, with
-// occasional outright failures. Writes still go straight to
-// BOOKING_SYNC_URL above, unchanged.
-const BOOKING_READ_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/bookingstate';
+// CUT OVER 21.09.26 along with booking/index.html's own SYNC_URL (same
+// Postgres-backed store) — the old cache-proxy (resource_booking_state.py)
+// still exists but would now be reading a Sheet nothing writes to any
+// more, so this had to move too, same lockstep-cutover lesson as
+// cover-plan's 6 read-only consumers.
+const BOOKING_READ_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/bookingstate-db';
 
 // FAB zone definitions (must match FAB tool)
 const FAB_GROUPS = {
