@@ -683,11 +683,11 @@
         .mtc-result-row-detail .no-gaps { color: #1798d3; }
         .mtc-all-q-label { margin-top: 14px; font-weight: 600; color: #0a0101; }
         .mtc-all-questions {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 4px 12px;
+            display: flex;
+            gap: 4px 24px;
             margin-top: 8px;
         }
+        .mtc-q-col { display: flex; flex-direction: column; flex: 1; min-width: 140px; }
         .mtc-q-item { font-size: 0.9em; padding: 2px 0; }
         .mtc-q-item.correct { color: #1798d3; }
         .mtc-q-item.correct span { color: #1798d3; }
@@ -834,8 +834,8 @@
                 <div class="mtc-option-row">
                     <label for="mtc-wait-between">Between questions:</label>
                     <select id="mtc-wait-between">
-                        <option value="auto" selected>Auto-advance (2 second pause)</option>
-                        <option value="wait">Wait for "Next question" button</option>
+                        <option value="auto">Auto-advance (2 second pause)</option>
+                        <option value="wait" selected>Wait for "Next question" button</option>
                     </select>
                 </div>
                 <div class="mtc-teacher-row">
@@ -983,7 +983,7 @@
             <button class="btn-home" id="btn-home" onclick="goHome()">Change Tables</button>
         </div>
 
-        <div class="version-footer">21.09.26h</div>
+        <div class="version-footer">21.09.26i</div>
     </div>
 
     <script>
@@ -1291,6 +1291,12 @@
         document.getElementById('mtc-answer').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') mtcSubmit();
         });
+        document.addEventListener('keydown', function(e) {
+            if (!document.getElementById('mtc-pin-screen').classList.contains('active')) return;
+            if (e.key >= '0' && e.key <= '9') pinKeyPress(e.key);
+            else if (e.key === 'Backspace') pinBack();
+            else if (e.key === 'Escape') pinCancel();
+        });
 
         // Mode switching
         function switchMode(mode) {
@@ -1454,11 +1460,24 @@
                 if (all.length > 0) {
                     detail += '<p class="mtc-all-q-label">All ' + all.length + ' questions asked:</p>';
                     detail += '<div class="mtc-all-questions">';
-                    all.forEach((a, qi) => {
-                        const cls = a.isCorrect ? 'correct' : 'wrong';
-                        const mark = a.isCorrect ? '✓' : (a.timedOut ? 'timed out' : '→ ' + a.given);
-                        detail += '<div class="mtc-q-item ' + cls + '">' + (qi + 1) + '. ' + a.a + ' × ' + a.b + ' = ' + a.correct + ' <span>' + mark + '</span></div>';
-                    });
+                    // Read down each column (1-9, 10-17, 18-25), not across the row.
+                    const numCols = 3;
+                    const base = Math.floor(all.length / numCols);
+                    const remainder = all.length % numCols;
+                    let idx = 0;
+                    for (let c = 0; c < numCols; c++) {
+                        const size = base + (c < remainder ? 1 : 0);
+                        detail += '<div class="mtc-q-col">';
+                        for (let k = 0; k < size; k++) {
+                            const qi = idx + k;
+                            const a = all[qi];
+                            const cls = a.isCorrect ? 'correct' : 'wrong';
+                            const mark = a.isCorrect ? '✓' : (a.timedOut ? 'timed out' : '→ ' + a.given);
+                            detail += '<div class="mtc-q-item ' + cls + '">' + (qi + 1) + '. ' + a.a + ' × ' + a.b + ' = ' + a.correct + ' <span>' + mark + '</span></div>';
+                        }
+                        detail += '</div>';
+                        idx += size;
+                    }
                     detail += '</div>';
                 }
                 detail += '</div>';
