@@ -983,7 +983,7 @@
             <button class="btn-home" id="btn-home" onclick="goHome()">Change Tables</button>
         </div>
 
-        <div class="version-footer">21.09.26k</div>
+        <div class="version-footer">21.09.26l</div>
     </div>
 
     <script>
@@ -1530,18 +1530,60 @@
 
         // MTC mode - follows the official test format: tables 2-12, 3 practice
         // questions then 25 timed test questions
+        // Mirrors the real MTC's question-selection rules: no 0x/1x tables,
+        // no division, the 6/7/8/9/12 tables (the hardest) appear more
+        // often, the easier 2/5/10 tables are capped at 7 questions, and
+        // the 25 chosen facts are then presented in a random order.
         function generateMTCQuestions() {
-            const pool = [];
-            for (let table = 2; table <= 12; table++) {
-                for (let i = 2; i <= 12; i++) {
-                    pool.push({ a: table, b: i });
+            const HARD_TABLES = [6, 7, 8, 9, 12];
+            const EASY_TABLES = [2, 5, 10];
+            const MAX_EASY = 7;
+            const TOTAL = 25;
+
+            let pool = [];
+            for (let a = 2; a <= 12; a++) {
+                for (let b = 2; b <= 12; b++) {
+                    const weight = HARD_TABLES.includes(a) ? 2 : 1;
+                    for (let w = 0; w < weight; w++) pool.push({ a, b });
                 }
             }
             for (let i = pool.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [pool[i], pool[j]] = [pool[j], pool[i]];
             }
-            questions = pool.slice(0, 25);
+
+            const selected = [];
+            const seen = new Set();
+            let easyCount = 0;
+            for (const fact of pool) {
+                if (selected.length >= TOTAL) break;
+                const key = fact.a + 'x' + fact.b;
+                if (seen.has(key)) continue;
+                const isEasy = EASY_TABLES.includes(fact.a);
+                if (isEasy && easyCount >= MAX_EASY) continue;
+                seen.add(key);
+                if (isEasy) easyCount++;
+                selected.push(fact);
+            }
+            // The easy-table cap only ever excludes 3 of the 11 tables, so
+            // there are always enough remaining facts — this is just a
+            // safety net in case that ever changes.
+            if (selected.length < TOTAL) {
+                for (let a = 2; a <= 12 && selected.length < TOTAL; a++) {
+                    for (let b = 2; b <= 12 && selected.length < TOTAL; b++) {
+                        const key = a + 'x' + b;
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        selected.push({ a, b });
+                    }
+                }
+            }
+
+            for (let i = selected.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [selected[i], selected[j]] = [selected[j], selected[i]];
+            }
+            questions = selected;
         }
 
         function startMTC() {
