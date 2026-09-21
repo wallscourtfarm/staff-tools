@@ -559,7 +559,13 @@ const SHARED_TOKEN = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52e
 // check at all).
 const OWN_BACKEND_TOKEN = '2013';
 const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
-const LUNCH_COVER_URL = GATEWAY_URL + '&key=wfa_lc';
+// Read-only overlay of lunch-cover's own data (lunch-cover/index.html is
+// the real owner and still writes straight to the Apps Script gateway,
+// unchanged) — proxied through wfa-data since direct Apps Script reads of
+// this exact endpoint failed outright 4 of 10 times when measured live
+// 21.09.26 ("Could not load: lunch cover", reported as happening often).
+// See Claude's memory: project_lunch_cover_load_failures_21_09_26.
+const LUNCH_COVER_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/kv?key=wfa_lc&token=' + SHARED_TOKEN;
 const BOOKING_SYNC_URL = 'https://script.google.com/macros/s/AKfycbwzNtos0vdjnUhsFQ_igTtLNXyBd8k9c6rPkA0IZdkM3vJLAoIdSHonTbHAbyFNfH_BWQ/exec';
 // Read-only proxies (fast, cached), same pattern as COVER_SYNC_URL above —
 // this page's own week/booking loads (syncLoad/loadBookingOverlay) were
@@ -3598,12 +3604,23 @@ function buildAfterSchoolEvents(rows) {
   return events;
 }
 
+// label carries the start time prefixed on, e.g. "08:20 · Morning Briefing",
+// when a Time was set (added 21.09.26) — the sheet stores Time separately
+// from Session (Session decides which row it appears in; Time is just
+// shown for context, so a raw time like "08:20" no longer needs to be
+// mistyped into Session itself, which only recognises the two literal
+// category strings and would otherwise silently drop the row entirely).
+function withTime_(r) {
+  const t = (r.Time || '').trim();
+  return t ? `${t} · ${r.Label}` : r.Label;
+}
+
 function buildRecurringAfterSchool(rows) {
   return rows
     .filter(r => r.Session && String(r.Session).trim() === 'After School' && r.Day)
     .map(r => ({
       dayIdx: DAY_NAME_MAP[String(r.Day).trim().toLowerCase()],
-      label: r.Label,
+      label: withTime_(r),
       bg: r.Colour || '#1e3a8a'
     }))
     .filter(r => r.dayIdx !== undefined && r.label);
@@ -3614,7 +3631,7 @@ function buildRecurringBeforeSchool(rows) {
     .filter(r => r.Session && String(r.Session).trim() === 'Before School' && r.Day)
     .map(r => ({
       dayIdx: DAY_NAME_MAP[String(r.Day).trim().toLowerCase()],
-      label: r.Label,
+      label: withTime_(r),
       bg: r.Colour || '#1e3a8a'
     }))
     .filter(r => r.dayIdx !== undefined && r.label);
