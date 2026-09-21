@@ -1038,6 +1038,15 @@ function yearGroupMatches(raw, yearGroup) {
   return expandYearGroups(raw).includes(yearGroup);
 }
 
+// `parseInt(r.Order) || 99` treated a literal Order of "0" as falsy and fell
+// through to 99 (last) — a real bug found 21.09.26 adding a before-school
+// row with Order=0, which sorted to the very end instead of the start.
+// Every Order-parsing site in this file uses this instead.
+function parseOrder(v) {
+  const n = parseInt(v, 10);
+  return Number.isNaN(n) ? 99 : n;
+}
+
 // ── Build subjects from sheet ─────────────────────────────────────────────────
 function buildSubjectGroups(rows, yearGroup) {
   // Blank YearGroup = universal defaults; specific YearGroup = additions
@@ -1055,7 +1064,7 @@ function buildSubjectGroups(rows, yearGroup) {
     seen.add(key);
     const g = (r.Group || '').trim() || '';
     if (!groupMap[g]) { groupMap[g] = { label: g, subjects: [] }; groupOrder.push(g); }
-    groupMap[g].subjects.push({ name: r.Subject, col: r.Colour || '#64748b', _order: parseInt(r.Order) || 99 });
+    groupMap[g].subjects.push({ name: r.Subject, col: r.Colour || '#64748b', _order: parseOrder(r.Order) });
   });
   // Sort subjects within each group by Order
   Object.values(groupMap).forEach(g => {
@@ -1086,7 +1095,7 @@ function buildInterventions(rows, yearGroup) {
       name: r.Activity,
       col: r.Colour || '#64748b',
       colourable: r.Colourable === 'true' || r.Colourable === 'TRUE',
-      _order: parseInt(r.Order) || 99
+      _order: parseOrder(r.Order)
     });
   });
   // Sort subjects within each group by Order
@@ -1112,7 +1121,7 @@ function buildDayStructure(rows, yearGroup) {
     afterSchool: (r.ID || '').trim().toLowerCase() === 'after',
     beforeSchool: (r.ID || '').trim().toLowerCase() === 'before',
     hideTime: (r.HideTime || '').trim().toLowerCase() === 'true',
-    order: parseInt(r.Order) || 99,
+    order: parseOrder(r.Order),
   });
   // Group all rows by ID, preferring specific matches over universal
   const byId = new Map();
