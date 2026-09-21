@@ -627,14 +627,15 @@
         .mtc-checkbox-label input { width: 18px; height: 18px; }
         .mtc-name-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
         .mtc-name-row label { font-size: 0.95em; color: #505a5f; white-space: nowrap; }
-        .mtc-name-row input {
+        .mtc-name-row input, .mtc-name-row select {
             flex: 1;
             padding: 8px 12px;
             font-size: 1em;
             border-radius: 4px;
             border: 2px solid #0b0c0c;
+            background: white;
         }
-        .mtc-name-row input:focus { border-color: #1798d3; outline: none; }
+        .mtc-name-row input:focus, .mtc-name-row select:focus { border-color: #1798d3; outline: none; }
         .mtc-name-error { color: #d4351c; font-size: 0.9em; margin-top: 8px; }
         .mtc-header { cursor: default; }
 
@@ -652,6 +653,12 @@
 
         .mtc-class-results { max-width: 700px; margin: 0 auto; padding: 30px 20px; text-align: left; }
         .mtc-class-results h2 { font-size: 1.8em; color: #0a0101; margin-bottom: 16px; }
+        .mtc-year-filter-row { justify-content: flex-start; margin: 0 0 16px; }
+        .mtc-summary-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+        .mtc-summary-table th, .mtc-summary-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #ddd; }
+        .mtc-summary-table th { color: #505a5f; font-size: 0.9em; font-weight: 600; }
+        .mtc-summary-table td { font-size: 1em; }
+        .mtc-summary-table td.name { font-weight: 700; color: #0a0101; }
         .mtc-class-results-actions { display: flex; gap: 10px; margin-top: 20px; }
         .mtc-btn-print {
             background: #1798d3; color: white; font-size: 1.1em; font-weight: 600;
@@ -840,7 +847,17 @@
                         <label for="mtc-child-name">Child's name:</label>
                         <input type="text" id="mtc-child-name" placeholder="e.g. Amy" autocomplete="off">
                     </div>
-                    <div class="mtc-name-error" id="mtc-name-error" style="display:none;">Enter the child's name first.</div>
+                    <div class="mtc-name-row" id="mtc-year-row" style="display:none;">
+                        <label for="mtc-year-group">Year group:</label>
+                        <select id="mtc-year-group">
+                            <option value="">Choose...</option>
+                            <option value="Y3">Y3</option>
+                            <option value="Y4">Y4</option>
+                            <option value="Y5">Y5</option>
+                            <option value="Y6">Y6</option>
+                        </select>
+                    </div>
+                    <div class="mtc-name-error" id="mtc-name-error" style="display:none;">Enter the child's name and year group first.</div>
                 </div>
                 <button class="start-btn" onclick="startMTC()">Start now</button>
             </div>
@@ -888,7 +905,21 @@
             </div>
             <div class="mtc-class-results">
                 <h2>Class Results</h2>
+                <div class="mtc-option-row mtc-year-filter-row">
+                    <label for="mtc-year-filter">Year group:</label>
+                    <select id="mtc-year-filter" onchange="renderClassResults()">
+                        <option value="">All year groups</option>
+                        <option value="Y3">Y3</option>
+                        <option value="Y4">Y4</option>
+                        <option value="Y5">Y5</option>
+                        <option value="Y6">Y6</option>
+                    </select>
+                </div>
                 <div id="mtc-class-results-status">Loading…</div>
+                <table class="mtc-summary-table" id="mtc-summary-table" style="display:none;">
+                    <thead><tr><th>Name</th><th>Year</th><th>Score</th><th>%</th></tr></thead>
+                    <tbody id="mtc-summary-table-body"></tbody>
+                </table>
                 <div id="mtc-class-results-list"></div>
                 <div class="mtc-class-results-actions">
                     <button class="mtc-btn-print" onclick="window.print()">Print</button>
@@ -952,7 +983,7 @@
             <button class="btn-home" id="btn-home" onclick="goHome()">Change Tables</button>
         </div>
 
-        <div class="version-footer">21.09.26g</div>
+        <div class="version-footer">21.09.26h</div>
     </div>
 
     <script>
@@ -974,6 +1005,7 @@
         let mtcWaitBetween = false;
         let mtcTeacherMode = false;
         let mtcChildName = '';
+        let mtcYearGroup = '';
 
         const MTC_BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwRLnz_jXJcyLVZvjMq65fmcaxDi0og07oLpGCW8B6fGuTZcRNLIzaiif4ejaJp1ETP/exec';
         const MTC_TOKEN = 'b57e5f3b0231b8f161cdfa0a9b53d7a343bae6288e18091c';
@@ -1296,6 +1328,7 @@
         function toggleTeacherMode() {
             mtcTeacherMode = document.getElementById('mtc-teacher-mode').checked;
             document.getElementById('mtc-name-row').style.display = mtcTeacherMode ? 'flex' : 'none';
+            document.getElementById('mtc-year-row').style.display = mtcTeacherMode ? 'flex' : 'none';
             document.getElementById('mtc-name-error').style.display = 'none';
         }
 
@@ -1345,63 +1378,101 @@
             showScreen('mtc-welcome-screen');
         }
 
+        let mtcAllResults = [];
+
         function showClassResults() {
             showScreen('mtc-class-results-screen');
             const status = document.getElementById('mtc-class-results-status');
-            const list = document.getElementById('mtc-class-results-list');
+            document.getElementById('mtc-summary-table').style.display = 'none';
+            document.getElementById('mtc-class-results-list').innerHTML = '';
             status.textContent = 'Loading…';
-            list.innerHTML = '';
 
             fetch(MTC_BACKEND_URL + '?token=' + MTC_TOKEN)
                 .then(r => r.json())
                 .then(data => {
                     if (data.error) throw new Error(data.error);
-                    const results = data.results || [];
-                    if (results.length === 0) {
-                        status.textContent = 'No results saved yet.';
-                        return;
-                    }
-                    status.textContent = results.length + ' result' + (results.length > 1 ? 's' : '') + ' saved.';
-
-                    let html = '';
-                    results.forEach((r, i) => {
-                        const when = new Date(r.timestamp).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
-                        const all = r.answers_json || [];
-                        const wrong = all.filter(a => !a.isCorrect);
-                        let detail = '<div class="mtc-result-row-detail" id="mtc-detail-' + i + '">';
-                        detail += '<div>' + when + '</div>';
-                        if (wrong.length === 0) {
-                            detail += '<p class="no-gaps">No mistakes — got every question right.</p>';
-                        } else {
-                            detail += '<p>Facts to practise:</p>';
-                            wrong.forEach(a => {
-                                const given = a.timedOut ? 'timed out' : ('answered ' + a.given);
-                                detail += '<div class="wrong-fact">' + a.a + ' × ' + a.b + ' = ' + a.correct + ' (' + given + ')</div>';
-                            });
-                        }
-                        if (all.length > 0) {
-                            detail += '<p class="mtc-all-q-label">All ' + all.length + ' questions asked:</p>';
-                            detail += '<div class="mtc-all-questions">';
-                            all.forEach((a, qi) => {
-                                const cls = a.isCorrect ? 'correct' : 'wrong';
-                                const mark = a.isCorrect ? '✓' : (a.timedOut ? 'timed out' : '→ ' + a.given);
-                                detail += '<div class="mtc-q-item ' + cls + '">' + (qi + 1) + '. ' + a.a + ' × ' + a.b + ' = ' + a.correct + ' <span>' + mark + '</span></div>';
-                            });
-                            detail += '</div>';
-                        }
-                        detail += '</div>';
-
-                        html += '<div class="mtc-result-row" onclick="document.getElementById(\'mtc-detail-' + i + '\').classList.toggle(\'open\')">' +
-                            '<div class="mtc-result-row-head">' +
-                            '<span class="name">' + escapeHtml_(r.child_name) + '</span>' +
-                            '<span class="score">' + r.score + ' / ' + r.total + ' (' + r.percent + '%)</span>' +
-                            '</div>' + detail + '</div>';
-                    });
-                    list.innerHTML = html;
+                    mtcAllResults = data.results || [];
+                    renderClassResults();
                 })
                 .catch(err => {
                     status.textContent = 'Could not load results — check the connection and try again.';
                 });
+        }
+
+        function renderClassResults() {
+            const status = document.getElementById('mtc-class-results-status');
+            const list = document.getElementById('mtc-class-results-list');
+            const table = document.getElementById('mtc-summary-table');
+            const tbody = document.getElementById('mtc-summary-table-body');
+            const yearFilter = document.getElementById('mtc-year-filter').value;
+
+            const results = yearFilter
+                ? mtcAllResults.filter(r => r.year_group === yearFilter)
+                : mtcAllResults;
+
+            if (mtcAllResults.length === 0) {
+                status.textContent = 'No results saved yet.';
+                table.style.display = 'none';
+                tbody.innerHTML = '';
+                list.innerHTML = '';
+                return;
+            }
+            if (results.length === 0) {
+                status.textContent = 'No results saved yet for ' + yearFilter + '.';
+                table.style.display = 'none';
+                tbody.innerHTML = '';
+                list.innerHTML = '';
+                return;
+            }
+            status.textContent = results.length + ' result' + (results.length > 1 ? 's' : '') + ' saved' + (yearFilter ? ' for ' + yearFilter : '') + '.';
+
+            let tableHtml = '';
+            let listHtml = '';
+            results.forEach((r, i) => {
+                const when = new Date(r.timestamp).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+                const all = r.answers_json || [];
+                const wrong = all.filter(a => !a.isCorrect);
+
+                tableHtml += '<tr>' +
+                    '<td class="name">' + escapeHtml_(r.child_name) + '</td>' +
+                    '<td>' + escapeHtml_(r.year_group || '—') + '</td>' +
+                    '<td>' + r.score + ' / ' + r.total + '</td>' +
+                    '<td>' + r.percent + '%</td>' +
+                    '</tr>';
+
+                let detail = '<div class="mtc-result-row-detail" id="mtc-detail-' + i + '">';
+                detail += '<div>' + when + '</div>';
+                if (wrong.length === 0) {
+                    detail += '<p class="no-gaps">No mistakes — got every question right.</p>';
+                } else {
+                    detail += '<p>Facts to practise:</p>';
+                    wrong.forEach(a => {
+                        const given = a.timedOut ? 'timed out' : ('answered ' + a.given);
+                        detail += '<div class="wrong-fact">' + a.a + ' × ' + a.b + ' = ' + a.correct + ' (' + given + ')</div>';
+                    });
+                }
+                if (all.length > 0) {
+                    detail += '<p class="mtc-all-q-label">All ' + all.length + ' questions asked:</p>';
+                    detail += '<div class="mtc-all-questions">';
+                    all.forEach((a, qi) => {
+                        const cls = a.isCorrect ? 'correct' : 'wrong';
+                        const mark = a.isCorrect ? '✓' : (a.timedOut ? 'timed out' : '→ ' + a.given);
+                        detail += '<div class="mtc-q-item ' + cls + '">' + (qi + 1) + '. ' + a.a + ' × ' + a.b + ' = ' + a.correct + ' <span>' + mark + '</span></div>';
+                    });
+                    detail += '</div>';
+                }
+                detail += '</div>';
+
+                listHtml += '<div class="mtc-result-row" onclick="document.getElementById(\'mtc-detail-' + i + '\').classList.toggle(\'open\')">' +
+                    '<div class="mtc-result-row-head">' +
+                    '<span class="name">' + escapeHtml_(r.child_name) + (r.year_group ? ' (' + escapeHtml_(r.year_group) + ')' : '') + '</span>' +
+                    '<span class="score">' + r.score + ' / ' + r.total + ' (' + r.percent + '%)</span>' +
+                    '</div>' + detail + '</div>';
+            });
+
+            tbody.innerHTML = tableHtml;
+            table.style.display = 'table';
+            list.innerHTML = listHtml;
         }
 
         function escapeHtml_(s) {
@@ -1420,6 +1491,7 @@
                 method: 'POST',
                 body: JSON.stringify({
                     childName: mtcChildName,
+                    yearGroup: mtcYearGroup,
                     score: score,
                     total: questions.length,
                     answers: allAnswers
@@ -1456,9 +1528,10 @@
         function startMTC() {
             mtcTeacherMode = document.getElementById('mtc-teacher-mode').checked;
             mtcChildName = document.getElementById('mtc-child-name').value.trim();
-            if (mtcTeacherMode && !mtcChildName) {
+            mtcYearGroup = document.getElementById('mtc-year-group').value;
+            if (mtcTeacherMode && (!mtcChildName || !mtcYearGroup)) {
                 document.getElementById('mtc-name-error').style.display = 'block';
-                document.getElementById('mtc-child-name').focus();
+                (mtcChildName ? document.getElementById('mtc-year-group') : document.getElementById('mtc-child-name')).focus();
                 return;
             }
             document.getElementById('mtc-name-error').style.display = 'none';

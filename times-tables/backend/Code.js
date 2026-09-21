@@ -10,7 +10,7 @@
 
 const SPREADSHEET_ID = ''; // blank = use active/bound spreadsheet
 const SHEET_NAME = 'Results';
-const HEADERS = ['timestamp', 'child_name', 'score', 'total', 'percent', 'answers_json'];
+const HEADERS = ['timestamp', 'child_name', 'score', 'total', 'percent', 'answers_json', 'year_group'];
 
 function tokenOK(e) {
   const expected = PropertiesService.getScriptProperties().getProperty('SHARED_TOKEN');
@@ -55,7 +55,8 @@ function doPost(e) {
       data.score,
       data.total,
       percent,
-      JSON.stringify(data.answers || [])
+      JSON.stringify(data.answers || []),
+      String(data.yearGroup || '').trim().slice(0, 20)
     ]);
 
     return json_({ ok: true });
