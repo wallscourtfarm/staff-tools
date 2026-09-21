@@ -674,6 +674,18 @@
         .mtc-result-row-detail.open { display: block; }
         .mtc-result-row-detail .wrong-fact { color: #d4351c; margin: 3px 0; }
         .mtc-result-row-detail .no-gaps { color: #1798d3; }
+        .mtc-all-q-label { margin-top: 14px; font-weight: 600; color: #0a0101; }
+        .mtc-all-questions {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 4px 12px;
+            margin-top: 8px;
+        }
+        .mtc-q-item { font-size: 0.9em; padding: 2px 0; }
+        .mtc-q-item.correct { color: #1798d3; }
+        .mtc-q-item.correct span { color: #1798d3; }
+        .mtc-q-item.wrong { color: #0a0101; }
+        .mtc-q-item.wrong span { color: #d4351c; font-weight: 600; }
 
         @media print {
             .mode-selector, .mtc-header, .mtc-class-results-actions, .version-footer { display: none !important; }
@@ -940,7 +952,7 @@
             <button class="btn-home" id="btn-home" onclick="goHome()">Change Tables</button>
         </div>
 
-        <div class="version-footer">21.09.26f</div>
+        <div class="version-footer">21.09.26g</div>
     </div>
 
     <script>
@@ -1354,7 +1366,8 @@
                     let html = '';
                     results.forEach((r, i) => {
                         const when = new Date(r.timestamp).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
-                        const wrong = (r.answers_json || []).filter(a => !a.isCorrect);
+                        const all = r.answers_json || [];
+                        const wrong = all.filter(a => !a.isCorrect);
                         let detail = '<div class="mtc-result-row-detail" id="mtc-detail-' + i + '">';
                         detail += '<div>' + when + '</div>';
                         if (wrong.length === 0) {
@@ -1365,6 +1378,16 @@
                                 const given = a.timedOut ? 'timed out' : ('answered ' + a.given);
                                 detail += '<div class="wrong-fact">' + a.a + ' × ' + a.b + ' = ' + a.correct + ' (' + given + ')</div>';
                             });
+                        }
+                        if (all.length > 0) {
+                            detail += '<p class="mtc-all-q-label">All ' + all.length + ' questions asked:</p>';
+                            detail += '<div class="mtc-all-questions">';
+                            all.forEach((a, qi) => {
+                                const cls = a.isCorrect ? 'correct' : 'wrong';
+                                const mark = a.isCorrect ? '✓' : (a.timedOut ? 'timed out' : '→ ' + a.given);
+                                detail += '<div class="mtc-q-item ' + cls + '">' + (qi + 1) + '. ' + a.a + ' × ' + a.b + ' = ' + a.correct + ' <span>' + mark + '</span></div>';
+                            });
+                            detail += '</div>';
                         }
                         detail += '</div>';
 
