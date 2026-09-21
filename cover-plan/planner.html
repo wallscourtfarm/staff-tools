@@ -523,7 +523,7 @@ body.edit-locked .notify-btn   { display:none; }
   <button onclick="closeDeleteMenu()" style="display:block;width:100%;text-align:left;background:none;border:none;color:#64748b;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:12px">Cancel</button>
 </div>
 
-<footer>Wallscourt Farm Academy · Release Schedule · 21.09.26a</footer>
+<footer>Wallscourt Farm Academy · Release Schedule · 21.09.26b</footer>
 
 <script>
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -563,14 +563,13 @@ const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqru
 // have no authentication at all — anyone with the URL could read or
 // overwrite the entire cover-plan state). Same SHARED_TOKEN value as
 // everywhere else in this codebase.
-const SYNC_URL   = new URLSearchParams(location.search).get('dbtest') === '1'
-  // Opt-in only — DB-backed migration target for the release-plan state,
-  // proven with a real backfilled+verified copy of the live data 21.09.26
-  // (see project_db_migration_full_tool_inventory_20_09_26 in Claude's
-  // memory). Everyone without ?dbtest=1 in the URL keeps using the real
-  // Apps Script backend below, completely unaffected.
-  ? 'https://api.wallscourt-farm-academy.co.uk/planning/coverstate-db?token=' + SHARED_TOKEN
-  : 'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec?token=' + SHARED_TOKEN;
+// CUT OVER 21.09.26 to the Postgres-backed store — real live data
+// backfilled and verified first, tested live via ?dbtest=1 and confirmed
+// by Innes before this switch (see project_db_migration_full_tool_
+// inventory_20_09_26 in Claude's memory). The old Apps Script backend is
+// deliberately left running, untouched, as an instant one-line rollback:
+//   'https://script.google.com/macros/s/AKfycbz-w7hGrqjEnfXNKkhzfaGFWhOk0QMhzigsPTJXY2YgHYcYPjC2QroFk8x_Q5j0E_fisg/exec?token=' + SHARED_TOKEN
+const SYNC_URL   = 'https://api.wallscourt-farm-academy.co.uk/planning/coverstate-db?token=' + SHARED_TOKEN;
 // Railway relay endpoint — avoids GAS CORS redirect issue. Handles staff SMS
 // notifications and the "raise a concern" form only; it has no Apps Script
 // forwarding logic, so it must NOT be used for CalendarEvents CRUD (see
