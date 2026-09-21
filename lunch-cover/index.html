@@ -125,7 +125,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title">Lunch Cover Rota</div>
-    <div class="app-subtitle">Wallscourt Farm Academy · 19.09.26c</div>
+    <div class="app-subtitle">Wallscourt Farm Academy · 21.09.26a</div>
   </div>
 </div>
 
@@ -196,7 +196,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunch Cover Rota · WFA-19.09.26c</footer>
+<footer>Wallscourt Farm Academy · Lunch Cover Rota · WFA-21.09.26a</footer>
 
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/reliability.js"></script>
 <script>
@@ -627,6 +627,24 @@ function copyToNext() {
 function setAsTerm() {
   if (!confirm('Save this week\'s rota as the term default? New weeks will auto-fill from it.')) return;
   termTemplate = deepCopyWeek(getWeek());
+  // Backfill any other week that already has a state.slots entry but is
+  // entirely unassigned. getWeek()'s auto-fill only ever fires for a week
+  // with NO entry yet (`if (!state.slots[key])`) — a week gets an entry the
+  // moment anyone so much as opens it (even just browsing forward), so a
+  // week visited before a term rota existed stays a blank shell forever,
+  // immune to this template, even though "New weeks will auto-fill from it"
+  // implies the whole term is now covered. Found 21.09.26: this week's rota
+  // silently stayed empty despite Set as term rota having been run earlier
+  // on a different week — teaching-schedule correctly showed nothing because
+  // there was genuinely nothing there. Only touches weeks with zero
+  // assignments anywhere, so a week someone has actually started filling in
+  // is never overwritten.
+  Object.keys(state.slots).forEach(key => {
+    if (String(key) === String(state.weekIdx)) return;
+    const wk = state.slots[key];
+    const isEmpty = !DUTIES.some(d => (wk[d.id] || []).some(day => day.length));
+    if (isEmpty) state.slots[key] = deepCopyWeek(termTemplate);
+  });
   save();
   alert('Term rota saved. New weeks will now start with this layout.');
 }
