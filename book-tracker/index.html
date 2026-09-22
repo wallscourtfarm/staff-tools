@@ -267,7 +267,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · WFA-22.09.26a</div>
+  <div class="version">WFA Book Tracker · WFA-22.09.26b</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -1415,6 +1415,11 @@ function renderBookPicker() {
                 ${copyLabel(c)}
               </button>`).join('')}
           </div>
+          <button class="btn btn-ghost btn-sm" style="margin-top:6px;font-size:11.5px"
+            onclick="doLogExternalRead('${b.id}','${escJs(b.title)}')"
+            title="For a book they've already read at home — no checkout needed">
+            ✓ Already read this at home
+          </button>
         </div>
       </div>
     </div>`;
@@ -1468,6 +1473,30 @@ async function doCheckout(bookId, copyNum, title) {
     const child = children.find(c => c.id === selChild.id);
     if (child) child.activeCheckouts.push({ checkoutId: r.checkoutId, bookId, copyNum, checkoutDate: new Date().toLocaleDateString('en-GB') });
     toast(`✓ Checked out to ${selChild.name}`);
+    renderChildDetail();
+    renderChildren();
+    scheduleSync(); // background sync, coalesced
+  } catch(e) { toast('Error: '+e.message); }
+}
+
+// For a reading-challenge book a child has already read at home — never
+// checked out from school, so no copy/checkout/quiz/return cycle at all.
+// Staff attest it directly (same trust level as the existing quiz staff-
+// override) and it counts toward totalReads/milestones exactly like a
+// normal completed return.
+async function doLogExternalRead(bookId, title) {
+  if (!selChild) return;
+  if (!confirm(`Mark "${title}" as already read by ${selChild.name}? This counts toward their reading total.`)) return;
+  try {
+    const r = await api({ action:'logExternalRead', childId:selChild.id, bookId });
+    if (!r.ok) { toast(r.error || 'Could not log this read'); return; }
+    const child = children.find(c => c.id === selChild.id);
+    if (child) child.totalReads = r.totalReads != null ? r.totalReads : (child.totalReads || 0) + 1;
+    if (r.milestone) {
+      showMilestone(selChild.id, r.milestone);
+    } else {
+      toast(`✓ Marked as read by ${selChild.name}`);
+    }
     renderChildDetail();
     renderChildren();
     scheduleSync(); // background sync, coalesced
