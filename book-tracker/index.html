@@ -267,7 +267,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · WFA-22.09.26b</div>
+  <div class="version">WFA Book Tracker · WFA-22.09.26c</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -1373,18 +1373,25 @@ function renderChildDetail() {
       ${c.lks2Reads > 0 ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">LKS2 challenge: ${c.lks2Reads} reads</div>` : ''}
     </div>
     ${activeHtml}
-    ${c.activeCheckouts.length === 0 ? '<div id="childBookPicker" style="margin-top:16px"></div>' : ''}
+    <div id="childBookPicker" style="margin-top:16px"></div>
   `;
-  if (!c.activeCheckouts.length) renderBookPicker();
+  renderBookPicker();
 }
 
+// Checking a book OUT is only offered when the child has no active
+// checkout (one physical book at a time) — but "already read this at
+// home" never depends on that, so it stays available either way. When
+// there's an active checkout the picker drops straight to a simpler
+// read-only-books list (no availability/copy info, since checkout isn't
+// on offer) rather than disappearing entirely, which is the gap this
+// was added to close (22.09.26 — Innes couldn't log an at-home read for
+// a child who already had a different book checked out).
 function renderBookPicker() {
-  const phBooks = books.filter(b => b.phase === pickPhase).sort((a,b) => a.title.localeCompare(b.title));
-  const avail   = phBooks.filter(b => b.available > 0);
-  const out     = phBooks.filter(b => b.available === 0);
-  const picker  = document.getElementById('childBookPicker');
-  if (!picker) return; // book picker isn't in the DOM while the child has an active checkout
+  const picker = document.getElementById('childBookPicker');
+  if (!picker || !selChild) return;
+  const hasActiveCheckout = selChild.activeCheckouts.length > 0;
 
+  const phBooks = books.filter(b => b.phase === pickPhase).sort((a,b) => a.title.localeCompare(b.title));
   const otherPhase = pickPhase === 'LKS2' ? 'UKS2' : 'LKS2';
   const childPhase = ['Y3','Y4'].includes(selChild?.yearGroup) ? 'LKS2' : 'UKS2';
   const crossPhase = pickPhase !== childPhase;
@@ -1394,6 +1401,22 @@ function renderBookPicker() {
     if (c.available) return `Copy ${c.copyNum} ✓`;
     return `Copy ${c.copyNum}: ${esc(childName(c.childId)||'Out')}`;
   };
+
+  const readOnlyBookHtml = b => `
+    <div class="book-card">
+      <div class="book-cover-wrap">
+        ${coverImg(b.id, b.title, false)}
+        <div style="flex:1;min-width:0">
+          <div class="book-title">${esc(b.title)}</div>
+          ${b.author ? `<div class="book-author">${esc(b.author)}</div>` : ''}
+          <button class="btn btn-ghost btn-sm" style="margin-top:6px;font-size:11.5px"
+            onclick="doLogExternalRead('${b.id}','${escJs(b.title)}')"
+            title="For a book they've already read at home — no checkout needed">
+            ✓ Already read this at home
+          </button>
+        </div>
+      </div>
+    </div>`;
 
   const bookHtml = b => `
     <div class="book-card">
@@ -1426,6 +1449,34 @@ function renderBookPicker() {
 
   const q = bookPickerSearch.toLowerCase();
   const filterBooks = list => q ? list.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)) : list;
+
+  if (hasActiveCheckout) {
+    const filtBooks = filterBooks(phBooks);
+    picker.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px">
+        <div class="sec-hdr" style="margin:0">Log another book as already read</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${crossPhase ? `<span style="font-size:11px;font-weight:700;color:var(--amber);background:var(--amber-lt);padding:3px 8px;border-radius:6px">Showing ${pickPhase}</span>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="switchPickPhase('${otherPhase}')" style="font-size:12px">
+            Switch to ${otherPhase}
+          </button>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Checking out a new book isn't offered while one is already borrowed — but a different book read at home still counts.</div>
+      <input id="bookPickerSearchInput" type="text" placeholder="Search books…" value="${esc(bookPickerSearch)}"
+        oninput="bookPickerSearch=this.value;renderBookPicker()"
+        style="width:100%;box-sizing:border-box;padding:8px 12px;border:2px solid var(--border);border-radius:9px;font-size:14px;font-family:inherit;margin-bottom:12px">
+      <div class="book-picker-grid">
+        ${filtBooks.length ? filtBooks.map(readOnlyBookHtml).join('') : '<div style="color:var(--muted);font-size:13px">No books match.</div>'}
+      </div>
+    `;
+    const inp0 = document.getElementById('bookPickerSearchInput');
+    if (inp0 && bookPickerSearch) { inp0.focus(); inp0.setSelectionRange(inp0.value.length, inp0.value.length); }
+    return;
+  }
+
+  const avail = phBooks.filter(b => b.available > 0);
+  const out   = phBooks.filter(b => b.available === 0);
   const filtAvail = filterBooks(avail);
   const filtOut   = filterBooks(out);
 
