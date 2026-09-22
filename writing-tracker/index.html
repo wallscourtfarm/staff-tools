@@ -550,7 +550,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-weights" onclick="showTab('weights')">⭐ Weights</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">WFA-16.09.26a</span>
+      <span class="version">WFA-22.09.26a</span>
     </div>
   </header>
 
@@ -743,16 +743,19 @@ function scoreMeta(v) {
 // ================================================================
 // STATE
 // ================================================================
-const PRODUCTION_API_URL = 'https://script.google.com/macros/s/AKfycbzkr27LBT4SLJ2TsJzqXSN3sWHXIJE0YCqbLqp8tUJgRiBG0AycNUPvD9cWfblaNDaU/exec';
+// CUT OVER 22.09.26 to the Postgres-backed store (wfa-data) — real live
+// data (14 classes, 383 pupils via a fresh roster sync, 76 assessment
+// scores, weights, config) backfilled and verified first. Old Apps
+// Script backend deliberately left running, untouched, as an instant
+// one-line rollback if ever needed:
+//   'https://script.google.com/macros/s/AKfycbzkr27LBT4SLJ2TsJzqXSN3sWHXIJE0YCqbLqp8tUJgRiBG0AycNUPvD9cWfblaNDaU/exec'
+const PRODUCTION_API_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/writingtracker-db';
 // Read-through cache proxy on the Railway server we already own (see
-// wfa-data/backend/routers/writing_tracker.py) — GETs go through here
-// instead of straight to Apps Script, which otherwise hits Apps Script's
-// own per-account concurrent-execution ceiling under real classroom load
-// (measured 6.9-60s+/request, two outright failures, 13.09.26). Writes
-// still POST straight to state.apiUrl, unchanged — this proxy is
-// deliberately GET-only. Only used when apiUrl is still the real
-// production deployment — a device with a custom/test apiUrl (see the
-// Settings screen) reads straight from that URL instead, unproxied.
+// wfa-data/backend/routers/writing_tracker.py) — cut over the same day,
+// same Postgres store, to stay in lockstep with PRODUCTION_API_URL above.
+// Only used when apiUrl is still the real production deployment — a
+// device with a custom/test apiUrl (see the Settings screen) reads
+// straight from that URL instead, unproxied.
 const API_READ_URL = 'https://api.wallscourt-farm-academy.co.uk/writing-tracker/sync';
 const state = {
   apiUrl: localStorage.getItem('wfa_api_url') || PRODUCTION_API_URL,
