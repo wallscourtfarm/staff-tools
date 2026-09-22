@@ -252,7 +252,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · WFA-19.09.26c</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · WFA-22.09.26a</footer>
 
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/reliability.js"></script>
 <script>
@@ -287,7 +287,15 @@ const PALETTE = ['#1798d3','#f97316','#22c55e','#e879f9','#64748b','#ef4444','#8
 
 const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
 const GATEWAY_URL     = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
-const SYNC_URL        = GATEWAY_URL + '&key=wfa_slt';
+// checkPin stays on shared-sync (STAFF_PIN Script Property) — unrelated
+// to this tool's own state blob, not part of this migration.
+const CHECKPIN_URL    = GATEWAY_URL + '&action=checkPin';
+// CUT OVER 22.09.26 to the Postgres-backed store (wfa-data) — real live
+// state backfilled and verified byte-identical first. Old shared-sync
+// key=wfa_slt endpoint deliberately left running, untouched, as an
+// instant one-line rollback if ever needed:
+//   GATEWAY_URL + '&key=wfa_slt'
+const SYNC_URL        = 'https://api.wallscourt-farm-academy.co.uk/planning/sharedkv-db?key=wfa_slt&token=' + SHARED_TOKEN;
 // Read-only proxy (fast, cached) in front of the real Apps Script state
 // store — see project_shared_gateway_apps_script_ceiling in Claude's
 // memory. This file never writes to cover-plan state, only reads it, so
@@ -651,7 +659,7 @@ async function checkPinAsync(pin) {
     editMode = true; closePinModal(); updateLockUI(); return;
   }
   try {
-    const r = await fetch(SYNC_URL + '&action=checkPin&pin=' + encodeURIComponent(pin) + '&t=' + Date.now());
+    const r = await fetch(CHECKPIN_URL + '&pin=' + encodeURIComponent(pin) + '&t=' + Date.now());
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     if (d && d.ok) {
