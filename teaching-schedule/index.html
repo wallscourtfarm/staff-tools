@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-21.09.26b</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-22.09.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -549,7 +549,18 @@
 // one-line rollback if ever needed:
 //   'https://script.google.com/macros/s/AKfycbxKhzKMmoVbU1V_cXJla5wom1VCtXWA72IllygNX4XZffCBxt5kdt_wKYZ0YLyMopN0/exec'
 const SYNC_URL   = 'https://api.wallscourt-farm-academy.co.uk/planning/teachingschedule-db';
-const EXCEPTIONS_URL = 'https://script.google.com/macros/s/AKfycbwRTXlq_kqfstCk_lF6qVdoBBZeXdlWV2Gvja1d0H3rYEyCZvPPi2XNhCp3spOsXn3W/exec';
+// CUT OVER 22.09.26 to the Postgres-backed store (wfa-data's
+// activity_exceptions_db.py). This was the last read path still served by
+// a bound Apps Script on the big pupil-data hub sheet, and the cause of
+// the one health check that kept timing out. The old bound script is
+// deliberately left running, untouched, as an instant one-line rollback:
+//   'https://script.google.com/macros/s/AKfycbwRTXlq_kqfstCk_lF6qVdoBBZeXdlWV2Gvja1d0H3rYEyCZvPPi2XNhCp3spOsXn3W/exec'
+// Note the new endpoint returns lowercase date/staff/activity/session/type
+// keys — the shape every reader below already expected. The old one
+// returned the sheet's capitalised headers and had no Type column at all,
+// so server-persisted exceptions silently never matched and FAB_EXCEPTIONS
+// was always empty. Rolling back reinstates that bug.
+const EXCEPTIONS_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/activityexceptions-db';
 const FAB_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
 // Read-only proxy (fast, cached) in front of the real Apps Script state
 // store — see project_shared_gateway_apps_script_ceiling in Claude's
