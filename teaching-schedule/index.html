@@ -456,7 +456,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-22.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-22.09.26b</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -561,7 +561,19 @@ const SYNC_URL   = 'https://api.wallscourt-farm-academy.co.uk/planning/teachings
 // so server-persisted exceptions silently never matched and FAB_EXCEPTIONS
 // was always empty. Rolling back reinstates that bug.
 const EXCEPTIONS_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/activityexceptions-db';
-const FAB_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
+// CUT OVER 22.09.26 to the Postgres-backed store (fab-rota's own
+// fab_rota_db.py — fab-rota/index.html has read/written this since
+// 20.09.26). This overlay was still reading the old Apps Script
+// deployment, which nothing has written to since that cutover — confirmed
+// stale by diffing the two live responses: identical duty assignments
+// right now (nobody's re-arranged a duty in the two days since cutover)
+// but 11 real staffColours already diverged, meaning colour edits made in
+// the real fab-rota tool were silently invisible here. Would have shown
+// wrong duty assignments the moment anyone edited fab-rota, with no
+// warning. Same JSON contract, {state:{slots},staffColours} — only the
+// URL and token change. Auth here is the shared hub token (HUB_TOKEN),
+// not this tool's own OWN_BACKEND_TOKEN — see fab_rota_db.py.
+const FAB_SYNC_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/fab-rota/sync';
 // Read-only proxy (fast, cached) in front of the real Apps Script state
 // store — see project_shared_gateway_apps_script_ceiling in Claude's
 // memory. This file never writes to cover-plan state, only reads it, so
@@ -3851,7 +3863,7 @@ async function init() {
   const bookingPromise = loadBookingOverlay(initialWeekKey);
   const overlaysPromise = Promise.all([
     fetchOverlay_('activity exceptions', EXCEPTIONS_URL, EXCEPTIONS_URL + '?action=exceptions&token=' + OWN_BACKEND_TOKEN, undefined, {exceptions:[]}).then(d => d.exceptions || []),
-    fetchOverlay_('FAB rota', FAB_SYNC_URL, FAB_SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, undefined, null),
+    fetchOverlay_('FAB rota', FAB_SYNC_URL, FAB_SYNC_URL + '?token=' + SHARED_TOKEN, undefined, null),
     fetchOverlay_('release schedule (PPA/cover)', COVER_SYNC_URL, COVER_SYNC_URL + '?token=' + SHARED_TOKEN, undefined, null),
     fetchOverlay_('lunch cover', LUNCH_COVER_URL, LUNCH_COVER_URL, { signal: AbortSignal.timeout(8000) }, null),
   ]);
