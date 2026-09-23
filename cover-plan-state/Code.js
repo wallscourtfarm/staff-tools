@@ -177,6 +177,24 @@ function authorizeSheetsAccess() {
   return getStateSheet_().getName() + ', ' + getBackupSheet_().getName();
 }
 
+// Pretty-prints JSON for storage in a backup row — asked for 18.09.26 after
+// the live data-loss incident, when Innes had to actually look at what was
+// in these rows and found one giant unindented line unreadable. Falls back
+// to the raw string on any parse failure (should never happen — it's
+// re-parsing JSON this same script just read successfully — but a backup
+// step must never throw and block anything). Restoring reverses this
+// (compactBackupData_ below) so the LIVE cell — read by every device, every
+// load — never carries the extra whitespace; only the backup history does.
+function prettyPrintForBackup_(text) {
+  try { return JSON.stringify(JSON.parse(text), null, 2); }
+  catch (err) { return text; }
+}
+
+function compactBackupData_(text) {
+  try { return JSON.stringify(JSON.parse(text)); }
+  catch (err) { return text; }
+}
+
 // Snapshot the state about to be overwritten. No-op the first time this
 // script ever runs (nothing live yet to lose). Appends a timestamped row to
 // the CoverPlanBackups tab rather than a PropertiesService slot — a Sheets
@@ -189,7 +207,7 @@ function backupCurrentState(current) {
   if (!current) return;
   try {
     var sh = getBackupSheet_();
-    sh.appendRow([new Date().toISOString(), current]);
+    sh.appendRow([new Date().toISOString(), prettyPrintForBackup_(current)]);
     var lastRow = sh.getLastRow();
     if (lastRow > BACKUP_COUNT) {
       sh.deleteRows(1, lastRow - BACKUP_COUNT);
@@ -208,7 +226,9 @@ function listBackups() {
   for (var i = 0; i < rows.length; i++) {
     var ts = rows[i][0], data = rows[i][1];
     if (!ts) continue;
-    out.push({ row: i + 1, ts: (ts instanceof Date) ? ts.toISOString() : String(ts), size: String(data || '').length });
+    // size is the compact (restored) length, not the pretty-printed row's
+    // own length, so it means the same thing as the live state's size.
+    out.push({ row: i + 1, ts: (ts instanceof Date) ? ts.toISOString() : String(ts), size: compactBackupData_(String(data || '')).length });
   }
   out.sort(function (a, b) { return a.ts < b.ts ? 1 : (a.ts > b.ts ? -1 : 0); }); // newest first
   return out;
@@ -248,12 +268,16 @@ function doPost(e) {
     var rowNum = parseInt(e.parameter.index, 10);
     var backup = readBackupRow_(rowNum);
     if (!backup) return errorJson('no backup at row ' + rowNum);
+    // Backup rows are stored pretty-printed (see prettyPrintForBackup_) —
+    // compact back down before writing so the live cell, read by every
+    // device on every load, never carries that extra whitespace.
+    var restoreData = compactBackupData_(backup.data);
     // Keep the pre-restore state recoverable too, in case the wrong row gets restored.
     backupCurrentState(readState_());
-    writeState_(backup.data);
-    var restoreErr = verifyWrite_(backup.data);
+    writeState_(restoreData);
+    var restoreErr = verifyWrite_(restoreData);
     if (restoreErr) return errorJson(restoreErr);
-    setCachedState_(backup.data);
+    setCachedState_(restoreData);
     return json({ ok: true, restoredFrom: backup.ts });
   }
 
