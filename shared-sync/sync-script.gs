@@ -210,11 +210,28 @@ function getSyncBackupSheet_() {
   return sh;
 }
 
+// Pretty-prints JSON for storage in a backup row — asked for 18.09.26 after
+// a real data-loss incident on cover-plan-state, when Innes had to actually
+// look at what was in these rows and found one giant unindented line
+// unreadable. Falls back to the raw string on any parse failure (should
+// never happen, but a backup step must never throw). Restoring reverses
+// this (compactBackupData_) so the LIVE cell never carries the extra
+// whitespace — only the backup history does.
+function prettyPrintForBackup_(text) {
+  try { return JSON.stringify(JSON.parse(text), null, 2); }
+  catch (err) { return text; }
+}
+
+function compactBackupData_(text) {
+  try { return JSON.stringify(JSON.parse(text)); }
+  catch (err) { return text; }
+}
+
 function backupSyncKey_(key, current) {
   if (!current) return; // nothing to lose yet for this key
   try {
     const sh = getSyncBackupSheet_();
-    sh.appendRow([new Date().toISOString(), key, current]);
+    sh.appendRow([new Date().toISOString(), key, prettyPrintForBackup_(current)]);
     const lastRow = sh.getLastRow();
     if (lastRow > SYNC_BACKUP_COUNT) sh.deleteRows(1, lastRow - SYNC_BACKUP_COUNT);
   } catch (err) { /* never let a failed backup block the real write */ }
@@ -229,7 +246,9 @@ function listSyncBackups_() {
   for (let i = 0; i < rows.length; i++) {
     const ts = rows[i][0], key = rows[i][1], data = rows[i][2];
     if (!ts) continue;
-    out.push({ row: i + 1, ts: (ts instanceof Date) ? ts.toISOString() : String(ts), key: String(key || ''), size: String(data || '').length });
+    // size is the compact (restored) length, so it means the same thing as
+    // the live state's own size, not the pretty-printed row's length.
+    out.push({ row: i + 1, ts: (ts instanceof Date) ? ts.toISOString() : String(ts), key: String(key || ''), size: compactBackupData_(String(data || '')).length });
   }
   out.sort(function (a, b) { return a.ts < b.ts ? 1 : (a.ts > b.ts ? -1 : 0); }); // newest first
   return out;
@@ -246,11 +265,14 @@ function readSyncBackupRow_(rowNum) {
 function restoreSyncBackup_(p) {
   const backup = readSyncBackupRow_(parseInt(p.index, 10));
   if (!backup) return json({ status: 'error', message: 'no backup at row ' + p.index });
+  // Backup rows are stored pretty-printed — compact back down before
+  // writing so the live cell never carries that extra whitespace.
+  const restoreData = compactBackupData_(backup.data);
   backupSyncKey_(backup.key, readByKey_(backup.key)); // keep the pre-restore state recoverable too
-  writeByKey_(backup.key, backup.data);
-  const writeErr = verifyWrite_(backup.key, backup.data);
+  writeByKey_(backup.key, restoreData);
+  const writeErr = verifyWrite_(backup.key, restoreData);
   if (writeErr) return json({ status: 'error', message: writeErr });
-  setCachedKv_(backup.key, backup.data);
+  setCachedKv_(backup.key, restoreData);
   return json({ status: 'ok', restoredKey: backup.key, restoredFrom: backup.ts });
 }
 
