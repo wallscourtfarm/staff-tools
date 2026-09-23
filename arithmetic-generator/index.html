@@ -286,7 +286,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     </div>
   </div>
 
-  <div class="version">23.09.26a</div>
+  <div class="version">23.09.26b</div>
 </div>
 
 <script>
@@ -444,7 +444,16 @@ function updateTopicCards() {
   document.getElementById('classYearHint').textContent = classYear;
 }
 
-document.getElementById('classYear').addEventListener('change', updateTopicCards);
+const CLASS_YEAR_TO_LEVEL = {'Year 3':'Y3','Year 4':'Y4','Year 5':'Y5','Year 6':'Y6'};
+
+function syncStandardLevelToClassYear() {
+  const classYear = document.getElementById('classYear').value;
+  const level = CLASS_YEAR_TO_LEVEL[classYear];
+  if (level) document.getElementById('standardLevel').value = level;
+  updateTopicCards();
+}
+
+document.getElementById('classYear').addEventListener('change', syncStandardLevelToClassYear);
 document.getElementById('standardLevel').addEventListener('change', updateTopicCards);
 document.getElementById('includeReasoning').addEventListener('change', e => {
   document.getElementById('reasoningTopics').style.display = e.target.checked ? '' : 'none';
