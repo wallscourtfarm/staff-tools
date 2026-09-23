@@ -734,7 +734,7 @@
     <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA" style="height:44px;width:auto;border-radius:8px;flex-shrink:0">
     <div>
       <div class="nav-title">39 Week Plan</div>
-      <div class="nav-sub">Wallscourt Farm Academy · 13.09.26a</div>
+      <div class="nav-sub">Wallscourt Farm Academy · 23.09.26a</div>
     </div>
   </a>
   <div id="year-bar-inline" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"></div>
@@ -749,7 +749,7 @@
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">12.08.26d</span>
+  <span class="nav-version">23.09.26a</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -761,7 +761,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>12.08.26d</strong>
+  <strong>23.09.26a</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -1334,7 +1334,11 @@ const SPILL_TEXT = { new:'New — needs building', some:'Some resources exist', 
 // ════════════════════════════════════════════════════════════
 // STORAGE — localStorage + Google Apps Script sync
 // ════════════════════════════════════════════════════════════
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwgkJGVeJHQu1SAlXeoL_Rt-_FHt9j73Ld8YDI9E1-O1CFzzqoh5I6qnkEufpur2T57zg/exec';
+// CUT OVER 23.09.26 to the Postgres-backed store (curriculum_planner_db.py).
+// Old Apps Script backend deliberately left running, untouched, as an
+// instant one-line rollback if ever needed:
+//   'https://script.google.com/macros/s/AKfycbwgkJGVeJHQu1SAlXeoL_Rt-_FHt9j73Ld8YDI9E1-O1CFzzqoh5I6qnkEufpur2T57zg/exec'
+const GAS_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/curriculumplanner-db';
 // Shared light token (same scheme used across every other WFA tool's own
 // backend) — a deterrent, not real access control, but this endpoint
 // previously had none at all.
@@ -1347,14 +1351,25 @@ function saveData(k, d) {
   localStorage.setItem('wfa_cp_'+k, JSON.stringify(d));
   if (!GAS_URL) return;
   _setSyncStatus('saving');
-  // no-cors avoids CORS preflight issues with GAS; response is opaque but request reaches server
+  // Found 23.09.26 while cutting this over: the old Apps Script write used
+  // mode:'no-cors' (needed only because a real Content-Type: application/
+  // json header would trigger a CORS preflight GAS can't answer) — that
+  // makes the response permanently opaque, so a rejected save (bad token,
+  // a real backend error) was invisible; _setSyncStatus('saved') fired on
+  // any non-throw regardless of what the server actually did. This backend
+  // sends real CORS headers, so no-cors is no longer needed — the response
+  // is now read and a non-ok result shows as a real error, not "✓ Synced".
   fetch(GAS_URL + '?token=' + WFA_TOKEN, {
     method: 'POST',
-    mode: 'no-cors',
-    headers: {'Content-Type': 'text/plain'},
+    headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({key: 'wfa_cp_'+k, data: d})
   })
-  .then(() => _setSyncStatus('saved'))
+  .then(async res => {
+    let json = null;
+    try { json = await res.json(); } catch (_) {}
+    if (!res.ok || !json || json.ok === false) throw new Error((json && json.error) || ('HTTP ' + res.status));
+    _setSyncStatus('saved');
+  })
   .catch(() => _setSyncStatus('offline'));
 }
 
