@@ -252,7 +252,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · WFA-22.09.26a</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · WFA-24.09.26a</footer>
 
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/reliability.js"></script>
 <script>
@@ -289,7 +289,10 @@ const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b
 const GATEWAY_URL     = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
 // checkPin stays on shared-sync (STAFF_PIN Script Property) — unrelated
 // to this tool's own state blob, not part of this migration.
-const CHECKPIN_URL    = GATEWAY_URL + '&action=checkPin';
+// CUT OVER 24.09.26: the shared staff PIN is checked by the API now, not by
+// shared-sync. Same {ok:boolean} response, same fail-closed behaviour.
+// Rollback: GATEWAY_URL + '&action=checkPin'.
+const CHECKPIN_URL    = 'https://api.wallscourt-farm-academy.co.uk/planning/checkpin?token=' + SHARED_TOKEN;
 // CUT OVER 22.09.26 to the Postgres-backed store (wfa-data) — real live
 // state backfilled and verified byte-identical first. Old shared-sync
 // key=wfa_slt endpoint deliberately left running, untouched, as an
