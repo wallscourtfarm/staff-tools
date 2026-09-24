@@ -393,7 +393,7 @@
       white-space: nowrap;
     }
     /* ── Trainee (Hattie) marker: same size/weight as the staff-out tag above, so it stays quiet ── */
-    .tr-tag { display: inline-block; font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 3px; white-space: nowrap; cursor: pointer; border: 1px solid transparent; }
+    .tr-tag { display: inline-block; font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 3px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; cursor: pointer; border: 1px solid transparent; }
     .tr-cell { border: 1px solid transparent; }
     .tr-t    { color: #1e5a99; background: #e4eefa; border-color: #c6d9f0; }
     .tr-it   { color: #4c3fb0; background: #eae8fb; border-color: #d3cdf5; }
@@ -498,7 +498,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-23.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-24.09.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -3943,11 +3943,12 @@ function traineeKind(d) {
 function traineePill(d, nsd) {
   if (nsd) return '';
   const e = traineeKind(d);
-  if (!e || e.k === 's' || e.k === 'pb') return '';
+  if (!e || e.k === 'pb' || (e.k === 's' && !e.l)) return '';
   const kd = TR_KINDS[e.k];
   if (!kd) return '';
   const tip = `${traineeName()}: ${kd.long}${e.l ? ' — ' + e.l : ''}`;
-  return `<span class="tr-tag ${kd.cls}" title="${escAttr(tip)}" onclick="openTraineeModal('${isoKey(d)}')">${escHtml(traineeName())} · ${escHtml(kd.short)}</span>`;
+  const text = e.k === 's' ? e.l : kd.short;
+  return `<span class="tr-tag ${kd.cls}" title="${escAttr(tip)}" onclick="openTraineeModal('${isoKey(d)}')">${escHtml(traineeName())} · ${escHtml(text)}</span>`;
 }
 
 function updateTraineeChip() {
@@ -4084,7 +4085,7 @@ async function saveTraineeEdit() {
   if (type === 'day') {
     const k = document.getElementById('trKind').value;
     const l = document.getElementById('trLabel').value.trim();
-    mutate = t => { if (k === 's') delete t.days[iso]; else t.days[iso] = l ? { k, l } : { k }; };
+    mutate = t => { if (k === 's' && !l) delete t.days[iso]; else t.days[iso] = l ? { k, l } : { k }; };
   } else {
     const txt = document.getElementById('trNote').value.trim();
     mutate = t => { t.weekNotes = t.weekNotes || {}; if (txt) t.weekNotes[iso] = txt; else delete t.weekNotes[iso]; };
