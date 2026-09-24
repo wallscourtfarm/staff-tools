@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 21.09.26a</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 24.09.26a</div>
       </div>
     </div>
     <div class="top-bar">
@@ -402,6 +402,11 @@ const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b
 // fab-rota's, read below) checks; previously neither checked anything.
 const OWN_BACKEND_TOKEN = '2013';
 const GATEWAY_URL     = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
+// CUT OVER 24.09.26: the config tabs moved off the Google Sheet to Postgres,
+// so these reads no longer go through shared-sync's getSheetTab action.
+// Same rows, same shape, same token. GATEWAY_URL above is left as the
+// one-line rollback path.
+const TABS_URL        = 'https://api.wallscourt-farm-academy.co.uk/planning/tab?token=' + SHARED_TOKEN;
 // CUT OVER 21.09.26 to the Postgres-backed store (wfa-data) — real live
 // data (all 47 weeks) backfilled and verified byte-identical first. Old
 // Apps Script backend deliberately left running, untouched, as an instant
@@ -1908,7 +1913,7 @@ async function init() {
     // renamed/added room from Resources, with zero indication) — only
     // TermDates failing was visible, via the outer catch below. Now every
     // tab failure is named in the overlayStatus banner.
-    const fetchTab = (tab, label) => fetchOverlay_(label, GATEWAY_URL + '&action=getSheetTab&tab=' + tab, undefined,
+    const fetchTab = (tab, label) => fetchOverlay_(label, TABS_URL + '&tab=' + tab, undefined,
       r => r.json().then(j => (j && !j.error) ? j.rows : Promise.reject(new Error(j && j.error || 'bad tab response'))), []);
     const [termsRows, eventsRows, calEventsRows, resourcesRows] = await Promise.all([
       fetchTab('TermDates', 'TermDates').then(rows => { if (!rows.length) throw new Error('TermDates tab not found'); return rows; }),
