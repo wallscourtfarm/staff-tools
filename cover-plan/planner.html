@@ -409,7 +409,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(19.09.26c)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(24.09.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -584,7 +584,13 @@ const NOTIFY_URL = 'https://api.wallscourt-farm-academy.co.uk/notify';
 // GETs (mode:'no-cors'), so the GAS CORS issue that forced the Railway relay
 // for the POST-based staff notifications never applied here. Loaded from
 // notify-config.json at init() so it can be repointed without editing this file.
-let EVENT_WRITE_URL = 'https://script.google.com/macros/s/AKfycbyP4GDIFJ4wClMfb0bNiO6Qo4oad9wsGrM2AbmMg0l_KxHdHz-R01MCm7mGexve0V5G/exec';
+// CUT OVER 24.09.26: CalendarEvents moved off the Google Sheet to Postgres,
+// so term-event add/edit/delete now POST here instead of to notify-script.gs.
+// Identical payload ({type:'event_write', action, event}) and identical
+// {success, error} response, so writeEvent_ below is unchanged. The Apps
+// Script is deliberately left running as the one-line rollback:
+//   'https://script.google.com/macros/s/AKfycbyP4GDIFJ4wClMfb0bNiO6Qo4oad9wsGrM2AbmMg0l_KxHdHz-R01MCm7mGexve0V5G/exec'
+let EVENT_WRITE_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/events/write?token=' + SHARED_TOKEN;
 
 // ── Mutable data (populated by init) ─────────────────────────────────────────
 let WEEKS    = [];
@@ -1022,7 +1028,15 @@ function hideSaveFailureBanner_() {
 // Failures are now queued and retryable via a banner instead of vanishing.
 let _pendingEventWrites = [];
 function writeEvent_(payload) {
-  return fetch(EVENT_WRITE_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload)))
+  // POSTs the payload as a JSON body since the 24.09.26 cutover. The Apps
+  // Script version took it as a ?payload= query string because that avoided
+  // a CORS preflight it couldn't answer; this backend sends real CORS
+  // headers, and a body has no length limit to run into.
+  return fetch(EVENT_WRITE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
     .then(async res => {
       let json = null;
       try { json = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
