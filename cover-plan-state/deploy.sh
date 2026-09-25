@@ -23,7 +23,7 @@ BASE_URL="https://script.google.com/macros/s/${DEPLOYMENT_ID}/exec"
 # Same token every real client sends — the endpoint requires it since
 # 13.09.26, so an unauthenticated health-check curl would otherwise always
 # get {"error":"unauthorised"} and wrongly report "Unexpected response".
-TOKEN="050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05"
+TOKEN="${SHARED_TOKEN:?set SHARED_TOKEN in your shell first}"
 
 grep -q '"access": "ANYONE_ANONYMOUS"' appsscript.json || {
   echo "✗ appsscript.json does not say ANYONE_ANONYMOUS — refusing to deploy (would break anonymous callers). Fix it first."
