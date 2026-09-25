@@ -104,7 +104,7 @@ function checkPin_(e) {
 // backend. The canonical flags are fetched here, combined with this
 // tool's own score data, and discarded once the aggregate is computed.
 const HUB_ROSTER_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec';
-const HUB_TOKEN = '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
+const HUB_TOKEN = PropertiesService.getScriptProperties().getProperty('HUB_TOKEN') || ''; // Script Property, never in the code
 const RT_YEAR_GROUPS = ['Y3', 'Y4', 'Y5', 'Y6'];
 const TERMS = ['Term 1', 'Term 2', 'Term 3', 'Term 4', 'Term 5', 'Term 6'];
 const TW = { 'Term 1': 8, 'Term 2': 8, 'Term 3': 8, 'Term 4': 8, 'Term 5': 6, 'Term 6': 7 };

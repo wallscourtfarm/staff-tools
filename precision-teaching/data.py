@@ -29,7 +29,7 @@ PROBES_DIR = DATA_DIR / "probes"
 # across all 383 pupils). A fixed URL rather than an environment override, so a
 # stale setting can't quietly point it back at Google.
 HUB_URL = "https://api.wallscourt-farm-academy.co.uk/planning/pupilroster-db/pupils"
-HUB_TOKEN = os.environ.get("HUB_TOKEN", "050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05")
+HUB_TOKEN = os.environ.get("HUB_TOKEN", "")
 
 
 def fetch_hub_pupils():
