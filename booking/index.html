@@ -250,7 +250,7 @@
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 24.09.26a</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 25.09.26a</div>
       </div>
     </div>
     <div class="top-bar">
@@ -419,7 +419,11 @@ const SYNC_URL        = 'https://api.wallscourt-farm-academy.co.uk/planning/book
 // it's safe to point at the cache; writes (planner.html/supply-admin.html)
 // still go straight to the real backend, unchanged.
 const COVER_PLAN_URL  = 'https://api.wallscourt-farm-academy.co.uk/planning/coverstate';
-const FAB_ROTA_URL    = 'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec';
+// 25.09.26: was the old FAB-rota Google Apps Script, which nothing writes to any
+// more (the FAB rota tool saves to this database store) — so this overlay was
+// showing an out-of-date rota. Old script kept only as a rollback reference:
+//   'https://script.google.com/macros/s/AKfycbxRdjTeRZGHw2ZUI8J9dtv1H41B4DKxvR7IDGVjzz_yjN_0dz4ZLn_ucQ5jtqMGCBVMgw/exec'
+const FAB_ROTA_URL    = 'https://api.wallscourt-farm-academy.co.uk/planning/fab-rota/sync';
 // CUT OVER 21.09.26 along with SYNC_URL above, same Postgres-backed store —
 // the old cache-proxy (resource_booking_state.py) still exists but would
 // now be reading a Sheet nothing writes to any more, so it had to move too.
@@ -1979,7 +1983,7 @@ async function init() {
   // Non-critical: load Cover Plan + FAB Rota for auto-blocking indicators
   Promise.all([
     fetchOverlay_('release schedule (cover-plan)', COVER_PLAN_URL + '?token=' + SHARED_TOKEN, { signal: AbortSignal.timeout(8000) }, r => r.json(), null),
-    fetchOverlay_('FAB rota', FAB_ROTA_URL + '?token=' + OWN_BACKEND_TOKEN, { signal: AbortSignal.timeout(8000) }, r => r.json(), null),
+    fetchOverlay_('FAB rota', FAB_ROTA_URL + '?token=' + SHARED_TOKEN, { signal: AbortSignal.timeout(8000) }, r => r.json(), null),
   ]).then(([cpJson, fabJson]) => {
     if (cpJson?.weekSlots)     coverPlanData = cpJson;
     if (fabJson?.state?.slots) fabRotaData   = fabJson;
