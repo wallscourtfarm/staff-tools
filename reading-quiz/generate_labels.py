@@ -16,7 +16,9 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 
-API_URL = "https://script.google.com/macros/s/AKfycbyXw7lwvL5O1xJApGdKGM_R-zQDfbC_kWZcAf9yUS0VwOjmVWnigAsDEcfxbwjoAe1B/exec"
+# 25.09.26: was the old book-tracker Google Apps Script (now returns an error page);
+# the book tracker runs on the database store. Old URL: https://script.google.com/macros/s/AKfycbyXw7lwvL5O1xJApGdKGM_R-zQDfbC_kWZcAf9yUS0VwOjmVWnigAsDEcfxbwjoAe1B/exec
+API_URL = "https://api.wallscourt-farm-academy.co.uk/planning/bktracker-db"
 TOKEN = "2013"
 
 PAGE_W, PAGE_H = A4  # 595.27, 841.89
@@ -131,7 +133,7 @@ def draw_label(c, x, y_top, book):
 def fetch_books():
     payload = urllib.parse.quote(json.dumps({"action": "getAll"}))
     url = f"{API_URL}?payload={payload}&token={TOKEN}"
-    with urllib.request.urlopen(url) as r:
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "WFA-label-script/1.0"})) as r:
         data = json.load(r)
     if data.get("error"):
         raise RuntimeError(data["error"])
