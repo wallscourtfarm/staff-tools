@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* WFA 25.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>SLT Schedule · WFA</title>
@@ -146,7 +151,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title">SLT Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy · 25.09.26b</div>
+    <div class="app-subtitle">Wallscourt Farm Academy · 25.09.26c</div>
   </div>
 </div>
 
@@ -252,7 +257,7 @@
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · WFA-25.09.26a</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · WFA-25.09.26c</footer>
 
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/reliability.js"></script>
 <script>
@@ -285,7 +290,7 @@ const EDIT_PIN = '0638ca808b91e684df3002bc';
 const DAYS    = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const PALETTE = ['#1798d3','#f97316','#22c55e','#e879f9','#64748b','#ef4444','#8b5cf6'];
 
-const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '7a28960f245ac20a084b93ed53f1764d53a37f8e7b245699';
+const SHARED_TOKEN    = '__hub__';
 // GATEWAY_URL (old Google Apps Script) removed 25.09.26 — it was never called; the tool runs on the database API. See git history.
 // checkPin stays on shared-sync (STAFF_PIN Script Property) — unrelated
 // to this tool's own state blob, not part of this migration.
