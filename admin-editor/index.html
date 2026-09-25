@@ -88,11 +88,13 @@
 
 <div class="toast" id="toast"></div>
 
-<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-25.09.26a</footer>
+<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-25.09.26b</footer>
 
 <script>
-const API_BASE = 'https://api.wallscourt-farm-academy.co.uk/planning/admin';
-const TOKEN = '7a28960f245ac20a084b93ed53f1764d53a37f8e7b245699';
+// Calls go through the site's own /_api proxy, which checks the staff login and adds the
+// real token itself — no token lives in this page any more (25.09.26).
+const API_BASE = '/_api/planning/admin';
+const TOKEN = '__hub__'; // placeholder the proxy swaps for the real token
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const YEAR_GROUPS = ['', 'Reception', 'Y1', 'Y2', 'Y3', 'Y4', 'Y5', 'Y6'];
@@ -153,7 +155,7 @@ let state = { view: 'home', tab: null, rows: [], editingIndex: null };
 
 async function api(path, opts = {}) {
   const url = API_BASE + path + (path.includes('?') ? '&' : '?') + 'token=' + TOKEN;
-  const res = await fetch(url, opts);
+  const res = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), 'X-WFA-Proxy': '1' } });
   const json = await res.json();
   return json;
 }
