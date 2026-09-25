@@ -64,7 +64,7 @@ var STATE_SHEET_ID = '1DBO1GERb_BRq-cnn1rousFtkVn9ajFnurzqitgknelc';
 var STATE_TAB_NAME = 'CoverPlanState';
 var BACKUP_TAB_NAME = 'CoverPlanBackups';
 
-var TOKEN = '050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05';
+var TOKEN = PropertiesService.getScriptProperties().getProperty('SHARED_TOKEN') || ''; // Script Property, never in the code
 
 // CacheService fronting the Sheet read, added 18.09.26 — this single
 // deployment backs planner.html + supply-admin.html directly plus 6 more
