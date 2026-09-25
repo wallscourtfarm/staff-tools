@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* WFA 25.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lunchtime Leaders</title>
@@ -185,11 +190,11 @@ footer { text-align: center; font-size: 10px; color: #94a3b8; padding: 10px; bor
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · Lunchtime Leaders · WFA-25.09.26b</footer>
+<footer>Wallscourt Farm Academy · Lunchtime Leaders · WFA-25.09.26c</footer>
 
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/reliability.js"></script>
 <script>
-const SHARED_TOKEN    = localStorage.getItem('wfa_shared_token') || '7a28960f245ac20a084b93ed53f1764d53a37f8e7b245699';
+const SHARED_TOKEN    = '__hub__';
 // GATEWAY_URL (old Google Apps Script) removed 25.09.26 — it was never called; the tool runs on the database API. See git history.
 // CUT OVER 22.09.26 to the Postgres-backed store (wfa-data) — real live
 // state backfilled and verified byte-identical first. Old shared-sync
