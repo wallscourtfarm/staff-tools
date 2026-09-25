@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* WFA 25.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Supply Booking — Wallscourt Farm Academy</title>
@@ -76,7 +81,7 @@
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Supply Booking <span style="color:#64748b;font-weight:normal;font-size:12px">(25.09.26a)</span></div>
+    <div class="header-title">Supply Booking <span style="color:#64748b;font-weight:normal;font-size:12px">(25.09.26b)</span></div>
     <div class="header-sub">Wallscourt Farm Academy — booked against the <a href="planner.html" style="color:#1798d3">Release Schedule</a></div>
   </div>
   <div class="week-nav">
@@ -93,11 +98,11 @@
   <div class="empty-week"><strong>Loading…</strong></div>
 </div>
 
-<footer>Wallscourt Farm Academy · Supply Booking · 25.09.26a</footer>
+<footer>Wallscourt Farm Academy · Supply Booking · 25.09.26b</footer>
 
 <script>
 // ── Shared config (same source as planner.html) ─────────────────────────────
-const SHARED_TOKEN = localStorage.getItem('wfa_shared_token') || '7a28960f245ac20a084b93ed53f1764d53a37f8e7b245699';
+const SHARED_TOKEN = '__hub__';
 // GATEWAY_URL (old Google Apps Script) removed 25.09.26 — it was never called; the tool runs on the database API. See git history.
 // Now requires a token (added 11.09.26 after this backend was found to
 // have no authentication at all — anyone with the URL could read or
