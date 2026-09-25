@@ -498,7 +498,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-24.09.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-25.09.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -644,7 +644,7 @@ const SHARED_TOKEN = localStorage.getItem('wfa_shared_token') || '050d7ae1a6b52e
 // checks (SYNC_URL/BOOKING_SYNC_URL/FAB_SYNC_URL below previously had no
 // check at all).
 const OWN_BACKEND_TOKEN = '2013';
-const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec?token=' + SHARED_TOKEN;
+// GATEWAY_URL (old Google Apps Script) removed 25.09.26 — it was never called; the tool runs on the database API. See git history.
 // Read-only overlay of lunch-cover's own data (lunch-cover/index.html is
 // the real owner and still writes straight to the Apps Script gateway,
 // unchanged) — proxied through wfa-data since direct Apps Script reads of
@@ -652,7 +652,7 @@ const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqru
 // 21.09.26 ("Could not load: lunch cover", reported as happening often).
 // See Claude's memory: project_lunch_cover_load_failures_21_09_26.
 const LUNCH_COVER_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/kv?key=wfa_lc&token=' + SHARED_TOKEN;
-const BOOKING_SYNC_URL = 'https://script.google.com/macros/s/AKfycbwzNtos0vdjnUhsFQ_igTtLNXyBd8k9c6rPkA0IZdkM3vJLAoIdSHonTbHAbyFNfH_BWQ/exec';
+// BOOKING_SYNC_URL (old Google Apps Script, used only as an on/off flag) removed 25.09.26.
 // CUT OVER 21.09.26 along with SYNC_URL above, same Postgres-backed store —
 // the old cache-proxy (teaching_schedule_state.py) still exists but would
 // now be reading a Sheet nothing writes to any more, so it had to move too.
@@ -1535,7 +1535,6 @@ function getBookingRowIndexes(booking) {
   return indexes;
 }
 async function loadBookingOverlay(weekKey) {
-  if (!BOOKING_SYNC_URL) return;
   try {
     const res = await fetch(`${BOOKING_READ_URL}?weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
     if (!res.ok) throw new Error('HTTP ' + res.status);
