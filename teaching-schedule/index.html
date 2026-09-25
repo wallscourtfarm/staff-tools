@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* WFA 25.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Learning Schedule · WFA</title>
@@ -498,7 +503,7 @@
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-25.09.26b</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-25.09.26c</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -638,7 +643,7 @@ const FAB_SYNC_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/fab-rot
 // it's safe to point at the cache; writes (planner.html/supply-admin.html)
 // still go straight to the real backend, unchanged.
 const COVER_SYNC_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/coverstate';
-const SHARED_TOKEN = localStorage.getItem('wfa_shared_token') || '7a28960f245ac20a084b93ed53f1764d53a37f8e7b245699';
+const SHARED_TOKEN = '__hub__';
 // Distinct from SHARED_TOKEN above (that one's for the shared-sync hub) —
 // this is the light deterrent token each tool's own dedicated backend
 // checks (SYNC_URL/BOOKING_SYNC_URL/FAB_SYNC_URL below previously had no
