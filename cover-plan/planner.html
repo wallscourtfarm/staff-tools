@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* WFA 25.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Release Schedule — Wallscourt Farm Academy</title>
@@ -409,7 +414,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(25.09.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(25.09.26b)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -523,7 +528,7 @@ body.edit-locked .notify-btn   { display:none; }
   <button onclick="closeDeleteMenu()" style="display:block;width:100%;text-align:left;background:none;border:none;color:#64748b;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:12px">Cancel</button>
 </div>
 
-<footer>Wallscourt Farm Academy · Release Schedule · 25.09.26a</footer>
+<footer>Wallscourt Farm Academy · Release Schedule · 25.09.26b</footer>
 
 <script>
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -557,7 +562,7 @@ const COLOUR_PRESETS = ['#1798d3','#7c3aed','#059669','#dc2626','#f59e0b','#0891
 
 let FRONT_END_EVENTS = []; // { id, date (YYYY-MM-DD), label, colour, session, notes }
 
-const SHARED_TOKEN = localStorage.getItem('wfa_shared_token') || '7a28960f245ac20a084b93ed53f1764d53a37f8e7b245699';
+const SHARED_TOKEN = '__hub__';
 // GATEWAY_URL (old Google Apps Script) removed 25.09.26 — it was never called; the tool runs on the database API. See git history.
 // Now requires a token (added 11.09.26 after this backend was found to
 // have no authentication at all — anyone with the URL could read or
@@ -1006,10 +1011,54 @@ function showSaveFailureBanner_(message) {
     banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;padding:12px 20px;text-align:center;font-weight:bold;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3)';
     document.body.prepend(banner);
   }
+  const btn = 'margin-left:12px;padding:4px 14px;border-radius:4px;border:none;background:#fff;color:#dc2626;font-weight:bold;cursor:pointer';
+  if (/sign-in expired/.test(message || '')) {
+    // 25.09.26: the login ran out. A refresh would reload the shared copy over this unsaved edit,
+    // so the banner says NOT to refresh — renew in a new tab, then Retry.
+    banner.innerHTML = '⚠ Your sign-in has ended, so your last change was NOT saved. Do NOT refresh or close this tab. ' +
+      '<button type="button" id="saveFailRenew" style="' + btn + '">Sign in again</button>' +
+      '<button type="button" id="saveFailRetry" style="' + btn + '">Then press Retry now</button>';
+    document.getElementById('saveFailRenew').onclick = () => window.open('signin-ok.html', '_blank');
+    document.getElementById('saveFailRetry').onclick = stateSave;
+    return;
+  }
   banner.innerHTML = '⚠ Your last change was NOT saved — ' + (message || 'connection problem') +
-    '. Do not close this tab. <button type="button" style="margin-left:12px;padding:4px 14px;border-radius:4px;border:none;background:#fff;color:#dc2626;font-weight:bold;cursor:pointer">Retry now</button>';
+    '. Do not close this tab. <button type="button" style="' + btn + '">Retry now</button>';
   banner.querySelector('button').onclick = stateSave;
 }
+
+// ── Sign-in watch (25.09.26) ───────────────────────────────────────────────────
+// Staff sign-in (Cloudflare Access) lasts 8 hours. Warn well before it ends, and never
+// tell anyone to refresh: a refresh reloads the shared copy over any unsaved edit.
+function showSigninWarning_(secsLeft) {
+  let b = document.getElementById('signinBanner');
+  if (secsLeft === null) { if (b) b.remove(); return; }
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'signinBanner';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99997;background:#f59e0b;color:#1f2937;padding:10px 20px;text-align:center;font-weight:bold;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    document.body.prepend(b);
+  }
+  const mins = Math.max(0, Math.round(secsLeft / 60));
+  b.innerHTML = (secsLeft <= 0
+      ? '⚠ Your sign-in has ended — changes will NOT save until you sign in again. '
+      : '⚠ Your sign-in ends in about ' + mins + ' min. ') +
+    'Sign in again in a new tab, then carry on here — do NOT refresh this page. ' +
+    '<button type="button" style="margin-left:12px;padding:4px 14px;border-radius:4px;border:none;background:#1f2937;color:#fff;font-weight:bold;cursor:pointer">Sign in again</button>';
+  b.querySelector('button').onclick = () => window.open('signin-ok.html', '_blank');
+}
+function checkSignin_() {
+  fetch('https://api.wallscourt-farm-academy.co.uk/_session', { cache: 'no-store' })
+    .then(r => r.json())
+    .then(j => {
+      if (j && j.ok) showSigninWarning_(j.exp - j.now < 1800 ? j.exp - j.now : null);
+      else if (j && j.code === 'no_session') showSigninWarning_(0);
+    })
+    .catch(() => { /* offline: the save banner reports real failures */ });
+}
+setInterval(checkSignin_, 120000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkSignin_(); });
+setTimeout(checkSignin_, 5000);
 function hideSaveFailureBanner_() {
   const banner = document.getElementById('saveFailBanner');
   if (banner) banner.remove();
