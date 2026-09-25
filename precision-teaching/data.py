@@ -20,14 +20,15 @@ REPO_DIR = Path(__file__).parent / "private-data"
 DATA_DIR = REPO_DIR / "data"
 PROBES_DIR = DATA_DIR / "probes"
 
-# ── Hub roster (Bromcom-sourced, via shared-sync) ────────────────────────────
+# ── Hub roster (Bromcom-sourced, via the WFA API) ────────────────────────────
 # Pupils only ever enter this tool by being picked from the live roster here
 # — never by typing a name. See add_pupil / sync_pupils_from_roster below.
 
-HUB_URL = os.environ.get(
-    "HUB_URL",
-    "https://script.google.com/macros/s/AKfycbxHg89VK1uqbWAJcqruqJFjEaavdWN74eB1KS-U_cMr75oVsBVZSi2X38l018oOYW7-4w/exec",
-)
+# Postgres roster on the WFA API since 25.09.26 — this used to read the
+# shared-sync Google Apps Script. Same pupil shape (compared field by field
+# across all 383 pupils). A fixed URL rather than an environment override, so a
+# stale setting can't quietly point it back at Google.
+HUB_URL = "https://api.wallscourt-farm-academy.co.uk/planning/pupilroster-db/pupils"
 HUB_TOKEN = os.environ.get("HUB_TOKEN", "050d7ae1a6b52eafa7d19b80c844dea8d20d1f678274fe05")
 
 
