@@ -75,7 +75,10 @@ export default {
     } catch (e) {
       user = null;
     }
-    if (!user) return json({ error: 'session expired — refresh the page and sign in again', code: 'no_session' }, 401);
+    if (!user) return json({ error: 'sign-in expired', code: 'no_session' }, 401);
+
+    // Lets a page ask how long the login has left, so it can warn before it lapses.
+    if (url.pathname === '/_api/_session') return json({ ok: true, exp: user.exp, now: Math.floor(Date.now() / 1000) });
 
     const target = new URL(env.API_ORIGIN + url.pathname.slice('/_api'.length));
     url.searchParams.forEach((v, k) => target.searchParams.append(k, v));
