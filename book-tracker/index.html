@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* WFA 25.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>WFA Reading Challenge Tracker</title>
@@ -258,7 +263,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · WFA-25.09.26d</div>
+  <div class="version">WFA Book Tracker · WFA-25.09.26e</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -1179,7 +1184,7 @@ async function importCSV(type) {
 // HUB ROSTER (school Pupils tab via shared-sync)
 // ════════════════════════════════════════════════
 // HUB_ROSTER_URL (old Google Apps Script) removed 25.09.26 — it was never called; the tool runs on the database API. See git history.
-const HUB_TOKEN = '7a28960f245ac20a084b93ed53f1764d53a37f8e7b245699'; // shared-sync gateway token (rotated 2026-09-08) — distinct from this tool's own apiUrl token above
+const HUB_TOKEN = '__hub__'; // shared-sync gateway token (rotated 2026-09-08) — distinct from this tool's own apiUrl token above
 // Read-through proxy on wfa-data's Railway service, same data as HUB_ROSTER_URL's
 // getPupils action — cuts request volume against the shared-sync Apps Script
 // deployment. Verified byte-identical to HUB_ROSTER_URL before switching, 21.09.26.
