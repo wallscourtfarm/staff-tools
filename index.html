@@ -149,6 +149,8 @@
   @media (prefers-reduced-motion: reduce) {
     .class-btn { transition: none; }
   }
+.reveal-btn{align-self:flex-start;margin:6px 0;padding:6px 12px;border:1px solid #1798d3;border-radius:8px;background:#fff;color:#1798d3;font:inherit;font-weight:700;font-size:.85rem;cursor:pointer}
+  .reveal-box{background:#eef7fc;border-radius:8px;padding:8px 10px;margin:4px 0}
 </style>
 </head>
 <body>
@@ -451,6 +453,8 @@
         <div class="card-icon">🎮</div>
         <h3>Spelling Games</h3>
         <p>Interactive spelling practice games for pupils, linked to the current spelling rule.</p>
+        <button type="button" class="reveal-btn" onclick="revealLogin(event,this)">Show teacher login</button>
+        <p class="reveal-box" hidden>For demoing on the board: code <strong>TEACH</strong>, PIN <strong>6053</strong></p>
         <span class="tag">All Years</span>
       </a>
     </div>
@@ -544,7 +548,7 @@
 </main>
 
 <div class="footer">
-  Wallscourt Farm Academy &mdash; Part of Cabot Learning Federation &mdash; 26.09.26c
+  Wallscourt Farm Academy &mdash; Part of Cabot Learning Federation &mdash; 26.09.26d
 </div>
 
 <script>
@@ -554,6 +558,12 @@
     var c = b.querySelector('.tab-count');
     if (p && c) c.textContent = p.querySelectorAll('a.card, a.class-btn').length;
   });
+  function revealLogin(e, btn) {
+    e.preventDefault(); e.stopPropagation();
+    var box = btn.nextElementSibling;
+    box.hidden = !box.hidden;
+    btn.textContent = box.hidden ? 'Show teacher login' : 'Hide teacher login';
+  }
   function switchTab(btn) {
     document.querySelectorAll('.tab-btn').forEach(t => t.setAttribute('aria-selected', 'false'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
