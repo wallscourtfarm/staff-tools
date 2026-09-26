@@ -257,7 +257,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   </div>
 </div>
 
-<footer>Wallscourt Farm Academy · SLT Schedule · WFA-25.09.26c</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · WFA-26.09.26a</footer>
 
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/reliability.js"></script>
 <script>
@@ -285,7 +285,6 @@ const ACT_COLOUR_OPTS = ['#1798d3','#8b5cf6','#6366f1','#ef4444','#94a3b8','#f97
 const SLT_ROLES = ['Principal', 'Vice Principal', 'Assistant Principal', 'SENCO', 'Phase Lead'];
 
 // Change this PIN to restrict edit access
-const EDIT_PIN = '0638ca808b91e684df3002bc';
 
 const DAYS    = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const PALETTE = ['#1798d3','#f97316','#22c55e','#e879f9','#64748b','#ef4444','#8b5cf6'];
@@ -660,7 +659,6 @@ function pinKey(k) {
   if(pinEntry.length===4) checkPinAsync(pinEntry);
 }
 // PIN is verified server-side (shared-sync checkPin / STAFF_PIN Script Property).
-// Offline fallback: accept the local PIN when the server can't be reached.
 // editMode already granted this browser session skips the prompt entirely.
 async function checkPinAsync(pin) {
   if (sessionStorage.getItem('wfa_slt_edit_ok') === '1') {
@@ -675,9 +673,9 @@ async function checkPinAsync(pin) {
       editMode = true; closePinModal(); updateLockUI();
     } else { refreshPinDots(true); setTimeout(() => { pinEntry=''; refreshPinDots(); }, 700); }
   } catch (err) {
-    if (pin === EDIT_PIN) {
-      editMode = true; closePinModal(); updateLockUI();
-    } else { refreshPinDots(true); setTimeout(() => { pinEntry=''; refreshPinDots(); }, 700); }
+    // Server unreachable: the PIN can't be checked, so edit mode stays locked
+    // (26.09.26: the built-in offline PIN that used to unlock it was removed).
+    refreshPinDots(true); setTimeout(() => { pinEntry=''; refreshPinDots(); }, 700);
   }
 }
 
