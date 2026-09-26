@@ -544,10 +544,16 @@
 </main>
 
 <div class="footer">
-  Wallscourt Farm Academy &mdash; Part of Cabot Learning Federation &mdash; 26.09.26b
+  Wallscourt Farm Academy &mdash; Part of Cabot Learning Federation &mdash; 26.09.26c
 </div>
 
 <script>
+  // Tab counts are computed from the cards on each panel so they never drift
+  document.querySelectorAll('.tab-btn').forEach(function (b) {
+    var p = document.getElementById(b.getAttribute('aria-controls'));
+    var c = b.querySelector('.tab-count');
+    if (p && c) c.textContent = p.querySelectorAll('a.card, a.class-btn').length;
+  });
   function switchTab(btn) {
     document.querySelectorAll('.tab-btn').forEach(t => t.setAttribute('aria-selected', 'false'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
