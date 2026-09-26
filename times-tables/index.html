@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* WFA 26.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Times Tables Practice - Wallscourt Farm Academy</title>
@@ -983,7 +988,7 @@
             <button class="btn-home" id="btn-home" onclick="goHome()">Change Tables</button>
         </div>
 
-        <div class="version-footer">23.09.26a</div>
+        <div class="version-footer">26.09.26a</div>
     </div>
 
     <script>
@@ -1012,7 +1017,6 @@
         // instant one-line rollback if ever needed:
         //   'https://script.google.com/macros/s/AKfycbwRLnz_jXJcyLVZvjMq65fmcaxDi0og07oLpGCW8B6fGuTZcRNLIzaiif4ejaJp1ETP/exec'
         const MTC_BACKEND_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/mtcresults-db';
-        const MTC_TOKEN = 'b57e5f3b0231b8f161cdfa0a9b53d7a343bae6288e18091c';
 
         // Triple-tap the MTC header to reach class results — a deterrent for
         // curious pupils, not real security (same as every other staff-only
@@ -1397,7 +1401,7 @@
             document.getElementById('mtc-class-results-list').innerHTML = '';
             status.textContent = 'Loading…';
 
-            fetch(MTC_BACKEND_URL + '?token=' + MTC_TOKEN)
+            fetch(MTC_BACKEND_URL + '?token=__hub__')
                 .then(r => r.json())
                 .then(data => {
                     if (data.error) throw new Error(data.error);
@@ -1510,7 +1514,7 @@
             statusEl.className = 'mtc-save-status saving';
             statusEl.textContent = 'Saving ' + mtcChildName + '’s result…';
 
-            fetch(MTC_BACKEND_URL + '?token=' + MTC_TOKEN, {
+            fetch(MTC_BACKEND_URL + '?token=__hub__', {
                 method: 'POST',
                 body: JSON.stringify({
                     childName: mtcChildName,
