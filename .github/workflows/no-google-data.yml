@@ -1,0 +1,10 @@
+name: No Google data references
+# Reference data lives in the WFA database (docs/SYSTEM.md section 3.4 in wfa-data).
+# This fails a push if live code reads, writes or links to a Google Sheet / Apps Script.
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/check_no_google_data.py
