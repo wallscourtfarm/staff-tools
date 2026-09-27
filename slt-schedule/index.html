@@ -126,17 +126,6 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     .modal-done { width: 100%; margin-top: 14px; background: #f1f5f9; color: #64748b; border: none; border-radius: 6px; padding: 9px; font-size: 13px; font-weight: 700; cursor: pointer; }
     .modal-done:hover { background: #e2e8f0; }
 
-    /* PIN modal */
-    .pin-modal { max-width: 320px; text-align: center; }
-    .pin-dots { display: flex; gap: 10px; justify-content: center; margin-bottom: 16px; }
-    .pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #cbd5e1; transition: all .15s; }
-    .pin-dot.filled { background: #1798d3; border-color: #1798d3; }
-    .pin-dot.error { background: #ef4444; border-color: #ef4444; }
-    .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
-    .pin-key { padding: 14px 0; border: 1.5px solid #e2e8f0; border-radius: 8px; background: #f8fafc; cursor: pointer; font-size: 16px; font-weight: 700; color: #1e293b; }
-    .pin-key:hover { background: #dbeafe; border-color: #93c5fd; }
-    .pin-cancel { width: 100%; padding: 9px; border: none; background: none; cursor: pointer; font-size: 13px; color: #94a3b8; }
-
     /* Sync status banner */
     .sync-banner { display: none; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; font-size: 11px; color: #92400e; }
     .sync-banner.show { display: flex; gap: 8px; align-items: center; }
@@ -230,34 +219,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   </div>
 </div>
 
-<!-- PIN modal -->
-<div class="modal-bg" id="pinModal">
-  <div class="modal pin-modal">
-    <h3>🔐 Edit PIN</h3>
-    <p class="modal-hint">Enter the 4-digit PIN to unlock editing</p>
-    <div class="pin-dots" id="pinDots">
-      <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
-      <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
-    </div>
-    <div class="pin-pad">
-      <button class="pin-key" onclick="pinKey('1')">1</button>
-      <button class="pin-key" onclick="pinKey('2')">2</button>
-      <button class="pin-key" onclick="pinKey('3')">3</button>
-      <button class="pin-key" onclick="pinKey('4')">4</button>
-      <button class="pin-key" onclick="pinKey('5')">5</button>
-      <button class="pin-key" onclick="pinKey('6')">6</button>
-      <button class="pin-key" onclick="pinKey('7')">7</button>
-      <button class="pin-key" onclick="pinKey('8')">8</button>
-      <button class="pin-key" onclick="pinKey('9')">9</button>
-      <button class="pin-key" onclick="pinKey('⌫')" style="font-size:13px;color:#94a3b8">⌫</button>
-      <button class="pin-key" onclick="pinKey('0')">0</button>
-      <div></div>
-    </div>
-    <button class="pin-cancel" onclick="closePinModal()">Cancel</button>
-  </div>
-</div>
-
-<footer>Wallscourt Farm Academy · SLT Schedule · WFA-26.09.26a</footer>
+<footer>Wallscourt Farm Academy · SLT Schedule · WFA-27.09.26a</footer>
 
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/reliability.js"></script>
 <script>
@@ -293,10 +255,6 @@ const SHARED_TOKEN    = '__hub__';
 // GATEWAY_URL (old Google Apps Script) removed 25.09.26 — it was never called; the tool runs on the database API. See git history.
 // checkPin stays on shared-sync (STAFF_PIN Script Property) — unrelated
 // to this tool's own state blob, not part of this migration.
-// CUT OVER 24.09.26: the shared staff PIN is checked by the API now, not by
-// shared-sync. Same {ok:boolean} response, same fail-closed behaviour.
-// Rollback: GATEWAY_URL + '&action=checkPin'.
-const CHECKPIN_URL    = 'https://api.wallscourt-farm-academy.co.uk/planning/checkpin?token=' + SHARED_TOKEN;
 // CUT OVER 22.09.26 to the Postgres-backed store (wfa-data) — real live
 // state backfilled and verified byte-identical first. Old shared-sync
 // key=wfa_slt endpoint deliberately left running, untouched, as an
@@ -632,9 +590,11 @@ function resetToTerm() {
   state.slots[state.weekIdx]=termTemplate?deepCopyWeek(termTemplate):{}; save(); render();
 }
 
-// ── Edit / PIN ────────────────────────────────────────────────────────────────
+// ── Edit / view toggle ──────────────────────────────────────────────────────────
+// No PIN: Cloudflare Access already restricts this page to staff (27.09.26).
 function toggleLock() {
-  if (editMode) { editMode=false; updateLockUI(); } else openPinModal();
+  editMode = !editMode;
+  updateLockUI();
 }
 
 function updateLockUI() {
@@ -644,39 +604,6 @@ function updateLockUI() {
   btn.className='lock-btn'+(editMode?' edit':'');
   document.body.classList.toggle('edit-mode', editMode);
   render();
-}
-
-let pinEntry='';
-function openPinModal() { pinEntry=''; refreshPinDots(); document.getElementById('pinModal').classList.add('open'); }
-function closePinModal() { document.getElementById('pinModal').classList.remove('open'); pinEntry=''; refreshPinDots(); }
-function refreshPinDots(error) {
-  for(let i=0;i<4;i++){const d=document.getElementById('pd'+i); d.className='pin-dot'; if(error)d.classList.add('error'); else if(i<pinEntry.length)d.classList.add('filled');}
-}
-function pinKey(k) {
-  if(k==='⌫'){pinEntry=pinEntry.slice(0,-1);refreshPinDots();return;}
-  if(pinEntry.length>=4) return;
-  pinEntry+=k; refreshPinDots();
-  if(pinEntry.length===4) checkPinAsync(pinEntry);
-}
-// PIN is verified server-side (shared-sync checkPin / STAFF_PIN Script Property).
-// editMode already granted this browser session skips the prompt entirely.
-async function checkPinAsync(pin) {
-  if (sessionStorage.getItem('wfa_slt_edit_ok') === '1') {
-    editMode = true; closePinModal(); updateLockUI(); return;
-  }
-  try {
-    const r = await fetch(CHECKPIN_URL + '&pin=' + encodeURIComponent(pin) + '&t=' + Date.now());
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const d = await r.json();
-    if (d && d.ok) {
-      sessionStorage.setItem('wfa_slt_edit_ok', '1');
-      editMode = true; closePinModal(); updateLockUI();
-    } else { refreshPinDots(true); setTimeout(() => { pinEntry=''; refreshPinDots(); }, 700); }
-  } catch (err) {
-    // Server unreachable: the PIN can't be checked, so edit mode stays locked
-    // (26.09.26: the built-in offline PIN that used to unlock it was removed).
-    refreshPinDots(true); setTimeout(() => { pinEntry=''; refreshPinDots(); }, 700);
-  }
 }
 
 // ── Item editor ───────────────────────────────────────────────────────────────
