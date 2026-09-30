@@ -1,9 +1,10 @@
 """
-Put the three teacher tools on the reading site behind staff sign-in (Cloudflare Access):
+Put the teacher tools on the reading site behind staff sign-in (Cloudflare Access):
 
     reading.wallscourt-farm-academy.co.uk/fluency
     reading.wallscourt-farm-academy.co.uk/phonics
     reading.wallscourt-farm-academy.co.uk/comprehension
+    reading.wallscourt-farm-academy.co.uk/results
 
 The pupil pages on the same site (login, assessment, home) stay open. Each tool gets its own
 path-scoped self-hosted Access app on the reusable "WFA Staff" policy (all staff), using the
@@ -25,7 +26,8 @@ import urllib.request
 HOST = 'reading.wallscourt-farm-academy.co.uk'
 TOOLS = {'fluency': 'Reading fluency (teacher tool)',
          'phonics': 'Phonics comprehension (teacher tool)',
-         'comprehension': 'Reading comprehension by level (teacher tool)'}
+         'comprehension': 'Reading comprehension by level (teacher tool)',
+         'results': 'Reading assessment results (teacher tool)'}
 POLICY_NAME = 'WFA Staff'
 API = 'https://api.cloudflare.com/client/v4'
 
