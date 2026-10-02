@@ -88,7 +88,7 @@
 
 <div class="toast" id="toast"></div>
 
-<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-02.10.26a</footer>
+<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-02.10.26b</footer>
 
 <script>
 // Calls go through the site's own /_api proxy, which checks the staff login and adds the
@@ -158,6 +158,8 @@ SECTIONS.DayTimings = {
     { key: 'ID', label: 'Short ID (letters, no spaces — cannot be changed later)', type: 'text', addOnly: true },
   ],
   sort: (a, b) => (parseInt(a.r.Order, 10) || 0) - (parseInt(b.r.Order, 10) || 0) || (a.r.YearGroup || '').localeCompare(b.r.YearGroup || ''),
+  canDuplicate: true,
+  duplicateHint: 'Change the year groups (and times) so this copy and the original don\'t cover the same year. Then edit the original to match.',
   deleteWarn: 'Removing a row can make part of the day disappear from the teaching schedule for those year groups.',
 };
 
@@ -217,12 +219,17 @@ function openEditForm(index) {
   openForm(index);
 }
 
-function openForm(editIndex) {
+function openDuplicateForm(index) {
+  openForm(null, state.rows[index]);
+}
+
+function openForm(editIndex, prefill) {
   const section = SECTIONS[state.tab];
-  const row = editIndex !== null ? state.rows[editIndex] : {};
+  const row = editIndex !== null ? state.rows[editIndex] : (prefill || {});
   state.editingIndex = editIndex;
 
-  let html = '<h3>' + (editIndex !== null ? 'Edit' : 'Add') + ' — ' + section.name + '</h3><form id="entryForm">';
+  let html = '<h3>' + (editIndex !== null ? 'Edit' : (prefill ? 'Copy of row' : 'Add')) + ' — ' + section.name + '</h3>' +
+    (prefill && section.duplicateHint ? '<p style="font-size:13px;color:#64748b;margin:-8px 0 16px">' + section.duplicateHint + '</p>' : '') + '<form id="entryForm">';
   section.fields.forEach(f => {
     if (f.addOnly && editIndex !== null) return;
     const rawVal = row[f.key] || '';
@@ -388,6 +395,7 @@ function render() {
         if (r.Colour) html += '<span class="colour-dot" style="background:' + r.Colour + '"></span>';
         html += '<div class="main"><div class="primary">' + (section.primary(r) || '(untitled)') + '</div>' +
           '<div class="secondary">' + (section.secondary(r) || '') + '</div></div>' +
+          (section.canDuplicate ? '<button class="row-btn" onclick="openDuplicateForm(' + i + ')">Duplicate</button>' : '') +
           '<button class="row-btn" onclick="openEditForm(' + i + ')">Edit</button>' +
           '<button class="row-btn danger" onclick="openDeleteConfirm(' + i + ')">Remove</button>' +
           '</div>';
