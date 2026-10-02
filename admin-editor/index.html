@@ -72,7 +72,7 @@
 <div class="app-header">
   <div>
     <div class="app-title">School Info</div>
-    <div class="app-subtitle">Term dates, calendar events, meetings, and the staff list</div>
+    <div class="app-subtitle">Term dates, calendar events, meetings, staff list, and day timings</div>
   </div>
 </div>
 
@@ -88,7 +88,7 @@
 
 <div class="toast" id="toast"></div>
 
-<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-25.09.26b</footer>
+<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-02.10.26a</footer>
 
 <script>
 // Calls go through the site's own /_api proxy, which checks the staff login and adds the
@@ -143,6 +143,27 @@ const SECTIONS = {
     ],
   },
 };
+
+SECTIONS.DayTimings = {
+  icon: '⏰', name: 'Day Timings', desc: 'Start and end times of each part of the school day, per year group',
+  primary: r => (r.Label || r.ID) + (r.YearGroup ? ' · ' + yearGroupsLabel(r.YearGroup) : ' · All years'),
+  secondary: r => r.HideTime === 'true' ? 'Time hidden on the schedule' : (r.Time || 'No time set'),
+  fields: [
+    { key: 'Label', label: 'Name shown on the schedule', type: 'text' },
+    { key: 'Time', label: 'Time (e.g. 09:00-10:30, or 15:15 for a single time)', type: 'text' },
+    { key: 'YearGroup', label: 'Year groups (blank = every year; otherwise e.g. 4,5,6 — use R for Reception)', type: 'text', optional: true },
+    { key: 'Order', label: 'Order down the day (1 = first)', type: 'number', min: 1, max: 99 },
+    { key: 'Type', label: 'Type', type: 'select', options: ['session', 'fixed'] },
+    { key: 'HideTime', label: 'Hide the time on the schedule', type: 'check' },
+    { key: 'ID', label: 'Short ID (letters, no spaces — cannot be changed later)', type: 'text', addOnly: true },
+  ],
+  sort: (a, b) => (parseInt(a.r.Order, 10) || 0) - (parseInt(b.r.Order, 10) || 0) || (a.r.YearGroup || '').localeCompare(b.r.YearGroup || ''),
+  deleteWarn: 'Removing a row can make part of the day disappear from the teaching schedule for those year groups.',
+};
+
+function yearGroupsLabel(yg) {
+  return yg.split(',').map(x => x.trim() === 'R' ? 'Reception' : 'Y' + x.trim()).join(', ');
+}
 
 function workingDaysLabel(wd) {
   if (!wd) return '';
@@ -203,9 +224,12 @@ function openForm(editIndex) {
 
   let html = '<h3>' + (editIndex !== null ? 'Edit' : 'Add') + ' — ' + section.name + '</h3><form id="entryForm">';
   section.fields.forEach(f => {
+    if (f.addOnly && editIndex !== null) return;
     const rawVal = row[f.key] || '';
     html += '<div class="field"><label>' + f.label + '</label>';
-    if (f.type === 'select') {
+    if (f.type === 'check') {
+      html += '<label style="font-weight:normal"><input type="checkbox" name="' + f.key + '" ' + (rawVal === 'true' ? 'checked' : '') + '> Yes</label>';
+    } else if (f.type === 'select') {
       const display = f.displayMap ? (f.displayMap[rawVal] || '') : rawVal;
       html += '<select name="' + f.key + '">';
       f.options.forEach(opt => {
@@ -251,7 +275,10 @@ async function handleFormSubmit(e) {
   let values = {};
 
   section.fields.forEach(f => {
-    if (f.type === 'days') {
+    if (f.addOnly && state.editingIndex !== null) return;
+    if (f.type === 'check') {
+      values[f.key] = formData.get(f.key) ? 'true' : '';
+    } else if (f.type === 'days') {
       const days = [];
       DAY_NAMES.forEach((d, i) => { if (formData.get('day_' + (i + 1))) days.push(String(i + 1)); });
       values['WorkingDays'] = days.join(',');
@@ -297,7 +324,7 @@ function openDeleteConfirm(index) {
   const section = SECTIONS[state.tab];
   const row = state.rows[index];
   const html = '<p>Remove <strong>' + section.primary(row) + '</strong>?</p>' +
-    '<p class="warn">This can\'t be undone.</p>' +
+    '<p class="warn">This can\'t be undone.' + (section.deleteWarn ? ' ' + section.deleteWarn : '') + '</p>' +
     '<div class="modal-actions">' +
     '<button type="button" class="btn-cancel" onclick="closeConfirm()">Cancel</button>' +
     '<button type="button" class="btn-primary" style="background:#dc2626" onclick="doDelete(' + index + ')">Remove</button>' +
@@ -352,6 +379,7 @@ function render() {
     html += '<div class="list-card">';
     const sorted = state.rows.map((r, i) => ({ r, i }));
     if (state.tab === 'Staff') sorted.sort((a, b) => (a.r.Name || '').localeCompare(b.r.Name || ''));
+    if (section.sort) sorted.sort(section.sort);
     if (sorted.length === 0) {
       html += '<div class="empty-msg">Nothing here yet — use "+ Add new" above.</div>';
     } else {
