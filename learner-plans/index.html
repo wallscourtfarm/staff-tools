@@ -752,6 +752,7 @@ function rowHtml(n, i) {
     review = `<div class="review"><div class="rl">Term ${n - 1} target being reviewed</div>
       <div style="white-space:pre-wrap">${esc(prevRow.target)}</div>
       ${prevRow.provision ? `<div class="rp" style="white-space:pre-wrap">Provision: ${esc(prevRow.provision)}</div>` : ''}
+      ${n === 2 && prevRow.notes ? `<div class="rp" style="white-space:pre-wrap">Notes so far: ${esc(prevRow.notes)}</div>` : ''}
     </div>
     <div class="status-group">${Object.keys(STATUS).map(k =>
       `<button class="status-btn ${k}${r.status === k ? ' sel' : ''}" onclick="setStatusBtn(${n},${i},'${k}')">${STATUS[k]}</button>`).join('')}</div>
@@ -768,6 +769,8 @@ function rowHtml(n, i) {
       <textarea class="fld" data-f="t.${n}.rows.${i}.target" oninput="setField(this)">${esc(r.target)}</textarea>
       <div class="sub"><label class="lbl">Provision</label>
       <textarea class="fld" data-f="t.${n}.rows.${i}.provision" oninput="setField(this)">${esc(r.provision)}</textarea></div>
+      ${n === 1 ? `<div class="sub"><label class="lbl">Progress notes so far</label>
+      <textarea class="fld" data-f="t.1.rows.${i}.notes" oninput="setField(this)">${esc(r.notes)}</textarea></div>` : ''}
     </div>
   </div>`;
 }
@@ -975,8 +978,9 @@ async function printTerm(n) {
 
   let head, body = '';
   if (n === 1) {
-    head = th('', '4%') + th('Target', '48%') + th('Provision', '48%');
-    for (const i of rowIdx) { const r = tm.rows[i]; body += `<tr>${td(String(i + 1), 'font-weight:700;text-align:center')}${td(esc(r.target))}${td(esc(r.provision))}</tr>`; }
+    const withNotes = rowIdx.some(i => tm.rows[i].notes);
+    head = th('', '4%') + th('Target', withNotes ? '36%' : '48%') + th('Provision', withNotes ? '30%' : '48%') + (withNotes ? th('Progress notes so far', '30%') : '');
+    for (const i of rowIdx) { const r = tm.rows[i]; body += `<tr>${td(String(i + 1), 'font-weight:700;text-align:center')}${td(esc(r.target))}${td(esc(r.provision))}${withNotes ? td(esc(r.notes)) : ''}</tr>`; }
   } else {
     head = th('', '3%') + th(`Term ${n - 1} target`, '20%') + th('Outcome', '9%') + th('Progress notes', '24%') + th(n === NTERMS ? 'New target (next year)' : 'New target', '22%') + th('Provision', '22%');
     for (const i of rowIdx) {
@@ -1039,7 +1043,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-04.10.26b
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-04.10.26c
 </footer>
 </body>
 </html>
