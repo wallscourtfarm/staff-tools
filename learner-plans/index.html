@@ -202,6 +202,7 @@ textarea.fld, .form-group textarea { resize: vertical; min-height: 70px; line-he
       <div class="plan-meta" id="planMeta"></div>
     </div>
     <select class="year-selector" id="yearSelector" onchange="switchYear(this.value)"></select>
+    <button class="btn btn-ghost btn-sm" onclick="openHistory()">🕘 History</button>
     <button class="btn btn-ghost btn-sm" id="formatBtn" onclick="toggleFormat()"></button>
     <button class="btn btn-ghost btn-sm" onclick="createNextYear()">+ New year</button>
     <button class="btn btn-danger btn-sm" onclick="archiveChild()">Archive</button>
@@ -210,6 +211,18 @@ textarea.fld, .form-group textarea { resize: vertical; min-height: 70px; line-he
     <div id="profileCard"></div>
     <div class="term-nav" id="termNav"></div>
     <div class="term-scroller" id="termScroller"></div>
+  </div>
+</div>
+
+<!-- HISTORY MODAL -->
+<div id="historyModal" style="display:none">
+  <div class="modal-overlay" onmousedown="if(event.target===this)closeHistory()">
+    <div class="modal" style="max-width:640px">
+      <h3>Earlier versions of this plan</h3>
+      <div class="help">A copy is kept automatically before the first change in each editing session, before any big deletion, and before a restore or delete. Restoring is itself saved, so it can be undone.</div>
+      <div id="historyList" style="max-height:55vh;overflow-y:auto"></div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeHistory()">Close</button></div>
+    </div>
   </div>
 </div>
 
@@ -875,6 +888,50 @@ function addTargetRow() {
   scheduleSave();
 }
 
+// ── HISTORY (snapshots) ──────────────────────────────────────────────────────
+const REASON_LABEL = { 'editing session': 'Start of an editing session', 'large deletion': 'Before a big deletion', 'before restore': 'Before a restore', 'before delete': 'Before a delete' };
+
+function whenText(iso) {
+  if (!iso) return 'unknown time';
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return d.toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+async function openHistory() {
+  await flushSave();
+  document.getElementById('historyModal').style.display = 'block';
+  const box = document.getElementById('historyList');
+  box.innerHTML = '<div class="help">Loading…</div>';
+  try {
+    const list = await api('GET', `/learner-plans/plans/${currentPlanId}/history`);
+    if (!list.length) { box.innerHTML = '<div class="help">No earlier versions yet. The first one is kept as soon as someone changes this plan.</div>'; return; }
+    box.innerHTML = list.map(h => `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;gap:12px;align-items:center;justify-content:space-between">
+      <div style="min-width:0">
+        <div style="font-weight:700">${esc(whenText(h.version_at))} <span style="font-weight:400;color:var(--muted);font-size:.8rem">· ${esc(REASON_LABEL[h.reason] || h.reason)}</span></div>
+        <div style="font-size:.84rem;margin-top:2px">${esc(h.summary || '')}</div>
+        <div style="font-size:.76rem;color:var(--muted);margin-top:2px">Replaced ${esc(whenText(h.taken_at))}${h.replaced_by ? ' by ' + esc(h.replaced_by.split('@')[0]) : ''}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="restoreVersion(${h.id})">Restore</button></div>`).join('');
+  } catch (e) { box.innerHTML = `<div class="help" style="color:var(--red)">Could not load the history: ${esc(e.message)}</div>`; }
+}
+
+function closeHistory() { document.getElementById('historyModal').style.display = 'none'; }
+
+async function restoreVersion(id) {
+  if (!confirm('Restore this version? What is on the plan now is kept in the history first, so you can switch back.')) return;
+  await flushSave();
+  try {
+    await api('POST', `/learner-plans/plans/${currentPlanId}/restore`, { snapshot_id: id });
+  } catch (e) { toast('Restore failed: ' + e.message, 'error'); return; }
+  childPlans = await fetchPlansForChild(currentChildId);
+  closeHistory();
+  await loadPlan(currentPlanId);
+  const cached = planCache[currentChildId]?.[currentPlan.academic_year];
+  if (cached) cached.terms = currentPlan.doc;
+  toast('Version restored', 'success');
+}
+
 // ── CHILD CRUD ────────────────────────────────────────────────────────────────
 
 // Roster picker (create only) — pupils not yet tracked in Learner Plans
@@ -1133,7 +1190,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-04.10.26g
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-04.10.26h
 </footer>
 </body>
 </html>
