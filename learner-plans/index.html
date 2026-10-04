@@ -201,6 +201,7 @@ textarea.fld, .form-group textarea { resize: vertical; min-height: 70px; line-he
       <div class="plan-meta" id="planMeta"></div>
     </div>
     <select class="year-selector" id="yearSelector" onchange="switchYear(this.value)"></select>
+    <button class="btn btn-ghost btn-sm" id="formatBtn" onclick="toggleFormat()"></button>
     <button class="btn btn-ghost btn-sm" onclick="createNextYear()">+ New year</button>
     <button class="btn btn-danger btn-sm" onclick="archiveChild()">Archive</button>
   </div>
@@ -353,6 +354,7 @@ function normaliseDoc(plan) {
   doc.strengths = doc.strengths || ''; doc.areas = doc.areas || '';
   doc.outcomesLabel = doc.outcomesLabel || '';
   doc.outcomes = Array.from({ length: 6 }, (_, i) => (doc.outcomes || [])[i] || '');
+  doc.format = (doc.format === 'ehcp' || doc.format === 'standard') ? doc.format : '';
   doc.rowsShown = Math.min(MAX_TARGETS, Math.max(1, doc.rowsShown || 1));
   doc.t = doc.t || {};
   for (let n = 1; n <= NTERMS; n++) {
@@ -380,6 +382,14 @@ function termHasData(doc, n) {
   return !!(tm.date || tm.pupilVoice || tm.familyVoice || tm.rows.some(r => r.target || r.provision || r.status || r.notes));
 }
 
+// A plan is in EHCP format if the plan says so; otherwise it follows the Bromcom EHCP flag.
+function planIsEhcp(child, plan) {
+  const f = plan && plan.terms && plan.terms.format;
+  if (f === 'ehcp') return true;
+  if (f === 'standard') return false;
+  return !!child && child.is_ehcp === 'true';
+}
+
 function planHasTermData(plan, n) {
   if (!plan || !plan.terms || plan.terms.v !== 2 || !plan.terms.t || !plan.terms.t[n]) return false;
   const tm = plan.terms.t[n];
@@ -403,8 +413,8 @@ async function flushSave() {
     if (!res || res.ok !== true) throw new Error('unexpected reply');
     if (JSON.stringify(currentPlan.doc) === sending) dirty = false;
     // keep the cached copies (dashboard pills, year switching, new-year rollover) in step with what was saved
-    const cached = planCache[currentPlan.child_id]?.[currentPlan.academic_year];
-    if (cached) cached.terms = JSON.parse(sending);
+    if (!planCache[currentPlan.child_id]) planCache[currentPlan.child_id] = {};
+    planCache[currentPlan.child_id][currentPlan.academic_year] = { id: currentPlan.id, child_id: currentPlan.child_id, academic_year: currentPlan.academic_year, terms: JSON.parse(sending) };
     const mine = childPlans.find(p => p.id === currentPlanId);
     if (mine) mine.terms = JSON.parse(sending);
     document.getElementById('saveBanner').style.display = 'none';
@@ -437,7 +447,7 @@ function childCard(c) {
     return `<span class="pill${has?' complete':''}">Term ${n}</span>`;
   }).join('');
   return `<div class="child-card" onclick="openChild('${c.id}')">
-    <h3>${esc(c.name)}${c.is_ehcp === 'true' ? '<span class="ehcp-badge">EHCP</span>' : ''}</h3>
+    <h3>${esc(c.name)}${planIsEhcp(c, plan) ? '<span class="ehcp-badge">EHCP</span>' : ''}</h3>
     <div class="meta">${[c.class_name, c.teacher].filter(Boolean).map(esc).join(' · ')}</div>
     <div class="term-pills">${pills}</div>
   </div>`;
@@ -458,7 +468,7 @@ function renderDashboard() {
 
   const ygList = (activeYG === 'All' ? children : children.filter(c => c.year_group === activeYG))
     .filter(c => !filter || c.name.toLowerCase().includes(filter))
-    .filter(c => !showEhcpOnly || c.is_ehcp === 'true');
+    .filter(c => !showEhcpOnly || planIsEhcp(c, planCache[c.id]?.[activeYear]));
 
   if (!ygList.length) {
     grid.style.display = 'grid';
@@ -537,7 +547,7 @@ async function openChild(childId) {
   currentChildId = childId;
   currentChild = children.find(c => c.id === childId) || archivedChildren.find(c => c.id === childId) || null;
   const child = currentChild;
-  document.getElementById('planName').innerHTML = esc(child.name) + (child.is_ehcp === 'true' ? '<span class="ehcp-badge">EHCP</span>' : '');
+  document.getElementById('planName').innerHTML = esc(child.name);
   document.getElementById('planMeta').textContent = [child.year_group, child.class_name, child.teacher].filter(Boolean).join(' · ');
   showPage('plan-view');
   childPlans = await fetchPlansForChild(childId);
@@ -598,11 +608,11 @@ async function createNextYear() {
   const startYear = parseInt(latest.academic_year.slice(0, 4), 10) + 1;
   const year = `${startYear}-${String(startYear + 1).slice(-2)}`;
   if (childPlans.some(p => p.academic_year === year)) { toast(`A ${year} plan already exists.`); return; }
-  if (!confirm(`Start the ${year} plan for ${currentChild.name}? Strengths, areas of development${currentChild.is_ehcp === 'true' ? ', EHCP outcomes' : ''} and the Term 6 new targets carry over.`)) return;
+  if (!confirm(`Start the ${year} plan for ${currentChild.name}? Strengths, areas of development${planIsEhcp(currentChild, childPlans[childPlans.length - 1]) ? ', EHCP outcomes' : ''} and the Term 6 new targets carry over.`)) return;
   const from = normaliseDoc(JSON.parse(JSON.stringify(latest)));
   const doc = blankDoc();
   doc.strengths = from.strengths; doc.areas = from.areas;
-  doc.outcomesLabel = from.outcomesLabel; doc.outcomes = from.outcomes.slice();
+  doc.outcomesLabel = from.outcomesLabel; doc.outcomes = from.outcomes.slice(); doc.format = from.format;
   from.t[6].rows.forEach((r, i) => { doc.t[1].rows[i].target = r.target; doc.t[1].rows[i].provision = r.provision; });
   doc.rowsShown = from.rowsShown;
   const made = await createPlan(currentChildId, year, doc);
@@ -614,7 +624,28 @@ async function createNextYear() {
 }
 
 // ── PLAN VIEW ────────────────────────────────────────────────────────────────
+function isEhcpNow() { return planIsEhcp(currentChild, { terms: currentPlan.doc }); }
+
+function renderPlanHeader() {
+  const e = isEhcpNow();
+  document.getElementById('planName').innerHTML = esc(currentChild.name) + (e ? '<span class="ehcp-badge">EHCP</span>' : '');
+  document.getElementById('formatBtn').textContent = e ? 'Switch to standard Learner Plan' : 'Switch to EHCP termly targets';
+}
+
+function toggleFormat() {
+  const toEhcp = !isEhcpNow();
+  const msg = toEhcp
+    ? `Switch ${currentChild.name} to the EHCP termly targets format? The long-term outcomes section appears. Nothing already written is changed.`
+    : `Switch ${currentChild.name} back to the standard Learner Plan format? The EHCP outcomes are hidden, not deleted.`;
+  if (!confirm(msg)) return;
+  currentPlan.doc.format = toEhcp ? 'ehcp' : 'standard';
+  renderPlanHeader();
+  renderProfile();
+  scheduleSave();
+}
+
 function renderPlan() {
+  renderPlanHeader();
   renderProfile();
   renderTermNav();
   renderTerms();
@@ -626,7 +657,7 @@ function renderPlan() {
 
 function renderProfile() {
   const doc = currentPlan.doc;
-  const ehcp = currentChild?.is_ehcp === 'true';
+  const ehcp = isEhcpNow();
   let html = '';
   if (ehcp) {
     html += `<div class="card" style="border-left:4px solid #e74c3c">
@@ -928,7 +959,7 @@ async function printTerm(n) {
   const doc = currentPlan.doc;
   const tm = doc.t[n];
   const prev = n > 1 ? doc.t[n - 1] : null;
-  const ehcp = child.is_ehcp === 'true';
+  const ehcp = isEhcpNow();
   const used = [0, 1, 2].filter(i => [tm.rows[i], prev && prev.rows[i]].some(r => r && (r.target || r.provision || r.status || r.notes)));
   const rowIdx = used.length ? used : [0];
   const BORDER = '1px solid #9bb7c7';
@@ -1008,7 +1039,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-04.10.26a
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-04.10.26b
 </footer>
 </body>
 </html>
