@@ -409,7 +409,7 @@ async function flushSave() {
   if (!currentPlanId || !currentPlan || !dirty) return;
   const sending = JSON.stringify(currentPlan.doc);
   try {
-    const res = await api('PUT', `/learner-plans/plans/${currentPlanId}`, { terms: currentPlan.doc });
+    const res = await api('POST', `/learner-plans/plans/${currentPlanId}/update`, { terms: currentPlan.doc });
     if (!res || res.ok !== true) throw new Error('unexpected reply');
     if (JSON.stringify(currentPlan.doc) === sending) dirty = false;
     // keep the cached copies (dashboard pills, year switching, new-year rollover) in step with what was saved
@@ -930,7 +930,7 @@ async function deleteChild() {
   const c = archivedChildren.find(c => c.id === currentChildId) || children.find(c => c.id === currentChildId);
   if (!confirm(`Permanently delete ALL plans for ${c?.name}? This cannot be undone.`)) return;
   try {
-    await api('DELETE', `/learner-plans/children/${currentChildId}`);
+    await api('POST', `/learner-plans/children/${currentChildId}/delete`);
   } catch(e) { toast('Delete failed: ' + e.message, 'error'); return; }
   await fetchChildren();
   await fetchArchivedChildren();
@@ -1043,7 +1043,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-04.10.26c
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-04.10.26d
 </footer>
 </body>
 </html>
