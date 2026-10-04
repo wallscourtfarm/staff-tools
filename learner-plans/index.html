@@ -151,7 +151,7 @@ textarea.fld, .form-group textarea { resize: vertical; min-height: 70px; line-he
 
 /* PRINT */
 @media print {
-  @page { size: A4 landscape; margin: 10mm; }
+  @page { size: A4 portrait; margin: 12mm; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body { background: white !important; }
   body > *:not(#printRoot) { display: none !important; }
@@ -739,7 +739,7 @@ function termCardHtml(n) {
           <textarea class="fld" style="min-height:90px" data-f="t.${n}.familyVoice" oninput="setField(this)">${esc(tm.familyVoice)}</textarea></div>
       </div>
     </div>
-    <div class="tf"><button class="btn btn-primary btn-sm" onclick="printTerm(${n})">📄 Term ${n} PDF for parents</button></div>
+    <div class="tf"><button class="btn btn-primary btn-sm" onclick="downloadTermPdf(${n}, this)">📄 Term ${n} PDF for families</button></div>
   </div>`;
 }
 
@@ -948,7 +948,7 @@ async function restoreChild(childId) {
   toast('Plan restored');
 }
 
-// ── PARENT PDF (one term) ────────────────────────────────────────────────────
+// ── FAMILY PDF (one term) ────────────────────────────────────────────────────
 function ukDate(iso) {
   if (!iso) return '';
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
@@ -956,8 +956,42 @@ function ukDate(iso) {
   return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-async function printTerm(n) {
-  await flushSave();
+function nameParts(name) {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  return { f: parts[0] || '', l: parts.length > 1 ? parts[parts.length - 1] : '' };
+}
+function simpleInitials(name) { const { f, l } = nameParts(name); return (f.slice(0, 1) + l.slice(0, 1)).toUpperCase(); }
+
+// Initials for the file name (CT). If two learners share them, use two letters of each name (CaDa).
+function pdfInitials(child) {
+  const ini = simpleInitials(child.name);
+  const clash = children.some(c => c.id !== child.id && simpleInitials(c.name) === ini);
+  if (!clash) return ini;
+  const { f, l } = nameParts(child.name);
+  const cap = s => s.slice(0, 1).toUpperCase() + s.slice(1, 2).toLowerCase();
+  return cap(f) + cap(l);
+}
+
+const PDF_CSS = `<style>
+.pd{font-family:Arial,'Liberation Sans','DejaVu Sans',sans-serif;color:#1a1a1a;font-size:10pt;line-height:1.45}
+.pd table{width:100%;border-collapse:collapse}
+.pd h1{font-size:15pt;margin:0 0 4px}
+.pd .meta{font-size:9.5pt;line-height:1.7}
+.pd .sec{font-size:9pt;font-weight:700;color:#0e5f86;text-transform:uppercase;margin:12px 0 4px}
+.pd .box{border:1px solid #9bb7c7;border-radius:6px;padding:7px 9px;white-space:pre-wrap;min-height:34px}
+.pd .tg{border:1px solid #9bb7c7;margin-bottom:10px;page-break-inside:avoid}
+.pd .tg th{background:#daeef8;color:#0e5f86;font-size:9.5pt;text-align:left;padding:5px 8px;border-bottom:1px solid #9bb7c7}
+.pd .tg td{padding:6px 8px;vertical-align:top;white-space:pre-wrap;border-bottom:1px solid #d6e4ec}
+.pd .tg tr:last-child td{border-bottom:none}
+.pd .lab{display:block;font-size:7.5pt;font-weight:700;color:#5d7f93;text-transform:uppercase;margin-bottom:2px}
+.pd .chip{display:inline-block;padding:1px 7px;border-radius:4px;font-weight:700;font-size:8.5pt}
+.pd .vb{border-radius:6px;padding:8px 10px;margin-bottom:8px;page-break-inside:avoid}
+.pd .vt{font-size:9pt;font-weight:800;text-transform:uppercase;margin-bottom:2px}
+.pd .vp{font-size:7.5pt;color:#666;margin-bottom:4px}
+.pd .vx{white-space:pre-wrap;min-height:30px}
+</style>`;
+
+function termPdfBody(n) {
   const child = currentChild || {};
   const doc = currentPlan.doc;
   const tm = doc.t[n];
@@ -965,65 +999,89 @@ async function printTerm(n) {
   const ehcp = isEhcpNow();
   const used = [0, 1, 2].filter(i => [tm.rows[i], prev && prev.rows[i]].some(r => r && (r.target || r.provision || r.status || r.notes)));
   const rowIdx = used.length ? used : [0];
-  const BORDER = '1px solid #9bb7c7';
   const STATUS_COL = { met: ['#d4f0e0', '#1a7a43'], partial: ['#fff3cd', '#856404'], not: ['#fde2df', '#a02a1f'] };
-  const th = (t, w) => `<th style="border:${BORDER};background:#daeef8;color:#0e5f86;font-size:9pt;text-align:left;padding:5px 7px;${w ? 'width:' + w + ';' : ''}">${t}</th>`;
-  const td = (t, extra = '') => `<td style="border:${BORDER};vertical-align:top;padding:6px 7px;font-size:10pt;line-height:1.45;white-space:pre-wrap;${extra}">${t}</td>`;
-  const box = (title, colour, bg, text, prompts) => `<td style="width:50%;vertical-align:top;padding:0 4px">
-    <div style="border:1px solid ${colour};background:${bg};border-radius:6px;padding:8px 10px;min-height:70px">
-      <div style="font-size:9pt;font-weight:800;text-transform:uppercase;color:${colour};margin-bottom:3px">${title}</div>
-      <div style="font-size:8pt;color:#666;margin-bottom:4px">${prompts}</div>
-      <div style="font-size:10pt;line-height:1.45;white-space:pre-wrap">${esc(text)}</div>
-    </div></td>`;
+  const cell = (label, text, extra = '') => `<td ${extra}><span class="lab">${label}</span>${esc(text)}</td>`;
 
-  let head, body = '';
-  if (n === 1) {
-    const withNotes = rowIdx.some(i => tm.rows[i].notes);
-    head = th('', '4%') + th('Target', withNotes ? '36%' : '48%') + th('Provision', withNotes ? '30%' : '48%') + (withNotes ? th('Progress notes so far', '30%') : '');
-    for (const i of rowIdx) { const r = tm.rows[i]; body += `<tr>${td(String(i + 1), 'font-weight:700;text-align:center')}${td(esc(r.target))}${td(esc(r.provision))}${withNotes ? td(esc(r.notes)) : ''}</tr>`; }
-  } else {
-    head = th('', '3%') + th(`Term ${n - 1} target`, '20%') + th('Outcome', '9%') + th('Progress notes', '24%') + th(n === NTERMS ? 'New target (next year)' : 'New target', '22%') + th('Provision', '22%');
-    for (const i of rowIdx) {
-      const r = tm.rows[i], p = prev.rows[i];
+  let blocks = '';
+  for (const i of rowIdx) {
+    const r = tm.rows[i];
+    if (n === 1) {
+      blocks += `<table class="tg"><tr><th colspan="2">Target ${i + 1}</th></tr>
+        <tr>${cell('Target', r.target, 'colspan="2"')}</tr>
+        <tr>${r.notes ? cell('Provision', r.provision, 'style="width:50%"') + cell('Progress notes so far', r.notes) : cell('Provision', r.provision, 'colspan="2"')}</tr></table>`;
+    } else {
+      const p = prev.rows[i];
       const sc = STATUS_COL[r.status];
-      body += `<tr>${td(String(i + 1), 'font-weight:700;text-align:center')}${td(esc(p.target))}
-        ${td(r.status ? `<span style="display:inline-block;padding:2px 6px;border-radius:4px;font-weight:700;font-size:9pt;background:${sc[0]};color:${sc[1]}">${STATUS[r.status]}</span>` : '')}
-        ${td(esc(r.notes))}${td(esc(r.target))}${td(esc(r.provision))}</tr>`;
+      const chip = r.status ? `<span class="chip" style="background:${sc[0]};color:${sc[1]}">${STATUS[r.status]}</span>` : '';
+      blocks += `<table class="tg"><tr><th>Target ${i + 1}</th><th style="text-align:right">${chip}</th></tr>
+        <tr>${cell(`Term ${n - 1} target`, p.target, 'colspan="2"')}</tr>
+        <tr>${cell('Progress notes', r.notes, 'colspan="2"')}</tr>
+        <tr>${cell(n === NTERMS ? 'New target (for next year)' : 'New target', r.target, 'style="width:50%"')}${cell('Provision', r.provision)}</tr></table>`;
     }
   }
 
-  let outcomes = '';
-  if (ehcp && doc.outcomes.some(o => o)) {
-    outcomes = `<div style="margin-bottom:10px"><div style="font-size:9.5pt;font-weight:800;color:#0e5f86;margin-bottom:3px">Long Term Outcomes from EHCP – End of ${esc(doc.outcomesLabel || '…')}</div>
-      <ol style="margin-left:18px;font-size:10pt;line-height:1.45">${doc.outcomes.map(o => o ? `<li>${esc(o)}</li>` : '').join('')}</ol></div>`;
-  }
+  const outcomes = (ehcp && doc.outcomes.some(o => o))
+    ? `<div class="sec">Long Term Outcomes from EHCP – End of ${esc(doc.outcomesLabel || '…')}</div>
+       <ol style="margin:0 0 0 18px;padding:0">${doc.outcomes.map(o => o ? `<li>${esc(o)}</li>` : '').join('')}</ol>` : '';
 
-  const html = `<div style="font-family:'Segoe UI',sans-serif;color:#1a1a1a">
-    <table style="width:100%;border-collapse:collapse;margin-bottom:10px"><tr>
-      <td style="vertical-align:middle">
-        <div style="font-size:15pt;font-weight:800">${ehcp ? 'EHCP Termly Targets' : 'Learner Plan'} — Term ${n}${n > 1 ? ' update' : ''}</div>
-        <div style="font-size:10.5pt;margin-top:4px"><b>Learner's name:</b> ${esc(child.name || '')} &nbsp;&nbsp; <b>Year group:</b> ${esc(child.year_group || '')} ${esc(child.class_name || '')} &nbsp;&nbsp; <b>Academic year:</b> ${esc(currentPlan.academic_year)}${tm.date ? ` &nbsp;&nbsp; <b>Meeting date:</b> ${esc(ukDate(tm.date))}` : ''}</div>
-      </td>
-      <td style="text-align:right;vertical-align:middle">${LOGO_DATA_URL ? `<img src="${LOGO_DATA_URL}" style="height:56px">` : ''}</td>
+  const voice = (title, colour, bg, border, prompts, text) => `<div class="vb" style="background:${bg};border:1px solid ${border}">
+    <div class="vt" style="color:${colour}">${title}</div><div class="vp">${prompts.map(esc).join(' · ')}</div><div class="vx">${esc(text)}</div></div>`;
+
+  return `${PDF_CSS}<div class="pd">
+    <table><tr>
+      <td style="vertical-align:middle"><h1>${ehcp ? 'EHCP Termly Targets' : 'Learner Plan'} — Term ${n}${n > 1 ? ' update' : ''}</h1>
+        <div class="meta"><b>Learner:</b> ${esc(child.name || '')} &nbsp; <b>Year group:</b> ${esc(child.year_group || '')} ${esc(child.class_name || '')}<br>
+        <b>Academic year:</b> ${esc(currentPlan.academic_year)}${tm.date ? ` &nbsp; <b>Meeting date:</b> ${esc(ukDate(tm.date))}` : ''}</div></td>
+      <td style="text-align:right;vertical-align:middle;width:30%">${LOGO_DATA_URL ? `<img src="${LOGO_DATA_URL}" style="height:56px">` : ''}</td>
     </tr></table>
     ${outcomes}
-    <table style="width:100%;border-collapse:collapse;margin-bottom:10px"><tr>
-      <td style="width:50%;vertical-align:top;padding-right:4px"><div style="border:${BORDER};border-radius:6px;padding:7px 9px"><div style="font-size:9pt;font-weight:800;color:#0e5f86;text-transform:uppercase;margin-bottom:3px">Strengths</div><div style="font-size:10pt;line-height:1.45;white-space:pre-wrap">${esc(doc.strengths)}</div></div></td>
-      <td style="width:50%;vertical-align:top;padding-left:4px"><div style="border:${BORDER};border-radius:6px;padding:7px 9px"><div style="font-size:9pt;font-weight:800;color:#0e5f86;text-transform:uppercase;margin-bottom:3px">Areas of Development</div><div style="font-size:10pt;line-height:1.45;white-space:pre-wrap">${esc(doc.areas)}</div></div></td>
+    <div class="sec">Strengths and Areas of Development</div>
+    <table><tr>
+      <td style="width:50%;vertical-align:top;padding-right:4px"><div class="box"><span class="lab">Strengths</span>${esc(doc.strengths)}</div></td>
+      <td style="width:50%;vertical-align:top;padding-left:4px"><div class="box"><span class="lab">Areas of Development</span>${esc(doc.areas)}</div></td>
     </tr></table>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:10px;page-break-inside:avoid"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
-    <table style="width:100%;border-collapse:collapse;page-break-inside:avoid"><tr>
-      ${box('Pupil Voice', '#6d28d9', '#f5f0ff', tm.pupilVoice, PUPIL_PROMPTS.map(esc).join(' · '))}
-      ${box('Family Voice', '#b45309', '#fef9f0', tm.familyVoice, FAMILY_PROMPTS.map(esc).join(' · '))}
-    </tr></table>
+    <div class="sec">Targets</div>
+    ${blocks}
+    <div class="sec">Pupil voice and family voice</div>
+    ${voice('Pupil Voice', '#6d28d9', '#f5f0ff', '#d8b4fe', PUPIL_PROMPTS, tm.pupilVoice)}
+    ${voice('Family Voice', '#b45309', '#fef9f0', '#f0e0c0', FAMILY_PROMPTS, tm.familyVoice)}
   </div>`;
+}
 
-  let pr = document.getElementById('printRoot');
-  if (!pr) { pr = document.createElement('div'); pr.id = 'printRoot'; document.body.appendChild(pr); }
-  pr.innerHTML = html;
-  await new Promise(r => setTimeout(r, 120));
-  window.print();
-  pr.innerHTML = '';
+// Saves a real PDF (made by the server) named like "CT Term 1.pdf". If the server cannot make it,
+// falls back to the browser's own print window, with the same name pre-filled.
+async function downloadTermPdf(n, btn) {
+  await flushSave();
+  const filename = `${pdfInitials(currentChild)} Term ${n}.pdf`;
+  const body = termPdfBody(n);
+  const full = `<!doctype html><html><head><meta charset="utf-8"><style>@page{size:A4 portrait;margin:12mm}body{margin:0}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${body}</body></html>`;
+  const label = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating PDF…'; }
+  try {
+    const res = await fetch(API + '/pdf/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ html: full, filename }) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = await res.blob();
+    if (!blob.size) throw new Error('empty file');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast(`Saved ${filename}`, 'success');
+  } catch (e) {
+    toast('Could not create the PDF file, so the print window is opening instead.', 'error');
+    let pr = document.getElementById('printRoot');
+    if (!pr) { pr = document.createElement('div'); pr.id = 'printRoot'; document.body.appendChild(pr); }
+    pr.innerHTML = body;
+    const oldTitle = document.title;
+    document.title = filename.replace(/\.pdf$/, '');
+    await new Promise(r => setTimeout(r, 150));
+    window.print();
+    document.title = oldTitle;
+    pr.innerHTML = '';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+  }
 }
 
 // ── UTILS ─────────────────────────────────────────────────────────────────────
@@ -1043,7 +1101,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-04.10.26d
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-04.10.26e
 </footer>
 </body>
 </html>
