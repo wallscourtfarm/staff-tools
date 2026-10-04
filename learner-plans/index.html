@@ -326,6 +326,11 @@ const LOGO_DATA_URL = 'data:image/webp;base64,UklGRh4kAABXRUJQVlA4IBIkAAAwdgCdAS
 async function init() {
   showPage('dashboard');
   await fetchChildren();
+  // class, teacher, year group and EHCP flag come from the school roster; refresh them on every load
+  try {
+    const r = await api('POST', '/learner-plans/children/sync-from-roster');
+    if (r && r.updated) await fetchChildren();
+  } catch (e) { /* the list above is still usable */ }
 }
 
 // ── DATA FETCHING ─────────────────────────────────────────────────────────────
@@ -1190,7 +1195,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-04.10.26h
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-04.10.26i
 </footer>
 </body>
 </html>
