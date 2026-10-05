@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<!-- WFA-05.10.26a: moved here from games.wallscourt-farm-academy.co.uk so it sits behind staff sign-in -->
+<html lang="en">
+<head>
+<script>
+/* WFA 05.10.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. Cloudflare Access already gates staff.wallscourt-farm-academy.co.uk/spelling-games/. The game scripts load from the public games site; the staff-only calls in them only work through this proxy. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spelling Games — Admin</title>
+<style>
+  :root{ --blue:#1798d3; --blue-dark:#0f6f9e; --navy:#12263a; --muted:#5b7a8a; --bg:#eef5f9; }
+  *{box-sizing:border-box;}
+  body{ font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif; background:var(--bg); color:var(--navy); margin:0; padding:24px; }
+  .wrap{ max-width:1000px; margin:0 auto; }
+  h1{ font-size:22px; margin:0 0 4px; }
+  p.sub{ font-size:13px; color:var(--muted); margin:0 0 20px; }
+  .toolbar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+  input[type=text]{ font-size:14px; padding:9px 12px; border-radius:10px; border:1.5px solid #c9dde7; flex:1; min-width:160px; }
+  button{ font-size:14px; font-weight:700; font-family:inherit; padding:10px 16px; border-radius:10px; border:none; background:var(--blue); color:#fff; cursor:pointer; white-space:nowrap; }
+  button:active{ transform:translateY(1px); }
+  button.secondary{ background:#fff; color:var(--blue-dark); border:1.5px solid #c9dde7; }
+  button:disabled{ opacity:.6; cursor:default; }
+  .tabs{ display:flex; gap:8px; margin-bottom:14px; }
+  .tab{ font-size:13px; font-weight:700; padding:8px 14px; border-radius:8px; cursor:pointer; color:var(--muted); }
+  .tab.active{ background:var(--blue); color:#fff; }
+  table{ width:100%; border-collapse:collapse; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 4px 16px rgba(18,38,58,.06); }
+  th,td{ text-align:left; padding:9px 12px; font-size:13px; border-bottom:1px solid #eef2f5; }
+  th{ background:#f4f9fb; color:var(--muted); text-transform:uppercase; font-size:11px; letter-spacing:.4px; }
+  td.mono{ font-family:'Courier New',monospace; font-weight:700; letter-spacing:.5px; }
+  td.num{ text-align:right; }
+  tr:hover td{ background:#f9fcfd; }
+  .status{ font-size:13px; color:var(--muted); margin-top:10px; }
+  .status.err{ color:#c0392b; }
+  .status.ok{ color:#1c8a4b; }
+  .pin-hidden{ letter-spacing:2px; }
+  .pin-toggle{ font-size:11px; color:var(--blue-dark); cursor:pointer; text-decoration:underline; margin-left:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔤 Spelling Games — Admin</h1>
+  <p class="sub">Staff only. Roster syncs from the school's Bromcom feed — nobody needs to type names in anywhere.</p>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="stats">Usage &amp; scores</div>
+    <div class="tab" data-tab="roster">Roster &amp; PINs</div>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="Search by name…">
+    <button class="secondary" id="btn-refresh">Refresh</button>
+    <button id="btn-sync">Sync roster from Bromcom</button>
+  </div>
+  <div class="status" id="status"></div>
+
+  <div id="stats-pane"><table id="stats-table"><thead><tr>
+    <th>Name</th><th>Year</th><th class="num">Rounds played</th><th class="num">Total score</th><th class="num">Games played</th>
+  </tr></thead><tbody></tbody></table></div>
+
+  <div id="roster-pane" style="display:none">
+    <p class="sub">PINs are hidden by default — click "show" on a row to reveal one at a time.</p>
+    <table id="roster-table"><thead><tr>
+      <th>Name</th><th>Year</th><th>Code</th><th>PIN</th><th>Status</th>
+    </tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<script src="https://games.wallscourt-farm-academy.co.uk/spelling-games/spelling-pool.js"></script>
+<script src="https://games.wallscourt-farm-academy.co.uk/spelling-games/roster.js"></script>
+<script>
+let allStats = [];
+let allRoster = [];
+let activeTab = 'stats';
+
+function setStatus(msg, cls) {
+  const el = document.getElementById('status');
+  el.textContent = msg || '';
+  el.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+function renderStats(rows) {
+  const tbody = document.querySelector('#stats-table tbody');
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.name}</td><td>${r.year}</td>
+      <td class="num">${r.roundsPlayed}</td>
+      <td class="num">${r.totalScore.toLocaleString()}</td>
+      <td class="num">${r.gamesPlayed}</td>
+    </tr>`).join('') || '<tr><td colspan="5">No matching learners.</td></tr>';
+}
+
+function renderRoster(rows) {
+  const tbody = document.querySelector('#roster-table tbody');
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td>${r.name}</td><td>${r.year}</td>
+      <td class="mono">${r.id}</td>
+      <td class="mono"><span class="pin-hidden" id="pin-${i}">••••</span><span class="pin-toggle" onclick="togglePin(${i},'${r.pin}')">show</span></td>
+      <td>${r.active ? 'Active' : 'Inactive'}</td>
+    </tr>`).join('') || '<tr><td colspan="5">No matching learners.</td></tr>';
+}
+
+function togglePin(i, pin) {
+  const el = document.getElementById('pin-' + i);
+  el.textContent = el.textContent === pin ? '••••' : pin;
+  el.classList.toggle('pin-hidden');
+}
+
+function applyFilter() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  if (activeTab === 'stats') {
+    renderStats(q ? allStats.filter(r => r.name.toLowerCase().includes(q)) : allStats);
+  } else {
+    renderRoster(q ? allRoster.filter(r => r.name.toLowerCase().includes(q)) : allRoster);
+  }
+}
+
+async function loadAll() {
+  setStatus('Loading…');
+  const [stats, roster] = await Promise.all([
+    spFetchAdminStats(BACKEND_URL),
+    spFetchAdminRoster(BACKEND_URL),
+  ]);
+  if (!stats || !roster) { setStatus('Could not reach the backend.', 'err'); return; }
+  allStats = stats;
+  allRoster = roster;
+  applyFilter();
+  setStatus(`${roster.length} learners on roster, ${roster.filter(r=>r.active).length} active.`);
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    activeTab = tab.dataset.tab;
+    document.getElementById('stats-pane').style.display = activeTab === 'stats' ? '' : 'none';
+    document.getElementById('roster-pane').style.display = activeTab === 'roster' ? '' : 'none';
+    applyFilter();
+  });
+});
+
+document.getElementById('search').addEventListener('input', applyFilter);
+document.getElementById('btn-refresh').addEventListener('click', loadAll);
+document.getElementById('btn-sync').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-sync');
+  btn.disabled = true;
+  setStatus('Syncing roster from Bromcom…');
+  const result = await spSyncRoster(BACKEND_URL, false);
+  if (result.error) {
+    setStatus('Sync failed: ' + result.error, 'err');
+  } else if (result.aborted) {
+    setStatus('Sync aborted: ' + result.reason, 'err');
+  } else {
+    setStatus(`Synced — ${result.pupilsAdded} added, ${result.pupilsUpdated} updated, ${result.pupilsDeactivated} deactivated.`, 'ok');
+    await loadAll();
+  }
+  btn.disabled = false;
+});
+
+loadAll();
+</script>
+<footer style="max-width:1000px;margin:20px auto 0;text-align:center;font-size:11px;color:var(--muted)">Wallscourt Farm Academy &mdash; Part of Cabot Learning Federation &middot; v22.09.26a</footer>
+</body>
+</html>

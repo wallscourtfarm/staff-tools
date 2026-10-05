@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<!-- WFA-05.10.26a: moved here from games.wallscourt-farm-academy.co.uk so it sits behind staff sign-in -->
+<html lang="en">
+<head>
+<script>
+/* WFA 05.10.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. Cloudflare Access already gates staff.wallscourt-farm-academy.co.uk/spelling-games/. The game scripts load from the public games site; the staff-only calls in them only work through this proxy. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spelling Games — Learner Cards</title>
+<style>
+  :root{
+    --blue:#1798d3; --blue-dark:#0f6f9e; --navy:#12263a; --muted:#5b7a8a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+    background:#eef5f9; color:var(--navy); margin:0; padding:28px;
+  }
+  .toolbar{
+    max-width:900px; margin:0 auto 24px; display:flex; align-items:center; justify-content:space-between; gap:16px;
+  }
+  .toolbar h1{ font-size:22px; margin:0 0 4px; }
+  .toolbar p{ font-size:13px; color:var(--muted); margin:0; max-width:520px; }
+  .toolbar-btns{ display:flex; gap:10px; flex-wrap:wrap; }
+  .toolbar button{
+    font-size:15px; font-weight:800; font-family:inherit; padding:12px 20px; border-radius:12px; border:none;
+    background:var(--blue); color:#fff; cursor:pointer; box-shadow:0 5px 0 var(--blue-dark); white-space:nowrap;
+  }
+  .toolbar button:active{ transform:translateY(3px); box-shadow:0 2px 0 var(--blue-dark); }
+  .toolbar button.secondary{ background:#eef5f9; color:var(--blue-dark); box-shadow:0 5px 0 #c9dde7; }
+  .toolbar button.secondary:active{ box-shadow:0 2px 0 #c9dde7; }
+  .toolbar button:disabled{ opacity:.6; cursor:default; }
+
+  .card-grid{
+    max-width:900px; margin:0 auto; display:grid; grid-template-columns:1fr; gap:14px;
+  }
+  .card{
+    background:#fff; border-radius:16px; padding:18px 20px; display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+    box-shadow:0 8px 20px rgba(18,38,58,.08); border:1.5px dashed #cfe2ec;
+  }
+  .card .info{ flex:0 0 auto; min-width:150px; }
+  .card .kicker{ font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.8px; color:var(--blue-dark); opacity:.8; }
+  .card .pname{ font-size:22px; font-weight:800; margin:2px 0 8px; }
+  .card .row{ display:flex; align-items:baseline; gap:8px; font-size:13px; color:var(--muted); margin-bottom:2px; }
+  .card .row b{ font-family:'Courier New',monospace; font-size:16px; letter-spacing:1.5px; color:var(--navy); font-weight:800; }
+  .card .pin-val{ font-size:20px; }
+
+  .card .qr-wrap{ text-align:center; flex:0 0 auto; }
+  .card .qr-wrap .qr{ width:100px; height:100px; margin:0 auto; }
+  .card .qr-wrap .qr svg{ width:100%; height:100%; display:block; }
+  .card .qr-wrap .glabel{ font-size:10.5px; font-weight:700; color:var(--muted); margin-top:4px; }
+  .card .games-note{ flex:1; font-size:12.5px; color:var(--muted); min-width:180px; }
+  .card .games-note b{ color:var(--navy); }
+  .card .games-note .unavailable{ color:#c3d2db; text-decoration:line-through; }
+
+  footer.note{
+    max-width:900px; margin:24px auto 0; font-size:12px; color:var(--muted); line-height:1.6;
+  }
+
+  @media print {
+    body{ background:#fff; padding:0; }
+    .toolbar{ display:none; }
+    .card-grid{ max-width:none; gap:14px; }
+    .card{ box-shadow:none; border:1.5px dashed #b9d8e6; break-inside:avoid; }
+    footer.note{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <div>
+      <h1>🎲 Spelling Games — Learner Cards</h1>
+      <p id="week-label">Print, cut out and hand one card to each child. They scan their code (or open their page and type it) to see everything they can play this week.</p>
+    </div>
+    <div class="toolbar-btns">
+      <button onclick="window.print()">🖨️ Print cards</button>
+      <button id="label-btn" class="secondary" onclick="downloadLabelSheet()">🏷️ Download labels (PDF)</button>
+    </div>
+  </div>
+
+  <div class="card-grid" id="card-grid"></div>
+
+  <footer class="note">
+    QR codes are generated in your browser using the <a href="https://github.com/kazuhikoarase/qrcode-generator" target="_blank" rel="noopener">qrcode-generator</a> library (MIT licence, vendored locally in <code>vendor/qrcode.js</code>, no external service or network call). Learners come from the school's Bromcom roster automatically (see <code>admin/index.html</code>'s "Sync roster" — nobody needs to type names in anywhere) and the current week comes from the shared TermDates calendar. <code>roster.js</code> is only the offline fallback used if the backend is unreachable. Each card's QR code goes to <code>play/index.html</code> — a learner's own page listing every game available for their year and the current week — rather than one QR per game, so a new game never means reprinting cards. Add a new game to that list by adding one entry to <code>GAMES</code> in <code>roster.js</code>.
+    <br><br>
+    "🏷️ Download labels" makes a PDF of the same code + PIN + QR code, laid out for a 99×42mm label sheet (Avery L7159, 12 per A4 sheet) instead of full cut-out cards — the identity part of the card that doesn't change from week to week, so it only needs printing once. PDF generation uses <a href="https://github.com/parallax/jsPDF" target="_blank" rel="noopener">jsPDF</a> (MIT licence, vendored locally in <code>vendor/jspdf.umd.min.js</code>). The label geometry (exact sizes and per-row/column nudges) is copied from this school's own <code>drawer-peg-labels</code> tool, which already calibrated it against a real printed sheet — re-check a test sheet if labels ever drift, rather than trusting the numbers blindly on a different printer.
+  </footer>
+
+<script src="https://games.wallscourt-farm-academy.co.uk/spelling-games/lessons-data.js"></script>
+<script src="https://games.wallscourt-farm-academy.co.uk/spelling-games/spelling-pool.js"></script>
+<script src="https://games.wallscourt-farm-academy.co.uk/spelling-games/vendor/jspdf.umd.min.js"></script>
+<script src="https://games.wallscourt-farm-academy.co.uk/spelling-games/vendor/qrcode.js"></script>
+<script src="https://games.wallscourt-farm-academy.co.uk/spelling-games/roster.js"></script>
+<script>
+  function qrSvgFor(url) {
+    const qr = qrcode(0, "M");
+    qr.addData(url);
+    qr.make();
+    return qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+  }
+
+  /* Same target every game's QR points at, factored out so the label-sheet
+     PDF (below) builds identical URLs to the on-screen cards. */
+  function targetUrlFor(learner) {
+    const target = new URL("play/index.html", "https://games.wallscourt-farm-academy.co.uk/spelling-games/");
+    target.searchParams.set("u", learner.id);
+    target.searchParams.set("y", learner.year);
+    target.searchParams.set("t", CURRENT_WEEK.term);
+    target.searchParams.set("w", CURRENT_WEEK.week);
+    return target;
+  }
+
+  async function renderCards() {
+    const live = await spFetchLiveRoster(BACKEND_URL);
+    if (live) {
+      if (live.roster && live.roster.length) ROSTER = live.roster;
+      if (live.currentWeek) CURRENT_WEEK = live.currentWeek;
+    }
+    // Cards need real PINs to print — the plain roster fetch above never
+    // includes them (a 2026-09-08 security fix, deliberate). This staff-
+    // only admin fetch does; falls back to whatever spFetchLiveRoster set
+    // above (PIN-less, or the static roster.js demo data) if it fails.
+    const adminRoster = await spFetchAdminRoster(BACKEND_URL);
+    if (adminRoster && adminRoster.length) ROSTER = adminRoster.filter(p => p.active !== false);
+
+    const grid = document.getElementById("card-grid");
+    const weeks = spGetWeeksForYear(ROSTER[0]?.year || "Y5");
+    const weekInfo = weeks.find(w => w.term === CURRENT_WEEK.term && w.week === CURRENT_WEEK.week);
+    document.getElementById("week-label").textContent =
+      `Cards for ${weekInfo ? weekInfo.label : `${CURRENT_WEEK.term} ${CURRENT_WEEK.week}`}` +
+      (live ? " — from the Roster/Settings tabs. Reprint after editing them." : " — from roster.js (Sheet unreachable). Change CURRENT_WEEK there and reprint.");
+
+    ROSTER.forEach(learner => {
+      const target = targetUrlFor(learner);
+
+      const gamesNote = GAMES.map(game => {
+        const available = !game.isAvailable || game.isAvailable(learner.year, CURRENT_WEEK.term, CURRENT_WEEK.week);
+        return available ? `${game.icon} ${game.label}` : `<span class="unavailable">${game.icon} ${game.label}</span>`;
+      }).join(" &nbsp; ");
+
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div class="info">
+          <div class="kicker">Spelling Games · WFA · ${learner.year}</div>
+          <div class="pname">${learner.name}</div>
+          <div class="row">Code&nbsp;<b>${learner.id}</b></div>
+          <div class="row">PIN&nbsp;<b class="pin-val">${learner.pin}</b></div>
+        </div>
+        <div class="qr-wrap">
+          <div class="qr">${qrSvgFor(target.href)}</div>
+          <div class="glabel">Scan for your games</div>
+        </div>
+        <div class="games-note"><b>This week:</b><br>${gamesNote}</div>`;
+      grid.appendChild(card);
+    });
+  }
+
+  /* ── Label sheet (99×42mm, Avery L7159, 12 per A4 sheet) ──
+     Same identity content as the cut-out cards above (name, year, code,
+     PIN, QR) but without the "this week" games note, since that's the one
+     part of the card that changes weekly — the rest is permanent, so a
+     label only needs printing once per learner rather than reprinted with
+     every card batch.
+
+     The exact label size (99.1×40.3mm, not the nominal 99×42) and the
+     per-row/per-column offsets below aren't invented — they're copied
+     from this school's drawer-peg-labels tool, which already calibrated
+     them against a real printed Avery L7159 sheet on this printer. Reuse
+     that calibration rather than the nominal spec, and re-check a test
+     sheet if labels ever drift on a different printer. */
+  const L7159 = {
+    width: 99.1, height: 40.3, border: 3, gap: 2,
+    cols: 2, rows: 6, perSheet: 12,
+    marginLeft: 6.35, marginTop: 21.15,
+    colOffsets: [-4, 1],
+    rowOffsets: [-4, -2, 0, 2, 4, 6]
+  };
+
+  /* jsPDF's addImage() needs a real PNG/JPEG, not the GIF data URL the
+     vendored QR library produces — round-trip it through a canvas. */
+  function gifDataUrlToPngDataUrl(gifDataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.onerror = reject;
+      img.src = gifDataUrl;
+    });
+  }
+  async function qrPngDataUrl(url) {
+    const qr = qrcode(0, "M");
+    qr.addData(url);
+    qr.make();
+    return gifDataUrlToPngDataUrl(qr.createDataURL(8, 32));
+  }
+
+  async function downloadLabelSheet() {
+    const btn = document.getElementById("label-btn");
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Building…";
+
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const liW = L7159.width - L7159.border * 2;
+      const liH = L7159.height - L7159.border * 2;
+      const qrSize = 25;
+
+      for (let i = 0; i < ROSTER.length; i++) {
+        const learner = ROSTER[i];
+        const posInSheet = i % L7159.perSheet;
+        const row = Math.floor(posInSheet / L7159.cols);
+        const col = posInSheet % L7159.cols;
+        if (posInSheet === 0 && i !== 0) doc.addPage();
+
+        const lx = L7159.marginLeft + col * (L7159.width + L7159.gap) + (L7159.colOffsets[col] || 0);
+        const ly = L7159.marginTop + row * (L7159.height + L7159.gap) + (L7159.rowOffsets[row] || 0);
+        const ix = lx + L7159.border;
+        const iy = ly + L7159.border;
+
+        const qrX = ix + liW - qrSize;
+        const qrY = iy + (liH - qrSize) / 2;
+        const png = await qrPngDataUrl(targetUrlFor(learner).href);
+        doc.addImage(png, "PNG", qrX, qrY, qrSize, qrSize);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6);
+        doc.setTextColor(91, 122, 138);
+        doc.text("Scan for your games", qrX + qrSize / 2, qrY + qrSize + 3, { align: "center" });
+
+        const textX = ix;
+        let ty = iy + 5;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        doc.setTextColor(15, 111, 158);
+        doc.text(`SPELLING GAMES · ${learner.year}`, textX, ty);
+        ty += 6.5;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.setTextColor(18, 38, 58);
+        doc.text(learner.name, textX, ty);
+        ty += 7;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(91, 122, 138);
+        doc.text("Code", textX, ty);
+        doc.setFont("courier", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(18, 38, 58);
+        doc.text(learner.id, textX + 13, ty);
+        ty += 6.5;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(91, 122, 138);
+        doc.text("PIN", textX, ty);
+        doc.setFont("courier", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(18, 38, 58);
+        doc.text(learner.pin, textX + 13, ty);
+      }
+
+      doc.save("wfa-spelling-games-labels.pdf");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  }
+
+  renderCards();
+</script>
+</body>
+</html>
