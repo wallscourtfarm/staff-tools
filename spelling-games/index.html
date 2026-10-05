@@ -28,6 +28,10 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .tab.active{ background:var(--blue); color:#fff; }
   table{ width:100%; border-collapse:collapse; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 4px 16px rgba(18,38,58,.06); }
   th,td{ text-align:left; padding:9px 12px; font-size:13px; border-bottom:1px solid #eef2f5; }
+  th[data-key]{ cursor:pointer; user-select:none; }
+  th[data-key]:hover{ color:var(--blue-dark); }
+  th.num{ text-align:right; }
+  th .arrow{ display:inline-block; width:10px; margin-left:4px; }
   th{ background:#f4f9fb; color:var(--muted); text-transform:uppercase; font-size:11px; letter-spacing:.4px; }
   td.mono{ font-family:'Courier New',monospace; font-weight:700; letter-spacing:.5px; }
   td.num{ text-align:right; }
@@ -57,13 +61,13 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="status" id="status"></div>
 
   <div id="stats-pane"><table id="stats-table"><thead><tr>
-    <th>Name</th><th>Year</th><th class="num">Rounds played</th><th class="num">Total score</th><th class="num">Games played</th>
+    <th data-key="name">Name</th><th data-key="year">Year</th><th class="num" data-key="roundsPlayed">Rounds played</th><th class="num" data-key="totalScore">Total score</th><th class="num" data-key="gamesPlayed">Games played</th>
   </tr></thead><tbody></tbody></table></div>
 
   <div id="roster-pane" style="display:none">
     <p class="sub">PINs are hidden by default — click "show" on a row to reveal one at a time.</p>
     <table id="roster-table"><thead><tr>
-      <th>Name</th><th>Year</th><th>Code</th><th>PIN</th><th>Status</th>
+      <th data-key="name">Name</th><th data-key="year">Year</th><th data-key="id">Code</th><th>PIN</th><th data-key="active">Status</th>
     </tr></thead><tbody></tbody></table>
   </div>
 </div>
@@ -74,6 +78,42 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 let allStats = [];
 let allRoster = [];
 let activeTab = 'stats';
+const sortState = { stats: { key: null, dir: 1 }, roster: { key: null, dir: 1 } };
+
+function sortRows(rows, tab) {
+  const { key, dir } = sortState[tab];
+  if (!key) return rows;
+  return rows.slice().sort((a, b) => {
+    const x = a[key], y = b[key];
+    const c = (typeof x === 'number' || typeof x === 'boolean')
+      ? Number(x) - Number(y)
+      : String(x == null ? '' : x).localeCompare(String(y == null ? '' : y), undefined, { numeric: true, sensitivity: 'base' });
+    return c * dir || String(a.name).localeCompare(String(b.name));
+  });
+}
+
+function updateArrows() {
+  ['stats', 'roster'].forEach(tab => {
+    document.querySelectorAll('#' + tab + '-table th').forEach(th => {
+      const old = th.querySelector('.arrow');
+      if (old) old.remove();
+      if (!th.dataset.key) return;
+      const on = sortState[tab].key === th.dataset.key;
+      th.insertAdjacentHTML('beforeend', '<span class="arrow">' + (on ? (sortState[tab].dir > 0 ? '▲' : '▼') : '') + '</span>');
+      th.setAttribute('aria-sort', on ? (sortState[tab].dir > 0 ? 'ascending' : 'descending') : 'none');
+    });
+  });
+}
+
+document.querySelectorAll('th[data-key]').forEach(th => {
+  th.addEventListener('click', () => {
+    const tab = th.closest('table').id === 'stats-table' ? 'stats' : 'roster';
+    const st = sortState[tab];
+    if (st.key === th.dataset.key) st.dir = -st.dir;
+    else { st.key = th.dataset.key; st.dir = th.classList.contains('num') ? -1 : 1; }
+    applyFilter();
+  });
+});
 
 function setStatus(msg, cls) {
   const el = document.getElementById('status');
@@ -112,10 +152,11 @@ function togglePin(i, pin) {
 function applyFilter() {
   const q = document.getElementById('search').value.trim().toLowerCase();
   if (activeTab === 'stats') {
-    renderStats(q ? allStats.filter(r => r.name.toLowerCase().includes(q)) : allStats);
+    renderStats(sortRows(q ? allStats.filter(r => r.name.toLowerCase().includes(q)) : allStats, 'stats'));
   } else {
-    renderRoster(q ? allRoster.filter(r => r.name.toLowerCase().includes(q)) : allRoster);
+    renderRoster(sortRows(q ? allRoster.filter(r => r.name.toLowerCase().includes(q)) : allRoster, 'roster'));
   }
+  updateArrows();
 }
 
 async function loadAll() {
@@ -162,6 +203,6 @@ document.getElementById('btn-sync').addEventListener('click', async () => {
 
 loadAll();
 </script>
-<footer style="max-width:1000px;margin:20px auto 0;text-align:center;font-size:11px;color:var(--muted)">Wallscourt Farm Academy &mdash; Part of Cabot Learning Federation &middot; v22.09.26a</footer>
+<footer style="max-width:1000px;margin:20px auto 0;text-align:center;font-size:11px;color:var(--muted)">Wallscourt Farm Academy &mdash; Part of Cabot Learning Federation &middot; v05.10.26b</footer>
 </body>
 </html>
