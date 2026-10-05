@@ -88,7 +88,7 @@
 
 <div class="toast" id="toast"></div>
 
-<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-05.10.26a</footer>
+<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-05.10.26b</footer>
 
 <script>
 // Calls go through the site's own /_api proxy, which checks the staff login and adds the
@@ -99,7 +99,7 @@ const TOKEN = '__hub__'; // placeholder the proxy swaps for the real token
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const YEAR_GROUPS = ['', 'Reception', 'Y1', 'Y2', 'Y3', 'Y4', 'Y5', 'Y6'];
 const YG_TO_CODE = { 'Reception': 'YR', 'Y1': 'Y1', 'Y2': 'Y2', 'Y3': 'Y3', 'Y4': 'Y4', 'Y5': 'Y5', 'Y6': 'Y6', '': '' };
-const ROLES = ['', 'Class', 'Teaching Partner', 'Learning Partner', 'Learning Support', 'Phase', 'Phase Lead', 'SENCO', 'Assistant Principal', 'Vice Principal', 'Principal', 'Administrator', 'Operations', 'Site Manager'];
+const ROLES = ['', 'Class', 'Cover Teacher', 'Teaching Partner', 'Learning Partner', 'Learning Support', 'Phase', 'Phase Lead', 'SENCO', 'Assistant Principal', 'Vice Principal', 'Principal', 'Administrator', 'Operations', 'Site Manager'];
 const NEEDS_COVER_TO_VALUE = { 'Automatic (class teachers need cover, others don\'t)': '', 'Yes — needs cover when absent': 'Yes', 'No — doesn\'t need cover (available to cover others)': 'No' };
 const VALUE_TO_NEEDS_COVER = Object.fromEntries(Object.entries(NEEDS_COVER_TO_VALUE).map(([k, v]) => [v, k]));
 const CODE_TO_YG = Object.fromEntries(Object.entries(YG_TO_CODE).map(([k, v]) => [v, k]));
@@ -144,12 +144,13 @@ const SECTIONS = {
       { key: 'YearGroup', label: 'Year group', type: 'select', options: YEAR_GROUPS.map(yg => yg || '(none / support staff)'), valueMap: { ...YG_TO_CODE, '(none / support staff)': '' }, displayMap: CODE_TO_YG },
       { key: 'WorkingDays', label: 'Working days', type: 'days' },
       { key: 'Role', label: 'Role', type: 'select', options: ROLES.map(r => r || '(not set)'), valueMap: { '(not set)': '' },
-        hint: 'To take a teacher out of their class, change this from Class to Teaching Partner (or the role they now have).' },
+        hint: 'Cover Teacher = a teacher with no class of their own: available for cover, lunch cover and FAB, not tied to a year group. Otherwise, to take a teacher out of their class change this from Class to what they do now.' },
       { key: 'DayOffCover', label: 'Needs cover when absent?', type: 'select', options: Object.keys(NEEDS_COVER_TO_VALUE), valueMap: NEEDS_COVER_TO_VALUE, displayMap: VALUE_TO_NEEDS_COVER,
         hint: 'Leave on Automatic unless the cover planner is getting it wrong for this person.' },
       { key: 'CoverRole', label: 'Gives cover as (blank = not on the cover list)', type: 'text', optional: true, list: ['Cover Supervisor', 'Teaching Partner', 'Learning Partner'],
         hint: 'Fill this in to make them appear in the cover planner\'s Cover Staff panel, available to cover other classes.' },
     ],
+    beforeSave: v => (v.Role === 'Cover Teacher' ? { ...v, YearGroup: '', DayOffCover: '' } : v),
   },
 };
 
