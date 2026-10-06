@@ -67,7 +67,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 </div>
 
 <div class="wrap" id="app"></div>
-<div class="version">WFA Reading Quiz · 06.10.26d</div>
+<div class="version">WFA Reading Quiz · 06.10.26e</div>
 
 <script>
 // ════════════════════════════════════════════════
@@ -655,6 +655,8 @@ function esc(s) {
 
 const app = document.getElementById('app');
 const bookId = new URLSearchParams(location.search).get('book') || '';
+// New per-copy stickers carry &copy=N: the borrower of that exact copy is found automatically.
+const copyNum = new URLSearchParams(location.search).get('copy') || '';
 let quiz = null; // {bookId, bookTitle, childId, childName, checkoutId, order, idx, correct, optionOrder}
 
 function render(html) { app.innerHTML = html; }
@@ -718,7 +720,13 @@ async function boot() {
   }
   render(`<div class="spinner"></div>`);
   try {
-    const r = await api({ action: 'getQuizCandidates', bookId });
+    const r = await api(copyNum ? { action: 'getQuizCandidates', bookId, copyNum } : { action: 'getQuizCandidates', bookId });
+    if (copyNum && r.candidates && r.candidates.length === 1) { renderConfirm(r.bookTitle, r.candidates[0]); return; }
+    if (copyNum && (!r.candidates || !r.candidates.length)) {
+      render(`<div class="card"><div class="big-icon">📚</div><h2>This copy isn't checked out right now</h2>
+        <p>"${esc(r.bookTitle || '')}" (copy ${esc(copyNum)}) doesn't look like it's checked out to anyone. Ask your teacher to check you out first, then try scanning again.</p></div>`);
+      return;
+    }
     if (!r.candidates || !r.candidates.length) {
       render(`<div class="card"><div class="big-icon">📚</div><h2>Not checked out right now</h2>
         <p>"${esc(r.bookTitle || '')}" doesn't look like it's checked out to anyone at the moment. Ask your teacher to check you out first, then try scanning again.</p></div>`);
@@ -731,8 +739,39 @@ async function boot() {
   }
 }
 
+// One borrower found from the copy's own QR code: just confirm, no list of names.
+function renderConfirm(bookTitle, c) {
+  window.__candidates = [c];
+  window.__bookTitle = bookTitle;
+  window.__labels = [c.name];
+  render(`
+    <div class="card">
+      <h2>Ready for your reading check?</h2>
+      <p><strong>${esc(bookTitle)}</strong></p>
+    </div>
+    <div class="card">
+      <button class="name-btn" onclick="startQuiz(0)">Start the check for ${esc(c.name)}</button>
+      <p style="margin-top:14px"><a href="#" onclick="showAllForBook();return false;">That's not me</a></p>
+    </div>`);
+}
+
+async function showAllForBook() {
+  render(`<div class="spinner"></div>`);
+  try {
+    const r = await api({ action: 'getQuizCandidates', bookId });
+    if (!r.candidates || !r.candidates.length) {
+      render(`<div class="card"><div class="big-icon">📚</div><h2>Not checked out right now</h2><p>Ask your teacher for help.</p></div>`);
+      return;
+    }
+    renderNamePicker(r.bookTitle, r.candidates);
+  } catch (e) {
+    render(`<div class="card"><div class="big-icon">😕</div><h2>Something went wrong</h2><p>Ask your teacher for help.</p></div>`);
+  }
+}
+
 function renderNamePicker(bookTitle, candidates) {
-  const labels = shortLabels(candidates.map(c => c.name));
+  // The server already sends initials (with longer labels for clashes), so use them as they are.
+  const labels = candidates.map(c => c.name);
   render(`
     <div class="card">
       <h2>Which book did you finish?</h2>
