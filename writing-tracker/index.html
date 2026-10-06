@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* WFA 25.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>WFA Writing Tracker</title>
@@ -547,7 +552,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-weights" onclick="showTab('weights')">⭐ Weights</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">WFA-25.09.26a</span>
+      <span class="version">WFA-06.10.26a</span>
     </div>
   </header>
 
@@ -799,7 +804,7 @@ function showSetup() {
   document.getElementById('app').classList.add('hidden');
 }
 
-const WFA_TOKEN = localStorage.getItem('wfa_shared_token') || '2013';
+const WFA_TOKEN = '__hub__';
 
 // The one door pupils/classes enter or leave through — see syncRosterFromHub_
 // in the Apps Script backend. Matches by UPN (tutor_group for classes),

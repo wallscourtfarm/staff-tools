@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* WFA 25.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>39 Week Plan 2025–26 | Wallscourt Farm Academy</title>
@@ -734,7 +739,7 @@
     <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA" style="height:44px;width:auto;border-radius:8px;flex-shrink:0">
     <div>
       <div class="nav-title">39 Week Plan</div>
-      <div class="nav-sub">Wallscourt Farm Academy · 23.09.26a</div>
+      <div class="nav-sub">Wallscourt Farm Academy · 06.10.26a</div>
     </div>
   </a>
   <div id="year-bar-inline" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"></div>
@@ -749,7 +754,7 @@
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">23.09.26a</span>
+  <span class="nav-version">06.10.26a</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -761,7 +766,7 @@
 
 <footer>
   <span>39 Week Plan &mdash; 2025&ndash;26 &mdash; Wallscourt Farm Academy</span>
-  <strong>23.09.26a</strong>
+  <strong>06.10.26a</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -1342,7 +1347,7 @@ const GAS_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/curriculumpl
 // Shared light token (same scheme used across every other WFA tool's own
 // backend) — a deterrent, not real access control, but this endpoint
 // previously had none at all.
-const WFA_TOKEN = localStorage.getItem('wfa_shared_token') || '2013';
+const WFA_TOKEN = '__hub__';
 
 function loadData(k) { try { return JSON.parse(localStorage.getItem('wfa_cp_'+k)||'{}'); } catch { return {}; } }
 
