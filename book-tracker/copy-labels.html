@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+/* WFA 06.10.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reading Quiz Copy Labels · WFA</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root { --brand:#1798d3; --ink:#0a0101; --muted:#667; --bg:#f4f7fb; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+header { background:var(--brand); color:#fff; padding:14px 20px; }
+header h1 { margin:0; font-size:1.15rem; }
+main { max-width: 900px; margin: 0 auto; padding: 18px 16px 40px; }
+.panel { background:#fff; border-radius:12px; padding:16px; margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.panel p { margin: 0 0 10px; color: var(--muted); font-size: .92rem; }
+.row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+select, button { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid #c8d3df; background:#fff; }
+button.primary { background: var(--brand); color:#fff; border-color: var(--brand); font-weight: 700; cursor: pointer; }
+button:disabled { opacity:.5; cursor: default; }
+#status { font-size:.9rem; color: var(--muted); }
+#status.err { color:#c0392b; font-weight:600; }
+#sheet { display:grid; grid-template-columns: repeat(2, 1fr); gap: 6mm; }
+.label { border: 1px dashed #aab; border-radius: 3mm; padding: 5mm; text-align:center; break-inside: avoid; background:#fff; min-height: 76mm; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:2mm; }
+.label .t { font-weight:800; font-size: 12pt; line-height:1.2; }
+.label .a { font-size: 9pt; color:#555; }
+.label .qr { margin: 1mm 0; }
+.label .c { font-weight:800; font-size: 11pt; color: var(--brand); }
+.label .s { font-size: 8pt; color:#555; }
+footer { text-align:center; font-size:11px; color:#a0b8c8; margin: 12px 0; }
+@media print {
+  @page { size: A4 portrait; margin: 10mm; }
+  body { background:#fff; }
+  header, .panel, footer { display:none; }
+  main { padding:0; max-width:none; }
+  #sheet { gap: 4mm; }
+  .label { border-color:#ccc; page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<header><h1>Reading Quiz · Copy Labels</h1></header>
+<main>
+  <div class="panel">
+    <p>One sticker per copy. Scanning a copy's sticker finds the child who has that copy checked out, so the quiz needs no list of names. Old book-only stickers keep working.</p>
+    <div class="row">
+      <label for="phase">Show</label>
+      <select id="phase"></select>
+      <select id="book"></select>
+      <button class="primary" id="print" disabled>Print labels</button>
+    </div>
+    <div id="status">Loading books…</div>
+  </div>
+  <div id="sheet"></div>
+</main>
+<footer>WFA Reading Quiz Copy Labels · WFA-06.10.26a</footer>
+<script>
+const API_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/bktracker-db';
+const WFA_TOKEN = '__hub__';
+const QUIZ_URL = 'https://staff.wallscourt-farm-academy.co.uk/reading-quiz/';
+let BOOKS = [];
+
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function setStatus(msg, err){ const el = document.getElementById('status'); el.textContent = msg; el.className = err ? 'err' : ''; }
+
+async function load() {
+  try {
+    const url = `${API_URL}?payload=${encodeURIComponent(JSON.stringify({action:'getAll'}))}&token=${WFA_TOKEN}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    BOOKS = (data.books || []).slice().sort((a, b) => (a.phase || '').localeCompare(b.phase || '') || (a.title || '').localeCompare(b.title || ''));
+    const phases = [...new Set(BOOKS.map(b => b.phase || ''))];
+    document.getElementById('phase').innerHTML = '<option value="">All phases</option>' + phases.map(p => `<option>${esc(p)}</option>`).join('');
+    refreshBookList();
+    document.getElementById('phase').onchange = refreshBookList;
+    document.getElementById('book').onchange = draw;
+    document.getElementById('print').onclick = () => window.print();
+    draw();
+  } catch (e) {
+    setStatus('Could not load the book list: ' + e.message + '. Reload to try again.', true);
+  }
+}
+
+function refreshBookList() {
+  const phase = document.getElementById('phase').value;
+  const list = BOOKS.filter(b => !phase || (b.phase || '') === phase);
+  document.getElementById('book').innerHTML = '<option value="">All books in this view</option>' + list.map(b => `<option value="${esc(b.id)}">${esc(b.title)}</option>`).join('');
+  draw();
+}
+
+function draw() {
+  const phase = document.getElementById('phase').value;
+  const bookId = document.getElementById('book').value;
+  const list = BOOKS.filter(b => (!phase || (b.phase || '') === phase) && (!bookId || b.id === bookId));
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = '';
+  let n = 0;
+  list.forEach(b => {
+    const total = b.totalCopies || (b.copies ? b.copies.length : 1) || 1;
+    for (let c = 1; c <= total; c++) {
+      const div = document.createElement('div');
+      div.className = 'label';
+      div.innerHTML = `<div class="t">${esc(b.title)}</div><div class="a">${esc(b.author || '')}</div><div class="qr"></div><div class="c">Copy ${c} of ${total}</div><div class="s">Scan to take your reading check</div>`;
+      sheet.appendChild(div);
+      new QRCode(div.querySelector('.qr'), { text: `${QUIZ_URL}?book=${encodeURIComponent(b.id)}&copy=${c}`, width: 120, height: 120, correctLevel: QRCode.CorrectLevel.M });
+      n++;
+    }
+  });
+  document.getElementById('print').disabled = n === 0;
+  setStatus(n + ' label' + (n === 1 ? '' : 's') + ' ready (' + list.length + ' book' + (list.length === 1 ? '' : 's') + '). Use Print, A4 portrait, no scaling.');
+}
+
+load();
+</script>
+</body>
+</html>
