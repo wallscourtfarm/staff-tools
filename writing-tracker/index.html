@@ -189,6 +189,16 @@ header {
   writing-mode: horizontal-tb;
 }
 
+.level-tabs { margin: 8px 0 6px; }
+.level-tabs .lt-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.level-tabs .lt-btn { padding: 6px 12px; font-size: 12px; font-weight: 600; border: 1px solid #e2e8f0;
+  border-radius: 6px; background: #fff; color: #475569; cursor: pointer; }
+.level-tabs .lt-btn.active { background: var(--dark, #0a0101); color: #fff; border-color: var(--dark, #0a0101); }
+.level-tabs .lt-btn.lt-below { border-color: #fbbf24; }
+.level-tabs .lt-btn.lt-gaps { border-color: #f59e0b; background: #fef3c7; color: #92400e; }
+.level-tabs .lt-btn.lt-gaps.active { background: #92400e; color: #fff; }
+.level-tabs .lt-summary { margin-top: 6px; font-size: 12px; color: #92400e; }
+
 /* Corner cell */
 .grid-table .corner-th {
   position: sticky; top: 0; left: 0; z-index: 10;
@@ -558,7 +568,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-weights" onclick="showTab('weights')">⭐ Weights</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">WFA-06.10.26d</span>
+      <span class="version">WFA-06.10.26e</span>
     </div>
   </header>
 
@@ -601,6 +611,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
       <div id="bulk-score-btns" style="display:flex;gap:4px;align-items:center;"></div>
       <button class="bulk-clear-btn" onclick="clearPupilSelection()">✕ Clear</button>
     </div>
+    <div id="level-tabs" class="level-tabs hidden"></div>
     <div class="grid-wrapper" id="grid-wrapper">
       <div class="empty-state" id="grid-empty">Select a class to begin.</div>
       <table class="grid-table hidden" id="grid-table">
@@ -780,6 +791,7 @@ const state = {
   assessments: {},   // {pupil_id: {skill_id: score}}
   groupStatsByClass: {}, // {class_id: {pp:{s,n}, nonPp:{s,n}, eal:..., sen:...}} — server-computed, no per-pupil flag ever lands in state
   skillFilter: 'all',
+  gridView: null,      // class year (default), a lower level e.g. 'Y4', or 'gaps'
   profileFilters: new Set(),
   saving: 0,
   pickerTarget: null, // {pupilId, skillId, cellEl}
@@ -1265,13 +1277,58 @@ function renderGrid() {
     countEl.textContent = '';
   }
 
-  const mainPupils = visiblePupils.filter(p =>
-    !p.working_at_level || p.working_at_level === state.currentClass.year_group);
-  const belowPupils = visiblePupils.filter(p =>
-    p.working_at_level && p.working_at_level !== state.currentClass.year_group);
+  const classYg = state.currentClass.year_group;
+  const lvlOf = p => p.working_at_level || classYg;
+  const levels = [classYg, ...[...new Set(visiblePupils.map(lvlOf))].filter(l => l !== classYg).sort().reverse()];
+  const gapPupils = visiblePupils.filter(p => carryOverGaps(p).length);
+  if (state.gridView !== 'gaps' && !levels.includes(state.gridView)) state.gridView = classYg;
+  if (state.gridView === 'gaps' && !gapPupils.length) state.gridView = classYg;
 
-  renderGridHeader(visiblePupils);
-  renderGridBody(mainPupils, belowPupils);
+  renderLevelTabs(levels, classYg, visiblePupils, gapPupils, lvlOf);
+
+  if (state.gridView === 'gaps') {
+    renderGridHeader(gapPupils);
+    renderCarryOverBody(gapPupils);
+  } else {
+    const viewPupils = visiblePupils.filter(p => lvlOf(p) === state.gridView);
+    renderGridHeader(viewPupils);
+    renderGridBody(viewPupils, state.gridView);
+  }
+}
+
+function setGridView(v) { state.gridView = v; renderGrid(); }
+
+function renderLevelTabs(levels, classYg, visiblePupils, gapPupils, lvlOf) {
+  const box = document.getElementById('level-tabs');
+  // Only worth showing when there is something other than the class year to switch to
+  if (levels.length === 1 && !gapPupils.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.classList.remove('hidden');
+  box.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'lt-row';
+  const mk = (label, view, cls) => {
+    const b = document.createElement('button');
+    b.className = 'lt-btn ' + (cls || '') + (state.gridView === view ? ' active' : '');
+    b.textContent = label;
+    b.addEventListener('click', () => setGridView(view));
+    row.appendChild(b);
+  };
+  levels.forEach(l => {
+    const n = visiblePupils.filter(p => lvlOf(p) === l).length;
+    mk(l === classYg ? `${l} class tracker (${n})` : `Working at ${l} (${n})`, l, l === classYg ? '' : 'lt-below');
+  });
+  if (gapPupils.length) mk(`Still to secure from earlier years (${gapPupils.length})`, 'gaps', 'lt-gaps');
+  box.appendChild(row);
+
+  if (state.gridView !== 'gaps' && state.gridView !== classYg) {
+    const sum = document.createElement('div');
+    sum.className = 'lt-summary';
+    sum.textContent = visiblePupils.filter(p => lvlOf(p) === state.gridView).map(p => {
+      const pr = levelProgress(p, state.gridView);
+      return `${p.name}: ${pr.secure}/${pr.total} secure`;
+    }).join('  ·  ');
+    box.appendChild(sum);
+  }
 }
 
 function renderGridHeader(pupils) {
@@ -1324,7 +1381,7 @@ function renderGridHeader(pupils) {
         lvlSel.appendChild(o);
       }
       lvlSel.addEventListener('click', e => e.stopPropagation());
-      lvlSel.addEventListener('change', e => { e.stopPropagation(); updatePupilLevel(p.pupil_id, lvlSel.value); });
+      lvlSel.addEventListener('change', e => { e.stopPropagation(); state.gridView = lvlSel.value; updatePupilLevel(p.pupil_id, lvlSel.value); });
       th.appendChild(lvlSel);
     }
     if (!state.cohortMode) th.addEventListener('click', () => togglePupilSelect(p.pupil_id));
@@ -1332,13 +1389,13 @@ function renderGridHeader(pupils) {
   });
 }
 
-function renderGridBody(mainPupils, belowPupils) {
+function renderGridBody(pupils, level) {
   const tbody = document.getElementById('grid-body');
   tbody.innerHTML = '';
 
-  const yg = state.currentClass?.year_group || 'Y4';
+  const yg = level;
   const allSkills = (() => {
-    const skills = getClassSkills();
+    const skills = SKILLS[level] || [];
     if (state.skillFilter === 'key') return skills.filter(s => s.key_essential);
     if (state.skillFilter === 'non_neg') return skills.filter(s => s.tier === 'non_neg');
     return skills;
@@ -1364,7 +1421,7 @@ function renderGridBody(mainPupils, belowPupils) {
     tierRow.className = 'section-row' + tierCls;
     const tierTd = document.createElement('td');
     tierTd.className = 'skill-col';
-    tierTd.colSpan = mainPupils.length + belowPupils.length + 1;
+    tierTd.colSpan = pupils.length + 1;
     tierTd.textContent = TIER_LABELS[tier];
     tierRow.appendChild(tierTd);
     tbody.appendChild(tierRow);
@@ -1379,7 +1436,7 @@ function renderGridBody(mainPupils, belowPupils) {
       catRow.className = 'section-row';
       const catTd = document.createElement('td');
       catTd.className = 'skill-col';
-      catTd.colSpan = mainPupils.length + belowPupils.length + 1;
+      catTd.colSpan = pupils.length + 1;
       catTd.style.fontWeight = '600';
       catTd.style.fontSize = '11px';
       catTd.style.color = '#475569';
@@ -1400,7 +1457,7 @@ function renderGridBody(mainPupils, belowPupils) {
             gRow.className = 'group-row';
             const gTd = document.createElement('td');
             gTd.className = 'skill-col group-header';
-            gTd.colSpan = mainPupils.length + belowPupils.length + 1;
+            gTd.colSpan = pupils.length + 1;
             gTd.textContent = skill.group;
             gTd.title = skill.group;
             gRow.appendChild(gTd);
@@ -1446,98 +1503,22 @@ function renderGridBody(mainPupils, belowPupils) {
         skillTd.appendChild(setRowBtn);
         tr.appendChild(skillTd);
 
-        // Score cells — main pupils
-        mainPupils.forEach(pupil => {
+        pupils.forEach(pupil => {
           tr.appendChild(makeScoreCell(pupil, skill, true));
-        });
-
-        // Score cells — below-level pupils (disabled for main framework rows)
-        belowPupils.forEach(pupil => {
-          tr.appendChild(makeScoreCell(pupil, skill, false));
         });
 
         tbody.appendChild(tr);
       });
     });
   });
+}
 
-  // Below-level section
-  if (belowPupils.length > 0) {
-    const groups = {};
-    belowPupils.forEach(p => {
-      const lvl = p.working_at_level;
-      if (!groups[lvl]) groups[lvl] = [];
-      groups[lvl].push(p);
-    });
-
-    Object.entries(groups).forEach(([level, pupils]) => {
-      const belowSkills = (() => {
-        const skills = SKILLS[level] || [];
-        if (state.skillFilter === 'key') return skills.filter(s => s.key_essential);
-        if (state.skillFilter === 'non_neg') return skills.filter(s => s.tier === 'non_neg');
-        return skills;
-      })();
-
-      // Section header
-      const hRow = document.createElement('tr');
-      hRow.className = 'section-row';
-      const hTd = document.createElement('td');
-      hTd.className = 'skill-col';
-      hTd.colSpan = mainPupils.length + belowPupils.length + 1;
-      hTd.textContent = `${level} Framework — ` + pupils.map(p => {
-        const pr = levelProgress(p, level);
-        return `${p.name} (${pr.secure}/${pr.total} secure)`;
-      }).join(', ');
-      hTd.style.background = '#fff7ed';
-      hTd.style.color = '#92400e';
-      hRow.appendChild(hTd);
-      tbody.appendChild(hRow);
-
-      const bTiers = ['non_neg','expected','greater_depth'];
-      bTiers.forEach(tier => {
-        const tSkills = belowSkills.filter(s => s.tier === tier);
-        if (!tSkills.length) return;
-
-        const cats = [...new Set(tSkills.map(s => s.category))];
-        cats.forEach(cat => {
-          tSkills.filter(s => s.category === cat).forEach(skill => {
-            const tr = document.createElement('tr');
-            tr.className = 'skill-row' + (skill.key_essential ? ' key-skill' : '');
-
-            const skillTd = document.createElement('td');
-            skillTd.className = 'skill-col';
-            skillTd.style.paddingLeft = '20px';
-            skillTd.style.background = '#fff7ed';
-            const skillText = document.createElement('span');
-            skillText.className = 'skill-text';
-            skillText.textContent = `[${level}] ${skill.skill}`;
-            skillTd.appendChild(skillText);
-            tr.appendChild(skillTd);
-
-            // Main pupils — disabled
-            mainPupils.forEach(() => {
-              const td = document.createElement('td');
-              td.className = 'score-cell disabled';
-              td.style.background = '#f8fafc';
-              tr.appendChild(td);
-            });
-
-            // Below pupils — scoreable
-            belowPupils.forEach(pupil => {
-              const enabled = pupils.includes(pupil);
-              tr.appendChild(makeScoreCell(pupil, skill, enabled));
-            });
-
-            tbody.appendChild(tr);
-          });
-        });
-      });
-    });
-  }
-
-  // Carried-over gaps from earlier years (pupils who have moved up but not
-  // yet secured everything). Cells are editable only for pupils with that gap.
-  const colPupils = [...mainPupils, ...belowPupils];
+// Skills from earlier years that pupils have not yet secured. Cells are
+// editable only for pupils who still have that gap.
+function renderCarryOverBody(pupils) {
+  const tbody = document.getElementById('grid-body');
+  tbody.innerHTML = '';
+  const colPupils = pupils;
   const gapMap = {};   // level -> {skillId: {skill, pupils:Set}}
   colPupils.forEach(p => carryOverGaps(p).forEach(g => {
     g.skills.forEach(sk => {
@@ -1583,6 +1564,7 @@ function renderGridBody(mainPupils, belowPupils) {
     });
   });
 }
+
 
 function makeScoreCell(pupil, skill, enabled) {
   const isCohort = state.cohortMode;
@@ -1832,11 +1814,7 @@ function openRowPicker(skillId, skillName, anchorEl) {
 }
 
 async function applyRowScore(skillId, value) {
-  const enabledPupils = state.pupils.filter(p => {
-    const isMain = !p.working_at_level || p.working_at_level === state.currentClass?.year_group;
-    return isMain; // main framework pupils; could extend for below-level skills
-  });
-  const targets = enabledPupils.map(p => ({
+  const targets = state.pupils.map(p => ({
     pupilId: p.pupil_id, skillId,
     cellEl: document.querySelector(`td[data-pupil-id="${p.pupil_id}"][data-skill-id="${skillId}"]`)
   })).filter(t => t.cellEl && !t.cellEl.classList.contains('disabled'));
@@ -1858,7 +1836,8 @@ function togglePupilSelect(pupilId) {
 }
 
 function selectAllPupils() {
-  state.pupils.forEach(p => {
+  const shown = new Set([...document.querySelectorAll('th.pupil-th')].map(t => t.dataset.pupilId));
+  state.pupils.filter(p => shown.has(p.pupil_id)).forEach(p => {
     state.selectedPupils.add(p.pupil_id);
     const th = document.querySelector(`th.pupil-th[data-pupil-id="${p.pupil_id}"]`);
     if (th) th.classList.add('sel-active');
