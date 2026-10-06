@@ -183,6 +183,12 @@ header {
   transform: rotate(180deg);
 }
 
+.pupil-level-sel {
+  display: block; width: 46px; margin: 4px auto 2px; padding: 1px 0;
+  font-size: 10px; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff;
+  writing-mode: horizontal-tb;
+}
+
 /* Corner cell */
 .grid-table .corner-th {
   position: sticky; top: 0; left: 0; z-index: 10;
@@ -552,7 +558,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-weights" onclick="showTab('weights')">⭐ Weights</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">WFA-06.10.26a</span>
+      <span class="version">WFA-06.10.26b</span>
     </div>
   </header>
 
@@ -1151,6 +1157,37 @@ function getSkillsForPupil(pupil) {
   return SKILLS[level] || [];
 }
 
+// Progress of a pupil against the framework they are working at.
+// Counts non-negotiables + expected skills (not greater depth); "secure" = score 4.
+const LEVEL_UP_THRESHOLD = 0.8;
+function levelProgress(pupil, level) {
+  const lvl = level || pupil.working_at_level || state.currentClass?.year_group;
+  const skills = (SKILLS[lvl] || []).filter(s => s.tier !== 'greater_depth');
+  let secure = 0, developing = 0;
+  skills.forEach(s => {
+    const v = state.assessments[pupil.pupil_id]?.[s.id];
+    if (v === '4') secure++;
+    else if (v === '0' || v === '1' || v === '2' || v === '3') developing++;
+  });
+  const total = skills.length;
+  return { level: lvl, total, secure, developing, ready: total > 0 && secure / total >= LEVEL_UP_THRESHOLD };
+}
+
+function nextLevel(level) {
+  const n = parseInt(String(level).replace('Y', ''), 10);
+  return n >= 1 && n < 6 ? 'Y' + (n + 1) : null;
+}
+
+function moveUpLevel(pupilId) {
+  const p = state.pupils.find(x => x.pupil_id === pupilId);
+  if (!p) return;
+  const cur = p.working_at_level || state.currentClass?.year_group;
+  const nxt = nextLevel(cur);
+  if (!nxt) return;
+  if (!confirm(`Move ${p.name} up to the ${nxt} framework? Their ${cur} scores are kept.`)) return;
+  updatePupilLevel(pupilId, nxt).then(() => renderInterventions());
+}
+
 function getClassSkills() {
   // Main skills = class year group
   const yg = state.currentClass?.year_group || 'Y4';
@@ -1254,6 +1291,23 @@ function renderGridHeader(pupils) {
       wrap.appendChild(badge);
     }
     th.appendChild(wrap);
+    if (!state.cohortMode) {
+      const classYg = state.currentClass?.year_group || 'Y4';
+      const cur = p.working_at_level || classYg;
+      const maxN = parseInt(classYg.replace('Y', ''), 10) || 6;
+      const lvlSel = document.createElement('select');
+      lvlSel.className = 'pupil-level-sel';
+      lvlSel.title = 'Working at framework: ' + cur;
+      for (let n = 1; n <= Math.max(maxN, parseInt(cur.replace('Y', ''), 10) || 0); n++) {
+        const o = document.createElement('option');
+        o.value = 'Y' + n; o.textContent = 'Y' + n;
+        if ('Y' + n === cur) o.selected = true;
+        lvlSel.appendChild(o);
+      }
+      lvlSel.addEventListener('click', e => e.stopPropagation());
+      lvlSel.addEventListener('change', e => { e.stopPropagation(); updatePupilLevel(p.pupil_id, lvlSel.value); });
+      th.appendChild(lvlSel);
+    }
     if (!state.cohortMode) th.addEventListener('click', () => togglePupilSelect(p.pupil_id));
     row.appendChild(th);
   });
@@ -1411,7 +1465,10 @@ function renderGridBody(mainPupils, belowPupils) {
       const hTd = document.createElement('td');
       hTd.className = 'skill-col';
       hTd.colSpan = mainPupils.length + belowPupils.length + 1;
-      hTd.textContent = `${level} Framework — ${pupils.map(p => p.name).join(', ')}`;
+      hTd.textContent = `${level} Framework — ` + pupils.map(p => {
+        const pr = levelProgress(p, level);
+        return `${p.name} (${pr.secure}/${pr.total} secure)`;
+      }).join(', ');
       hTd.style.background = '#fff7ed';
       hTd.style.color = '#92400e';
       hRow.appendChild(hTd);
@@ -1963,9 +2020,13 @@ function renderInterventions() {
     html += `<div class="int-section">
       <h2>Pupils Working Below Year Level</h2>`;
     belowLevel.forEach(p => {
+      const pr = levelProgress(p);
+      const pct = pr.total ? Math.round(pr.secure / pr.total * 100) : 0;
+      const nxt = nextLevel(pr.level);
       html += `<div class="int-card">
         <h3>${p.name}</h3>
-        <p>Working at ${p.working_at_level} framework (class is ${yg})</p>
+        <p>${yg} class, working at ${pr.level} — ${pr.secure}/${pr.total} secure (${pct}%), ${pr.developing} developing</p>
+        ${pr.ready && nxt ? `<p style="color:#14532d;font-weight:600">Ready to move up to ${nxt}? <button onclick="moveUpLevel('${p.pupil_id}')" style="font-size:11px;padding:2px 8px;cursor:pointer">Move up to ${nxt}</button></p>` : ''}
       </div>`;
     });
     html += '</div>';
