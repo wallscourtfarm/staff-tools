@@ -568,7 +568,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-weights" onclick="showTab('weights')">⭐ Weights</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">WFA-06.10.26e</span>
+      <span class="version">WFA-06.10.26f</span>
     </div>
   </header>
 
@@ -1209,13 +1209,34 @@ function nextLevel(level) {
   return n >= 1 && n < 6 ? 'Y' + (n + 1) : null;
 }
 
+// Privacy: pupils are DISPLAYED as "First name + last initial" (e.g. "Amy T"). Display only —
+// state, API payloads, IDs and the TAF JSON download keep the full name.
+function shortName(full, n) {
+  const t = String(full || '').trim().split(/\s+/).filter(Boolean);
+  if (t.length < 2) return t[0] || '';
+  return t[0] + ' ' + t[t.length - 1].slice(0, n || 1);
+}
+// Label for a pupil among the currently loaded list; two letters of surname where
+// "First X" would collide with another pupil in that list.
+let _pupilLabelSrc = null, _pupilLabelLen = -1, _pupilLabelMap = {};
+function pupilLabel(p) {
+  if (_pupilLabelSrc !== state.pupils || _pupilLabelLen !== state.pupils.length) {
+    const cnt = {};
+    state.pupils.forEach(q => { const k = shortName(q.name).toLowerCase(); cnt[k] = (cnt[k] || 0) + 1; });
+    _pupilLabelMap = {};
+    state.pupils.forEach(q => { _pupilLabelMap[q.pupil_id] = shortName(q.name, cnt[shortName(q.name).toLowerCase()] > 1 ? 2 : 1); });
+    _pupilLabelSrc = state.pupils; _pupilLabelLen = state.pupils.length;
+  }
+  return _pupilLabelMap[p.pupil_id] || shortName(p.name);
+}
+
 function moveUpLevel(pupilId) {
   const p = state.pupils.find(x => x.pupil_id === pupilId);
   if (!p) return;
   const cur = p.working_at_level || state.currentClass?.year_group;
   const nxt = nextLevel(cur);
   if (!nxt) return;
-  if (!confirm(`Move ${p.name} up to the ${nxt} framework? The ${cur} skills they haven't secured yet stay listed so you can keep tracking them.`)) return;
+  if (!confirm(`Move ${pupilLabel(p)} up to the ${nxt} framework? The ${cur} skills they haven't secured yet stay listed so you can keep tracking them.`)) return;
   updatePupilLevel(pupilId, nxt).then(() => renderInterventions());
 }
 
@@ -1325,7 +1346,7 @@ function renderLevelTabs(levels, classYg, visiblePupils, gapPupils, lvlOf) {
     sum.className = 'lt-summary';
     sum.textContent = visiblePupils.filter(p => lvlOf(p) === state.gridView).map(p => {
       const pr = levelProgress(p, state.gridView);
-      return `${p.name}: ${pr.secure}/${pr.total} secure`;
+      return `${pupilLabel(p)}: ${pr.secure}/${pr.total} secure`;
     }).join('  ·  ');
     box.appendChild(sum);
   }
@@ -1355,11 +1376,8 @@ function renderGridHeader(pupils) {
 
     const wrap = document.createElement('div');
     wrap.className = 'pupil-name-wrap';
-    wrap.title = p.name;
-    const nameParts = p.name.trim().split(/\s+/);
-    wrap.textContent = nameParts.length > 1
-      ? nameParts[0] + ' ' + nameParts[nameParts.length - 1][0]
-      : nameParts[0];
+    wrap.title = pupilLabel(p);
+    wrap.textContent = pupilLabel(p);
     if (p.working_at_level && p.working_at_level !== state.currentClass?.year_group) {
       const badge = document.createElement('span');
       badge.className = 'level-badge';
@@ -2054,7 +2072,7 @@ function renderInterventions() {
   } else {
     interventionPupils.forEach(({ pupil, skills }) => {
       html += `<div class="int-card">
-        <h3>${pupil.name}</h3>
+        <h3>${pupilLabel(pupil)}</h3>
         ${skills.map(s => `<p class="int-skill-stat">• ${s.category}: ${s.skill.substring(0, 70)}${s.skill.length > 70 ? '…' : ''}</p>`).join('')}
       </div>`;
     });
@@ -2066,7 +2084,7 @@ function renderInterventions() {
   if (carried.length) {
     html += `<div class="int-section"><h2>Still to Secure from Earlier Years</h2>`;
     carried.forEach(({ p, gaps }) => {
-      html += `<div class="int-card"><h3>${p.name}</h3>` + gaps.map(g =>
+      html += `<div class="int-card"><h3>${pupilLabel(p)}</h3>` + gaps.map(g =>
         `<p class="int-skill-stat"><b>${g.level}</b> — ${g.total - g.skills.length}/${g.total} secure; to secure:</p>` +
         g.skills.map(sk => `<p class="int-skill-stat">• ${sk.category}: ${sk.skill.substring(0, 80)}${sk.skill.length > 80 ? '…' : ''}</p>`).join('')
       ).join('') + `</div>`;
@@ -2083,7 +2101,7 @@ function renderInterventions() {
       const pct = pr.total ? Math.round(pr.secure / pr.total * 100) : 0;
       const nxt = nextLevel(pr.level);
       html += `<div class="int-card">
-        <h3>${p.name}</h3>
+        <h3>${pupilLabel(p)}</h3>
         <p>${yg} class, working at ${pr.level} — ${pr.secure}/${pr.total} secure (${pct}%), ${pr.developing} developing</p>
         ${pr.ready && nxt ? `<p style="color:#14532d;font-weight:600">Largely secure (${pr.total - pr.secure} left) — move up to ${nxt}? The remaining ${pr.level} skills stay listed. <button onclick="moveUpLevel('${p.pupil_id}')" style="font-size:11px;padding:2px 8px;cursor:pointer">Move up</button></p>` : ''}
       </div>`;
@@ -2204,7 +2222,7 @@ function renderAdminPupils() {
     const tr = document.createElement('tr');
     const level = p.working_at_level || p.year_group;
     const isBelow = level !== p.year_group;
-    tr.innerHTML = `<td>${p.name}</td>
+    tr.innerHTML = `<td>${pupilLabel(p)}</td>
       <td style="${isBelow ? 'color:#b45309;font-weight:600' : ''}">${level}</td>
       <td>${cls ? cls.class_name : '—'}</td>
       <td>
@@ -2300,7 +2318,7 @@ async function openTafTracker() {
   state.pupils.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p.pupil_id;
-    opt.textContent = p.name;
+    opt.textContent = pupilLabel(p);
     sel.appendChild(opt);
   });
   tafState.pupilId = state.pupils[0]?.pupil_id || null;

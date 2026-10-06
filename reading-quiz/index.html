@@ -67,7 +67,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 </div>
 
 <div class="wrap" id="app"></div>
-<div class="version">WFA Reading Quiz · 22.09.26a</div>
+<div class="version">WFA Reading Quiz · 06.10.26a</div>
 
 <script>
 // ════════════════════════════════════════════════
@@ -659,6 +659,20 @@ let quiz = null; // {bookId, bookTitle, childId, childName, checkoutId, order, i
 
 function render(html) { app.innerHTML = html; }
 
+// Privacy: pupils are DISPLAYED as "First name + last initial" (e.g. "Amy T"). Display only.
+function shortName(full, n) {
+  const t = String(full || '').trim().split(/\s+/).filter(Boolean);
+  if (t.length < 2) return t[0] || '';
+  return t[0] + ' ' + t[t.length - 1].slice(0, n || 1);
+}
+// Labels for the rendered list (array of full names -> array of short labels);
+// two letters of surname where "First X" would collide within the list.
+function shortLabels(names) {
+  const cnt = {};
+  names.forEach(n => { const k = shortName(n).toLowerCase(); cnt[k] = (cnt[k] || 0) + 1; });
+  return names.map(n => shortName(n, cnt[shortName(n).toLowerCase()] > 1 ? 2 : 1));
+}
+
 async function boot() {
   if (!bookId) {
     render(`<div class="card"><div class="big-icon">🤔</div><h2>Hmm, that link's not quite right</h2>
@@ -681,6 +695,7 @@ async function boot() {
 }
 
 function renderNamePicker(bookTitle, candidates) {
+  const labels = shortLabels(candidates.map(c => c.name));
   render(`
     <div class="card">
       <h2>Which book did you finish?</h2>
@@ -689,11 +704,12 @@ function renderNamePicker(bookTitle, candidates) {
     <div class="card">
       <p style="margin-bottom:14px">Tap your name to start your reading check:</p>
       ${candidates.map((c, i) => `
-        <button class="name-btn" onclick="startQuiz(${i})">${esc(c.name)}<span class="cls">${esc(c.yearGroup)} ${esc(c.class)}</span></button>
+        <button class="name-btn" onclick="startQuiz(${i})">${esc(labels[i])}<span class="cls">${esc(c.yearGroup)} ${esc(c.class)}</span></button>
       `).join('')}
     </div>`);
   window.__candidates = candidates;
   window.__bookTitle = bookTitle;
+  window.__labels = labels;
 }
 
 function startQuiz(i) {
@@ -705,7 +721,7 @@ function startQuiz(i) {
     return;
   }
   quiz = {
-    bookId, bookTitle: window.__bookTitle, childId: c.childId, childName: c.name, checkoutId: c.checkoutId,
+    bookId, bookTitle: window.__bookTitle, childId: c.childId, childName: c.name, childLabel: window.__labels[i], checkoutId: c.checkoutId,
     // Questions stay in authored order — shuffling could put a later
     // question before the one it gives the answer away for (16.09.26, see
     // book-tracker/index.html's openQuiz()). Option order is still shuffled.
@@ -764,7 +780,7 @@ function renderResult() {
   render(`
     <div class="card">
       <div class="result-icon">📖</div>
-      <h2 style="text-align:center">Nice reading, ${esc(quiz.childName)}!</h2>
+      <h2 style="text-align:center">Nice reading, ${esc(quiz.childLabel)}!</h2>
       <p style="text-align:center">You scored ${quiz.correct}/${quiz.order.length} on the reading check.</p>
       <p style="text-align:center;margin-top:10px">Bring <strong>${esc(quiz.bookTitle)}</strong> back to school and your teacher will add it to your list of completed Reading Challenge Books.</p>
     </div>`);
