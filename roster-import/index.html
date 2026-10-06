@@ -140,7 +140,7 @@ input[type=file]{display:none}
   </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-06.10.26b</div>
+<div class="version">WFA Roster Import · WFA-06.10.26c</div>
 
 <script>
 // CUT OVER 23.09.26 to the Postgres-backed store (pupil_roster_db.py) —
@@ -227,10 +227,11 @@ function fieldDiffText(before, after){
     const an = (typeof a === 'boolean') ? a : String(a||'');
     const bn = (typeof b === 'boolean') ? b : String(b||'');
     if (an !== bn) {
-      // Privacy: a surname change is shown by initial only (display only; the comparison above uses full values)
-      if (f === 'last_name') {
-        const ai = String(a||'').trim().charAt(0), bi = String(b||'').trim().charAt(0);
-        diffs.push(ai === bi ? 'Last name: updated' : 'Last name: ' + fmt(ai) + ' → ' + fmt(bi));
+      // Privacy: name changes are shown by initial only (display only; the comparison above uses full values)
+      if (f === 'last_name' || f === 'first_name') {
+        const ini = function(v){ const t = String(v||'').trim().split(/\s+/).filter(Boolean); const w = f === 'last_name' ? t[t.length-1] : t[0]; return (w||'').replace(/[^A-Za-z\u00C0-\u024F]/g,'').charAt(0).toUpperCase(); };
+        const ai = ini(a), bi = ini(b);
+        diffs.push(ai === bi ? FIELD_LABELS[f] + ': updated' : FIELD_LABELS[f] + ': ' + fmt(ai) + ' → ' + fmt(bi));
       } else diffs.push(FIELD_LABELS[f] + ': ' + fmt(a) + ' → ' + fmt(b));
     }
   });
@@ -373,20 +374,55 @@ function buildClassPayload(normalised){
   return out;
 }
 
-// Privacy: pupils are DISPLAYED as "First name + last initial" (e.g. "Amy T"). Display only —
-// UPNs, payloads and the stored names are untouched. UPNs are never displayed (data-upn is an attribute only).
-function shortName(first, last, n){
-  first = String(first || '').trim();
-  const t = String(last || '').trim().split(/\s+/).filter(Boolean);
-  const lt = t.length ? t[t.length - 1] : '';
-  return lt ? first + ' ' + lt.slice(0, n || 1) : first;
+// Privacy: pupils are DISPLAYED as INITIALS (e.g. "Innes McLean" -> "IM"); clashes within one list get longer labels (InMc, AmTh...). Display only — keys, data, exports keep full names.
+function _iniPart(w, n) {
+  const s = String(w || '').replace(/[^A-Za-zÀ-ɏ]/g, '');
+  if (!s) return '';
+  const t = s.slice(0, n);
+  const rest = (s === s.toUpperCase() || s === s.toLowerCase()) ? t.slice(1).toLowerCase() : t.slice(1);
+  return t.charAt(0).toUpperCase() + rest;
 }
-// Labels for a whole rendered list (array of [first,last]); two letters of surname where "First X" would collide.
-function shortLabels(pairs){
-  const cnt = {};
-  pairs.forEach(function(p){ const k = shortName(p[0], p[1]).toLowerCase(); cnt[k] = (cnt[k] || 0) + 1; });
-  return pairs.map(function(p){ return shortName(p[0], p[1], cnt[shortName(p[0], p[1]).toLowerCase()] > 1 ? 2 : 1); });
+function _iniSplit(first, last) {
+  const w = String(first == null ? '' : first).trim().split(/\s+/).filter(Boolean);
+  if (last === undefined || last === null || String(last).trim() === '') {
+    if (last === undefined && w.length > 1) return [w[0], w[w.length - 1]];
+    return [w[0] || '', ''];
+  }
+  const l = String(last).trim().split(/\s+/).filter(Boolean);
+  return [w[0] || '', l[l.length - 1]];
 }
+// pairs: array of [first, last] (last may be undefined to split a full name). Returns array of labels.
+function initialsLabels(pairs) {
+  const parts = pairs.map(p => _iniSplit(p[0], p[1]));
+  const L = parts.map(p => p.map(x => String(x).replace(/[^A-Za-zÀ-ɏ]/g, '').length));
+  const at = (i, n) => parts[i][1] ? _iniPart(parts[i][0], n) + _iniPart(parts[i][1], n) : _iniPart(parts[i][0], n + 1);
+  const fk = parts.map(p => (p[0] + '|' + p[1]).replace(/[^A-Za-z\u00C0-\u024F|]/g, '').toLowerCase());
+  const dupe = fk.map((k, i) => fk.some((o, j) => j !== i && o === k));
+  const out = new Array(parts.length);
+  let pending = parts.map((_, i) => i);
+  for (let n = 1; pending.length; n++) {
+    const cnt = {};
+    pending.forEach(i => { const k = at(i, n).toLowerCase(); cnt[k] = (cnt[k] || 0) + 1; });
+    const next = [];
+    pending.forEach(i => {
+      const k = at(i, n).toLowerCase();
+      const sat = n >= Math.max(L[i][0], L[i][1], 1) || n >= 12;
+      if (cnt[k] === 1) out[i] = at(i, n);
+      else if (sat) out[i] = dupe[i] ? at(i, 1) : at(i, n);
+      else next.push(i);
+    });
+    pending = next;
+  }
+  const seen = {};
+  for (let i = 0; i < out.length; i++) {
+    const k = out[i].toLowerCase();
+    seen[k] = (seen[k] || 0) + 1;
+    if (seen[k] > 1) out[i] = out[i] + ' ' + seen[k];
+  }
+  return out;
+}
+function shortName(first, last){ return initialsLabels([[first, last === undefined ? '' : last]])[0]; }
+function shortLabels(pairs){ return initialsLabels(pairs.map(function(p){ return [p[0], p[1] === undefined ? '' : p[1]]; })); }
 
 function rowHtml(name, badge, badgeClass){
   return '<div class="list-item"><span>' + esc(name) + '</span>' +
