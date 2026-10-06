@@ -72,7 +72,7 @@
 <div class="app-header">
   <div>
     <div class="app-title">School Info</div>
-    <div class="app-subtitle">Term dates, calendar events, meetings, staff list, and day timings</div>
+    <div class="app-subtitle">Term dates, calendar events, meetings, staff list, day timings, and bookable resources</div>
   </div>
 </div>
 
@@ -88,7 +88,7 @@
 
 <div class="toast" id="toast"></div>
 
-<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-05.10.26b</footer>
+<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-06.10.26a</footer>
 
 <script>
 // Calls go through the site's own /_api proxy, which checks the staff login and adds the
@@ -171,6 +171,34 @@ SECTIONS.DayTimings = {
   canDuplicate: true,
   duplicateHint: 'Change the year groups (and times) so this copy and the original don\'t cover the same year. Then edit the original to match.',
   deleteWarn: 'Removing a row can make part of the day disappear from the teaching schedule for those year groups.',
+};
+
+const RESOURCE_TYPE_TO_VALUE = { 'Room / space (one booking at a time)': 'space', 'Equipment (several can be booked at once)': 'equipment' };
+const RESOURCE_VALUE_TO_TYPE = Object.fromEntries(Object.entries(RESOURCE_TYPE_TO_VALUE).map(([k, v]) => [v, k]));
+
+SECTIONS.Resources = {
+  icon: '📦', name: 'Booking Resources', desc: 'The rooms and equipment that can be booked on the Resource Booking page',
+  primary: r => r.Name,
+  secondary: r => (r.Type === 'equipment' ? 'Equipment · ' + r.Quantity + ' available' : 'Room / space') + ' · shown in position ' + (r.Order || '?'),
+  fields: [
+    { key: 'Name', label: 'Name (as shown on the booking page)', type: 'text' },
+    { key: 'Type', label: 'What kind of resource is it?', type: 'select', options: Object.keys(RESOURCE_TYPE_TO_VALUE), valueMap: RESOURCE_TYPE_TO_VALUE, displayMap: RESOURCE_VALUE_TO_TYPE },
+    { key: 'Quantity', label: 'How many are there? (1 for a room)', type: 'number', min: 1, max: 500 },
+    { key: 'Colour', label: 'Colour', type: 'color' },
+    { key: 'Order', label: 'Position in the list (1 = first; rooms before equipment is tidiest)', type: 'number', min: 0, max: 99 },
+  ],
+  // The short ID is how bookings find their resource, so it is made from the name once, when adding, and never changed.
+  beforeSave: (v, isAdd, rows) => {
+    if (!isAdd) return v;
+    const base = (v.Name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || 'resource';
+    const taken = new Set(rows.map(r => (r.Id || '').trim()));
+    let id = base, n = 2;
+    while (taken.has(id)) id = base + '-' + (n++);
+    const maxOrder = Math.max(0, ...rows.map(r => parseInt(r.Order, 10) || 0));
+    return { ...v, Id: id, Order: v.Order || String(maxOrder + 1) };
+  },
+  sort: (a, b) => (parseInt(a.r.Order, 10) || 99) - (parseInt(b.r.Order, 10) || 99),
+  deleteWarn: 'It disappears from the booking page straight away. Bookings already made for it stay in the weekly records but can no longer be seen or moved there. If you only want to rename it, use Edit instead.',
 };
 
 function yearGroupsLabel(yg) {
@@ -309,7 +337,7 @@ async function handleFormSubmit(e) {
     }
   });
 
-  if (section.beforeSave) values = section.beforeSave(values);
+  if (section.beforeSave) values = section.beforeSave(values, state.editingIndex === null, state.rows);
 
   const submitBtn = e.target.querySelector('button[type=submit]');
   submitBtn.disabled = true;
