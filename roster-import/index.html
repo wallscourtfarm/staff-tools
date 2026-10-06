@@ -140,7 +140,7 @@ input[type=file]{display:none}
   </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-06.10.26a</div>
+<div class="version">WFA Roster Import · WFA-06.10.26b</div>
 
 <script>
 // CUT OVER 23.09.26 to the Postgres-backed store (pupil_roster_db.py) —
@@ -226,7 +226,13 @@ function fieldDiffText(before, after){
     const a = before[f], b = after[f];
     const an = (typeof a === 'boolean') ? a : String(a||'');
     const bn = (typeof b === 'boolean') ? b : String(b||'');
-    if (an !== bn) diffs.push(FIELD_LABELS[f] + ': ' + fmt(a) + ' → ' + fmt(b));
+    if (an !== bn) {
+      // Privacy: a surname change is shown by initial only (display only; the comparison above uses full values)
+      if (f === 'last_name') {
+        const ai = String(a||'').trim().charAt(0), bi = String(b||'').trim().charAt(0);
+        diffs.push(ai === bi ? 'Last name: updated' : 'Last name: ' + fmt(ai) + ' → ' + fmt(bi));
+      } else diffs.push(FIELD_LABELS[f] + ': ' + fmt(a) + ' → ' + fmt(b));
+    }
   });
   return diffs.join(' · ');
   function fmt(v){
@@ -331,14 +337,17 @@ function buildPreview(normalised, hubPupils, rejectedNoUpn){
 
   fillMissingSection(missing);
 
-  fillSection('secNew', 'listNew', newPupils, function(p){
-    return rowHtml(p.first_name + ' ' + p.last_name, p.year_group, 'join');
+  const newLbl = shortLabels(newPupils.map(function(p){ return [p.first_name, p.last_name]; }));
+  const leaveLbl = shortLabels(leaving.map(function(p){ return [p.first_name, p.last_name]; }));
+  const changedLbl = shortLabels(changed.map(function(c){ return [c.p.first_name, c.p.last_name]; }));
+  fillSection('secNew', 'listNew', newPupils, function(p, i){
+    return rowHtml(newLbl[i], p.year_group, 'join');
   });
-  fillSection('secLeave', 'listLeave', leaving, function(p){
-    return rowHtml(p.first_name + ' ' + p.last_name, p.wasClass || '', 'leave');
+  fillSection('secLeave', 'listLeave', leaving, function(p, i){
+    return rowHtml(leaveLbl[i], p.wasClass || '', 'leave');
   });
-  fillSection('secChanged', 'listChanged', changed, function(c){
-    return '<div class="list-item"><span>' + esc(c.p.first_name + ' ' + c.p.last_name) +
+  fillSection('secChanged', 'listChanged', changed, function(c, i){
+    return '<div class="list-item"><span>' + esc(changedLbl[i]) +
       '</span></div><div class="field-diff" style="padding-bottom:.5rem">' + esc(c.diff) + '</div>';
   });
 
@@ -364,6 +373,21 @@ function buildClassPayload(normalised){
   return out;
 }
 
+// Privacy: pupils are DISPLAYED as "First name + last initial" (e.g. "Amy T"). Display only —
+// UPNs, payloads and the stored names are untouched. UPNs are never displayed (data-upn is an attribute only).
+function shortName(first, last, n){
+  first = String(first || '').trim();
+  const t = String(last || '').trim().split(/\s+/).filter(Boolean);
+  const lt = t.length ? t[t.length - 1] : '';
+  return lt ? first + ' ' + lt.slice(0, n || 1) : first;
+}
+// Labels for a whole rendered list (array of [first,last]); two letters of surname where "First X" would collide.
+function shortLabels(pairs){
+  const cnt = {};
+  pairs.forEach(function(p){ const k = shortName(p[0], p[1]).toLowerCase(); cnt[k] = (cnt[k] || 0) + 1; });
+  return pairs.map(function(p){ return shortName(p[0], p[1], cnt[shortName(p[0], p[1]).toLowerCase()] > 1 ? 2 : 1); });
+}
+
 function rowHtml(name, badge, badgeClass){
   return '<div class="list-item"><span>' + esc(name) + '</span>' +
     (badge ? '<span class="badge ' + badgeClass + '">' + esc(badge) + '</span>' : '') + '</div>';
@@ -374,7 +398,7 @@ function fillSection(sectionId, listId, items, renderer){
   const list = document.getElementById(listId);
   if (!items.length) { sec.style.display = 'none'; return; }
   sec.style.display = 'block';
-  list.innerHTML = items.map(renderer).join('');
+  list.innerHTML = items.map(function(it, i){ return renderer(it, i); }).join('');
 }
 
 function fillMissingSection(missing){
@@ -383,10 +407,11 @@ function fillMissingSection(missing){
   document.getElementById('markLeaversResult').innerHTML = '';
   if (!missing.length) { card.style.display = 'none'; return; }
   card.style.display = 'block';
-  list.innerHTML = missing.map(function(p){
+  const missingLbl = shortLabels(missing.map(function(p){ return [p.first, p.last]; }));
+  list.innerHTML = missing.map(function(p, i){
     return '<div class="list-item"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1">' +
       '<input type="checkbox" class="missingCheck" data-upn="' + esc(p.upn) + '">' +
-      '<span>' + esc((p.first || '') + ' ' + (p.last || '')) + '</span></label>' +
+      '<span>' + esc(missingLbl[i]) + '</span></label>' +
       (p.class ? '<span class="badge">' + esc(p.class) + '</span>' : '') + '</div>';
   }).join('');
   list.querySelectorAll('.missingCheck').forEach(function(cb){

@@ -291,7 +291,7 @@ footer {
     <span style="margin-left:6px;">Score = weighted average across taught skills only</span>
     <button class="btn secondary" id="sync-roster-btn" style="margin-left:14px;">Sync roster</button>
   </div>
-  <span class="version">WFA-06.10.26a</span>
+  <span class="version">WFA-06.10.26b</span>
 </footer>
 
 <div id="toast"></div>
@@ -564,10 +564,11 @@ function renderGrid() {
     }).join('') +
     '<th>Score</th></tr></thead><tbody>';
 
-  state.pupils.forEach(p => {
+  const pupilLabels = shortLabels(state.pupils.map(p => p.name));
+  state.pupils.forEach((p, pi) => {
     const ratings = state.assessments[p.pupil_id] || {};
     const score = weightedPupilScore(p.pupil_id);
-    html += `<tr><td class="pupil-col">${escapeHtml(p.name)}</td>`;
+    html += `<tr><td class="pupil-col">${escapeHtml(pupilLabels[pi])}</td>`;
     cols.forEach(c => {
       const key = `${p.pupil_id}|${c.code}`;
       const r = state.dirty[key] !== undefined ? state.dirty[key] : (ratings[c.code] || '');
@@ -707,15 +708,30 @@ function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
+// Privacy: pupils are DISPLAYED as "First name + last initial" (e.g. "Amy T"). Display only.
+function shortName(full, n) {
+  const t = String(full || '').trim().split(/\s+/).filter(Boolean);
+  if (t.length < 2) return t[0] || '';
+  return t[0] + ' ' + t[t.length - 1].slice(0, n || 1);
+}
+// Labels for a whole rendered list (array of full names -> array of short labels);
+// two letters of surname where "First X" would collide within the list.
+function shortLabels(names) {
+  const cnt = {};
+  names.forEach(n => { const k = shortName(n).toLowerCase(); cnt[k] = (cnt[k] || 0) + 1; });
+  return names.map(n => shortName(n, cnt[shortName(n).toLowerCase()] > 1 ? 2 : 1));
+}
+
 // ================================================================
 // PUPIL PROFILE VIEW
 // ================================================================
 function renderProfileList() {
   const wrap = document.getElementById('profile-pupil-list');
-  wrap.innerHTML = state.pupils.map(p => {
+  const pupilLabels = shortLabels(state.pupils.map(p => p.name));
+  wrap.innerHTML = state.pupils.map((p, pi) => {
     const score = weightedPupilScore(p.pupil_id);
     return `<div class="pupil-list-item ${p.pupil_id === state.profilePupilId ? 'active' : ''}" data-id="${p.pupil_id}">
-      <span>${escapeHtml(p.name)}</span>
+      <span>${escapeHtml(pupilLabels[pi])}</span>
       <span class="score-pill">${score === null ? '—' : score + '%'}</span>
     </div>`;
   }).join('');
@@ -820,9 +836,10 @@ function renderCohort(data) {
     const av = a.score.pct === null ? 101 : a.score.pct, bv = b.score.pct === null ? 101 : b.score.pct;
     return av - bv;
   });
-  document.getElementById('cohort-pupils-body').innerHTML = pupils.map(p => `
+  const cohortLabels = shortLabels(pupils.map(p => p.name));
+  document.getElementById('cohort-pupils-body').innerHTML = pupils.map((p, pi) => `
     <div class="pupil-row">
-      <span class="name">${escapeHtml(p.name)}</span>
+      <span class="name">${escapeHtml(cohortLabels[pi])}</span>
       <span class="score-pill">${p.score.pct === null ? 'nothing taught yet' : p.score.pct + '% (' + p.score.ratedCount + '/' + p.score.taughtCount + ' taught rated)'}</span>
     </div>`).join('');
 }
