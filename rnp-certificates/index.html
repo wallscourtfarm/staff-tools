@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* WFA 25.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
 <meta charset="UTF-8">
 <title>RNP Certificate Generator — Wallscourt Farm Academy</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa.css">
@@ -137,7 +142,7 @@ var newTracking = null;
 // one-line rollback if ever needed:
 //   'https://script.google.com/macros/s/AKfycbzsgKQgORQ8S_V_X0hiTuPl5JCVgijW_JkDs4m6R27-_TMxoFGwt4L3mcjPaKBHPd1O/exec'
 var API_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/rnpcerts-db';
-var WFA_TOKEN = localStorage.getItem('wfa_shared_token') || '2013';
+var WFA_TOKEN = '__hub__';
 
 function loadXlsx(input) {
   var f = input.files[0]; if (!f) return;
@@ -404,6 +409,6 @@ function confirmPrinted() {
 }
 
 </script>
-<footer style="text-align:center;font-size:11px;color:#a0aec0;padding:8px 0;">Wallscourt Farm Academy &middot; RNP Certificate Tracker &middot; WFA-22.09.26a</footer>
+<footer style="text-align:center;font-size:11px;color:#a0aec0;padding:8px 0;">Wallscourt Farm Academy &middot; RNP Certificate Tracker &middot; WFA-06.10.26a</footer>
 </body>
 </html>
