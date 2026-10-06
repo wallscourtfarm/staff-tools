@@ -67,7 +67,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 </div>
 
 <div class="wrap" id="app"></div>
-<div class="version">WFA Reading Quiz · 06.10.26b</div>
+<div class="version">WFA Reading Quiz · 06.10.26c</div>
 
 <script>
 // ════════════════════════════════════════════════
@@ -659,57 +659,6 @@ let quiz = null; // {bookId, bookTitle, childId, childName, checkoutId, order, i
 
 function render(html) { app.innerHTML = html; }
 
-// Privacy: pupils are DISPLAYED as INITIALS (e.g. "Innes McLean" -> "IM"); clashes within one list get longer labels (InMc, AmTh...). Display only — keys, data, exports keep full names.
-function _iniPart(w, n) {
-  const s = String(w || '').replace(/[^A-Za-zÀ-ɏ]/g, '');
-  if (!s) return '';
-  const t = s.slice(0, n);
-  const rest = (s === s.toUpperCase() || s === s.toLowerCase()) ? t.slice(1).toLowerCase() : t.slice(1);
-  return t.charAt(0).toUpperCase() + rest;
-}
-function _iniSplit(first, last) {
-  const w = String(first == null ? '' : first).trim().split(/\s+/).filter(Boolean);
-  if (last === undefined || last === null || String(last).trim() === '') {
-    if (last === undefined && w.length > 1) return [w[0], w[w.length - 1]];
-    return [w[0] || '', ''];
-  }
-  const l = String(last).trim().split(/\s+/).filter(Boolean);
-  return [w[0] || '', l[l.length - 1]];
-}
-// pairs: array of [first, last] (last may be undefined to split a full name). Returns array of labels.
-function initialsLabels(pairs) {
-  const parts = pairs.map(p => _iniSplit(p[0], p[1]));
-  const L = parts.map(p => p.map(x => String(x).replace(/[^A-Za-zÀ-ɏ]/g, '').length));
-  const at = (i, n) => parts[i][1] ? _iniPart(parts[i][0], n) + _iniPart(parts[i][1], n) : _iniPart(parts[i][0], n + 1);
-  const fk = parts.map(p => (p[0] + '|' + p[1]).replace(/[^A-Za-z\u00C0-\u024F|]/g, '').toLowerCase());
-  const dupe = fk.map((k, i) => fk.some((o, j) => j !== i && o === k));
-  const out = new Array(parts.length);
-  let pending = parts.map((_, i) => i);
-  for (let n = 1; pending.length; n++) {
-    const cnt = {};
-    pending.forEach(i => { const k = at(i, n).toLowerCase(); cnt[k] = (cnt[k] || 0) + 1; });
-    const next = [];
-    pending.forEach(i => {
-      const k = at(i, n).toLowerCase();
-      const sat = n >= Math.max(L[i][0], L[i][1], 1) || n >= 12;
-      if (cnt[k] === 1) out[i] = at(i, n);
-      else if (sat) out[i] = dupe[i] ? at(i, 1) : at(i, n);
-      else next.push(i);
-    });
-    pending = next;
-  }
-  const seen = {};
-  for (let i = 0; i < out.length; i++) {
-    const k = out[i].toLowerCase();
-    seen[k] = (seen[k] || 0) + 1;
-    if (seen[k] > 1) out[i] = out[i] + ' ' + seen[k];
-  }
-  return out;
-}
-function shortName(full) { return initialsLabels([[full]])[0]; }
-// Labels for a whole rendered list (array of full names -> array of initials labels).
-function shortLabels(names) { return initialsLabels(names.map(n => [n])); }
-
 async function boot() {
   if (!bookId) {
     render(`<div class="card"><div class="big-icon">🤔</div><h2>Hmm, that link's not quite right</h2>
@@ -732,7 +681,6 @@ async function boot() {
 }
 
 function renderNamePicker(bookTitle, candidates) {
-  const labels = shortLabels(candidates.map(c => c.name));
   render(`
     <div class="card">
       <h2>Which book did you finish?</h2>
@@ -741,12 +689,11 @@ function renderNamePicker(bookTitle, candidates) {
     <div class="card">
       <p style="margin-bottom:14px">Tap your name to start your reading check:</p>
       ${candidates.map((c, i) => `
-        <button class="name-btn" onclick="startQuiz(${i})">${esc(labels[i])}<span class="cls">${esc(c.yearGroup)} ${esc(c.class)}</span></button>
+        <button class="name-btn" onclick="startQuiz(${i})">${esc(c.name)}<span class="cls">${esc(c.yearGroup)} ${esc(c.class)}</span></button>
       `).join('')}
     </div>`);
   window.__candidates = candidates;
   window.__bookTitle = bookTitle;
-  window.__labels = labels;
 }
 
 function startQuiz(i) {
@@ -758,7 +705,7 @@ function startQuiz(i) {
     return;
   }
   quiz = {
-    bookId, bookTitle: window.__bookTitle, childId: c.childId, childName: c.name, childLabel: window.__labels[i], checkoutId: c.checkoutId,
+    bookId, bookTitle: window.__bookTitle, childId: c.childId, childName: c.name, checkoutId: c.checkoutId,
     // Questions stay in authored order — shuffling could put a later
     // question before the one it gives the answer away for (16.09.26, see
     // book-tracker/index.html's openQuiz()). Option order is still shuffled.
@@ -817,7 +764,7 @@ function renderResult() {
   render(`
     <div class="card">
       <div class="result-icon">📖</div>
-      <h2 style="text-align:center">Nice reading, ${esc(quiz.childLabel)}!</h2>
+      <h2 style="text-align:center">Nice reading, ${esc(quiz.childName)}!</h2>
       <p style="text-align:center">You scored ${quiz.correct}/${quiz.order.length} on the reading check.</p>
       <p style="text-align:center;margin-top:10px">Bring <strong>${esc(quiz.bookTitle)}</strong> back to school and your teacher will add it to your list of completed Reading Challenge Books.</p>
     </div>`);
