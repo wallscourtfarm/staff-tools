@@ -20,26 +20,36 @@ main { max-width: 900px; margin: 0 auto; padding: 18px 16px 40px; }
 .panel { background:#fff; border-radius:12px; padding:16px; margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
 .panel p { margin: 0 0 10px; color: var(--muted); font-size: .92rem; }
 .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
-select, button { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid #c8d3df; background:#fff; }
+.row label { font-size:.9rem; color:var(--muted); }
+select, button, input[type=number] { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid #c8d3df; background:#fff; }
+input[type=number] { width: 80px; }
 button.primary { background: var(--brand); color:#fff; border-color: var(--brand); font-weight: 700; cursor: pointer; }
 button:disabled { opacity:.5; cursor: default; }
 #status { font-size:.9rem; color: var(--muted); }
 #status.err { color:#c0392b; font-weight:600; }
-#sheet { display:grid; grid-template-columns: repeat(2, 1fr); gap: 6mm; }
-.label { border: 1px dashed #aab; border-radius: 3mm; padding: 5mm; text-align:center; break-inside: avoid; background:#fff; min-height: 76mm; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:2mm; }
-.label .t { font-weight:800; font-size: 12pt; line-height:1.2; }
-.label .a { font-size: 9pt; color:#555; }
-.label .qr { margin: 1mm 0; }
-.label .c { font-weight:800; font-size: 11pt; color: var(--brand); }
-.label .s { font-size: 8pt; color:#555; }
+
+/* ── The sheet: same geometry as the 24 (3x8) 64x34mm labels in the Drawer, Peg & Other Labels tool.
+   A4 portrait, labels placed at fixed mm positions (page margin, gap and the per-column / per-row nudges
+   that tool uses), so these print exactly where that tool's labels print. ── */
+#pages { display:flex; flex-direction:column; align-items:center; gap:12px; }
+.sheet { position:relative; width:210mm; height:297mm; background:#fff; box-shadow:0 1px 6px rgba(0,0,0,.2); zoom:.5; flex:none; overflow:hidden; }
+.lab { position:absolute; width:63.5mm; height:34mm; background:var(--bc, #3288ce); }
+.lab .in { position:absolute; left:2mm; top:2mm; right:2mm; bottom:2mm; background:#fff; display:flex; align-items:center; gap:3mm; padding:0 2mm 0 3mm; overflow:hidden; }
+.lab .qr { width:24mm; height:24mm; flex:none; }
+.lab .qr img, .lab .qr canvas { width:24mm !important; height:24mm !important; display:block; }
+.lab .qr canvas { display:none; }
+.lab .tx { flex:1; min-width:0; color:#1e2d3d; font-family:'Tw Cen MT','Century Gothic','Trebuchet MS',system-ui,sans-serif; display:flex; flex-direction:column; justify-content:center; gap:1.5mm; }
+.lab .t { font-weight:700; line-height:1.15; overflow:hidden; word-break:break-word; }
+.lab .c { font-weight:700; font-size:10pt; }
 footer { text-align:center; font-size:11px; color:#a0b8c8; margin: 12px 0; }
 @media print {
-  @page { size: A4 portrait; margin: 10mm; }
-  body { background:#fff; }
-  header, .panel, footer { display:none; }
-  main { padding:0; max-width:none; }
-  #sheet { gap: 4mm; }
-  .label { border-color:#ccc; page-break-inside: avoid; }
+  @page { size: A4 portrait; margin: 0; }
+  html, body { background:#fff; margin:0; }
+  header, .panel, footer { display:none !important; }
+  main { padding:0; max-width:none; margin:0; }
+  #pages { display:block; }
+  .sheet { zoom:1; box-shadow:none; margin:0; page-break-after:always; break-after:page; }
+  .sheet:last-child { page-break-after:auto; break-after:auto; }
 }
 </style>
 </head>
@@ -47,22 +57,39 @@ footer { text-align:center; font-size:11px; color:#a0b8c8; margin: 12px 0; }
 <header><h1>Reading Quiz · Copy Labels</h1></header>
 <main>
   <div class="panel">
-    <p>One sticker per copy. Scanning a copy's sticker finds the child who has that copy checked out, so the quiz needs no list of names. Old book-only stickers keep working.</p>
+    <p>One label per copy, on the same 24-per-sheet (3 × 8, 64 × 34 mm) layout as the Drawer, Peg &amp; Other Labels tool. Scanning a copy's label finds the child who has that copy checked out, so the quiz needs no list of names. Old book-only labels keep working.</p>
     <div class="row">
       <label for="phase">Show</label>
       <select id="phase"></select>
       <select id="book"></select>
+    </div>
+    <div class="row">
+      <label for="colour">Border colour</label>
+      <select id="colour">
+        <option value="#3288ce">Blue (R, Y4)</option>
+        <option value="#f57721">Orange (Y1, Y5)</option>
+        <option value="#63b44a">Green (Y2, Y6)</option>
+        <option value="#c1126d">Magenta (Y3)</option>
+      </select>
+      <label for="start">Start at label</label>
+      <input type="number" id="start" min="1" max="24" value="1">
       <button class="primary" id="print" disabled>Print labels</button>
     </div>
     <div id="status">Loading books…</div>
+    <p style="margin-top:10px;margin-bottom:0">In the print window choose A4, Margins: None, Scale: 100% (not "fit to page").</p>
   </div>
-  <div id="sheet"></div>
+  <div id="pages"></div>
 </main>
-<footer>WFA Reading Quiz Copy Labels · WFA-06.10.26a</footer>
+<footer>WFA Reading Quiz Copy Labels · WFA-06.10.26b</footer>
 <script>
 const API_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/bktracker-db';
 const WFA_TOKEN = '__hub__';
 const QUIZ_URL = 'https://staff.wallscourt-farm-academy.co.uk/reading-quiz/';
+
+// Same numbers as LABEL_CONFIG.label64x34 in drawer-peg-labels/index.html.
+const L = { width: 63.5, height: 34, gap: 2.52, left: 9.4, top: 5.05, cols: 3, rows: 8,
+            colOffsets: [-4, -1, 1], rowOffsets: [2, 1, 0, -1, -2.5, -3, -4, -6] };
+const PER_SHEET = L.cols * L.rows;
 let BOOKS = [];
 
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -78,11 +105,12 @@ async function load() {
     BOOKS = (data.books || []).slice().sort((a, b) => (a.phase || '').localeCompare(b.phase || '') || (a.title || '').localeCompare(b.title || ''));
     const phases = [...new Set(BOOKS.map(b => b.phase || ''))];
     document.getElementById('phase').innerHTML = '<option value="">All phases</option>' + phases.map(p => `<option>${esc(p)}</option>`).join('');
-    refreshBookList();
-    document.getElementById('phase').onchange = refreshBookList;
+    document.getElementById('phase').onchange = () => { refreshBookList(); };
     document.getElementById('book').onchange = draw;
+    document.getElementById('colour').onchange = draw;
+    document.getElementById('start').oninput = draw;
     document.getElementById('print').onclick = () => window.print();
-    draw();
+    refreshBookList();
   } catch (e) {
     setStatus('Could not load the book list: ' + e.message + '. Reload to try again.', true);
   }
@@ -95,26 +123,64 @@ function refreshBookList() {
   draw();
 }
 
+function labelPos(slot) {
+  const row = Math.floor(slot / L.cols), col = slot % L.cols;
+  return {
+    x: L.left + col * (L.width + L.gap) + (L.colOffsets[col] || 0),
+    y: L.top + row * (L.height + L.gap) + (L.rowOffsets[row] || 0)
+  };
+}
+
+function fitTitle(el) {
+  // largest size (pt) at which the title fits three lines in the text box
+  let size = 11;
+  el.style.fontSize = size + 'pt';
+  while (size > 6 && el.scrollHeight > el.clientHeight + 1) { size -= 0.5; el.style.fontSize = size + 'pt'; }
+}
+
 function draw() {
   const phase = document.getElementById('phase').value;
   const bookId = document.getElementById('book').value;
+  const colour = document.getElementById('colour').value;
+  const start = Math.max(1, Math.min(PER_SHEET, parseInt(document.getElementById('start').value, 10) || 1));
   const list = BOOKS.filter(b => (!phase || (b.phase || '') === phase) && (!bookId || b.id === bookId));
-  const sheet = document.getElementById('sheet');
-  sheet.innerHTML = '';
-  let n = 0;
+
+  const items = [];
   list.forEach(b => {
     const total = b.totalCopies || (b.copies ? b.copies.length : 1) || 1;
-    for (let c = 1; c <= total; c++) {
-      const div = document.createElement('div');
-      div.className = 'label';
-      div.innerHTML = `<div class="t">${esc(b.title)}</div><div class="a">${esc(b.author || '')}</div><div class="qr"></div><div class="c">Copy ${c} of ${total}</div><div class="s">Scan to take your reading check</div>`;
-      sheet.appendChild(div);
-      new QRCode(div.querySelector('.qr'), { text: `${QUIZ_URL}?book=${encodeURIComponent(b.id)}&copy=${c}`, width: 120, height: 120, correctLevel: QRCode.CorrectLevel.M });
-      n++;
-    }
+    for (let c = 1; c <= total; c++) items.push({ b, c, total });
   });
-  document.getElementById('print').disabled = n === 0;
-  setStatus(n + ' label' + (n === 1 ? '' : 's') + ' ready (' + list.length + ' book' + (list.length === 1 ? '' : 's') + '). Use Print, A4 portrait, no scaling.');
+
+  const pages = document.getElementById('pages');
+  pages.innerHTML = '';
+  const slots = start - 1 + items.length;
+  const sheetCount = Math.max(1, Math.ceil(slots / PER_SHEET));
+  const sheets = [];
+  for (let i = 0; i < sheetCount; i++) {
+    const s = document.createElement('div');
+    s.className = 'sheet';
+    s.style.setProperty('--bc', colour);
+    pages.appendChild(s);
+    sheets.push(s);
+  }
+  items.forEach((it, i) => {
+    const slot = start - 1 + i;
+    const sheet = sheets[Math.floor(slot / PER_SHEET)];
+    const pos = labelPos(slot % PER_SHEET);
+    const lab = document.createElement('div');
+    lab.className = 'lab';
+    lab.style.left = pos.x + 'mm';
+    lab.style.top = pos.y + 'mm';
+    lab.innerHTML = `<div class="in"><div class="qr"></div><div class="tx"><div class="t">${esc(it.b.title)}</div><div class="c">Copy ${it.c} of ${it.total}</div></div></div>`;
+    sheet.appendChild(lab);
+    new QRCode(lab.querySelector('.qr'), { text: `${QUIZ_URL}?book=${encodeURIComponent(it.b.id)}&copy=${it.c}`, width: 360, height: 360, correctLevel: QRCode.CorrectLevel.M });
+    const t = lab.querySelector('.t');
+    // cap the title box at 3 lines' worth of the tallest size, then shrink to fit
+    t.style.maxHeight = '17mm';
+    fitTitle(t);
+  });
+  document.getElementById('print').disabled = items.length === 0;
+  setStatus(items.length + ' label' + (items.length === 1 ? '' : 's') + ' (' + list.length + ' book' + (list.length === 1 ? '' : 's') + ') on ' + sheetCount + ' sheet' + (sheetCount === 1 ? '' : 's') + '.');
 }
 
 load();
