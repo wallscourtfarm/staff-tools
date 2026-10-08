@@ -503,7 +503,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-06.10.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-08.10.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1896,6 +1896,17 @@ function renderFixedNote(wk, view, day, rowId) {
   </div>`;
 }
 
+// Notes used to save only when the box lost focus, so text typed just before the
+// page was closed or the iPad went to sleep was never saved. Now saved ~1.5s
+// after typing pauses as well.
+function debouncedNoteSave_(input, handler) {
+  let t = null;
+  return function () {
+    clearTimeout(t);
+    t = setTimeout(() => { if (input.isConnected) handler({ target: input }); }, 1500);
+  };
+}
+
 function onFixedNoteBlur(e) {
   const { wk, view, day, row } = e.target.dataset;
   setFixedNote(wk, view, day, row, e.target.value);
@@ -1938,39 +1949,99 @@ async function postScheduleSave_(weekKey, data) {
     });
     let json = null;
     try { json = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
-    return !!(res.ok && json && json.status !== 'error');
+    const ok = !!(res.ok && json && json.status !== 'error');
+    if (ok && json.updatedAt) weekStamps[weekKey] = json.updatedAt;
+    return ok;
   } catch (err) {
     return false;
   }
 }
 
-async function syncSave() {
+// Version stamp of each week as last seen on the server (from a load or a
+// successful save). Every save sends it back as baseUpdatedAt; the server
+// refuses the save if the week has moved on since (status "conflict") instead of
+// letting a stale page overwrite newer text — the root cause of Reception's
+// "my notes disappeared and went back to how they were" reports (08.10.26: a
+// page left open overnight, or two people on the same week, then one small edit
+// pushed the whole stale week over everything saved since).
+const weekStamps = {};
+let saveChain = Promise.resolve();
+let savesPending = 0;
+
+function syncSave() {
   if (!SYNC_URL) return;
   const wk = schedKey();
   if (!syncedWeeks.has(wk)) return; // haven't confirmed the real backend state for this week yet — don't risk overwriting it
-  const body = JSON.stringify({ action:'save', yearGroup: YEAR_GROUP, weekKey: wk, data: state.schedule[wk] || {} });
+  // Saves run one at a time: a second save sent before the first returns would
+  // carry the old version stamp and be refused as a conflict with our own edit.
+  // The data is read when the save actually runs, so queued saves coalesce.
+  savesPending++;
+  saveChain = saveChain.then(() => doSave_(wk)).catch(() => updateSyncStatus('err')).then(() => { savesPending--; });
+}
+
+async function doSave_(wk) {
+  const body = JSON.stringify({ action:'save', yearGroup: YEAR_GROUP, weekKey: wk, data: state.schedule[wk] || {}, baseUpdatedAt: weekStamps[wk] || null });
   // Found 18.09.26 (cover-plan-state incident): `.then(() => updateSyncStatus('ok'))`
   // treated ANY resolved fetch as success — the backend can reject a save
   // with a normal 200 and a {"status":"error",...} body (a write-verification
   // failure), which was being silently shown as synced. Must inspect the body.
-  fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, { method:'POST', body, headers:{'Content-Type':'text/plain'} })
-    .then(async res => {
-      let json = null;
-      try { json = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
-      if (!res.ok || !json || json.status === 'error') {
-        throw new Error((json && json.message) || ('save rejected (HTTP ' + res.status + ')'));
-      }
-      updateSyncStatus('ok');
-    })
-    .catch(() => updateSyncStatus('err'));
+  let res, json = null;
+  try {
+    res = await fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, { method:'POST', body, headers:{'Content-Type':'text/plain'}, keepalive: body.length < 60000 });
+    try { json = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
+  } catch (err) { updateSyncStatus('err'); return; }
+  if (json && json.status === 'conflict') { handleSaveConflict_(wk, json); return; }
+  if (!res.ok || !json || json.status === 'error') { updateSyncStatus('err'); return; }
+  if (json.updatedAt) weekStamps[wk] = json.updatedAt;
+  updateSyncStatus('ok');
 }
 
-async function syncLoad(weekKey) {
+// The server's copy of this week is newer than what this page was based on.
+// Keep the page's own version in localStorage (so nothing typed is ever truly
+// lost), show the server's newer version, and tell the teacher plainly.
+function handleSaveConflict_(wk, json) {
+  try { localStorage.setItem(`wfa_ts_conflict_${YEAR_GROUP}_${wk}_${Date.now()}`, JSON.stringify(state.schedule[wk] || {})); } catch {}
+  if (json.data && json.data.master) state.schedule[wk] = json.data;
+  weekStamps[wk] = json.updatedAt || null;
+  persistLocal();
+  if (wk === schedKey()) renderGrid();
+  updateSyncStatus('err');
+  showSyncBanner_('This week was changed on another device or tab, so your last edit was NOT saved (this stops newer work being overwritten). The latest saved version is now showing — please re-enter that last change.');
+}
+
+function showSyncBanner_(msg) {
+  let b = document.getElementById('syncBanner');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'syncBanner';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#fff7ed;color:#9a3412;border-bottom:3px solid #f97316;padding:12px 44px 12px 16px;font:700 14px Nunito,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.2)';
+    b.innerHTML = '<span></span><button style="position:absolute;right:12px;top:8px;border:0;background:none;font-size:22px;cursor:pointer;color:#9a3412" aria-label="Dismiss">&times;</button>';
+    b.querySelector('button').onclick = () => b.remove();
+    document.body.appendChild(b);
+  }
+  b.firstChild.textContent = msg;
+}
+
+function isEditingField_() {
+  const t = document.activeElement && document.activeElement.tagName;
+  return t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT';
+}
+
+// background = a refresh of a week this page already holds (tab came back into
+// view / periodic). It never replaces the week while the teacher is typing or a
+// save is still going out, and only re-renders when the server really has
+// something newer.
+async function syncLoad(weekKey, background) {
   if (!SYNC_URL) return;
+  // A redraw while someone is typing in a note would wipe what they've typed.
+  if (isEditingField_()) { setTimeout(() => syncLoad(weekKey, background), 2000); return; }
+  if (background && (savesPending > 0 || !syncedWeeks.has(weekKey))) return;
   try {
     const res = await fetch(`${TEACHING_SCHEDULE_READ_URL}?yearGroup=${encodeURIComponent(YEAR_GROUP)}&weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
     if (!res.ok) return;
     const json = await res.json();
+    if (isEditingField_() || (background && savesPending > 0)) { setTimeout(() => syncLoad(weekKey, background), 2000); return; }
+    if (background && json && json.updatedAt && json.updatedAt === weekStamps[weekKey]) return; // nothing newer
     if (json && json.data && json.data.master) {
       // Basic sanity check only (must look like real schedule data). The backend
       // now keys storage by yearGroup itself, so cross-year-group bleed can't
@@ -1990,7 +2061,7 @@ async function syncLoad(weekKey) {
     // treating it as "confirmed empty" would let syncSave() overwrite real
     // saved data with nothing. See cover-plan's 15.09.26 data-loss incident,
     // same bug class. Must check for the error shape, not just "reached here".
-    if (!(json && json.status === 'error')) syncedWeeks.add(weekKey);
+    if (!(json && json.status === 'error')) { syncedWeeks.add(weekKey); weekStamps[weekKey] = json.updatedAt || null; }
   } catch {}
 }
 
@@ -2647,12 +2718,14 @@ function renderBody() {
 
   el.querySelectorAll('.item-note').forEach(input => {
     input.addEventListener('blur', onNoteBlur);
+    input.addEventListener('input', debouncedNoteSave_(input, onNoteBlur));
     input.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); input.blur(); } });
     input.addEventListener('input', function() { this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'; });
     if (input.value) { input.style.height = 'auto'; input.style.height = input.scrollHeight + 'px'; }
   });
   el.querySelectorAll('.fixed-note-input').forEach(input => {
     input.addEventListener('blur', onFixedNoteBlur);
+    input.addEventListener('input', debouncedNoteSave_(input, onFixedNoteBlur));
     input.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); input.blur(); } });
     input.addEventListener('input', function() { this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'; });
     if (input.value) { input.style.height = 'auto'; input.style.height = input.scrollHeight + 'px'; }
@@ -4346,6 +4419,21 @@ async function init() {
   // repeated data loss. Removed: individual edits already push themselves via
   // syncSave(), so nothing legitimate depended on this running at load time.
 }
+
+// Keep an open page current: re-check the server when the tab/app comes back
+// into view and every 2 minutes, so a page left open all night never works from
+// an out-of-date copy. When the page is hidden, flush any note still being typed.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    const a = document.activeElement;
+    if (a && (a.classList.contains('item-note') || a.classList.contains('fixed-note-input'))) a.blur();
+  } else {
+    syncLoad(schedKey(), true);
+  }
+});
+window.addEventListener('focus', () => syncLoad(schedKey(), true));
+window.addEventListener('pagehide', () => { const a = document.activeElement; if (a && a.blur) a.blur(); });
+setInterval(() => { if (document.visibilityState === 'visible') syncLoad(schedKey(), true); }, 120000);
 
 init();
 
