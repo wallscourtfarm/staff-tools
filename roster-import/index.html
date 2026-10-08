@@ -89,6 +89,8 @@ input[type=file]{display:none}
     name on it (certificates, labels, sheets), the tool asks for this names file. <strong>Keep it on your own computer, inside the school
     network.</strong> It is read in your browser only to put names on that printout, and is never saved by the tool. Upload the Bromcom export
     above, then download the file here. Do this again whenever pupils join or leave, and apply the import first so new pupils have a code.</p>
+    <p class="hint" style="margin-bottom:6px">A teacher only needs the file for their own children. Choose a class or a year group, or everyone.</p>
+    <select id="namesScope" style="margin-bottom:10px;padding:8px 10px;border-radius:8px;border:1px solid #c8d3df;font:inherit"><option value="">Everyone</option></select><br>
     <button class="applybtn" id="namesFileBtn" disabled>⬇ Download names file</button>
     <div id="namesFileResult"></div>
   </div>
@@ -151,7 +153,7 @@ input[type=file]{display:none}
   </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-06.10.26d</div>
+<div class="version">WFA Roster Import · WFA-08.10.26a</div>
 
 <script>
 // CUT OVER 23.09.26 to the Postgres-backed store (pupil_roster_db.py) —
@@ -288,6 +290,7 @@ async function handleFile(e){
 
     lastNormalised = normalised;
     document.getElementById('namesFileBtn').disabled = !normalised.length;
+    fillNamesScope(normalised);
     statusEl.textContent = 'Fetching current roster to build preview…';
     const hubPupils = await fetchHubPupils();
 
@@ -302,6 +305,15 @@ async function handleFile(e){
 
 // Builds the names file in the browser: pupil code, initials, full name, class. The server is only asked
 // for the pupil code of each UPN and sends no names. Nothing is stored or uploaded with the names.
+function fillNamesScope(rows){
+  const sel = document.getElementById('namesScope');
+  const years = {}, classes = {};
+  rows.forEach(function(p){ if (p.status !== 'active') return; if (p.year_group) years[p.year_group] = 1; if (p.tutor_group) classes[p.tutor_group] = 1; });
+  sel.innerHTML = '<option value="">Everyone</option>' +
+    '<optgroup label="Year group">' + Object.keys(years).sort().map(function(y){ return '<option value="y:' + y + '">' + y + '</option>'; }).join('') + '</optgroup>' +
+    '<optgroup label="Class">' + Object.keys(classes).sort().map(function(c){ return '<option value="c:' + c + '">' + c + '</option>'; }).join('') + '</optgroup>';
+}
+
 async function downloadNamesFile(){
   const btn = document.getElementById('namesFileBtn');
   const out = document.getElementById('namesFileResult');
@@ -309,20 +321,26 @@ async function downloadNamesFile(){
   if (!lastNormalised || !lastNormalised.length) return;
   btn.disabled = true;
   try {
-    const rows = lastNormalised.filter(function(p){ return p.status === 'active'; });
+    const scope = document.getElementById('namesScope').value;
+    const rows = lastNormalised.filter(function(p){
+      if (p.status !== 'active') return false;
+      if (scope.indexOf('y:') === 0) return p.year_group === scope.slice(2);
+      if (scope.indexOf('c:') === 0) return p.tutor_group === scope.slice(2);
+      return true;
+    });
     const r = await fetch(HUB_URL + '/pupilcodes?token=' + encodeURIComponent(WFA_TOKEN), { method: 'POST', body: JSON.stringify({ upns: rows.map(function(p){ return p.upn; }) }) });
     const data = await r.json();
     if (data.status !== 'ok') throw new Error(data.message || 'unknown error');
     const list = [];
     rows.forEach(function(p){
       const id = data.codes[p.upn];
-      if (id) list.push({ pupil_id: id, first: p.first_name, last: p.last_name, cls: p.tutor_group });
+      if (id) list.push({ pupil_id: id, first: p.first_name, last: p.last_name, cls: p.tutor_group, year: p.year_group });
     });
     const blob = new Blob([WFANames.buildCsv(list)], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     const d = new Date();
     a.href = URL.createObjectURL(blob);
-    a.download = 'WFA-names-file-' + String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getFullYear()).slice(2) + '.csv';
+    a.download = 'WFA-names-file-' + (scope ? scope.slice(2) + '-' : 'school-') + String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getFullYear()).slice(2) + '.csv';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
     const missing = (data.missing || []).length;
