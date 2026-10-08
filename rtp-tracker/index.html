@@ -189,6 +189,7 @@ footer {
   justify-content: center; z-index: 1000; font-size: 14px; color: var(--blue); font-weight: 700;
 }
 </style>
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
 </head>
 <body>
 
@@ -291,7 +292,7 @@ footer {
     <span style="margin-left:6px;">Score = weighted average across taught skills only</span>
     <button class="btn secondary" id="sync-roster-btn" style="margin-left:14px;">Sync roster</button>
   </div>
-  <span class="version">WFA-06.10.26c</span>
+  <span class="version">WFA-08.10.26a</span>
 </footer>
 
 <div id="toast"></div>
@@ -568,7 +569,7 @@ function renderGrid() {
   state.pupils.forEach((p, pi) => {
     const ratings = state.assessments[p.pupil_id] || {};
     const score = weightedPupilScore(p.pupil_id);
-    html += `<tr><td class="pupil-col">${escapeHtml(pupilLabels[pi])}</td>`;
+    html += `<tr><td class="pupil-col"${pidAttr(p)}>${escapeHtml(pupilLabels[pi])}</td>`;
     cols.forEach(c => {
       const key = `${p.pupil_id}|${c.code}`;
       const r = state.dirty[key] !== undefined ? state.dirty[key] : (ratings[c.code] || '');
@@ -755,6 +756,11 @@ function initialsLabels(pairs) {
   }
   return out;
 }
+// data-pupil-id attribute (pupil code) so WFANames.screen can swap the label for a full name locally.
+function pidAttr(p) {
+  const c = p && p.pupilCode;
+  return c ? ` data-pupil-id="${escapeHtml(c)}"` : '';
+}
 function shortName(full) { return initialsLabels([[full]])[0]; }
 // Labels for a whole rendered list (array of full names -> array of initials labels).
 function shortLabels(names) { return initialsLabels(names.map(n => [n])); }
@@ -768,7 +774,7 @@ function renderProfileList() {
   wrap.innerHTML = state.pupils.map((p, pi) => {
     const score = weightedPupilScore(p.pupil_id);
     return `<div class="pupil-list-item ${p.pupil_id === state.profilePupilId ? 'active' : ''}" data-id="${p.pupil_id}">
-      <span>${escapeHtml(pupilLabels[pi])}</span>
+      <span${pidAttr(p)}>${escapeHtml(pupilLabels[pi])}</span>
       <span class="score-pill">${score === null ? '—' : score + '%'}</span>
     </div>`;
   }).join('');
@@ -876,7 +882,7 @@ function renderCohort(data) {
   const cohortLabels = shortLabels(pupils.map(p => p.name));
   document.getElementById('cohort-pupils-body').innerHTML = pupils.map((p, pi) => `
     <div class="pupil-row">
-      <span class="name">${escapeHtml(cohortLabels[pi])}</span>
+      <span class="name"${pidAttr(p)}>${escapeHtml(cohortLabels[pi])}</span>
       <span class="score-pill">${p.score.pct === null ? 'nothing taught yet' : p.score.pct + '% (' + p.score.ratedCount + '/' + p.score.taughtCount + ' taught rated)'}</span>
     </div>`).join('');
 }
@@ -933,10 +939,11 @@ document.getElementById('sync-roster-btn').addEventListener('click', async () =>
     const dry = await apiPost({ action: 'syncRoster', dryRun: true }, { timeoutMs: 60000 });
     const lines = [
       `Classes: +${dry.classesAdded} added, ${dry.classesUpdated} updated, ${dry.classesDeactivated.length} deactivated`,
-      `Pupils: +${dry.pupilsAdded} added, ${dry.pupilsUpdated} updated, ${dry.pupilsDeactivated} deactivated`
+      `Pupils: +${dry.pupilsAdded} added, ${dry.pupilsUpdated} updated, ${dry.pupilsDeactivated} deactivated`,
+      `Pupil codes to fill: ${dry.pupilCodesFilled || 0}`
     ];
     if (dry.aborted) lines.push('⚠️ ' + dry.reason);
-    const total = dry.classesAdded + dry.classesUpdated + dry.classesDeactivated.length + dry.pupilsAdded + dry.pupilsUpdated + dry.pupilsDeactivated;
+    const total = dry.classesAdded + dry.classesUpdated + dry.classesDeactivated.length + dry.pupilsAdded + dry.pupilsUpdated + dry.pupilsDeactivated + (dry.pupilCodesFilled || 0);
     if (!total) { toast('Roster already up to date.'); return; }
     if (!confirm('Sync roster from the school system?\n\n' + lines.join('\n') + '\n\nApply these changes?')) return;
     btn.textContent = 'Syncing…';
@@ -953,6 +960,7 @@ document.getElementById('sync-roster-btn').addEventListener('click', async () =>
   }
 });
 
+try { if (window.WFANames && WFANames.screen) WFANames.screen.init(); } catch (e) { /* names-on-screen is optional */ }
 bootstrap();
 </script>
 </body>

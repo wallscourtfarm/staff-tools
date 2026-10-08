@@ -568,7 +568,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-weights" onclick="showTab('weights')">⭐ Weights</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">WFA-06.10.26g</span>
+      <span class="version">WFA-08.10.26a</span>
     </div>
   </header>
 
@@ -727,6 +727,7 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
   <button id="picker-close" onclick="closePicker()">✕ Close</button>
 </div>
 
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
 <script>
 // ================================================================
 // SKILLS DATA
@@ -1269,6 +1270,12 @@ function pupilLabel(p) {
   return _pupilLabelMap[p.pupil_id] || shortName(p.name);
 }
 
+// Attribute that lets WFANames.screen swap the label for a full name (from the teacher's own names file).
+// Only put it on an element that contains NOTHING but the label text. Omitted when the pupil has no code.
+function pcEsc(v) { return String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function pcAttr(p) { return p && p.pupilCode ? ' data-pupil-id="' + pcEsc(p.pupilCode) + '"' : ''; }
+function pcTag(el, p) { if (p && p.pupilCode) el.setAttribute('data-pupil-id', p.pupilCode); return el; }
+
 function moveUpLevel(pupilId) {
   const p = state.pupils.find(x => x.pupil_id === pupilId);
   if (!p) return;
@@ -1383,10 +1390,14 @@ function renderLevelTabs(levels, classYg, visiblePupils, gapPupils, lvlOf) {
   if (state.gridView !== 'gaps' && state.gridView !== classYg) {
     const sum = document.createElement('div');
     sum.className = 'lt-summary';
-    sum.textContent = visiblePupils.filter(p => lvlOf(p) === state.gridView).map(p => {
+    visiblePupils.filter(p => lvlOf(p) === state.gridView).forEach((p, i) => {
       const pr = levelProgress(p, state.gridView);
-      return `${pupilLabel(p)}: ${pr.secure}/${pr.total} secure`;
-    }).join('  ·  ');
+      if (i) sum.appendChild(document.createTextNode('  ·  '));
+      const nm = pcTag(document.createElement('span'), p);
+      nm.textContent = pupilLabel(p);
+      sum.appendChild(nm);
+      sum.appendChild(document.createTextNode(`: ${pr.secure}/${pr.total} secure`));
+    });
     box.appendChild(sum);
   }
 }
@@ -1416,7 +1427,9 @@ function renderGridHeader(pupils) {
     const wrap = document.createElement('div');
     wrap.className = 'pupil-name-wrap';
     wrap.title = pupilLabel(p);
-    wrap.textContent = pupilLabel(p);
+    const nameSpan = pcTag(document.createElement('span'), p);
+    nameSpan.textContent = pupilLabel(p);
+    wrap.appendChild(nameSpan);
     if (p.working_at_level && p.working_at_level !== state.currentClass?.year_group) {
       const badge = document.createElement('span');
       badge.className = 'level-badge';
@@ -2111,7 +2124,7 @@ function renderInterventions() {
   } else {
     interventionPupils.forEach(({ pupil, skills }) => {
       html += `<div class="int-card">
-        <h3>${pupilLabel(pupil)}</h3>
+        <h3${pcAttr(pupil)}>${pupilLabel(pupil)}</h3>
         ${skills.map(s => `<p class="int-skill-stat">• ${s.category}: ${s.skill.substring(0, 70)}${s.skill.length > 70 ? '…' : ''}</p>`).join('')}
       </div>`;
     });
@@ -2123,7 +2136,7 @@ function renderInterventions() {
   if (carried.length) {
     html += `<div class="int-section"><h2>Still to Secure from Earlier Years</h2>`;
     carried.forEach(({ p, gaps }) => {
-      html += `<div class="int-card"><h3>${pupilLabel(p)}</h3>` + gaps.map(g =>
+      html += `<div class="int-card"><h3${pcAttr(p)}>${pupilLabel(p)}</h3>` + gaps.map(g =>
         `<p class="int-skill-stat"><b>${g.level}</b> — ${g.total - g.skills.length}/${g.total} secure; to secure:</p>` +
         g.skills.map(sk => `<p class="int-skill-stat">• ${sk.category}: ${sk.skill.substring(0, 80)}${sk.skill.length > 80 ? '…' : ''}</p>`).join('')
       ).join('') + `</div>`;
@@ -2140,7 +2153,7 @@ function renderInterventions() {
       const pct = pr.total ? Math.round(pr.secure / pr.total * 100) : 0;
       const nxt = nextLevel(pr.level);
       html += `<div class="int-card">
-        <h3>${pupilLabel(p)}</h3>
+        <h3${pcAttr(p)}>${pupilLabel(p)}</h3>
         <p>${yg} class, working at ${pr.level} — ${pr.secure}/${pr.total} secure (${pct}%), ${pr.developing} developing</p>
         ${pr.ready && nxt ? `<p style="color:#14532d;font-weight:600">Largely secure (${pr.total - pr.secure} left) — move up to ${nxt}? The remaining ${pr.level} skills stay listed. <button onclick="moveUpLevel('${p.pupil_id}')" style="font-size:11px;padding:2px 8px;cursor:pointer">Move up</button></p>` : ''}
       </div>`;
@@ -2261,7 +2274,7 @@ function renderAdminPupils() {
     const tr = document.createElement('tr');
     const level = p.working_at_level || p.year_group;
     const isBelow = level !== p.year_group;
-    tr.innerHTML = `<td>${pupilLabel(p)}</td>
+    tr.innerHTML = `<td${pcAttr(p)}>${pupilLabel(p)}</td>
       <td style="${isBelow ? 'color:#b45309;font-weight:600' : ''}">${level}</td>
       <td>${cls ? cls.class_name : '—'}</td>
       <td>
@@ -2358,6 +2371,7 @@ async function openTafTracker() {
     const opt = document.createElement('option');
     opt.value = p.pupil_id;
     opt.textContent = pupilLabel(p);
+    pcTag(opt, p);
     sel.appendChild(opt);
   });
   tafState.pupilId = state.pupils[0]?.pupil_id || null;
@@ -2586,8 +2600,14 @@ function tafRenderGrid() {
   container.appendChild(table);
 }
 
-function tafExport() {
+async function tafExport() {
   const raw = tafGetData();
+  // Names in the download come only from a names file the teacher chooses now (matched by pupil code);
+  // otherwise the file carries initials labels.
+  let namesFile = null;
+  try {
+    namesFile = await WFANames.pick({ purpose: 'Names will be put in this download.', skipLabel: 'Download without names' });
+  } catch (e) { namesFile = null; }
   const out = {
     class_id: state.currentClassId,
     class_name: state.currentClass?.class_name || '',
@@ -2597,8 +2617,10 @@ function tafExport() {
   };
   state.pupils.forEach(p => {
     const pd = raw.pupils?.[p.pupil_id] || {};
-    out.pupils[p.pupil_id] = { name: p.name, taf_level: pd.level || '', scores: pd.scores || {} };
+    const rec = namesFile && p.pupilCode ? namesFile.get(p.pupilCode) : null;
+    out.pupils[p.pupil_id] = { name: (rec && rec.name) || pupilLabel(p), taf_level: pd.level || '', scores: pd.scores || {} };
   });
+  if (namesFile) namesFile.clear();
   const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2678,6 +2700,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  try { WFANames.screen.init(); } catch (e) { console.warn('Names helper unavailable', e); }
   bootstrap();
 });
 </script>
