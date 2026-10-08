@@ -9,6 +9,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>WFA Reading Challenge Tracker</title>
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -263,7 +264,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
   </div>
-  <div class="version">WFA Book Tracker · WFA-06.10.26a</div>
+  <div class="version">WFA Book Tracker · WFA-08.10.26a</div>
 </div>
 
 <!-- ══ SETTINGS MODAL ══ -->
@@ -371,6 +372,9 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
 // ════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════
+// Privacy: screens show pupils as INITIALS. Real names only come from the teacher's own names file
+// (memory only; 'Show names' button, or at certificate print time).
+try { if (window.WFANames) WFANames.screen.init(); } catch(e) {}
 const API_KEY = 'wfa_rc_api_url';
 // CUT OVER 22.09.26 to the Postgres-backed store (wfa-data) — real live
 // data (339 children, 59 books, 606 checkouts, 41 cover overrides, 473
@@ -1003,6 +1007,7 @@ async function loadData() {
   try {
     const d = await getAllViaProxy();
     children = d.children || [];
+    assignLabels();
     books    = d.books    || [];
     demographics = d.demographics || demographics;
     serverCoverOverrides = d.coverOverrides || {};
@@ -1198,11 +1203,15 @@ async function syncHubRoster() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     const roster = (d.pupils || [])
-      .map(p => ({ name: (p.first + ' ' + p.last).trim(), yearGroup: p.yearGroup || '', class: p.class || '' }))
+      .map(p => ({ name: (p.first + ' ' + p.last).trim(), yearGroup: p.yearGroup || '', class: p.class || '', pupilCode: p.pupilId || '' }))
       .filter(c => c.name);
     if (!roster.length) { toast('Roster came back empty — is the hub Pupils tab populated?'); return; }
-    const existing = new Set(children.map(c => (c.name || '').trim().toLowerCase()));
-    const missing = roster.filter(c => !existing.has(c.name.toLowerCase()));
+    // Children are matched by pupil code first, then by name. If the server is hiding names, a child with
+    // no code cannot be compared safely, so do not add anyone (it could create duplicates).
+    if (children.some(c => !c.name && !c.pupilCode)) { toast('Some children have no pupil code yet, so the roster cannot be pulled safely. Ask for the pupil-code report.', 6000); return; }
+    const existingNames = new Set(children.filter(c => c.name).map(c => c.name.trim().toLowerCase()));
+    const existingCodes = new Set(children.map(c => c.pupilCode).filter(Boolean));
+    const missing = roster.filter(c => !(c.pupilCode && existingCodes.has(c.pupilCode)) && !existingNames.has(c.name.toLowerCase()));
     if (!missing.length) { toast('✓ Children list already up to date'); return; }
     const res = await api({ action: 'importData', children: missing });
     toast(`✓ Added ${res.children || missing.length} pupil${(res.children || missing.length) === 1 ? '' : 's'} from the school roster`);
@@ -1342,12 +1351,12 @@ function renderChildDetail() {
         ${already
           ? `<div style="font-size:13px;color:var(--green)">✓ Already scored ${already.score}/${already.total} at home</div>`
           : hasQuiz
-            ? `<div style="font-size:13px;color:var(--muted)">Not taken yet — do it with ${esc(c.name.split(' ')[0])} below.</div>`
+            ? `<div style="font-size:13px;color:var(--muted)">Not taken yet — do it with ${pupilSpan(c)} below.</div>`
             : `<div style="font-size:13px;color:var(--muted)">No quiz written yet for this book.</div>`}
       </div>
       <div class="modal-btns" style="flex-direction:column;gap:8px;margin-top:10px">
-        <button class="btn btn-green" style="width:100%" onclick="doReturn('${co.checkoutId}',true,'${escJs(c.name)}','${c.id}','${co.bookId}')">${primaryLabel}</button>
-        <button class="btn btn-ghost" style="width:100%" onclick="doReturn('${co.checkoutId}',false,'${escJs(c.name)}','${c.id}')">↩ Returned (not finished)</button>
+        <button class="btn btn-green" style="width:100%" onclick="doReturn('${co.checkoutId}',true,'${escJs(c.label)}','${c.id}','${co.bookId}')">${primaryLabel}</button>
+        <button class="btn btn-ghost" style="width:100%" onclick="doReturn('${co.checkoutId}',false,'${escJs(c.label)}','${c.id}')">↩ Returned (not finished)</button>
       </div>`;
   }).join('');
 
@@ -1370,7 +1379,7 @@ function renderChildDetail() {
   document.getElementById('childDetailBody').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
       <div>
-        <div style="font-weight:800;font-size:19px">${esc(c.name)}</div>
+        <div style="font-weight:800;font-size:19px">${pupilSpan(c)}</div>
         <div style="font-size:13px;color:var(--muted)">${c.yearGroup}${c.class ? ' · '+c.class : ''}</div>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="closeChildDetail()" style="font-size:18px;line-height:1;padding:4px 10px">✕</button>
@@ -1408,7 +1417,7 @@ function renderBookPicker() {
   const copyLabel = c => {
     if (c.lost) return `Copy ${c.copyNum}: ❌ Lost`;
     if (c.available) return `Copy ${c.copyNum} ✓`;
-    return `Copy ${c.copyNum}: ${esc(childName(c.childId)||'Out')}`;
+    return `Copy ${c.copyNum}: ${pupilSpanById(c.childId)||'Out'}`;
   };
 
   const readOnlyBookHtml = b => `
@@ -1532,7 +1541,7 @@ async function doCheckout(bookId, copyNum, title) {
     }
     const child = children.find(c => c.id === selChild.id);
     if (child) child.activeCheckouts.push({ checkoutId: r.checkoutId, bookId, copyNum, checkoutDate: new Date().toLocaleDateString('en-GB') });
-    toast(`✓ Checked out to ${selChild.name}`);
+    toast(`✓ Checked out to ${selChild.label}`);
     renderChildDetail();
     renderChildren();
     scheduleSync(); // background sync, coalesced
@@ -1546,7 +1555,7 @@ async function doCheckout(bookId, copyNum, title) {
 // normal completed return.
 async function doLogExternalRead(bookId, title) {
   if (!selChild) return;
-  if (!confirm(`Mark "${title}" as already read by ${selChild.name}? This counts toward their reading total.`)) return;
+  if (!confirm(`Mark "${title}" as already read by ${selChild.label}? This counts toward their reading total.`)) return;
   try {
     const r = await api({ action:'logExternalRead', childId:selChild.id, bookId });
     if (!r.ok) { toast(r.error || 'Could not log this read'); return; }
@@ -1555,7 +1564,7 @@ async function doLogExternalRead(bookId, title) {
     if (r.milestone) {
       showMilestone(selChild.id, r.milestone);
     } else {
-      toast(`✓ Marked as read by ${selChild.name}`);
+      toast(`✓ Marked as read by ${selChild.label}`);
     }
     renderChildDetail();
     renderChildren();
@@ -1573,7 +1582,7 @@ function fmtReadDate(d) {
 // the child's total by one and never touches other children.
 async function doRemoveRead(kind, id, title) {
   if (!selChild) return;
-  if (!confirm(`⚠️ Remove "${title}" from ${selChild.name}'s reads?\n\nThis takes 1 off their reading total (and may take them back below a milestone). Only do this if the read was recorded by mistake.`)) return;
+  if (!confirm(`⚠️ Remove "${title}" from ${selChild.label}'s reads?\n\nThis takes 1 off their reading total (and may take them back below a milestone). Only do this if the read was recorded by mistake.`)) return;
   try {
     const r = await api({ action:'removeRead', kind, id });
     if (!r.ok) { toast(r.error || 'Could not remove this read'); return; }
@@ -1583,7 +1592,7 @@ async function doRemoveRead(kind, id, title) {
       child.reads = (child.reads || []).filter(x => !(x.kind === kind && String(x.id) === String(id)));
       if (kind === 'read') child.booksRead = child.reads.filter(x => x.kind === 'read').map(x => ({ title: x.title, dateRead: x.dateRead }));
     }
-    toast(`✓ Removed from ${selChild.name}'s reads`);
+    toast(`✓ Removed from ${selChild.label}'s reads`);
     renderChildDetail();
     renderChildren();
     // no scheduleSync(): the cached read proxy can still serve the pre-removal
@@ -1722,7 +1731,7 @@ function renderQuizResult() {
   document.getElementById('quizBody').innerHTML = `
     <div style="text-align:center;padding:6px 0 2px">
       <div style="font-size:36px;margin-bottom:8px">📖</div>
-      <div style="font-weight:800;font-size:17px;margin-bottom:6px">${esc(aq.childName)} scored ${aq.correct}/${aq.order.length}</div>
+      <div style="font-weight:800;font-size:17px;margin-bottom:6px">${pupilSpanById(aq.childId)||esc(aq.childName)} scored ${aq.correct}/${aq.order.length}</div>
       <p style="color:var(--muted);font-size:14px;line-height:1.5">Worth a quick chat about the book if that seems low for someone who's finished it.</p>
     </div>
     <button class="btn btn-blue" style="width:100%" onclick="finishQuizResult()">Finish</button>`;
@@ -1864,7 +1873,7 @@ function renderDashboard() {
   overdue.sort((a,b) => b.age - a.age);
 
   // Children sorted alphabetically with their books read
-  const chByName = [...allCh].sort((a,b) => a.name.localeCompare(b.name));
+  const chByName = [...allCh].sort((a,b) => (a.label||'').localeCompare(b.label||''));
 
   el.innerHTML = `
     <!-- Summary stats -->
@@ -1897,7 +1906,7 @@ function renderDashboard() {
       ${topReaders.length ? topReaders.map((c,i) => `
         <div style="display:flex;align-items:center;gap:10px;padding:6px 0;${i < topReaders.length-1 ? 'border-bottom:1px solid var(--border)' : ''}">
           <span style="font-size:13px;font-weight:700;color:var(--muted);min-width:20px">#${i+1}</span>
-          <span style="flex:1;font-size:14px;font-weight:600">${esc(c.name)}</span>
+          <span style="flex:1;font-size:14px;font-weight:600">${pupilSpan(c)}</span>
           <span style="font-size:11px;color:var(--muted)">${c.yearGroup}${c.class ? ' · '+c.class : ''}</span>
           <span style="font-size:18px;font-weight:800;color:var(--blue)">${c.totalReads}</span>
         </div>`).join('') : '<div style="color:var(--muted);font-size:13px">No data yet</div>'}
@@ -1923,7 +1932,7 @@ function renderDashboard() {
       ${overdue.map((o,i) => `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;${i < overdue.length-1 ? 'border-bottom:1px solid var(--border)' : ''}">
           <div>
-            <div style="font-size:14px;font-weight:600">${esc(o.child.name)}</div>
+            <div style="font-size:14px;font-weight:600">${pupilSpan(o.child)}</div>
             <div style="font-size:12px;color:var(--muted)">${esc(o.title)}</div>
           </div>
           <span style="font-size:13px;font-weight:700;color:var(--amber)">${o.age}d</span>
@@ -1936,7 +1945,7 @@ function renderDashboard() {
       ${chByName.length ? chByName.map((c,i) => `
         <div style="padding:8px 0;${i < chByName.length-1 ? 'border-bottom:1px solid var(--border)' : ''}">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${c.booksRead&&c.booksRead.length ? 4 : 0}px">
-            <span style="font-size:14px;font-weight:700">${esc(c.name)}</span>
+            <span style="font-size:14px;font-weight:700">${pupilSpan(c)}</span>
             <span style="font-size:12px;color:var(--muted)">${c.yearGroup}${c.class ? ' · '+c.class : ''} · <strong>${c.totalReads}</strong> reads</span>
           </div>
           ${c.booksRead && c.booksRead.length ? `<div style="font-size:12px;color:var(--muted);line-height:1.6">${c.booksRead.map(b => esc(b.title)).join(' · ')}</div>` : '<div style="font-size:12px;color:var(--muted);font-style:italic">No reads recorded</div>'}
@@ -1990,11 +1999,11 @@ function buildLetterBar(elId, letters, active, onclickFn) {
 function renderChildren() {
   let list = children.filter(c => c.yearGroup === phase);
   if (yrFilter !== 'all') list = list.filter(c => c.yearGroup === yrFilter);
-  list.sort((a,b) => a.name.localeCompare(b.name));
+  list.sort((a,b) => (a.label||'').localeCompare(b.label||''));
 
-  const letters = [...new Set(list.map(c => c.name.trim()[0]?.toUpperCase()).filter(Boolean))].sort();
+  const letters = [...new Set(list.map(c => (c.label||'').trim()[0]?.toUpperCase()).filter(Boolean))].sort();
   buildLetterBar('chLetters', letters, chLetterFilter, 'setChLetter');
-  if (chLetterFilter !== 'all') list = list.filter(c => c.name.trim()[0]?.toUpperCase() === chLetterFilter);
+  if (chLetterFilter !== 'all') list = list.filter(c => (c.label||'').trim()[0]?.toUpperCase() === chLetterFilter);
 
   const el = document.getElementById('chList');
   if (!list.length) { el.innerHTML = empty('👦','No children in this group yet'); return; }
@@ -2005,7 +2014,7 @@ function renderChildren() {
     return `<div class="ch-card" onclick="openChildDetail('${c.id}')">
       <div class="ch-row">
         <div class="ch-info">
-          <div class="name">${esc(c.name)}</div>
+          <div class="name">${pupilSpan(c)}</div>
           <div class="meta">${c.yearGroup}${c.class ? ' · '+c.class : ''}</div>
           ${milestoneBadge(c.totalReads)}
         </div>
@@ -2066,7 +2075,7 @@ function renderBooks() {
           if (c.lost) {
             bg='#fce4e4'; col='var(--red)'; label='❌ Lost / Missing';
           } else if (!c.available) {
-            bg='var(--amber-lt)'; col='var(--amber)'; label='📤 Out: '+esc(childName(c.childId)||'?');
+            bg='var(--amber-lt)'; col='var(--amber)'; label='📤 Out: '+(pupilSpanById(c.childId)||'?');
           } else {
             bg='var(--green-lt)'; col='var(--green)'; label='✓ Available';
           }
@@ -2090,7 +2099,7 @@ function renderBooks() {
 function showMilestone(childId, ms) {
   const child = children.find(c => c.id === childId);
   pendingCert = { child, ms };
-  document.getElementById('certName').textContent = child?.name || '';
+  document.getElementById('certName').innerHTML = pupilSpan(child);
   document.getElementById('certMsg').textContent = ms === 25
     ? 'has completed the Reading Challenge! 🎉'
     : `has reached ${ms} reads! 🎉`;
@@ -2103,14 +2112,14 @@ async function printCertForChild(childId) {
   const ms = [25,20,15,10,5].find(m => child.totalReads >= m) || 5;
   const ph = detectCertPhase(child);
   const item = {child, ms, phase: ph, slideNum: (CERT_SLIDE_MAP[ms]||{})[ph]||1};
-  await populatePrintArea([item]);
-  window.print();
+  await printCertificates([item]);
   showCertConfirmBanner([item]);
 }
 
 function closeCert() {
   document.getElementById('certOverlay').classList.add('hidden');
   pendingCert = null;
+  clearPrintArea();
   if (selChild) renderChildDetail();
   renderChildren();
 }
@@ -2119,8 +2128,7 @@ async function printCert() {
   if (!pendingCert) return;
   const { child, ms } = pendingCert;
   const ph = detectCertPhase(child);
-  await populatePrintArea([{child, ms, phase: ph, slideNum: (CERT_SLIDE_MAP[ms]||{})[ph]||1}]);
-  window.print();
+  await printCertificates([{child, ms, phase: ph, slideNum: (CERT_SLIDE_MAP[ms]||{})[ph]||1}]);
 }
 
 // ════════════════════════════════════════════════
@@ -2175,7 +2183,30 @@ async function editCover(bookId) {
 }
 
 function bookTitle(id) { return books.find(b => b.id === id)?.title || ''; }
-function childName(id) { return children.find(c => c.id === id)?.name || null; }
+function childById(id) { return children.find(c => c.id === id) || null; }
+// Initials label only (safe for toasts, confirms, tooltips).
+function childName(id) { return childById(id)?.label || null; }
+// A label shown on screen goes ALONE in a data-pupil-id span so "Show names" can swap it.
+function pupilSpan(c) {
+  if (!c) return '';
+  const l = esc(c.label || '');
+  return c.pupilCode ? `<span data-pupil-id="${esc(c.pupilCode)}">${l}</span>` : l;
+}
+function pupilSpanById(id) { return pupilSpan(childById(id)); }
+// Use the API's `label` when present; otherwise work it out per year-group + class list.
+function assignLabels() {
+  const need = children.filter(c => !c.label);
+  if (!need.length) return;
+  const groups = {};
+  need.forEach(c => { const k = (c.yearGroup || '') + '|' + (c.class || ''); (groups[k] = groups[k] || []).push(c); });
+  Object.values(groups).forEach(list => {
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || '') || a.id.localeCompare(b.id));
+    const pairs = list.map(c => { const t = String(c.name || '').trim().split(/\s+/); return [t[0] || '', t.slice(1).join(' ')]; });
+    let labs;
+    try { labs = window.WFANames ? WFANames.initialsLabels(pairs) : null; } catch(e) { labs = null; }
+    list.forEach((c, i) => { c.label = (labs && labs[i]) || ((pairs[i][0][0] || '') + ((pairs[i][1].split(' ').pop() || '')[0] || '')).toUpperCase() || '?'; });
+  });
+}
 
 function milestoneBadge(reads) {
   const achieved = [5,10,15,20,25].filter(m => reads >= m);
@@ -2297,24 +2328,22 @@ function getCertPending(){
 function renderCerts(){
   const pending=getCertPending();
   const issued=getCertIssued();
-  const childMap={};
-  children.forEach(c=>childMap[c.id]=c.name);
 
   const pendingHTML=pending.length===0
     ?'<div style="text-align:center;padding:40px 20px;color:var(--muted)"><div style="font-size:2.2rem;margin-bottom:8px">🎉</div>All caught up — no pending certificates!</div>'
     :pending.map((it,idx)=>`
       <label class="ch-card" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 14px" id="cpi-${idx}">
         <input type="checkbox" class="cpi-chk" data-idx="${idx}" checked onchange="updateCertBtn()" style="width:18px;height:18px;accent-color:var(--blue);flex-shrink:0">
-        <span style="font-weight:600;flex:1">${esc(it.child.name)}</span>
+        <span style="font-weight:600;flex:1">${pupilSpan(it.child)}</span>
         <span style="font-size:.75rem;padding:2px 8px;border-radius:20px;color:white;font-weight:600;background:${{bronze:'#cd7f32',silver:'#8e9eab',gold:'#c9962a',platinum:'#5a7a8a',diamond:'#8b5cf6'}[CERT_AWARD_CLS[it.ms]]||'#999'}">${CERT_AWARD_NAMES[it.ms]}</span>
         <span style="font-size:.75rem;color:var(--muted);background:#f0f0f0;padding:2px 7px;border-radius:10px">${it.phase}</span>
         <span style="font-size:.75rem;color:var(--muted)">${it.child.totalReads} reads</span>
       </label>`).join('');
 
   const histRows=Object.entries(issued).map(([id,certs])=>{
-    const name=childMap[id]||id;
+    const name=pupilSpanById(id)||esc(id);
     const levels=Object.entries(certs).sort((a,b)=>a[0]-b[0]).map(([ms,date])=>`${CERT_AWARD_NAMES[ms]} (${date})`).join(', ');
-    return `<div style="display:flex;justify-content:space-between;padding:6px 10px;background:#f8f9fa;border-radius:5px;font-size:.83rem"><strong>${esc(name)}</strong><span style="color:var(--muted)">${esc(levels)}</span></div>`;
+    return `<div style="display:flex;justify-content:space-between;padding:6px 10px;background:#f8f9fa;border-radius:5px;font-size:.83rem"><strong>${name}</strong><span style="color:var(--muted)">${esc(levels)}</span></div>`;
   });
 
   document.getElementById('certsContent').innerHTML=`
@@ -2352,8 +2381,7 @@ async function generateCerts(){
   const checked=[...document.querySelectorAll('.cpi-chk:checked')];
   if(!checked.length)return;
   certPendingToPrint=checked.map(c=>pending[parseInt(c.dataset.idx)]);
-  await populatePrintArea(certPendingToPrint);
-  window.print();
+  await printCertificates(certPendingToPrint);
   showCertConfirmPanel();
 }
 
@@ -2365,7 +2393,7 @@ function showCertConfirmPanel(){
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn btn-blue" onclick="confirmCertsPrinted()">✓ Yes, mark as printed</button>
         <button class="btn" style="background:#e53935;color:white" onclick="window.print()">🖨️ Print again</button>
-        <button class="btn btn-ghost" onclick="document.getElementById('certConfirmPanel').remove();certPendingToPrint=[]">✕ Cancel</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('certConfirmPanel').remove();certPendingToPrint=[];clearPrintArea()">✕ Cancel</button>
       </div>
     </div>`);
 }
@@ -2381,7 +2409,7 @@ function showCertConfirmBanner(items) {
   banner.innerHTML = `<span style="font-size:.93rem">Did the certificate print correctly?</span>
     <div style="display:flex;gap:10px">
       <button style="background:white;color:#1b5e20;border:none;border-radius:6px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit" onclick="confirmBannerPrinted()">✓ Yes, mark as printed</button>
-      <button style="background:rgba(255,255,255,.2);color:white;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-family:inherit" onclick="document.getElementById('certConfirmBanner').remove()">✕ Dismiss</button>
+      <button style="background:rgba(255,255,255,.2);color:white;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-family:inherit" onclick="clearPrintArea();document.getElementById('certConfirmBanner').remove()">✕ Dismiss</button>
     </div>`;
   document.body.appendChild(banner);
 }
@@ -2395,11 +2423,28 @@ function confirmBannerPrinted() {
   });
   setCertIssued(issued);
   _bannerItems = [];
+  clearPrintArea();
   document.getElementById('certConfirmBanner')?.remove();
   toast('✓ Certificate marked as issued');
 }
 
-async function populatePrintArea(items){
+// Certificates carry the child's real name, so ask for the teacher's names file first. The file is used
+// only to draw the names onto the certificate canvases, then cleared. No file = initials label instead.
+async function printCertificates(items) {
+  let nf = null;
+  try {
+    if (window.WFANames) nf = await WFANames.pick({ purpose: 'Names will be printed on the certificates.', skipLabel: 'Print without names' });
+  } catch(e) { nf = null; }
+  try { await populatePrintArea(items, nf); }
+  finally { if (nf) { try { nf.clear(); } catch(e) {} } }
+  window.print();
+}
+
+// The drawn names live only in these canvases; wiped as soon as the job is confirmed/dismissed.
+function clearPrintArea() { const pa = document.getElementById('certPrintArea'); if (pa) pa.innerHTML = ''; }
+window.addEventListener('pagehide', clearPrintArea);
+
+async function populatePrintArea(items, nf){
   const pa = document.getElementById('certPrintArea');
   pa.innerHTML = '';
   await document.fonts.ready;
@@ -2421,7 +2466,8 @@ async function populatePrintArea(items){
         // left:35mm, top:12mm → proportional to canvas
         const x = Math.round(35 / 297 * W);
         const y = Math.round(12 / 210 * H) + px; // +px so top is baseline anchor
-        ctx.fillText(`Dear ${it.child.name},`, x, y);
+        const rec = nf && it.child.pupilCode ? nf.get(it.child.pupilCode) : null;
+        ctx.fillText(`Dear ${(rec && rec.name) || it.child.label},`, x, y);
         resolve();
       };
       img.onerror = resolve;
@@ -2440,6 +2486,7 @@ function confirmCertsPrinted(){
   });
   setCertIssued(issued);
   certPendingToPrint=[];
+  clearPrintArea();
   renderCerts();
   toast('✓ Certificates marked as issued');
 }
