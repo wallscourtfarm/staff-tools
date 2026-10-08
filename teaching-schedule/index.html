@@ -503,7 +503,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-08.10.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-08.10.26b</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -526,6 +526,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <button class="action-btn" onclick="copyWeekToNext()">Copy week → next week</button>
   <button class="action-btn" onclick="copyWeekToTerm()">Copy to term</button>
   <button class="action-btn" onclick="openSubjectModal()">Subject settings</button>
+  <button class="action-btn" onclick="openRestoreModal()">Restore earlier version</button>
   <button class="action-btn danger" onclick="clearActiveView()">Clear view</button>
   <span class="sheet-status" id="sheetStatus">Loading…</span>
   <span class="sheet-status" id="syncStatus"></span>
@@ -2007,6 +2008,66 @@ function handleSaveConflict_(wk, json) {
   if (wk === schedKey()) renderGrid();
   updateSyncStatus('err');
   showSyncBanner_('This week was changed on another device or tab, so your last edit was NOT saved (this stops newer work being overwritten). The latest saved version is now showing — please re-enter that last change.');
+}
+
+// ── Restore an earlier version of this week ─────────────────────────────────
+// Every save keeps the version it replaced (up to 40 per week). This lists them
+// with a summary of the notes in each, and puts the chosen one back. Restoring
+// first backs up what is there now, so it can itself be undone from this list.
+async function openRestoreModal() {
+  const wk = schedKey();
+  let bg = document.getElementById('restoreModal');
+  if (bg) bg.remove();
+  bg = document.createElement('div');
+  bg.id = 'restoreModal';
+  bg.className = 'modal-bg open';
+  bg.innerHTML = `<div class="modal"><h3>Restore an earlier version</h3>
+    <div class="modal-hint">${escHtml(weekLabel())} &middot; ${escHtml(YEAR_GROUP)}. Pick a version from before the problem. What is on screen now is saved first, so you can undo this.</div>
+    <div id="restoreBody">Loading…</div>
+    <div class="modal-footer"><button class="modal-cancel" onclick="document.getElementById('restoreModal').remove()">Close</button></div></div>`;
+  document.body.appendChild(bg);
+  const body = bg.querySelector('#restoreBody');
+  let json;
+  try {
+    await saveChain; // make sure anything just typed has been saved first
+    const res = await fetch(`${SYNC_URL}?action=listBackups&yearGroup=${encodeURIComponent(YEAR_GROUP)}&weekKey=${encodeURIComponent(wk)}&token=${OWN_BACKEND_TOKEN}`);
+    json = await res.json();
+  } catch (e) { json = null; }
+  if (!json || !Array.isArray(json.backups)) { body.textContent = 'Could not load earlier versions. Check your connection and try again.'; return; }
+  const when = ts => new Date(ts).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const summary = x => `${x.notes} note${x.notes === 1 ? '' : 's'}, ${x.chars} characters` + (x.snippets && x.snippets.length ? `<br><span style="color:#64748b">${x.snippets.map(escHtml).join(' &nbsp;|&nbsp; ')}</span>` : '');
+  let html = '';
+  if (json.current) html += `<div class="staff-modal-row"><b>Now on screen</b> &middot; saved ${escHtml(when(json.current.ts))}<br>${summary(json.current)}</div>`;
+  if (!json.backups.length) html += '<div class="staff-modal-row">No earlier versions have been kept for this week yet.</div>';
+  json.backups.forEach(b => {
+    html += `<div class="staff-modal-row"><div class="smr-top"><b style="flex:1">${escHtml(when(b.ts))}</b><button class="modal-save" style="flex:none;padding:6px 14px;font-size:12px" data-id="${b.id}" data-ts="${escAttr(when(b.ts))}">Restore this</button></div>${summary(b)}</div>`;
+  });
+  body.innerHTML = html;
+  body.querySelectorAll('button[data-id]').forEach(btn => btn.addEventListener('click', () => restoreBackupVersion_(wk, Number(btn.dataset.id), btn.dataset.ts)));
+}
+
+async function restoreBackupVersion_(wk, id, label) {
+  if (!confirm(`Put this week back to how it was on ${label}?\n\nWhat is on screen now is saved first, so you can undo this.`)) return;
+  const body = document.querySelector('#restoreModal #restoreBody');
+  try {
+    await saveChain;
+    const res = await fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'restoreBackup', id, yearGroup: YEAR_GROUP, weekKey: wk }) });
+    const json = await res.json();
+    if (!res.ok || json.status !== 'ok') throw new Error(json.message || 'restore failed');
+    const r2 = await fetch(`${TEACHING_SCHEDULE_READ_URL}?yearGroup=${encodeURIComponent(YEAR_GROUP)}&weekKey=${encodeURIComponent(wk)}&token=${OWN_BACKEND_TOKEN}`);
+    const j2 = await r2.json();
+    state.schedule[wk] = j2.data || {};
+    weekStamps[wk] = j2.updatedAt || null;
+    syncedWeeks.add(wk);
+    persistLocal();
+    renderGrid();
+    updateSyncStatus('ok');
+    document.getElementById('restoreModal').remove();
+    alert('Restored. The week now shows the version from ' + label + '.');
+  } catch (e) {
+    if (body) body.insertAdjacentHTML('afterbegin', '<div style="color:#b91c1c;font-weight:700;margin-bottom:8px">Could not restore that version — nothing was changed.</div>');
+  }
 }
 
 function showSyncBanner_(msg) {
