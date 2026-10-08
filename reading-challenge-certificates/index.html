@@ -9,6 +9,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WFA Reading Challenge — Certificates</title>
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
 <style>
 @font-face {
   font-family: 'Sassoon Infant Rg';
@@ -393,7 +394,7 @@ footer {
   <div class="cert-preview-wrap" id="certPreviewWrap"></div>
 </div>
 
-<footer>WFA Reading Challenge Certificates · WFA-06.10.26a</footer>
+<footer>WFA Reading Challenge Certificates · WFA-08.10.26a</footer>
 
 <script>
 'use strict';
@@ -465,6 +466,31 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+/* Privacy: screens show INITIALS. Real names come only from the teacher's own names file (memory only):
+   the 'Show names' button, or the file chosen when certificates are generated. */
+try { if (window.WFANames) WFANames.screen.init(); } catch(e) {}
+
+// A label shown on screen goes ALONE in a data-pupil-id span so "Show names" can swap it.
+function pupilSpan(c) {
+  if (!c) return '';
+  const l = esc(c.label || '');
+  return c.pupilCode ? `<span data-pupil-id="${esc(c.pupilCode)}">${l}</span>` : l;
+}
+// Use the API's `label` when present; otherwise work it out per year-group + class list.
+function assignLabels() {
+  const need = allChildren.filter(c => !c.label);
+  if (!need.length) return;
+  const groups = {};
+  need.forEach(c => { const k = (c.yearGroup || '') + '|' + (c.class || ''); (groups[k] = groups[k] || []).push(c); });
+  Object.values(groups).forEach(list => {
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || '') || String(a.id).localeCompare(String(b.id)));
+    const pairs = list.map(c => { const t = String(c.name || '').trim().split(/\s+/); return [t[0] || '', t.slice(1).join(' ')]; });
+    let labs;
+    try { labs = window.WFANames ? WFANames.initialsLabels(pairs) : null; } catch(e) { labs = null; }
+    list.forEach((c, i) => { c.label = (labs && labs[i]) || ((pairs[i][0][0] || '') + ((pairs[i][1].split(' ').pop() || '')[0] || '')).toUpperCase() || '?'; });
+  });
+}
+
 function detectPhase(child) {
   const yg = (child.yearGroup || '').trim().toUpperCase();
   if (['Y3','Y4','YEAR3','YEAR4','3','4'].includes(yg)) return 'LKS2';
@@ -484,6 +510,7 @@ async function loadData() {
       ...c,
       totalReads: parseInt(c.totalReads) || 0
     }));
+    assignLabels();
     // Merge sheet-issued certificates into the local cache so another
     // device's printouts show as done here too.
     if (Array.isArray(d.certIssues)) {
@@ -522,11 +549,15 @@ async function syncHubRoster() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     const roster = (d.pupils || [])
-      .map(p => ({ name: (p.first + ' ' + p.last).trim(), yearGroup: p.yearGroup || '', class: p.class || '' }))
+      .map(p => ({ name: (p.first + ' ' + p.last).trim(), yearGroup: p.yearGroup || '', class: p.class || '', pupilCode: p.pupilId || '' }))
       .filter(c => c.name);
     if (!roster.length) throw new Error('hub roster is empty');
-    const existing = new Set(allChildren.map(c => (c.name || '').trim().toLowerCase()));
-    const missing = roster.filter(c => !existing.has(c.name.toLowerCase()));
+    // Match by pupil code first, then name. If the server is hiding names, a child with no code cannot be
+    // compared safely, so add nobody (it could create duplicates).
+    if (allChildren.some(c => !c.name && !c.pupilCode)) throw new Error('some children have no pupil code yet');
+    const existingNames = new Set(allChildren.filter(c => c.name).map(c => c.name.trim().toLowerCase()));
+    const existingCodes = new Set(allChildren.map(c => c.pupilCode).filter(Boolean));
+    const missing = roster.filter(c => !(c.pupilCode && existingCodes.has(c.pupilCode)) && !existingNames.has(c.name.toLowerCase()));
     if (!missing.length) { setStatus('ok', 'Roster already up to date — ' + allChildren.length + ' children'); return; }
     await fetch(API_URL + '?token=' + WFA_TOKEN, {
       method: 'POST',
@@ -579,7 +610,7 @@ function renderPendingList() {
   list.innerHTML = pendingItems.map((it, idx) => `
     <label class="pending-item" id="pi-${idx}">
       <input type="checkbox" class="pi-check" data-idx="${idx}" checked onchange="updateGenerateBtn()">
-      <span class="pending-name">${esc(it.child.name)}</span>
+      <span class="pending-name">${pupilSpan(it.child)}</span>
       <span class="pending-level lvl-${AWARD_CLASSES[it.ms]}">${AWARD_NAMES[it.ms]}</span>
       <span class="pending-phase">${it.phase}</span>
       <span style="font-size:.75rem;color:#888;">${it.child.totalReads} reads</span>
@@ -610,30 +641,44 @@ async function printWhenReady() {
   window.print();
 }
 
-function generateCerts() {
+async function generateCerts() {
   const checked = [...document.querySelectorAll('.pi-check:checked')];
   if (!checked.length) return;
 
   pendingToPrint = checked.map(c => pendingItems[parseInt(c.dataset.idx)]);
 
+  // Certificates carry the child's real name, so ask for the teacher's names file first. It is used only
+  // to write the names into the certificate pages below, then cleared. No file = initials instead.
+  let nf = null;
+  try {
+    if (window.WFANames) nf = await WFANames.pick({ purpose: 'Names will be printed on the certificates.', skipLabel: 'Print without names' });
+  } catch(e) { nf = null; }
+
   const wrap = document.getElementById('certPreviewWrap');
-  wrap.innerHTML = pendingToPrint.map(it => buildCertHTML(it)).join('');
+  try { wrap.innerHTML = pendingToPrint.map(it => buildCertHTML(it, nf)).join(''); }
+  finally { if (nf) { try { nf.clear(); } catch(e) {} } }
 
   document.getElementById('printCount').textContent = `${pendingToPrint.length} cert${pendingToPrint.length !== 1 ? 's' : ''}`;
   document.getElementById('appView').style.display = 'none';
   document.getElementById('printView').style.display = 'block';
 }
 
-function buildCertHTML(it) {
+function buildCertHTML(it, nf) {
+  const rec = nf && it.child.pupilCode ? nf.get(it.child.pupilCode) : null;
+  const who = (rec && rec.name) || it.child.label || '';
   const imgSrc = SLIDE_IMGS[it.slideNum];
   return `
     <div class="cert-page">
       <div class="cert-container">
         <img class="cert-bg" src="${imgSrc}" alt="${AWARD_NAMES[it.ms]} ${it.phase} certificate">
-        <div class="name-overlay">${esc(it.child.name)}</div>
+        <div class="name-overlay">${esc(who)}</div>
       </div>
     </div>`;
 }
+
+// The printed names live only in this preview; wipe them as soon as the print view is left.
+function clearCertPreview() { const w = document.getElementById('certPreviewWrap'); if (w) w.innerHTML = ''; }
+window.addEventListener('pagehide', clearCertPreview);
 
 function confirmPrinted() {
   markIssued(pendingToPrint);
@@ -643,6 +688,7 @@ function confirmPrinted() {
 }
 
 function backToList() {
+  clearCertPreview();
   document.getElementById('printView').style.display = 'none';
   document.getElementById('appView').style.display = '';
 }
@@ -653,16 +699,16 @@ function showHistory() {
   const histCard = document.getElementById('historyCard');
   const list = document.getElementById('historyList');
 
-  const childMap = {};
-  allChildren.forEach(c => childMap[c.id] = c.name);
+  const childById = {};
+  allChildren.forEach(c => childById[c.id] = c);
 
   const rows = Object.entries(issued).map(([id, certs]) => {
-    const name = childMap[id] || id;
+    const name = childById[id] ? pupilSpan(childById[id]) : esc(id);
     const levels = Object.entries(certs)
       .sort((a,b) => a[0]-b[0])
       .map(([ms, date]) => `${AWARD_NAMES[ms]} (${date})`)
       .join(', ');
-    return `<div class="history-item"><span class="history-name">${esc(name)}</span><span class="history-certs">${esc(levels)}</span></div>`;
+    return `<div class="history-item"><span class="history-name">${name}</span><span class="history-certs">${esc(levels)}</span></div>`;
   });
 
   list.innerHTML = rows.length
