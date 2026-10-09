@@ -153,7 +153,7 @@ input[type=file]{display:none}
   </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-08.10.26b</div>
+<div class="version">WFA Roster Import · WFA-09.10.26a</div>
 
 <script>
 // CUT OVER 23.09.26 to the Postgres-backed store (pupil_roster_db.py) —
@@ -309,7 +309,8 @@ function fillNamesScope(rows){
   const sel = document.getElementById('namesScope');
   const years = {}, classes = {};
   rows.forEach(function(p){ if (p.status !== 'active') return; if (p.year_group) years[p.year_group] = 1; if (p.tutor_group) classes[p.tutor_group] = 1; });
-  sel.innerHTML = '<option value="">Everyone</option>' +
+  sel.innerHTML = '<option value="">Everyone (one file)</option>' +
+    '<option value="split">Everyone, one file per year group</option>' +
     '<optgroup label="Year group">' + Object.keys(years).sort().map(function(y){ return '<option value="y:' + y + '">' + y + '</option>'; }).join('') + '</optgroup>' +
     '<optgroup label="Class">' + Object.keys(classes).sort().map(function(c){ return '<option value="c:' + c + '">' + c + '</option>'; }).join('') + '</optgroup>';
 }
@@ -322,29 +323,46 @@ async function downloadNamesFile(){
   btn.disabled = true;
   try {
     const scope = document.getElementById('namesScope').value;
-    const rows = lastNormalised.filter(function(p){
-      if (p.status !== 'active') return false;
-      if (scope.indexOf('y:') === 0) return p.year_group === scope.slice(2);
-      if (scope.indexOf('c:') === 0) return p.tutor_group === scope.slice(2);
-      return true;
-    });
-    const r = await fetch(HUB_URL + '/pupilcodes?token=' + encodeURIComponent(WFA_TOKEN), { method: 'POST', body: JSON.stringify({ upns: rows.map(function(p){ return p.upn; }) }) });
+    const active = lastNormalised.filter(function(p){ return p.status === 'active'; });
+    // Each job is one file: a label for the file name and the pupils in it.
+    let jobs;
+    if (scope === 'split') {
+      const byYear = {};
+      active.forEach(function(p){ const y = p.year_group || 'No-year'; (byYear[y] = byYear[y] || []).push(p); });
+      jobs = Object.keys(byYear).sort().map(function(y){ return { label: y, rows: byYear[y] }; });
+    } else {
+      jobs = [{ label: scope ? scope.slice(2) : 'school', rows: active.filter(function(p){
+        if (scope.indexOf('y:') === 0) return p.year_group === scope.slice(2);
+        if (scope.indexOf('c:') === 0) return p.tutor_group === scope.slice(2);
+        return true;
+      }) }];
+    }
+    const all = jobs.reduce(function(a, j){ return a.concat(j.rows); }, []);
+    const r = await fetch(HUB_URL + '/pupilcodes?token=' + encodeURIComponent(WFA_TOKEN), { method: 'POST', body: JSON.stringify({ upns: all.map(function(p){ return p.upn; }) }) });
     const data = await r.json();
     if (data.status !== 'ok') throw new Error(data.message || 'unknown error');
-    const list = [];
-    rows.forEach(function(p){
-      const id = data.codes[p.upn];
-      if (id) list.push({ pupil_id: id, first: p.first_name, last: p.last_name, cls: p.tutor_group, year: p.year_group });
-    });
-    const blob = new Blob([WFANames.buildCsv(list)], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
     const d = new Date();
-    a.href = URL.createObjectURL(blob);
-    a.download = 'WFA-names-file-' + (scope ? scope.slice(2) + '-' : 'school-') + String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getFullYear()).slice(2) + '.csv';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+    const stamp = String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getFullYear()).slice(2);
+    let total = 0;
+    for (let i = 0; i < jobs.length; i++) {
+      const list = [];
+      jobs[i].rows.forEach(function(p){
+        const id = data.codes[p.upn];
+        if (id) list.push({ pupil_id: id, first: p.first_name, last: p.last_name, cls: p.tutor_group, year: p.year_group });
+      });
+      if (!list.length) continue;
+      total += list.length;
+      const blob = new Blob([WFANames.buildCsv(list)], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'WFA-names-file-' + String(jobs[i].label).replace(/[^A-Za-z0-9]+/g, '') + '-' + stamp + '.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+      if (i < jobs.length - 1) await new Promise(function(res){ setTimeout(res, 500); });
+    }
     const missing = (data.missing || []).length;
-    out.innerHTML = '<div class="success">✓ Names file downloaded (' + list.length + ' pupils). Keep it on your own computer.' +
+    out.innerHTML = '<div class="success">✓ Names ' + (jobs.length > 1 ? 'files downloaded (' + jobs.length + ' files, ' : 'file downloaded (') + total + ' pupils). Keep ' + (jobs.length > 1 ? 'them' : 'it') + ' on your own computer.' +
+      (jobs.length > 1 ? ' If only some arrived, your browser may have asked to allow multiple downloads: allow them and click again.' : '') +
       (missing ? ' ' + missing + ' pupil(s) in this file are not in the roster yet, so they are not included. Apply the import first, then download again.' : '') + '</div>';
   } catch (err) {
     out.innerHTML = '<div class="error" style="display:block">Could not make the names file: ' + String(err.message || err).replace(/</g,'&lt;') + '</div>';
