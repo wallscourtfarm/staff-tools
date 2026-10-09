@@ -49,7 +49,7 @@ button:disabled { opacity:.5; cursor: default; }
 </style>
 </head>
 <body>
-<header><h1>📇 Reading Login Cards</h1><span class="ver">WFA-09.10.26a</span></header>
+<header><h1>📇 Reading Login Cards</h1><span class="ver">WFA-09.10.26b</span></header>
 <main>
   <div class="panel">
     <p>Each child gets a personal card with a QR code. Scanning it with the iPad camera opens the reading assessment as that child, with no name to type.
@@ -83,7 +83,7 @@ async function load() {
     const sel = document.getElementById('cls');
     const years = [...new Set(CLASSES.map(c => c.year))];
     sel.innerHTML = years.map(y => `<option value="Y:${esc(y)}">Whole of ${esc(y)} (a page per class)</option>`).join('') +
-      CLASSES.map((c, i) => `<option value="C:${i}">${esc(c.group)} (${c.pupils.length} children)</option>`).join('');
+      CLASSES.map((c, i) => `<option value="C:${i}">${esc(c.display || c.group)} (${c.pupils.length} children)</option>`).join('');
     // default to Year 5, the class this tool was first made for
     const y5 = [...sel.options].find(o => o.value === 'C:' + CLASSES.findIndex(c => c.year === 'Y5'));
     if (y5) sel.value = y5.value;
@@ -108,7 +108,7 @@ function build() {
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `<div class="qr"></div><div class="tx"><div class="lab">${esc(p.label)}</div>` +
-          `<div class="cls">${esc(c.group)} · Reading Assessment</div>` +
+          `<div class="cls">${esc(c.display || c.group)} · Reading Assessment</div>` +
           `<div class="how">Scan this code with the iPad camera to start.</div>` +
           `<div class="keep">This is your own card. Keep it safe and don't share it.</div></div>`;
         new QRCode(card.querySelector('.qr'), { text: LOGIN_URL + '#c=' + p.pupilCode, width: 360, height: 360, correctLevel: QRCode.CorrectLevel.M });
