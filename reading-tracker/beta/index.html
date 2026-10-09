@@ -324,7 +324,7 @@ thead th.nc{text-align:left;padding-left:11px;}
     <span class="hd-ti">Reading Tracker</span>
     <button id="morning-toggle" onclick="toggleMorningMode()" title="Morning mode">☀️ Morning</button>
     <button id="names-btn" title="Pupil names on this device">📇 Names</button>
-    <span id="cv-ver-badge" style="font-size:10px;font-weight:800;color:rgba(255,255,255,.55);letter-spacing:.03em;margin-left:4px;align-self:center;">WFA-09.10.26a TEST</span>
+    <span id="cv-ver-badge" style="font-size:10px;font-weight:800;color:rgba(255,255,255,.55);letter-spacing:.03em;margin-left:4px;align-self:center;">WFA-09.10.26b TEST</span>
     <span id="cv-sync-badge" style="font-size:10px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:.03em;margin-left:6px;align-self:center;"></span>
     <div class="yr-sg" id="cv-yr">
       <button class="yr-btn" data-y="Y3">Y3</button>
@@ -466,7 +466,7 @@ thead th.nc{text-align:left;padding-left:11px;}
         &nbsp;· Tap any cell to edit
       </div>
     </div>
-    <div class="vf">WFA-09.10.26a TEST</div>
+    <div class="vf">WFA-09.10.26b TEST</div>
   </div>
 </div>
 
@@ -929,6 +929,19 @@ const NAMES_KEY='rt:names:v1',ROSTER_KEY='rt:roster:v1';
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);if(v===null)return d;const o=JSON.parse(v);return(o&&typeof o==='object')?o:d;}catch(e){return d;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
 let NAMES=lsGet(NAMES_KEY,{}),ROSTER=lsGet(ROSTER_KEY,{});
+// Names do not stay on a device forever: they are forgotten 8 weeks after the names file was last loaded
+// (the clock starts when names are first seeded or loaded on this device).
+const NAMES_STAMP='rt:names:stamp',NAMES_TTL=56*86400000;
+const stampNames=()=>{try{localStorage.setItem(NAMES_STAMP,String(Date.now()));}catch(e){}};
+(function expireOldNames(){try{
+  const s0=parseInt(localStorage.getItem(NAMES_STAMP)||'0',10);
+  if(!s0||Date.now()-s0<=NAMES_TTL)return;
+  localStorage.removeItem(NAMES_KEY);NAMES={};
+  const ks=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&NAME_BEARING_PFX.some(pf=>k.startsWith(pf)))ks.push(k);}
+  ks.forEach(k=>localStorage.removeItem(k));localStorage.removeItem(NAMES_STAMP);
+  window.__namesExpired=true;
+}catch(e){}})();
+window.addEventListener('load',()=>{if(window.__namesExpired)setTimeout(()=>toast('Names on this device were cleared (8 weeks old). Load your names file again.'),1500);});
 let codeMap={};   // in-memory "yr|class|First Last" -> code, built from NAMES; only used to translate legacy name-keyed records
 const nameOf=code=>{const n=NAMES[code];return(n&&(n.first||n.last))?n:null;};
 const pName=p=>p.named?`${p.first} ${p.last}`.trim():p.label;
@@ -971,7 +984,7 @@ function seedNamesFromLocalCaches(){
         (ROSTER[yr]=ROSTER[yr]||{})[cls]=found.map((c,i)=>({code:c,label:labs[i]}));rosterAdded=true;
       }
     });
-    if(added)lsSet(NAMES_KEY,NAMES);
+    if(added){lsSet(NAMES_KEY,NAMES);if(!localStorage.getItem(NAMES_STAMP))stampNames();}
     if(rosterAdded)lsSet(ROSTER_KEY,ROSTER);
     return added;
   }catch(e){return 0;}
@@ -1637,13 +1650,14 @@ async function loadNamesFiles(files){
   const before=JSON.stringify(NAMES);
   const{merged,skipped}=mergeNameRows(NAMES,rows,rosterCodes);
   if(merged&&!lsSet(NAMES_KEY,NAMES)){NAMES=JSON.parse(before);msg.textContent='Could not save names on this device (browser storage is full or blocked).';return;}
+  if(merged)stampNames();
   const t=`${merged} pupils loaded`+(skipped?` · ${skipped} in the file are not in these classes (ignored)`:'')+(bad?` · ${bad} file(s) could not be read`:'');
   msg.textContent=t;toast(merged?`${merged} pupils loaded`:'No pupils loaded');
   rerenderForNames();
 }
 function forgetNames(){
   if(!confirm('Forget all pupil names on this device?\n\nThe tool will show initials until you load your names file again. Reading counts are not affected.'))return;
-  try{localStorage.removeItem(NAMES_KEY);}catch(e){}
+  try{localStorage.removeItem(NAMES_KEY);localStorage.removeItem(NAMES_STAMP);}catch(e){}
   NAMES={};
   try{const ks=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&NAME_BEARING_PFX.some(pf=>k.startsWith(pf)))ks.push(k);}ks.forEach(k=>localStorage.removeItem(k));localStorage.removeItem('__rt_codemap__');}catch(e){}
   document.getElementById('nm-msg').textContent='Names forgotten on this device.';toast('Names forgotten');
