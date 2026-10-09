@@ -153,7 +153,7 @@ input[type=file]{display:none}
   </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-09.10.26a</div>
+<div class="version">WFA Roster Import · WFA-09.10.26b</div>
 
 <script>
 // CUT OVER 23.09.26 to the Postgres-backed store (pupil_roster_db.py) —
@@ -310,9 +310,40 @@ function fillNamesScope(rows){
   const years = {}, classes = {};
   rows.forEach(function(p){ if (p.status !== 'active') return; if (p.year_group) years[p.year_group] = 1; if (p.tutor_group) classes[p.tutor_group] = 1; });
   sel.innerHTML = '<option value="">Everyone (one file)</option>' +
-    '<option value="split">Everyone, one file per year group</option>' +
+    '<option value="split">Everyone, one zip, a file per year group</option>' +
     '<optgroup label="Year group">' + Object.keys(years).sort().map(function(y){ return '<option value="y:' + y + '">' + y + '</option>'; }).join('') + '</optgroup>' +
     '<optgroup label="Class">' + Object.keys(classes).sort().map(function(c){ return '<option value="c:' + c + '">' + c + '</option>'; }).join('') + '</optgroup>';
+}
+
+// Minimal zip writer (no compression), so one download can hold several names files.
+function makeZip(files){
+  const enc = new TextEncoder();
+  const table = []; for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); table[n] = c >>> 0; }
+  function crc32(b){ let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = table[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  const d = new Date();
+  const dosTime = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  const dosDate = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  const parts = [], central = []; let offset = 0;
+  files.forEach(function(f){
+    const name = enc.encode(f.name), data = enc.encode(f.text), crc = crc32(data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, dosTime, true); lh.setUint16(12, dosDate, true); lh.setUint32(14, crc, true);
+    lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+    parts.push(lh.buffer, name, data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+    ch.setUint16(12, dosTime, true); ch.setUint16(14, dosDate, true); ch.setUint32(16, crc, true);
+    ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, name.length, true);
+    ch.setUint32(42, offset, true);
+    central.push(ch.buffer, name);
+    offset += 30 + name.length + data.length;
+  });
+  const cdSize = central.reduce(function(a, b){ return a + (b.byteLength !== undefined ? b.byteLength : b.length); }, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  return new Blob(parts.concat(central, [end.buffer]), { type: 'application/zip' });
 }
 
 async function downloadNamesFile(){
@@ -344,25 +375,28 @@ async function downloadNamesFile(){
     const d = new Date();
     const stamp = String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getFullYear()).slice(2);
     let total = 0;
-    for (let i = 0; i < jobs.length; i++) {
+    const made = [];
+    jobs.forEach(function(j){
       const list = [];
-      jobs[i].rows.forEach(function(p){
+      j.rows.forEach(function(p){
         const id = data.codes[p.upn];
         if (id) list.push({ pupil_id: id, first: p.first_name, last: p.last_name, cls: p.tutor_group, year: p.year_group });
       });
-      if (!list.length) continue;
+      if (!list.length) return;
       total += list.length;
-      const blob = new Blob([WFANames.buildCsv(list)], { type: 'text/csv;charset=utf-8' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'WFA-names-file-' + String(jobs[i].label).replace(/[^A-Za-z0-9]+/g, '') + '-' + stamp + '.csv';
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
-      if (i < jobs.length - 1) await new Promise(function(res){ setTimeout(res, 500); });
-    }
+      made.push({ name: 'WFA-names-file-' + String(j.label).replace(/[^A-Za-z0-9]+/g, '') + '-' + stamp + '.csv', text: WFANames.buildCsv(list) });
+    });
+    if (!made.length) throw new Error('no pupils to include');
+    const zipped = made.length > 1;
+    const blob = zipped ? makeZip(made) : new Blob([made[0].text], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = zipped ? 'WFA-names-files-by-year-' + stamp + '.zip' : made[0].name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
     const missing = (data.missing || []).length;
-    out.innerHTML = '<div class="success">✓ Names ' + (jobs.length > 1 ? 'files downloaded (' + jobs.length + ' files, ' : 'file downloaded (') + total + ' pupils). Keep ' + (jobs.length > 1 ? 'them' : 'it') + ' on your own computer.' +
-      (jobs.length > 1 ? ' If only some arrived, your browser may have asked to allow multiple downloads: allow them and click again.' : '') +
+    out.innerHTML = '<div class="success">✓ ' + (zipped ? 'One zip downloaded with ' + made.length + ' names files (' : 'Names file downloaded (') + total + ' pupils). Keep ' + (zipped ? 'it, and the files inside it,' : 'it') + ' on your own computer.' +
+      (zipped ? ' Open the zip to get one file per year group.' : '') +
       (missing ? ' ' + missing + ' pupil(s) in this file are not in the roster yet, so they are not included. Apply the import first, then download again.' : '') + '</div>';
   } catch (err) {
     out.innerHTML = '<div class="error" style="display:block">Could not make the names file: ' + String(err.message || err).replace(/</g,'&lt;') + '</div>';
