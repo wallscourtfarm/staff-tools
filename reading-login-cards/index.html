@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+/* WFA 09.10.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reading Login Cards · WFA</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root { --brand:#1798d3; --ink:#0a0101; --muted:#667; --bg:#f4f7fb; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+header { background:var(--brand); color:#fff; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
+header h1 { margin:0; font-size:1.15rem; }
+header .ver { font-size:.75rem; opacity:.75; }
+main { max-width: 900px; margin: 0 auto; padding: 18px 16px 40px; }
+.panel { background:#fff; border-radius:12px; padding:16px; margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.panel p { margin: 0 0 10px; color: var(--muted); font-size: .92rem; }
+.row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+.row label { font-size:.9rem; color:var(--muted); }
+select, button { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid #c8d3df; background:#fff; }
+button.primary { background: var(--brand); color:#fff; border-color: var(--brand); font-weight: 700; cursor: pointer; }
+button:disabled { opacity:.5; cursor: default; }
+#status { font-size:.9rem; color: var(--muted); }
+#status.err { color:#c0392b; font-weight:600; }
+
+/* A4 sheet, 2 x 4 cards (95 x 68 mm), cut along the dotted lines */
+.sheet { width:190mm; margin:0 auto 10mm; display:grid; grid-template-columns:repeat(2,95mm); grid-auto-rows:68mm; background:#fff; page-break-after:always; break-after:page; }
+.card { border:.3mm dashed #aab; padding:4mm 5mm; display:flex; gap:4mm; align-items:center; overflow:hidden; }
+.card .qr { width:34mm; height:34mm; flex:none; }
+.card .qr img, .card .qr canvas { width:34mm !important; height:34mm !important; display:block; }
+.card .qr canvas { display:none; }
+.card .tx { flex:1; min-width:0; }
+.card .lab { font-size:20pt; font-weight:800; color:var(--brand); line-height:1; margin-bottom:2mm; }
+.card .cls { font-size:9pt; color:#444; margin-bottom:2mm; }
+.card .how { font-size:8.5pt; color:#222; line-height:1.3; }
+.card .keep { font-size:7.5pt; color:#777; margin-top:2mm; }
+@media print {
+  body { background:#fff; }
+  header, .panel, #status { display:none !important; }
+  main { padding:0; max-width:none; }
+  .sheet { margin:0 auto; }
+  @page { size: A4 portrait; margin: 10mm 10mm; }
+}
+</style>
+</head>
+<body>
+<header><h1>📇 Reading Login Cards</h1><span class="ver">WFA-09.10.26a</span></header>
+<main>
+  <div class="panel">
+    <p>Each child gets a personal card with a QR code. Scanning it with the iPad camera opens the reading assessment as that child, with no name to type.
+       Cards show <b>initials only</b>. The code on the card is the child's private key, so hand the cards out directly and keep them safe.</p>
+    <div class="row">
+      <label for="cls">Class</label>
+      <select id="cls"><option>Loading…</option></select>
+      <button id="go" class="primary" disabled>Make cards</button>
+      <button id="print" disabled>🖨 Print</button>
+    </div>
+    <div id="status"></div>
+  </div>
+  <div id="out"></div>
+</main>
+<script>
+const API_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/readassess-db';
+const WFA_TOKEN = '__hub__';
+const LOGIN_URL = 'https://reading.wallscourt-farm-academy.co.uk/login.html';
+const PER_SHEET = 8;
+let CLASSES = [];
+
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function setStatus(msg, err){ const el = document.getElementById('status'); el.textContent = msg; el.className = err ? 'err' : ''; }
+
+async function load() {
+  try {
+    const r = await fetch(API_URL + '?action=loginCards&token=' + WFA_TOKEN, { cache: 'no-store' });
+    const d = await r.json();
+    if (!d || !d.ok) throw new Error((d && d.error) || 'bad response');
+    CLASSES = d.classes || [];
+    const sel = document.getElementById('cls');
+    const years = [...new Set(CLASSES.map(c => c.year))];
+    sel.innerHTML = years.map(y => `<option value="Y:${esc(y)}">Whole of ${esc(y)} (a page per class)</option>`).join('') +
+      CLASSES.map((c, i) => `<option value="C:${i}">${esc(c.group)} (${c.pupils.length} children)</option>`).join('');
+    // default to Year 5, the class this tool was first made for
+    const y5 = [...sel.options].find(o => o.value === 'C:' + CLASSES.findIndex(c => c.year === 'Y5'));
+    if (y5) sel.value = y5.value;
+    document.getElementById('go').disabled = false;
+    setStatus('');
+  } catch (e) {
+    setStatus('Could not load the class lists. Check you are signed in, then reload.', true);
+  }
+}
+
+function build() {
+  const v = document.getElementById('cls').value;
+  const chosen = v.startsWith('Y:') ? CLASSES.filter(c => c.year === v.slice(2)) : [CLASSES[+v.slice(2)]];
+  const out = document.getElementById('out');
+  out.innerHTML = '';
+  let n = 0;
+  chosen.forEach(c => {
+    for (let i = 0; i < c.pupils.length; i += PER_SHEET) {
+      const sheet = document.createElement('div');
+      sheet.className = 'sheet';
+      c.pupils.slice(i, i + PER_SHEET).forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `<div class="qr"></div><div class="tx"><div class="lab">${esc(p.label)}</div>` +
+          `<div class="cls">${esc(c.group)} · Reading Assessment</div>` +
+          `<div class="how">Scan this code with the iPad camera to start.</div>` +
+          `<div class="keep">This is your own card. Keep it safe and don't share it.</div></div>`;
+        new QRCode(card.querySelector('.qr'), { text: LOGIN_URL + '#c=' + p.pupilCode, width: 360, height: 360, correctLevel: QRCode.CorrectLevel.M });
+        sheet.appendChild(card);
+        n++;
+      });
+      out.appendChild(sheet);
+    }
+  });
+  document.getElementById('print').disabled = !n;
+  setStatus(n + ' cards ready. Print on plain A4 and cut along the dotted lines.');
+}
+
+document.getElementById('go').addEventListener('click', build);
+document.getElementById('print').addEventListener('click', () => window.print());
+load();
+</script>
+</body>
+</html>
