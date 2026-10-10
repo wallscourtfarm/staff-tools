@@ -153,7 +153,7 @@ input[type=file]{display:none}
   </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-09.10.26b</div>
+<div class="version">WFA Roster Import · WFA-10.10.26a</div>
 
 <script>
 // CUT OVER 23.09.26 to the Postgres-backed store (pupil_roster_db.py) —
@@ -231,6 +231,13 @@ function normaliseRow(row){
     is_disadvantaged: isPp || isLac || isSen,
     status: isLeaver ? 'left' : 'active'
   };
+}
+
+// First 3 letters of the first name / of the last word of the surname (same rule as the server's stubnames.py).
+function stub3(v, last){
+  const t = String(v||'').trim().split(/\s+/).filter(Boolean);
+  const w = last ? t[t.length-1] : t[0];
+  return (w||'').replace(/[^A-Za-z]/g,'').slice(0,3);
 }
 
 function fieldDiffText(before, after){
@@ -437,7 +444,10 @@ function buildPreview(normalised, hubPupils, rejectedNoUpn){
       is_lac: existing.lac, is_eal: existing.eal, is_service_child: !!existing.serviceChild,
       is_disadvantaged: !!existing.disadvantaged
     };
-    const diffText = fieldDiffText(before, p);
+    // The hub keeps only 3-letter name stubs (10.10.26), so compare names stub to stub or every child looks changed.
+    const diffText = fieldDiffText(
+      Object.assign({}, before, { first_name: stub3(before.first_name, false), last_name: stub3(before.last_name, true) }),
+      Object.assign({}, p, { first_name: stub3(p.first_name, false), last_name: stub3(p.last_name, true) }));
     if (diffText) changed.push({ p: p, diff: diffText });
     else unchanged++;
   });
