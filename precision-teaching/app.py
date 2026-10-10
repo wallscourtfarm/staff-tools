@@ -29,7 +29,7 @@ from data import (
     get_skill_status, set_skill_status, pass_review, fail_review, get_reviews_due,
     migrate_skills_format, skill_status, active_skills_for, count_by_status,
     generate_sheet, get_answer, get_review_items,
-    fetch_hub_pupils, sync_pupils_from_roster,
+    fetch_hub_pupils, sync_pupils_from_roster, anonymise_pupils, pupil_label, display_name, parse_names_csv,
     is_windowed, get_active_window, get_window_frontier, set_active_window, suggest_next_window,
 )
 
@@ -278,7 +278,7 @@ def _compact_header(c, margin, usable_w, y_top, title_bits, right_text, h):
 def render_compact_sheet_slot(c, margin, usable_w, slot_top, slot_bottom, pupil, sheet, include_answers):
     """One sheet drawn into a given vertical slot (a whole page, or half a
     page when two are stacked) — the density Innes's old Excel sheets had."""
-    bits = [f"{pupil['firstName']} {pupil['lastName']}", sheet["skill_name"]]
+    bits = [f"{display_name(pupil)}", sheet["skill_name"]]
     if sheet.get("day_label"):
         bits.append(sheet["day_label"])
     header_h = min(9 * _mm, (slot_top - slot_bottom) * 0.12)
@@ -332,7 +332,9 @@ def year_group_filtered_pupils(pupils_data, key):
         filtered = pupils_data["pupils"]
     else:
         filtered = [p for p in pupils_data["pupils"] if (p.get("yearGroup") or "Unknown") == selected]
-    return [(p["id"], f"{p['firstName']} {p['lastName']}") for p in filtered], selected
+    opts = [(p["id"], f"{display_name(p)}") for p in filtered]
+    opts.sort(key=lambda o: o[1].lower())          # first-initial order (labels and full names both start with the first name)
+    return opts, selected
 
 
 st.set_page_config(page_title="WFA Precision Teaching", page_icon="📊", layout="wide")
@@ -377,6 +379,11 @@ if "pupils_data" not in st.session_state:
     if migrated:
         save_pupils(st.session_state.pupils_data)
         git_add_commit_push("data/pupils.json", "Migrate skills to new review format")
+    # Privacy (10.10.26): tracked pupils keep a pupil code + initials, never a name or UPN. Idempotent.
+    _anon = anonymise_pupils(st.session_state.pupils_data)
+    if _anon["changed"]:
+        save_pupils(st.session_state.pupils_data)
+        git_add_commit_push("data/pupils.json", f"Privacy: {_anon['changed']} pupils now held by pupil code and initials only")
 
 
 # ── Self-Assessment Mode ───────────────────────────────────────────────────
@@ -395,7 +402,7 @@ if query_params.get("mode") == "self_assess":
         st.error("Invalid token. Please check with your teacher.")
         st.stop()
 
-    st.title(f"Hi {pupil['firstName']}! 👋")
+    st.title(f"Hi {display_name(pupil)}! 👋")
 
     active_skills = active_skills_for(pupil)
     if not active_skills:
@@ -471,7 +478,7 @@ if query_params.get("mode") == "self_assess":
 
                     if aim_met:
                         st.balloons()
-                        st.success(f"🎯 Well done {pupil['firstName']}! Target hit!")
+                        st.success(f"🎯 Well done {display_name(pupil)}! Target hit!")
                     else:
                         st.info(f"Keep practising — you got {correct} right. You'll get there!")
 
@@ -485,7 +492,7 @@ if query_params.get("mode") == "self_assess":
                     if st.button("Save my result", use_container_width=True, type="primary"):
                         add_probe(pupil["id"], skill_id, "timed", correct, errors, len(questions), duration, "", item_results)
                         filepath = str(PROBES_DIR / pupil["id"] / f"{skill_id}.json")
-                        git_add_commit_push(filepath, f"Maths check: {pupil['firstName']} {step['name']}")
+                        git_add_commit_push(filepath, f"Maths check: {pupil_label(pupil)} {step['name']}")
                         # Clean up session state
                         for key in ["maths_start", "maths_questions", "maths_answers", "maths_idx"]:
                             st.session_state.pop(key, None)
@@ -570,7 +577,7 @@ if query_params.get("mode") == "self_assess":
 
                     if aim_met:
                         st.balloons()
-                        st.success(f"🎯 Well done {pupil['firstName']}! Target hit!")
+                        st.success(f"🎯 Well done {display_name(pupil)}! Target hit!")
                     else:
                         st.info(f"Keep practising — you got {correct} right!")
 
@@ -583,7 +590,7 @@ if query_params.get("mode") == "self_assess":
                             idx += 1
                         add_probe(pupil["id"], skill_id, "timed", correct, errors, len(results), duration, "", item_results)
                         filepath = str(PROBES_DIR / pupil["id"] / f"{skill_id}.json")
-                        git_add_commit_push(filepath, f"Phonics check: {pupil['firstName']} {step['name']}")
+                        git_add_commit_push(filepath, f"Phonics check: {pupil_label(pupil)} {step['name']}")
                         for key in ["phonics_start", "phonics_questions", "phonics_results", "phonics_idx"]:
                             st.session_state.pop(key, None)
                         st.rerun()
@@ -711,9 +718,9 @@ if query_params.get("mode") == "self_assess":
 
                 if accuracy == 100:
                     st.balloons()
-                    st.success(f"🌟 Amazing {pupil['firstName']}! All words correct!")
+                    st.success(f"🌟 Amazing {display_name(pupil)}! All words correct!")
                 elif accuracy >= 80:
-                    st.success(f"Good effort {pupil['firstName']}! {correct} out of {total} correct.")
+                    st.success(f"Good effort {display_name(pupil)}! {correct} out of {total} correct.")
                 else:
                     st.info(f"You got {correct} out of {total}. Keep practising!")
 
@@ -732,7 +739,7 @@ if query_params.get("mode") == "self_assess":
                 if st.button("Save my result", use_container_width=True, type="primary"):
                     add_probe(pupil["id"], skill_id, "untimed", correct, errors, total, 0, "", item_results)
                     filepath = str(PROBES_DIR / pupil["id"] / f"{skill_id}.json")
-                    git_add_commit_push(filepath, f"Spelling check: {pupil['firstName']} {step['name']}")
+                    git_add_commit_push(filepath, f"Spelling check: {pupil_label(pupil)} {step['name']}")
                     for key in ["spell_idx", "spell_answers"]:
                         st.session_state.pop(key, None)
                     st.rerun()
@@ -753,6 +760,22 @@ with st.sidebar:
             st.rerun()
     else:
         st.success("All synced ✓")
+
+    st.divider()
+
+    # Teacher's names file: real names for printouts and screens in THIS browser session only (never saved).
+    with st.expander("Names file (optional)"):
+        st.caption("Children show as initials. To see names on screen and printed sheets, add your names file. "
+                   "It stays in this session only and is never saved or sent anywhere.")
+        _nf = st.file_uploader("Names file (CSV)", type=["csv"], key="pt_names_csv")
+        if _nf is not None:
+            try:
+                st.session_state["pt_names"] = parse_names_csv(_nf.getvalue().decode("utf-8", errors="ignore"))
+                st.success(f"Names loaded for {len(st.session_state['pt_names'])} children (this session only).")
+            except Exception:
+                st.warning("That file could not be read as a names file.")
+        elif st.session_state.get("pt_names"):
+            st.session_state.pop("pt_names", None)
 
     st.divider()
 
@@ -777,7 +800,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy")
+st.caption("Wallscourt Farm Academy · WFA-10.10.26a")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
@@ -832,7 +855,7 @@ with tab1:
                     if step:
                         status = "✅ Mastered" if skills.get(skill_id) == "mastered" else f"{cpm}/min" if isinstance(cpm, (int, float)) else latest
             rows.append({
-                "Name": f"{p['firstName']} {p['lastName']}",
+                "Name": f"{display_name(p)}",
                 "Class": p.get("class", ""),
                 "Active Skills": len(active),
                 "Mastered": sum(1 for entry in skills.values()
@@ -876,19 +899,19 @@ with tab1:
         if maths_sheets:
             with st.expander("Who needs maths"):
                 for p, step in maths_sheets:
-                    st.markdown(f"- {p['firstName']} {p['lastName']}: {step['name']}")
+                    st.markdown(f"- {display_name(p)}: {step['name']}")
     with col_b:
         st.metric("Phonics (adult needed)", len(phonics_sheets))
         if phonics_sheets:
             with st.expander("Who needs reading"):
                 for p, step in phonics_sheets:
-                    st.markdown(f"- {p['firstName']} {p['lastName']}: {step['name']}")
+                    st.markdown(f"- {display_name(p)}: {step['name']}")
     with col_c:
         st.metric("Spelling checks due", len(spelling_checks))
         if spelling_checks:
             with st.expander("Who needs spelling check"):
                 for p, step in spelling_checks:
-                    st.markdown(f"- {p['firstName']} {p['lastName']}: {step['name']}")
+                    st.markdown(f"- {display_name(p)}: {step['name']}")
 
     # ── Reviews Due ──────────────────────────────────────────────────────────
 
@@ -904,7 +927,7 @@ with tab1:
             overdue_text = f" ({overdue}d overdue)" if overdue > 0 else ""
             col1, col2, col3 = st.columns([3, 2, 1])
             with col1:
-                st.markdown(f"**{p['firstName']} {p['lastName']}** — {step['ladder_name']}: {step['name']}")
+                st.markdown(f"**{display_name(p)}** — {step['ladder_name']}: {step['name']}")
             with col2:
                 stage_label = stage_labels.get(stage, "?")
                 if overdue > 0:
@@ -925,8 +948,8 @@ with tab2:
     pupils_data = st.session_state.pupils_data
     ladders_data = st.session_state.ladders_data
 
-    st.markdown("**Add a pupil to track** — search the school roster, no typing a name")
-    tracked_upns = {p.get("upn") for p in pupils_data["pupils"] if p.get("upn")}
+    st.markdown("**Add a pupil to track** — pick them from the school roster by class and initials")
+    tracked_codes = {p.get("pupilCode") for p in pupils_data["pupils"] if p.get("pupilCode")}
 
     year_col, search_col, refresh_col = st.columns([1, 3, 1])
     with year_col:
@@ -935,18 +958,16 @@ with tab2:
             key="roster_year_filter", label_visibility="collapsed",
         )
     with search_col:
-        roster_query = st.text_input("Search by name", key="roster_search", label_visibility="collapsed", placeholder="Type a name…")
+        roster_query = st.text_input("Search by initials or class", key="roster_search", label_visibility="collapsed", placeholder="Type initials or a class, e.g. IM or 5IM…")
     with refresh_col:
-        if st.button("🔄 Refresh names", help="Refresh names/classes of already-tracked pupils from the roster"):
+        if st.button("🔄 Refresh", help="Refresh initials and classes of already-tracked pupils from the roster"):
             result = sync_pupils_from_roster(pupils_data)
             if result.get("error"):
                 st.warning("Could not reach the roster right now — try again shortly.")
             else:
                 save_pupils(pupils_data)
-                git_add_commit_push("data/pupils.json", "Refresh pupil names/classes from roster")
+                git_add_commit_push("data/pupils.json", "Refresh pupil classes from roster")
                 msg = f"{result['updated']} refreshed"
-                if result["upnAttached"]:
-                    msg += f", {result['upnAttached']} matched to the roster for the first time"
                 if result["unmatched"]:
                     msg += f". Not found on the roster: {', '.join(result['unmatched'])}"
                 st.success(msg)
@@ -962,17 +983,20 @@ with tab2:
                 hub_pupils = [p for p in hub_pupils if p.get("yearGroup") == year_filter]
             q = roster_query.strip().lower()
             matches = [p for p in hub_pupils
-                       if q in f"{p.get('first','')} {p.get('last','')}".lower()
-                       and p.get("upn") not in tracked_upns][:10]
+                       if (q in (p.get("label") or "").lower() or q in (p.get("class") or "").lower()
+                           or q in f"{p.get('class','')} {p.get('label','')}".lower())
+                       and p.get("pupilId") not in tracked_codes]
+            matches.sort(key=lambda p: ((p.get("class") or ""), (p.get("label") or "").lower()))   # first initial order
+            matches = matches[:20]
             if not matches:
                 st.info("No match on the active roster (or they're already being tracked).")
             for p in matches:
-                label = f"{p.get('first','')} {p.get('last','')} — {p.get('yearGroup','')} {p.get('class','')}"
-                if st.button(f"+ {label}", key=f"addroster_{p.get('upn')}"):
-                    pupil = add_pupil(pupils_data, p.get("upn"), p.get("first", ""), p.get("last", ""), p.get("class", ""), p.get("yearGroup", ""))
+                label = f"{p.get('label','?')} — {p.get('yearGroup','')} {p.get('class','')}"
+                if st.button(f"+ {label}", key=f"addroster_{p.get('pupilId')}"):
+                    pupil = add_pupil(pupils_data, p)
                     save_pupils(pupils_data)
-                    git_add_commit_push("data/pupils.json", f"Track pupil: {p.get('first')} {p.get('last')}")
-                    st.success(f"Now tracking {p.get('first')} {p.get('last')} (token: **{pupil['token']}**)")
+                    git_add_commit_push("data/pupils.json", f"Track pupil: {p.get('label')}")
+                    st.success(f"Now tracking {p.get('label')} (token: **{pupil['token']}**)")
                     st.rerun()
 
     # ── Set Starting Points ──────────────────────────────────────────────
@@ -1044,13 +1068,13 @@ with tab2:
                         if selected_step_data and is_windowed(selected_step_data):
                             window_size = selected_step_data["windowSize"]
                             st.info(
-                                f"This is a rolling-list skill — {sp_pupil_data['firstName']} will start with the "
+                                f"This is a rolling-list skill — {display_name(sp_pupil_data)} will start with the "
                                 f"first {window_size} items ({', '.join(selected_step_data['items'][:window_size])}). "
                                 f"Run a Baseline in Daily Check to record what they already know, then use "
                                 f"'Update rolling list' there as they master items."
                             )
                         elif selected_step_data:
-                            st.markdown(f"**Items in {selected_step_data['name']}:** Tick the ones {sp_pupil_data['firstName']} already knows confidently.")
+                            st.markdown(f"**Items in {selected_step_data['name']}:** Tick the ones {display_name(sp_pupil_data)} already knows confidently.")
                             # Load any existing baseline for this skill
                             existing_probes = load_probes(sp_pupil_id, selected_step_id)
                             existing_baseline = get_baseline(existing_probes)
@@ -1111,11 +1135,11 @@ with tab2:
 
                         save_pupils(pupils_data)
                         # Commit both pupils.json and any probe files
-                        git_add_commit_push("data/pupils.json", f"Set starting point for {sp_pupil_data['firstName']}: {ladder['name']}")
+                        git_add_commit_push("data/pupils.json", f"Set starting point for {pupil_label(sp_pupil_data)}: {ladder['name']}")
                         if selected_step_id != "none" and step_data and not is_windowed(step_data):
                             filepath = str(PROBES_DIR / sp_pupil_id / f"{selected_step_id}.json")
-                            git_add_commit_push(filepath, f"Baseline for {sp_pupil_data['firstName']}: {selected_step_id}")
-                        st.success(f"Updated {ladder['name']} for {sp_pupil_data['firstName']}!")
+                            git_add_commit_push(filepath, f"Baseline for {pupil_label(sp_pupil_data)}: {selected_step_id}")
+                        st.success(f"Updated {ladder['name']} for {display_name(sp_pupil_data)}!")
                         st.rerun()
 
     # ── Pupil List ─────────────────────────────────────────────────────────
@@ -1130,7 +1154,7 @@ with tab2:
             skills = p.get("currentSkills", {})
             active_count = sum(1 for v in skills.values() if skill_status(v) == "active")
             mastered_count = sum(1 for v in skills.values() if skill_status(v) in ("mastered", "secure"))
-            label = f"{p['firstName']} {p['lastName']} ({p.get('class', '—')}) — {active_count} active, {mastered_count} mastered — Token: `{p['token']}`"
+            label = f"{display_name(p)} ({p.get('class', '—')}) — {active_count} active, {mastered_count} mastered — Token: `{p['token']}`"
 
             with st.expander(label):
                 if skills:
@@ -1150,10 +1174,10 @@ with tab2:
 
                 # Stop tracking — only removes them from this tool's list, not
                 # from the school roster or any other WFA tool.
-                if st.button(f"Stop tracking {p['firstName']}", key=f"remove_{p['id']}"):
+                if st.button(f"Stop tracking {display_name(p)}", key=f"remove_{p['id']}"):
                     pupils_data["pupils"] = [pp for pp in pupils_data["pupils"] if pp["id"] != p["id"]]
                     save_pupils(pupils_data)
-                    git_add_commit_push("data/pupils.json", f"Stop tracking {p['firstName']} {p['lastName']}")
+                    git_add_commit_push("data/pupils.json", f"Stop tracking {pupil_label(p)}")
                     st.rerun()
 
 # ── Tab 3: Skill Ladders ───────────────────────────────────────────────────
@@ -1192,7 +1216,7 @@ with tab4:
             active_skills = active_skills_for(pupil)
 
             if not active_skills:
-                st.info(f"No active skills for {pupil['firstName']}. Assign skills in the Pupils tab.")
+                st.info(f"No active skills for {display_name(pupil)}. Assign skills in the Pupils tab.")
             else:
                 skill_options = []
                 for skill_id in active_skills:
@@ -1262,7 +1286,7 @@ with tab4:
                                 item_results = {k: v for k, v in results.items() if v is not None}
                                 add_probe(pupil_id, skill_id, "baseline", correct, errors, len(probe_items), 0, "", item_results)
                                 filepath = str(PROBES_DIR / pupil_id / f"{skill_id}.json")
-                                git_add_commit_push(filepath, f"Baseline: {pupil['firstName']} {step['name']}")
+                                git_add_commit_push(filepath, f"Baseline: {pupil_label(pupil)} {step['name']}")
                                 if "baseline_results" in st.session_state:
                                     del st.session_state.baseline_results
                                 st.success("Baseline saved!")
@@ -1306,7 +1330,7 @@ with tab4:
                                         item_results = {k: v for k, v in st.session_state.probe_results.items() if v is not None}
                                         add_probe(pupil_id, skill_id, "timed", correct, errors, len(probe_items), duration, notes, item_results)
                                         filepath = str(PROBES_DIR / pupil_id / f"{skill_id}.json")
-                                        git_add_commit_push(filepath, f"Timed check: {pupil['firstName']} {step['name']}")
+                                        git_add_commit_push(filepath, f"Timed check: {pupil_label(pupil)} {step['name']}")
 
                                         # Rolling-list skills graduate via "Update rolling list"
                                         # below (once the whole step is known), not from
@@ -1317,7 +1341,7 @@ with tab4:
                                                 set_skill_status(pupil, skill_id, "mastered")
                                                 set_skill_status(pupil, next_step["id"], "active")
                                                 save_pupils(pupils_data)
-                                                git_add_commit_push("data/pupils.json", f"Progress {pupil['firstName']}: {step['name']} → {next_step['name']}")
+                                                git_add_commit_push("data/pupils.json", f"Progress {pupil_label(pupil)}: {step['name']} → {next_step['name']}")
 
                                         del st.session_state.probe_active
                                         del st.session_state.probe_start
@@ -1404,7 +1428,7 @@ with tab4:
                                 item_results = dict(answered)
                                 add_probe(pupil_id, skill_id, "untimed", correct, errors, len(probe_items), 0, "", item_results)
                                 filepath = str(PROBES_DIR / pupil_id / f"{skill_id}.json")
-                                git_add_commit_push(filepath, f"Untimed check: {pupil['firstName']} {step['name']}")
+                                git_add_commit_push(filepath, f"Untimed check: {pupil_label(pupil)} {step['name']}")
                                 if "untimed_results" in st.session_state:
                                     del st.session_state.untimed_results
                                 st.success("Check saved!")
@@ -1456,7 +1480,7 @@ with tab4:
                                         if next_step:
                                             set_skill_status(pupil, next_step["id"], "active")
                                     save_pupils(pupils_data)
-                                    git_add_commit_push("data/pupils.json", f"Update rolling list for {pupil['firstName']}: {step['name']}")
+                                    git_add_commit_push("data/pupils.json", f"Update rolling list for {pupil_label(pupil)}: {step['name']}")
                                     st.success("List updated!")
                                     st.rerun()
 
@@ -1617,7 +1641,7 @@ with tab5:
 
                             try:
                                 from charts import celeration_chart
-                                fig = celeration_chart(probes, aim, step["name"], pupil['firstName'])
+                                fig = celeration_chart(probes, aim, step["name"], display_name(pupil))
                                 st.plotly_chart(fig, use_container_width=True)
                             except ImportError:
                                 st.warning("Install plotly for charts: pip install plotly")
@@ -1655,7 +1679,7 @@ with tab6:
         st.subheader("Generate Activity Sheets")
 
         # Select pupil(s)
-        pupil_options = [(p["id"], f"{p['firstName']} {p['lastName']}") for p in pupils_data["pupils"]]
+        pupil_options = sorted([(p["id"], f"{display_name(p)}") for p in pupils_data["pupils"]], key=lambda o: o[1].lower())
         pupil_options.insert(0, ("all", "Whole class"))
         selected = st.selectbox("Select pupil", pupil_options, format_func=lambda x: x[1], key="print_pupil")
         selected_id = selected[0] if selected else None
@@ -1695,7 +1719,7 @@ with tab6:
                 for p, skill_id, step in sheets_to_generate:
                     entry = p.get("currentSkills", {}).get(skill_id)
                     count = entry.get("itemsPerSheet", 25) if isinstance(entry, dict) else 25
-                    st.markdown(f"- {p['firstName']} {p['lastName']} — {step['ladder_name']}: {step['name']} ({count} items)")
+                    st.markdown(f"- {display_name(p)} — {step['ladder_name']}: {step['name']} ({count} items)")
 
                 if st.button("Generate PDF", type="primary", use_container_width=True):
                     from reportlab.lib.pagesizes import A4
