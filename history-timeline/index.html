@@ -90,7 +90,7 @@ h1 {
 
 /* ── Sticky label column ─── */
 .label-col {
-  width: 198px;
+  width: 236px;
   flex-shrink: 0;
   border-right: 2px solid #d8e4f0;
   background: #f5f8fc;
@@ -780,6 +780,31 @@ h1 {
 .label-axis-pad .era-key { position: absolute; top: 0; left: 12px; font-size: 10px; font-weight: 700; color: #1a3a5c; text-transform: uppercase; letter-spacing: .4px; display: flex; align-items: center; }
 .label-axis-pad { position: relative; }
 
+/* ── Row thumbnails ─── */
+.row-thumb {
+  width: 42px; height: 28px;
+  border-radius: 5px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.12);
+}
+
+/* ── Today marker ─── */
+.today-line {
+  position: absolute; top: 0; bottom: 0;
+  width: 2px; margin-left: -1px;
+  background: #1a3a5c;
+  z-index: 4;
+  pointer-events: none;
+}
+.today-pill {
+  position: absolute; top: 4px; right: 5px;
+  background: #1a3a5c; color: #fff;
+  font-size: 10px; font-weight: 800; letter-spacing: .3px;
+  padding: 2px 7px; border-radius: 10px;
+  white-space: nowrap;
+}
+
 /* ── Key-event markers on bars ─── */
 .ev-dot {
   position: absolute;
@@ -811,7 +836,9 @@ body.board { padding: 14px 14px 20px; }
 body.board h1 { font-size: 36px; }
 body.board .subtitle { font-size: 16px; }
 body.board .leg-item { font-size: 15px; }
-body.board .label-col { width: 270px; }
+body.board .label-col { width: 320px; }
+body.board .row-thumb { width: 56px; height: 38px; }
+body.board .today-pill { font-size: 13px; }
 body.board .row-label .rname { font-size: 15px; }
 body.board .row-label .rdates { font-size: 12px; }
 body.board .yg-pill { font-size: 12.5px; padding: 3px 7px; }
@@ -828,6 +855,7 @@ body.board .yg-btn, body.board .tb-btn { font-size: 15px; min-height: 42px; padd
   .label-col { width: 130px; }
   .row-label { padding: 0 6px; gap: 5px; }
   .row-label .rdates { display: none; }
+  .row-thumb { display: none; }
   .tl-titlebar .tl-hint { display: none; }
   .modal-overlay { padding: 8px; }
   .modal-title { font-size: 22px; }
@@ -1371,7 +1399,7 @@ const SIZES = {
 };
 // A3 landscape, 8mm margins ≈ 1527px wide at 96dpi: the whole timeline fits on one sheet.
 function printSizes() {
-  const avail = 1527 - (board ? 270 : 198) - 6;
+  const avail = 1527 - (board ? 320 : 236) - 6;
   const aPx = Math.round(avail * 1000 / 2600);
   return { rowH: 46, barH: 32, axisH: 50, eraH: 26, aPx: aPx, bPx: avail - aPx };
 }
@@ -1528,6 +1556,11 @@ function render() {
   breakLine.style.left = breakPx + 'px';
   barsArea.appendChild(breakLine);
 
+  // Today marker
+  const todayLine = el('div', 'today-line', '<span class="today-pill">Today · ' + THIS_YEAR + '</span>');
+  todayLine.style.left = yearToPx(THIS_YEAR) + 'px';
+  barsArea.appendChild(todayLine);
+
   PERIODS.forEach((period, rowIdx) => {
     const color = YG_COLORS[period.yg];
 
@@ -1539,7 +1572,14 @@ function render() {
     rl.title = 'What else was happening during ' + period.name + '?';
     const pill = el('div', 'yg-pill', period.yg);
     pill.style.background = color;
-    rl.append(pill, el('div', 'row-label-text',
+    rl.appendChild(pill);
+    if (period.img) {
+      const th = el('img', 'row-thumb');
+      th.src = period.img;
+      th.alt = '';
+      rl.appendChild(th);
+    }
+    rl.append(el('div', 'row-label-text',
       `<div class="rname">${period.name}</div><div class="rdates">${period.d}</div>`));
     rl.addEventListener('click', () => setFocus(focusId === period.id ? null : period.id, true));
     rl.addEventListener('keydown', e => {
@@ -2283,6 +2323,6 @@ render();
 })();
 
 </script>
-<div style="text-align:center;font-size:11px;color:#6a7a9a;margin-top:14px">Version WFA-10.10.26c</div>
+<div style="text-align:center;font-size:11px;color:#6a7a9a;margin-top:14px">Version WFA-10.10.26d</div>
 </body>
 </html>
