@@ -648,24 +648,77 @@ def check_aim_met(step, probes_data):
 
 
 # ── Pupil Helpers ───────────────────────────────────────────────────────────
+#
+# PRIVACY (10.10.26): this tool no longer stores a child's name or UPN. A tracked pupil is identified by the
+# roster's random pupil code (`pupilCode`, "p_" + 10 chars) and shown by the roster's initials `label`.
+# `firstName` / `lastName` hold only 3-letter stubs (kept so older code paths still work). Real names appear
+# only if the teacher loads their names file for this browser session (st.session_state["pt_names"], memory only).
 
-def add_pupil(pupils_data, upn, first_name, last_name, class_name="", year_group=""):
-    """Create a locally-tracked pupil record. upn links it back to the
-    Bromcom-sourced roster — first/last/class/yearGroup are a snapshot taken
-    at add time; call sync_pupils_from_roster to refresh them later. The
-    p### id stays the internal key (probe history is filed under it) — upn
-    is the identity link, not a replacement for it."""
+def _letters(token):
+    return re.sub(r"[^A-Za-z]", "", token or "")
+
+
+def stub_first(value):
+    toks = str(value or "").split()
+    return _letters(toks[0])[:3] if toks else ""
+
+
+def stub_last(value):
+    toks = str(value or "").split()
+    return _letters(toks[-1])[:3] if toks else ""
+
+
+def pupil_label(pupil):
+    """Initials for a tracked pupil: the roster's label, else first letters of the stubs."""
+    lab = (pupil.get("label") or "").strip()
+    if lab:
+        return lab
+    return ((pupil.get("firstName", "")[:1] + pupil.get("lastName", "")[:1]).upper()) or "?"
+
+
+def display_name(pupil):
+    """What to show for a pupil: their real name only when the teacher has loaded a names file in this
+    browser session; otherwise their initials."""
+    try:
+        import streamlit as st
+        names = st.session_state.get("pt_names") or {}
+    except Exception:
+        names = {}
+    full = names.get(pupil.get("pupilCode") or "")
+    return full or pupil_label(pupil)
+
+
+def parse_names_csv(text):
+    """Teacher's names file (CSV: pupil_id, first_name, last_name, full_name ...) -> {pupil_code: full name}.
+    Kept in memory for the session only; never written anywhere."""
+    import csv, io
+    out = {}
+    rd = csv.DictReader(io.StringIO(text.lstrip("\ufeff")))
+    for row in rd:
+        row = {(k or "").strip().lower(): (v or "").strip() for k, v in row.items()}
+        code = row.get("pupil_id", "")
+        full = row.get("full_name") or f"{row.get('first_name', '')} {row.get('last_name', '')}".strip()
+        if code and full:
+            out[code] = full
+    return out
+
+
+def add_pupil(pupils_data, hub_pupil):
+    """Create a locally-tracked pupil record from a roster pupil (as returned by fetch_hub_pupils). Stores the
+    pupil code, initials label, class and year group only. The p### id stays the internal key (probe history
+    is filed under it)."""
     pupil_id = f"p{len(pupils_data['pupils']) + 1:03d}"
     while any(p["id"] == pupil_id for p in pupils_data["pupils"]):
         num = int(pupil_id[1:]) + 1
         pupil_id = f"p{num:03d}"
     pupil = {
         "id": pupil_id,
-        "upn": upn,
-        "firstName": first_name,
-        "lastName": last_name,
-        "class": class_name,
-        "yearGroup": year_group,
+        "pupilCode": hub_pupil.get("pupilId") or "",
+        "label": hub_pupil.get("label") or "",
+        "firstName": stub_first(hub_pupil.get("first")),
+        "lastName": stub_last(hub_pupil.get("last")),
+        "class": hub_pupil.get("class", ""),
+        "yearGroup": hub_pupil.get("yearGroup", ""),
         "token": _generate_token(),
         "currentSkills": {},
         "notes": "",
@@ -681,50 +734,64 @@ def get_pupil(pupils_data, pupil_id):
     return None
 
 
+def anonymise_pupils(pupils_data):
+    """One-time, idempotent: bring every tracked pupil to the privacy shape. Links each to the roster by UPN
+    (then by an unambiguous stub match within the year group), stores the pupil code + label, drops the UPN,
+    and cuts the name fields to 3-letter stubs. Names are cut even if the roster cannot be reached; the UPN
+    and code link are only touched when it can. Returns counts only: {changed, linked, unlinked}."""
+    hub = fetch_hub_pupils()
+    by_upn = {p.get("upn"): p for p in hub if p.get("upn")}
+    by_code = {p.get("pupilId"): p for p in hub if p.get("pupilId")}
+    by_stub = {}
+    for h in hub:
+        by_stub.setdefault((h.get("yearGroup"), (h.get("first") or "").lower(), (h.get("last") or "").lower()), []).append(h)
+    changed = linked = unlinked = 0
+    for pupil in pupils_data["pupils"]:
+        before = (pupil.get("firstName"), pupil.get("lastName"), pupil.get("upn"), pupil.get("pupilCode"), pupil.get("label"))
+        hub_p = None
+        if hub:
+            if pupil.get("pupilCode"):
+                hub_p = by_code.get(pupil["pupilCode"])
+            if not hub_p and pupil.get("upn"):
+                hub_p = by_upn.get(pupil["upn"])
+            if not hub_p:
+                cands = by_stub.get((pupil.get("yearGroup"), stub_first(pupil.get("firstName")).lower(),
+                                     stub_last(pupil.get("lastName")).lower()), [])
+                hub_p = cands[0] if len(cands) == 1 else None
+        if hub_p:
+            pupil["pupilCode"] = hub_p.get("pupilId") or pupil.get("pupilCode", "")
+            pupil["label"] = hub_p.get("label") or pupil.get("label", "")
+            pupil.pop("upn", None)
+            linked += 1
+        elif hub:
+            unlinked += 1
+        pupil["firstName"], pupil["lastName"] = stub_first(pupil.get("firstName")), stub_last(pupil.get("lastName"))
+        if before != (pupil.get("firstName"), pupil.get("lastName"), pupil.get("upn"), pupil.get("pupilCode"), pupil.get("label")):
+            changed += 1
+    return {"changed": changed, "linked": linked, "unlinked": unlinked}
+
+
 def sync_pupils_from_roster(pupils_data):
-    """Refresh every tracked pupil's name/class from the live hub roster.
-    Pupils added before UPN tracking existed (no upn stored) are matched by
-    name and have their upn attached; unmatched ones are reported rather
-    than left silently stale. Returns {updated, upnAttached, unmatched}."""
+    """Refresh every tracked pupil's label / class / year group from the live roster, matched by pupil code.
+    Unlinked pupils are reported by label, never by name. Returns {updated, unmatched}."""
     hub_pupils = fetch_hub_pupils()
     if not hub_pupils:
-        return {"updated": 0, "upnAttached": 0, "unmatched": [], "error": "roster unavailable"}
-
-    by_upn = {p.get("upn"): p for p in hub_pupils if p.get("upn")}
-    by_name = {}
-    for p in hub_pupils:
-        key = f"{p.get('first','')} {p.get('last','')}".strip().lower()
-        by_name.setdefault(key, p)
-
-    updated, attached, unmatched = 0, 0, []
+        return {"updated": 0, "unmatched": [], "error": "roster unavailable"}
+    by_code = {p.get("pupilId"): p for p in hub_pupils if p.get("pupilId")}
+    updated, unmatched = 0, []
     for pupil in pupils_data["pupils"]:
-        hub_p = by_upn.get(pupil.get("upn")) if pupil.get("upn") else None
-        attaching = False
+        hub_p = by_code.get(pupil.get("pupilCode"))
         if not hub_p:
-            key = f"{pupil.get('firstName','')} {pupil.get('lastName','')}".strip().lower()
-            hub_p = by_name.get(key)
-            attaching = hub_p is not None
-
-        if not hub_p:
-            unmatched.append(f"{pupil.get('firstName','')} {pupil.get('lastName','')}".strip())
+            unmatched.append(pupil_label(pupil))
             continue
-
-        new_first = hub_p.get("first", pupil["firstName"])
-        new_last  = hub_p.get("last", pupil["lastName"])
-        new_class = hub_p.get("class", pupil.get("class", ""))
-        new_year_group = hub_p.get("yearGroup", pupil.get("yearGroup", ""))
-        changed = (new_first != pupil["firstName"] or new_last != pupil["lastName"]
-                   or new_class != pupil.get("class", "") or new_year_group != pupil.get("yearGroup", ""))
-        if attaching:
-            pupil["upn"] = hub_p.get("upn")
-            attached += 1
-        if changed:
-            pupil["firstName"], pupil["lastName"], pupil["class"], pupil["yearGroup"] = (
-                new_first, new_last, new_class, new_year_group,
-            )
+        new = {"label": hub_p.get("label") or pupil.get("label", ""),
+               "class": hub_p.get("class", pupil.get("class", "")),
+               "yearGroup": hub_p.get("yearGroup", pupil.get("yearGroup", "")),
+               "firstName": stub_first(hub_p.get("first")), "lastName": stub_last(hub_p.get("last"))}
+        if any(pupil.get(k) != v for k, v in new.items()):
+            pupil.update(new)
             updated += 1
-
-    return {"updated": updated, "upnAttached": attached, "unmatched": unmatched}
+    return {"updated": updated, "unmatched": unmatched}
 
 
 # ── Skill Status Helpers ─────────────────────────────────────────────────────
@@ -1354,7 +1421,7 @@ def generate_sheet(pupil, skill_id, ladders_data, probes_data=None, include_revi
     random.shuffle(questions)
 
     return {
-        "pupil_name": f"{pupil['firstName']} {pupil['lastName']}",
+        "pupil_name": display_name(pupil),
         "skill_name": step["name"],
         "ladder_name": step["ladder_name"] if "ladder_name" in step else ladder["name"],
         "subject": subject,
