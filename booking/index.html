@@ -255,7 +255,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 06.10.26a</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 10.10.26a</div>
       </div>
     </div>
     <div class="top-bar">
@@ -1924,9 +1924,10 @@ async function init() {
     // tab failure is named in the overlayStatus banner.
     const fetchTab = (tab, label) => fetchOverlay_(label, TABS_URL + '&tab=' + tab, undefined,
       r => r.json().then(j => (j && !j.error) ? j.rows : Promise.reject(new Error(j && j.error || 'bad tab response'))), []);
-    const [termsRows, eventsRows, calEventsRows, resourcesRows] = await Promise.all([
+    // 10.10.26: 'Events' was an empty legacy tab and has gone from the DB
+    // ("tab not found"); everything lives in CalendarEvents, so don't ask for it.
+    const [termsRows, calEventsRows, resourcesRows] = await Promise.all([
       fetchTab('TermDates', 'TermDates').then(rows => { if (!rows.length) throw new Error('TermDates tab not found'); return rows; }),
-      fetchTab('Events', 'Events'),
       fetchTab('CalendarEvents', 'CalendarEvents'),
       fetchTab('Resources', 'Resources'),
     ]);
@@ -1943,7 +1944,7 @@ async function init() {
 
     WEEKS = buildWeeks(termsRows);
     {
-      const evtRows = [...eventsRows, ...calEventsRows];
+      const evtRows = [...calEventsRows];
       if (evtRows.length) {
         state.nonSchoolDays = buildNonSchoolDays(evtRows);
         state.schoolEvents  = buildSchoolEvents(evtRows);
