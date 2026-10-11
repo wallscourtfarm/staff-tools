@@ -737,6 +737,25 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
   box-shadow: 0 1px 5px rgba(0,0,0,.18); min-height: 52px; color: var(--ink);
 }
 #layerBtnWrap button.on { background: var(--blue); color: #fff; }
+.bmk {
+  position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; padding: 0;
+  transform: rotate(45deg); background: #0f6e9c; border: 2px solid #fff; border-radius: 3px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.35); z-index: 3; cursor: pointer;
+}
+.bmk::before { content: ''; position: absolute; inset: -9px; }
+.bmk:hover { background: #FFC000; }
+.bmk.many { transform: none; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%; }
+.bmk.many span { display: block; color: #fff; font-size: 11px; font-weight: 900; line-height: 20px; text-align: center; }
+.bmk.many:hover span { color: var(--ink); }
+body.board .bmk { width: 18px; height: 18px; margin: -9px 0 0 -9px; }
+body.board .bmk.many { width: 30px; height: 30px; margin: -15px 0 0 -15px; }
+body.board .bmk.many span { font-size: 13px; line-height: 26px; }
+#pop { max-width: min(460px, calc(100vw - 20px)); }
+.mk-ev + .mk-ev { border-top: 1px solid var(--line); padding-top: 10px; }
+.mk-title { font-size: 20px; font-weight: 900; margin: 6px 0 4px; }
+.mk-text { font-size: 17px; font-weight: 700; color: #34495a; line-height: 1.4; margin: 0; }
+.mk-ev .ago-line { font-size: 15px; margin-top: 6px; }
+.keylist .bmkk { width: 12px; height: 12px; margin: 0 11px; background: #0f6e9c; transform: rotate(45deg); border-radius: 2px; }
 .keylist .pin { width: 34px; text-align: center; font-style: normal; font-size: 18px; }
 .row-label.local { background: #fffaf0 !important; }
 .row-label.local-first, .local-sep { border-top: 3px dashed #e0b84a; }
@@ -897,7 +916,7 @@ body.board #zoomBar button { width: 76px; height: 76px; font-size: 40px; }
       <div id="chartWrap">
         <div class="print-head">
           <img src="../logo.png" alt="">
-          <div><h1>A Timeline of History</h1><p>Wallscourt Farm Academy · Y1 &amp; Y5 orange · Y2 &amp; Y6 green · Y3 pink · Y4 blue · Version WFA-11.10.26b</p></div>
+          <div><h1>A Timeline of History</h1><p>Wallscourt Farm Academy · Y1 &amp; Y5 orange · Y2 &amp; Y6 green · Y3 pink · Y4 blue · Version WFA-11.10.26c</p></div>
         </div>
         <div class="tl-body">
           <div class="label-col" id="labelCol"></div>
@@ -912,7 +931,7 @@ body.board #zoomBar button { width: 76px; height: 76px; font-size: 40px; }
         <button id="zoomOut" aria-label="Zoom out">－</button>
         <button id="zoomFit" aria-label="Whole timeline" title="Whole timeline">⌂</button>
       </div>
-      <div id="attrib">Version WFA-11.10.26b</div>
+      <div id="attrib">Version WFA-11.10.26c</div>
     </div>
 
     <aside id="panel">
@@ -940,6 +959,7 @@ body.board #zoomBar button { width: 76px; height: 76px; font-size: 40px; }
           <div><i class="ln red"></i>BC / AD</div>
           <div><i class="ln navy"></i>Today</div>
           <div><i class="pin">📍</i>Our local history — turn on in 🗂️ Layers</div>
+          <div><i class="bmkk"></i>A key moment in Bristol — tap it</div>
           <div id="keyScaleRow"><i class="ln gold"></i>Scale changes here</div>
         </div>
         <p class="hint small" id="footer"></p>
@@ -1432,6 +1452,7 @@ const LOCAL_PERIODS = [
     bullets:[
       "Suffragettes were women who campaigned — sometimes by breaking the law — for women's right to vote",
       "In 1909 women could not vote in general elections",
+      "Bristol women had campaigned peacefully for the vote since 1868 — the suffragettes used more forceful protests",
       "From 1907 Annie Kenney led the suffragettes (the Women's Social and Political Union) in Bristol and the West of England",
       "In November 1909 Winston Churchill, a government minister, came to speak in Bristol — women were not allowed into his meeting",
       "Theresa Garnett confronted Churchill with a whip at Temple Meads station",
@@ -1441,6 +1462,7 @@ const LOCAL_PERIODS = [
       "A blue plaque at Horfield Prison (2021) remembers Theresa Garnett — the first blue plaque on a working prison in the UK",
     ],
     events: [
+      {date:"1868", year:1868, title:"Bristol women ask for the vote", text:"The Bristol and West of England Society for Women's Suffrage is set up. Bristol women campaign peacefully for the vote for 40 years before the suffragette protests."},
       {date:"1903", year:1903, title:"The WSPU is founded", text:"Emmeline Pankhurst starts the Women's Social and Political Union in Manchester. Its members become known as suffragettes."},
       {date:"1907", year:1907, title:"Annie Kenney comes to Bristol", text:"Annie Kenney, a former mill worker, becomes the suffragettes' organiser for Bristol and the West of England."},
       {date:"13 November 1909", year:1909.86, title:"The whip at Temple Meads", text:"Winston Churchill arrives in Bristol to speak at the Colston Hall. Women are kept out of his meeting. At Temple Meads station, Theresa Garnett confronts him with a whip, shouting 'Take that in the name of the insulted women of England!'"},
@@ -1479,6 +1501,7 @@ const LOCAL_PERIODS = [
       {date:"17 September 1963", year:1963.71, title:"Raghbir Singh", text:"Raghbir Singh, a Sikh man, becomes Bristol's first non-white bus conductor."},
       {date:"1965", year:1965, title:"Race Relations Act", text:"Britain's first law against racial discrimination makes it illegal in public places."},
       {date:"1968", year:1968, title:"A stronger law", text:"A new Race Relations Act makes discrimination illegal in jobs and housing too."},
+      {date:"1968", year:1968.5, title:"St Pauls Festival", text:"Roy Hackett, one of the boycott leaders, helps start the St Pauls Festival to bring the area's communities together. Today it is St Pauls Carnival."},
       {date:"2009", year:2009, title:"Paul Stephenson OBE", text:"Paul Stephenson is awarded an OBE for his work for equal opportunities and community relations."},
     ]
   },
@@ -1496,6 +1519,7 @@ const LOCAL_PERIODS = [
       "Records disagree on how many people died: Aerospace Bristol says 149, other accounts say over 200 — why might that be?",
       "The next day, Hurricane fighters of No. 504 Squadron moved to Filton to defend it",
       "Many of those killed are remembered on memorials at St Peter's Church, Filton",
+      "In 1943–44 US General Omar Bradley planned the American part of D-Day at Clifton College in Bristol",
       "After D-Day in June 1944, wounded American soldiers were flown into Filton",
     ],
     events: [
@@ -1506,14 +1530,61 @@ const LOCAL_PERIODS = [
       {date:"25 September 1940", year:1940.73, title:"The Filton raid", text:"At 11.47am German bombers attack the aircraft works. More than 160 bombs fall in under a minute and air-raid shelters are hit. Aerospace Bristol says 149 people were killed."},
       {date:"26 September 1940", year:1940.74, title:"Hurricanes arrive", text:"No. 504 Squadron's Hurricane fighters move to Filton to protect the factories."},
       {date:"24 November 1940", year:1940.9, title:"The Bristol Blitz", text:"The first big night raid on Bristol destroys much of the old city centre."},
+      {date:"11 April 1941", year:1941.28, title:"The Good Friday raid", text:"The last big raid of the Bristol Blitz damages the docks and homes across the city."},
+      {date:"1943–1944", year:1943.8, title:"Planning D-Day in Bristol", text:"US General Omar Bradley makes Clifton College in Bristol the headquarters of the US First Army. The American part of the D-Day landings is planned there."},
       {date:"June 1944", year:1944.45, title:"After D-Day", text:"Filton becomes a major arrival point for wounded American soldiers flown back from France."},
       {date:"8 May 1945", year:1945.35, title:"VE Day", text:"The war in Europe ends. People in Bristol celebrate with street parties."},
+      {date:"9 April 1969", year:1969.27, title:"After the war: Concorde", text:"Filton's aircraft story carries on: the first British-built Concorde makes its first flight from Filton."},
     ]
   },
 ];
 
 let localOn = lsGet('wfa_htl_local') === '1';
-let PERIODS = localOn ? CORE_PERIODS.concat(LOCAL_PERIODS) : CORE_PERIODS.slice();
+
+// ─── Bristol through time: point markers (no full page — tap opens a small box) ──
+// Source: visitbristol.co.uk/discover/about-bristol/history (11.10.26), cross-checked:
+// Bristol Castle (first recorded 1088), Storming of Bristol (26 July 1643), Concorde 002 (9 April 1969),
+// Good Friday raid (11 April 1941), St Pauls Festival (1968) — Wikipedia / Clifton College / Bristol Archives.
+const BRISTOL_ROW = {
+  id:"bristol", local:true, markers:true, name:"Bristol through time", yg:"All", s:1051, e:THIS_YEAR,
+  d:"Key moments, 1051 – today",
+  events: [
+    {date:"1051", year:1051, title:"A busy Saxon port", text:"Bristol is already a port trading with Ireland, Somerset and North Devon. Its old name, Brycgstow, means 'the place at the bridge'."},
+    {date:"by 1088", year:1088, title:"Bristol Castle", text:"After the Norman Conquest a castle is built beside the River Avon. It is first written about in 1088. Castle Park is on the site today."},
+    {date:"1140", year:1140, title:"An abbey is founded", text:"Robert Fitzharding founds an abbey. Its church later becomes Bristol Cathedral."},
+    {date:"1216", year:1216, title:"Magna Carta and the first mayor", text:"After King John dies, Magna Carta is reissued at Bristol. The same year, Bristol has its first mayor."},
+    {date:"1373", year:1373, title:"A county of its own", text:"King Edward III gives Bristol a Great Charter, making it a county of its own — a sign of how important it had become."},
+    {date:"May 1497", year:1497, title:"Cabot sets sail", text:"John Cabot sails from Bristol on the Matthew and reaches North America, probably Newfoundland."},
+    {date:"1574", year:1574, title:"Elizabeth I visits", text:"Queen Elizabeth I visits St Mary Redcliffe church. She is said to have praised it as the finest parish church in England."},
+    {date:"26 July 1643", year:1643, title:"Bristol captured", text:"In the Civil War, Prince Rupert's Royalist army storms Bristol and takes it from Parliament."},
+    {date:"1698–1807", year:1698, title:"The slave trade", text:"From 1698, more than 2,000 slave ships sail from Bristol. They carry an estimated 500,000 enslaved Africans across the Atlantic. Much of Bristol's wealth came from this trade."},
+    {date:"1739", year:1739, title:"John Wesley's New Room", text:"John Wesley builds the New Room in Broadmead, now the oldest Methodist chapel in the world."},
+    {date:"1766", year:1766, title:"The Theatre Royal opens", text:"The Theatre Royal (now Bristol Old Vic) opens. It is the oldest theatre in the English-speaking world still putting on plays."},
+    {date:"1788", year:1788, title:"Campaigning against slavery", text:"After a visit from Thomas Clarkson, Bristol sets up the first anti-slavery committee outside London."},
+    {date:"1807", year:1807, title:"Slave trade abolished", text:"Parliament makes the British slave trade illegal. Slavery itself is not ended in the British Empire until the 1830s."},
+    {date:"1809", year:1809, title:"The Floating Harbour", text:"A new harbour is built so ships stay afloat even when the tide goes out — the Floating Harbour you can still see today."},
+    {date:"October 1831", year:1831, title:"The Bristol Riots", text:"Angry that Parliament has blocked the Reform Bill, which would let more men vote, crowds riot and set fire to buildings in Queen Square."},
+    {date:"1836", year:1836, title:"Bristol Zoo opens", text:"Bristol Zoological Gardens open in Clifton — one of the oldest zoos in the world. In 2022 the zoo moved to a new site, the Bristol Zoo Project."},
+    {date:"1837", year:1837, title:"SS Great Western", text:"Brunel's steamship the Great Western is launched in Bristol, built to cross the Atlantic to New York."},
+    {date:"1841", year:1841, title:"Railway to London", text:"Brunel's Great Western Railway between Bristol and London is completed."},
+    {date:"1843", year:1843, title:"SS Great Britain", text:"Brunel's SS Great Britain is launched — the first big iron ship driven by a propeller."},
+    {date:"1864", year:1864, title:"Clifton Suspension Bridge", text:"The bridge, designed by Brunel when he was a young man, finally opens — five years after his death."},
+    {date:"1868", year:1868, title:"Votes for women society", text:"The Bristol and West of England Society for Women's Suffrage is set up, more than 40 years before the suffragette protests of 1909."},
+    {date:"1897", year:1897, title:"Cabot Tower", text:"Work begins on Cabot Tower on Brandon Hill, to mark 400 years since John Cabot's voyage."},
+    {date:"24 November 1940", year:1940.9, title:"The Bristol Blitz", text:"German bombers make their first big night raid on Bristol, destroying much of the old city centre."},
+    {date:"11 April 1941", year:1941.28, title:"The Good Friday raid", text:"The last major raid of the Bristol Blitz. More than 1,000 people in Bristol were killed in the Blitz."},
+    {date:"1968", year:1968, title:"St Pauls Festival", text:"Roy Hackett and others start the St Pauls Festival to bring the area's communities together. It is now St Pauls Carnival."},
+    {date:"9 April 1969", year:1969.27, title:"Concorde flies from Filton", text:"The first British-built Concorde, the supersonic airliner, makes its first flight from Filton."},
+    {date:"1970", year:1970, title:"SS Great Britain comes home", text:"The SS Great Britain is towed 8,000 miles from the Falkland Islands back to the Bristol dock where it was built."},
+    {date:"1979", year:1979, title:"First Balloon Fiesta", text:"The first Bristol International Balloon Fiesta takes place, with 27 balloons."},
+    {date:"26 November 2003", year:2003.9, title:"Concorde's last flight", text:"The very last Concorde flight lands at Filton. That aircraft is now in the Aerospace Bristol museum."},
+    {date:"2015", year:2015, title:"European Green Capital", text:"Bristol becomes the first UK city to be named European Green Capital."},
+    {date:"June 2020", year:2020.45, title:"Colston's statue pulled down", text:"During Black Lives Matter protests, the statue of slave trader Edward Colston is pulled down and rolled into the harbour. It is now in the M Shed museum."},
+  ]
+};
+
+function buildPeriods() { return localOn ? CORE_PERIODS.concat([BRISTOL_ROW], LOCAL_PERIODS) : CORE_PERIODS.slice(); }
+let PERIODS = buildPeriods();
 
 // ─── Scale config ──────────────────────────────────────────────────────────
 // "Two scales": ancient (left) and medieval/modern (right) squeezed differently.
@@ -1745,7 +1816,7 @@ function render() {
   barsArea.appendChild(todayLine);
 
   PERIODS.forEach((period, rowIdx) => {
-    const color = YG_COLORS[period.yg];
+    const color = YG_COLORS[period.yg] || '#0f6e9c';
 
     // Label column row — tap for "Meanwhile…"
     const rl = el('div', 'row-label' + (period.local ? ' local' : '') + (period.local && !PERIODS[rowIdx - 1].local ? ' local-first' : ''));
@@ -1764,12 +1835,14 @@ function render() {
     }
     rl.append(el('div', 'row-label-text',
       `<div class="rname">${period.local ? '📍 ' : ''}${period.name}</div><div class="rdates">${period.d}</div>`));
-    rl.addEventListener('click', () => setFocus(focusId === period.id ? null : period.id, true));
+    if (period.markers) rl.title = 'Tap a ◆ on the timeline to read about that moment';
+    else rl.addEventListener('click', () => setFocus(focusId === period.id ? null : period.id, true));
     rl.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); rl.click(); }
     });
     labelCol.appendChild(rl);
     rowEls[period.id] = rl;
+    if (period.markers) { drawMarkers(period, rowIdx, totalW); return; }
 
     // Bar
     const extL   = period.s < RANGE_A.s;
@@ -1848,7 +1921,7 @@ function applyState() {
     const n = ygNum(p);
     const future  = !!upTo && n > upTo;
     const current = !!upTo && n === upTo;
-    const dim     = !!focus && p.id !== focus.id && !overlaps(p, focus);
+    const dim     = !!focus && !p.markers && p.id !== focus.id && !overlaps(p, focus);
     const isFocus = !!focus && p.id === focus.id;
     [barEls[p.id], rowEls[p.id]].forEach(e => {
       if (!e) return;
@@ -1874,7 +1947,7 @@ function applyState() {
 
   // Banner
   if (focus) {
-    const others = PERIODS.filter(p => p.id !== focus.id && overlaps(p, focus));
+    const others = PERIODS.filter(p => !p.markers && p.id !== focus.id && overlaps(p, focus));
     const chip = p => `<button class="mw-chip" data-open="${p.id}" style="background:${YG_COLORS[p.yg]}">${p.name} · ${p.yg}</button>`;
     mwBox.style.borderLeftColor = YG_COLORS[focus.yg];
     mwText.innerHTML =
@@ -1939,7 +2012,7 @@ document.getElementById('scaleBtn').addEventListener('click', e => openPop(e.cur
 function setLocal(on) {
   localOn = on;
   lsSet('wfa_htl_local', on ? '1' : '0');
-  PERIODS = on ? CORE_PERIODS.concat(LOCAL_PERIODS) : CORE_PERIODS.slice();
+  PERIODS = buildPeriods();
   if (focusId && !PERIODS.some(p => p.id === focusId)) focusId = null;
   document.getElementById('layerBtn').classList.toggle('on', on);
   render();
@@ -1955,6 +2028,36 @@ document.getElementById('layerBtn').addEventListener('click', e => openPop(e.cur
     }
   })));
 
+// Bristol markers: ◆ per event; events too close together share one numbered circle
+function drawMarkers(row, rowIdx, totalW) {
+  const size = board && !printing ? 18 : 14;
+  const cy = rowIdx * cfg.rowH + cfg.rowH / 2;
+  const groups = [];
+  row.events.slice().sort((a, b) => a.year - b.year).forEach(ev => {
+    const x = clamp(yearToPx(ev.year), 0, totalW);
+    const g = groups[groups.length - 1];
+    if (g && x - g.x0 < size + 6) { g.items.push(ev); g.x1 = x; }
+    else groups.push({ x0: x, x1: x, items: [ev] });
+  });
+  groups.forEach(g => {
+    const many = g.items.length > 1;
+    const m = el('button', 'bmk' + (many ? ' many' : ''), many ? '<span>' + g.items.length + '</span>' : '');
+    m.style.left = ((g.x0 + g.x1) / 2) + 'px';
+    m.style.top = cy + 'px';
+    m.setAttribute('aria-label', g.items.map(e => e.date + ': ' + e.title).join('; '));
+    const label = g.items.map(e => '<b>' + e.date + '</b> · ' + e.title).join('<br>');
+    m.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') showMtip(label, e.clientX, e.clientY); });
+    m.addEventListener('pointerleave', hideMtip);
+    m.addEventListener('click', e => { e.stopPropagation(); if (dragMoved) return; hideMtip(); openMarkerBox(m, g.items); });
+    barsArea.appendChild(m);
+  });
+}
+function openMarkerBox(anchor, items) {
+  openPop(anchor, '<h3>📍 Bristol through time</h3>' + items.map(ev =>
+    '<div class="mk-ev"><span class="mini-ev-badge" style="background:var(--blue-d)">' + ev.date + '</span>' +
+    '<p class="mk-title">' + ev.title + '</p><p class="mk-text">' + ev.text + '</p>' + agoHtml(ev.year, ev.date) + '</div>').join(''));
+}
+
 // Popover + simple modal helpers
 const pop = document.getElementById('pop');
 function openPop(anchor, html, wire) {
@@ -1963,6 +2066,7 @@ function openPop(anchor, html, wire) {
   const r = anchor.getBoundingClientRect();
   pop.style.left = Math.max(10, Math.min(r.left, innerWidth - pop.offsetWidth - 10)) + 'px';
   pop.style.top = (r.bottom + 8) + 'px';
+  if (r.bottom + 8 + pop.offsetHeight > innerHeight) pop.style.top = Math.max(10, r.top - pop.offsetHeight - 8) + 'px';
   if (wire) wire(pop);
   setTimeout(() => document.addEventListener('pointerdown', popAway), 0);
 }
@@ -2528,7 +2632,8 @@ function shuffle(a) {
   return a;
 }
 function eligiblePeriods() {
-  return upTo ? PERIODS.filter(p => ygNum(p) <= upTo) : PERIODS.slice();
+  const list = PERIODS.filter(p => !p.markers);
+  return upTo ? list.filter(p => ygNum(p) <= upTo) : list;
 }
 
 function pickItems(mode) {
