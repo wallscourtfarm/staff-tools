@@ -291,7 +291,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     </div>
   </div>
 
-  <div class="version">06.10.26b</div>
+  <div class="version">11.10.26a</div>
 </div>
 
 <script>
@@ -586,7 +586,7 @@ function genY2Arith(t, targetCount, sortMode) {
       () => { const a=rand(2,6),b=rand(2,6),c=rand(2,6); return {text:`${a} + ${b} + ${c} =`,answer:a+b+c,marks:1}; },
     ],
   };
-  const qs = buildFromPools(pools, {...t, _core:true}, targetCount, simple);
+  const qs = buildFromPools(pools, {...t, _core:Object.values(t).every(Boolean)}, targetCount, simple);
   return orderQuestions(qs, sortMode, Y2_TOPIC_ORDER);
 }
 
@@ -647,7 +647,7 @@ function genY3Arith(t, targetCount, sortMode) {
       () => { const a=rand(10,99); return {text:`${a} × 0 =`,answer:0,marks:1}; },
     ],
   };
-  const qs = buildFromPools(pools, {...t, _core:true}, targetCount, tt);
+  const qs = buildFromPools(pools, {...t, _core:Object.values(t).every(Boolean)}, targetCount, tt);
   return orderQuestions(qs, sortMode, Y3_TOPIC_ORDER);
 }
 
@@ -722,7 +722,7 @@ function genY4Arith(t, targetCount, sortMode) {
     ],
   };
 
-  let qs = buildFromPools(pools, {...t, _core:true}, targetCount, tt);
+  let qs = buildFromPools(pools, {...t, _core:Object.values(t).every(Boolean)}, targetCount, tt);
   if (qs.some(q => q.yg)) qs = qs.map(q => q.yg ? q : {...q, yg:'Y4'});
   return orderQuestions(qs, sortMode, Y4_TOPIC_ORDER, 'Y4');
 }
@@ -745,9 +745,18 @@ function genY5Arith(t, targetCount, sortMode) {
       () => { const a=rand(10000,49999),b=rand(1000,9999); return {text:`${a} + ${b} =`,answer:a+b,marks:1}; },
       () => { const a=rand(20000,79999),b=rand(1000,9999); return {text:`${a} - ${b} =`,answer:a-b,marks:1}; },
     ],
+    // Mixed digit lengths on purpose so pupils must line up place value carefully.
     y5Column: [
-      () => { const a=rand(20000,79999),b=rand(10000,20000); return {text:`${a} + ${b} =`,answer:a+b,col:true,marks:1}; },
-      () => { const a=rand(30000,99999),b=rand(10000,a-5000); return {text:`${a} - ${b} =`,answer:a-b,col:true,marks:1}; },
+      () => { const a=rand(10000,89999),b=rand(1000,9999); return {text:`${a} + ${b} =`,answer:a+b,col:true,marks:1}; },
+      () => { const a=rand(1000,9999),b=rand(10000,89999); return {text:`${a} + ${b} =`,answer:a+b,col:true,marks:1}; },
+      () => { const a=rand(10000,89999),b=rand(100,999); return {text:`${a} + ${b} =`,answer:a+b,col:true,marks:1}; },
+      () => { const a=rand(2000,9999),b=rand(100,999); return {text:`${a} + ${b} =`,answer:a+b,col:true,marks:1}; },
+      () => { const a=rand(20000,59999),b=rand(10000,39999); return {text:`${a} + ${b} =`,answer:a+b,col:true,marks:1}; },
+      () => { const a=rand(20000,99999),b=rand(1000,9999); return {text:`${a} - ${b} =`,answer:a-b,col:true,marks:1}; },
+      () => { const a=rand(10000,99999),b=rand(100,999); return {text:`${a} - ${b} =`,answer:a-b,col:true,marks:1}; },
+      () => { const a=rand(2000,9999),b=rand(100,999); return {text:`${a} - ${b} =`,answer:a-b,col:true,marks:1}; },
+      () => { const a=rand(40000,99999),b=rand(10000,a-10000); return {text:`${a} - ${b} =`,answer:a-b,col:true,marks:1}; },
+      () => { const a=rand(2,9)*10000+pick([0,1000,100]),b=rand(1000,9999); return {text:`${a} - ${b} =`,answer:a-b,col:true,marks:1}; },
     ],
     y5ShortMult: [
       () => { const a=rand(1002,3999),b=rand(3,9); return {text:`${a} × ${b} =`,answer:a*b,work:true,marks:1}; },
@@ -834,7 +843,7 @@ function genY5Arith(t, targetCount, sortMode) {
     ],
   };
 
-  let qs = buildFromPools(pools, {...t, _core:true}, targetCount, tt);
+  let qs = buildFromPools(pools, {...t, _core:Object.values(t).every(Boolean)}, targetCount, tt);
   if (qs.some(q => q.yg)) qs = qs.map(q => q.yg ? q : {...q, yg:'Y5'});
   return orderQuestions(qs, sortMode, Y5_TOPIC_ORDER, 'Y5');
 }
