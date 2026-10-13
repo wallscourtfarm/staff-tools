@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+/* WFA 13.10.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Writing Tracker New Scoring</title>
+<style>
+  /* Layout: a sticky-header marking grid (statements down the side, children across) under a class-year switcher. Palette: school blue plus neutrals tinted toward it; status colours carry their own text colours so they read in both themes. */
+  :root {
+    --bg:#f1f5f9; --surface:#ffffff; --surface2:#f8fafc; --fg:#0f172a; --fg2:#334155; --muted:#64748b;
+    --line:#e2e8f0; --line2:#eef2f7; --accent:#1798d3; --accent-fg:#ffffff;
+    --inv-bg:#0a0101; --inv-fg:#ffffff; --tier:#0a0101; --cat:#e2e8f0; --grp:#f1f5f9;
+    --red-bg:#fef2f2; --red-bd:#f87171; --red-fg:#991b1b;
+    --amb-bg:#fffbeb; --amb-bd:#fcd34d; --amb-fg:#92400e; --amb-fill:#fef3c7;
+    --grn-bg:#dcfce7; --grn-bd:#86efac; --grn-fg:#166534;
+    --shadow:0 1px 4px rgba(0,0,0,.1); --shadow-pop:0 6px 24px rgba(0,0,0,.25);
+    --hdr-font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#0b1220; --surface:#111a2b; --surface2:#16213a; --fg:#e6edf7; --fg2:#c3cfe0; --muted:#8a9bb5;
+    --line:#26344d; --line2:#1d2a42; --accent:#38bdf8; --accent-fg:#06202e;
+    --inv-bg:#e6edf7; --inv-fg:#0b1220; --tier:#050a14; --cat:#1d2a42; --grp:#16213a;
+    --red-bg:#3b1414; --red-bd:#b91c1c; --red-fg:#fecaca;
+    --amb-bg:#33260a; --amb-bd:#a16207; --amb-fg:#fde68a; --amb-fill:#3d2d0a;
+    --grn-bg:#0b2e1a; --grn-bd:#166534; --grn-fg:#bbf7d0;
+    --shadow:0 1px 4px rgba(0,0,0,.5); --shadow-pop:0 6px 24px rgba(0,0,0,.6); color-scheme:dark; } }
+  :root[data-theme="dark"] {
+    --bg:#0b1220; --surface:#111a2b; --surface2:#16213a; --fg:#e6edf7; --fg2:#c3cfe0; --muted:#8a9bb5;
+    --line:#26344d; --line2:#1d2a42; --accent:#38bdf8; --accent-fg:#06202e;
+    --inv-bg:#e6edf7; --inv-fg:#0b1220; --tier:#050a14; --cat:#1d2a42; --grp:#16213a;
+    --red-bg:#3b1414; --red-bd:#b91c1c; --red-fg:#fecaca;
+    --amb-bg:#33260a; --amb-bd:#a16207; --amb-fg:#fde68a; --amb-fill:#3d2d0a;
+    --grn-bg:#0b2e1a; --grn-bd:#166534; --grn-fg:#bbf7d0;
+    --shadow:0 1px 4px rgba(0,0,0,.5); --shadow-pop:0 6px 24px rgba(0,0,0,.6); color-scheme:dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:var(--hdr-font); background:var(--bg); color:var(--fg); }
+  header { background:var(--accent); color:var(--accent-fg); padding:12px 18px; }
+  header h1 { margin:0; font-size:17px; text-wrap:balance; } header p { margin:2px 0 0; font-size:12px; opacity:.92; }
+  .wrap { padding-inline:16px; padding-block:12px 40px; max-width:1500px; margin:0 auto; }
+  .banner { background:var(--red-bg); border:2px solid var(--red-bd); color:var(--red-fg); border-radius:8px; padding:8px 12px; font-size:12px; font-weight:600; margin-bottom:10px; }
+  details.how { background:var(--surface); border-radius:10px; box-shadow:var(--shadow); margin-bottom:10px; font-size:13px; }
+  details.how summary { padding:9px 14px; font-weight:700; cursor:pointer; }
+  details.how .body { padding:0 14px 12px; line-height:1.5; max-width:100%; overflow-x:auto; }
+  details.how table { border-collapse:collapse; margin:6px 0 10px; font-size:12px; }
+  details.how td, details.how th { border:1px solid var(--line); padding:4px 9px; text-align:left; }
+  details.how th { background:var(--surface2); }
+  .classtabs { display:flex; gap:6px; flex-wrap:wrap; }
+  .ct { padding:9px 18px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--fg); font-size:14px; font-weight:800; cursor:pointer; }
+  .ct.active { background:var(--accent); color:var(--accent-fg); border-color:var(--accent); }
+  .group-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin:8px 0 4px; }
+  .legend { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:8px; border:2px solid transparent; font-size:12px; font-weight:600; cursor:pointer; background:var(--surface); color:var(--fg); box-shadow:var(--shadow); }
+  .chip .sw { width:14px; height:14px; border-radius:4px; border:1px solid rgba(0,0,0,.2); }
+  .chip.active { border-color:var(--fg); }
+  .btn { padding:6px 12px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--fg); font-size:12px; font-weight:600; cursor:pointer; }
+  .hint { font-size:12px; color:var(--fg2); margin:8px 0; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .lvltabs { display:flex; gap:6px; flex-wrap:wrap; }
+  .lt { padding:7px 14px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--fg); font-size:13px; font-weight:700; cursor:pointer; }
+  .lt.active { background:var(--inv-bg); color:var(--inv-fg); border-color:var(--inv-bg); }
+  .lt.below { border-color:var(--amb-bd); }
+  .lt small { font-weight:600; opacity:.8; }
+  .lvlnote { font-size:12px; color:var(--amb-fg); margin:3px 0 8px; min-height:16px; }
+  button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  .grid-scroll { overflow:auto; max-height:78vh; max-width:100%; background:var(--surface); border-radius:12px; box-shadow:var(--shadow); }
+  table { border-collapse:separate; border-spacing:0; width:auto; font-size:12px; }
+  th, td { padding:0; border-bottom:1px solid var(--line2); }
+  thead th { position:sticky; top:0; background:var(--surface); color:var(--fg2); z-index:4; text-align:center; padding:6px 4px; vertical-align:bottom; border-bottom:2px solid var(--line); }
+  th.skillh { text-align:left; padding:8px 10px; width:430px; min-width:430px; max-width:430px; left:0; z-index:6; font-size:13px; }
+  th.wh { font-size:11px; color:var(--muted); width:56px; min-width:56px; left:430px; z-index:6; }
+  th.pupilh { width:118px; min-width:118px; font-size:14px; font-weight:800; }
+  .wsel { display:block; margin:3px auto 4px; font-size:11px; font-weight:700; padding:2px 3px; border-radius:6px; border:1px solid var(--line); background:var(--surface); color:var(--fg); max-width:108px; }
+  .hbadge { display:inline-block; font-size:15px; font-weight:900; padding:1px 9px; border-radius:7px; }
+  .hexp { font-size:11px; color:var(--fg2); font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums; }
+  td.skilltd { position:sticky; left:0; z-index:2; background:var(--surface); color:var(--fg); text-align:left; padding:6px 10px; font-size:12px; line-height:1.35; width:430px; min-width:430px; max-width:430px; border-right:1px solid var(--line); }
+  td.skilltd .ex { display:block; font-size:11px; color:var(--muted); margin-top:2px; white-space:pre-line; }
+  .key { display:inline-block; background:var(--amb-fill); color:var(--amb-fg); border:1px solid var(--amb-bd); font-size:9px; font-weight:800; padding:0 5px; border-radius:8px; margin-left:6px; vertical-align:middle; }
+  td.wtd { position:sticky; left:430px; z-index:2; text-align:center; background:var(--surface2); border-right:1px solid var(--line); width:56px; min-width:56px; }
+  .wbox { width:44px; padding:3px 2px; text-align:center; font-size:13px; font-weight:700; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--fg); }
+  .wlock { display:inline-block; min-width:28px; padding:3px 6px; font-size:13px; font-weight:800; color:var(--fg2); background:var(--line); border-radius:6px; font-variant-numeric:tabular-nums; }
+  .wlock.zero { color:var(--muted); background:var(--grp); }
+  tr.tierrow td { background:var(--tier); color:#fff; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; padding:5px 10px; position:sticky; left:0; }
+  tr.catrow td { background:var(--cat); font-size:11px; font-weight:800; padding:4px 10px; color:var(--fg2); }
+  tr.grprow td { background:var(--grp); font-size:11px; font-weight:700; padding:3px 10px 3px 22px; color:var(--fg2); font-style:italic; }
+  td.cell { width:118px; min-width:118px; height:32px; text-align:center; font-size:11px; font-weight:700; cursor:pointer; user-select:none; border-right:1px solid var(--surface); }
+  td.cell:hover { filter:brightness(.93); }
+  td.cell.paint { cursor:copy; }
+  tr.sumrow td { vertical-align:top; background:var(--surface); border-bottom:3px solid var(--line); }
+  td.sum { padding:8px; font-size:11px; color:var(--fg); }
+  .warn { background:var(--amb-bg); border:1px solid var(--amb-bd); color:var(--amb-fg); border-radius:8px; padding:6px 8px; font-size:11px; font-weight:600; margin:2px 0 6px; line-height:1.35; }
+  .warn button { margin-top:4px; display:block; padding:4px 8px; border-radius:6px; border:1px solid var(--amb-bd); background:var(--surface); font-size:11px; font-weight:700; cursor:pointer; color:var(--amb-fg); }
+  .score { line-height:1; font-variant-numeric:tabular-nums; } .score .big { font-size:22px; font-weight:800; color:var(--accent); } .score .of { font-size:12px; color:var(--muted); font-weight:600; }
+  .pct { font-size:12px; font-weight:700; margin:2px 0 4px; font-variant-numeric:tabular-nums; }
+  .bar { display:flex; height:9px; border-radius:5px; overflow:hidden; background:var(--line2); margin:3px 0 4px; }
+  .bar span { display:block; height:100%; }
+  .nums { font-size:11px; color:var(--fg2); white-space:nowrap; } .cov { color:var(--muted); font-size:11px; }
+  .ready { display:inline-block; background:var(--grn-bg); color:var(--grn-fg); border:1px solid var(--grn-bd); border-radius:10px; padding:0 7px; font-size:10px; font-weight:800; margin-top:3px; }
+  .empty { padding:24px; font-size:13px; color:var(--muted); }
+  .picker { position:fixed; z-index:50; background:var(--surface); color:var(--fg); border-radius:12px; box-shadow:var(--shadow-pop); padding:8px; width:min(330px, calc(100vw - 16px)); display:none; max-height:92vh; overflow:auto; }
+  .picker.open { display:block; }
+  .picker h4 { margin:2px 4px 6px; font-size:12px; color:var(--fg2); font-weight:600; }
+  .picker button { display:flex; width:100%; align-items:center; gap:8px; text-align:left; border:2px solid transparent; border-radius:8px; padding:7px 10px; margin-bottom:4px; font-size:13px; font-weight:600; cursor:pointer; }
+  .picker button small { display:block; font-weight:400; font-size:11px; opacity:.85; }
+  .picker .sep { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; margin:6px 4px 4px; }
+  .wstatus { font-size:12px; color:var(--muted); } .wstatus.err { color:var(--red-fg); }
+  .wbox.changed { border-color:var(--accent); background:var(--surface2); box-shadow:0 0 0 1px var(--accent); }
+  #chgbody table { width:100%; } #chgbody td, #chgbody th { vertical-align:top; } #chgbody .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  #chgbody .rb { padding:2px 8px; font-size:11px; }
+  footer { text-align:center; font-size:11px; color:var(--muted); margin-top:16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Writing Tracker – proposed new scoring (review draft)</h1>
+  <p>Every statement in the framework (Y1 to Y5) with the draft weightings · fictitious children</p>
+</header>
+<div class="wrap">
+  <div class="banner">REVIEW DRAFT. This is the proposed new writing tracker, shown with made-up children and the draft weights. It is not connected to the live writing tracker, and nothing you do here changes real pupil data. Marks you make on the grid are not saved: if you refresh, they disappear. <b>Weights are different:</b> if you change a weight, it is saved for all staff, with your email and the time, so Innes can collect the changes without paper.</div>
+
+  <details class="how">
+    <summary>How the new scoring works (click to open)</summary>
+    <div class="body">
+      <p><b>1. For each statement, you pick one status</b> (click a cell). The tool never works the status out for you.</p>
+      <table>
+        <tr><th>Status</th><th>What it means</th><th>Share of the statement's weight earned</th></tr>
+        <tr><td>Secure</td><td>Taught and used accurately across multiple pieces of writing (over ¾ accurate)</td><td>100%</td></tr>
+        <tr><td>Developing</td><td>Using it with increasing success (about ⅔ accurate)</td><td>60%</td></tr>
+        <tr><td>Emerging</td><td>Used a few times with some success (about ½ accurate)</td><td>40%</td></tr>
+        <tr><td>Reteach</td><td>No or very little accuracy (0–25%); explicitly reteach</td><td>0%</td></tr>
+        <tr><td>Taught, not used</td><td>Taught, not yet seen in their writing</td><td>0% (counts)</td></tr>
+        <tr><td>x Not taught · Unreviewed</td><td>No evidence yet</td><td>not counted at all</td></tr>
+      </table>
+      <p><b>2. Percentages.</b> A child's <b>Expected %</b> = weight earned ÷ weight available across the non-negotiables and expected standards that count. <b>Greater depth %</b> is worked out separately from the greater depth statements. Non-negotiables are part of the percentage; there is no pass/fail on them.</p>
+      <p><b>3. Grade</b> for a child working at their own year group: <b>D</b> = expected ≥ 90% and greater depth ≥ 60% · <b>O1</b> = expected ≥ 75% · <b>O2</b> = expected ≥ 65% · <b>Y</b> = expected ≥ 50%.</p>
+      <p><b>4. Below 50% of the year group's expected statements</b> means "at an earlier stage": <b>A - Yn</b>. The teacher chooses which year's statements a child is working at (the "working at" box under the child's initials). If a child on an earlier year's statements is still under 50% of them, the tool flags it and offers to move them one year lower. It is always the teacher's decision. Below Y1 is recorded as <b>A - EY</b>.</p>
+      <p><b>5. Weights</b> (0 to 10, whole numbers) are shown next to each statement and start at the draft values. <b>This is the one thing you can change that is kept.</b> Type a new weight in a box and it is saved straight away for all staff, along with your email and the time. A box that differs from the draft turns blue, and the list of changes is under the grid. These are proposals only: they do not change the live writing tracker. In the final tool the weights would be locked.</p>
+    </div>
+  </details>
+
+  <div class="group-label">Class year group</div>
+  <div class="classtabs" id="classtabs"></div>
+
+  <div class="group-label">Status key (click one, then click cells to paint it; or just click any cell)</div>
+  <div class="legend" id="legendJudge"></div>
+  <div class="legend" id="legendNone" style="margin-top:6px"></div>
+  <div class="hint">
+    <span id="paintHint">Paint mode off.</span>
+    <button class="btn" id="paintOff" style="display:none">Stop painting</button>
+    <button class="btn" id="clearBtn">Clear all marks (empty class)</button>
+    <button class="btn" id="resetBtn">Reload the example children</button>
+    <label style="font-weight:600"><input type="checkbox" id="lockW"> Preview final version: lock the weights</label>
+    <span id="wstatus" class="wstatus"></span>
+  </div>
+
+  <div class="group-label">Which year's statements</div>
+  <div class="lvltabs" id="lvltabs"></div>
+  <div class="lvlnote" id="lvlnote"></div>
+
+  <div class="grid-scroll"><table id="grid"></table></div>
+
+  <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
+  <footer>Proposed new scoring tool · review draft WFA-13.10.26b · draft weights of 12.10.26 · statements as in the current framework (wording may change)</footer>
+</div>
+<div class="picker" id="picker"></div>
+
+<script>
+const SKILLS = {"Y1": [{"id": "Y1_001", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Express their ideas and feelings about their experiences orally using full sentences, including use of past, present and future tenses and making use of conjunctions, with modelling and support from their teacher.", "example": ""}, {"id": "Y1_002", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Hold a pencil effectively in preparation for fluent writing – using the tripod grip in almost all cases", "example": ""}, {"id": "Y1_003", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Write recognisable letters, most of which are correctly formed", "example": ""}, {"id": "Y1_004", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Spell Phase 3 words by segmenting them and representing the sounds with a letter or letters", "example": ""}, {"id": "Y1_005", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Write simple phrases and sentences, using finger spaces, that can be read by others.", "example": ""}, {"id": "Y1_006", "tier": "expected", "category": "Composition", "skill": "Write for a range of purposes and audiences, including to entertain, inform, argue and explain across the curriculum. Writing should be based on personal experiences and on those of others as well as through the use of high quality texts.", "example": ""}, {"id": "Y1_007", "tier": "expected", "category": "Composition", "skill": "Write to convey information.", "example": ""}, {"id": "Y1_008", "tier": "expected", "category": "Composition", "skill": "Compose a sentence orally before writing it", "example": "", "key_essential": true}, {"id": "Y1_009", "tier": "expected", "category": "Composition", "skill": "story language", "example": "e.g. once upon a time/one day/happily ever after", "group": "Use simple narrative language features"}, {"id": "Y1_010", "tier": "expected", "category": "Composition", "skill": "power of three", "example": "e.g. he walked and he walked and he walked", "group": "Use simple narrative language features"}, {"id": "Y1_011", "tier": "expected", "category": "Sentence Structure", "skill": "Use 'and' to join words", "example": "e.g. The dragon was huge and angry and scary."}, {"id": "Y1_012", "tier": "expected", "category": "Sentence Structure", "skill": "Use 'and' to join clauses", "example": "e.g. The dragon was huge and it breathed fire.", "key_essential": true}, {"id": "Y1_013", "tier": "expected", "category": "Tense & Verb Form", "skill": "Use present tense with some accuracy", "example": "e.g. I walk to school."}, {"id": "Y1_014", "tier": "expected", "category": "Tense & Verb Form", "skill": "Use past tense with some accuracy", "example": "e.g. I walked to school."}, {"id": "Y1_015", "tier": "expected", "category": "Cohesion", "skill": "Write linked sentences after discussion with teacher", "example": ""}, {"id": "Y1_016", "tier": "expected", "category": "Punctuatation", "skill": "Use many capital letters accurately at the start of sentences.", "example": "", "key_essential": true}, {"id": "Y1_017", "tier": "expected", "category": "Punctuatation", "skill": "Use many full stops accurately to demarcate the end of a completed idea.", "example": "", "key_essential": true}, {"id": "Y1_018", "tier": "expected", "category": "Punctuatation", "skill": "Consistently use capital letter for ‘I’ and their own name.", "example": ""}, {"id": "Y1_019", "tier": "expected", "category": "Punctuatation", "skill": "Some use of capital letters for proper nouns", "example": "e.g. He saw Peter."}, {"id": "Y1_020", "tier": "expected", "category": "Punctuatation", "skill": "Begin to punctuate sentences using question marks", "example": "e.g. Where did he go?"}, {"id": "Y1_021", "tier": "expected", "category": "Punctuatation", "skill": "Begin to punctuate sentences using exclamation marks", "example": "e.g. Zoom! The rocket flew."}, {"id": "Y1_022", "tier": "expected", "category": "Spelling", "skill": "Make phonetically plausible spelling choices in line with school’s phonics progression and the phonemes taught so far.", "example": "", "key_essential": true}, {"id": "Y1_023", "tier": "expected", "category": "Spelling", "skill": "Spell many Y1 common exception words.", "example": "", "key_essential": true}, {"id": "Y1_024", "tier": "expected", "category": "Spelling", "skill": "Apply Year 1 spelling rules", "example": "e.g. tch usually spelt as tch if it comes straight after a single vowel letter"}, {"id": "Y1_025", "tier": "expected", "category": "Spelling", "skill": "Spell the days of the week", "example": ""}, {"id": "Y1_026", "tier": "expected", "category": "Handwriting", "skill": "Form most lower-case letters in the correct direction, starting and finishing in the right place.", "example": "", "key_essential": true}, {"id": "Y1_027", "tier": "expected", "category": "Handwriting", "skill": "Form most capital letters correctly.", "example": ""}, {"id": "Y1_028", "tier": "expected", "category": "Handwriting", "skill": "Use finger spaces consistently.", "example": "", "key_essential": true}, {"id": "Y1_029", "tier": "expected", "category": "Editing & Revising", "skill": "Re-read what they have written to check that it makes sense edit to correct errors.", "example": "", "key_essential": true}, {"id": "Y1_030", "tier": "greater_depth", "category": "Composition", "skill": "Manipulate the language and grammar taught within Year 1 in a range of independent writing, drawing on shared reading.", "example": ""}, {"id": "Y1_031", "tier": "greater_depth", "category": "Composition", "skill": "Consistently use vocabulary from across the curriculum in their writing", "example": ""}, {"id": "Y1_032", "tier": "greater_depth", "category": "Composition", "skill": "Maintain the quality and accuracy of their writing when writing at greater length", "example": ""}, {"id": "Y1_033", "tier": "greater_depth", "category": "Composition", "skill": "Use simple noun phrases", "example": ""}, {"id": "Y1_034", "tier": "greater_depth", "category": "Spelling", "skill": "Add -ing and -ed where there is no change to the root word", "example": "e.g. jumped, jumping, played, playing."}, {"id": "Y1_035", "tier": "greater_depth", "category": "Spelling", "skill": "Spell words with the prefix -un", "example": ""}, {"id": "Y1_036", "tier": "greater_depth", "category": "Spelling", "skill": "Add the suffix -er and -est where no change is needed to the spelling of the root word", "example": "e.g. low, lowest"}, {"id": "Y1_037", "tier": "greater_depth", "category": "Spelling", "skill": "Add -s to nouns and verbs", "example": "e.g. flowers, plants, grows, likes."}, {"id": "Y1_038", "tier": "greater_depth", "category": "Spelling", "skill": "Consistently apply year 1 spelling expectations in their writing across the curriculum.", "example": ""}, {"id": "Y1_039", "tier": "greater_depth", "category": "Editing & Revising", "skill": "Some use of editing strategies to improve the accuracy of spelling, punctuation and grammar", "example": ""}], "Y2": [{"id": "Y2_001", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Spell the Year 1 common exception words", "example": ""}, {"id": "Y2_002", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Accurately read and write using the Year 1 phonemes", "example": ""}, {"id": "Y2_003", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Write to convey information using and to join words and clauses", "example": ""}, {"id": "Y2_004", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use present and past tense with some accuracy.", "example": ""}, {"id": "Y2_005", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use many full stops accurately to demarcate the end of a completed idea.", "example": ""}, {"id": "Y2_006", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use many capital letters accurately at the start of sentences.", "example": ""}, {"id": "Y2_007", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Form lower case letters, capital letters and digits 0-9 correctly and understand which letters belong to which family", "example": ""}, {"id": "Y2_008", "tier": "expected", "category": "Composition", "skill": "Write for a range of purposes and audiences including to entertain, inform, argue and explain across the curriculum. Writing should be based on personal experiences and of those of others as well as through the use of high quality texts.", "example": ""}, {"id": "Y2_009", "tier": "expected", "category": "Composition", "skill": "Use the main language features of narrative \ne.g. story language, powerful verbs, tense, third person, power of 3", "example": "e.g. He wore old shoes, a dark cloak and had a scruffy beard.", "key_essential": true}, {"id": "Y2_010", "tier": "expected", "category": "Composition", "skill": "Write about real events, recording these simply and clearly", "example": ""}, {"id": "Y2_011", "tier": "expected", "category": "Composition", "skill": "Use the main language features of non-fiction", "example": "e.g. imperative verbs for instructions, adverbs such as firstly, next, then, third person for reports", "key_essential": true}, {"id": "Y2_012", "tier": "expected", "category": "Composition", "skill": "Statement", "example": "e.g. John was cold. / Lizards have scaly skin.", "group": "Use sentences with all different forms:"}, {"id": "Y2_013", "tier": "expected", "category": "Composition", "skill": "Exclamation", "example": "e.g. The dragon was huge! / It was great fun! * Note: No expectation to use exclamation mark", "group": "Use sentences with all different forms:"}, {"id": "Y2_014", "tier": "expected", "category": "Composition", "skill": "Question", "example": "e.g. Would like to read about mammals?", "group": "Use sentences with all different forms:"}, {"id": "Y2_015", "tier": "expected", "category": "Composition", "skill": "Command", "example": "e.g. Come to the party.  Bring all your friends.", "group": "Use sentences with all different forms:"}, {"id": "Y2_016", "tier": "expected", "category": "Composition", "skill": "Create simple settings in narratives", "example": "e.g. the woods, under the sea, space"}, {"id": "Y2_017", "tier": "expected", "category": "Composition", "skill": "Use a variety of simple pronouns", "example": "e.g. she, her, the girl, John"}, {"id": "Y2_018", "tier": "expected", "category": "Composition", "skill": "Use expanded noun phrases to describe and specify", "example": "e.g. A huge, scary monster. A brilliant day out"}, {"id": "Y2_019", "tier": "expected", "category": "Sentence Structure", "skill": "Simple sentences", "example": "e.g. John sneezed."}, {"id": "Y2_020", "tier": "expected", "category": "Sentence Structure", "skill": "Co-ordination", "example": "e.g. It was cold but we still had to go outside.  and, or, but, so", "key_essential": true}, {"id": "Y2_021", "tier": "expected", "category": "Sentence Structure", "skill": "Subordination", "example": "e.g. Joan was fed up because she couldn’t get to sleep.  When, if, that, because"}, {"id": "Y2_022", "tier": "expected", "category": "Tense & Verb Form", "skill": "Simple past", "example": "e.g. Birds flew in the sky.     Continuous past e.g Birds were flying in the sky.", "group": "Use the present and past tenses mostly correctly and consistently", "key_essential": true}, {"id": "Y2_023", "tier": "expected", "category": "Tense & Verb Form", "skill": "Simple present", "example": "e.g. Birds fly in the sky.   Continuous present e.g Birds are flying in the sky", "group": "Use the present and past tenses mostly correctly and consistently", "key_essential": true}, {"id": "Y2_024", "tier": "expected", "category": "Cohesion", "skill": "Start to use paragraphs to group related information", "example": ""}, {"id": "Y2_025", "tier": "expected", "category": "Cohesion", "skill": "Use simple organisational devices", "example": "e.g. headings, sub-headings, captions"}, {"id": "Y2_026", "tier": "expected", "category": "Punctuatation", "skill": "Aa  for the start of sentences and proper nouns", "example": "", "group": "Demarcate most completed ideas in their writing with capital letters and full stops and use question marks correctly when required.", "key_essential": true}, {"id": "Y2_027", "tier": "expected", "category": "Punctuatation", "skill": "Accurate use of full stops to demarcate the end of a completed idea", "example": "", "group": "Demarcate most completed ideas in their writing with capital letters and full stops and use question marks correctly when required.", "key_essential": true}, {"id": "Y2_028", "tier": "expected", "category": "Punctuatation", "skill": "?", "example": "", "group": "Demarcate most completed ideas in their writing with capital letters and full stops and use question marks correctly when required.", "key_essential": true}, {"id": "Y2_029", "tier": "expected", "category": "Punctuatation", "skill": "Use apostrophes for contractions correctly", "example": "e.g. can't, won't, shouldn't"}, {"id": "Y2_030", "tier": "expected", "category": "Spelling", "skill": "Segment spoken words into phonemes and represent these by graphemes, spelling many of these words correctly and making phonically-plausible attempts at others (taking account of taught spelling rules).", "example": "", "key_essential": true}, {"id": "Y2_031", "tier": "expected", "category": "Spelling", "skill": "Some evidence of year two spelling rules applied independently once taught", "example": "e.g. the u sound spelt with an o, mother"}, {"id": "Y2_032", "tier": "expected", "category": "Spelling", "skill": "Spell many Y2 common exception words.", "example": "", "key_essential": true}, {"id": "Y2_033", "tier": "expected", "category": "Handwriting", "skill": "Form capital letters and digits of the correct size, orientation, and relationship to one another and to lowercase letters.", "example": ""}, {"id": "Y2_034", "tier": "expected", "category": "Handwriting", "skill": "Ascenders and descenders are of the correct relative size.", "example": "", "key_essential": true}, {"id": "Y2_035", "tier": "expected", "category": "Handwriting", "skill": "Use spacing between words that reflects the size of the letters.", "example": "", "key_essential": true}, {"id": "Y2_036", "tier": "expected", "category": "Editing & Revising", "skill": "Re-read what they have written to check that it makes sense edit to correct errors.", "example": "", "key_essential": true}, {"id": "Y2_037", "tier": "expected", "category": "Editing & Revising", "skill": "Use a dictionary, finding the word using the initial letter", "example": ""}, {"id": "Y2_038", "tier": "greater_depth", "category": "Composition", "skill": "Write effectively and coherently for different purposes, drawing on their reading to inform the vocabulary and grammar of their writing", "example": ""}, {"id": "Y2_039", "tier": "greater_depth", "category": "Punctuation", "skill": "Use the punctuation taught at KS1 mostly correctly:", "example": ""}, {"id": "Y2_040", "tier": "greater_depth", "category": "Punctuation", "skill": "Use commas in lists", "example": "e.g. The dragon was big, scary and dangerous."}, {"id": "Y2_041", "tier": "greater_depth", "category": "Punctuation", "skill": "contraction", "example": "e.g. won't / don’t / didn’t / can’t", "group": "Apostrophes"}, {"id": "Y2_042", "tier": "greater_depth", "category": "Punctuation", "skill": "Singular possession", "example": "e.g. John’s house.", "group": "Apostrophes"}, {"id": "Y2_043", "tier": "greater_depth", "category": "Punctuation", "skill": "Add suffixes to spell most words correctly in their writing (e.g. –ment, –ness, – ful, –less, –ly). Excitement, sadness, hopeless, suddenly, joyful, cheerful", "example": ""}, {"id": "Y2_044", "tier": "greater_depth", "category": "Spelling", "skill": "Spell most common exception words.", "example": ""}, {"id": "Y2_045", "tier": "greater_depth", "category": "Spelling", "skill": "Add suffixes to spell most words correctly in their writing (e.g. –ment, –ness, – ful, –less, –ly). Excitement, sadness, hopeless, suddenly, joyful, cheerful", "example": ""}, {"id": "Y2_046", "tier": "greater_depth", "category": "Handwriting", "skill": "Use the diagonal and horizontal strokes needed to join some letters", "example": ""}, {"id": "Y2_047", "tier": "greater_depth", "category": "Editing & Revising", "skill": "Consistently using both editing and revising strategies independently to improve the quality and accuracy of their writing.", "example": ""}], "Y3": [{"id": "Y3_001", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Spell some KS1 common exception words correctly", "example": ""}, {"id": "Y3_002", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Spell using the KS1 phonemes mostly", "example": ""}, {"id": "Y3_003", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Add -er, -est, -ing, -ed, -s where there is no change to the root word e.g. jump, jumping, jumper", "example": ""}, {"id": "Y3_004", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Demarcate most completed ideas accurately with a capital letter at the start and a full stop at the end", "example": ""}, {"id": "Y3_005", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Form letters of the correct size relative to one another", "example": ""}, {"id": "Y3_006", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use expanded noun phrases to add detail e.g. the scary dragon, red hot flames", "example": ""}, {"id": "Y3_007", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Write sentences that make sense", "example": ""}, {"id": "Y3_008", "tier": "expected", "category": "Composition", "skill": "Write for a range of purposes and audiences, including to entertain, inform, argue and explain", "example": ""}, {"id": "Y3_009", "tier": "expected", "category": "Composition", "skill": "Describe settings and characters in narratives", "example": "e.g. describing characters' appearance, feelings, through the use of dialogue"}, {"id": "Y3_010", "tier": "expected", "category": "Composition", "skill": "technical language", "example": "e.g. The magnets repelled each other.", "group": "Consistently use the language features of non-fiction"}, {"id": "Y3_011", "tier": "expected", "category": "Composition", "skill": "precise nouns and pronouns", "example": "e.g. oak tree instread of tree / sparrow instead of bird", "group": "Consistently use the language features of non-fiction"}, {"id": "Y3_012", "tier": "expected", "category": "Composition", "skill": "use of speech", "example": "e.g. \"Can you reach it?\" asked Paul.", "group": "Consistently use the language features of a narrative"}, {"id": "Y3_013", "tier": "expected", "category": "Composition", "skill": "power of three (3 adjectives, 3 short sentences, 3 questions etc)", "example": "e.g. She leapt pver the gate, across the field and into the barn", "group": "Consistently use the language features of a narrative"}, {"id": "Y3_014", "tier": "expected", "category": "Composition", "skill": "similes", "example": "e.g. He was like an angry dragon.", "group": "Use figurative language", "key_essential": true}, {"id": "Y3_015", "tier": "expected", "category": "Composition", "skill": "alliteration", "example": "e.g. The deadly dragon let out a flurry of ferocious flames.", "group": "Use figurative language"}, {"id": "Y3_016", "tier": "expected", "category": "Sentence Structure", "skill": "Use conjunctions, prepositions and adverbs for time", "example": "e.g. when, before, next, then, later", "key_essential": true}, {"id": "Y3_017", "tier": "expected", "category": "Sentence Structure", "skill": "Use conjunctions, prepositions and adverbs for cause", "example": "e.g. because, since, as, so", "key_essential": true}, {"id": "Y3_018", "tier": "expected", "category": "Sentence Structure", "skill": "Use conjunctions, prepositions and adverbs for place", "example": "e.g. when, in, above, under, next to", "key_essential": true}, {"id": "Y3_019", "tier": "expected", "category": "Sentence Structure", "skill": "compound sentences using co-ordinating conjunctions (e.g. yet, so)", "example": "", "group": "Extend the range of sentences with more than one clause by using a range of conjunctions to write…", "key_essential": true}, {"id": "Y3_020", "tier": "expected", "category": "Sentence Structure", "skill": "complex sentences using subordinate conjunctions (e.g. as, while, before, after, until, while)", "example": "", "group": "Extend the range of sentences with more than one clause by using a range of conjunctions to write…"}, {"id": "Y3_021", "tier": "expected", "category": "Sentence Structure", "skill": "Use noun phrases expanded with adjectives and adverbs", "example": "e.g. extremely hot flames / a brave and dangerous mission / the most terrifying dragon in the whole world", "key_essential": true}, {"id": "Y3_022", "tier": "expected", "category": "Tense & Verb Form", "skill": "Past perfect (It happened in the past)", "example": "e.g. He had not finished his meal. / They had not seen him before.", "group": "Use present and past tense correctly and consistently"}, {"id": "Y3_023", "tier": "expected", "category": "Tense & Verb Form", "skill": "Present perfect (It started in the past and continued into the present)", "example": "e.g. He had left that morning… She has baked cakes for years…", "group": "Use present and past tense correctly and consistently"}, {"id": "Y3_024", "tier": "expected", "category": "Tense & Verb Form", "skill": "Use the progressive form of the verb to show actions in progress / continuous action", "example": "e.g. The dragon was flying in the air. The flames are burning the village.", "group": "Use present and past tense correctly and consistently"}, {"id": "Y3_025", "tier": "expected", "category": "Tense & Verb Form", "skill": "Use tense correctly and consistently throughout a piece of writing.", "example": "", "group": "Use present and past tense correctly and consistently"}, {"id": "Y3_026", "tier": "expected", "category": "Cohesion", "skill": "Start to use paragraphs to group relate information (based on time, place, topic)", "example": ""}, {"id": "Y3_027", "tier": "expected", "category": "Cohesion", "skill": "Use simple organisational devices", "example": "e.g. headings, subheadings, captions"}, {"id": "Y3_028", "tier": "expected", "category": "Cohesion", "skill": "Use nouns and pronouns to aid cohesion within sentences", "example": "e.g. Tom ran…he felt...the lad was exhausted"}, {"id": "Y3_029", "tier": "expected", "category": "Punctuatation", "skill": "KS1 expectations: Demarcate most completed ideas accurately with a capital letter at the start and a full stop at the end", "example": "", "group": "Punctuate sentences accurately"}, {"id": "Y3_030", "tier": "expected", "category": "Punctuatation", "skill": "exclamation marks", "example": "e.g. He slammed the book down on the table!", "group": "Punctuate sentences accurately"}, {"id": "Y3_031", "tier": "expected", "category": "Punctuatation", "skill": "commas in lists", "example": "e.g. He picked up an apple, an orange and a biscuit. / He paused, scanned the cave and crouched down.", "group": "Punctuate sentences accurately"}, {"id": "Y3_032", "tier": "expected", "category": "Punctuatation", "skill": "Use apostrophes for contractions correctly", "example": "e.g. can't, won't, shouldn't", "key_essential": true}, {"id": "Y3_033", "tier": "expected", "category": "Punctuatation", "skill": "Use apostrophes for singular possession correctly", "example": "e.g. the dragon's teeth"}, {"id": "Y3_034", "tier": "expected", "category": "Punctuatation", "skill": "Punctuate speech using just inverted commas (speech marks) with some accuracy", "example": "", "key_essential": true}, {"id": "Y3_035", "tier": "expected", "category": "Spelling", "skill": "Apply Y3 spelling rules.", "example": "", "key_essential": true}, {"id": "Y3_036", "tier": "expected", "category": "Spelling", "skill": "Spell some words from the Y3/4 spelling list correctly", "example": ""}, {"id": "Y3_037", "tier": "expected", "category": "Handwriting", "skill": "Maintain a legible and consistent handwriting style", "example": ""}, {"id": "Y3_038", "tier": "expected", "category": "Handwriting", "skill": "Secure using cursive handwriting.", "example": "", "key_essential": true}, {"id": "Y3_039", "tier": "expected", "category": "Handwriting", "skill": "Use the diagonal and horizontal strokes that are needed to join letters and understand which letters, when adjacent to one another are best left unjoined", "example": ""}, {"id": "Y3_040", "tier": "expected", "category": "Editing & Revising", "skill": "Edit writing in relation to Year 3 grammar, punctuation and spelling expectations", "example": "e.g. adding in missing punctuation, correcting spellings and correcting tense and verb forms. Editing = technical accuracy.", "key_essential": true}, {"id": "Y3_041", "tier": "expected", "category": "Editing & Revising", "skill": "Revise writing using Year 3 skills", "example": "e.g. adding in, or more effectively using, the skills outlined in composition, sentence structure and cohesion. Revising = uplevelling."}, {"id": "Y3_042", "tier": "greater_depth", "category": "Composition", "skill": "Maintain the quality and accuracy of their writing when writing at greater length.", "example": ""}, {"id": "Y3_043", "tier": "greater_depth", "category": "Composition", "skill": "Manipulate the language and grammar taught in Year 3 in a range of independent writing, drawing on shared and independent reading.", "example": ""}, {"id": "Y3_044", "tier": "greater_depth", "category": "Composition", "skill": "Consistently use vocabulary from across the curriculum in their writing.", "example": ""}, {"id": "Y3_045", "tier": "greater_depth", "category": "Sentence Structure", "skill": "Understand the concept of a main and subordinate clause", "example": "e.g. main: She decided to rescue the prince… sub: ...although the dragon was dangerous"}, {"id": "Y3_046", "tier": "greater_depth", "category": "Sentence Structure", "skill": "Begin to use commas to separate main and subordinate clauses", "example": "e.g. Although the dragon was dangerous, she decided to rescue the prince."}, {"id": "Y3_047", "tier": "greater_depth", "category": "Punctuation", "skill": "Begin to demarcate speech with all necessary punctuation i.e. punctuating at the end of speech inside the inverted comma, new speaker new line.", "example": ""}, {"id": "Y3_048", "tier": "greater_depth", "category": "Editing & Revising", "skill": "Consistently using both editing and revising strategies independently to improve the quality and accuracy of their writing.", "example": ""}], "Y4": [{"id": "Y4_001", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Spell KS1 common exception words as well as some Y3/4 words accurately.", "example": ""}, {"id": "Y4_002", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use the following punctuation securely: full stops to demarcate the end of a completed idea, capital letters, question marks and commas for lists.", "example": ""}, {"id": "Y4_003", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use a range of adverbs for time e.g. later, soon, next and place e.g. here, there, away, nearby.", "example": ""}, {"id": "Y4_004", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use simple past and present tense mostly accurately.", "example": ""}, {"id": "Y4_005", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use a range of coordinating and subordinating conjunctions.", "example": ""}, {"id": "Y4_006", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use apostrophes for contractions correctly", "example": ""}, {"id": "Y4_007", "tier": "expected", "category": "Composition", "skill": "Write for a range of purposes and audiences, including to entertain, inform, argue and explain across the curriculum", "example": ""}, {"id": "Y4_008", "tier": "expected", "category": "Composition", "skill": "Describe settings and characters in narratives", "example": "e.g. describing characters' behaviour, thoughts, reactions to events e.g. As Varjak cautiously crept into the room, he thought this could be it. His fur stood on end.", "key_essential": true}, {"id": "Y4_009", "tier": "expected", "category": "Composition", "skill": "similes", "example": "e.g. Like a statue, he stood still hoping not to be noticed.", "group": "Develop the use of figurative language", "key_essential": true}, {"id": "Y4_010", "tier": "expected", "category": "Composition", "skill": "alliteration", "example": "e.g. The leaves flutter, fly and flip in autumn.", "group": "Develop the use of figurative language"}, {"id": "Y4_011", "tier": "expected", "category": "Composition", "skill": "hyperbole (used to exaggerate, add emphasis, add humour or gain attention)", "example": "e.g. She cried what seemed like a river of tears.", "group": "Develop the use of figurative language"}, {"id": "Y4_012", "tier": "expected", "category": "Composition", "skill": "Power of three (three sentences, three adjectives, three verbs etc) linked to sentence work", "example": "e.g. The cottage was almost invisible, hiding under a thick layer of snow and glistening in the sunlight."}, {"id": "Y4_013", "tier": "expected", "category": "Composition", "skill": "Precise nouns and pronouns", "example": "e.g. oak tree instead of tree, sparrow instead of bird", "group": "Expand their use of non-fiction language features"}, {"id": "Y4_014", "tier": "expected", "category": "Composition", "skill": "Technical vocabulary linked to enquiry", "example": "", "group": "Expand their use of non-fiction language features"}, {"id": "Y4_015", "tier": "expected", "category": "Composition", "skill": "Curriculum linked descriptive language", "example": "e.g. Some reptiles can skilfully camouflage themselves", "group": "Expand their use of non-fiction language features"}, {"id": "Y4_016", "tier": "expected", "category": "Sentence Structure", "skill": "Use a range of subordinating conjunctions to form complex sentences", "example": "e.g. as, while, before, after, until, while although, since, even though, though"}, {"id": "Y4_017", "tier": "expected", "category": "Sentence Structure", "skill": "at the start", "example": "e.g. Although it was dangerous, Alex was determined to face the dragon.", "group": "Show some variety in complex sentence structure, positioning the subordinate clause …"}, {"id": "Y4_018", "tier": "expected", "category": "Sentence Structure", "skill": "at the end", "example": "e.g. Alex was determined to face the dragon, although it was dangerous.", "group": "Show some variety in complex sentence structure, positioning the subordinate clause …"}, {"id": "Y4_019", "tier": "expected", "category": "Sentence Structure", "skill": "for time (when)", "example": "e.g. Many years ago,… After a while,…", "group": "Use fronted adverbials with a comma", "key_essential": true}, {"id": "Y4_020", "tier": "expected", "category": "Sentence Structure", "skill": "place (where)", "example": "e.g. Inside the castle,… All over its back,…", "group": "Use fronted adverbials with a comma", "key_essential": true}, {"id": "Y4_021", "tier": "expected", "category": "Sentence Structure", "skill": "for manner (how)", "example": "e.g. Shaking uncontrollably, … With fear in her eyes, ...", "group": "Use fronted adverbials with a comma", "key_essential": true}, {"id": "Y4_022", "tier": "expected", "category": "Sentence Structure", "skill": "compound sentences using co-ordinating conjunctions (e.g. yet, so)", "example": "", "group": "Extend the range of sentences with more than one clause by using a range of conjunctions to write…"}, {"id": "Y4_023", "tier": "expected", "category": "Sentence Structure", "skill": "complex sentences using subordinate conjunctions (e.g. as, while, before, after, until, while)", "example": "", "group": "Extend the range of sentences with more than one clause by using a range of conjunctions to write…", "key_essential": true}, {"id": "Y4_024", "tier": "expected", "category": "Sentence Structure", "skill": "prepositional phrases", "example": "e.g. the dragon with a fire-breathing mouth; with razor-sharp talons at the end of its arms", "group": "Use noun phrases expanded with", "key_essential": true}, {"id": "Y4_025", "tier": "expected", "category": "Sentence Structure", "skill": "modifying adjectives", "example": "e.g. A terrifying dragon with razor-sharp teeth.", "group": "Use noun phrases expanded with", "key_essential": true}, {"id": "Y4_026", "tier": "expected", "category": "Sentence Structure", "skill": "modifying nouns", "example": "e.g. Demon dragon …", "group": "Use noun phrases expanded with"}, {"id": "Y4_027", "tier": "expected", "category": "Tense & Verb Form", "skill": "Maintain the use of present and past tenses correctly and consistently throughout an extended piece of writing", "example": "e.g. a story written in the past tense with present tense for speech", "key_essential": true}, {"id": "Y4_028", "tier": "expected", "category": "Tense & Verb Form", "skill": "Use the present perfect form of verbs (describes completed actions/consequences)", "example": "e.g. The team has won. They have eaten their dinner.", "key_essential": true}, {"id": "Y4_029", "tier": "expected", "category": "Cohesion", "skill": "Organise content into relevant paragraphs across the text (awareness of new paragraph for a change in time, place or topic)", "example": "", "key_essential": true}, {"id": "Y4_030", "tier": "expected", "category": "Cohesion", "skill": "Use appropriate headings and sub-headings in non-fiction writing", "example": "e.g. newspaper report - headline to hook, non-chronological report - formal to introduce", "key_essential": true}, {"id": "Y4_031", "tier": "expected", "category": "Cohesion", "skill": "Maintain cohesion across a piece of writing, including through the use of a variety of nouns and pronouns e.g the dragon, the monster, the beast, it, Alex, she, the girl", "example": ""}, {"id": "Y4_032", "tier": "expected", "category": "Punctuatation", "skill": "Inverted commas to indicate speech", "example": "", "group": "Use inverted commas and other punctuation (capital letter & punctuate at end) to accurately to indicate direct speech e.g. Alex screamed, “Help me!\" or \"This dragon’s going to burn me to a crisp!” cried Josh.", "key_essential": true}, {"id": "Y4_033", "tier": "expected", "category": "Punctuatation", "skill": "Capital letter at the start of speech", "example": "", "group": "Use inverted commas and other punctuation (capital letter & punctuate at end) to accurately to indicate direct speech e.g. Alex screamed, “Help me!\" or \"This dragon’s going to burn me to a crisp!” cried Josh.", "key_essential": true}, {"id": "Y4_034", "tier": "expected", "category": "Punctuatation", "skill": "Punctuation at end of speech (before the inverted comma)", "example": "", "group": "Use inverted commas and other punctuation (capital letter & punctuate at end) to accurately to indicate direct speech e.g. Alex screamed, “Help me!\" or \"This dragon’s going to burn me to a crisp!” cried Josh.", "key_essential": true}, {"id": "Y4_035", "tier": "expected", "category": "Punctuatation", "skill": "Punctuation after the reporting clause if used at the beginning of the sentence", "example": "", "group": "Use inverted commas and other punctuation (capital letter & punctuate at end) to accurately to indicate direct speech e.g. Alex screamed, “Help me!\" or \"This dragon’s going to burn me to a crisp!” cried Josh.", "key_essential": true}, {"id": "Y4_036", "tier": "expected", "category": "Punctuatation", "skill": "New speaker, new line", "example": "", "group": "Use inverted commas and other punctuation (capital letter & punctuate at end) to accurately to indicate direct speech e.g. Alex screamed, “Help me!\" or \"This dragon’s going to burn me to a crisp!” cried Josh.", "key_essential": true}, {"id": "Y4_037", "tier": "expected", "category": "Punctuatation", "skill": "Use apostrophes for singular and plural possession", "example": ""}, {"id": "Y4_038", "tier": "expected", "category": "Spelling", "skill": "Apply Y4 spelling rules.", "example": "", "key_essential": true}, {"id": "Y4_039", "tier": "expected", "category": "Spelling", "skill": "Spell most words from the Y3/4 spelling list correctly", "example": ""}, {"id": "Y4_040", "tier": "expected", "category": "Handwriting", "skill": "Use the diagonal and horizontal strokes that are needed to join letters and understand which letters, when adjacent to one another, are best left unjoined.", "example": ""}, {"id": "Y4_041", "tier": "expected", "category": "Editing & Revising", "skill": "Edit writing in relation to Year 4 grammar, punctuation and spelling expectations to ensure it is technically accurate", "example": "e.g. adding in missing punctuation, correcting spellings and correcting tense and verb forms.", "key_essential": true}, {"id": "Y4_042", "tier": "expected", "category": "Editing & Revising", "skill": "Revise their writing in relation to the content", "example": "e.g. uplevelling vocabulary, adding clauses, adding words etc.", "key_essential": true}, {"id": "Y4_043", "tier": "greater_depth", "category": "Composition", "skill": "Maintain the quality and accuracy of their writing when writing at greater length.", "example": ""}, {"id": "Y4_044", "tier": "greater_depth", "category": "Composition", "skill": "Manipulate the language and grammar taught in Year 4 in a range of independent writing, drawing on shared and independent writing.", "example": ""}, {"id": "Y4_045", "tier": "greater_depth", "category": "Composition", "skill": "Consistently use vocabulary from across the curriculum in their writing.", "example": ""}, {"id": "Y4_046", "tier": "greater_depth", "category": "Punctuation", "skill": "Use commas to separate subordinate clauses", "example": "e.g. Because it was cold, we put on our coats."}, {"id": "Y4_047", "tier": "greater_depth", "category": "Editing & Revising", "skill": "Consistently using both editing and revising strategies independently to improve the quality and accuracy of their writing.", "example": ""}], "Y5": [{"id": "Y5_001", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Spell most words from the Year 3/4 list correctly.", "example": ""}, {"id": "Y5_002", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use co-ordinating and subordinating conjunctions.", "example": ""}, {"id": "Y5_003", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Identify main and subordinate clauses.", "example": ""}, {"id": "Y5_004", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Demarcate completed ideas accurately with full stops, capital letters, question marks and exclamation marks.", "example": ""}, {"id": "Y5_005", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use apostrophes for contractions and singular possession accurately.", "example": ""}, {"id": "Y5_006", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use speech marks around direct speech with some accuracy.", "example": ""}, {"id": "Y5_007", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use commas in lists.", "example": ""}, {"id": "Y5_008", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use simple paragraphs.", "example": ""}, {"id": "Y5_009", "tier": "non_neg", "category": "Non-Negotiatables", "skill": "Use the diagonal and horizontal strokes that are needed to join letters and understand which letters when adjacent to one another, are best left un-joined.", "example": ""}, {"id": "Y5_010", "tier": "expected", "category": "Composition", "skill": "Write for a range of purposes and audiences based on personal experiences and high quality texts", "example": "e.g. narratives, newspaper & chronological reports, diaries, letters, recounts, persuasive leaflets, advertising, discussion, instructions, explanation, poetry"}, {"id": "Y5_011", "tier": "expected", "category": "Composition", "skill": "Describe settings and characters in narratives", "example": "e.g. through using show-not-tell, describing reactions to other characters, reactions to the setting."}, {"id": "Y5_012", "tier": "expected", "category": "Composition", "skill": "Use dialogue in narrative to show the relationship between characters and move the action on.", "example": ""}, {"id": "Y5_013", "tier": "expected", "category": "Composition", "skill": "Begin to extend and refine their use of narrative language features", "example": "e.g. reported speech instead of direct, repetition for effect, power of three"}, {"id": "Y5_014", "tier": "expected", "category": "Composition", "skill": "similes", "example": "e.g. as angry as an erupting volcano", "group": "Use figurative language"}, {"id": "Y5_015", "tier": "expected", "category": "Composition", "skill": "personification", "example": "e.g. Gnarled fingers stretched out from the tree's body.", "group": "Use figurative language", "key_essential": true}, {"id": "Y5_016", "tier": "expected", "category": "Composition", "skill": "metaphor", "example": "e.g. He was an erupting volcano...", "group": "Use figurative language"}, {"id": "Y5_017", "tier": "expected", "category": "Composition", "skill": "allusion", "example": "e.g. It was a Pandora's box of horrors...", "group": "Use figurative language"}, {"id": "Y5_018", "tier": "expected", "category": "Composition", "skill": "idioms", "example": "e.g. Tom had been feeling under the weather for weeks.", "group": "Use figurative language"}, {"id": "Y5_019", "tier": "expected", "category": "Sentence Structure", "skill": "Simple", "example": "e.g. Tom scanned the horizon.", "group": "Use a range of simple, compound and complex sentence structures, moving the position of the subordinate clause"}, {"id": "Y5_020", "tier": "expected", "category": "Sentence Structure", "skill": "Compound", "example": "e.g. Tom wore a bowtie whereas Henry wore a tie.", "group": "Use a range of simple, compound and complex sentence structures, moving the position of the subordinate clause", "key_essential": true}, {"id": "Y5_021", "tier": "expected", "category": "Sentence Structure", "skill": "Subordination at the start", "example": "e.g. Although it was dangerous, Alex was determined to face the dragon.", "group": "Use a range of simple, compound and complex sentence structures, moving the position of the subordinate clause", "key_essential": true}, {"id": "Y5_022", "tier": "expected", "category": "Sentence Structure", "skill": "Subordination in the middle", "example": "e.g. Alex was determined, although it was dangerous, to face the dragon.", "group": "Use a range of simple, compound and complex sentence structures, moving the position of the subordinate clause"}, {"id": "Y5_023", "tier": "expected", "category": "Sentence Structure", "skill": "Subordination at the end", "example": "e.g. Alex was determined to face the dragon, although it was dangerous.", "group": "Use a range of simple, compound and complex sentence structures, moving the position of the subordinate clause"}, {"id": "Y5_024", "tier": "expected", "category": "Sentence Structure", "skill": "Relative clause", "example": "e.g. The young boy who was terribly thin and pale, escaped from the lorry. (defines which who specifically in this example)  / The young boy, who was terribly thin and pale, escaped from the lorry (this doesn’t define who in this example).", "group": "Use a range of simple, compound and complex sentence structures, moving the position of the subordinate clause", "key_essential": true}, {"id": "Y5_025", "tier": "expected", "category": "Sentence Structure", "skill": "Indicate degrees of possibility using modal verbs", "example": "e.g. can, could, couldn’t, should, will, won’t, would, may", "group": "Use a range of simple, compound and complex sentence structures, moving the position of the subordinate clause"}, {"id": "Y5_026", "tier": "expected", "category": "Sentence Structure", "skill": "Indicate degrees of possibility using adverbs", "example": "e.g. possibly, certainly, definitely, perhaps, surely", "group": "Use a range of simple, compound and complex sentence structures, moving the position of the subordinate clause"}, {"id": "Y5_027", "tier": "expected", "category": "Tense & Verb Form", "skill": "Simple tense i.e. past, present, future", "example": "e.g. They saw it. / They could see it. / They would see it soon.", "group": "Use verb tenses and verb forms consistently and accurately"}, {"id": "Y5_028", "tier": "expected", "category": "Tense & Verb Form", "skill": "Progressive tense (ongoing actions)", "example": "e.g. They were singing / They are singing / They will be singing", "group": "Use verb tenses and verb forms consistently and accurately"}, {"id": "Y5_029", "tier": "expected", "category": "Tense & Verb Form", "skill": "Perfect tense (describing completed actions)", "example": "e.g. It has been reported that dragon eggs have been found on the South coast. Scientists had believed the eggs were from a bird of prey but, after the first egg hatched yesterday, they have now confirmed the eggs are baby dragons.", "group": "Use verb tenses and verb forms consistently and accurately"}, {"id": "Y5_030", "tier": "expected", "category": "Cohesion", "skill": "Use organisational and presentational devices to structure text and to guide the reader", "example": "e.g. bullet points, diagrams, pictures, font size and type."}, {"id": "Y5_031", "tier": "expected", "category": "Cohesion", "skill": "Conjunctions", "example": "e.g. In addition (and), Alternatively (but), Fortunately (opinion), Meanwhile (when), For this reason (why)", "group": "Use a range of cohesive devices within and between paragraphs"}, {"id": "Y5_032", "tier": "expected", "category": "Cohesion", "skill": "Adverbials of time and place", "example": "e.g. As the sun set  / within the cave", "group": "Use a range of cohesive devices within and between paragraphs", "key_essential": true}, {"id": "Y5_033", "tier": "expected", "category": "Cohesion", "skill": "Synonyms", "example": "e.g. They rose higher into the sky. Within moments, they had climbed further still and had reached the clouds.", "group": "Use a range of cohesive devices within and between paragraphs"}, {"id": "Y5_034", "tier": "expected", "category": "Cohesion", "skill": "Pronouns (relative)", "example": "e.g. who, which, where, when, that, whose", "group": "Use a range of cohesive devices within and between paragraphs", "key_essential": true}, {"id": "Y5_035", "tier": "expected", "category": "Punctuatation", "skill": "Capital letters Aa", "example": "", "group": "Secure in previously taught punctuation & begin to use brackets, dashes and commas to mark parenthesis"}, {"id": "Y5_036", "tier": "expected", "category": "Punctuatation", "skill": "Accurate use of full stops to demarcate the end of a completed idea", "example": "", "group": "Secure in previously taught punctuation & begin to use brackets, dashes and commas to mark parenthesis"}, {"id": "Y5_037", "tier": "expected", "category": "Punctuatation", "skill": "Speech rules (\" \", CL at start, punctuation at end, new speaker new line, comma after reporting clause if needed)", "example": "", "group": "Secure in previously taught punctuation & begin to use brackets, dashes and commas to mark parenthesis", "key_essential": true}, {"id": "Y5_038", "tier": "expected", "category": "Punctuatation", "skill": "Question marks ?", "example": "", "group": "Secure in previously taught punctuation & begin to use brackets, dashes and commas to mark parenthesis"}, {"id": "Y5_039", "tier": "expected", "category": "Punctuatation", "skill": "Exclamation marks !", "example": "", "group": "Secure in previously taught punctuation & begin to use brackets, dashes and commas to mark parenthesis"}, {"id": "Y5_040", "tier": "expected", "category": "Punctuatation", "skill": "Ellipsis ...", "example": "", "group": "Secure in previously taught punctuation & begin to use brackets, dashes and commas to mark parenthesis"}, {"id": "Y5_041", "tier": "expected", "category": "Punctuatation", "skill": "Apostrophe for contraction didn't won't", "example": "", "group": "Secure in previously taught punctuation & begin to use brackets, dashes and commas to mark parenthesis", "key_essential": true}, {"id": "Y5_042", "tier": "expected", "category": "Punctuatation", "skill": "Apostrophe for possession", "example": "e.g. They left Joe's tent alone.", "group": "Secure in previously taught punctuation & begin to use brackets, dashes and commas to mark parenthesis", "key_essential": true}, {"id": "Y5_043", "tier": "expected", "category": "Punctuatation", "skill": "Brackets", "example": "e.g.Tom knew (he wasn't sure how but he did) that his fate was sealed.", "group": "Secure in previously taught punctuation & begin to use brackets, dashes and commas to mark parenthesis"}, {"id": "Y5_044", "tier": "expected", "category": "Punctuatation", "skill": "Hyphen", "example": "e.g. twenty-five (numbers) cold-blooded (compound adjective)", "group": "Secure in previously taught punctuation & begin to use brackets, dashes and commas to mark parenthesis"}, {"id": "Y5_045", "tier": "expected", "category": "Punctuatation", "skill": "Dash", "example": "e.g. Tom knew - without a shadow of a doubt - that his fae was sealed.", "group": "Secure in previously taught punctuation & begin to use brackets, dashes and commas to mark parenthesis"}, {"id": "Y5_046", "tier": "expected", "category": "Punctuatation", "skill": "Commas to mark subordinate and relative clauses", "example": "e.g. Alex, who was incredibly brave, charged up to the fierce creature. Alex charged up to the dragon, which was an incredibly brave thing to do.", "group": "Secure in previously taught punctuation & begin to use brackets, dashes and commas to mark parenthesis", "key_essential": true}, {"id": "Y5_047", "tier": "expected", "category": "Spelling", "skill": "Apply Year 5 spelling rules", "example": "", "key_essential": true}, {"id": "Y5_048", "tier": "expected", "category": "Spelling", "skill": "Spell some words from the Y5/6 spelling list correctly e. g homophones", "example": ""}, {"id": "Y5_049", "tier": "expected", "category": "Handwriting", "skill": "Write in a consistent and joined style, with increased quality and speed", "example": ""}, {"id": "Y5_050", "tier": "expected", "category": "Editing & Revising", "skill": "Edit writing in relation to Year 5 grammar, punctuation and spelling expectations.", "example": "", "key_essential": true}, {"id": "Y5_051", "tier": "expected", "category": "Editing & Revising", "skill": "Revise writing using Year 5 skills", "example": "e.g. adding in, or more effectively using, the skills outlined in composition, sentence structure and cohesion.", "key_essential": true}, {"id": "Y5_052", "tier": "greater_depth", "category": "Composition", "skill": "Maintain the quality and accuracy of their writing when writing at greater length.", "example": ""}, {"id": "Y5_053", "tier": "greater_depth", "category": "Composition", "skill": "Manipulate the language and grammar taught in Year 5 in a range of independent writing, drawing on shared and independent reading.", "example": ""}, {"id": "Y5_054", "tier": "greater_depth", "category": "Composition", "skill": "Consistently use vocabulary from across the curriculum in their writing.", "example": ""}, {"id": "Y5_055", "tier": "greater_depth", "category": "Sentence Structure", "skill": "Use expanded noun phrases to convey complicated information concisely", "example": "e.g. several species of dragon inhabit the forests of China. The dragon with golden scales is the most dangerous of all"}, {"id": "Y5_056", "tier": "greater_depth", "category": "Punctuation", "skill": "Use commas to clarify meaning or avoid ambiguity", "example": "e.g. The dragon, who had golden scales, flew across the sky. The dragon who had golden scales, flew across the sky."}, {"id": "Y5_057", "tier": "greater_depth", "category": "Editing & Revising", "skill": "Consistently use editing strategies to improve the accuracy of their writing.", "example": ""}, {"id": "Y5_058", "tier": "greater_depth", "category": "Editing & Revising", "skill": "Revise writing effectively with a good awareness of their writing's impact upon their reader.", "example": ""}]};
+const DRAFT = {"Y1_001": 5, "Y1_002": 4, "Y1_003": 4, "Y1_004": 5, "Y1_005": 5, "Y1_006": 2, "Y1_007": 3, "Y1_008": 4, "Y1_009": 2, "Y1_010": 0, "Y1_011": 5, "Y1_012": 5, "Y1_013": 4, "Y1_014": 4, "Y1_015": 3, "Y1_016": 5, "Y1_017": 5, "Y1_018": 5, "Y1_019": 4, "Y1_020": 2, "Y1_021": 0, "Y1_022": 5, "Y1_023": 3, "Y1_024": 0, "Y1_025": 0, "Y1_026": 4, "Y1_027": 4, "Y1_028": 4, "Y1_029": 3, "Y1_030": 1, "Y1_031": 1, "Y1_032": 1, "Y1_033": 1, "Y1_034": 1, "Y1_035": 1, "Y1_036": 1, "Y1_037": 1, "Y1_038": 1, "Y1_039": 1, "Y2_001": 1, "Y2_002": 1, "Y2_003": 1, "Y2_004": 1, "Y2_005": 1, "Y2_006": 1, "Y2_007": 1, "Y2_008": 3, "Y2_009": 4, "Y2_010": 2, "Y2_011": 2, "Y2_012": 1, "Y2_013": 1, "Y2_014": 1, "Y2_015": 1, "Y2_016": 5, "Y2_017": 4, "Y2_018": 5, "Y2_019": 4, "Y2_020": 4, "Y2_021": 2, "Y2_022": 4, "Y2_023": 4, "Y2_024": 1, "Y2_025": 3, "Y2_026": 5, "Y2_027": 5, "Y2_028": 4, "Y2_029": 4, "Y2_030": 5, "Y2_031": 4, "Y2_032": 4, "Y2_033": 4, "Y2_034": 4, "Y2_035": 3, "Y2_036": 3, "Y2_037": 1, "Y2_038": 1, "Y2_039": 1, "Y2_040": 1, "Y2_041": 1, "Y2_042": 1, "Y2_043": 1, "Y2_044": 1, "Y2_045": 1, "Y2_046": 1, "Y2_047": 1, "Y3_001": 1, "Y3_002": 1, "Y3_003": 1, "Y3_004": 1, "Y3_005": 1, "Y3_006": 1, "Y3_007": 1, "Y3_008": 4, "Y3_009": 5, "Y3_010": 3, "Y3_011": 2, "Y3_012": 3, "Y3_013": 3, "Y3_014": 3, "Y3_015": 2, "Y3_016": 3, "Y3_017": 5, "Y3_018": 3, "Y3_019": 4, "Y3_020": 4, "Y3_021": 2, "Y3_022": 2, "Y3_023": 2, "Y3_024": 4, "Y3_025": 5, "Y3_026": 3, "Y3_027": 3, "Y3_028": 1, "Y3_029": 5, "Y3_030": 2, "Y3_031": 4, "Y3_032": 5, "Y3_033": 5, "Y3_034": 3, "Y3_035": 4, "Y3_036": 3, "Y3_037": 2, "Y3_038": 5, "Y3_039": 0, "Y3_040": 4, "Y3_041": 3, "Y3_042": 3, "Y3_043": 4, "Y3_044": 4, "Y3_045": 1, "Y3_046": 2, "Y3_047": 2, "Y3_048": 4, "Y4_001": 1, "Y4_002": 1, "Y4_003": 1, "Y4_004": 1, "Y4_005": 1, "Y4_006": 1, "Y4_007": 4, "Y4_008": 5, "Y4_009": 3, "Y4_010": 2, "Y4_011": 1, "Y4_012": 4, "Y4_013": 2, "Y4_014": 3, "Y4_015": 1, "Y4_016": 4, "Y4_017": 5, "Y4_018": 3, "Y4_019": 5, "Y4_020": 5, "Y4_021": 4, "Y4_022": 3, "Y4_023": 3, "Y4_024": 3, "Y4_025": 4, "Y4_026": 1, "Y4_027": 5, "Y4_028": 2, "Y4_029": 3, "Y4_030": 3, "Y4_031": 3, "Y4_032": 5, "Y4_033": 5, "Y4_034": 4, "Y4_035": 4, "Y4_036": 4, "Y4_037": 4, "Y4_038": 3, "Y4_039": 3, "Y4_040": 4, "Y4_041": 4, "Y4_042": 3, "Y4_043": 5, "Y4_044": 4, "Y4_045": 4, "Y4_046": 1, "Y4_047": 4, "Y5_001": 1, "Y5_002": 1, "Y5_003": 1, "Y5_004": 1, "Y5_005": 1, "Y5_006": 1, "Y5_007": 1, "Y5_008": 1, "Y5_009": 1, "Y5_010": 3, "Y5_011": 5, "Y5_012": 3, "Y5_013": 2, "Y5_014": 2, "Y5_015": 2, "Y5_016": 1, "Y5_017": 1, "Y5_018": 1, "Y5_019": 5, "Y5_020": 5, "Y5_021": 4, "Y5_022": 2, "Y5_023": 3, "Y5_024": 3, "Y5_025": 1, "Y5_026": 1, "Y5_027": 5, "Y5_028": 5, "Y5_029": 4, "Y5_030": 4, "Y5_031": 3, "Y5_032": 4, "Y5_033": 1, "Y5_034": 2, "Y5_035": 5, "Y5_036": 5, "Y5_037": 4, "Y5_038": 5, "Y5_039": 2, "Y5_040": 1, "Y5_041": 5, "Y5_042": 5, "Y5_043": 2, "Y5_044": 1, "Y5_045": 2, "Y5_046": 4, "Y5_047": 4, "Y5_048": 4, "Y5_049": 3, "Y5_050": 4, "Y5_051": 2, "Y5_052": 3, "Y5_053": 4, "Y5_054": 4, "Y5_055": 3, "Y5_056": 1, "Y5_057": 4, "Y5_058": 5};
+
+// ---- Statuses ---------------------------------------------------------
+const STATUS = {
+  secure:     { label:'Secure',           bg:'#86efac', fg:'#14532d', desc:'Taught and used accurately across multiple pieces of writing (over ¾ accurate) · 100% of the weight' },
+  developing: { label:'Developing',       bg:'#d9f99d', fg:'#3f6212', desc:'Using it with increasing success (about ⅔ accurate) · 60% of the weight' },
+  emerging:   { label:'Emerging',         bg:'#fed7aa', fg:'#9a3412', desc:'Used a few times with some success (about ½ accurate); expect more confidence after the next teaching · 40% of the weight' },
+  reteach:    { label:'Reteach',          bg:'#fca5a5', fg:'#7f1d1d', desc:'Used with no or very little accuracy (0–25%); needs to be explicitly retaught · none of the weight' },
+  taught:     { label:'Taught, not used', bg:'#fef9c3', fg:'#7a4f00', desc:'Taught, not yet used · none of the weight' },
+  x:          { label:'x Not taught',     bg:'#dbeafe', fg:'#1e40af', desc:'Not taught yet, or genre not covered · not counted' },
+  none:       { label:'Unreviewed',       bg:'#f0f0f0', fg:'#9ca3af', desc:'Not looked at yet · not counted' }
+};
+const JUDGE_ORDER = ['reteach','emerging','developing','secure'];
+const NONE_ORDER  = ['x','taught','none'];
+const POINTS = { secure:1, developing:0.6, emerging:0.4, reteach:0, taught:0 };
+const YEARS = ['Y1','Y2','Y3','Y4','Y5'];
+const TIERNAME = { non_neg:'Non-Negotiables', expected:'Expected Standards', greater_depth:'Greater Depth' };
+const WEIGHT = {};
+YEARS.forEach(y => SKILLS[y].forEach(s => WEIGHT[s.id] = (s.id in DRAFT ? DRAFT[s.id] : 1)));
+
+// ---- Fictitious children ----------------------------------------------
+function rng(seed){ let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const PROFILE = { D:{q:.97}, O1:{q:.78}, O2:{q:.72}, Y:{q:.62}, low:{q:.42}, gaps:{q:.80, gap:.22} };
+function fill(rand, p, framework, out){
+  const pr = PROFILE[p];
+  framework.forEach(s => {
+    let v = pr.q + (rand()-.5)*.5; if (s.tier === 'greater_depth') v -= .15;
+    let st = v > .78 ? 'secure' : v > .55 ? 'developing' : v > .30 ? 'emerging' : 'reteach';
+    if (st === 'reteach' && rand() < .25) st = 'taught';
+    if (pr.gap && rand() < pr.gap) st = rand() < .5 ? 'none' : 'x';
+    out[s.id] = st;
+  });
+}
+const INITIALS = ['AB','CD','EF','GH','IJ','KL','MN','OP'];
+function buildClass(y){
+  const n = parseInt(y.slice(1),10), rand = rng(1000+n*77), data = {}, pupils = [];
+  const plan = [['D',y],['O1',y],['gaps',y],['O2',y],['Y',y],['low',y],
+                ['Y', n>=2 ? 'Y'+(n-1) : y], ['low', n>=3 ? 'Y'+(n-2) : (n===2 ? 'Y1' : y)]];
+  plan.forEach(([prof, work], i) => {
+    const id = INITIALS[i]; data[id] = {};
+    YEARS.forEach(L => SKILLS[L].forEach(s => data[id][s.id] = 'none'));
+    fill(rand, prof, SKILLS[work], data[id]);
+    pupils.push({ id, work });
+  });
+  return { pupils, data };
+}
+let CLASS = {};
+function loadExamples(){ CLASS = {}; YEARS.forEach(y => CLASS[y] = buildClass(y)); }
+loadExamples();
+function clearMarks(){ YEARS.forEach(y => { Object.keys(CLASS[y].data).forEach(p => Object.keys(CLASS[y].data[p]).forEach(id => CLASS[y].data[p][id] = 'none')); CLASS[y].pupils.forEach(p => p.work = y); }); }
+
+// ---- Scoring ----------------------------------------------------------
+let classYear = 'Y5', level = 'Y5', paint = null, wLocked = false;
+let canWrite = null, SHARED = {};
+const dOf = id => (id in DRAFT ? DRAFT[id] : 1);
+const clampW = v => Math.min(10, Math.max(0, Math.round(Number(v)) || 0));
+const SKILL_BY_ID = {}; YEARS.forEach(y => SKILLS[y].forEach(k => SKILL_BY_ID[k.id] = k));
+const LEVEL_UP = 0.9;
+const yearNum = L => parseInt(L.slice(1), 10);
+const lowerOf = L => yearNum(L) <= 1 ? 'EY' : 'Y' + (yearNum(L) - 1);
+const lbl = L => L === classYear ? L : 'A - ' + L;
+const levelsFor = y => YEARS.slice(0, yearNum(y));
+function summary(p){
+  const L = p.work, d = CLASS[classYear].data[p.id];
+  const c = { secure:0, developing:0, emerging:0, reteach:0, taught:0 };
+  const exp = { points:0, max:0, counted:0, total:0, wAll:0, wSecure:0 }, gd = { points:0, max:0, counted:0, total:0 };
+  SKILLS[L].forEach(s => {
+    const v = d[s.id], w = WEIGHT[s.id], isGd = s.tier === 'greater_depth', g = isGd ? gd : exp;
+    g.total++; if (!isGd) exp.wAll += w;
+    if (v in POINTS){ g.points += w*POINTS[v]; g.max += w; g.counted++; if (!isGd){ c[v]++; if (v==='secure') exp.wSecure += w; } }
+  });
+  return { L, c, exp, gd, expPct: exp.max ? 100*exp.points/exp.max : null, gdPct: gd.max ? 100*gd.points/gd.max : null };
+}
+function dooya(e, g){
+  if (e === null) return '';
+  if (e >= 90 && g !== null && g >= 60) return 'D';
+  if (e >= 75) return 'O1';
+  if (e >= 65) return 'O2';
+  if (e >= 50) return 'Y';
+  return '';
+}
+const GSTYLE = { D:['#bfdbfe','#1e3a8a'], O1:['#86efac','#14532d'], O2:['#d9f99d','#3f6212'], Y:['#fde68a','#92400e'], A:['#e9d5ff','#581c87'], '':['#e5e7eb','#6b7280'] };
+function grade(u){
+  const own = u.L === classYear, below50 = u.expPct !== null && u.expPct < 50;
+  const lower = lowerOf(u.L), ey = lower === 'EY', canMove = !ey;
+  const mk = t => ({ text:t, move:lower, canMove, ey });
+  if (own){
+    const g = dooya(u.expPct, u.gdPct);
+    if (g) return { label:g, style:g, warn:null };
+    return { label:'below Y', style:'', warn: u.expPct === null ? null : mk('Under 50% of the '+u.L+' statements. '+(ey ? 'This would be recorded as "A - EY".' : 'Check whether '+lower+' statements would fit better.')) };
+  }
+  return { label:'A - '+u.L, style:'A', warn: below50 ? mk('Under 50% of the '+u.L+' statements, so "A - '+u.L+'" may not be right. '+(ey ? 'This would be recorded as "A - EY".' : 'Check whether '+lower+' statements fit better.')) : null };
+}
+
+// ---- Rendering --------------------------------------------------------
+const esc = s => String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = n => (Math.round(n*10)/10).toString();
+const pc = n => n === null ? '–' : Math.round(n)+'%';
+
+function renderClassTabs(){
+  document.getElementById('classtabs').innerHTML = YEARS.map(y => '<button class="ct'+(y===classYear?' active':'')+'" data-cy="'+y+'">Year '+y.slice(1)+' class</button>').join('');
+}
+function chip(key){
+  const s = STATUS[key], el = document.createElement('div');
+  el.className = 'chip'+(paint===key?' active':''); el.innerHTML = '<span class="sw" style="background:'+s.bg+'"></span>'+s.label; el.title = s.desc;
+  el.onclick = () => { paint = (paint===key ? null : key); renderLegend(); renderGrid(); };
+  return el;
+}
+function renderLegend(){
+  const a = document.getElementById('legendJudge'), b = document.getElementById('legendNone');
+  a.innerHTML=''; b.innerHTML='';
+  JUDGE_ORDER.forEach(k => a.appendChild(chip(k))); NONE_ORDER.forEach(k => b.appendChild(chip(k)));
+  document.getElementById('paintHint').textContent = paint ? 'Painting "'+STATUS[paint].label+'": click cells to set them.' : 'Paint mode off.';
+  document.getElementById('paintOff').style.display = paint ? '' : 'none';
+}
+function renderTabs(){
+  const t = document.getElementById('lvltabs'); t.innerHTML = '';
+  levelsFor(classYear).slice().reverse().forEach(L => {
+    const n = CLASS[classYear].pupils.filter(p => p.work === L).length;
+    const b = document.createElement('button');
+    b.className = 'lt'+(L===level?' active':'')+(L!==classYear?' below':''); b.dataset.lvl = L;
+    b.innerHTML = (L===classYear ? L+' (class year)' : 'A - '+L)+' <small>· '+n+' pupil'+(n===1?'':'s')+'</small>';
+    t.appendChild(b);
+  });
+}
+function renderGrid(){
+  renderClassTabs(); renderTabs();
+  const t = document.getElementById('grid'), pupils = CLASS[classYear].pupils.filter(p => p.work === level);
+  if (!pupils.length){ t.innerHTML = '<tbody><tr><td class="empty">No children are working at '+lbl(level)+' right now. Use a child\'s "working at" box on another tab to move them here.</td></tr></tbody>'; return; }
+  const sums = pupils.map(p => { const u = summary(p); return { p, u, g: grade(u) }; });
+  let h = '<thead><tr><th class="skillh">'+level+' statements ('+SKILLS[level].length+')</th><th class="wh">Weight</th>';
+  sums.forEach(({p,u,g}) => {
+    const [bg,fg] = GSTYLE[g.style];
+    h += '<th class="pupilh">'+p.id+'<select class="wsel" data-p="'+p.id+'">'+levelsFor(classYear).map(L => '<option value="'+L+'"'+(L===p.work?' selected':'')+'>'+(L===classYear?'Working at '+L:'A - '+L)+'</option>').join('')+'</select>'
+      +'<span class="hbadge" style="background:'+bg+';color:'+fg+'">'+g.label+'</span><div class="hexp">Expected '+pc(u.expPct)+'</div></th>';
+  });
+  h += '</tr></thead><tbody>';
+  // summary row
+  h += '<tr class="sumrow"><td class="skilltd" style="font-weight:800;font-size:13px">Overall security and grade</td><td class="wtd"></td>';
+  sums.forEach(({p,u,g}) => {
+    const c = u.c, e = u.exp, w = n => e.counted ? 100*n/e.counted : 0;
+    const ready = e.wAll && (e.wSecure/e.wAll) >= LEVEL_UP;
+    h += '<td class="sum">'
+      +(g.warn ? '<div class="warn">⚠ '+g.warn.text+(g.warn.canMove ? '<button data-move="'+p.id+'" data-to="'+g.warn.move+'">Move to A - '+g.warn.move+'</button>' : '')+'</div>' : '')
+      +'<div class="score"><span class="big">'+fmt(e.points)+'</span><span class="of"> / '+fmt(e.max)+'</span></div>'
+      +'<div class="pct">Expected '+pc(u.expPct)+'</div>'
+      +'<div class="bar"><span style="width:'+w(c.reteach+c.taught)+'%;background:#fca5a5"></span><span style="width:'+w(c.emerging)+'%;background:#fed7aa"></span><span style="width:'+w(c.developing)+'%;background:#d9f99d"></span><span style="width:'+w(c.secure)+'%;background:#86efac"></span></div>'
+      +(u.L === classYear ? '<div class="pct">Greater depth '+pc(u.gdPct)+'</div>' : '')
+      +'<div class="nums">'+c.secure+' secure · '+c.developing+' dev.</div><div class="nums">'+c.emerging+' emerging · '+c.reteach+' reteach</div>'
+      +'<div class="nums">'+c.taught+' taught, not used</div><div class="cov">'+e.counted+' of '+e.total+' counted</div>'
+      +(ready ? '<div><span class="ready">READY TO MOVE UP</span></div>' : '')+'</td>';
+  });
+  h += '</tr>';
+  // statements
+  const ncol = pupils.length + 2;
+  ['non_neg','expected','greater_depth'].forEach(tk => {
+    const list = SKILLS[level].filter(s => s.tier === tk); if (!list.length) return;
+    h += '<tr class="tierrow"><td colspan="'+ncol+'">'+TIERNAME[tk]+' ('+list.length+')</td></tr>';
+    let lastCat = null, lastGrp = null;
+    list.forEach(s => {
+      if (tk !== 'non_neg' && s.category !== lastCat){ h += '<tr class="catrow"><td colspan="'+ncol+'">'+esc(s.category)+'</td></tr>'; lastCat = s.category; lastGrp = null; }
+      const g = s.group || null;
+      if (g !== lastGrp){ if (g) h += '<tr class="grprow"><td colspan="'+ncol+'">'+esc(g)+'</td></tr>'; lastGrp = g; }
+      const w = WEIGHT[s.id];
+      h += '<tr><td class="skilltd">'+esc(s.skill).replace(/\n/g,' ')+(s.key_essential?'<span class="key">KEY</span>':'')+(s.example?'<span class="ex">'+esc(s.example)+'</span>':'')+'</td>'
+        +'<td class="wtd">'+((wLocked || canWrite === false) ? '<span class="wlock'+(w===0?' zero':'')+'" title="Weight, locked">'+w+'</span>' : '<input type="number" class="wbox'+(w!==dOf(s.id)?' changed':'')+'" min="0" max="10" step="1" value="'+w+'" data-w="'+s.id+'" aria-label="Weight">')+'</td>';
+      pupils.forEach(p => {
+        const v = CLASS[classYear].data[p.id][s.id], m = STATUS[v];
+        h += '<td class="cell'+(paint?' paint':'')+'" data-p="'+p.id+'" data-s="'+s.id+'" style="background:'+m.bg+';color:'+m.fg+'">'+(v==='none' ? '' : (v==='x' ? 'x' : m.label))+'</td>';
+      });
+      h += '</tr>';
+    });
+  });
+  t.innerHTML = h + '</tbody>';
+}
+function setWork(pid, L, viaButton){
+  const p = CLASS[classYear].pupils.find(x => x.id === pid); p.work = L;
+  const note = document.getElementById('lvlnote');
+  if (viaButton){ level = L; note.textContent = pid+' moved to '+lbl(L)+'. Now mark them against these statements.'; }
+  else note.textContent = pid+' is now working at '+lbl(L)+(L===level ? '.' : '. See the '+lbl(L)+' tab.');
+  renderGrid();
+}
+
+// ---- Picker -----------------------------------------------------------
+const picker = document.getElementById('picker'); let target = null;
+const btn = k => { const s = STATUS[k]; return '<button data-k="'+k+'" style="background:'+s.bg+';color:'+s.fg+'"><span>'+s.label+'<small>'+s.desc+'</small></span></button>'; };
+function openPicker(cell){
+  target = { p:cell.dataset.p, s:cell.dataset.s };
+  const sk = SKILLS[level].find(x => x.id === target.s);
+  picker.innerHTML = '<h4>'+target.p+' · '+esc(sk.skill).slice(0,90)+(sk.skill.length>90?'…':'')+'</h4>'+JUDGE_ORDER.slice().reverse().map(btn).join('')+'<div class="sep">No evidence yet</div>'+NONE_ORDER.map(btn).join('');
+  picker.querySelectorAll('button').forEach(b => b.onclick = () => { if (!target) return; CLASS[classYear].data[target.p][target.s] = b.dataset.k; closePicker(); renderGrid(); });
+  const r = cell.getBoundingClientRect(); picker.classList.add('open');
+  const ph = picker.offsetHeight; let top = r.bottom + 4; if (top + ph > innerHeight - 8) top = Math.max(8, innerHeight - ph - 8);
+  picker.style.top = top+'px'; picker.style.left = Math.max(8, Math.min(r.left, innerWidth - 342))+'px';
+}
+function closePicker(){ picker.classList.remove('open'); target = null; }
+
+// ---- Events -----------------------------------------------------------
+const grid = document.getElementById('grid');
+grid.addEventListener('click', e => {
+  const mv = e.target.closest('button[data-move]');
+  if (mv){ e.stopPropagation(); setWork(mv.dataset.move, mv.dataset.to, true); return; }
+  const c = e.target.closest('td.cell'); if (!c) return;
+  if (paint){ CLASS[classYear].data[c.dataset.p][c.dataset.s] = paint; renderGrid(); }
+  else { e.stopPropagation(); openPicker(c); }
+});
+grid.addEventListener('change', e => {
+  const sel = e.target.closest('select.wsel'); if (sel){ setWork(sel.dataset.p, sel.value, false); return; }
+  const i = e.target.closest('input[data-w]'); if (!i) return;
+  saveWeight(i.dataset.w, clampW(i.value));
+});
+document.getElementById('classtabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-cy]'); if (!b) return;
+  classYear = b.dataset.cy; level = classYear; document.getElementById('lvlnote').textContent = ''; renderGrid();
+});
+document.getElementById('lvltabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-lvl]'); if (!b) return; level = b.dataset.lvl; document.getElementById('lvlnote').textContent = ''; renderGrid();
+});
+document.addEventListener('click', e => { if (!picker.contains(e.target)) closePicker(); });
+document.getElementById('paintOff').onclick = () => { paint = null; renderLegend(); renderGrid(); };
+document.getElementById('clearBtn').onclick = () => { clearMarks(); level = classYear; document.getElementById('lvlnote').textContent = 'All marks cleared. Every child is back on the class year, ready to mark.'; renderGrid(); };
+document.getElementById('resetBtn').onclick = () => { loadExamples(); level = classYear; document.getElementById('lvlnote').textContent = ''; renderGrid(); };
+document.getElementById('lockW').onchange = e => { wLocked = e.target.checked; renderGrid(); };
+
+
+// ---- Weights: shared through the school database (device fallback) ----------
+const API = 'https://api.wallscourt-farm-academy.co.uk/planning/writingweightsreview-db';
+const WKEY = 'wfa_writing_new_weights_v1';
+let apiOk = false, LOG = [], lastSnap = '';
+function loadLocal(){ try { const x = JSON.parse(localStorage.getItem(WKEY) || '{}'); Object.keys(x).forEach(id => { if (SKILL_BY_ID[id] && x[id] && typeof x[id].weight === 'number') SHARED[id] = x[id]; }); } catch (e) {} }
+function saveLocal(){ try { localStorage.setItem(WKEY, JSON.stringify(SHARED)); } catch (e) {} }
+function setStatus(t, err){ const el = document.getElementById('wstatus'); el.textContent = t; el.className = 'wstatus' + (err ? ' err' : ''); }
+function baseStatus(){
+  if (apiOk) setStatus('Weights are shared: a change saves for all staff, with your email and the time.');
+  else setStatus('Could not reach the shared store, so weight changes are kept on this device only. Use "Download CSV" under the grid to send them on.', true);
+}
+function applyShared(){ YEARS.forEach(y => SKILLS[y].forEach(k => { const x = SHARED[k.id]; WEIGHT[k.id] = x ? clampW(x.weight) : dOf(k.id); })); }
+async function api(method, body){
+  const opt = { method, cache:'no-store' };
+  if (body){ opt.headers = { 'Content-Type':'application/json' }; opt.body = JSON.stringify(body); }
+  const url = API + (method === 'GET' ? '?action=load&token=__hub__' : '?token=__hub__');
+  let r = await fetch(url, opt);
+  if (!r.ok && method === 'GET') r = await fetch(url, opt);           // one retry on a dropped connection
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  if (!j || j.ok !== true) throw new Error((j && j.error) || 'bad reply');
+  return j;
+}
+function takeSnapshot(j){
+  const next = {}; Object.keys(j.weights || {}).forEach(id => { const x = j.weights[id]; if (SKILL_BY_ID[id] && x && typeof x.weight === 'number') next[id] = { weight:x.weight, by:x.by || '', at:x.at || '' }; });
+  SHARED = next; LOG = (j.log || []).filter(l => SKILL_BY_ID[l.skill_id]);
+  applyShared();
+}
+async function refreshShared(quiet){
+  try {
+    const j = await api('GET'); const key = JSON.stringify([j.weights, j.log]);
+    const wasOk = apiOk; apiOk = true;
+    if (key !== lastSnap && !(quiet && document.activeElement && document.activeElement.classList.contains('wbox'))){ lastSnap = key; takeSnapshot(j); renderGrid(); renderChanges(); }
+    if (!wasOk) baseStatus();
+  } catch (e) { if (apiOk || !quiet){ apiOk = false; loadLocal(); applyShared(); baseStatus(); renderGrid(); renderChanges(); } }
+}
+async function saveWeight(id, v){
+  const prev = WEIGHT[id]; if (v === prev) { renderGrid(); return; }
+  const draft = dOf(id);
+  if (!apiOk){                                  // device-only fallback
+    if (v === draft) delete SHARED[id]; else SHARED[id] = { weight:v, at:new Date().toISOString() };
+    applyShared(); saveLocal(); renderGrid(); renderChanges(); setStatus('Saved on this device only: ' + id + ', ' + prev + ' to ' + v + '.', true); return;
+  }
+  WEIGHT[id] = v; renderGrid();                 // show it at once, then confirm with the store
+  try {
+    const j = await api('POST', v === draft ? { action:'revert', skill_id:id, to:draft } : { action:'set', skill_id:id, weight:v, from:prev });
+    lastSnap = JSON.stringify([j.weights, j.log]); takeSnapshot(j); renderGrid(); renderChanges();
+    setStatus('Saved for all staff: ' + id + ', ' + prev + ' to ' + v + '.');
+  } catch (e) {
+    WEIGHT[id] = prev; renderGrid(); renderChanges();
+    setStatus('Could not save that change (' + (e && e.message || 'error') + '). The weight has gone back to ' + prev + '. If this keeps happening, refresh the page and sign in again.', true);
+  }
+}
+const whenFmt = iso => { try { return new Date(iso).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }); } catch (e) { return ''; } };
+function allRows(){
+  const rows = [['Year','Tier','Category','Group','ID','Statement','Key essential','Draft weight','Current weight','Changed by','Changed at']];
+  YEARS.forEach(y => SKILLS[y].forEach(k => { const x = SHARED[k.id] || {}; rows.push([y, TIERNAME[k.tier], k.category || '', k.group || '', k.id, String(k.skill).replace(/[\t\r\n]+/g,' '), k.key_essential ? 'Yes' : '', dOf(k.id), WEIGHT[k.id], x.by || '', x.at || '']); }));
+  return rows;
+}
+function renderChanges(){
+  const diffs = [];
+  YEARS.forEach(y => SKILLS[y].forEach(k => { if (WEIGHT[k.id] !== dOf(k.id)) diffs.push(k); }));
+  document.getElementById('chgsum').textContent = 'Weight changes from the draft (' + diffs.length + ')';
+  let h = '<p>' + (diffs.length ? diffs.length + ' statement' + (diffs.length===1?' has':'s have') + ' a weight different from the draft.' : 'No weights have been changed from the draft yet.')
+    + ' <button class="btn" id="csvW">Download CSV</button> <button class="btn" id="copyW">Copy all weights as a table</button>' + (apiOk ? '' : ' <button class="btn" id="resetW">Reset all to the draft</button>') + ' <span id="copyMsg" class="wstatus"></span></p>';
+  if (diffs.length){
+    h += '<table><tr><th>Statement</th><th class="num">Draft</th><th class="num">Now</th><th>Changed by</th><th></th></tr>';
+    diffs.forEach(k => { const x = SHARED[k.id] || {}; const t = esc(k.skill).slice(0, 110) + (k.skill.length > 110 ? '…' : '');
+      h += '<tr><td><b>' + k.id + '</b> ' + t + '</td><td class="num">' + dOf(k.id) + '</td><td class="num"><b>' + WEIGHT[k.id] + '</b></td><td>' + esc(x.by || '') + (x.at ? '<br>' + whenFmt(x.at) : '') + '</td><td>' + (wLocked ? '' : '<button class="btn rb" data-revert="' + k.id + '">Back to draft</button>') + '</td></tr>'; });
+    h += '</table>';
+  }
+  if (LOG.length){
+    h += '<p style="margin-top:10px"><b>Recent changes</b></p><table><tr><th>When</th><th>Statement</th><th class="num">From</th><th class="num">To</th><th>By</th></tr>';
+    LOG.slice(0, 25).forEach(l => { const k = SKILL_BY_ID[l.skill_id]; h += '<tr><td>' + whenFmt(l.at) + '</td><td><b>' + l.skill_id + '</b> ' + esc(k.skill).slice(0, 70) + (k.skill.length > 70 ? '…' : '') + '</td><td class="num">' + (l.from === null ? '' : l.from) + '</td><td class="num">' + (l.to === null ? '' : l.to) + '</td><td>' + esc(l.by || '') + '</td></tr>'; });
+    h += '</table>';
+  }
+  document.getElementById('chgbody').innerHTML = h;
+}
+document.getElementById('chgbody').addEventListener('click', async e => {
+  const m = () => document.getElementById('copyMsg');
+  const rb = e.target.closest('button[data-revert]'); if (rb){ saveWeight(rb.dataset.revert, dOf(rb.dataset.revert)); return; }
+  if (e.target.closest('#resetW')){ if (confirm('Set every weight on this device back to the draft values?')){ SHARED = {}; applyShared(); saveLocal(); renderGrid(); renderChanges(); setStatus('All weights on this device are back to the draft values.', true); } return; }
+  if (e.target.closest('#copyW')){
+    try { await navigator.clipboard.writeText(allRows().map(r => r.join('\t')).join('\n')); m().textContent = 'Copied. Paste into Excel or Sheets.'; } catch (err) { m().textContent = 'Could not copy here. Use Download CSV instead.'; }
+    return;
+  }
+  if (e.target.closest('#csvW')){
+    const csv = allRows().map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\r\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv' })); a.download = 'writing-weights-' + new Date().toISOString().slice(0,10) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove(); m().textContent = 'Downloaded.';
+  }
+});
+setStatus('Loading the shared weights…');
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshShared(true); });
+setInterval(() => { if (document.visibilityState === 'visible') refreshShared(true); }, 90000);
+renderLegend(); renderGrid(); renderChanges(); refreshShared(false);
+</script>
+</body>
+</html>
