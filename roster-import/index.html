@@ -97,6 +97,8 @@ input[type=file]{display:none}
 
   <div id="previewCard" class="card" style="display:none">
     <h2>Preview — nothing has been written yet</h2>
+    <div style="margin:.2rem 0 .8rem"><button type="button" id="showNamesBtn" class="applybtn" style="background:#fff;color:var(--blue);border:1px solid var(--blue);padding:.35rem .8rem;font-size:.85rem">👁 Show names</button>
+      <span class="hint" style="margin-left:.5rem">Names come from the file you just chose. They are shown on this screen only, never saved, and hide again after 10 minutes.</span></div>
     <div class="metric-row">
       <div class="metric"><div class="metric-value" style="color:var(--green)" id="mNew">0</div><div class="metric-label">New pupils</div></div>
       <div class="metric"><div class="metric-value" style="color:var(--red)" id="mLeave">0</div><div class="metric-label">Leaving</div></div>
@@ -153,7 +155,7 @@ input[type=file]{display:none}
   </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-10.10.26a</div>
+<div class="version">WFA Roster Import · WFA-14.10.26a</div>
 
 <script>
 // CUT OVER 23.09.26 to the Postgres-backed store (pupil_roster_db.py) —
@@ -471,16 +473,9 @@ function buildPreview(normalised, hubPupils, rejectedNoUpn){
   const newLbl = shortLabels(newPupils.map(function(p){ return [p.first_name, p.last_name]; }));
   const leaveLbl = shortLabels(leaving.map(function(p){ return [p.first_name, p.last_name]; }));
   const changedLbl = shortLabels(changed.map(function(c){ return [c.p.first_name, c.p.last_name]; }));
-  fillSection('secNew', 'listNew', newPupils, function(p, i){
-    return rowHtml(newLbl[i], p.year_group, 'join');
-  });
-  fillSection('secLeave', 'listLeave', leaving, function(p, i){
-    return rowHtml(leaveLbl[i], p.wasClass || '', 'leave');
-  });
-  fillSection('secChanged', 'listChanged', changed, function(c, i){
-    return '<div class="list-item"><span>' + esc(changedLbl[i]) +
-      '</span></div><div class="field-diff" style="padding-bottom:.5rem">' + esc(c.diff) + '</div>';
-  });
+  lastPreview = { newPupils: newPupils, leaving: leaving, changed: changed, newLbl: newLbl, leaveLbl: leaveLbl, changedLbl: changedLbl };
+  setShowNames(false);
+  renderLists();
 
   currentPayload = {
     pupils: normalised,
@@ -553,6 +548,34 @@ function initialsLabels(pairs) {
 }
 function shortName(first, last){ return initialsLabels([[first, last === undefined ? '' : last]])[0]; }
 function shortLabels(pairs){ return initialsLabels(pairs.map(function(p){ return [p[0], p[1] === undefined ? '' : p[1]]; })); }
+
+// "Show names": the full names are already in the file the teacher chose (held in this page's memory only).
+// Shown on screen on request, hidden again after 10 minutes, when the tab is hidden, or on a new preview.
+let lastPreview = null, showNamesOn = false, showNamesTimer = null;
+function fullOf(p){ return (String(p.first_name || '') + ' ' + String(p.last_name || '')).trim(); }
+function setShowNames(on){
+  showNamesOn = !!on;
+  clearTimeout(showNamesTimer);
+  if (showNamesOn) showNamesTimer = setTimeout(function(){ setShowNames(false); renderLists(); }, 10 * 60 * 1000);
+  const b = document.getElementById('showNamesBtn');
+  if (b) b.textContent = showNamesOn ? '🙈 Hide names' : '👁 Show names';
+}
+function renderLists(){
+  if (!lastPreview) return;
+  const L = lastPreview;
+  fillSection('secNew', 'listNew', L.newPupils, function(p, i){
+    return rowHtml(showNamesOn ? fullOf(p) : L.newLbl[i], p.year_group, 'join');
+  });
+  fillSection('secLeave', 'listLeave', L.leaving, function(p, i){
+    return rowHtml(showNamesOn ? fullOf(p) : L.leaveLbl[i], p.wasClass || '', 'leave');
+  });
+  fillSection('secChanged', 'listChanged', L.changed, function(c, i){
+    return '<div class="list-item"><span>' + esc(showNamesOn ? fullOf(c.p) : L.changedLbl[i]) +
+      '</span></div><div class="field-diff" style="padding-bottom:.5rem">' + esc(c.diff) + '</div>';
+  });
+}
+document.getElementById('showNamesBtn').addEventListener('click', function(){ setShowNames(!showNamesOn); renderLists(); });
+document.addEventListener('visibilitychange', function(){ if (document.hidden && showNamesOn) { setShowNames(false); renderLists(); } });
 
 function rowHtml(name, badge, badgeClass){
   return '<div class="list-item"><span>' + esc(name) + '</span>' +
