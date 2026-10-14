@@ -103,6 +103,13 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
 #img-input{display:none}
 
 /* CONTROLS */
+body.tk-on #combined-panel{display:none!important}
+#takeover{display:none;grid-column:1;grid-row:1;width:100%;height:100%;z-index:5;background:#fff;position:relative;min-height:0;min-width:0;align-items:center;justify-content:center;overflow:hidden}
+#takeover.on{display:flex}
+#takeover img{max-width:100%;max-height:100%;object-fit:contain}
+#takeover iframe{width:100%;height:100%;border:0;background:#fff}
+#takeover-back{position:absolute;top:6px;right:6px;z-index:6;opacity:0.35}
+#takeover-back:hover{opacity:1}
 #ctrl{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:6px 0 2px;flex-shrink:0}
 .cb{padding:6px 8px;font-size:11px;font-family:'Nunito',sans-serif;font-weight:700;background:rgba(240,240,240,0.95);border:1.5px solid #C8C8C8;border-radius:5px;cursor:pointer;color:#444;text-align:center}
 .cb:hover{background:#DCDCDC}
@@ -359,7 +366,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Hazel</span><span id="version-tag">h.10.10.26f</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Hazel</span><span id="version-tag">h.14.10.26a</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -372,6 +379,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
   <div id="menu-updated" style="text-align:right;font-size:0.55rem;color:#AAA;padding-right:0.3em;margin-top:-0.3em"></div>
   <div id="main">
     <div id="puzzle-panel"></div>
+    <div id="takeover"><button class="cb" id="takeover-back" onclick="clearTakeover()">Back to puzzles</button><div id="takeover-body" style="display:contents"></div></div>
     <div id="right-panel">
       <div class="msg-hdr">Morning Messages</div>
       <div id="msg-img-wrap">
@@ -386,6 +394,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
         <button class="cb" onclick="newPuzzle()">New puzzle</button>
         <button class="cb" onclick="toggleType()">Switch puzzle</button>
         <button class="cb" onclick="openImgOverlay()">Add image</button>
+        <button class="cb" id="tk-btn" onclick="openTakeover()" style="grid-column:1/-1">Replace the 4 puzzles <span id="tk-dot" style="display:none;color:#e67e22">&#9679;</span></button>
         <button class="cb" onclick="openOverride()">Override today <span id="override-dot"></span></button>
         <button class="cb" onclick="openSetup()">Setup</button>
       </div>
@@ -408,6 +417,26 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
       </div>
     </div>
     <div style="text-align:right;margin-top:1rem"><button class="oclose" onclick="closeImgOverlay()">Cancel</button></div>
+  </div>
+</div>
+
+<!-- Replace the 4 puzzles -->
+<input type="file" id="tk-file" accept="image/*" style="display:none" onchange="tkFile(event)">
+<div class="overlay" id="tk-overlay" onclick="if(event.target===this)closeTakeover()">
+  <div class="obox" style="max-width:560px">
+    <h2>Replace the 4 puzzles (today only)</h2>
+    <p style="font-size:0.82rem;color:#666;margin-bottom:12px">Show your own picture, page or HTML in the puzzle area instead. It clears itself at the end of today, or press &ldquo;Back to puzzles&rdquo;.</p>
+    <div class="ov-field"><button class="oadd" style="width:100%" onclick="document.getElementById('tk-file').click()">Upload an image</button></div>
+    <div class="ov-field"><label>Image or web page address (https://)</label>
+      <input type="url" id="tk-url" placeholder="https://...">
+      <div style="display:flex;gap:8px;margin-top:6px"><button class="osave" style="flex:1" onclick="tkUrl('img')">Show as image</button><button class="osave" style="flex:1" onclick="tkUrl('page')">Show as web page</button></div>
+      <div class="hint">Some sites refuse to be shown inside another page. If a web page stays blank, use an image or paste HTML instead.</div></div>
+    <div class="ov-field"><label>Or paste HTML</label>
+      <textarea id="tk-html" placeholder="&lt;h1&gt;Review: ...&lt;/h1&gt;"></textarea>
+      <button class="osave" style="width:100%;margin-top:6px" onclick="tkHtml()">Show this HTML</button></div>
+    <div style="display:flex;justify-content:space-between;margin-top:1rem">
+      <button class="odanger" onclick="clearTakeover();closeTakeover()">Back to puzzles</button>
+      <button class="oclose" onclick="closeTakeover()">Close</button></div>
   </div>
 </div>
 
@@ -2822,8 +2851,57 @@ function getActivityPool(){
   return ALL_TYPES;
 }
 
+// REPLACE THE 4 PUZZLES — shows an image / web page / pasted HTML over the
+// puzzle area for today only. Stored in this browser (localStorage), keyed
+// to today's date, so it never carries over. Pasted HTML runs in a sandboxed
+// iframe (scripts allowed, no access to this page).
+const TK_KEY='y5_takeover';
+function tkGet(){try{const o=JSON.parse(localStorage.getItem(TK_KEY)||'null');return o&&o.date===todayStr()?o:null}catch(e){return null}}
+function tkSet(type,value){
+  try{localStorage.setItem(TK_KEY,JSON.stringify({date:todayStr(),type,value}))}
+  catch(e){alert('Could not keep that (too big for this browser). It will show now but will be lost if the page reloads.')}
+  tkShow({type,value});closeTakeover();
+}
+function tkShow(o){
+  const t=document.getElementById('takeover'),b=document.getElementById('takeover-body'),dot=document.getElementById('tk-dot');
+  b.innerHTML='';
+  document.body.classList.toggle('tk-on',!!o);
+  if(!o){t.classList.remove('on');if(dot)dot.style.display='none';return}
+  let el;
+  if(o.type==='img'){el=document.createElement('img');el.src=o.value;el.alt=''}
+  else{el=document.createElement('iframe');if(o.type==='html'){el.setAttribute('sandbox','allow-scripts');el.srcdoc=o.value}
+    else{el.setAttribute('sandbox','allow-scripts allow-same-origin allow-forms allow-popups');el.src=o.value}}
+  b.appendChild(el);t.classList.add('on');if(dot)dot.style.display='inline';
+}
+function openTakeover(){document.getElementById('tk-overlay').classList.add('on')}
+function closeTakeover(){document.getElementById('tk-overlay').classList.remove('on')}
+function clearTakeover(){try{localStorage.removeItem(TK_KEY)}catch(e){}tkShow(null)}
+function tkUrl(kind){
+  const u=document.getElementById('tk-url').value.trim();
+  if(!/^https:\/\//i.test(u)){alert('Please paste an address starting with https://');return}
+  tkSet(kind,u);
+}
+function tkHtml(){
+  const h=document.getElementById('tk-html').value;
+  if(!h.trim()){alert('Paste some HTML first');return}
+  tkSet('html',h);
+}
+function tkFile(e){
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{const im=new Image();im.onload=()=>{
+    const m=1800,k=Math.min(1,m/Math.max(im.width,im.height));
+    const c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+    const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);
+    tkSet('img',c.toDataURL('image/jpeg',0.85));
+  };im.src=r.result};
+  r.readAsDataURL(f);
+}
+// Drop an old day's takeover and re-check at midnight rollover (board is left open)
+setInterval(()=>{if(!tkGet())tkShow(null)},60*1000);
+
 function init(){
-  renderDate();renderLunch();renderMsg();loadImg();
+  renderDate();renderLunch();renderMsg();loadImg();tkShow(tkGet());
   pType='combined'; // Always show combined view (4 puzzles at once)
   newPuzzle();updateDot();
   const vtag=document.getElementById('version-tag');
