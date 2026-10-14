@@ -162,7 +162,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Book Label Generator</footer>
+<footer>Wallscourt Farm Academy — Book Label Generator · WFA-14.10.26a</footer>
 
 <script>
 // Year group colours
@@ -526,7 +526,12 @@ async function generatePdf() {
 
         // Fill label background (with bleed extending beyond label edges)
         doc.setFillColor(r, g, b);
-        doc.rect(pos.x - BLEED, pos.y - BLEED, 139 + 2 * BLEED, 99.1 + 2 * BLEED, 'F');
+        // Bleed only on the sides that face the sheet edge, never into a neighbouring label
+        const bleedL = (i % 2 === 0) ? BLEED : 0;
+        const bleedR = (i % 2 === 1) ? BLEED : 0;
+        const bleedT = (i < 2) ? BLEED : 0;
+        const bleedB = (i >= 2) ? BLEED : 0;
+        doc.rect(pos.x - bleedL, pos.y - bleedT, 139 + bleedL + bleedR, 99.1 + bleedT + bleedB, 'F');
 
         // Draw white box
         doc.setFillColor(255, 255, 255);
