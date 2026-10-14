@@ -155,7 +155,7 @@ input[type=file]{display:none}
   </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-14.10.26a</div>
+<div class="version">WFA Roster Import · WFA-14.10.26b</div>
 
 <script>
 // CUT OVER 23.09.26 to the Postgres-backed store (pupil_roster_db.py) —
@@ -415,11 +415,15 @@ async function downloadNamesFile(){
 document.getElementById('namesFileBtn').addEventListener('click', downloadNamesFile);
 
 async function fetchHubPupils(){
-  const url = PUPIL_ROSTER_URL + '/pupils?token=' + encodeURIComponent(WFA_TOKEN) + '&v=' + Date.now();
+  // real=1: the server decrypts each child's real UPN for this comparison with the Bromcom file (memory only here;
+  // the database itself holds only a keyed token once UPN-at-rest is on). Older servers ignore the flag.
+  const url = PUPIL_ROSTER_URL + '/pupils?real=1&token=' + encodeURIComponent(WFA_TOKEN) + '&v=' + Date.now();
   const r = await fetch(url, { cache: 'no-store' });
   const data = await r.json();
   if (data.error) throw new Error('Hub error: ' + data.error);
-  return data.pupils || [];
+  const pupils = data.pupils || [];
+  pupils.forEach(function(p){ if (p.upnReal) p.upn = p.upnReal; });
+  return pupils;
 }
 
 function buildPreview(normalised, hubPupils, rejectedNoUpn){
