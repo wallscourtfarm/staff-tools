@@ -103,7 +103,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#fff;font-family:'
 #img-input{display:none}
 
 /* CONTROLS */
-body.tk-on #combined-panel{display:none!important}
+body.tk-on #combined-panel,body.tk-on #puzzle-panel{display:none!important}
 #takeover{display:none;grid-column:1;grid-row:1;width:100%;height:100%;z-index:5;background:#fff;position:relative;min-height:0;min-width:0;align-items:center;justify-content:center;overflow:hidden}
 #takeover.on{display:flex}
 #takeover img{max-width:100%;max-height:100%;object-fit:contain}
@@ -366,7 +366,7 @@ body.tk-on #combined-panel{display:none!important}
   <div id="date-hdr">
     <img id="date-logo" src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy">
     <span id="date-text"></span>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Hazel</span><span id="version-tag">h.14.10.26a</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-right:0.2em"><span id="class-name">Hazel</span><span id="version-tag">h.14.10.26b</span></div>
   </div>
   <div id="lunch-bar">
     <div class="lc lc-r" id="lc0">—</div>
@@ -393,10 +393,7 @@ body.tk-on #combined-panel{display:none!important}
         <button class="cb" id="solbtn" onclick="toggleSols()">Solutions</button>
         <button class="cb" onclick="newPuzzle()">New puzzle</button>
         <button class="cb" onclick="toggleType()">Switch puzzle</button>
-        <button class="cb" onclick="openImgOverlay()">Add image</button>
-        <button class="cb" id="tk-btn" onclick="openTakeover()" style="grid-column:1/-1">Replace the 4 puzzles <span id="tk-dot" style="display:none;color:#e67e22">&#9679;</span></button>
-        <button class="cb" onclick="openOverride()">Override today <span id="override-dot"></span></button>
-        <button class="cb" onclick="openSetup()">Setup</button>
+        <button class="cb" onclick="openSetup()">Setup <span id="setup-dot" style="display:none;color:#e67e22">&#9679;</span></button>
       </div>
     </div>
   </div>
@@ -479,6 +476,12 @@ body.tk-on #combined-panel{display:none!important}
 <div class="overlay" id="setup-ov" onclick="if(event.target===this)closeSetup()">
   <div class="obox">
     <h2>Setup</h2>
+    <div class="ov-field"><label>Board tools</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button class="oadd" onclick="closeSetup();openTakeover()">Replace the 4 puzzles <span id="tk-dot" style="display:none">&#9679;</span></button>
+        <button class="oadd" onclick="closeSetup();openOverride()">Override today <span id="override-dot"></span></button>
+        <button class="oadd" onclick="closeSetup();openImgOverlay()">Add image</button>
+      </div></div>
 
     <h3>Lunch menu</h3>
     <p style="font-size:0.82rem;color:#666;margin-bottom:10px">Set centrally for every board — see the shared menu admin tool. Nothing to edit here.</p>
@@ -2865,7 +2868,7 @@ function tkSet(type,value){
 function tkShow(o){
   const t=document.getElementById('takeover'),b=document.getElementById('takeover-body'),dot=document.getElementById('tk-dot');
   b.innerHTML='';
-  document.body.classList.toggle('tk-on',!!o);
+  document.body.classList.toggle('tk-on',!!o);tkDots();
   if(!o){t.classList.remove('on');if(dot)dot.style.display='none';return}
   let el;
   if(o.type==='img'){el=document.createElement('img');el.src=o.value;el.alt=''}
@@ -2873,6 +2876,8 @@ function tkShow(o){
     else{el.setAttribute('sandbox','allow-scripts allow-same-origin allow-forms allow-popups');el.src=o.value}}
   b.appendChild(el);t.classList.add('on');if(dot)dot.style.display='inline';
 }
+function tkDots(){const a=document.getElementById('tk-dot'),b=document.getElementById('override-dot'),c=document.getElementById('setup-dot');if(c)c.style.display=((a&&a.style.display!=='none')||(b&&b.style.display!=='none'&&b.style.display!==''))?'inline':'none'}
+setInterval(tkDots,2000);
 function openTakeover(){document.getElementById('tk-overlay').classList.add('on')}
 function closeTakeover(){document.getElementById('tk-overlay').classList.remove('on')}
 function clearTakeover(){try{localStorage.removeItem(TK_KEY)}catch(e){}tkShow(null)}
