@@ -29,7 +29,7 @@ from data import (
     get_skill_status, set_skill_status, pass_review, fail_review, get_reviews_due,
     migrate_skills_format, skill_status, active_skills_for, count_by_status,
     generate_sheet, get_answer, get_review_items,
-    fetch_hub_pupils, fetch_hub_pupils_checked, sync_pupils_from_roster, anonymise_pupils, pupil_label, display_name, parse_names_csv,
+    fetch_hub_pupils, fetch_hub_pupils_checked, step_subject, step_kind, sync_pupils_from_roster, anonymise_pupils, pupil_label, display_name, parse_names_csv,
     is_windowed, get_active_window, get_window_frontier, set_active_window, suggest_next_window,
 )
 
@@ -167,6 +167,9 @@ def _pdf_footer_answers(c, margin, usable_w, y_top, questions, subject, display_
             q["question"].replace("?", q["answer"]) if "?" in q["question"] else f"{q['question']} = {q['answer']}"
             for q in questions
         )
+    elif display_mode == "cloze":
+        label = "Answers: "
+        body = "   ".join(f"{i}) {q['answer']}" for i, q in enumerate(questions, 1))
     elif subject == "spellings" and display_mode == "dictation":
         label = "Words to read aloud: "
         body = ", ".join(q["question"] for q in questions)
@@ -276,6 +279,174 @@ def _compact_header(c, margin, usable_w, y_top, title_bits, right_text, h):
     return y_top - h
 
 
+# ── Handwriting fonts (joined style uses the school-licensed XCCW fonts, kept in the PRIVATE data repo's fonts/
+#    folder, never in this public repo; print style uses Sassoon Infant above) ───────────────────────────────
+
+_HW_FONT_FILES = {"XCCW4a": "XCCW_Joined_4a.ttf", "XCCW4b": "XCCW_Joined_4b.ttf",
+                  "XCCWD4a": "XCCW_Joined_Dotted_4a.ttf", "XCCWD4b": "XCCW_Joined_Dotted_4b.ttf"}
+_hw_fonts_ok = None
+
+
+def _hw_joined_fonts_available():
+    global _hw_fonts_ok
+    if _hw_fonts_ok is not None:
+        return _hw_fonts_ok
+    from data import REPO_DIR
+    folders = [REPO_DIR / "fonts", os.path.join(os.path.dirname(__file__), "fonts"),
+               os.path.expanduser("~/projects/wfa-app/fonts")]
+    try:
+        for name, fn in _HW_FONT_FILES.items():
+            path = next((os.path.join(str(f), fn) for f in folders if os.path.exists(os.path.join(str(f), fn))), None)
+            if not path:
+                raise FileNotFoundError(fn)
+            pdfmetrics.registerFont(TTFont(name, path))
+        _hw_fonts_ok = True
+    except Exception:
+        _hw_fonts_ok = False
+    return _hw_fonts_ok
+
+
+def _xccw_runs(text, dotted):
+    """XCCW join rule: a letter uses the '4b' form when the PREVIOUS letter is o, r, v, w or x (a top exit)."""
+    out, prev = [], ""
+    for ch in text:
+        b = "b" if prev in "orvwx" and prev else "a"
+        out.append((ch, ("XCCWD4" if dotted else "XCCW4") + b))
+        prev = ch.lower()
+    return out
+
+
+def _draw_joined(c, x, y, text, size, dotted=False):
+    for ch, fnt in _xccw_runs(text, dotted):
+        c.setFont(fnt, size)
+        c.drawString(x, y, ch)
+        x += c.stringWidth(ch, fnt, size)
+    return x
+
+
+def _joined_width(c, text, size, dotted=False):
+    return sum(c.stringWidth(ch, f, size) for ch, f in _xccw_runs(text, dotted))
+
+
+def _is_full_page(sheet):
+    """Sheets that get a whole page: phonics, reading-style recognition lists, cloze and handwriting.
+    Maths and dictation spelling sit two to a page."""
+    if sheet.get("display_mode") in ("cloze", "handwriting"):
+        return True
+    return sheet["subject"] == "phonics" or (sheet.get("display_mode") == "recognition" and sheet["subject"] != "maths")
+
+
+def _hw_style_for(sheet):
+    pick = st.session_state.get("hw_style_override", "As set")
+    if pick == "Print":
+        style = "print"
+    elif pick == "Joined (cursive)":
+        style = "joined"
+    else:
+        style = "joined" if sheet.get("hw_kind") == "hw_joins" else "print"
+    if style == "joined" and not _hw_joined_fonts_available():
+        style = "print"
+    return style
+
+
+def _draw_handwriting_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
+    """Tracing rows: the model, then dotted copies to trace; each followed by a blank line to write on."""
+    items = [q["question"] for q in sheet["questions"]]
+    n = len(items)
+    if n == 0:
+        return
+    style = _hw_style_for(sheet)
+    avail = grid_top - grid_bottom - 4 * _mm
+    row_h = min(16 * _mm, avail / (2 * n))
+    paired = row_h >= 11 * _mm
+    if not paired:
+        row_h = min(16 * _mm, avail / n)
+    size = row_h * 0.62 * 2.0 / 1.0
+    size = min(size, row_h * 1.25)
+    y = grid_top - 2 * _mm
+    for it in items:
+        base = y - row_h * 0.30
+        for row_kind in (("trace", "write") if paired else ("trace",)):
+            top_line, mid_line = y - row_h * 0.08, y - row_h * 0.38
+            bl = y - row_h * 0.70
+            c.setLineWidth(0.5)
+            c.setStrokeColorRGB(0.8, 0.8, 0.8)
+            c.line(margin, top_line, margin + usable_w, top_line)
+            c.setDash([2, 2], 0)
+            c.line(margin, mid_line, margin + usable_w, mid_line)
+            c.setDash()
+            c.setStrokeColorRGB(0.45, 0.45, 0.45)
+            c.line(margin, bl, margin + usable_w, bl)
+            if row_kind == "trace":
+                x = margin + 2 * _mm
+                w = (_joined_width(c, it, size) if style == "joined" else c.stringWidth(it, _WORD_FONT, size))
+                c.setFillColorRGB(0, 0, 0)
+                if style == "joined":
+                    _draw_joined(c, x, bl, it, size)
+                else:
+                    c.setFont(_WORD_FONT, size)
+                    c.drawString(x, bl, it)
+                x += w + 10 * _mm
+                gap = 6 * _mm if len(it) < 3 else 9 * _mm
+                c.setFillColorRGB(0.62, 0.62, 0.62)
+                while x + w <= margin + usable_w:
+                    if style == "joined":
+                        _draw_joined(c, x, bl, it, size, dotted=True)
+                    else:
+                        c.setFont(_WORD_FONT, size)
+                        c.drawString(x, bl, it)
+                    x += w + gap
+                c.setFillColorRGB(0, 0, 0)
+            y -= row_h
+        y -= row_h * 0.05
+
+
+def _draw_cloze_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
+    """Word bank in a box, then numbered sentences with a gap to fill."""
+    bank = sheet.get("bank") or []
+    y = grid_top - 3 * _mm
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColorRGB(*_GREY)
+    c.drawString(margin, y - 3, "Word bank - choose the word that fits each sentence")
+    y -= 7 * _mm
+    bsz = 17
+    words = "     ".join(bank)
+    lines = _wrap_line(c, words, _WORD_FONT, bsz, usable_w - 8 * _mm)
+    box_h = len(lines) * (bsz + 6) + 8
+    c.setStrokeColorRGB(*_WFA_BLUE)
+    c.setLineWidth(1.4)
+    c.roundRect(margin, y - box_h, usable_w, box_h, 6, stroke=1, fill=0)
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont(_WORD_FONT, bsz)
+    for i, ln in enumerate(lines):
+        c.drawString(margin + 4 * _mm, y - 8 - bsz + 2 - i * (bsz + 6), ln)
+    y -= box_h + 8 * _mm
+    qs = sheet["questions"]
+    pitch = max(9 * _mm, min(17 * _mm, (y - grid_bottom) / max(len(qs), 1)))
+    gap_w = 34 * _mm
+    for i, q in enumerate(qs, 1):
+        before, _, after = q["question"].partition("___")
+        sz = 16
+        label = f"{i})"
+        while sz > 9 and 9 * _mm + c.stringWidth(before + after, _WORD_FONT, sz) + gap_w > usable_w:
+            sz -= 1
+        c.setFont("Helvetica", 11)
+        c.setFillColorRGB(*_GREY)
+        c.drawString(margin, y - pitch * 0.55, label)
+        c.setFillColorRGB(0, 0, 0)
+        c.setFont(_WORD_FONT, sz)
+        x = margin + 9 * _mm
+        c.drawString(x, y - pitch * 0.55, before)
+        x += c.stringWidth(before, _WORD_FONT, sz)
+        c.setStrokeColorRGB(0.3, 0.3, 0.3)
+        c.setLineWidth(0.8)
+        c.line(x + 1, y - pitch * 0.58, x + gap_w - 1, y - pitch * 0.58)
+        x += gap_w
+        c.drawString(x, y - pitch * 0.55, after)
+        y -= pitch
+
+
+
 def render_compact_sheet_slot(c, margin, usable_w, slot_top, slot_bottom, pupil, sheet, include_answers):
     """One sheet drawn into a given vertical slot (a whole page, or half a
     page when two are stacked) — the density Innes's old Excel sheets had."""
@@ -283,13 +454,23 @@ def render_compact_sheet_slot(c, margin, usable_w, slot_top, slot_bottom, pupil,
     if sheet.get("day_label"):
         bits.append(sheet["day_label"])
     header_h = min(9 * _mm, (slot_top - slot_bottom) * 0.12)
-    right_text = f"Time: _______   Score: _______   {date.today().strftime('%d/%m/%y')}"
+    mode = sheet.get("display_mode")
+    if mode == "handwriting":
+        right_text = f"Date: {date.today().strftime('%d/%m/%y')}"
+        include_answers = False
+    else:
+        right_text = f"Time: _______   Score: _______   {date.today().strftime('%d/%m/%y')}"
     header_bottom = _compact_header(c, margin, usable_w, slot_top, bits, right_text, header_h)
 
     footer_h = (14 * _mm if include_answers else 2 * _mm)
     grid_top = header_bottom - 2
     grid_bottom = slot_bottom + footer_h
-    _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, maths_cols=4)
+    if mode == "cloze":
+        _draw_cloze_body(c, margin, usable_w, grid_top, grid_bottom, sheet)
+    elif mode == "handwriting":
+        _draw_handwriting_body(c, margin, usable_w, grid_top, grid_bottom, sheet)
+    else:
+        _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, maths_cols=4)
 
     if include_answers:
         _pdf_footer_answers(c, margin, usable_w, grid_bottom - 10, sheet["questions"], sheet["subject"], sheet.get("display_mode"), max_lines=2)
@@ -432,7 +613,7 @@ if query_params.get("mode") == "self_assess":
             if l["id"] == step["ladder_id"]:
                 ladder = l
                 break
-        subject = ladder["subject"] if ladder else "maths"
+        subject = step_subject(step, ladders_data, ladder)
 
         # ── MATHS MODE: Auto-marking timed probe ──────────────────────────
         if subject == "maths":
@@ -545,7 +726,7 @@ if query_params.get("mode") == "self_assess":
                             st.rerun()
 
         # ── PHONICS MODE: Adult-led timed reading ─────────────────────────
-        elif subject == "phonics":
+        elif subject in ("phonics", "handwriting", "custom"):
             st.subheader(f"📖 {step['name']}")
             aim = step["aim"]
             st.caption("Adult: listen to the child read each grapheme and mark correct or incorrect.")
@@ -802,7 +983,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-16.10.26h")
+st.caption("Wallscourt Farm Academy · WFA-16.10.26i")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
@@ -887,10 +1068,10 @@ with tab1:
                 if l["id"] == step["ladder_id"]:
                     ladder = l
                     break
-            subject = ladder["subject"] if ladder else "maths"
+            subject = step_subject(step, ladders_data, ladder)
             if subject == "maths":
                 maths_sheets.append((p, step))
-            elif subject == "phonics":
+            elif subject in ("phonics", "handwriting", "custom"):
                 phonics_sheets.append((p, step))
             elif subject == "spellings":
                 spelling_checks.append((p, step))
@@ -1069,14 +1250,21 @@ with tab2:
             sk = p.setdefault("currentSkills", {})
             old = sk.get(step_id) if step_id else None
             keep = old.get("itemsPerSheet") if isinstance(old, dict) else None
-            for s in lad["steps"]:
-                sk.pop(s["id"], None)
+            if lad.get("independent"):
+                # Custom sets and handwriting: steps are separate sets, not a ladder. Each is on or off.
+                for s in lad["steps"]:
+                    if skill_status(sk.get(s["id"], "")) == "active":
+                        sk.pop(s["id"], None)
+            else:
+                for s in lad["steps"]:
+                    sk.pop(s["id"], None)
             if step_id is None:
                 return
-            for s in lad["steps"]:
-                if s["id"] == step_id:
-                    break
-                set_skill_status(p, s["id"], "mastered")
+            if not lad.get("independent"):
+                for s in lad["steps"]:
+                    if s["id"] == step_id:
+                        break
+                    set_skill_status(p, s["id"], "mastered")
             set_skill_status(p, step_id, "active")
             sk[step_id]["itemsPerSheet"] = keep or 25
             sd = next(s for s in lad["steps"] if s["id"] == step_id)
@@ -1139,6 +1327,43 @@ with tab2:
 
             st.button(f"💾 Save {len(changes)} change(s)" if changes else "💾 Save", type="primary",
                       disabled=not changes, on_click=_do_save)
+
+            # ── Choose the exact facts (rolling-list skills such as times tables) ────────
+            win_rows = []
+            for p in shown:
+                for i in show_ids:
+                    for s in lad_by_id[i]["steps"]:
+                        if is_windowed(s) and skill_status((p.get("currentSkills") or {}).get(s["id"], "")) == "active":
+                            win_rows.append((p, lad_by_id[i], s))
+            if win_rows:
+                with st.expander("🎯 Choose the exact facts (e.g. 9×2 to 9×6) for times tables and other rolling lists"):
+                    st.caption("Children learn best from a small number of facts, repeated. Pick the step, the children, and the facts they should practise. "
+                               "Their sheets then use only those facts.")
+                    step_choices = {}
+                    for p, lad, s in win_rows:
+                        step_choices.setdefault(s["id"], (lad, s))
+                    sid_pick = st.selectbox("Step", list(step_choices), key="facts_step",
+                                            format_func=lambda x: f"{step_choices[x][0]['name']}: {step_choices[x][1]['name']}")
+                    f_lad, f_step = step_choices[sid_pick]
+                    kids = [p for p, lad, s in win_rows if s["id"] == sid_pick]
+                    kid_ids = st.multiselect("Children", [p["id"] for p in kids], default=[p["id"] for p in kids],
+                                             format_func=lambda x: display_name(get_pupil(pupils_data, x)), key=f"facts_kids_{sid_pick}")
+                    cur = get_active_window(kids[0], sid_pick, f_step) if kids else []
+                    facts = st.multiselect("Facts to practise (3 to 6 is ideal)", f_step["items"], default=cur, key=f"facts_pick_{sid_pick}")
+
+                    def _do_facts(ids=tuple(kid_ids), chosen=tuple(facts), st_=f_step, sid=sid_pick):
+                        pd_ = st.session_state.pupils_data
+                        ordered = [x for x in st_["items"] if x in chosen]
+                        front = max((st_["items"].index(x) for x in ordered), default=0)
+                        for p in pd_["pupils"]:
+                            if p["id"] in ids:
+                                set_active_window(p, sid, ordered, front)
+                        save_pupils(pd_)
+                        git_add_commit_push("data/pupils.json", f"Set facts for {len(ids)} pupil(s)")
+                        st.session_state["pt_flash"] = f"Set {len(ordered)} fact(s) for {len(ids)} child(ren): {', '.join(ordered)}"
+
+                    st.button("Set these facts", on_click=_do_facts, disabled=not (kid_ids and facts), type="primary")
+
         else:
             st.info("Choose at least one skill set above.")
 
@@ -1164,6 +1389,8 @@ with tab2:
             skills = sp_pupil_data.get("currentSkills", {})
 
             for ladder in ladders_data["ladders"]:
+                if not ladder["steps"]:
+                    continue
                 with st.expander(f"{ladder['name']} ({ladder['subject']})"):
                     # Visual ladder progression
                     cols = st.columns(min(len(ladder["steps"]), 6))
@@ -1328,7 +1555,94 @@ with tab2:
 with tab3:
     ladders_data = st.session_state.ladders_data
 
+    # ── Make your own practice set ───────────────────────────────────────────
+    with st.expander("➕ Make your own practice set (chosen graphemes, letters, joins or words)", expanded=False):
+        st.caption("A set is a short list for a child to practise every day. Once made, it appears under **Custom sets** in Assign skills and in the weekly plan.")
+        import re as _re
+        kind_labels = {
+            "gr": "Phonics: chosen graphemes",
+            "hl": "Handwriting: chosen letters",
+            "hj": "Handwriting: chosen joins (e.g. rt, eo)",
+            "cw": "Words in sentences (common exception words and homophones)",
+        }
+        cs_kind = st.selectbox("What kind of set?", list(kind_labels), format_func=lambda k: kind_labels[k], key="cs_kind")
+        cs_name = st.text_input("Name for this set", key="cs_name", placeholder="e.g. Set 2 sounds: ai, ee, oa")
+        cs_items = []
+        if cs_kind == "gr":
+            pools = {}
+            for l in ladders_data["ladders"]:
+                if l["subject"] == "phonics":
+                    for s in l["steps"]:
+                        pools[s["name"]] = s["items"]
+            group = st.multiselect("Show graphemes from", list(pools), default=list(pools), key="cs_gr_groups")
+            options = []
+            for g in group:
+                for it in pools[g]:
+                    if it not in options:
+                        options.append(it)
+            picked = st.multiselect("Graphemes", options, key="cs_gr_pick")
+            extra = st.text_input("Any others (separate with spaces)", key="cs_gr_extra")
+            cs_items = picked + [w for w in extra.split() if w not in picked]
+        elif cs_kind == "hl":
+            cs_items = st.multiselect("Letters", list("abcdefghijklmnopqrstuvwxyz"), key="cs_hl_pick")
+        elif cs_kind == "hj":
+            j1, j2 = st.columns(2)
+            with j1:
+                first = st.multiselect("First letters", list("abcdefghijklmnopqrstuvwxyz"), key="cs_hj_first")
+            with j2:
+                second = st.multiselect("Joined to", list("abcdefghijklmnopqrstuvwxyz"), key="cs_hj_second")
+            typed = st.text_input("Or type the joins, separated by spaces (e.g. rt eo ing)", key="cs_hj_typed")
+            combos = [x + y for x in first for y in second]
+            cs_items = combos + [w for w in typed.split() if w not in combos]
+        else:
+            from cloze_bank import SENTENCES
+            cs_items = st.multiselect("Words (only words with sentences are listed)", sorted(SENTENCES, key=str.lower), key="cs_cw_pick")
+        st.caption(f"{len(cs_items)} item(s) chosen" + (": " + ", ".join(cs_items[:30]) if cs_items else "."))
+
+        def _make_set(kind=cs_kind, nm=cs_name, items=tuple(cs_items)):
+            ld = st.session_state.ladders_data
+            lad = next(l for l in ld["ladders"] if l["id"] == "custom_sets")
+            slug = _re.sub(r"[^a-z0-9]+", "_", nm.lower()).strip("_")[:24] or "set"
+            sid = f"custom_{slug}"
+            n = 2
+            while any(s["id"] == sid for s in lad["steps"]):
+                sid = f"custom_{slug}_{n}"
+                n += 1
+            subj, k = {"gr": ("phonics", None), "hl": ("handwriting", "hw_letters"),
+                       "hj": ("handwriting", "hw_joins"), "cw": ("spellings", "cloze")}[kind]
+            step = {"id": sid, "name": nm.strip(), "subject": subj,
+                    "aim": {"correctPerMin": 20, "maxErrors": 1, "timedSec": 60}, "items": list(items),
+                    "untimedAim": {"accuracyPct": 100, "minTrials": 3}}
+            if k:
+                step["kind"] = k
+            lad["steps"].append(step)
+            save_ladders(ld)
+            git_add_commit_push("data/skill-ladders.json", f"Add custom set: {nm.strip()}")
+            for key in ("cs_name", "cs_gr_pick", "cs_gr_extra", "cs_hl_pick", "cs_hj_first", "cs_hj_second", "cs_hj_typed", "cs_cw_pick"):
+                st.session_state.pop(key, None)
+            st.session_state["pt_flash"] = f"Made the set '{nm.strip()}'. Find it under Custom sets in Assign skills."
+
+        st.button("Make this set", on_click=_make_set, type="primary", disabled=not (cs_name.strip() and cs_items))
+
+        cust = next((l for l in ladders_data["ladders"] if l["id"] == "custom_sets"), None)
+        if cust and cust["steps"]:
+            by = {s["id"]: s for s in cust["steps"]}
+            rm = st.multiselect("Delete a set you made", list(by), format_func=lambda i: by[i]["name"], key="cs_rm")
+
+            def _rm_sets(ids=tuple(rm)):
+                ld = st.session_state.ladders_data
+                lad = next(l for l in ld["ladders"] if l["id"] == "custom_sets")
+                lad["steps"] = [s for s in lad["steps"] if s["id"] not in ids]
+                save_ladders(ld)
+                git_add_commit_push("data/skill-ladders.json", "Delete custom set(s)")
+                st.session_state.pop("cs_rm", None)
+
+            st.button("Delete selected sets", on_click=_rm_sets, disabled=not rm)
+
+
     for ladder in ladders_data["ladders"]:
+        if not ladder["steps"]:
+            continue
         with st.expander(f"{ladder['name']} ({ladder['subject']})"):
             for i, step in enumerate(ladder["steps"]):
                 status_emoji = "✅" if i == 0 else "🔵"
@@ -1911,6 +2225,8 @@ with tab6:
                 with bc3:
                     wk_cover = st.checkbox("Include a timetable page for each child", value=True, key="wk_cover")
 
+                st.radio("Handwriting style", ["As set", "Print", "Joined (cursive)"], horizontal=True, key="hw_style_override",
+                         help="Letter families are printed in print style and joins in joined style unless you choose here.")
                 if st.button("Create weekly packs (PDF)", type="primary", width="stretch"):
                     from reportlab.lib.pagesizes import A4
                     from reportlab.pdfgen import canvas as pdfcanvas
@@ -1979,7 +2295,7 @@ with tab6:
                                     continue
                                 sheet["day_label"] = DAY_FULL[d]
                                 n_sheets += 1
-                                if sheet["subject"] == "phonics" or (sheet.get("display_mode") == "recognition" and sheet["subject"] != "maths"):
+                                if _is_full_page(sheet):
                                     _flush()
                                     render_compact_sheet_slot(c, margin, usable_w, page_h - margin, margin, p, sheet, wk_answers)
                                     c.showPage()
@@ -2086,7 +2402,7 @@ with tab6:
                         # one.
                         recognition_sheets, boxed_sheets = [], []
                         for p, sheet in all_sheets:
-                            is_recognition = sheet["subject"] == "phonics" or (sheet.get("display_mode") == "recognition" and sheet["subject"] != "maths")
+                            is_recognition = _is_full_page(sheet)
                             (recognition_sheets if is_recognition else boxed_sheets).append((p, sheet))
 
                         for p, sheet in recognition_sheets:
