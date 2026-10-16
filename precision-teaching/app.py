@@ -1022,7 +1022,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-16.10.26l")
+st.caption("Wallscourt Farm Academy · WFA-16.10.26m")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
@@ -2263,7 +2263,7 @@ with tab6:
                     wk_answers = st.checkbox("Include answer key", value=True, key="wk_answers")
                 with bc3:
                     wk_cover = st.checkbox("Include a timetable page for each child", value=True, key="wk_cover")
-                    st.checkbox("Mix in 1-2 review facts from skills already mastered", value=False, key="print_review",
+                    st.checkbox("Mix in 1-2 review facts from skills already mastered", value=False, key="print_review_w",
                                 help="Off by default, so a sheet only has the facts you chose.")
 
                 hw1, hw2, hw3 = st.columns([2, 1, 1])
@@ -2337,7 +2337,7 @@ with tab6:
                                 sid = k.split(":", 1)[1]
                                 step = get_step(ladders_data, sid)
                                 pool = get_active_window(p, sid, step) if is_windowed(step) else None
-                                sheet = generate_sheet(p, sid, ladders_data, item_pool=pool, include_review=bool(st.session_state.get("print_review", False)))
+                                sheet = generate_sheet(p, sid, ladders_data, item_pool=pool, include_review=bool(st.session_state.get("print_review_w", False)))
                                 if not sheet:
                                     continue
                                 sheet["day_label"] = DAY_FULL[d]
@@ -2397,7 +2397,6 @@ with tab6:
                         include_answers = st.checkbox("Include answer key", value=True, key="print_answers")
                         st.checkbox("Mix in 1-2 review facts from skills already mastered", value=False, key="print_review_q",
                                     help="Off by default, so a sheet only has the facts you chose.")
-                        st.session_state["print_review"] = st.session_state.get("print_review_q", False)
 
                     st.caption(
                         "Item count per sheet comes from what was set for each pupil/skill in Set Starting Points. "
@@ -2436,7 +2435,7 @@ with tab6:
                             for day_n in range(1, day_count + 1):
                                 # Each call reshuffles independently — same
                                 # item content, different order per day.
-                                sheet = generate_sheet(p, skill_id, ladders_data, item_pool=grid_item_pool, include_review=bool(st.session_state.get("print_review", False)))
+                                sheet = generate_sheet(p, skill_id, ladders_data, item_pool=grid_item_pool, include_review=bool(st.session_state.get("print_review_q", False)))
                                 if sheet:
                                     if week_mode:
                                         sheet["day_label"] = f"Day {day_n}"
