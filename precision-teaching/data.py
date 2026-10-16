@@ -508,40 +508,110 @@ def _git_auth_url():
     return base
 
 
+# The server has no git identity of its own, so every commit carries one explicitly. (Without it `git commit`
+# fails with "Author identity unknown", which used to be swallowed: nothing was saved to the data repo.)
+_GIT_ID = ["-c", "user.name=WFA Precision Teaching", "-c", "user.email=noreply@wallscourt-farm-academy.co.uk"]
+SAVE_STATUS = {"ok": True, "message": "", "at": None}
+
+
+def _redact(text):
+    tok = _github_token()
+    text = text or ""
+    return text.replace(tok, "***") if tok else text
+
+
+def _git(args, timeout=30):
+    return subprocess.run(["git", *_GIT_ID, *args], cwd=REPO_DIR, capture_output=True, text=True, timeout=timeout)
+
+
+def _record_save(ok, message=""):
+    SAVE_STATUS.update({"ok": ok, "message": _redact(message).strip()[:400], "at": datetime.now().strftime("%H:%M:%S")})
+
+
 def git_pull():
     if not (REPO_DIR / ".git").exists():
         try:
             REPO_DIR.parent.mkdir(parents=True, exist_ok=True)
-            subprocess.run(["git", "clone", _git_auth_url(), str(REPO_DIR)],
-                            capture_output=True, timeout=30)
-        except Exception:
+            r = subprocess.run(["git", "clone", _git_auth_url(), str(REPO_DIR)], capture_output=True, text=True, timeout=60)
+            if r.returncode != 0:
+                _record_save(False, "Could not fetch the saved data from GitHub: " + (r.stderr or r.stdout))
+        except Exception as e:
+            _record_save(False, f"Could not fetch the saved data from GitHub: {type(e).__name__}")
             return False
         return (REPO_DIR / ".git").exists()
     ensure_remote_auth()
     try:
-        subprocess.run(["git", "pull", "--rebase"], cwd=REPO_DIR, capture_output=True, timeout=15)
+        f = _git(["fetch", _git_auth_url(), "+main:refs/remotes/origin/main"], timeout=30)
+        if f.returncode != 0:
+            _record_save(False, "Could not fetch the saved data from GitHub: " + (f.stderr or f.stdout))
+            return False
+        r = _git(["rebase", "--autostash", "origin/main"], timeout=30)
+        if r.returncode != 0:
+            _git(["rebase", "--abort"], timeout=10)
+            _record_save(False, "Could not combine the saved data with this server's changes: " + (r.stderr or r.stdout))
+            return False
         return True
     except Exception:
         return False
 
 
 def git_add_commit_push(filepath, message):
+    """Commit a data file and push it to the private data repo. Records the outcome in SAVE_STATUS so the app
+    can say plainly when a change is NOT backed up."""
     try:
         ensure_remote_auth()
-        subprocess.run(["git", "add", filepath], cwd=REPO_DIR, capture_output=True, timeout=10)
-        subprocess.run(["git", "commit", "-m", message], cwd=REPO_DIR, capture_output=True, timeout=10)
-        remote = subprocess.run(["git", "remote", "get-url", "origin"], cwd=REPO_DIR,
-                                capture_output=True, text=True, timeout=5)
-        push_url = _git_auth_url() if remote.returncode == 0 else None
-        result = subprocess.run(["git", "push", push_url or "origin", "HEAD:main"],
-                                cwd=REPO_DIR, capture_output=True, timeout=30)
-        if result.returncode != 0:
-            subprocess.run(["git", "pull", "--rebase"], cwd=REPO_DIR, capture_output=True, timeout=15)
-            subprocess.run(["git", "push", push_url or "origin", "HEAD:main"],
-                           cwd=REPO_DIR, capture_output=True, timeout=30)
+        a = _git(["add", filepath], timeout=15)
+        if a.returncode != 0:
+            _record_save(False, "git add failed: " + (a.stderr or a.stdout))
+            return False
+        c = _git(["commit", "-m", message], timeout=15)
+        out = (c.stdout or "") + (c.stderr or "")
+        if c.returncode != 0 and "nothing to commit" not in out and "nothing added" not in out:
+            _record_save(False, "git commit failed: " + out)
+            return False
+        url = _git_auth_url()
+        p = _git(["push", url, "HEAD:main"], timeout=45)
+        if p.returncode != 0:
+            f = _git(["fetch", url, "+main:refs/remotes/origin/main"], timeout=30)
+            if f.returncode == 0:
+                if _git(["rebase", "--autostash", "origin/main"], timeout=30).returncode != 0:
+                    _git(["rebase", "--abort"], timeout=10)
+            p = _git(["push", url, "HEAD:main"], timeout=45)
+        if p.returncode != 0:
+            _record_save(False, "git push failed: " + (p.stderr or p.stdout))
+            return False
+        _git(["update-ref", "refs/remotes/origin/main", "HEAD"], timeout=10)   # so 'unpushed commits' counts correctly
+        _record_save(True, "")
         return True
-    except Exception:
+    except Exception as e:
+        _record_save(False, f"{type(e).__name__}: {e}")
         return False
+
+
+def git_unsaved_count():
+    """Changes not yet safely on GitHub: uncommitted files in the data repo plus commits not yet pushed."""
+    try:
+        st_ = _git(["status", "--porcelain", "--", "data"], timeout=10)
+        files = [l for l in st_.stdout.splitlines() if l.strip()]
+        return len(files) + git_pending_commits()
+    except Exception:
+        return 0
+
+
+def git_selftest():
+    """Plain-English check that this server can read from AND write to the private data repo."""
+    lines = []
+    if not _github_token():
+        return ["No GITHUB_TOKEN is set on this server, so nothing can be saved to GitHub."]
+    url = _git_auth_url()
+    try:
+        r = _git(["ls-remote", url, "HEAD"], timeout=30)
+        lines.append("Read from GitHub: OK" if r.returncode == 0 else "Read from GitHub: FAILED. " + _redact(r.stderr or r.stdout).strip()[:250])
+        w = _git(["push", "--dry-run", url, "HEAD:main"], timeout=30)
+        lines.append("Write to GitHub: OK" if w.returncode == 0 else "Write to GitHub: FAILED. " + _redact(w.stderr or w.stdout).strip()[:250])
+    except Exception as e:
+        lines.append(f"Check could not run: {type(e).__name__}")
+    return lines
 
 
 def git_pending_commits():
