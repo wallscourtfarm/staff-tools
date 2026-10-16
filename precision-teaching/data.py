@@ -32,18 +32,26 @@ HUB_URL = "https://api.wallscourt-farm-academy.co.uk/planning/pupilroster-db/pup
 HUB_TOKEN = os.environ.get("HUB_TOKEN", "")
 
 
-def fetch_hub_pupils():
-    """Live pupil list from the hub. Returns [] on any failure — callers
-    should treat that as 'roster unavailable right now', not 'no pupils'."""
+def fetch_hub_pupils_checked():
+    """Live pupil list from the hub as (pupils, problem). `problem` is "" on success, otherwise a short plain
+    reason (no token, token refused, unreachable) so the screen can say why the list is empty."""
+    if not HUB_TOKEN:
+        return [], "This tool has no hub token set (HUB_TOKEN on Railway)."
     try:
         r = requests.get(HUB_URL, params={"action": "getPupils", "token": HUB_TOKEN}, timeout=20)
         r.raise_for_status()
         data = r.json()
-    except Exception:
-        return []
+    except Exception as e:
+        return [], f"The roster could not be reached ({type(e).__name__})."
     if data.get("error"):
-        return []
-    return data.get("pupils", [])
+        return [], f"The roster refused the request ({data.get('error')}). The hub token on Railway may be out of date."
+    return data.get("pupils", []), ""
+
+
+def fetch_hub_pupils():
+    """Live pupil list from the hub. Returns [] on any failure — callers
+    should treat that as 'roster unavailable right now', not 'no pupils'."""
+    return fetch_hub_pupils_checked()[0]
 
 # ── Skill Ladders ──────────────────────────────────────────────────────────
 
