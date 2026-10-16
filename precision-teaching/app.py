@@ -801,7 +801,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-16.10.26a")
+st.caption("Wallscourt Farm Academy · WFA-16.10.26b")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
@@ -949,19 +949,19 @@ with tab2:
     pupils_data = st.session_state.pupils_data
     ladders_data = st.session_state.ladders_data
 
-    st.markdown("**Add a pupil to track** — pick them from the school roster by class and initials")
+    st.markdown("**Add pupils to track**")
+    st.caption("1. Pick a year group.  2. Click the box and choose children (type to search; pick as many as you like).  3. Press **Add**.")
     tracked_codes = {p.get("pupilCode") for p in pupils_data["pupils"] if p.get("pupilCode")}
 
-    year_col, search_col, refresh_col = st.columns([1, 3, 1])
+    year_col, refresh_col = st.columns([1, 1])
     with year_col:
         year_filter = st.selectbox(
             "Year group", ["All years", "EYFS", "Y1", "Y2", "Y3", "Y4", "Y5", "Y6"],
-            key="roster_year_filter", label_visibility="collapsed",
+            index=5, key="roster_year_filter",
         )
-    with search_col:
-        roster_query = st.text_input("Search by initials or class", key="roster_search", label_visibility="collapsed", placeholder="Optional: filter by initials or class, e.g. IM or 5IM…")
     with refresh_col:
-        if st.button("🔄 Refresh", help="Refresh initials and classes of already-tracked pupils from the roster"):
+        st.write("")
+        if st.button("🔄 Refresh initials and classes of tracked pupils"):
             result = sync_pupils_from_roster(pupils_data)
             if result.get("error"):
                 st.warning("Could not reach the roster right now — try again shortly.")
@@ -981,25 +981,31 @@ with tab2:
     else:
         if year_filter != "All years":
             hub_pupils = [p for p in hub_pupils if p.get("yearGroup") == year_filter]
-        q = roster_query.strip().lower()
-        matches = [p for p in hub_pupils
-                   if (not q or q in (p.get("label") or "").lower() or q in (p.get("class") or "").lower()
-                       or q in f"{p.get('class','')} {p.get('label','')}".lower())
-                   and p.get("pupilId") not in tracked_codes]
-        matches.sort(key=lambda p: ((p.get("class") or ""), (p.get("label") or "").lower()))   # first initial order
-        if not q and year_filter == "All years":
-            st.caption(f"{len(matches)} children on the roster. Choose a year group or type initials to narrow the list.")
-        matches = matches[:60]
-        if not matches:
-            st.info("No match on the active roster (or they're already being tracked).")
-        for p in matches:
-            label = f"{p.get('label','?')} — {p.get('yearGroup','')} {p.get('class','')}"
-            if st.button(f"+ {label}", key=f"addroster_{p.get('pupilId')}"):
-                pupil = add_pupil(pupils_data, p)
-                save_pupils(pupils_data)
-                git_add_commit_push("data/pupils.json", f"Track pupil: {p.get('label')}")
-                st.success(f"Now tracking {p.get('label')} (token: **{pupil['token']}**)")
-                st.rerun()
+        names = st.session_state.get("pt_names") or {}
+
+        def _roster_label(p):
+            full = names.get(p.get("pupilId") or "")
+            where = f"{p.get('label') or '?'} · {p.get('class') or p.get('yearGroup') or ''}"
+            return f"{full} ({where})" if full else where
+
+        avail = [p for p in hub_pupils if p.get("pupilId") not in tracked_codes]
+        avail.sort(key=lambda p: ((p.get("class") or ""), _roster_label(p).lower()))
+        by_code = {p["pupilId"]: p for p in avail if p.get("pupilId")}
+        if not names:
+            st.caption("Showing initials. Load your names file (sidebar, 'Names file') to see names here too.")
+        picked = st.multiselect(
+            f"Children to add ({len(avail)} not yet tracked)", options=list(by_code),
+            format_func=lambda c: _roster_label(by_code[c]), key="roster_pick",
+            placeholder="Click here, then pick or type to search…",
+        )
+        if st.button(f"➕ Add {len(picked)} selected" if picked else "➕ Add selected", type="primary", disabled=not picked):
+            for c in picked:
+                add_pupil(pupils_data, by_code[c])
+            save_pupils(pupils_data)
+            git_add_commit_push("data/pupils.json", f"Track {len(picked)} pupil(s)")
+            st.session_state["roster_pick"] = []
+            st.success(f"Now tracking {len(picked)} pupil(s). Scroll down to set their starting points.")
+            st.rerun()
 
     # ── Set Starting Points ──────────────────────────────────────────────
 
