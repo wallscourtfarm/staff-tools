@@ -801,7 +801,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-16.10.26b")
+st.caption("Wallscourt Farm Academy · WFA-16.10.26c")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
@@ -1006,6 +1006,22 @@ with tab2:
             st.session_state["roster_pick"] = []
             st.success(f"Now tracking {len(picked)} pupil(s). Scroll down to set their starting points.")
             st.rerun()
+
+    # ── Remove pupils added by mistake ─────────────────────────────────────
+    if pupils_data["pupils"]:
+        by_id = {p["id"]: p for p in pupils_data["pupils"]}
+        gone = st.multiselect(
+            f"Remove children from tracking ({len(by_id)} tracked)", options=list(by_id),
+            format_func=lambda i: f"{display_name(by_id[i])} ({by_id[i].get('class') or '—'})",
+            key="remove_pick", placeholder="Click here and choose anyone added by mistake…",
+        )
+        if st.button(f"🗑 Remove {len(gone)} selected" if gone else "🗑 Remove selected", disabled=not gone):
+            pupils_data["pupils"] = [p for p in pupils_data["pupils"] if p["id"] not in gone]
+            save_pupils(pupils_data)
+            git_add_commit_push("data/pupils.json", f"Stop tracking {len(gone)} pupil(s)")
+            st.session_state["remove_pick"] = []
+            st.rerun()
+        st.caption("This only removes them from this tool. Their practice records stay saved, and they are not removed from the school roster.")
 
     # ── Set Starting Points ──────────────────────────────────────────────
 
