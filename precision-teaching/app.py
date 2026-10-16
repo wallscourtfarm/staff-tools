@@ -349,6 +349,7 @@ inject_wfa_css(buttons=True, inputs=True, download=True)
 
 st.markdown("""
 <style>
+div[data-testid="stMainBlockContainer"] { max-width: 100% !important; padding-left: 2rem; padding-right: 2rem; }
     .metric-card {
         background: linear-gradient(135deg, #1798d3 0%, #0d7bb8 100%);
         color: white; padding: 1.5rem; border-radius: 12px; text-align: center;
@@ -801,7 +802,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-16.10.26g")
+st.caption("Wallscourt Farm Academy · WFA-16.10.26h")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
