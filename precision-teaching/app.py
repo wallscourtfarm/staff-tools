@@ -29,14 +29,14 @@ from data import (
     get_skill_status, set_skill_status, pass_review, fail_review, get_reviews_due,
     migrate_skills_format, skill_status, active_skills_for, count_by_status,
     generate_sheet, get_answer, get_review_items,
-    fetch_hub_pupils, sync_pupils_from_roster, anonymise_pupils, pupil_label, display_name, parse_names_csv,
+    fetch_hub_pupils, fetch_hub_pupils_checked, sync_pupils_from_roster, anonymise_pupils, pupil_label, display_name, parse_names_csv,
     is_windowed, get_active_window, get_window_frontier, set_active_window, suggest_next_window,
 )
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _cached_roster():
-    return fetch_hub_pupils()
+    return fetch_hub_pupils_checked()
 
 
 def get_roster():
@@ -46,10 +46,11 @@ def get_roster():
     button bypasses this and hits the live roster directly. A failed fetch
     isn't cached — clearing it immediately means the next keystroke retries
     instead of being stuck showing "unavailable" for the rest of the TTL."""
-    result = _cached_roster()
-    if not result:
+    pupils, problem = _cached_roster()
+    if not pupils:
         _cached_roster.clear()
-    return result
+    st.session_state["roster_problem"] = problem
+    return pupils
 
 # ── PDF Renderer — "Clean Cards" ──────────────────────────────────────────
 #
@@ -800,7 +801,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-10.10.26a")
+st.caption("Wallscourt Farm Academy · WFA-16.10.26a")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
@@ -958,7 +959,7 @@ with tab2:
             key="roster_year_filter", label_visibility="collapsed",
         )
     with search_col:
-        roster_query = st.text_input("Search by initials or class", key="roster_search", label_visibility="collapsed", placeholder="Type initials or a class, e.g. IM or 5IM…")
+        roster_query = st.text_input("Search by initials or class", key="roster_search", label_visibility="collapsed", placeholder="Optional: filter by initials or class, e.g. IM or 5IM…")
     with refresh_col:
         if st.button("🔄 Refresh", help="Refresh initials and classes of already-tracked pupils from the roster"):
             result = sync_pupils_from_roster(pupils_data)
@@ -973,31 +974,32 @@ with tab2:
                 st.success(msg)
                 st.rerun()
 
-    if roster_query.strip():
-        with st.spinner("Searching roster…"):
-            hub_pupils = get_roster()
-        if not hub_pupils:
-            st.warning("Could not reach the roster right now — try again shortly.")
-        else:
-            if year_filter != "All years":
-                hub_pupils = [p for p in hub_pupils if p.get("yearGroup") == year_filter]
-            q = roster_query.strip().lower()
-            matches = [p for p in hub_pupils
-                       if (q in (p.get("label") or "").lower() or q in (p.get("class") or "").lower()
-                           or q in f"{p.get('class','')} {p.get('label','')}".lower())
-                       and p.get("pupilId") not in tracked_codes]
-            matches.sort(key=lambda p: ((p.get("class") or ""), (p.get("label") or "").lower()))   # first initial order
-            matches = matches[:20]
-            if not matches:
-                st.info("No match on the active roster (or they're already being tracked).")
-            for p in matches:
-                label = f"{p.get('label','?')} — {p.get('yearGroup','')} {p.get('class','')}"
-                if st.button(f"+ {label}", key=f"addroster_{p.get('pupilId')}"):
-                    pupil = add_pupil(pupils_data, p)
-                    save_pupils(pupils_data)
-                    git_add_commit_push("data/pupils.json", f"Track pupil: {p.get('label')}")
-                    st.success(f"Now tracking {p.get('label')} (token: **{pupil['token']}**)")
-                    st.rerun()
+    with st.spinner("Loading roster…"):
+        hub_pupils = get_roster()
+    if not hub_pupils:
+        st.warning(st.session_state.get("roster_problem") or "Could not reach the roster right now — try again shortly.")
+    else:
+        if year_filter != "All years":
+            hub_pupils = [p for p in hub_pupils if p.get("yearGroup") == year_filter]
+        q = roster_query.strip().lower()
+        matches = [p for p in hub_pupils
+                   if (not q or q in (p.get("label") or "").lower() or q in (p.get("class") or "").lower()
+                       or q in f"{p.get('class','')} {p.get('label','')}".lower())
+                   and p.get("pupilId") not in tracked_codes]
+        matches.sort(key=lambda p: ((p.get("class") or ""), (p.get("label") or "").lower()))   # first initial order
+        if not q and year_filter == "All years":
+            st.caption(f"{len(matches)} children on the roster. Choose a year group or type initials to narrow the list.")
+        matches = matches[:60]
+        if not matches:
+            st.info("No match on the active roster (or they're already being tracked).")
+        for p in matches:
+            label = f"{p.get('label','?')} — {p.get('yearGroup','')} {p.get('class','')}"
+            if st.button(f"+ {label}", key=f"addroster_{p.get('pupilId')}"):
+                pupil = add_pupil(pupils_data, p)
+                save_pupils(pupils_data)
+                git_add_commit_push("data/pupils.json", f"Track pupil: {p.get('label')}")
+                st.success(f"Now tracking {p.get('label')} (token: **{pupil['token']}**)")
+                st.rerun()
 
     # ── Set Starting Points ──────────────────────────────────────────────
 
