@@ -801,7 +801,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-16.10.26e")
+st.caption("Wallscourt Farm Academy · WFA-16.10.26f")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
@@ -1032,98 +1032,114 @@ with tab2:
                   disabled=not gone, on_click=_do_remove)
         st.caption("This only removes them from this tool. Their practice records stay saved, and they are not removed from the school roster.")
 
-    # ── Assign skills: one grid for the whole class ──────────────────────
+    # ── Assign skills: children x skill sets table ───────────────────────
 
     st.divider()
     st.subheader("Assign skills")
     if not pupils_data["pupils"]:
         st.info("Add children above first, then assign skills here.")
     else:
-        st.caption("1. Choose a skill set.  2. Pick a step for each child in the table (or use **Set everyone shown**).  3. Press **Save**. "
+        st.caption("One row per child, one column per skill set. Click a cell to choose the step that child is working on "
+                   "(a child can have a step in several skill sets). Press **Save** once at the end. "
                    "Steps before the one you choose are marked as already mastered.")
         lad_by_id = {l["id"]: l for l in ladders_data["ladders"]}
-        g1, g2, g3 = st.columns([2, 1, 1])
-        with g1:
-            asg_lad_id = st.selectbox("Skill set", list(lad_by_id), key="asg_ladder",
-                                      format_func=lambda i: f"{lad_by_id[i]['name']} ({lad_by_id[i]['subject']})")
-        asg_lad = lad_by_id[asg_lad_id]
-        classes = sorted({p.get("class") or "—" for p in pupils_data["pupils"]})
-        with g2:
-            asg_class = st.selectbox("Class", ["All"] + classes, key="asg_class")
         none_lbl = "— not assigned —"
-        step_names = [s["name"] for s in asg_lad["steps"]]
-        name_to_id = {s["name"]: s["id"] for s in asg_lad["steps"]}
+        in_use = [i for i, l in lad_by_id.items()
+                  if any(skill_status((p.get("currentSkills") or {}).get(s["id"], "")) == "active"
+                         for p in pupils_data["pupils"] for s in l["steps"])]
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            show_ids = st.multiselect(
+                "Skill sets to show as columns", list(lad_by_id), default=in_use or ["times_tables"],
+                format_func=lambda i: lad_by_id[i]["name"], key="asg_cols")
+        classes = sorted({p.get("class") or "—" for p in pupils_data["pupils"]})
+        with c2:
+            asg_class = st.selectbox("Class", ["All"] + classes, key="asg_class")
+        shown = [p for p in pupils_data["pupils"] if asg_class == "All" or (p.get("class") or "—") == asg_class]
+        shown.sort(key=lambda p: ((p.get("class") or ""), display_name(p).lower()))
 
-        def _current_step_name(p):
-            for s in asg_lad["steps"]:
+        def _step_name(p, lad):
+            for s in lad["steps"]:
                 if skill_status((p.get("currentSkills") or {}).get(s["id"], "")) == "active":
                     return s["name"]
             return none_lbl
 
-        shown = [p for p in pupils_data["pupils"] if asg_class == "All" or (p.get("class") or "—") == asg_class]
-        shown.sort(key=lambda p: ((p.get("class") or ""), display_name(p).lower()))
-        with g3:
-            bulk = st.selectbox("Set everyone shown to", [none_lbl] + step_names, index=0, key="asg_bulk_step",
-                                help="Pick a step, press the button beside it, and every child in the table below is set to it.")
-
-        def _apply_step(p, step_id, per_sheet=None):
+        def _apply_step(p, lad, step_id):
             sk = p.setdefault("currentSkills", {})
-            old = sk.get(step_id)
+            old = sk.get(step_id) if step_id else None
             keep = old.get("itemsPerSheet") if isinstance(old, dict) else None
-            for s in asg_lad["steps"]:
+            for s in lad["steps"]:
                 sk.pop(s["id"], None)
             if step_id is None:
                 return
-            for s in asg_lad["steps"]:
+            for s in lad["steps"]:
                 if s["id"] == step_id:
                     break
                 set_skill_status(p, s["id"], "mastered")
             set_skill_status(p, step_id, "active")
-            sk[step_id]["itemsPerSheet"] = per_sheet or keep or 25
-            sd = next(s for s in asg_lad["steps"] if s["id"] == step_id)
+            sk[step_id]["itemsPerSheet"] = keep or 25
+            sd = next(s for s in lad["steps"] if s["id"] == step_id)
             if is_windowed(sd):
                 set_active_window(p, step_id, sd["items"][:sd["windowSize"]], sd["windowSize"] - 1)
 
-        def _do_bulk():
-            pd_ = st.session_state.pupils_data
-            sid = st.session_state["asg_bulk_step"]
-            codes = {p["id"] for p in shown}
-            for p in pd_["pupils"]:
-                if p["id"] in codes:
-                    _apply_step(p, name_to_id.get(sid))
-            save_pupils(pd_)
-            git_add_commit_push("data/pupils.json", f"Assign {asg_lad['name']} to {len(codes)} pupil(s)")
-            st.session_state.pop("asg_editor", None)
-            st.session_state["pt_flash"] = f"{asg_lad['name']}: set {len(codes)} child(ren) to '{sid}'."
+        # Quick fill: one skill set + one step for every child shown
+        if show_ids:
+            f1, f2, f3 = st.columns([2, 2, 1])
+            with f1:
+                fill_lad_id = st.selectbox("Quick fill: skill set", show_ids, key="asg_fill_lad",
+                                           format_func=lambda i: lad_by_id[i]["name"])
+            fill_lad = lad_by_id[fill_lad_id]
+            with f2:
+                fill_step = st.selectbox("Set everyone shown to", [none_lbl] + [s["name"] for s in fill_lad["steps"]],
+                                         key=f"asg_fill_step_{fill_lad_id}")
 
-        with g3:
-            st.button("Apply to all shown", on_click=_do_bulk, disabled=not shown)
+            def _do_fill():
+                pd_ = st.session_state.pupils_data
+                ids = {p["id"] for p in shown}
+                sid = next((s["id"] for s in fill_lad["steps"] if s["name"] == fill_step), None)
+                for p in pd_["pupils"]:
+                    if p["id"] in ids:
+                        _apply_step(p, fill_lad, sid)
+                save_pupils(pd_)
+                git_add_commit_push("data/pupils.json", f"Assign {fill_lad['name']} to {len(ids)} pupil(s)")
+                for k in [k for k in st.session_state if str(k).startswith("asg_editor")]:
+                    st.session_state.pop(k)
+                st.session_state["pt_flash"] = f"{fill_lad['name']}: set {len(ids)} child(ren) to '{fill_step}'."
 
-        import pandas as pd
-        df = pd.DataFrame({
-            "Child": [display_name(p) for p in shown],
-            "Class": [p.get("class") or "—" for p in shown],
-            "Working on": [_current_step_name(p) for p in shown],
-        })
-        edited = st.data_editor(
-            df, hide_index=True, width="stretch", key=f"asg_editor_{asg_lad_id}_{asg_class}_{len(shown)}",
-            disabled=["Child", "Class"],
-            column_config={"Working on": st.column_config.SelectboxColumn(
-                "Working on (click a cell to choose)", options=[none_lbl] + step_names, required=True, width="large")},
-        )
-        changed = [i for i in range(len(shown)) if edited.iloc[i]["Working on"] != df.iloc[i]["Working on"]]
+            with f3:
+                st.write("")
+                st.button("Apply to all shown", on_click=_do_fill, disabled=not shown)
 
-        def _do_save(idx=tuple(changed), vals=tuple(edited["Working on"].tolist())):
-            pd_ = st.session_state.pupils_data
-            for i in idx:
-                tgt = next(p for p in pd_["pupils"] if p["id"] == shown[i]["id"])
-                _apply_step(tgt, name_to_id.get(vals[i]))
-            save_pupils(pd_)
-            git_add_commit_push("data/pupils.json", f"Assign {asg_lad['name']} to {len(idx)} pupil(s)")
-            st.session_state["pt_flash"] = f"Saved {asg_lad['name']} for {len(idx)} child(ren)."
+            import pandas as pd
+            cols = {"Child": [display_name(p) for p in shown], "Class": [p.get("class") or "—" for p in shown]}
+            for i in show_ids:
+                cols[lad_by_id[i]["name"]] = [_step_name(p, lad_by_id[i]) for p in shown]
+            df = pd.DataFrame(cols)
+            cfg = {lad_by_id[i]["name"]: st.column_config.SelectboxColumn(
+                lad_by_id[i]["name"], options=[none_lbl] + [s["name"] for s in lad_by_id[i]["steps"]], required=True)
+                for i in show_ids}
+            edited = st.data_editor(
+                df, hide_index=True, width="stretch", disabled=["Child", "Class"], column_config=cfg,
+                key=f"asg_editor_{'-'.join(show_ids)}_{asg_class}_{len(shown)}_{sum(len(p.get('currentSkills') or {}) for p in shown)}",
+            )
+            changes = [(r, i) for r in range(len(shown)) for i in show_ids
+                       if edited.iloc[r][lad_by_id[i]["name"]] != df.iloc[r][lad_by_id[i]["name"]]]
 
-        st.button(f"💾 Save {len(changed)} change(s)" if changed else "💾 Save", type="primary",
-                  disabled=not changed, on_click=_do_save)
+            def _do_save(ch=tuple(changes), ed=edited):
+                pd_ = st.session_state.pupils_data
+                for r, i in ch:
+                    lad = lad_by_id[i]
+                    tgt = next(p for p in pd_["pupils"] if p["id"] == shown[r]["id"])
+                    nm = ed.iloc[r][lad["name"]]
+                    _apply_step(tgt, lad, next((s["id"] for s in lad["steps"] if s["name"] == nm), None))
+                save_pupils(pd_)
+                git_add_commit_push("data/pupils.json", f"Assign skills: {len(ch)} change(s)")
+                st.session_state["pt_flash"] = f"Saved {len(ch)} change(s)."
+
+            st.button(f"💾 Save {len(changes)} change(s)" if changes else "💾 Save", type="primary",
+                      disabled=not changes, on_click=_do_save)
+        else:
+            st.info("Choose at least one skill set above.")
 
     # ── Fine-tune one child ──────────────────────────────────────────────
 
