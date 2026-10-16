@@ -569,7 +569,108 @@ def save_pupils(pupils_data):
 
 def load_ladders():
     data = read_json(DATA_DIR / "skill-ladders.json")
-    return data if data else default_skill_ladders()
+    data = data if data else default_skill_ladders()
+    try:
+        used = set()
+        for p in (read_json(DATA_DIR / "pupils.json") or {}).get("pupils", []):
+            used.update((p.get("currentSkills") or {}).keys())
+    except Exception:
+        used = set()
+    return merge_builtin_ladders(data, used)
+
+
+# ── Built-in ladders added on every load (handwriting, homophones, custom sets, ULS spelling) ──────────────
+
+_HW_AIM = {"correctPerMin": 20, "maxErrors": 0, "timedSec": 60}
+
+
+def _hw_step(step_id, name, items):
+    return {"id": step_id, "name": name, "aim": dict(_HW_AIM), "items": list(items),
+            "untimedAim": {"accuracyPct": 100, "minTrials": 3}}
+
+
+def builtin_ladders():
+    from cloze_bank import HOMOPHONE_STEPS
+    return [
+        {"id": "homophones", "name": "Homophones", "subject": "spellings", "kind": "cloze",
+         "description": "Choose the right homophone for each sentence from a word bank",
+         "steps": [{"id": sid, "name": nm, "aim": {"correctPerMin": 10, "maxErrors": 1, "timedSec": 60},
+                    "items": words, "untimedAim": {"accuracyPct": 100, "minTrials": 3}}
+                   for sid, nm, words in HOMOPHONE_STEPS]},
+        {"id": "handwriting_letters", "name": "Handwriting: letter families", "subject": "handwriting",
+         "kind": "hw_letters", "independent": True,
+         "description": "Letter formation by family",
+         "steps": [
+             _hw_step("hw_curly", "Curly caterpillar letters (c a d g o q s e f)", list("cadgoqsef")),
+             _hw_step("hw_ladder", "Long ladder letters (l i t u j y)", list("ltiujy")),
+             _hw_step("hw_robot", "One-armed robot letters (b h k m n p r)", list("bhkmnpr")),
+             _hw_step("hw_zigzag", "Zig-zag monster letters (v w x z)", list("vwxz")),
+         ]},
+        {"id": "handwriting_joins", "name": "Handwriting: joins", "subject": "handwriting",
+         "kind": "hw_joins", "independent": True,
+         "description": "Joining letters in pairs and common endings",
+         "steps": [
+             _hw_step("hj_r", "Joins with r (ra re ri ro ru...)", ["ra", "re", "ri", "ro", "ru", "rt", "rn", "rm", "rl", "ry"]),
+             _hw_step("hj_o", "Joins with o (oa oe oi ol...)", ["oa", "oe", "oi", "ol", "on", "or", "os", "ot", "ou", "ow"]),
+             _hw_step("hj_e", "Joins with e (ea ed ee el...)", ["ea", "ed", "ee", "el", "en", "er", "es", "et", "eo", "ew"]),
+             _hw_step("hj_tl", "Joins to t and l (at et it ot ut al el il...)", ["at", "et", "it", "ot", "ut", "al", "el", "il", "ol", "ul"]),
+             _hw_step("hj_vowel", "Vowel pairs (ai ea ee ie oa ou...)", ["ai", "ea", "ee", "ie", "oa", "oo", "ou", "ow", "ue", "ay"]),
+             _hw_step("hj_end", "Common endings (ing ed er est ly...)", ["ing", "ed", "er", "est", "ly", "ful", "ment", "tion"]),
+         ]},
+        {"id": "custom_sets", "name": "Custom sets", "subject": "custom", "independent": True,
+         "description": "Sets you make yourself: chosen graphemes, letters, joins or words", "steps": []},
+    ]
+
+
+_OLD_SPELLING_SHED_LADDERS = {"spelling_rules_y1", "spelling_rules_y2", "spelling_rules_y4"}
+_CLOZE_LADDER_PREFIXES = ("common_exception_words",)
+
+
+def merge_builtin_ladders(ladders_data, used_step_ids=()):
+    """Add any missing built-in ladders/steps; switch the common exception word ladders to sentence (cloze)
+    practice; drop the old Spelling Shed ladders unless a child is still using one of their steps."""
+    used = set(used_step_ids)
+    ladders = ladders_data.setdefault("ladders", [])
+    keep = []
+    for l in ladders:
+        if l["id"] in _OLD_SPELLING_SHED_LADDERS and not any(s["id"] in used for s in l["steps"]):
+            continue
+        keep.append(l)
+    ladders[:] = keep
+    by_id = {l["id"]: l for l in ladders}
+    extra = list(builtin_ladders())
+    uls = read_json(DATA_DIR / "uls-spelling-ladders.json")
+    if uls:
+        extra += uls.get("ladders", [])
+    for b in extra:
+        have = by_id.get(b["id"])
+        if not have:
+            ladders.append(b)
+            by_id[b["id"]] = b
+            continue
+        for k in ("kind", "independent", "subject"):
+            if k in b and k not in have:
+                have[k] = b[k]
+        known = {s["id"] for s in have["steps"]}
+        have["steps"].extend(s for s in b["steps"] if s["id"] not in known)
+    for l in ladders:
+        if l["id"].startswith(_CLOZE_LADDER_PREFIXES) and not l.get("kind"):
+            l["kind"] = "cloze"
+    return ladders_data
+
+
+def step_subject(step, ladders_data=None, ladder=None):
+    """A step's subject: its own if set (custom sets), else its ladder's."""
+    if step.get("subject"):
+        return step["subject"]
+    if ladder is None and ladders_data is not None:
+        ladder = next((l for l in ladders_data["ladders"] if l["id"] == step.get("ladder_id")), None)
+    return ladder["subject"] if ladder else "maths"
+
+
+def step_kind(step, ladder=None):
+    """How a step is practised: 'cloze', 'hw_letters', 'hw_joins' or None (the standard sheet for its subject)."""
+    return step.get("kind") or (ladder.get("kind") if ladder else None)
 
 
 def save_ladders(ladders_data):
@@ -1353,6 +1454,51 @@ def _sheet_question(item, skill_id, step_name, is_bonds):
     }
 
 
+def _cloze_sheet(pupil, skill_id, step, ladder, subject, pool, target_count):
+    """'Choose the word that fits' sheet: a word bank plus gap sentences. Each sentence is used once per sheet."""
+    from cloze_bank import sentences_for
+    if target_count is None:
+        entry = pupil.get("currentSkills", {}).get(skill_id)
+        target_count = entry.get("itemsPerSheet", 25) if isinstance(entry, dict) else 25
+    target = max(6, min(int(target_count), 16))
+    words = [w for w in pool if sentences_for(w)]
+    used = {w: 0 for w in words}
+    questions = []
+    rounds = 0
+    while len(questions) < target and words and rounds < 4:
+        batch = words[:]
+        random.shuffle(batch)
+        for w in batch:
+            sents = sentences_for(w)
+            if used[w] < len(sents) and len(questions) < target:
+                questions.append({"item": w, "question": sents[used[w]], "answer": w, "is_review": False,
+                                  "from_skill": skill_id, "from_skill_name": step["name"]})
+                used[w] += 1
+        rounds += 1
+    random.shuffle(questions)
+    bank = sorted({q["answer"] for q in questions}, key=lambda w: w.lower())
+    random.shuffle(bank)
+    return {
+        "pupil_name": display_name(pupil), "skill_name": step["name"],
+        "ladder_name": step["ladder_name"] if "ladder_name" in step else (ladder["name"] if ladder else ""),
+        "subject": subject, "display_mode": "cloze", "aim": step["aim"], "untimedAim": step.get("untimedAim"),
+        "items": questions, "review_items": [], "questions": questions, "bank": bank,
+        "total_questions": len(questions),
+    }
+
+
+def _handwriting_sheet(pupil, skill_id, step, ladder, kind, pool):
+    qs = [{"item": it, "question": it, "answer": it, "is_review": False, "from_skill": skill_id,
+           "from_skill_name": step["name"]} for it in pool]
+    return {
+        "pupil_name": display_name(pupil), "skill_name": step["name"],
+        "ladder_name": step["ladder_name"] if "ladder_name" in step else (ladder["name"] if ladder else ""),
+        "subject": "handwriting", "display_mode": "handwriting", "hw_kind": kind,
+        "aim": step["aim"], "untimedAim": step.get("untimedAim"),
+        "items": qs, "review_items": [], "questions": qs, "total_questions": len(qs),
+    }
+
+
 def generate_sheet(pupil, skill_id, ladders_data, probes_data=None, include_review=True,
                     item_pool=None, target_count=None):
     """Generate a practice sheet for a pupil on a given skill.
@@ -1388,7 +1534,8 @@ def generate_sheet(pupil, skill_id, ladders_data, probes_data=None, include_revi
             ladder = l
             break
 
-    subject = ladder["subject"] if ladder else "maths"
+    subject = step_subject(step, ladders_data, ladder)
+    kind = step_kind(step, ladder)
     is_bonds = ladder is not None and ladder["id"] == "number_bonds"
     # Common Exception Words are a *reading* recognition task (see the word,
     # say it) like maths/phonics, not a dictation-spelling task — only the
@@ -1396,6 +1543,11 @@ def generate_sheet(pupil, skill_id, ladders_data, probes_data=None, include_revi
     is_cew = ladder is not None and ladder["id"].startswith("common_exception_words")
     display_mode = "dictation" if subject == "spellings" and not is_cew else "recognition"
     pool = item_pool if item_pool is not None else step["items"]
+
+    if kind == "cloze":
+        return _cloze_sheet(pupil, skill_id, step, ladder, subject, pool, target_count)
+    if kind in ("hw_letters", "hw_joins"):
+        return _handwriting_sheet(pupil, skill_id, step, ladder, kind, pool)
 
     if target_count is None:
         entry = pupil.get("currentSkills", {}).get(skill_id)
