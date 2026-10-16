@@ -176,7 +176,7 @@ SENTENCES = {
 
 # Words that sound alike, grouped, so a word bank can show them together (here, hear / where, wear, were).
 HOMOPHONE_GROUPS = [
-    ["there", "their", "they're"], ["to", "too", "two"], ["hear", "here"], ["were", "where", "wear"],
+    ["there", "their", "they're"], ["to", "too", "two"], ["hear", "here"], ["where", "were", "wear"],
     ["right", "write"], ["no", "know"], ["new", "knew"], ["sea", "see"], ["be", "bee"], ["one", "won"],
     ["meat", "meet"], ["peace", "piece"], ["plain", "plane"], ["brake", "break"], ["grate", "great"],
     ["mail", "male"], ["main", "mane"], ["weather", "whether"], ["who's", "whose"], ["accept", "except"],
