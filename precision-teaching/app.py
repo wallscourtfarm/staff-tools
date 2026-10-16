@@ -801,7 +801,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-16.10.26f")
+st.caption("Wallscourt Farm Academy · WFA-16.10.26g")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
@@ -1818,112 +1818,292 @@ with tab6:
     if not pupils_data["pupils"]:
         st.info("Add pupils first.")
     else:
-        st.subheader("Generate Activity Sheets")
+        sub_week, sub_quick = st.tabs(["📅 Weekly plan per child", "Quick print"])
 
-        # Select pupil(s)
-        pupil_options = sorted([(p["id"], f"{display_name(p)}") for p in pupils_data["pupils"]], key=lambda o: o[1].lower())
-        pupil_options.insert(0, ("all", "Whole class"))
-        selected = st.selectbox("Select pupil", pupil_options, format_func=lambda x: x[1], key="print_pupil")
-        selected_id = selected[0] if selected else None
+        with sub_week:
+            DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+            DAY_FULL = {"Mon": "Monday", "Tue": "Tuesday", "Wed": "Wednesday", "Thu": "Thursday", "Fri": "Friday"}
+            st.caption("Choose which days each child does each activity, then print their week: a timetable page, then one sheet for each day. "
+                       "Skills come from **Assign skills** on the Pupils tab.")
 
-        if selected_id:
-            # Determine which pupils to generate sheets for
-            if selected_id == "all":
-                target_pupils = pupils_data["pupils"]
+            wk_classes = sorted({p.get("class") or "—" for p in pupils_data["pupils"]})
+            wc1, wc2 = st.columns([1, 3])
+            with wc1:
+                wk_class = st.selectbox("Class", ["All"] + wk_classes, key="wk_class")
+            wk_pool = [p for p in pupils_data["pupils"] if wk_class == "All" or (p.get("class") or "—") == wk_class]
+            wk_pool.sort(key=lambda p: ((p.get("class") or ""), display_name(p).lower()))
+            with wc2:
+                wk_ids = st.multiselect("Children", [p["id"] for p in wk_pool], default=[p["id"] for p in wk_pool],
+                                        format_func=lambda i: display_name(get_pupil(pupils_data, i)), key=f"wk_children_{wk_class}")
+            wk_kids = [get_pupil(pupils_data, i) for i in wk_ids]
+
+            with st.expander("Add an activity that has no sheet here (e.g. Handwriting)"):
+                oa1, oa2 = st.columns([2, 1])
+                with oa1:
+                    oa_name = st.text_input("Activity name", key="wk_other_name", placeholder="Handwriting")
+                with oa2:
+                    st.write("")
+                    def _add_other():
+                        nm = (st.session_state.get("wk_other_name") or "").strip()
+                        if not nm:
+                            return
+                        pd_ = st.session_state.pupils_data
+                        for p in pd_["pupils"]:
+                            if p["id"] in wk_ids:
+                                lst = p.setdefault("otherActivities", [])
+                                if nm not in lst:
+                                    lst.append(nm)
+                        save_pupils(pd_)
+                        git_add_commit_push("data/pupils.json", f"Add activity {nm}")
+                        st.session_state["wk_other_name"] = ""
+                        st.session_state["pt_flash"] = f"Added '{nm}' for the children selected."
+                    st.button("Add to selected children", on_click=_add_other, disabled=not wk_ids)
+                st.caption("These appear on the timetable page only; no practice sheet is made for them.")
+
+            rows = []   # (pupil, key, label)
+            for p in wk_kids:
+                for sid in active_skills_for(p):
+                    st_ = get_step(ladders_data, sid)
+                    if st_:
+                        rows.append((p, f"skill:{sid}", f"{st_['ladder_name']}: {st_['name']}"))
+                for nm in p.get("otherActivities", []):
+                    rows.append((p, f"other:{nm}", nm))
+
+            if not wk_kids:
+                st.info("Choose at least one child.")
+            elif not rows:
+                st.info("None of these children have a skill assigned yet. Use Assign skills on the Pupils tab.")
             else:
-                target_pupils = [get_pupil(pupils_data, selected_id)]
-
-            # Collect all active skills across selected pupils
-            sheets_to_generate = []
-            for p in target_pupils:
-                active = active_skills_for(p)
-                for skill_id in active:
-                    step = get_step(ladders_data, skill_id)
-                    if step:
-                        sheets_to_generate.append((p, skill_id, step))
-
-            if not sheets_to_generate:
-                st.info("No active skills to generate sheets for.")
-            else:
-                # Options
-                col_opt1, col_opt2 = st.columns(2)
-                with col_opt1:
-                    week_mode = st.radio("Sheets", ["Single sheet", "Whole week (5 days, same set)"], key="print_mode") == "Whole week (5 days, same set)"
-                with col_opt2:
-                    include_answers = st.checkbox("Include answer key", value=True, key="print_answers")
-
-                st.caption(
-                    "Item count per sheet comes from what was set for each pupil/skill in Set Starting Points. "
-                    + "2 sheets per page, top/bottom with a cut line."
-                    + (" A week is 5 day-sheets, so ~3 pages per skill." if week_mode else "")
+                import pandas as pd
+                wk_df = pd.DataFrame({
+                    "Child": [display_name(p) for p, _, _ in rows],
+                    "Activity": [lab for _, _, lab in rows],
+                    **{d: [d in (p.get("weekPlan", {}).get(k, DAYS)) for p, k, _ in rows] for d in DAYS},
+                })
+                wk_edit = st.data_editor(
+                    wk_df, hide_index=True, width="stretch", disabled=["Child", "Activity"],
+                    column_config={d: st.column_config.CheckboxColumn(d) for d in DAYS},
+                    key=f"wk_editor_{wk_class}_{len(rows)}_{sum(len(p.get('weekPlan', {})) for p in wk_kids)}",
                 )
-                st.markdown(f"**{len(sheets_to_generate)} skill{'s' if len(sheets_to_generate) != 1 else ''}{' × 5 days' if week_mode else ''}:**")
-                for p, skill_id, step in sheets_to_generate:
-                    entry = p.get("currentSkills", {}).get(skill_id)
-                    count = entry.get("itemsPerSheet", 25) if isinstance(entry, dict) else 25
-                    st.markdown(f"- {display_name(p)} — {step['ladder_name']}: {step['name']} ({count} items)")
 
-                if st.button("Generate PDF", type="primary", use_container_width=True):
+                def _plan_from(edit_df):
+                    out = {}
+                    for r, (p, k, _) in enumerate(rows):
+                        out.setdefault(p["id"], {})[k] = [d for d in DAYS if bool(edit_df.iloc[r][d])]
+                    return out
+
+                def _save_plan(plan=None):
+                    pd_ = st.session_state.pupils_data
+                    for pid, mp in (plan or {}).items():
+                        tgt = next(p for p in pd_["pupils"] if p["id"] == pid)
+                        tgt.setdefault("weekPlan", {}).update(mp)
+                    save_pupils(pd_)
+                    git_add_commit_push("data/pupils.json", "Save weekly practice plan")
+                    st.session_state["pt_flash"] = "Weekly plan saved."
+
+                plan_now = _plan_from(wk_edit)
+                bc1, bc2, bc3 = st.columns([1, 1, 2])
+                with bc1:
+                    st.button("💾 Save plan", on_click=_save_plan, kwargs={"plan": plan_now})
+                with bc2:
+                    wk_answers = st.checkbox("Include answer key", value=True, key="wk_answers")
+                with bc3:
+                    wk_cover = st.checkbox("Include a timetable page for each child", value=True, key="wk_cover")
+
+                if st.button("Create weekly packs (PDF)", type="primary", width="stretch"):
                     from reportlab.lib.pagesizes import A4
                     from reportlab.pdfgen import canvas as pdfcanvas
                     from io import BytesIO
-
                     buf = BytesIO()
                     margin = 15 * _mm
                     page_w, page_h = A4
                     usable_w = page_w - 2 * margin
-
                     c = pdfcanvas.Canvas(buf, pagesize=A4)
-                    # Every sheet — single or one per day of a week — goes
-                    # through the same 2-per-page compact layout (top/bottom,
-                    # cut line between). A cramped 5-in-a-page week view
-                    # left boxes too small to write in, so week mode is now
-                    # just "5 day-labelled sheets" fed into the same pipeline
-                    # single-sheet mode uses, just spanning more pages.
-                    all_sheets = []
-                    for p, skill_id, step in sheets_to_generate:
-                        # Windowed skills only ever practise their current
-                        # window, not the whole step — same set all week.
-                        grid_item_pool = get_active_window(p, skill_id, step) if is_windowed(step) else None
-                        day_count = 5 if week_mode else 1
-                        for day_n in range(1, day_count + 1):
-                            # Each call reshuffles independently — same
-                            # item content, different order per day.
-                            sheet = generate_sheet(p, skill_id, ladders_data, item_pool=grid_item_pool)
-                            if sheet:
-                                if week_mode:
-                                    sheet["day_label"] = f"Day {day_n}"
-                                all_sheets.append((p, sheet))
 
-                    # Recognition sheets (phonics/CEW — read it, say it, no
-                    # box to write in) get a full page each: at the item
-                    # counts these actually run (20-30 words), squeezing them
-                    # into a half-page made every word small regardless of
-                    # per-word sizing — there just isn't the room. Maths and
-                    # spelling dictation keep 2-per-page since those have a
-                    # real minimum writable-box size to hit, not a text-size
-                    # one.
-                    recognition_sheets, boxed_sheets = [], []
-                    for p, sheet in all_sheets:
-                        is_recognition = sheet["subject"] == "phonics" or sheet.get("display_mode") == "recognition"
-                        (recognition_sheets if is_recognition else boxed_sheets).append((p, sheet))
-
-                    for p, sheet in recognition_sheets:
-                        render_compact_sheet_slot(c, margin, usable_w, page_h - margin, margin, p, sheet, include_answers)
+                    def _timetable_page(p, items):
+                        y = page_h - margin - 6 * _mm
+                        c.setFont("Helvetica-Bold", 20)
+                        c.setFillColorRGB(0x17 / 255, 0x98 / 255, 0xd3 / 255)
+                        c.drawString(margin, y, f"{display_name(p)} - this week's practice")
+                        c.setFillColorRGB(0, 0, 0)
+                        y -= 14 * _mm
+                        label_w = usable_w - 5 * 22 * _mm
+                        row_h = 16 * _mm
+                        c.setFont("Helvetica-Bold", 12)
+                        for j, d in enumerate(DAYS):
+                            c.drawCentredString(margin + label_w + j * 22 * _mm + 11 * _mm, y, DAY_FULL[d][:3])
+                        y -= 4 * _mm
+                        for label, days in items:
+                            c.setStrokeColorRGB(0.6, 0.6, 0.6)
+                            c.rect(margin, y - row_h, usable_w, row_h)
+                            c.setFont("Helvetica", 12)
+                            for ln_i, ln in enumerate(_wrap_line(c, label, "Helvetica", 12, label_w - 4 * _mm)[:2]):
+                                c.drawString(margin + 2 * _mm, y - 6.5 * _mm - ln_i * 5 * _mm, ln)
+                            for j, d in enumerate(DAYS):
+                                cx = margin + label_w + j * 22 * _mm
+                                c.line(cx, y, cx, y - row_h)
+                                if d in days:
+                                    c.setFillColorRGB(0x17 / 255, 0x98 / 255, 0xd3 / 255)
+                                    c.circle(cx + 11 * _mm, y - row_h / 2, 4.5 * _mm, stroke=0, fill=1)
+                                    c.setFillColorRGB(0, 0, 0)
+                            y -= row_h
+                            if y < margin + row_h:
+                                break
                         c.showPage()
 
-                    for i in range(0, len(boxed_sheets), 2):
-                        render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, boxed_sheets[i:i + 2], include_answers)
-                        c.showPage()
+                    n_sheets = 0
+                    for p in wk_kids:
+                        plan = plan_now.get(p["id"], {})
+                        items = [(lab, plan.get(k, [])) for pp, k, lab in rows if pp["id"] == p["id"]]
+                        if not any(days for _, days in items):
+                            continue
+                        if wk_cover:
+                            _timetable_page(p, items)
+                        pending = []
+                        def _flush():
+                            global_pending = list(pending)
+                            for i2 in range(0, len(global_pending), 2):
+                                render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, global_pending[i2:i2 + 2], wk_answers)
+                                c.showPage()
+                            pending.clear()
+                        for d in DAYS:
+                            for pp, k, lab in rows:
+                                if pp["id"] != p["id"] or not k.startswith("skill:") or d not in plan.get(k, []):
+                                    continue
+                                sid = k.split(":", 1)[1]
+                                step = get_step(ladders_data, sid)
+                                pool = get_active_window(p, sid, step) if is_windowed(step) else None
+                                sheet = generate_sheet(p, sid, ladders_data, item_pool=pool)
+                                if not sheet:
+                                    continue
+                                sheet["day_label"] = DAY_FULL[d]
+                                n_sheets += 1
+                                if sheet["subject"] == "phonics" or (sheet.get("display_mode") == "recognition" and sheet["subject"] != "maths"):
+                                    _flush()
+                                    render_compact_sheet_slot(c, margin, usable_w, page_h - margin, margin, p, sheet, wk_answers)
+                                    c.showPage()
+                                else:
+                                    pending.append((p, sheet))
+                                    if len(pending) == 2:
+                                        _flush()
+                        _flush()
+                    if n_sheets == 0 and not wk_cover:
+                        st.warning("Nothing to print: no days are ticked.")
+                    else:
+                        c.save()
+                        buf.seek(0)
+                        st.success(f"Created {n_sheets} sheet(s) for {len(wk_kids)} child(ren).")
+                        st.download_button("Download weekly packs", buf.getvalue(),
+                                           file_name=f"precision-teach-week-{date.today().isoformat()}.pdf",
+                                           mime="application/pdf", width="stretch", type="primary")
 
-                    c.save()
-                    buf.seek(0)
+        with sub_quick:
+            st.subheader("Generate Activity Sheets")
 
-                    st.success("PDF generated!")
-                    st.download_button(
-                        "Download PDF", buf.getvalue(),
-                        file_name=f"precision-teach-sheets-{date.today().isoformat()}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True,
-                        type="primary",
+            # Select pupil(s)
+            pupil_options = sorted([(p["id"], f"{display_name(p)}") for p in pupils_data["pupils"]], key=lambda o: o[1].lower())
+            pupil_options.insert(0, ("all", "Whole class"))
+            selected = st.selectbox("Select pupil", pupil_options, format_func=lambda x: x[1], key="print_pupil")
+            selected_id = selected[0] if selected else None
+
+            if selected_id:
+                # Determine which pupils to generate sheets for
+                if selected_id == "all":
+                    target_pupils = pupils_data["pupils"]
+                else:
+                    target_pupils = [get_pupil(pupils_data, selected_id)]
+
+                # Collect all active skills across selected pupils
+                sheets_to_generate = []
+                for p in target_pupils:
+                    active = active_skills_for(p)
+                    for skill_id in active:
+                        step = get_step(ladders_data, skill_id)
+                        if step:
+                            sheets_to_generate.append((p, skill_id, step))
+
+                if not sheets_to_generate:
+                    st.info("No active skills to generate sheets for.")
+                else:
+                    # Options
+                    col_opt1, col_opt2 = st.columns(2)
+                    with col_opt1:
+                        week_mode = st.radio("Sheets", ["Single sheet", "Whole week (5 days, same set)"], key="print_mode") == "Whole week (5 days, same set)"
+                    with col_opt2:
+                        include_answers = st.checkbox("Include answer key", value=True, key="print_answers")
+
+                    st.caption(
+                        "Item count per sheet comes from what was set for each pupil/skill in Set Starting Points. "
+                        + "2 sheets per page, top/bottom with a cut line."
+                        + (" A week is 5 day-sheets, so ~3 pages per skill." if week_mode else "")
                     )
+                    st.markdown(f"**{len(sheets_to_generate)} skill{'s' if len(sheets_to_generate) != 1 else ''}{' × 5 days' if week_mode else ''}:**")
+                    for p, skill_id, step in sheets_to_generate:
+                        entry = p.get("currentSkills", {}).get(skill_id)
+                        count = entry.get("itemsPerSheet", 25) if isinstance(entry, dict) else 25
+                        st.markdown(f"- {display_name(p)} — {step['ladder_name']}: {step['name']} ({count} items)")
+
+                    if st.button("Generate PDF", type="primary", use_container_width=True):
+                        from reportlab.lib.pagesizes import A4
+                        from reportlab.pdfgen import canvas as pdfcanvas
+                        from io import BytesIO
+
+                        buf = BytesIO()
+                        margin = 15 * _mm
+                        page_w, page_h = A4
+                        usable_w = page_w - 2 * margin
+
+                        c = pdfcanvas.Canvas(buf, pagesize=A4)
+                        # Every sheet — single or one per day of a week — goes
+                        # through the same 2-per-page compact layout (top/bottom,
+                        # cut line between). A cramped 5-in-a-page week view
+                        # left boxes too small to write in, so week mode is now
+                        # just "5 day-labelled sheets" fed into the same pipeline
+                        # single-sheet mode uses, just spanning more pages.
+                        all_sheets = []
+                        for p, skill_id, step in sheets_to_generate:
+                            # Windowed skills only ever practise their current
+                            # window, not the whole step — same set all week.
+                            grid_item_pool = get_active_window(p, skill_id, step) if is_windowed(step) else None
+                            day_count = 5 if week_mode else 1
+                            for day_n in range(1, day_count + 1):
+                                # Each call reshuffles independently — same
+                                # item content, different order per day.
+                                sheet = generate_sheet(p, skill_id, ladders_data, item_pool=grid_item_pool)
+                                if sheet:
+                                    if week_mode:
+                                        sheet["day_label"] = f"Day {day_n}"
+                                    all_sheets.append((p, sheet))
+
+                        # Recognition sheets (phonics/CEW — read it, say it, no
+                        # box to write in) get a full page each: at the item
+                        # counts these actually run (20-30 words), squeezing them
+                        # into a half-page made every word small regardless of
+                        # per-word sizing — there just isn't the room. Maths and
+                        # spelling dictation keep 2-per-page since those have a
+                        # real minimum writable-box size to hit, not a text-size
+                        # one.
+                        recognition_sheets, boxed_sheets = [], []
+                        for p, sheet in all_sheets:
+                            is_recognition = sheet["subject"] == "phonics" or (sheet.get("display_mode") == "recognition" and sheet["subject"] != "maths")
+                            (recognition_sheets if is_recognition else boxed_sheets).append((p, sheet))
+
+                        for p, sheet in recognition_sheets:
+                            render_compact_sheet_slot(c, margin, usable_w, page_h - margin, margin, p, sheet, include_answers)
+                            c.showPage()
+
+                        for i in range(0, len(boxed_sheets), 2):
+                            render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, boxed_sheets[i:i + 2], include_answers)
+                            c.showPage()
+
+                        c.save()
+                        buf.seek(0)
+
+                        st.success("PDF generated!")
+                        st.download_button(
+                            "Download PDF", buf.getvalue(),
+                            file_name=f"precision-teach-sheets-{date.today().isoformat()}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True,
+                            type="primary",
+                        )
