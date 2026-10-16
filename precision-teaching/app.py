@@ -1022,7 +1022,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-16.10.26m")
+st.caption("Wallscourt Farm Academy · WFA-16.10.26n")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────

@@ -525,16 +525,44 @@ def _git(args, timeout=30):
 
 
 def _record_save(ok, message=""):
+    if not ok:
+        print(f"[precision-teaching save] FAILED: {_redact(message).strip()[:300]}", flush=True)
     SAVE_STATUS.update({"ok": ok, "message": _redact(message).strip()[:400], "at": datetime.now().strftime("%H:%M:%S")})
+
+
+def _clone_data_repo():
+    """Fetch the private data repo into REPO_DIR. REPO_DIR may already hold files that were never under git
+    (written while git was missing): they are kept in a backup folder, and a local pupil list is carried over
+    if GitHub has none."""
+    import shutil
+    tmp = REPO_DIR.parent / "private-data-clone"
+    shutil.rmtree(tmp, ignore_errors=True)
+    r = subprocess.run(["git", "clone", _git_auth_url(), str(tmp)], capture_output=True, text=True, timeout=90)
+    if r.returncode != 0:
+        _record_save(False, "Could not fetch the saved data from GitHub: " + _redact(r.stderr or r.stdout))
+        shutil.rmtree(tmp, ignore_errors=True)
+        return False
+    local_pupils = read_json(REPO_DIR / "data" / "pupils.json") if REPO_DIR.exists() else None
+    if REPO_DIR.exists():
+        backup = REPO_DIR.parent / "private-data-local-backup"
+        shutil.rmtree(backup, ignore_errors=True)
+        shutil.move(str(REPO_DIR), str(backup))
+    shutil.move(str(tmp), str(REPO_DIR))
+    remote_pupils = read_json(REPO_DIR / "data" / "pupils.json") or {"pupils": []}
+    if local_pupils and local_pupils.get("pupils") and not remote_pupils.get("pupils"):
+        write_json(REPO_DIR / "data" / "pupils.json", local_pupils)
+    return True
 
 
 def git_pull():
     if not (REPO_DIR / ".git").exists():
         try:
             REPO_DIR.parent.mkdir(parents=True, exist_ok=True)
-            r = subprocess.run(["git", "clone", _git_auth_url(), str(REPO_DIR)], capture_output=True, text=True, timeout=60)
-            if r.returncode != 0:
-                _record_save(False, "Could not fetch the saved data from GitHub: " + (r.stderr or r.stdout))
+            if not _clone_data_repo():
+                return False
+        except FileNotFoundError:
+            _record_save(False, "git is not installed on this server, so nothing can be saved to GitHub.")
+            return False
         except Exception as e:
             _record_save(False, f"Could not fetch the saved data from GitHub: {type(e).__name__}")
             return False
@@ -583,6 +611,9 @@ def git_add_commit_push(filepath, message):
         _git(["update-ref", "refs/remotes/origin/main", "HEAD"], timeout=10)   # so 'unpushed commits' counts correctly
         _record_save(True, "")
         return True
+    except FileNotFoundError:
+        _record_save(False, "git is not installed on this server, so nothing can be saved to GitHub.")
+        return False
     except Exception as e:
         _record_save(False, f"{type(e).__name__}: {e}")
         return False
@@ -590,6 +621,8 @@ def git_add_commit_push(filepath, message):
 
 def git_unsaved_count():
     """Changes not yet safely on GitHub: uncommitted files in the data repo plus commits not yet pushed."""
+    if not (REPO_DIR / ".git").exists():
+        return 1      # no link to the data repo at all: nothing here is backed up
     try:
         st_ = _git(["status", "--porcelain", "--", "data"], timeout=10)
         files = [l for l in st_.stdout.splitlines() if l.strip()]
@@ -603,6 +636,12 @@ def git_selftest():
     lines = []
     if not _github_token():
         return ["No GITHUB_TOKEN is set on this server, so nothing can be saved to GitHub."]
+    try:
+        subprocess.run(["git", "--version"], capture_output=True, timeout=5)
+    except FileNotFoundError:
+        return ["git is not installed on this server, so nothing can be saved to GitHub."]
+    if not (REPO_DIR / ".git").exists():
+        return ["This server has no copy of the data repository yet (the first fetch from GitHub failed)."]
     url = _git_auth_url()
     try:
         r = _git(["ls-remote", url, "HEAD"], timeout=30)
