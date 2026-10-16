@@ -29,7 +29,7 @@ from data import (
     get_skill_status, set_skill_status, pass_review, fail_review, get_reviews_due,
     migrate_skills_format, skill_status, active_skills_for, count_by_status,
     generate_sheet, get_answer, get_review_items,
-    fetch_hub_pupils, fetch_hub_pupils_checked, step_subject, step_kind, sync_pupils_from_roster, anonymise_pupils, pupil_label, display_name, parse_names_csv,
+    fetch_hub_pupils, fetch_hub_pupils_checked, git_unsaved_count, git_selftest, SAVE_STATUS, step_subject, step_kind, sync_pupils_from_roster, anonymise_pupils, pupil_label, display_name, parse_names_csv,
     is_windowed, get_active_window, get_window_frontier, set_active_window, suggest_next_window,
 )
 
@@ -963,16 +963,25 @@ if query_params.get("mode") == "self_assess":
 
 # Sidebar
 with st.sidebar:
-    pending = git_pending_commits()
-    if pending > 0:
-        st.warning(f"{pending} unsynced change{'s' if pending != 1 else ''}")
-        if st.button("Sync now", use_container_width=True):
-            git_pull()
-            st.session_state.pupils_data = load_pupils()
-            st.session_state.ladders_data = load_ladders()
+    unsaved = git_unsaved_count()
+    if unsaved > 0 or not SAVE_STATUS["ok"]:
+        st.error("⚠ Not backed up. Changes made here can be lost the next time the tool restarts.")
+        if SAVE_STATUS["message"]:
+            st.caption(SAVE_STATUS["message"])
+        if st.button("Try saving again", use_container_width=True):
+            git_add_commit_push("data", "Save pending changes")
             st.rerun()
     else:
-        st.success("All synced ✓")
+        st.success("Saved and backed up ✓")
+    with st.expander("Check saving"):
+        if st.button("Run the check", use_container_width=True, key="selftest"):
+            for ln in git_selftest():
+                (st.success if ln.endswith("OK") else st.error)(ln)
+        if st.button("Reload saved data from GitHub", use_container_width=True, key="reload_sync"):
+            if git_pull():
+                st.session_state.pupils_data = load_pupils()
+                st.session_state.ladders_data = load_ladders()
+            st.rerun()
 
     st.divider()
 
@@ -1013,7 +1022,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-16.10.26j")
+st.caption("Wallscourt Farm Academy · WFA-16.10.26k")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
