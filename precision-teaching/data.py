@@ -1476,13 +1476,16 @@ def _cloze_sheet(pupil, skill_id, step, ladder, subject, pool, target_count):
                 used[w] += 1
         rounds += 1
     random.shuffle(questions)
-    bank = sorted({q["answer"] for q in questions}, key=lambda w: w.lower())
-    random.shuffle(bank)
+    from cloze_bank import bank_groups
+    groups = bank_groups({q["answer"] for q in questions})
+    if all(len(g) == 1 for g in groups):      # no homophones (e.g. common exception words): order carries no hint
+        random.shuffle(groups)
+    bank = [w for g in groups for w in g]
     return {
         "pupil_name": display_name(pupil), "skill_name": step["name"],
         "ladder_name": step["ladder_name"] if "ladder_name" in step else (ladder["name"] if ladder else ""),
         "subject": subject, "display_mode": "cloze", "aim": step["aim"], "untimedAim": step.get("untimedAim"),
-        "items": questions, "review_items": [], "questions": questions, "bank": bank,
+        "items": questions, "review_items": [], "questions": questions, "bank": bank, "bank_groups": groups,
         "total_questions": len(questions),
     }
 

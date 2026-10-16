@@ -283,8 +283,22 @@ def _compact_header(c, margin, usable_w, y_top, title_bits, right_text, h):
 #    folder, never in this public repo; print style uses Sassoon Infant above) ───────────────────────────────
 
 _HW_FONT_FILES = {"XCCW4a": "XCCW_Joined_4a.ttf", "XCCW4b": "XCCW_Joined_4b.ttf",
-                  "XCCWD4a": "XCCW_Joined_Dotted_4a.ttf", "XCCWD4b": "XCCW_Joined_Dotted_4b.ttf"}
+                  "XCCWD4a": "XCCW_Joined_Dotted_4a.ttf", "XCCWD4b": "XCCW_Joined_Dotted_4b.ttf",
+                  "SassoInfDotB": "SassoInfDotB.ttf", "LinkpenDot": "LinkpenDot.ttf"}
 _hw_fonts_ok = None
+
+# Same fonts, sizes and line geometry as the school handwriting tool (app.wallscourt-farm-academy.co.uk/handwriting).
+_MM = 72 / 25.4
+HW_FONTS = {
+    "Cursive, dotted (XCCW)": {"xccw": True, "solid": False, "size": 26, "asc": 8.07 * _MM, "desc": 3.55 * _MM, "xh": 4.8 * _MM},
+    "Cursive, solid (XCCW)": {"xccw": True, "solid": True, "size": 26, "asc": 8.07 * _MM, "desc": 3.55 * _MM, "xh": 4.8 * _MM},
+    "Print, dotted (Sassoon)": {"font": "SassoInfDotB", "size": 31.8, "asc": 8.0 * _MM, "desc": 3.33 * _MM, "xh": 5.0 * _MM},
+    "Pre-cursive, dotted (Linkpen)": {"font": "LinkpenDot", "size": 26, "asc": 9.0434 * _MM, "desc": 4.0 * _MM, "xh": 5.0 * _MM},
+}
+HW_DEFAULT_FONT = "Cursive, dotted (XCCW)"
+_HW_NAVY = (14 / 255, 40 / 255, 65 / 255)
+_HW_LBLUE = (0.65, 0.82, 0.93)
+_HW_TEAL = (21 / 255, 96 / 255, 130 / 255)
 
 
 def _hw_joined_fonts_available():
@@ -306,26 +320,32 @@ def _hw_joined_fonts_available():
     return _hw_fonts_ok
 
 
-def _xccw_runs(text, dotted):
+def _xccw_runs(text, solid):
     """XCCW join rule: a letter uses the '4b' form when the PREVIOUS letter is o, r, v, w or x (a top exit)."""
     out, prev = [], ""
     for ch in text:
-        b = "b" if prev in "orvwx" and prev else "a"
-        out.append((ch, ("XCCWD4" if dotted else "XCCW4") + b))
+        b = "b" if prev and prev in "orvwx" else "a"
+        out.append((ch, ("XCCW4" if solid else "XCCWD4") + b))
         prev = ch.lower()
     return out
 
 
-def _draw_joined(c, x, y, text, size, dotted=False):
-    for ch, fnt in _xccw_runs(text, dotted):
-        c.setFont(fnt, size)
-        c.drawString(x, y, ch)
-        x += c.stringWidth(ch, fnt, size)
-    return x
+def _hw_draw(c, spec, x, y, text):
+    c.setFillColorRGB(*_HW_NAVY)
+    if spec.get("xccw"):
+        for ch, fnt in _xccw_runs(text, spec["solid"]):
+            c.setFont(fnt, spec["size"])
+            c.drawString(x, y, ch)
+            x += c.stringWidth(ch, fnt, spec["size"])
+    else:
+        c.setFont(spec["font"], spec["size"])
+        c.drawString(x, y, text)
 
 
-def _joined_width(c, text, size, dotted=False):
-    return sum(c.stringWidth(ch, f, size) for ch, f in _xccw_runs(text, dotted))
+def _hw_width(c, spec, text):
+    if spec.get("xccw"):
+        return sum(c.stringWidth(ch, f, spec["size"]) for ch, f in _xccw_runs(text, spec["solid"]))
+    return c.stringWidth(text, spec["font"], spec["size"])
 
 
 def _is_full_page(sheet):
@@ -336,81 +356,91 @@ def _is_full_page(sheet):
     return sheet["subject"] == "phonics" or (sheet.get("display_mode") == "recognition" and sheet["subject"] != "maths")
 
 
-def _hw_style_for(sheet):
-    pick = st.session_state.get("hw_style_override", "As set")
-    if pick == "Print":
-        style = "print"
-    elif pick == "Joined (cursive)":
-        style = "joined"
-    else:
-        style = "joined" if sheet.get("hw_kind") == "hw_joins" else "print"
-    if style == "joined" and not _hw_joined_fonts_available():
-        style = "print"
-    return style
+def _hw_ruled_row(c, margin, usable_w, baseline, spec, show_x, show_desc, tint=False):
+    asc, desc = spec["asc"], spec["desc"]
+    c.setDash()
+    c.setStrokeColorRGB(*_HW_LBLUE)
+    c.setLineWidth(0.5)
+    c.line(margin, baseline + asc, margin + usable_w, baseline + asc)
+    if show_x:
+        c.setStrokeColorRGB(0.80, 0.80, 0.80)
+        c.setLineWidth(0.4)
+        c.setDash(3, 3)
+        c.line(margin, baseline + spec["xh"], margin + usable_w, baseline + spec["xh"])
+        c.setDash()
+    c.setStrokeColorRGB(*_HW_LBLUE)
+    c.setLineWidth(1.4)
+    c.line(margin, baseline, margin + usable_w, baseline)
+    if show_desc:
+        c.setStrokeColorRGB(0.80, 0.80, 0.80)
+        c.setLineWidth(0.4)
+        c.setDash(8, 4)
+        c.line(margin, baseline - desc, margin + usable_w, baseline - desc)
+        c.setDash()
 
 
 def _draw_handwriting_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
-    """Tracing rows: the model, then dotted copies to trace; each followed by a blank line to write on."""
+    """Ruled rows like the school handwriting tool: the item in dotted writing to trace, then room to keep writing."""
     items = [q["question"] for q in sheet["questions"]]
-    n = len(items)
-    if n == 0:
+    if not items:
         return
-    style = _hw_style_for(sheet)
-    avail = grid_top - grid_bottom - 4 * _mm
-    row_h = min(16 * _mm, avail / (2 * n))
-    paired = row_h >= 11 * _mm
-    if not paired:
-        row_h = min(16 * _mm, avail / n)
-    size = row_h * 0.62 * 2.0 / 1.0
-    size = min(size, row_h * 1.25)
-    y = grid_top - 2 * _mm
+    name = st.session_state.get("hw_font", HW_DEFAULT_FONT)
+    if name not in HW_FONTS or not _hw_joined_fonts_available():
+        name, spec = "Print (Sassoon)", {"font": _WORD_FONT, "size": 30, "asc": 8.0 * _MM, "desc": 3.33 * _MM, "xh": 5.0 * _MM}
+    else:
+        spec = HW_FONTS[name]
+    show_x = st.session_state.get("hw_xheight", True)
+    show_desc = st.session_state.get("hw_descender", True)
+    row_h = spec["asc"] + spec["desc"] + 2.5 * _MM
+    c.setFillColorRGB(*_HW_TEAL)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(margin, grid_top - 11, "Trace each item, then continue writing it on the rest of the line.")
+    y = grid_top - 18 - spec["asc"]
+    capacity = int((y - spec["desc"] - grid_bottom) // row_h) + 1
+    practice = 1 if len(items) * 2 <= capacity else 0
+    short = all(len(it) <= 3 for it in items)
     for it in items:
-        base = y - row_h * 0.30
-        for row_kind in (("trace", "write") if paired else ("trace",)):
-            top_line, mid_line = y - row_h * 0.08, y - row_h * 0.38
-            bl = y - row_h * 0.70
-            c.setLineWidth(0.5)
-            c.setStrokeColorRGB(0.8, 0.8, 0.8)
-            c.line(margin, top_line, margin + usable_w, top_line)
-            c.setDash([2, 2], 0)
-            c.line(margin, mid_line, margin + usable_w, mid_line)
-            c.setDash()
-            c.setStrokeColorRGB(0.45, 0.45, 0.45)
-            c.line(margin, bl, margin + usable_w, bl)
-            if row_kind == "trace":
-                x = margin + 2 * _mm
-                w = (_joined_width(c, it, size) if style == "joined" else c.stringWidth(it, _WORD_FONT, size))
-                c.setFillColorRGB(0, 0, 0)
-                if style == "joined":
-                    _draw_joined(c, x, bl, it, size)
-                else:
-                    c.setFont(_WORD_FONT, size)
-                    c.drawString(x, bl, it)
-                x += w + 10 * _mm
-                gap = 6 * _mm if len(it) < 3 else 9 * _mm
-                c.setFillColorRGB(0.62, 0.62, 0.62)
-                while x + w <= margin + usable_w:
-                    if style == "joined":
-                        _draw_joined(c, x, bl, it, size, dotted=True)
-                    else:
-                        c.setFont(_WORD_FONT, size)
-                        c.drawString(x, bl, it)
-                    x += w + gap
-                c.setFillColorRGB(0, 0, 0)
+        if y - spec["desc"] < grid_bottom:
+            break
+        _hw_ruled_row(c, margin, usable_w, y, spec, show_x, show_desc)
+        x = margin + 2
+        w = _hw_width(c, spec, it)
+        _hw_draw(c, spec, x, y, it)
+        if short:
+            gap = 6 * _mm if len(it) == 1 else 9 * _mm
+            x += w + gap
+            for _ in range(3):
+                if x + w > margin + usable_w * 0.62:
+                    break
+                _hw_draw(c, spec, x, y, it)
+                x += w + gap
+        y -= row_h
+        for _ in range(practice):
+            if y - spec["desc"] < grid_bottom:
+                break
+            _hw_ruled_row(c, margin, usable_w, y, spec, show_x, show_desc)
             y -= row_h
-        y -= row_h * 0.05
+        y -= 2 * _MM
+    while y - spec["desc"] >= grid_bottom:
+        _hw_ruled_row(c, margin, usable_w, y, spec, show_x, show_desc)
+        y -= row_h
+    c.setFillColorRGB(0, 0, 0)
 
 
 def _draw_cloze_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
     """Word bank in a box, then numbered sentences with a gap to fill."""
     bank = sheet.get("bank") or []
+    groups = sheet.get("bank_groups") or [[w] for w in bank]
     y = grid_top - 3 * _mm
     c.setFont("Helvetica-Bold", 9)
     c.setFillColorRGB(*_GREY)
     c.drawString(margin, y - 3, "Word bank - choose the word that fits each sentence")
     y -= 7 * _mm
     bsz = 17
-    words = "     ".join(bank)
+    if any(len(g) > 1 for g in groups):
+        words = "   /   ".join(", ".join(g) for g in groups)      # homophones together, groups separated by a slash
+    else:
+        words = "     ".join(bank)
     lines = _wrap_line(c, words, _WORD_FONT, bsz, usable_w - 8 * _mm)
     box_h = len(lines) * (bsz + 6) + 8
     c.setStrokeColorRGB(*_WFA_BLUE)
@@ -983,7 +1013,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-16.10.26i")
+st.caption("Wallscourt Farm Academy · WFA-16.10.26j")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
@@ -2225,8 +2255,14 @@ with tab6:
                 with bc3:
                     wk_cover = st.checkbox("Include a timetable page for each child", value=True, key="wk_cover")
 
-                st.radio("Handwriting style", ["As set", "Print", "Joined (cursive)"], horizontal=True, key="hw_style_override",
-                         help="Letter families are printed in print style and joins in joined style unless you choose here.")
+                hw1, hw2, hw3 = st.columns([2, 1, 1])
+                with hw1:
+                    st.selectbox("Handwriting font", list(HW_FONTS), key="hw_font",
+                                 help="Used for handwriting letter and join sheets. Cursive dotted is the default.")
+                with hw2:
+                    st.checkbox("Show x-height line", value=True, key="hw_xheight")
+                with hw3:
+                    st.checkbox("Show descender line", value=True, key="hw_descender")
                 if st.button("Create weekly packs (PDF)", type="primary", width="stretch"):
                     from reportlab.lib.pagesizes import A4
                     from reportlab.pdfgen import canvas as pdfcanvas

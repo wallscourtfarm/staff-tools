@@ -174,6 +174,32 @@ SENTENCES = {
 }
 
 
+# Words that sound alike, grouped, so a word bank can show them together (here, hear / where, wear, were).
+HOMOPHONE_GROUPS = [
+    ["there", "their", "they're"], ["to", "too", "two"], ["hear", "here"], ["were", "where", "wear"],
+    ["right", "write"], ["no", "know"], ["new", "knew"], ["sea", "see"], ["be", "bee"], ["one", "won"],
+    ["meat", "meet"], ["peace", "piece"], ["plain", "plane"], ["brake", "break"], ["grate", "great"],
+    ["mail", "male"], ["main", "mane"], ["weather", "whether"], ["who's", "whose"], ["accept", "except"],
+    ["affect", "effect"], ["knot", "not"], ["berry", "bury"], ["ball", "bawl"], ["fair", "fare"],
+    ["groan", "grown"], ["heal", "heel", "he'll"], ["meddle", "medal"], ["missed", "mist"],
+    ["rain", "reign", "rein"], ["scene", "seen"],
+]
+
+
+def bank_groups(words):
+    """Group a set of words for a word bank: homophones together (alphabetical inside a group), other words
+    on their own. Groups are in the order of the homophone list above; single words follow."""
+    words = list(dict.fromkeys(words))
+    groups, seen = [], set()
+    for g in HOMOPHONE_GROUPS:
+        present = [w for w in g if w in words]
+        if len(present) > 1:
+            groups.append(present)
+            seen.update(present)
+    rest = sorted((w for w in words if w not in seen), key=str.lower)
+    return groups + [[w] for w in rest]
+
+
 def sentences_for(word):
     """Gap sentences for a word (list), or [] if none written."""
     return SENTENCES.get(word, [])
