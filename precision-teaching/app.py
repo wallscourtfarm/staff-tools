@@ -801,7 +801,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-16.10.26c")
+st.caption("Wallscourt Farm Academy · WFA-16.10.26d")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
@@ -949,6 +949,8 @@ with tab2:
     pupils_data = st.session_state.pupils_data
     ladders_data = st.session_state.ladders_data
 
+    if st.session_state.get("pt_flash"):
+        st.success(st.session_state.pop("pt_flash"))
     st.markdown("**Add pupils to track**")
     st.caption("1. Pick a year group.  2. Click the box and choose children (type to search; pick as many as you like).  3. Press **Add**.")
     tracked_codes = {p.get("pupilCode") for p in pupils_data["pupils"] if p.get("pupilCode")}
@@ -998,14 +1000,17 @@ with tab2:
             format_func=lambda c: _roster_label(by_code[c]), key="roster_pick",
             placeholder="Click here, then pick or type to search…",
         )
-        if st.button(f"➕ Add {len(picked)} selected" if picked else "➕ Add selected", type="primary", disabled=not picked):
-            for c in picked:
-                add_pupil(pupils_data, by_code[c])
-            save_pupils(pupils_data)
-            git_add_commit_push("data/pupils.json", f"Track {len(picked)} pupil(s)")
+        def _do_add(codes=tuple(picked), lookup=by_code):
+            pd_ = st.session_state.pupils_data
+            for c in codes:
+                add_pupil(pd_, lookup[c])
+            save_pupils(pd_)
+            git_add_commit_push("data/pupils.json", f"Track {len(codes)} pupil(s)")
             st.session_state["roster_pick"] = []
-            st.success(f"Now tracking {len(picked)} pupil(s). Scroll down to set their starting points.")
-            st.rerun()
+            st.session_state["pt_flash"] = f"Now tracking {len(codes)} pupil(s). Scroll down to set their starting points."
+
+        st.button(f"➕ Add {len(picked)} selected" if picked else "➕ Add selected", type="primary",
+                  disabled=not picked, on_click=_do_add)
 
     # ── Remove pupils added by mistake ─────────────────────────────────────
     if pupils_data["pupils"]:
@@ -1015,12 +1020,16 @@ with tab2:
             format_func=lambda i: f"{display_name(by_id[i])} ({by_id[i].get('class') or '—'})",
             key="remove_pick", placeholder="Click here and choose anyone added by mistake…",
         )
-        if st.button(f"🗑 Remove {len(gone)} selected" if gone else "🗑 Remove selected", disabled=not gone):
-            pupils_data["pupils"] = [p for p in pupils_data["pupils"] if p["id"] not in gone]
-            save_pupils(pupils_data)
-            git_add_commit_push("data/pupils.json", f"Stop tracking {len(gone)} pupil(s)")
+        def _do_remove(ids=tuple(gone)):
+            pd_ = st.session_state.pupils_data
+            pd_["pupils"] = [p for p in pd_["pupils"] if p["id"] not in ids]
+            save_pupils(pd_)
+            git_add_commit_push("data/pupils.json", f"Stop tracking {len(ids)} pupil(s)")
             st.session_state["remove_pick"] = []
-            st.rerun()
+            st.session_state["pt_flash"] = f"Removed {len(ids)} pupil(s) from tracking."
+
+        st.button(f"🗑 Remove {len(gone)} selected" if gone else "🗑 Remove selected",
+                  disabled=not gone, on_click=_do_remove)
         st.caption("This only removes them from this tool. Their practice records stay saved, and they are not removed from the school roster.")
 
     # ── Set Starting Points ──────────────────────────────────────────────
