@@ -351,7 +351,9 @@ def _hw_width(c, spec, text):
 def _is_full_page(sheet):
     """Sheets that get a whole page: phonics, reading-style recognition lists, cloze and handwriting.
     Maths and dictation spelling sit two to a page."""
-    if sheet.get("display_mode") in ("cloze", "handwriting"):
+    if sheet.get("display_mode") == "handwriting":
+        return len(sheet["questions"]) > 6          # a few letters or joins fit half a page: two sheets per page
+    if sheet.get("display_mode") == "cloze":
         return True
     return sheet["subject"] == "phonics" or (sheet.get("display_mode") == "recognition" and sheet["subject"] != "maths")
 
@@ -396,32 +398,26 @@ def _draw_handwriting_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
     c.setFont("Helvetica-Bold", 9)
     c.drawString(margin, grid_top - 11, "Trace each item, then continue writing it on the rest of the line.")
     y = grid_top - 18 - spec["asc"]
-    capacity = int((y - spec["desc"] - grid_bottom) // row_h) + 1
-    few = len(items) <= 3                      # precision teaching: one or two targets, practised again and again
-    block = max(2, capacity // len(items)) if few else (2 if len(items) * 2 <= capacity else 1)
+    # One line per item (the item in dotted writing to trace, then room to keep writing it), then ONE empty line
+    # to practise again if the writing was not good enough. Nothing else, so a sheet stays short.
     short = all(len(it) <= 3 for it in items)
-    for it in items:
-        for r in range(block):
-            if y - spec["desc"] < grid_bottom:
-                break
-            _hw_ruled_row(c, margin, usable_w, y, spec, show_x, show_desc)
-            if r == 0 or (few and r == 1):         # the first rows start with the item to trace
-                x = margin + 2
-                w = _hw_width(c, spec, it)
-                _hw_draw(c, spec, x, y, it)
-                if short:
-                    gap = 6 * _mm if len(it) == 1 else 9 * _mm
-                    x += w + gap
-                    for _ in range(4 if few else 3):
-                        if x + w > margin + usable_w * (0.8 if few else 0.62):
-                            break
-                        _hw_draw(c, spec, x, y, it)
-                        x += w + gap
-            y -= row_h
-        y -= 2 * _MM
-    while y - spec["desc"] >= grid_bottom:
+    for it in items + [None]:
+        if y - spec["desc"] < grid_bottom:
+            break
         _hw_ruled_row(c, margin, usable_w, y, spec, show_x, show_desc)
-        y -= row_h
+        if it is not None:
+            x = margin + 2
+            w = _hw_width(c, spec, it)
+            _hw_draw(c, spec, x, y, it)
+            if short:
+                gap = 6 * _mm if len(it) == 1 else 9 * _mm
+                x += w + gap
+                for _ in range(4):
+                    if x + w > margin + usable_w * 0.6:
+                        break
+                    _hw_draw(c, spec, x, y, it)
+                    x += w + gap
+        y -= row_h + 2 * _MM
     c.setFillColorRGB(0, 0, 0)
 
 
@@ -1114,7 +1110,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 
 if st.query_params.get("print") == "week":
     st.markdown(logo_html("Print this week"), unsafe_allow_html=True)
-    st.caption(f"Wallscourt Farm Academy · WFA-17.10.26c · Children and targets come from the Precision Teaching page "
+    st.caption(f"Wallscourt Farm Academy · WFA-17.10.26d · Children and targets come from the Precision Teaching page "
                f"(staff.wallscourt-farm-academy.co.uk/precision/).")
     try:
         _load, _cat = _pt_get("load"), _pt_get("catalogue")["catalogue"]
@@ -1214,7 +1210,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-17.10.26c")
+st.caption("Wallscourt Farm Academy · WFA-17.10.26d")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")

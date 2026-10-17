@@ -106,8 +106,9 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 
   <div class="bar">
     <button class="btn" id="btnAdd">+ Add children</button>
-    <select id="fClass" aria-label="Class"></select>
+    <select id="fClass" aria-label="Class" hidden></select>
     <span class="grow"></span>
+    <span id="namesSlot"></span>
     <a class="btn ghost" id="btnPrint" href="https://precision-teaching.wallscourt-farm-academy.co.uk/?print=week" target="_blank" rel="noopener">🖨 Print this week</a>
   </div>
 
@@ -119,7 +120,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <button class="btn quiet" id="btnClearSel">Clear</button>
   </div>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-17.10.26a</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-17.10.26b</span></footer>
 
 <div class="veil" id="veil"></div>
 
@@ -485,7 +486,22 @@ function endTarget(status, msg) {
 $('tDone').onclick = function () { endTarget('done', 'Well done! Target finished. Give them the next one with "+ target".'); };
 $('tRemove').onclick = function () { if (confirm('Remove this target?')) endTarget('removed', 'Target removed.'); };
 
-if (window.WFANames) WFANames.screen.init();
+// The shared names helper puts its button and "names showing" bar in the bottom corner, where they cover this
+// page's own buttons. Keep them in the toolbar instead.
+if (window.WFANames) {
+  var NS = WFANames.screen, slot = $('namesSlot'), baseUi = NS._ui;
+  NS._ui = function () {
+    baseUi.apply(NS, arguments);
+    [NS._btn, NS._bar].forEach(function (e) {
+      if (!e || e.parentNode === slot) return;
+      e.style.position = 'static'; e.style.transform = 'none'; e.style.boxShadow = 'none';
+      e.style.right = e.style.bottom = e.style.left = 'auto';
+      slot.appendChild(e);
+    });
+  };
+  NS.init();
+  NS._ui();
+}
 load();
 </script>
 </body>
