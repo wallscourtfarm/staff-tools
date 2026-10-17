@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+/* WFA 25.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precision Teaching</title>
+<link rel="icon" href="../favicon.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa.css">
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
+<style>
+  :root { --ink:#0a0101; --muted:#5b6b7b; --line:#d9e3ec; --soft:#f4f9fd; --ok:#2bae62; --warn:#e57d24; --bad:#c62828; }
+  body { color: var(--ink); }
+  header { padding: 18px 24px; }
+  header h1 { font-size: 1.6rem; }
+  main { max-width: 1400px; padding: 20px 16px 80px; }
+  button { font: inherit; cursor: pointer; }
+  .btn { border: 0; border-radius: 10px; padding: 10px 16px; font-weight: 800; background: var(--wfa-blue); color: #fff; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.ghost { background: #fff; color: var(--wfa-blue); border: 2px solid var(--wfa-blue); }
+  .btn.quiet { background: #eef4f9; color: var(--ink); }
+  .btn.danger { background: #fff; color: var(--bad); border: 2px solid #f1c4c4; }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .bar .grow { flex: 1; }
+  select, input[type=text], input[type=search] { font: inherit; font-size: 16px; padding: 9px 12px; border: 2px solid var(--line); border-radius: 10px; background: #fff; }
+  .banner { padding: 12px 16px; border-radius: 10px; margin-bottom: 14px; font-weight: 700; display: none; }
+  .banner.show { display: flex; gap: 12px; align-items: center; }
+  .banner.err { background: #fdecec; color: var(--bad); }
+  .banner.ok { background: #e8f7ee; color: #1d7a45; }
+  .card { background: #fff; border-radius: 14px; box-shadow: 0 2px 10px rgba(23,152,211,.10); }
+  .empty { padding: 40px 20px; text-align: center; color: var(--muted); }
+  .empty b { display: block; color: var(--ink); font-size: 1.2rem; margin-bottom: 6px; }
+
+  /* group list */
+  .row { display: grid; grid-template-columns: 44px 120px 1fr auto; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  .row.sel { background: #f0f8fd; }
+  .tick { width: 30px; height: 30px; border-radius: 8px; border: 2px solid #b9cbdb; background: #fff; display: grid; place-items: center; font-weight: 900; color: #fff; }
+  .row.sel .tick { background: var(--wfa-blue); border-color: var(--wfa-blue); }
+  .who b { font-size: 1.15rem; display: block; }
+  .who small { color: var(--muted); font-weight: 700; }
+  .who .left { color: var(--bad); font-size: .8rem; font-weight: 800; }
+  .targets { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tchip { text-align: left; border: 2px solid var(--line); background: var(--soft); border-radius: 12px; padding: 7px 11px; line-height: 1.25; }
+  .tchip:hover { border-color: var(--wfa-blue); }
+  .tchip .a { font-weight: 800; font-size: .95rem; }
+  .tchip .i { font-size: .95rem; }
+  .tchip .d { font-size: .8rem; color: var(--muted); font-weight: 700; }
+  .addt { border: 2px dashed #b9cbdb; background: #fff; color: var(--wfa-blue); border-radius: 12px; padding: 9px 12px; font-weight: 800; }
+  .rowmenu { border: 0; background: none; color: var(--muted); font-size: 1.3rem; padding: 4px 8px; }
+  .selbar { position: sticky; bottom: 12px; display: none; margin-top: 14px; padding: 12px 16px; background: var(--ink); color: #fff; border-radius: 14px; gap: 12px; align-items: center; }
+  .selbar.show { display: flex; }
+  .selbar .btn.quiet { background: #333; color: #fff; }
+
+  /* panels */
+  .veil { position: fixed; inset: 0; background: rgba(10,1,1,.45); display: none; z-index: 50; }
+  .veil.show { display: block; }
+  .panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 100%); background: #fff; z-index: 51; display: none; flex-direction: column; box-shadow: -8px 0 30px rgba(0,0,0,.2); }
+  .panel.show { display: flex; }
+  .ph { padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+  .ph h3 { font-size: 1.25rem; font-weight: 900; flex: 1; }
+  .pb { padding: 16px 20px; overflow-y: auto; flex: 1; }
+  .pf { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .pf .grow { flex: 1; }
+  .x { border: 0; background: #eef4f9; width: 38px; height: 38px; border-radius: 10px; font-size: 1.2rem; }
+  .step { margin-bottom: 22px; }
+  .step h4 { font-size: .85rem; text-transform: uppercase; letter-spacing: .8px; color: var(--wfa-blue); margin-bottom: 10px; font-weight: 900; }
+  .step h4 span { color: var(--muted); text-transform: none; letter-spacing: 0; font-weight: 700; }
+  .grid-btns { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+  .opt { border: 2px solid var(--line); background: #fff; border-radius: 12px; padding: 11px 12px; text-align: left; font-weight: 800; }
+  .opt small { display: block; font-weight: 600; color: var(--muted); }
+  .opt.on { border-color: var(--wfa-blue); background: #e7f4fb; }
+  .section-name { font-size: .8rem; font-weight: 800; color: var(--muted); margin: 10px 0 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border: 2px solid var(--line); background: #fff; border-radius: 999px; padding: 9px 15px; font-size: 1.05rem; font-weight: 800; min-width: 48px; }
+  .chip.on { background: var(--wfa-blue); border-color: var(--wfa-blue); color: #fff; }
+  .chip.kid { font-size: .95rem; padding: 7px 12px; }
+  .hint { color: var(--muted); font-size: .9rem; margin: -4px 0 10px; }
+  .small-links { display: flex; gap: 14px; margin-top: 8px; }
+  .small-links button { border: 0; background: none; color: var(--wfa-blue); font-weight: 800; padding: 0; }
+  .partlist { max-height: 300px; overflow-y: auto; border: 2px solid var(--line); border-radius: 12px; }
+  .partlist .opt { border: 0; border-top: 1px solid var(--line); border-radius: 0; width: 100%; }
+  .partlist .grp { padding: 6px 12px; background: var(--soft); font-size: .8rem; font-weight: 900; color: var(--muted); position: sticky; top: 0; }
+  .err-msg { color: var(--bad); font-weight: 800; }
+  footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 10px; }
+  @media (max-width: 720px) {
+    .row { grid-template-columns: 40px 1fr auto; }
+    .row .targets { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-content">
+    <img class="logo" src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA">
+    <div><h1>Precision Teaching</h1><p>My group: each child's targets, and the days they practise them</p></div>
+  </div>
+</header>
+
+<main>
+  <div id="banner" class="banner"></div>
+
+  <div class="bar">
+    <button class="btn" id="btnAdd">+ Add children</button>
+    <select id="fClass" aria-label="Class"></select>
+    <span class="grow"></span>
+    <a class="btn ghost" id="btnPrint" href="https://precision-teaching.wallscourt-farm-academy.co.uk/?print=week" target="_blank" rel="noopener">🖨 Print this week</a>
+  </div>
+
+  <div class="card" id="group"><div class="empty">Loading…</div></div>
+
+  <div class="selbar" id="selbar">
+    <span id="selCount"></span><span class="grow" style="flex:1"></span>
+    <button class="btn" id="btnGiveSel">Give a target</button>
+    <button class="btn quiet" id="btnClearSel">Clear</button>
+  </div>
+</main>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-17.10.26a</span></footer>
+
+<div class="veil" id="veil"></div>
+
+<!-- Add children -->
+<section class="panel" id="pAdd" aria-label="Add children">
+  <div class="ph"><h3>Add children to my group</h3><button class="x" data-close>✕</button></div>
+  <div class="pb">
+    <div class="bar">
+      <select id="aYear" aria-label="Year group"></select>
+      <select id="aClass" aria-label="Class"></select>
+      <input type="search" id="aSearch" placeholder="Search initials" class="grow">
+    </div>
+    <p class="hint">Tap the children to add. Children already in your group are not shown.</p>
+    <div class="chips" id="aList"></div>
+  </div>
+  <div class="pf"><span class="grow" id="aCount"></span><button class="btn" id="aSave" disabled>Add</button></div>
+</section>
+
+<!-- Give / edit a target -->
+<section class="panel" id="pTarget" aria-label="Target">
+  <div class="ph"><h3 id="tTitle">Give a target</h3><button class="x" data-close>✕</button></div>
+  <div class="pb">
+    <div class="step"><h4>Children</h4><div class="chips" id="tKids"></div></div>
+    <div class="step" id="sArea"><h4>1. What to practise</h4><div id="tAreas"></div></div>
+    <div class="step" id="sPart" hidden><h4>2. Which part</h4><input type="search" id="tPartSearch" placeholder="Search, e.g. Y4, suffix, -tion" style="width:100%;margin-bottom:8px" hidden><div id="tParts"></div></div>
+    <div class="step" id="sItems" hidden><h4>3. Exactly these <span id="tPickHint"></span></h4><p class="hint" id="tHint"></p><div class="chips" id="tItems"></div>
+      <div class="small-links"><button id="tAll">Choose all</button><button id="tNone">Clear</button></div>
+      <div id="tFreeWrap" hidden style="margin-top:10px"><input type="text" id="tFree" placeholder="Type your own, separated by spaces (e.g. rt eo)" style="width:100%"></div>
+    </div>
+    <div class="step" id="sDays" hidden><h4>4. Days</h4><div class="chips" id="tDays"></div></div>
+  </div>
+  <div class="pf">
+    <button class="btn danger" id="tRemove" hidden>Remove target</button>
+    <button class="btn quiet" id="tDone" hidden>✓ Learnt: finish target</button>
+    <span class="grow err-msg" id="tErr"></span>
+    <button class="btn" id="tSave" disabled>Save</button>
+  </div>
+</section>
+
+<script>
+'use strict';
+var API = 'https://api.wallscourt-farm-academy.co.uk/planning/precision-db?token=__hub__';
+var ROSTER = 'https://api.wallscourt-farm-academy.co.uk/planning/pupilroster-db/pupils?token=__hub__';
+var DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+var S = { children: [], targets: [], catalogue: null, roster: null, sel: new Set(), loaded: false };
+
+function $(id) { return document.getElementById(id); }
+function el(tag, attrs, kids) {
+  var e = document.createElement(tag);
+  Object.keys(attrs || {}).forEach(function (k) {
+    if (k === 'text') e.textContent = attrs[k];
+    else if (k === 'on') Object.keys(attrs.on).forEach(function (ev) { e.addEventListener(ev, attrs.on[ev]); });
+    else e.setAttribute(k, attrs[k]);
+  });
+  (kids || []).forEach(function (k) { if (k) e.appendChild(typeof k === 'string' ? document.createTextNode(k) : k); });
+  return e;
+}
+function kidLabel(c) { return el('span', { 'data-pupil-id': c.pupilCode, text: c.label || '?' }); }
+function banner(kind, msg, retry) {
+  var b = $('banner');
+  b.className = 'banner show ' + kind;
+  b.textContent = msg;
+  if (retry) b.appendChild(el('button', { class: 'btn quiet', text: 'Try again', on: { click: retry } }));
+  if (kind === 'ok') setTimeout(function () { if (b.textContent.indexOf(msg) === 0) b.className = 'banner'; }, 3500);
+}
+
+// ── Talking to the API (check res.ok AND the body; never report success we did not get) ────────────
+function getJSON(url) {
+  return fetch(url, { cache: 'no-store' }).then(function (r) {
+    if (!r.ok) throw new Error('The server said ' + r.status);
+    return r.json();
+  });
+}
+function post(body) {
+  return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(function (r) { if (!r.ok) throw new Error('The server said ' + r.status); return r.json(); })
+    .then(function (d) {
+      if (!d || d.ok !== true) throw new Error((d && d.error) || 'Not saved');
+      S.children = d.children; S.targets = d.targets; render();
+      return d;
+    });
+}
+function load() {
+  Promise.all([getJSON(API + '&action=load'), getJSON(API + '&action=catalogue')]).then(function (res) {
+    if (!res[0].ok) throw new Error(res[0].error || 'Could not load');
+    if (!res[1].ok) throw new Error(res[1].error || 'Could not load');
+    S.children = res[0].children; S.targets = res[0].targets; S.catalogue = res[1].catalogue; S.loaded = true;
+    $('banner').className = 'banner';
+    render();
+  }).catch(function (e) {
+    banner('err', 'Could not load your group: ' + e.message + '. Nothing has been changed.', load);
+    $('group').innerHTML = '<div class="empty">Not loaded.</div>';
+  });
+}
+function area(id) { return S.catalogue.areas.find(function (a) { return a.id === id; }); }
+
+// ── My group ────────────────────────────────────────────────────────────────────────────────────────────
+function render() {
+  var classes = Array.from(new Set(S.children.map(function (c) { return c.class; }))).sort();
+  var fc = $('fClass'), keep = fc.value;
+  fc.innerHTML = '';
+  fc.appendChild(el('option', { value: '', text: 'All classes (' + S.children.length + ')' }));
+  classes.forEach(function (c) { fc.appendChild(el('option', { value: c, text: c })); });
+  if (classes.indexOf(keep) >= 0) fc.value = keep;
+  fc.hidden = classes.length < 2;
+
+  var g = $('group');
+  g.innerHTML = '';
+  var shown = S.children.filter(function (c) { return !fc.value || c.class === fc.value; });
+  if (!shown.length) {
+    g.appendChild(el('div', { class: 'empty' }, [el('b', { text: 'No children in your group yet' }),
+      'Press "+ Add children" to choose them from the school roster.']));
+  }
+  shown.forEach(function (c) {
+    var mine = S.targets.filter(function (t) { return t.pupilCode === c.pupilCode; });
+    var sel = S.sel.has(c.pupilCode);
+    var tg = el('div', { class: 'targets' });
+    mine.forEach(function (t) {
+      var a = area(t.area);
+      tg.appendChild(el('button', { class: 'tchip', title: 'Change or finish this target', on: { click: function () { openTarget({ target: t }); } } }, [
+        el('div', { class: 'a', text: chipTitle(a, t) }),
+        el('div', { class: 'i', text: t.items.join('  ') }),
+        el('div', { class: 'd', text: t.days.length === 5 ? 'Every day' : t.days.join(' ') })
+      ]));
+    });
+    tg.appendChild(el('button', { class: 'addt', text: '+ target', on: { click: function () { openTarget({ kids: [c.pupilCode] }); } } }));
+    var who = el('div', { class: 'who' }, [el('b', {}, [kidLabel(c)]), el('small', { text: c.class })]);
+    if (!c.onRoster) who.appendChild(el('div', { class: 'left', text: 'Not on the roster now' }));
+    g.appendChild(el('div', { class: 'row' + (sel ? ' sel' : '') }, [
+      el('button', { class: 'tick', 'aria-label': 'Select', text: sel ? '✓' : '', on: { click: function () { toggleSel(c.pupilCode); } } }),
+      who, tg,
+      el('button', { class: 'rowmenu', title: 'Remove from my group', text: '✕', on: { click: function () { removeChild(c); } } })
+    ]));
+  });
+  var n = S.sel.size;
+  $('selbar').className = 'selbar' + (n ? ' show' : '');
+  $('selCount').textContent = n + ' child' + (n === 1 ? '' : 'ren') + ' selected';
+}
+function chipTitle(a, t) {
+  if (!a) return t.partName;
+  var nm = a.name.replace(/ \(.*\)$/, '');
+  if (a.kind === 'hw_letters' || a.kind === 'hw_joins') return nm;          // the letters/joins themselves say it all
+  if (a.id === 'spelling' || a.id === 'cew') return nm.replace(' rules', '') + ': ' + t.partName;
+  return nm + ': ' + t.partName.replace(/^Number bonds to/, 'to');
+}
+function toggleSel(code) { S.sel.has(code) ? S.sel.delete(code) : S.sel.add(code); render(); }
+function removeChild(c) {
+  if (!confirm('Take ' + (c.label || 'this child') + ' out of your group? Their targets are kept, and come back if you add them again.')) return;
+  S.sel.delete(c.pupilCode);
+  post({ action: 'removeChild', pupilCode: c.pupilCode })
+    .then(function () { banner('ok', 'Removed from your group.'); })
+    .catch(function (e) { banner('err', 'Not removed: ' + e.message); });
+}
+$('fClass').addEventListener('change', render);
+$('btnClearSel').onclick = function () { S.sel.clear(); render(); };
+$('btnGiveSel').onclick = function () { openTarget({ kids: Array.from(S.sel) }); };
+
+// ── Panels ──────────────────────────────────────────────────────────────────────────────────────────────
+function openPanel(id) { $('veil').className = 'veil show'; $(id).className = 'panel show'; }
+function closePanels() { $('veil').className = 'veil'; document.querySelectorAll('.panel').forEach(function (p) { p.className = 'panel'; }); }
+$('veil').onclick = closePanels;
+document.querySelectorAll('[data-close]').forEach(function (b) { b.onclick = closePanels; });
+
+// ── Add children ────────────────────────────────────────────────────────────────────────────────────────
+var A = { picked: new Set() };
+$('btnAdd').onclick = function () {
+  if (!S.loaded) return;
+  A.picked = new Set();
+  openPanel('pAdd');
+  if (S.roster) return fillAdd();
+  $('aList').textContent = 'Loading the roster…';
+  getJSON(ROSTER).then(function (d) {
+    if (!d.pupils) throw new Error(d.error || 'no pupils');
+    S.roster = d.pupils.filter(function (p) { return p.pupilId; });
+    var years = Array.from(new Set(S.roster.map(function (p) { return p.yearGroup; }))).sort();
+    $('aYear').innerHTML = '';
+    $('aYear').appendChild(el('option', { value: '', text: 'All years' }));
+    years.forEach(function (y) { $('aYear').appendChild(el('option', { value: y, text: y })); });
+    var mostYear = S.children.length ? S.children[0].yearGroup : '';
+    if (years.indexOf(mostYear) >= 0) $('aYear').value = mostYear;
+    fillAdd();
+  }).catch(function (e) { $('aList').textContent = 'Could not load the roster: ' + e.message; });
+};
+function fillAdd() {
+  var y = $('aYear').value;
+  var classes = Array.from(new Set(S.roster.filter(function (p) { return !y || p.yearGroup === y; }).map(function (p) { return p.class; }))).sort();
+  var ac = $('aClass'), keep = ac.value;
+  ac.innerHTML = '';
+  ac.appendChild(el('option', { value: '', text: 'All classes' }));
+  classes.forEach(function (c) { ac.appendChild(el('option', { value: c, text: c })); });
+  if (classes.indexOf(keep) >= 0) ac.value = keep;
+  var q = $('aSearch').value.trim().toLowerCase();
+  var have = new Set(S.children.map(function (c) { return c.pupilCode; }));
+  var names = (window.WFANames && WFANames.screen.active && WFANames.screen.file) || null;
+  var list = S.roster.filter(function (p) {
+    if (have.has(p.pupilId) || (y && p.yearGroup !== y) || (ac.value && p.class !== ac.value)) return false;
+    if (!q) return true;
+    var nm = names && names.get(p.pupilId);
+    return (p.label || '').toLowerCase().indexOf(q) >= 0 || (nm && nm.name.toLowerCase().indexOf(q) >= 0);
+  }).sort(function (a, b) { return (a.class + a.label).localeCompare(b.class + b.label); });
+  var box = $('aList');
+  box.innerHTML = '';
+  if (!list.length) box.textContent = 'No children match.';
+  var lastClass = null;
+  list.forEach(function (p) {
+    if (!ac.value && p.class !== lastClass) { box.appendChild(el('div', { class: 'section-name', style: 'width:100%', text: p.class })); lastClass = p.class; }
+    box.appendChild(el('button', { class: 'chip kid' + (A.picked.has(p.pupilId) ? ' on' : ''), on: { click: function () {
+      A.picked.has(p.pupilId) ? A.picked.delete(p.pupilId) : A.picked.add(p.pupilId); fillAdd();
+    } } }, [kidLabel({ pupilCode: p.pupilId, label: p.label })]));
+  });
+  var n = A.picked.size;
+  $('aCount').textContent = n ? n + ' chosen' : '';
+  $('aSave').disabled = !n;
+  $('aSave').textContent = n ? 'Add ' + n + ' child' + (n === 1 ? '' : 'ren') : 'Add';
+}
+['aYear', 'aClass'].forEach(function (id) { $(id).addEventListener('change', fillAdd); });
+$('aSearch').addEventListener('input', fillAdd);
+$('aSave').onclick = function () {
+  var kids = S.roster.filter(function (p) { return A.picked.has(p.pupilId); }).map(function (p) {
+    return { pupilCode: p.pupilId, label: p.label, class: p.class, yearGroup: p.yearGroup };
+  });
+  $('aSave').disabled = true;
+  post({ action: 'addChildren', children: kids }).then(function () {
+    closePanels(); banner('ok', 'Added ' + kids.length + ' to your group. Now give them a target.');
+    S.sel = new Set(kids.map(function (k) { return k.pupilCode; })); render();
+  }).catch(function (e) { $('aSave').disabled = false; banner('err', 'Not added: ' + e.message); });
+};
+
+// ── Give / edit a target ────────────────────────────────────────────────────────────────────────────────
+var T = {};
+function openTarget(opts) {
+  if (!S.loaded) return;
+  var t = opts.target;
+  T = { edit: t || null, kids: t ? [t.pupilCode] : opts.kids.slice(), area: t ? t.area : null, part: t ? t.part : null,
+        items: new Set(t ? t.items : []), extra: t ? t.items.slice() : [], days: new Set(t ? t.days : DAYS),
+        pickArea: !t, pickPart: !t };
+  $('tTitle').textContent = t ? 'Change target' : (T.kids.length > 1 ? 'Give ' + T.kids.length + ' children a target' : 'Give a target');
+  $('tRemove').hidden = $('tDone').hidden = !t;
+  $('tErr').textContent = '';
+  $('tPartSearch').value = '';
+  $('tFree').value = '';
+  openPanel('pTarget');
+  drawTarget();
+}
+function drawTarget() {
+  var kidsBox = $('tKids'); kidsBox.innerHTML = '';
+  T.kids.forEach(function (code) {
+    var c = S.children.find(function (x) { return x.pupilCode === code; }) || { pupilCode: code, label: '?' };
+    kidsBox.appendChild(el('span', { class: 'chip kid on' }, [kidLabel(c)]));
+  });
+  // 1. area
+  var ab = $('tAreas'); ab.innerHTML = '';
+  $('sArea').hidden = !!T.edit;
+  var sections = [];
+  S.catalogue.areas.forEach(function (a) { if (sections.indexOf(a.section) < 0) sections.push(a.section); });
+  if (T.area && !T.pickArea) {
+    var ca = area(T.area);
+    ab.appendChild(el('div', { class: 'bar' }, [el('span', { class: 'opt on', text: ca.name.replace(/ \(.*\)$/, '') }),
+      el('button', { class: 'btn quiet', text: 'Change', on: { click: function () { T.pickArea = true; drawTarget(); } } })]));
+    sections = [];
+  }
+  sections.forEach(function (sec) {
+    ab.appendChild(el('div', { class: 'section-name', text: sec }));
+    var grid = el('div', { class: 'grid-btns' });
+    S.catalogue.areas.filter(function (a) { return a.section === sec; }).forEach(function (a) {
+      grid.appendChild(el('button', { class: 'opt' + (T.area === a.id ? ' on' : ''), on: { click: function () {
+        if (T.area !== a.id) { T.area = a.id; T.part = null; T.items = new Set(); }
+        T.pickArea = false; T.pickPart = true;
+        drawTarget();
+      } } }, [a.name.replace(/ \(.*\)$/, '')]));
+    });
+    ab.appendChild(grid);
+  });
+  var a = T.area && area(T.area);
+  $('sPart').hidden = !a;
+  $('sItems').hidden = $('sDays').hidden = !(a && T.part);
+  if (!a) return updateSave();
+  // 2. part
+  var many = a.parts.length > 14;
+  var pb = $('tParts'); pb.innerHTML = '';
+  if (T.part && !T.pickPart) {
+    var cp = a.parts.find(function (p) { return p.id === T.part; });
+    $('tPartSearch').hidden = true;
+    pb.appendChild(el('div', { class: 'bar' }, [el('span', { class: 'opt on', text: cp ? cp.name : T.part }),
+      el('button', { class: 'btn quiet', text: 'Change', on: { click: function () { T.pickPart = true; drawTarget(); } } })]));
+  } else {
+  $('tPartSearch').hidden = !many;
+  var q = $('tPartSearch').value.trim().toLowerCase();
+  var wrap = el('div', { class: many ? 'partlist' : 'grid-btns' });
+  var lastGrp = null;
+  a.parts.filter(function (p) {
+      var g = p.group || '';
+      return !q || (p.name + ' ' + g + ' ' + g.replace('Year ', 'Y') + ' ' + p.items.join(' ')).toLowerCase().indexOf(q) >= 0;
+    })
+    .forEach(function (p) {
+      if (many && p.group && p.group !== lastGrp) { wrap.appendChild(el('div', { class: 'grp', text: p.group })); lastGrp = p.group; }
+      wrap.appendChild(el('button', { class: 'opt' + (T.part === p.id ? ' on' : ''), on: { click: function () {
+        if (T.part !== p.id) {
+          T.part = p.id;
+          var n = a.pick > 0 ? a.pick : p.items.length;
+          T.items = new Set(/_any$/.test(p.id) ? [] : p.items.slice(0, n));   // 'Any letters': you choose
+        }
+        T.pickPart = false;
+        drawTarget();
+        $('sItems').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } } }, [p.name, (!many && p.group) ? el('small', { text: p.group }) : null]));
+    });
+  pb.appendChild(wrap);
+  }
+  if (!T.part) return updateSave();
+  var part = a.parts.find(function (p) { return p.id === T.part; });
+  // 3. items
+  $('tPickHint').textContent = a.pick > 0 ? '(about ' + a.pick + ' is best)' : '';
+  $('tHint').textContent = a.hint || '';
+  var ib = $('tItems'); ib.innerHTML = '';
+  var all = part.items.slice();
+  Array.from(T.items).forEach(function (i) { if (all.indexOf(i) < 0) all.push(i); });
+  all.forEach(function (i) {
+    ib.appendChild(el('button', { class: 'chip' + (T.items.has(i) ? ' on' : ''), text: i, on: { click: function () {
+      T.items.has(i) ? T.items.delete(i) : T.items.add(i); drawTarget();
+    } } }));
+  });
+  $('tFreeWrap').hidden = !a.free;
+  // 4. days
+  var db = $('tDays'); db.innerHTML = '';
+  DAYS.forEach(function (d) {
+    db.appendChild(el('button', { class: 'chip' + (T.days.has(d) ? ' on' : ''), text: d, on: { click: function () {
+      T.days.has(d) ? T.days.delete(d) : T.days.add(d); drawTarget();
+    } } }));
+  });
+  updateSave();
+}
+function chosenItems() {
+  var a = area(T.area), part = a && a.parts.find(function (p) { return p.id === T.part; });
+  if (!part) return [];
+  var order = part.items.concat(Array.from(T.items).filter(function (i) { return part.items.indexOf(i) < 0; }));
+  var out = order.filter(function (i) { return T.items.has(i); });
+  if (a.free) $('tFree').value.split(/[\s,]+/).forEach(function (w) { w = w.trim(); if (w && out.indexOf(w) < 0) out.push(w); });
+  return out;
+}
+function updateSave() {
+  var n = chosenItems().length;
+  $('tSave').disabled = !(T.kids.length && T.area && T.part && n && T.days.size);
+  $('tSave').textContent = T.edit ? 'Save changes' : (T.kids.length > 1 ? 'Give to ' + T.kids.length + ' children' : 'Save target');
+}
+$('tFree').addEventListener('input', updateSave);
+$('tPartSearch').addEventListener('input', drawTarget);
+$('tAll').onclick = function () { var a = area(T.area), p = a.parts.find(function (x) { return x.id === T.part; }); T.items = new Set(p.items); drawTarget(); };
+$('tNone').onclick = function () { T.items = new Set(); drawTarget(); };
+$('tSave').onclick = function () {
+  var target = { part: T.part, items: chosenItems(), days: DAYS.filter(function (d) { return T.days.has(d); }) };
+  if (T.edit) target.id = T.edit.id; else { target.pupilCodes = T.kids; target.area = T.area; }
+  $('tSave').disabled = true; $('tErr').textContent = '';
+  post({ action: 'saveTarget', target: target }).then(function () {
+    closePanels(); S.sel.clear(); render();
+    banner('ok', T.edit ? 'Target changed.' : 'Target saved for ' + T.kids.length + ' child' + (T.kids.length === 1 ? '' : 'ren') + '.');
+  }).catch(function (e) { $('tErr').textContent = 'Not saved: ' + e.message; updateSave(); });
+};
+function endTarget(status, msg) {
+  post({ action: 'endTarget', id: T.edit.id, status: status }).then(function () { closePanels(); banner('ok', msg); })
+    .catch(function (e) { $('tErr').textContent = 'Not saved: ' + e.message; });
+}
+$('tDone').onclick = function () { endTarget('done', 'Well done! Target finished. Give them the next one with "+ target".'); };
+$('tRemove').onclick = function () { if (confirm('Remove this target?')) endTarget('removed', 'Target removed.'); };
+
+if (window.WFANames) WFANames.screen.init();
+load();
+</script>
+</body>
+</html>
