@@ -529,6 +529,93 @@ def render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, slot_entries, i
         render_compact_sheet_slot(c, margin, usable_w, bottom_top, bottom_bottom, *slot_entries[1], include_answers)
 
 
+def build_week_pdf(wk_kids, rows, plan_now, ladders_data, wk_answers=True, wk_cover=True, review=False):
+    """One PDF for the chosen children: per child an optional timetable page, then that week's sheets in day order.
+    rows: [(pupil, key, label)] where key is "skill:<step id>" (gets a sheet) or anything else (timetable only).
+    plan_now: {pupil id: {key: [days]}}. Returns (pdf bytes, number of sheets)."""
+    DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+    DAY_FULL = {"Mon": "Monday", "Tue": "Tuesday", "Wed": "Wednesday", "Thu": "Thursday", "Fri": "Friday"}
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas as pdfcanvas
+    from io import BytesIO
+    buf = BytesIO()
+    margin = 15 * _mm
+    page_w, page_h = A4
+    usable_w = page_w - 2 * margin
+    c = pdfcanvas.Canvas(buf, pagesize=A4)
+
+    def _timetable_page(p, items):
+        y = page_h - margin - 6 * _mm
+        c.setFont("Helvetica-Bold", 20)
+        c.setFillColorRGB(0x17 / 255, 0x98 / 255, 0xd3 / 255)
+        c.drawString(margin, y, f"{display_name(p)} - this week's practice")
+        c.setFillColorRGB(0, 0, 0)
+        y -= 14 * _mm
+        label_w = usable_w - 5 * 22 * _mm
+        row_h = 16 * _mm
+        c.setFont("Helvetica-Bold", 12)
+        for j, d in enumerate(DAYS):
+            c.drawCentredString(margin + label_w + j * 22 * _mm + 11 * _mm, y, DAY_FULL[d][:3])
+        y -= 4 * _mm
+        for label, days in items:
+            c.setStrokeColorRGB(0.6, 0.6, 0.6)
+            c.rect(margin, y - row_h, usable_w, row_h)
+            c.setFont("Helvetica", 12)
+            for ln_i, ln in enumerate(_wrap_line(c, label, "Helvetica", 12, label_w - 4 * _mm)[:2]):
+                c.drawString(margin + 2 * _mm, y - 6.5 * _mm - ln_i * 5 * _mm, ln)
+            for j, d in enumerate(DAYS):
+                cx = margin + label_w + j * 22 * _mm
+                c.line(cx, y, cx, y - row_h)
+                if d in days:
+                    c.setFillColorRGB(0x17 / 255, 0x98 / 255, 0xd3 / 255)
+                    c.circle(cx + 11 * _mm, y - row_h / 2, 4.5 * _mm, stroke=0, fill=1)
+                    c.setFillColorRGB(0, 0, 0)
+            y -= row_h
+            if y < margin + row_h:
+                break
+        c.showPage()
+
+    n_sheets = 0
+    for p in wk_kids:
+        plan = plan_now.get(p["id"], {})
+        items = [(lab, plan.get(k, [])) for pp, k, lab in rows if pp["id"] == p["id"]]
+        if not any(days for _, days in items):
+            continue
+        if wk_cover:
+            _timetable_page(p, items)
+        pending = []
+        def _flush():
+            global_pending = list(pending)
+            for i2 in range(0, len(global_pending), 2):
+                render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, global_pending[i2:i2 + 2], wk_answers)
+                c.showPage()
+            pending.clear()
+        for d in DAYS:
+            for pp, k, lab in rows:
+                if pp["id"] != p["id"] or not k.startswith("skill:") or d not in plan.get(k, []):
+                    continue
+                sid = k.split(":", 1)[1]
+                step = get_step(ladders_data, sid)
+                pool = get_active_window(p, sid, step) if is_windowed(step) else None
+                sheet = generate_sheet(p, sid, ladders_data, item_pool=pool, include_review=review)
+                if not sheet:
+                    continue
+                sheet["day_label"] = DAY_FULL[d]
+                n_sheets += 1
+                if _is_full_page(sheet):
+                    _flush()
+                    render_compact_sheet_slot(c, margin, usable_w, page_h - margin, margin, p, sheet, wk_answers)
+                    c.showPage()
+                else:
+                    pending.append((p, sheet))
+                    if len(pending) == 2:
+                        _flush()
+        _flush()
+    c.save()
+    buf.seek(0)
+    return buf.getvalue(), n_sheets
+
+
 # ── Year Group Filter ────────────────────────────────────────────────────────
 
 def year_group_filtered_pupils(pupils_data, key):
@@ -957,6 +1044,113 @@ if query_params.get("mode") == "self_assess":
 
     st.stop()
 
+# ── Print this week (targets from the new Precision Teaching page on staff.*/precision/) ─────────────────
+# Since 17.10.26 children and targets live in the school database (API /planning/precision-db). This screen reads
+# them and makes the week's sheets with the same sheet code as before.
+
+_PT_API = "https://api.wallscourt-farm-academy.co.uk/planning/precision-db"
+_KIND = {"maths": ("maths", None), "recognition": ("phonics", None), "cloze": ("spellings", "cloze"),
+         "dictation": ("spellings", None), "hw_letters": ("handwriting", "hw_letters"), "hw_joins": ("handwriting", "hw_joins")}
+
+
+def _pt_get(action):
+    import requests as _rq
+    r = _rq.get(_PT_API, params={"action": action, "token": os.environ.get("HUB_TOKEN", "")},
+                headers={"User-Agent": "wfa-precision-teaching/1.0"}, timeout=30)
+    r.raise_for_status()
+    d = r.json()
+    if not d.get("ok"):
+        raise RuntimeError(d.get("error") or "not ok")
+    return d
+
+
+def _targets_to_sheets(load, catalogue, base_ladders):
+    """Turn the database's children + targets into the shapes the sheet code already understands."""
+    import copy
+    areas = {a["id"]: a for a in catalogue["areas"]}
+    L = copy.deepcopy(base_ladders)
+    pt_steps, bonds_steps = [], []
+    kids, rows, plan = [], [], {}
+    by_code = {}
+    for c in load["children"]:
+        p = {"id": c["pupilCode"], "pupilCode": c["pupilCode"], "label": c["label"], "class": c["class"],
+             "currentSkills": {}}
+        by_code[c["pupilCode"]] = p
+    for t in load["targets"]:
+        p = by_code.get(t["pupilCode"])
+        a = areas.get(t["area"])
+        if not p or not a:
+            continue
+        subject, kind = _KIND.get(a["kind"], ("maths", None))
+        sid = f"pt{t['id']}"
+        short = a["name"].split(" (")[0]
+        name = t["partName"]
+        if kind and kind.startswith("hw"):
+            name = f"{short.split(': ')[-1].capitalize()}: {' '.join(t['items'])}"
+        elif t["part"].endswith(("_own", "_any")):
+            name = f"Sounds: {' '.join(t['items'])}" if a["id"] == "phonics" else f"{short}: {' '.join(t['items'])}"
+        step = {"id": sid, "name": name,
+                "subject": subject, "items": list(t["items"]),
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3}}
+        if kind:
+            step["kind"] = kind
+        (bonds_steps if a["id"] == "number_bonds" else pt_steps).append(step)
+        p["currentSkills"][sid] = {"status": "active", "masteredDate": None, "nextReview": None, "reviewStage": None,
+                                   "itemsPerSheet": 25}
+        key = f"skill:{sid}"
+        rows.append((p, key, f"{short}: {' '.join(t['items'])}"))
+        plan.setdefault(p["id"], {})[key] = list(t["days"])
+    L["ladders"].append({"id": "pt_targets", "name": "Targets", "subject": "custom", "independent": True, "steps": pt_steps})
+    nb = next((l for l in L["ladders"] if l["id"] == "number_bonds"), None)
+    if nb is not None:
+        nb["steps"] = nb["steps"] + bonds_steps          # keeps the number-bonds sheet layout (a blank on either side)
+    for p in by_code.values():
+        if p["currentSkills"]:
+            kids.append(p)
+    kids.sort(key=lambda p: (p["class"], p["label"]))
+    return kids, rows, plan, L
+
+
+if st.query_params.get("print") == "week":
+    st.markdown(logo_html("Print this week"), unsafe_allow_html=True)
+    st.caption(f"Wallscourt Farm Academy · WFA-17.10.26b · Children and targets come from the Precision Teaching page "
+               f"(staff.wallscourt-farm-academy.co.uk/precision/).")
+    try:
+        _load, _cat = _pt_get("load"), _pt_get("catalogue")["catalogue"]
+    except Exception as e:
+        st.error(f"Could not read your group from the school database ({type(e).__name__}). Nothing was printed. Try again in a minute.")
+        st.stop()
+    _kids, _rows, _plan, _L = _targets_to_sheets(_load, _cat, st.session_state.ladders_data)
+    if not _kids:
+        st.info("No targets yet. Give your children targets on the Precision Teaching page first.")
+        st.stop()
+    with st.expander("Names file (optional): print real names instead of initials"):
+        _nf = st.file_uploader("Names file (CSV)", type=["csv"], key="pw_names_csv")
+        if _nf is not None:
+            st.session_state["pt_names"] = parse_names_csv(_nf.getvalue().decode("utf-8", errors="ignore"))
+            st.success(f"Names loaded for {len(st.session_state['pt_names'])} children (this session only).")
+    _classes = sorted({p["class"] for p in _kids})
+    _cls = st.selectbox("Class", ["All"] + _classes) if len(_classes) > 1 else "All"
+    _pool = [p for p in _kids if _cls == "All" or p["class"] == _cls]
+    _ids = st.multiselect("Children", [p["id"] for p in _pool], default=[p["id"] for p in _pool],
+                          format_func=lambda i: next(display_name(p) for p in _pool if p["id"] == i), key=f"pw_kids_{_cls}")
+    o1, o2, o3 = st.columns(3)
+    with o1:
+        _ans = st.checkbox("Include answer key", value=True)
+    with o2:
+        _cover = st.checkbox("Timetable page for each child", value=True)
+    with o3:
+        st.selectbox("Handwriting font", list(HW_FONTS), key="hw_font")
+    if st.button("Create this week's sheets (PDF)", type="primary", disabled=not _ids):
+        _sel = [p for p in _pool if p["id"] in _ids]
+        _r = [r for r in _rows if r[0]["id"] in _ids]
+        _pdf, _n = build_week_pdf(_sel, _r, _plan, _L, _ans, _cover, False)
+        st.success(f"Made {_n} sheet(s) for {len(_sel)} child(ren).")
+        st.download_button("Download the sheets", _pdf, file_name=f"precision-teaching-week-{date.today().isoformat()}.pdf",
+                           mime="application/pdf", type="primary")
+    st.stop()
+
 # ── Main Teacher App ────────────────────────────────────────────────────────
 
 # Sidebar
@@ -1020,7 +1214,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-17.10.26a")
+st.caption("Wallscourt Farm Academy · WFA-17.10.26b")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
@@ -2329,89 +2523,13 @@ with tab6:
                 with hw3:
                     st.checkbox("Show descender line", value=True, key="hw_descender")
                 if st.button("Create weekly packs (PDF)", type="primary", width="stretch"):
-                    from reportlab.lib.pagesizes import A4
-                    from reportlab.pdfgen import canvas as pdfcanvas
-                    from io import BytesIO
-                    buf = BytesIO()
-                    margin = 15 * _mm
-                    page_w, page_h = A4
-                    usable_w = page_w - 2 * margin
-                    c = pdfcanvas.Canvas(buf, pagesize=A4)
-
-                    def _timetable_page(p, items):
-                        y = page_h - margin - 6 * _mm
-                        c.setFont("Helvetica-Bold", 20)
-                        c.setFillColorRGB(0x17 / 255, 0x98 / 255, 0xd3 / 255)
-                        c.drawString(margin, y, f"{display_name(p)} - this week's practice")
-                        c.setFillColorRGB(0, 0, 0)
-                        y -= 14 * _mm
-                        label_w = usable_w - 5 * 22 * _mm
-                        row_h = 16 * _mm
-                        c.setFont("Helvetica-Bold", 12)
-                        for j, d in enumerate(DAYS):
-                            c.drawCentredString(margin + label_w + j * 22 * _mm + 11 * _mm, y, DAY_FULL[d][:3])
-                        y -= 4 * _mm
-                        for label, days in items:
-                            c.setStrokeColorRGB(0.6, 0.6, 0.6)
-                            c.rect(margin, y - row_h, usable_w, row_h)
-                            c.setFont("Helvetica", 12)
-                            for ln_i, ln in enumerate(_wrap_line(c, label, "Helvetica", 12, label_w - 4 * _mm)[:2]):
-                                c.drawString(margin + 2 * _mm, y - 6.5 * _mm - ln_i * 5 * _mm, ln)
-                            for j, d in enumerate(DAYS):
-                                cx = margin + label_w + j * 22 * _mm
-                                c.line(cx, y, cx, y - row_h)
-                                if d in days:
-                                    c.setFillColorRGB(0x17 / 255, 0x98 / 255, 0xd3 / 255)
-                                    c.circle(cx + 11 * _mm, y - row_h / 2, 4.5 * _mm, stroke=0, fill=1)
-                                    c.setFillColorRGB(0, 0, 0)
-                            y -= row_h
-                            if y < margin + row_h:
-                                break
-                        c.showPage()
-
-                    n_sheets = 0
-                    for p in wk_kids:
-                        plan = plan_now.get(p["id"], {})
-                        items = [(lab, plan.get(k, [])) for pp, k, lab in rows if pp["id"] == p["id"]]
-                        if not any(days for _, days in items):
-                            continue
-                        if wk_cover:
-                            _timetable_page(p, items)
-                        pending = []
-                        def _flush():
-                            global_pending = list(pending)
-                            for i2 in range(0, len(global_pending), 2):
-                                render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, global_pending[i2:i2 + 2], wk_answers)
-                                c.showPage()
-                            pending.clear()
-                        for d in DAYS:
-                            for pp, k, lab in rows:
-                                if pp["id"] != p["id"] or not k.startswith("skill:") or d not in plan.get(k, []):
-                                    continue
-                                sid = k.split(":", 1)[1]
-                                step = get_step(ladders_data, sid)
-                                pool = get_active_window(p, sid, step) if is_windowed(step) else None
-                                sheet = generate_sheet(p, sid, ladders_data, item_pool=pool, include_review=bool(st.session_state.get("print_review_w", False)))
-                                if not sheet:
-                                    continue
-                                sheet["day_label"] = DAY_FULL[d]
-                                n_sheets += 1
-                                if _is_full_page(sheet):
-                                    _flush()
-                                    render_compact_sheet_slot(c, margin, usable_w, page_h - margin, margin, p, sheet, wk_answers)
-                                    c.showPage()
-                                else:
-                                    pending.append((p, sheet))
-                                    if len(pending) == 2:
-                                        _flush()
-                        _flush()
+                    pdf_bytes, n_sheets = build_week_pdf(wk_kids, rows, plan_now, ladders_data, wk_answers, wk_cover,
+                                                         bool(st.session_state.get("print_review_w", False)))
                     if n_sheets == 0 and not wk_cover:
                         st.warning("Nothing to print: no days are ticked.")
                     else:
-                        c.save()
-                        buf.seek(0)
                         st.success(f"Created {n_sheets} sheet(s) for {len(wk_kids)} child(ren).")
-                        st.download_button("Download weekly packs", buf.getvalue(),
+                        st.download_button("Download weekly packs", pdf_bytes,
                                            file_name=f"precision-teach-week-{date.today().isoformat()}.pdf",
                                            mime="application/pdf", width="stretch", type="primary")
 
