@@ -1114,7 +1114,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 
 if st.query_params.get("print") == "week":
     st.markdown(logo_html("Print this week"), unsafe_allow_html=True)
-    st.caption(f"Wallscourt Farm Academy · WFA-17.10.26b · Children and targets come from the Precision Teaching page "
+    st.caption(f"Wallscourt Farm Academy · WFA-17.10.26c · Children and targets come from the Precision Teaching page "
                f"(staff.wallscourt-farm-academy.co.uk/precision/).")
     try:
         _load, _cat = _pt_get("load"), _pt_get("catalogue")["catalogue"]
@@ -1214,7 +1214,10 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-17.10.26b")
+st.caption("Wallscourt Farm Academy · WFA-17.10.26c")
+st.info("**New:** add children and give them targets on the new Precision Teaching page: "
+        "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
+        "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
