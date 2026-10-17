@@ -694,7 +694,8 @@ _HW_AIM = {"correctPerMin": 20, "maxErrors": 0, "timedSec": 60}
 
 
 def _hw_step(step_id, name, items):
-    return {"id": step_id, "name": name, "aim": dict(_HW_AIM), "items": list(items),
+    # windowSize 2: a child practises just two letters (or joins) at a time; the teacher can choose which two.
+    return {"id": step_id, "name": name, "aim": dict(_HW_AIM), "items": list(items), "windowSize": 2,
             "untimedAim": {"accuracyPct": 100, "minTrials": 3}}
 
 
@@ -762,6 +763,10 @@ def merge_builtin_ladders(ladders_data, used_step_ids=()):
                 have[k] = b[k]
         known = {s["id"] for s in have["steps"]}
         have["steps"].extend(s for s in b["steps"] if s["id"] not in known)
+        want = {s["id"]: s["windowSize"] for s in b["steps"] if s.get("windowSize")}
+        for s in have["steps"]:
+            if s["id"] in want and not s.get("windowSize") and s["id"].startswith(("hw_", "hj_")):
+                s["windowSize"] = want[s["id"]]
     for l in ladders:
         if l["id"].startswith(_CLOZE_LADDER_PREFIXES) and not l.get("kind"):
             l["kind"] = "cloze"

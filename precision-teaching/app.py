@@ -397,28 +397,26 @@ def _draw_handwriting_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
     c.drawString(margin, grid_top - 11, "Trace each item, then continue writing it on the rest of the line.")
     y = grid_top - 18 - spec["asc"]
     capacity = int((y - spec["desc"] - grid_bottom) // row_h) + 1
-    practice = 1 if len(items) * 2 <= capacity else 0
+    few = len(items) <= 3                      # precision teaching: one or two targets, practised again and again
+    block = max(2, capacity // len(items)) if few else (2 if len(items) * 2 <= capacity else 1)
     short = all(len(it) <= 3 for it in items)
     for it in items:
-        if y - spec["desc"] < grid_bottom:
-            break
-        _hw_ruled_row(c, margin, usable_w, y, spec, show_x, show_desc)
-        x = margin + 2
-        w = _hw_width(c, spec, it)
-        _hw_draw(c, spec, x, y, it)
-        if short:
-            gap = 6 * _mm if len(it) == 1 else 9 * _mm
-            x += w + gap
-            for _ in range(3):
-                if x + w > margin + usable_w * 0.62:
-                    break
-                _hw_draw(c, spec, x, y, it)
-                x += w + gap
-        y -= row_h
-        for _ in range(practice):
+        for r in range(block):
             if y - spec["desc"] < grid_bottom:
                 break
             _hw_ruled_row(c, margin, usable_w, y, spec, show_x, show_desc)
+            if r == 0 or (few and r == 1):         # the first rows start with the item to trace
+                x = margin + 2
+                w = _hw_width(c, spec, it)
+                _hw_draw(c, spec, x, y, it)
+                if short:
+                    gap = 6 * _mm if len(it) == 1 else 9 * _mm
+                    x += w + gap
+                    for _ in range(4 if few else 3):
+                        if x + w > margin + usable_w * (0.8 if few else 0.62):
+                            break
+                        _hw_draw(c, spec, x, y, it)
+                        x += w + gap
             y -= row_h
         y -= 2 * _MM
     while y - spec["desc"] >= grid_bottom:
@@ -1022,7 +1020,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-16.10.26n")
+st.caption("Wallscourt Farm Academy · WFA-17.10.26a")
 st.divider()
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
@@ -1388,7 +1386,7 @@ with tab2:
                     kid_ids = st.multiselect("Children", [p["id"] for p in kids], default=[p["id"] for p in kids],
                                              format_func=lambda x: display_name(get_pupil(pupils_data, x)), key=f"facts_kids_{sid_pick}")
                     cur = get_active_window(kids[0], sid_pick, f_step) if kids else []
-                    facts = st.multiselect("Facts to practise (3 to 6 is ideal)", f_step["items"], default=cur, key=f"facts_pick_{sid_pick}")
+                    facts = st.multiselect(f"Facts to practise ({'1 or 2' if (f_step.get('windowSize') or 5) <= 2 else '3 to 6'} is ideal)", f_step["items"], default=cur, key=f"facts_pick_{sid_pick}")
 
                     def _do_facts(ids=tuple(kid_ids), chosen=tuple(facts), st_=f_step, sid=sid_pick):
                         pd_ = st.session_state.pupils_data
@@ -1405,6 +1403,62 @@ with tab2:
 
         else:
             st.info("Choose at least one skill set above.")
+
+        # ── Handwriting: pick the letters or joins for specific children ─────────────
+        with st.expander("✍️ Handwriting: pick one or two letters or joins for specific children"):
+            st.caption("For precision teaching, one or two targets at a time work best. Choose the children, then the letters or joins, then press Set. "
+                       "It replaces whatever handwriting target they had.")
+            hk = st.radio("Practise", ["Letters", "Joins"], horizontal=True, key="hwq_kind")
+            hkids = st.multiselect("Children", [p["id"] for p in shown], key=f"hwq_kids_{asg_class}",
+                                   format_func=lambda i: display_name(get_pupil(pupils_data, i)))
+            az = list("abcdefghijklmnopqrstuvwxyz")
+            if hk == "Letters":
+                hw_items = st.multiselect("Letters", az, key="hwq_letters", max_selections=3)
+            else:
+                j1, j2 = st.columns(2)
+                with j1:
+                    jf = st.multiselect("First letter", az, key="hwq_first", max_selections=3)
+                with j2:
+                    js = st.multiselect("Joined to", az, key="hwq_second", max_selections=3)
+                jt = st.text_input("Or type the joins, separated by spaces (e.g. rt eo)", key="hwq_typed")
+                combos = [x + y for x in jf for y in js]
+                hw_items = combos + [w for w in jt.split() if w not in combos]
+            if len(hw_items) > 3:
+                st.warning("That is quite a lot for precision teaching. Two is ideal.")
+
+            def _set_hw(kind=hk, kids=tuple(hkids), items=tuple(hw_items)):
+                ld = st.session_state.ladders_data
+                lad = next(l for l in ld["ladders"] if l["id"] == "custom_sets")
+                tag = "hw_letters" if kind == "Letters" else "hw_joins"
+                nm = f"{kind}: {' '.join(items)}"
+                step = next((s for s in lad["steps"] if s.get("kind") == tag and s["items"] == list(items)), None)
+                if step is None:
+                    sid = "custom_hw_" + "".join(ch for ch in "_".join(items) if ch.isalnum() or ch == "_")[:24]
+                    n = 2
+                    while any(s["id"] == sid for s in lad["steps"]):
+                        sid, n = f"{sid.rsplit('_x', 1)[0]}_x{n}", n + 1
+                    step = {"id": sid, "name": nm, "subject": "handwriting", "kind": tag,
+                            "aim": {"correctPerMin": 20, "maxErrors": 0, "timedSec": 60}, "items": list(items),
+                            "untimedAim": {"accuracyPct": 100, "minTrials": 3}}
+                    lad["steps"].append(step)
+                    save_ladders(ld)
+                    git_add_commit_push("data/skill-ladders.json", f"Handwriting set: {nm}")
+                pd_ = st.session_state.pupils_data
+                other_hw = {s["id"] for s in lad["steps"] if s.get("kind") == tag and s["id"] != step["id"]}
+                for p in pd_["pupils"]:
+                    if p["id"] in kids:
+                        sk = p.setdefault("currentSkills", {})
+                        for o in other_hw:
+                            if skill_status(sk.get(o, "")) == "active":
+                                sk.pop(o, None)
+                        set_skill_status(p, step["id"], "active")
+                save_pupils(pd_)
+                git_add_commit_push("data/pupils.json", f"Handwriting target {nm} for {len(kids)} pupil(s)")
+                st.session_state["pt_flash"] = f"Set '{nm}' for {len(kids)} child(ren). It is in their weekly plan and prints as a sheet."
+                for k in ("hwq_letters", "hwq_first", "hwq_second", "hwq_typed"):
+                    st.session_state.pop(k, None)
+
+            st.button("Set handwriting target", on_click=_set_hw, type="primary", disabled=not (hkids and hw_items))
 
     # ── Fine-tune one child ──────────────────────────────────────────────
 
@@ -2219,7 +2273,7 @@ with tab6:
                 for sid in active_skills_for(p):
                     st_ = get_step(ladders_data, sid)
                     if st_:
-                        rows.append((p, f"skill:{sid}", f"{st_['ladder_name']}: {st_['name']}"))
+                        rows.append((p, f"skill:{sid}", st_["name"] if st_["ladder_id"] == "custom_sets" else f"{st_['ladder_name']}: {st_['name']}"))
                 for nm in p.get("otherActivities", []):
                     rows.append((p, f"other:{nm}", nm))
 
