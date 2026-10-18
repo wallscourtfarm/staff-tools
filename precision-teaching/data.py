@@ -1568,27 +1568,25 @@ def _sheet_question(item, skill_id, step_name, is_bonds):
     }
 
 
-def _cloze_sheet(pupil, skill_id, step, ladder, subject, pool, target_count):
-    """'Choose the word that fits' sheet: a word bank plus gap sentences. Each sentence is used once per sheet."""
+def _cloze_sheet(pupil, skill_id, step, ladder, subject, pool, target_count, variant=None):
+    """'Choose the word that fits' sheet: a word bank plus gap sentences, in a shuffled order.
+
+    Each word gets two sentences a day. variant is the day of the week (0 = Monday): each day takes the NEXT two
+    sentences for every word, so with 10 sentences per word no sentence repeats within a week. With no variant
+    (a one-off sheet) the starting point is random."""
     from cloze_bank import sentences_for
-    if target_count is None:
-        entry = pupil.get("currentSkills", {}).get(skill_id)
-        target_count = entry.get("itemsPerSheet", 25) if isinstance(entry, dict) else 25
-    target = max(6, min(int(target_count), 16))
+    per_word = 2
     words = [w for w in pool if sentences_for(w)]
-    used = {w: 0 for w in words}
+    random.shuffle(words)
     questions = []
-    rounds = 0
-    while len(questions) < target and words and rounds < 4:
-        batch = words[:]
-        random.shuffle(batch)
-        for w in batch:
-            sents = sentences_for(w)
-            if used[w] < len(sents) and len(questions) < target:
-                questions.append({"item": w, "question": sents[used[w]], "answer": w, "is_review": False,
-                                  "from_skill": skill_id, "from_skill_name": step["name"]})
-                used[w] += 1
-        rounds += 1
+    for w in words:
+        sents = sentences_for(w)
+        k = min(per_word, len(sents))
+        start = (variant * k) if variant is not None else random.randrange(len(sents))
+        for j in range(k):
+            questions.append({"item": w, "question": sents[(start + j) % len(sents)], "answer": w, "is_review": False,
+                              "from_skill": skill_id, "from_skill_name": step["name"]})
+    questions = questions[:16]
     random.shuffle(questions)
     from cloze_bank import bank_groups
     groups = bank_groups({q["answer"] for q in questions})
@@ -1617,7 +1615,7 @@ def _handwriting_sheet(pupil, skill_id, step, ladder, kind, pool):
 
 
 def generate_sheet(pupil, skill_id, ladders_data, probes_data=None, include_review=True,
-                    item_pool=None, target_count=None):
+                    item_pool=None, target_count=None, variant=None):
     """Generate a practice sheet for a pupil on a given skill.
 
     item_pool: the items to draw from — pass the pupil's current rolling
@@ -1662,7 +1660,7 @@ def generate_sheet(pupil, skill_id, ladders_data, probes_data=None, include_revi
     pool = item_pool if item_pool is not None else step["items"]
 
     if kind == "cloze":
-        return _cloze_sheet(pupil, skill_id, step, ladder, subject, pool, target_count)
+        return _cloze_sheet(pupil, skill_id, step, ladder, subject, pool, target_count, variant)
     if kind in ("hw_letters", "hw_joins"):
         return _handwriting_sheet(pupil, skill_id, step, ladder, kind, pool)
 
