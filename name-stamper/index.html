@@ -30,7 +30,7 @@ button:disabled { opacity:.5; cursor: default; }
 </style>
 </head>
 <body>
-<header><h1>🔒 Name Stamper</h1><span class="ver">WFA-18.10.26b</span></header>
+<header><h1>🔒 Name Stamper</h1><span class="ver">WFA-18.10.26c</span></header>
 <main>
   <div class="panel">
     <p><b>What this does.</b> Sheets from the Home Learning generator are made with each child's initials. Here your own browser writes the real first name over the initials, using your names file. Nothing is uploaded: the PDF and the names file stay on this computer, and are forgotten when you close or reload this page.</p>
@@ -90,10 +90,33 @@ button:disabled { opacity:.5; cursor: default; }
     return String(text).normalize('NFC').replace(/[^ -~ -ÿ]/g, '');
   }
 
+  // Newer sheets (Precision Teaching, printing tools): each slot says where, how big, what colour, and any text
+  // that follows the name on the same line.
+  async function stampV2(doc, stamps) {
+    var fonts = [await doc.embedFont(PDFLib.StandardFonts.HelveticaBold), await doc.embedFont(PDFLib.StandardFonts.Helvetica)];
+    var pages = doc.getPages(), done = 0, missing = 0;
+    var rgb = function (a) { return PDFLib.rgb(a[0], a[1], a[2]); };
+    stamps.forEach(function (r) {
+      var rec = names.get(r.id);
+      var nm = rec && safe(r.m === 'n' ? (rec.name || ((rec.first || '') + ' ' + (rec.last || '')).trim()) : (rec.first || ''));
+      if (!nm) { missing++; return; }
+      var page = pages[r.pg]; if (!page) return;
+      var font = r.b ? fonts[0] : fonts[1], full = (r.pre || '') + nm + (r.pst || '');
+      var newW = font.widthOfTextAtSize(full, r.s);
+      var span = Math.max(r.w, newW) + 4, x0 = r.a === 'c' ? r.x - span / 2 : (r.a === 'r' ? r.x - span + 2 : r.x - 1);
+      page.drawRectangle({ x: x0, y: r.y - 1, width: span, height: r.s * 0.95 + 1, color: rgb(r.cv) });
+      page.drawText(full, { x: r.a === 'c' ? r.x - newW / 2 : (r.a === 'r' ? r.x - newW : r.x), y: r.y, size: r.s, font: font, color: rgb(r.tc) });
+      done++;
+    });
+    doc.setKeywords([]);
+    return { bytes: await doc.save(), done: done, missing: missing };
+  }
+
   async function stampOne(file) {
     var bytes = file.bytes;
     var doc = await PDFLib.PDFDocument.load(bytes, { updateMetadata: false });
     var kw = doc.getKeywords() || '';
+    if (kw.indexOf('WFASTAMPS2:') === 0) return stampV2(doc, JSON.parse(kw.slice(11)));
     if (kw.indexOf('WFASTAMPS1:') !== 0) return { error: 'No name positions in ' + file.name + ' (was it made by the Home Learning generator?)' };
     var stamps = JSON.parse(kw.slice(11));
     var font = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
