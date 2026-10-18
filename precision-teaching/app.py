@@ -30,7 +30,7 @@ from data import (
     get_skill_status, set_skill_status, pass_review, fail_review, get_reviews_due,
     migrate_skills_format, skill_status, active_skills_for, count_by_status,
     generate_sheet, get_answer, get_review_items,
-    fetch_hub_pupils, fetch_hub_pupils_checked, git_unsaved_count, git_selftest, SAVE_STATUS, step_subject, step_kind, sync_pupils_from_roster, anonymise_pupils, pupil_label, display_name, parse_names_csv,
+    fetch_hub_pupils, fetch_hub_pupils_checked, git_unsaved_count, git_selftest, SAVE_STATUS, step_subject, step_kind, sync_pupils_from_roster, anonymise_pupils, pupil_label, display_name,
     is_windowed, get_active_window, get_window_frontier, set_active_window, suggest_next_window,
 )
 
@@ -1371,7 +1371,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 # The print screen is reached from the Precision Teaching page (staff.*/precision/, "Print" tab). It is dressed
 # like that page (same header, tab bar, cards, chips, buttons; Streamlit's own toolbar hidden) so a teacher does
 # not feel they have left the tool. Only the look is set here: the sheets are made by build_week_pdf as before.
-_PRINT_VER = "WFA-18.10.26j"
+_PRINT_VER = "WFA-18.10.26k"
 _STAFF_PT = "https://staff.wallscourt-farm-academy.co.uk/precision/"
 _PRINT_CSS = """
 <style>
@@ -1526,20 +1526,6 @@ with st.sidebar:
 
     st.divider()
 
-    # Teacher's names file: real names for printouts and screens in THIS browser session only (never saved).
-    with st.expander("Names file (optional)"):
-        st.caption("Children show as initials. Adding your names file shows names ON SCREEN only (printed sheets always use initials: "
-                   "add names to those with the Name Stamper tool). It stays in this session only and is never saved.")
-        _nf = st.file_uploader("Names file (CSV)", type=["csv"], key="pt_names_csv")
-        if _nf is not None:
-            try:
-                st.session_state["pt_names"] = parse_names_csv(_nf.getvalue().decode("utf-8", errors="ignore"))
-                st.success(f"Names loaded for {len(st.session_state['pt_names'])} children (this session only).")
-            except Exception:
-                st.warning("That file could not be read as a names file.")
-        elif st.session_state.get("pt_names"):
-            st.session_state.pop("pt_names", None)
-
     st.divider()
 
     # Import/export
@@ -1563,7 +1549,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-18.10.26j")
+st.caption("Wallscourt Farm Academy · WFA-18.10.26k")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
@@ -1748,18 +1734,12 @@ with tab2:
     else:
         if year_filter != "All years":
             hub_pupils = [p for p in hub_pupils if p.get("yearGroup") == year_filter]
-        names = st.session_state.get("pt_names") or {}
-
         def _roster_label(p):
-            full = names.get(p.get("pupilId") or "")
-            where = f"{p.get('label') or '?'} · {p.get('class') or p.get('yearGroup') or ''}"
-            return f"{full} ({where})" if full else where
+            return f"{p.get('label') or '?'} · {p.get('class') or p.get('yearGroup') or ''}"
 
         avail = [p for p in hub_pupils if p.get("pupilId") not in tracked_codes]
         avail.sort(key=lambda p: ((p.get("class") or ""), _roster_label(p).lower()))
         by_code = {p["pupilId"]: p for p in avail if p.get("pupilId")}
-        if not names:
-            st.caption("Showing initials. Load your names file (sidebar, 'Names file') to see names here too.")
         picked = st.multiselect(
             f"Children to add ({len(avail)} not yet tracked)", options=list(by_code),
             format_func=lambda c: _roster_label(by_code[c]), key="roster_pick",
