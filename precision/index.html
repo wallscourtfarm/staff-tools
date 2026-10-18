@@ -15,6 +15,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 <style>
   :root { --ink:#0a0101; --muted:#5b6b7b; --line:#d9e3ec; --soft:#f4f9fd; --ok:#2bae62; --warn:#e57d24; --bad:#c62828; }
   body { color: var(--ink); }
+  [hidden] { display: none !important; }
   header { padding: 18px 24px; }
   header h1 { font-size: 1.6rem; }
   main { max-width: 1400px; padding: 20px 16px 80px; }
@@ -86,7 +87,57 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .partlist .opt { border: 0; border-top: 1px solid var(--line); border-radius: 0; width: 100%; }
   .partlist .grp { padding: 6px 12px; background: var(--soft); font-size: .8rem; font-weight: 900; color: var(--muted); position: sticky; top: 0; }
   .err-msg { color: var(--bad); font-weight: 800; }
+  /* tabs */
+  .tabs { display: flex; gap: 6px; background: #e3eef6; padding: 5px; border-radius: 12px; }
+  .tabs button { border: 0; background: none; border-radius: 9px; padding: 9px 16px; font-weight: 900; color: var(--muted); }
+  .tabs button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+
+  /* this week: scores */
+  .wk { width: 100%; border-collapse: collapse; }
+  .wk th { font-size: .8rem; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 900; padding: 10px 6px; text-align: left; border-bottom: 2px solid var(--line); }
+  .wk th.dc { text-align: center; }
+  .wk th.dc small { display: block; text-transform: none; letter-spacing: 0; font-weight: 700; }
+  .wk td { padding: 8px 6px; border-top: 1px solid var(--line); vertical-align: middle; }
+  .wk tr.first td { border-top: 2px solid #c9d8e5; }
+  .wk td.kid b { font-size: 1.1rem; display: block; }
+  .wk td.kid small { color: var(--muted); font-weight: 700; }
+  .wk td.tg .a { font-weight: 800; font-size: .95rem; }
+  .wk td.tg .i { font-size: .95rem; }
+  .wk td.tg .aimt { font-size: .78rem; color: var(--muted); font-weight: 700; }
+  .wk tr.old { opacity: .55; }
+  .cell { display: flex; flex-direction: column; gap: 4px; align-items: center; padding: 5px; border-radius: 10px; border: 2px solid transparent; min-width: 76px; }
+  .cell.off { background: repeating-linear-gradient(135deg, #fafcfe 0 6px, #f0f4f8 6px 12px); }
+  .cell.met { border-color: var(--ok); background: #eaf8f0; }
+  .cell.miss { border-color: #f3c99f; background: #fff7ef; }
+  .cell.saving { border-color: #9ccbe6; }
+  .cell.failed { border-color: var(--bad); background: #fdecec; }
+  .cell label { display: flex; align-items: center; gap: 4px; font-weight: 900; font-size: .85rem; }
+  .cell label.r { color: #1d7a45; }
+  .cell label.w { color: var(--bad); }
+  .cell input { width: 50px; font: inherit; font-size: 18px; font-weight: 800; text-align: center; padding: 5px 2px; border: 2px solid var(--line); border-radius: 8px; background: #fff; }
+  .cell input:focus { outline: none; border-color: var(--wfa-blue); }
+  .cell input:disabled { background: transparent; border-style: dashed; }
+  .done-btn { border: 2px solid var(--line); background: #fff; border-radius: 10px; width: 56px; height: 44px; font-weight: 900; font-size: 1.2rem; color: #b9cbdb; }
+  .done-btn.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .prog { min-width: 190px; }
+  .prog .st { font-size: .85rem; font-weight: 800; color: var(--muted); }
+  .prog .ready { color: #1d7a45; font-size: .95rem; }
+  .prog .btn { padding: 8px 12px; font-size: .9rem; margin-top: 6px; text-align: left; }
+  .prog .linkish { border: 0; background: none; color: var(--wfa-blue); font-weight: 800; padding: 6px 0 0; display: block; font-size: .85rem; }
+  .wkhint { color: var(--muted); font-size: .9rem; margin: 0 0 12px; }
+  .scroll-x { overflow-x: auto; }
   footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 10px; }
+  @media (max-width: 1000px) {
+    .wk td, .wk th { padding: 6px 3px; }
+    .cell { min-width: 0; padding: 4px 3px; }
+    .cell input { width: 42px; }
+    .cell label { gap: 2px; }
+    .done-btn { width: 46px; }
+    .prog { min-width: 118px; }
+    .prog .btn { padding: 7px 9px; }
+    .wk td.tg { min-width: 120px; }
+    .wk td.tg .aimt { display: none; }
+  }
   @media (max-width: 720px) {
     .row { grid-template-columns: 40px 1fr auto; }
     .row .targets { grid-column: 1 / -1; }
@@ -105,7 +156,14 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div id="banner" class="banner"></div>
 
   <div class="bar">
+    <div class="tabs" role="tablist"><button id="tabGroup" class="on">My group</button><button id="tabWeek">This week</button></div>
     <button class="btn" id="btnAdd">+ Add children</button>
+    <span id="weekNav" hidden class="bar" style="margin:0">
+      <button class="btn quiet" id="wPrev" aria-label="Week before">‹</button>
+      <b id="wLabel"></b>
+      <button class="btn quiet" id="wNext" aria-label="Week after">›</button>
+      <button class="btn quiet" id="wNow" hidden>This week</button>
+    </span>
     <select id="fClass" aria-label="Class" hidden></select>
     <span class="grow"></span>
     <span id="namesSlot"></span>
@@ -113,6 +171,10 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   </div>
 
   <div class="card" id="group"><div class="empty">Loading…</div></div>
+  <div id="weekView" hidden>
+    <p class="wkhint">From each child's sheet, type the number <b style="color:#1d7a45">✓ right</b> and <b style="color:#c62828">✗ wrong</b> (leave ✗ blank if none). It saves by itself. Striped days are not on the child's plan, but you can still type a score.</p>
+    <div class="card scroll-x" id="week"></div>
+  </div>
 
   <div class="selbar" id="selbar">
     <span id="selCount"></span><span class="grow" style="flex:1"></span>
@@ -120,7 +182,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <button class="btn quiet" id="btnClearSel">Clear</button>
   </div>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-18.10.26a</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-18.10.26b</span></footer>
 
 <div class="veil" id="veil"></div>
 
@@ -165,7 +227,8 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 var API = 'https://api.wallscourt-farm-academy.co.uk/planning/precision-db?token=__hub__';
 var ROSTER = 'https://api.wallscourt-farm-academy.co.uk/planning/pupilroster-db/pupils?token=__hub__';
 var DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-var S = { children: [], targets: [], catalogue: null, roster: null, sel: new Set(), loaded: false };
+var S = { children: [], targets: [], finished: [], scores: [], week: null, view: 'group',
+          catalogue: null, roster: null, sel: new Set(), loaded: false };
 
 function $(id) { return document.getElementById(id); }
 function el(tag, attrs, kids) {
@@ -194,20 +257,27 @@ function getJSON(url) {
     return r.json();
   });
 }
-function post(body) {
+function postQuiet(body) {          // saves and takes in the new data, but does not redraw (used while typing scores)
+  if (S.week) body.week = S.week;
   return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     .then(function (r) { if (!r.ok) throw new Error('The server said ' + r.status); return r.json(); })
     .then(function (d) {
       if (!d || d.ok !== true) throw new Error((d && d.error) || 'Not saved');
-      S.children = d.children; S.targets = d.targets; render();
+      take(d);
       return d;
     });
 }
+function post(body) { return postQuiet(body).then(function (d) { render(); return d; }); }
+function take(d) {
+  S.children = d.children; S.targets = d.targets; S.finished = d.finished || []; S.scores = d.scores || [];
+  S.week = d.week || S.week;
+}
 function load() {
-  Promise.all([getJSON(API + '&action=load'), getJSON(API + '&action=catalogue')]).then(function (res) {
+  var wk = S.week ? '&week=' + S.week : '&week=' + isoDay(mondayOf(new Date()));
+  Promise.all([getJSON(API + '&action=load' + wk), S.catalogue ? { ok: true, catalogue: S.catalogue } : getJSON(API + '&action=catalogue')]).then(function (res) {
     if (!res[0].ok) throw new Error(res[0].error || 'Could not load');
     if (!res[1].ok) throw new Error(res[1].error || 'Could not load');
-    S.children = res[0].children; S.targets = res[0].targets; S.catalogue = res[1].catalogue; S.loaded = true;
+    take(res[0]); S.catalogue = res[1].catalogue; S.loaded = true;
     $('banner').className = 'banner';
     render();
   }).catch(function (e) {
@@ -219,6 +289,12 @@ function area(id) { return S.catalogue.areas.find(function (a) { return a.id ===
 
 // ── My group ────────────────────────────────────────────────────────────────────────────────────────────
 function render() {
+  $('group').hidden = S.view !== 'group';
+  $('weekView').hidden = S.view !== 'week';
+  $('btnAdd').hidden = S.view !== 'group';
+  $('weekNav').hidden = S.view !== 'week';
+  $('tabGroup').className = S.view === 'group' ? 'on' : '';
+  $('tabWeek').className = S.view === 'week' ? 'on' : '';
   var classes = Array.from(new Set(S.children.map(function (c) { return c.class; }))).sort();
   var fc = $('fClass'), keep = fc.value;
   fc.innerHTML = '';
@@ -255,7 +331,8 @@ function render() {
       el('button', { class: 'rowmenu', title: 'Remove from my group', text: '✕', on: { click: function () { removeChild(c); } } })
     ]));
   });
-  var n = S.sel.size;
+  if (S.view === 'week') renderWeek();
+  var n = S.view === 'group' ? S.sel.size : 0;
   $('selbar').className = 'selbar' + (n ? ' show' : '');
   $('selCount').textContent = n + ' child' + (n === 1 ? '' : 'ren') + ' selected';
 }
@@ -277,6 +354,171 @@ function removeChild(c) {
 $('fClass').addEventListener('change', render);
 $('btnClearSel').onclick = function () { S.sel.clear(); render(); };
 $('btnGiveSel').onclick = function () { openTarget({ kids: Array.from(S.sel) }); };
+
+// ── This week: scores ───────────────────────────────────────────────────────────────────────────────
+function pad(n) { return (n < 10 ? '0' : '') + n; }
+function isoDay(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function fromIso(s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+function mondayOf(d) { var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); var w = (x.getDay() + 6) % 7; x.setDate(x.getDate() - w); return x; }
+function addDays(d, n) { var x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; }
+var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function short(d) { return d.getDate() + ' ' + MONTHS[d.getMonth()]; }
+function weekDates() { var m = fromIso(S.week); return DAYS.map(function (_, i) { return isoDay(addDays(m, i)); }); }
+function scoreFor(tid, day) { return S.scores.find(function (x) { return x.targetId === tid && x.date === day; }); }
+function aimMet(aim, c, w) {
+  if (!aim || aim.type === 'none' || c === null || c === undefined) return false;
+  w = w || 0;
+  if (aim.type === 'per_minute') return c >= aim.correct && w <= aim.maxWrong;
+  return c > 0 && w === 0;
+}
+function aimText(t) { return t.aim && t.aim.type !== 'none' ? 'Aim: ' + t.aim.text : 'Handwriting: move on when you judge it'; }
+
+function renderWeek() {
+  var mon = fromIso(S.week), thisMon = isoDay(mondayOf(new Date()));
+  $('wLabel').textContent = (S.week === thisMon ? 'This week, ' : 'Week of ') + short(mon) + ' to ' + short(addDays(mon, 4));
+  $('wNow').hidden = S.week === thisMon;
+  $('wNext').disabled = S.week >= thisMon;
+  var fc = $('fClass').value;
+  var days = weekDates(), today = isoDay(new Date());
+  var box = $('week'); box.innerHTML = '';
+  var kids = S.children.filter(function (c) { return !fc || c.class === fc; });
+  var all = S.targets.concat(S.finished);
+  if (!kids.some(function (c) { return all.some(function (t) { return t.pupilCode === c.pupilCode; }); })) {
+    box.appendChild(el('div', { class: 'empty' }, [el('b', { text: 'No targets to score' }), 'Give your children targets on "My group" first.']));
+    return;
+  }
+  var head = el('tr', {}, [el('th', { text: 'Child' }), el('th', { text: 'Target' })].concat(DAYS.map(function (d, i) {
+    return el('th', { class: 'dc' }, [d, el('small', { text: short(fromIso(days[i])) })]);
+  })).concat([el('th', { text: 'Progress' })]));
+  var tb = el('tbody');
+  kids.forEach(function (c) {
+    var mine = all.filter(function (t) { return t.pupilCode === c.pupilCode; })
+      .sort(function (a, b) { return (a.status === 'active') - (b.status === 'active') || a.id - b.id; });
+    mine.forEach(function (t, k) {
+      var tr = el('tr', { class: (k === 0 ? 'first' : '') + (t.status !== 'active' ? ' old' : ''), 'data-t': t.id });
+      if (k === 0) {
+        var who = el('td', { class: 'kid', rowspan: mine.length }, [el('b', {}, [kidLabel(c)]), el('small', { text: c.class })]);
+        tr.appendChild(who);
+      }
+      tr.appendChild(el('td', { class: 'tg' }, [el('div', { class: 'a', text: chipTitle(area(t.area), t) }),
+        el('div', { class: 'i', text: t.items.join('  ') }), el('div', { class: 'aimt', text: aimText(t) })]));
+      days.forEach(function (day, i) { tr.appendChild(el('td', {}, [scoreCell(t, day, DAYS[i], day > today)])); });
+      tr.appendChild(el('td', { class: 'prog' }, [progress(t)]));
+      tb.appendChild(tr);
+    });
+  });
+  box.appendChild(el('table', { class: 'wk' }, [el('thead', {}, [head]), tb]));
+}
+
+function cellClass(t, s, planned) {
+  var k = 'cell' + (planned ? '' : ' off');
+  if (s && t.aim && t.aim.type !== 'none' && s.correct !== null) k += aimMet(t.aim, s.correct, s.wrong) ? ' met' : ' miss';
+  return k;
+}
+function scoreCell(t, day, dname, future) {
+  var s = scoreFor(t.id, day), planned = t.days.indexOf(dname) >= 0, live = t.status === 'active' && !future;
+  var cell = el('div', { class: cellClass(t, s, planned), title: planned ? '' : 'Not on the plan for this day' });
+  if (t.aim && t.aim.type === 'none') {
+    var on = !!(s && s.done);
+    var b = el('button', { class: 'done-btn' + (on ? ' on' : ''), text: '✓', 'aria-label': 'Practised on ' + dname });
+    if (!live) b.disabled = true;
+    b.onclick = function () {
+      on = !on; b.className = 'done-btn' + (on ? ' on' : '');
+      saveCell(cell, t, day, { done: on });
+    };
+    cell.appendChild(b);
+    return cell;
+  }
+  function box(cls, sym, val, label) {
+    var inp = el('input', { type: 'text', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '3', enterkeyhint: 'next',
+                            autocomplete: 'off', 'aria-label': label + ', ' + dname });
+    inp.value = val === null || val === undefined ? '' : String(val);
+    if (!live) inp.disabled = true;
+    return { lab: el('label', { class: cls }, [sym, inp]), inp: inp };
+  }
+  var r = box('r', '✓', s && s.correct, 'Right'), w = box('w', '✗', s && s.wrong, 'Wrong');
+  var timer = null;
+  function go() {
+    clearTimeout(timer);
+    var rv = r.inp.value.replace(/\D/g, ''), wv = w.inp.value.replace(/\D/g, '');
+    if (r.inp.value !== rv) r.inp.value = rv;
+    if (w.inp.value !== wv) w.inp.value = wv;
+    var payload = { correct: rv === '' ? null : +rv, wrong: wv === '' ? null : +wv };
+    var old = scoreFor(t.id, day) || { correct: null, wrong: null };
+    if (old.correct === payload.correct && old.wrong === payload.wrong && cell.className.indexOf('failed') < 0) return;
+    if (payload.correct === null && payload.wrong !== null) return;             // wait for the number right
+    saveCell(cell, t, day, payload);
+  }
+  [r.inp, w.inp].forEach(function (inp) {
+    inp.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(go, 900); });
+    inp.addEventListener('blur', go);
+    inp.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      var list = Array.from(document.querySelectorAll('#week input:not(:disabled)'));
+      var nx = list[list.indexOf(inp) + 1];
+      if (nx) nx.focus(); else inp.blur();
+    });
+  });
+  cell.appendChild(r.lab); cell.appendChild(w.lab);
+  return cell;
+}
+function saveCell(cell, t, day, payload) {
+  var planned = t.days.indexOf(DAYS[weekDates().indexOf(day)]) >= 0;
+  cell.className = 'cell' + (planned ? '' : ' off') + ' saving';
+  postQuiet(Object.assign({ action: 'saveScore', targetId: t.id, date: day }, payload)).then(function () {
+    var nt = S.targets.concat(S.finished).find(function (x) { return x.id === t.id; }) || t;
+    cell.className = cellClass(nt, scoreFor(t.id, day), planned);
+    var row = document.querySelector('#week tr[data-t="' + t.id + '"] td.prog');
+    if (row) { row.innerHTML = ''; row.appendChild(progress(nt)); }
+  }).catch(function (e) {
+    cell.className = 'cell failed';
+    banner('err', 'A score was NOT saved (' + e.message + '). It is shown in red: change it again to retry.');
+  });
+}
+function progress(t) {
+  var box = el('div');
+  if (t.status !== 'active') { box.appendChild(el('div', { class: 'st', text: '✓ Moved on' })); return box; }
+  var a = t.aim || { type: 'none' };
+  if (a.type !== 'none') {
+    if (t.ready) box.appendChild(el('div', { class: 'st ready', text: '★ Ready to move on: aim met ' + t.streak + ' times in a row' }));
+    else box.appendChild(el('div', { class: 'st', text: t.streak ? 'Aim met ' + t.streak + ' time' + (t.streak === 1 ? '' : 's') + ' in a row (3 to move on)' : 'Aim not met yet' }));
+  }
+  if (t.next && (t.ready || a.type === 'none')) {
+    box.appendChild(el('button', { class: 'btn', text: 'Move on to ' + t.next.items.join(' '), on: { click: function () { moveOn(t); } } }));
+  } else if (t.ready) {
+    box.appendChild(el('button', { class: 'btn', text: 'Choose the next items', on: { click: function () { openTarget({ target: t }); } } }));
+  }
+  if (!t.ready && t.next && a.type !== 'none') {
+    box.appendChild(el('button', { class: 'linkish', text: 'Move on anyway', on: { click: function () { moveOn(t); } } }));
+  }
+  if (!t.next && a.type === 'none') {
+    box.appendChild(el('button', { class: 'linkish', text: 'Change the ' + (t.area === 'hw_joins' ? 'joins' : 'letters'), on: { click: function () { openTarget({ target: t }); } } }));
+  }
+  return box;
+}
+function moveOn(t) {
+  var c = S.children.find(function (x) { return x.pupilCode === t.pupilCode; }) || {};
+  var nx = t.next;
+  var what = (nx.part !== t.part ? nx.partName + ': ' : '') + nx.items.join(' ');
+  if (!confirm('Move ' + (c.label || 'this child') + ' on to ' + what + '?\n\nThe old target (' + t.items.join(' ') +
+               ') is marked as learnt. Same days: ' + t.days.join(' ') + '. Print the new sheets with "Print this week".')) return;
+  post({ action: 'moveOn', id: t.id }).then(function () { banner('ok', 'Well done! Moved on to ' + what + '.'); })
+    .catch(function (e) { banner('err', 'Not moved on: ' + e.message); });
+}
+function setView(v) { S.view = v; if (v === 'week') S.sel.clear(); render(); }
+$('tabGroup').onclick = function () { setView('group'); };
+$('tabWeek').onclick = function () { setView('week'); };
+function goWeek(iso) {
+  S.week = iso; $('week').innerHTML = '<div class="empty">Loading…</div>';
+  getJSON(API + '&action=load&week=' + iso).then(function (d) {
+    if (!d.ok) throw new Error(d.error || 'Could not load');
+    take(d); render();
+  }).catch(function (e) { banner('err', 'Could not load that week: ' + e.message, function () { goWeek(iso); }); });
+}
+$('wPrev').onclick = function () { goWeek(isoDay(addDays(fromIso(S.week), -7))); };
+$('wNext').onclick = function () { goWeek(isoDay(addDays(fromIso(S.week), 7))); };
+$('wNow').onclick = function () { goWeek(isoDay(mondayOf(new Date()))); };
 
 // ── Panels ──────────────────────────────────────────────────────────────────────────────────────────────
 function openPanel(id) { $('veil').className = 'veil show'; $(id).className = 'panel show'; }
