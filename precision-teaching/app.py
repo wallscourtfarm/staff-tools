@@ -8,6 +8,7 @@ import time
 from reportlab.lib.units import mm as _mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+import name_stamps
 from wfa_shared.logo import logo_html
 from wfa_shared.streamlit_css import inject_wfa_css
 
@@ -260,7 +261,7 @@ def _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, maths_
             _draw_dictation_item(c, x, y_top, col_w, row_h, i + 1, font_size)
 
 
-def _compact_header(c, margin, usable_w, y_top, title_bits, right_text, h):
+def _compact_header(c, margin, usable_w, y_top, title_bits, right_text, h, name_slot=None):
     """Slim single-line header (name/skill + Time:/Score: fields to fill
     in by hand) instead of a big banner — the point is paper density, not
     branding. A thin blue rule is the only WFA touch."""
@@ -268,6 +269,9 @@ def _compact_header(c, margin, usable_w, y_top, title_bits, right_text, h):
     c.setFillColorRGB(*_WFA_DARK)
     baseline = y_top - h * 0.62
     c.drawString(margin, baseline, "  |  ".join(title_bits))
+    if name_slot is not None:      # title_bits[0] is the child's initials: the browser swaps in the real name
+        name_stamps.log(c, margin, baseline, title_bits[0], min(11, h * 0.5), name_slot.get("pupilCode"),
+                        post=("  |  " + "  |  ".join(title_bits[1:])) if len(title_bits) > 1 else "", color=_WFA_DARK)
     if right_text:
         c.setFont("Helvetica", min(9, h * 0.42))
         c.setFillColorRGB(*_GREY)
@@ -567,7 +571,7 @@ def _draw_cloze_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
 def render_compact_sheet_slot(c, margin, usable_w, slot_top, slot_bottom, pupil, sheet, include_answers):
     """One sheet drawn into a given vertical slot (a whole page, or half a
     page when two are stacked) — the density Innes's old Excel sheets had."""
-    bits = [f"{display_name(pupil)}", sheet["skill_name"]]
+    bits = [pupil_label(pupil), sheet["skill_name"]]    # initials only: names are added in the teacher's browser
     if sheet.get("day_label"):
         bits.append(sheet["day_label"])
     header_h = min(9 * _mm, (slot_top - slot_bottom) * 0.12)
@@ -577,7 +581,7 @@ def render_compact_sheet_slot(c, margin, usable_w, slot_top, slot_bottom, pupil,
         include_answers = False
     else:
         right_text = f"Time: _______   Score: _______   {date.today().strftime('%d/%m/%y')}"
-    header_bottom = _compact_header(c, margin, usable_w, slot_top, bits, right_text, header_h)
+    header_bottom = _compact_header(c, margin, usable_w, slot_top, bits, right_text, header_h, name_slot=pupil)
 
     footer_h = (14 * _mm if include_answers else 2 * _mm)
     grid_top = header_bottom - 2
@@ -659,7 +663,9 @@ def _build_day_papers(c, buf, wk_kids, rows, plan_now, ladders_data, wk_answers,
         c.drawString(margin + 5 * _mm, top - h + h * 0.3, DAY_FULL[d])
         c.setFont("Helvetica-Bold", max(10, size * 0.5))
         c.drawRightString(margin + usable_w - 5 * _mm, top - h + h * 0.34,
-                          f"{display_name(p)}   ·   {note}" if note else display_name(p))
+                          f"{pupil_label(p)}   ·   {note}" if note else pupil_label(p))
+        name_stamps.log(c, margin + usable_w - 5 * _mm, top - h + h * 0.34, pupil_label(p), max(10, size * 0.5), p.get("pupilCode"),
+                        post=f"   ·   {note}" if note else "", align="r", cover=(r, g, b), color=(1, 1, 1))
         c.setFillColorRGB(0, 0, 0)
         return top - h - 3 * _mm
 
@@ -792,7 +798,9 @@ def build_week_pdf(wk_kids, rows, plan_now, ladders_data, wk_answers=True, wk_co
         y = page_h - margin - 6 * _mm
         c.setFont("Helvetica-Bold", 20)
         c.setFillColorRGB(0x17 / 255, 0x98 / 255, 0xd3 / 255)
-        c.drawString(margin, y, f"{display_name(p)} - this week's practice")
+        c.drawString(margin, y, f"{pupil_label(p)} - this week's practice")
+        name_stamps.log(c, margin, y, pupil_label(p), 20, p.get("pupilCode"), post=" - this week's practice",
+                        color=(0x17 / 255, 0x98 / 255, 0xd3 / 255))
         c.setFillColorRGB(0, 0, 0)
         y -= 14 * _mm
         label_w = usable_w - 5 * 22 * _mm
@@ -1363,7 +1371,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 # The print screen is reached from the Precision Teaching page (staff.*/precision/, "Print" tab). It is dressed
 # like that page (same header, tab bar, cards, chips, buttons; Streamlit's own toolbar hidden) so a teacher does
 # not feel they have left the tool. Only the look is set here: the sheets are made by build_week_pdf as before.
-_PRINT_VER = "WFA-18.10.26i"
+_PRINT_VER = "WFA-18.10.26j"
 _STAFF_PT = "https://staff.wallscourt-farm-academy.co.uk/precision/"
 _PRINT_CSS = """
 <style>
@@ -1436,11 +1444,9 @@ if st.query_params.get("print") == "week":
     _card_who = st.container(border=True)
     _card_how = st.container(border=True)
     _card_go = st.container(border=True)
-    with st.expander("Names file (optional): print real names instead of initials"):
-        _nf = st.file_uploader("Names file (CSV)", type=["csv"], key="pw_names_csv")
-        if _nf is not None:
-            st.session_state["pt_names"] = parse_names_csv(_nf.getvalue().decode("utf-8", errors="ignore"))
-            st.success(f"Names loaded for {len(st.session_state['pt_names'])} children (this session only).")
+    st.info("Sheets are made with each child's initials. To print real names, download the PDF and add them with the "
+            "[Name stamper](https://staff.wallscourt-farm-academy.co.uk/name-stamper/): it works in your own browser, so "
+            "your names file never comes to this website.", icon="🔒")
     _classes = sorted({p["class"] for p in _kids})
     _card_who.markdown('<div class="pt-step">1. Whose sheets</div>', unsafe_allow_html=True)
     _EACH, _ALL = "Each class (a separate file for each)", "All classes together (one file)"
@@ -1481,7 +1487,9 @@ if st.query_params.get("print") == "week":
         for c_, kids_ in groups:
             ids_ = {p["id"] for p in kids_}
             r_ = [r for r in _rows if r[0]["id"] in ids_]
+            name_stamps.begin()
             pdf_, n_ = build_week_pdf(kids_, r_, _plan, _L, _ans, _cover, False, day_per_paper=_duplex, share_paper=_share)
+            pdf_ = name_stamps.finish(pdf_)
             files.append((c_, len(kids_), n_, pdf_))
         st.session_state["pw_files"] = files
     for c_, nk, n_, pdf_ in st.session_state.get("pw_files", []):
@@ -1520,8 +1528,8 @@ with st.sidebar:
 
     # Teacher's names file: real names for printouts and screens in THIS browser session only (never saved).
     with st.expander("Names file (optional)"):
-        st.caption("Children show as initials. To see names on screen and printed sheets, add your names file. "
-                   "It stays in this session only and is never saved or sent anywhere.")
+        st.caption("Children show as initials. Adding your names file shows names ON SCREEN only (printed sheets always use initials: "
+                   "add names to those with the Name Stamper tool). It stays in this session only and is never saved.")
         _nf = st.file_uploader("Names file (CSV)", type=["csv"], key="pt_names_csv")
         if _nf is not None:
             try:
@@ -1555,7 +1563,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-18.10.26i")
+st.caption("Wallscourt Farm Academy · WFA-18.10.26j")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
@@ -2867,8 +2875,10 @@ with tab6:
                 with hw3:
                     st.checkbox("Show descender line", value=True, key="hw_descender")
                 if st.button("Create weekly packs (PDF)", type="primary", width="stretch"):
+                    name_stamps.begin()
                     pdf_bytes, n_sheets = build_week_pdf(wk_kids, rows, plan_now, ladders_data, wk_answers, wk_cover,
                                                          bool(st.session_state.get("print_review_w", False)))
+                    pdf_bytes = name_stamps.finish(pdf_bytes)
                     if n_sheets == 0 and not wk_cover:
                         st.warning("Nothing to print: no days are ticked.")
                     else:
@@ -2934,6 +2944,7 @@ with tab6:
                         margin = 15 * _mm
                         page_w, page_h = A4
                         usable_w = page_w - 2 * margin
+                        name_stamps.begin()
 
                         c = pdfcanvas.Canvas(buf, pagesize=A4)
                         # Every sheet — single or one per day of a week — goes
@@ -2983,7 +2994,7 @@ with tab6:
 
                         st.success("PDF generated!")
                         st.download_button(
-                            "Download PDF", buf.getvalue(),
+                            "Download PDF", name_stamps.finish(buf.getvalue()),
                             file_name=f"precision-teach-sheets-{date.today().isoformat()}.pdf",
                             mime="application/pdf",
                             use_container_width=True,
