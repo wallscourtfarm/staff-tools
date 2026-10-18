@@ -1361,7 +1361,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 if st.query_params.get("print") == "week":
     st.markdown("[← Back to My group](https://staff.wallscourt-farm-academy.co.uk/precision/)")
     st.markdown(logo_html("Print this week"), unsafe_allow_html=True)
-    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26f · Children and targets come from the Precision Teaching page "
+    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26g · Children and targets come from the Precision Teaching page "
                f"(staff.wallscourt-farm-academy.co.uk/precision/).")
     try:
         _load, _cat = _pt_get("load"), _pt_get("catalogue")["catalogue"]
@@ -1398,13 +1398,26 @@ if st.query_params.get("print") == "week":
                              help="A day is never split across two pieces of paper. If a whole day fits in the space "
                                   "left on the paper, it goes there, with its own day heading.")
         st.caption("Print double-sided (flip on the long edge). Blank sides are added where needed.")
+    _sel_classes = sorted({p["class"] for p in _pool if p["id"] in _ids})
+    _split = False
+    if len(_sel_classes) > 1:
+        _split = st.checkbox("A separate file for each class", value=True,
+                             help="So each class teacher gets their own set of sheets to print.")
     if st.button("Create this week's sheets (PDF)", type="primary", disabled=not _ids):
         _sel = [p for p in _pool if p["id"] in _ids]
-        _r = [r for r in _rows if r[0]["id"] in _ids]
-        _pdf, _n = build_week_pdf(_sel, _r, _plan, _L, _ans, _cover, False, day_per_paper=_duplex, share_paper=_share)
-        st.success(f"Made {_n} sheet(s) for {len(_sel)} child(ren).")
-        st.download_button("Download the sheets", _pdf, file_name=f"precision-teaching-week-{date.today().isoformat()}.pdf",
-                           mime="application/pdf", type="primary")
+        groups = [(c_, [p for p in _sel if p["class"] == c_]) for c_ in _sel_classes] if _split else [("", _sel)]
+        files = []
+        for c_, kids_ in groups:
+            ids_ = {p["id"] for p in kids_}
+            r_ = [r for r in _rows if r[0]["id"] in ids_]
+            pdf_, n_ = build_week_pdf(kids_, r_, _plan, _L, _ans, _cover, False, day_per_paper=_duplex, share_paper=_share)
+            files.append((c_, len(kids_), n_, pdf_))
+        st.session_state["pw_files"] = files
+    for c_, nk, n_, pdf_ in st.session_state.get("pw_files", []):
+        tag = f"-{c_}" if c_ else ""
+        label = f"Download {c_} ({nk} child{'ren' if nk != 1 else ''}, {n_} sheets)" if c_ else f"Download the sheets ({nk} child{'ren' if nk != 1 else ''}, {n_} sheets)"
+        st.download_button(label, pdf_, file_name=f"precision-teaching-week{tag}-{date.today().isoformat()}.pdf",
+                           mime="application/pdf", type="primary", key=f"pw_dl_{c_ or 'all'}", on_click="ignore")
     st.divider()
     st.markdown("[← Back to My group](https://staff.wallscourt-farm-academy.co.uk/precision/) to change children or targets.")
     st.stop()
@@ -1472,7 +1485,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-18.10.26f")
+st.caption("Wallscourt Farm Academy · WFA-18.10.26g")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
