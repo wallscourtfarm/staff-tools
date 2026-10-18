@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Name Stamper · WFA</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
+<style>
+:root { --brand:#1798d3; --ink:#0a0101; --muted:#667; --bg:#f4f7fb; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+header { background:var(--brand); color:#fff; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
+header h1 { margin:0; font-size:1.15rem; }
+header .ver { font-size:.75rem; opacity:.75; }
+main { max-width: 760px; margin: 0 auto; padding: 18px 16px 40px; }
+.panel { background:#fff; border-radius:12px; padding:16px; margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.panel h2 { margin:0 0 6px; font-size:1.02rem; }
+.panel p { margin: 0 0 10px; color: var(--muted); font-size: .92rem; }
+.drop { border:2px dashed #b9c8d8; border-radius:10px; padding:22px; text-align:center; color:var(--muted); cursor:pointer; }
+.drop.over { border-color: var(--brand); background:#eef7fd; }
+button { font: inherit; padding: 9px 14px; border-radius: 8px; border: 1px solid #c8d3df; background:#fff; cursor:pointer; }
+button.primary { background: var(--brand); color:#fff; border-color: var(--brand); font-weight: 700; }
+button:disabled { opacity:.5; cursor: default; }
+#status { font-size:.92rem; color: var(--muted); margin-top:10px; }
+#status.err { color:#c0392b; font-weight:600; }
+.res a { display:block; margin:6px 0; font-weight:600; }
+.note { font-size:.85rem; color:var(--muted); }
+</style>
+</head>
+<body>
+<header><h1>🔒 Name Stamper</h1><span class="ver">WFA-18.10.26a</span></header>
+<main>
+  <div class="panel">
+    <p><b>What this does.</b> Sheets from the Home Learning generator are made with each child's initials. Here your own browser writes the real first name over the initials, using your names file. Nothing is uploaded: the PDF and the names file stay on this computer, and are forgotten when you close or reload this page.</p>
+  </div>
+  <div class="panel">
+    <h2>1. Your names file</h2>
+    <p>The CSV you keep on your own computer. You can choose more than one (for example one per class).</p>
+    <input type="file" id="names" accept=".csv,text/csv" multiple>
+    <div id="nameInfo" class="note"></div>
+  </div>
+  <div class="panel">
+    <h2>2. The Home Learning PDF(s)</h2>
+    <div class="drop" id="drop">Drop the PDF here, or click to choose<input type="file" id="pdfs" accept="application/pdf,.pdf" multiple hidden></div>
+    <div id="pdfInfo" class="note" style="margin-top:8px"></div>
+  </div>
+  <div class="panel">
+    <button class="primary" id="go" disabled>Add names</button>
+    <div id="status"></div>
+    <div class="res" id="res"></div>
+  </div>
+</main>
+<script>
+(function () {
+  'use strict';
+  var names = null, pdfFiles = [], urls = [];
+  var NAVY = PDFLib.rgb(26 / 255, 60 / 255, 110 / 255);
+  var $ = function (id) { return document.getElementById(id); };
+  function status(t, err) { var s = $('status'); s.textContent = t; s.className = err ? 'err' : ''; }
+  function refresh() { $('go').disabled = !(names && names.size && pdfFiles.length); }
+
+  $('names').addEventListener('change', function (e) {
+    var files = Array.prototype.slice.call(e.target.files || []);
+    names = null; $('nameInfo').textContent = '';
+    if (!files.length) { refresh(); return; }
+    Promise.all(files.map(function (f) { return f.text(); })).then(function (texts) {
+      var merged = null;
+      texts.forEach(function (t) { var nf = WFANames.parseCsv(t); merged = merged ? merged.merge(nf) : nf; });
+      names = merged.size ? merged : null;
+      $('nameInfo').textContent = names ? names.size + ' children loaded.' : 'That does not look like a names file (it needs a pupil_id column and names).';
+      refresh();
+    }).catch(function (e) { names = null; $('nameInfo').textContent = 'That file could not be read as a names file.'; refresh(); });
+  });
+
+  var drop = $('drop'), pin = $('pdfs');
+  drop.addEventListener('click', function () { pin.click(); });
+  ['dragover', 'dragenter'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+  function setPdfs(list) {
+    pdfFiles = Array.prototype.slice.call(list || []).filter(function (f) { return /pdf$/i.test(f.type) || /\.pdf$/i.test(f.name); });
+    $('pdfInfo').textContent = pdfFiles.map(function (f) { return f.name; }).join(', ');
+    refresh();
+  }
+  drop.addEventListener('drop', function (e) { setPdfs(e.dataTransfer.files); });
+  pin.addEventListener('change', function () { setPdfs(pin.files); });
+
+  function safe(text) {   // Helvetica can only draw Latin-1 characters
+    return String(text).normalize('NFC').replace(/[^ -~ -ÿ]/g, '');
+  }
+
+  async function stampOne(file) {
+    var bytes = await file.arrayBuffer();
+    var doc = await PDFLib.PDFDocument.load(bytes, { updateMetadata: false });
+    var kw = doc.getKeywords() || '';
+    if (kw.indexOf('WFASTAMPS1:') !== 0) return { error: 'No name positions in ' + file.name + ' (was it made by the Home Learning generator?)' };
+    var stamps = JSON.parse(kw.slice(11));
+    var font = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+    var pages = doc.getPages(), done = 0, missing = 0;
+    stamps.forEach(function (s) {
+      var rec = names.get(s[5]);
+      var first = rec && safe(rec.first || (rec.name || '').split(' ')[0] || '');
+      if (!first) { missing++; return; }
+      var page = pages[s[0]]; if (!page) return;
+      var x = s[1], y = s[2], w = s[3], size = s[4];
+      page.drawRectangle({ x: x - 2, y: y - 3.5, width: Math.max(w, font.widthOfTextAtSize(first, size)) + 4, height: size + 5, color: PDFLib.rgb(1, 1, 1) });
+      page.drawText(first, { x: x, y: y, size: size, font: font, color: NAVY });
+      done++;
+    });
+    doc.setKeywords([]);   // positions no longer needed
+    var out = await doc.save();
+    return { bytes: out, done: done, missing: missing };
+  }
+
+  $('go').addEventListener('click', async function () {
+    $('go').disabled = true; $('res').innerHTML = ''; urls.forEach(URL.revokeObjectURL); urls = [];
+    try {
+      var lines = [];
+      for (var i = 0; i < pdfFiles.length; i++) {
+        status('Adding names to ' + pdfFiles[i].name + '…');
+        var r = await stampOne(pdfFiles[i]);
+        if (r.error) { lines.push(r.error); continue; }
+        var url = URL.createObjectURL(new Blob([r.bytes], { type: 'application/pdf' })); urls.push(url);
+        var a = document.createElement('a'); a.href = url; a.download = pdfFiles[i].name.replace(/\.pdf$/i, '') + '-names.pdf';
+        a.textContent = '⬇ ' + a.download + '  (' + r.done + ' names added' + (r.missing ? ', ' + r.missing + ' not in your names file: left as initials' : '') + ')';
+        $('res').appendChild(a);
+      }
+      status(lines.length ? lines.join(' ') : 'Done. Download below. Names are in the PDFs only; nothing was sent anywhere.', lines.length > 0);
+    } catch (e) { status('Something went wrong (' + (e && e.name || 'error') + '). Check it is a Home Learning PDF.', true); }
+    $('go').disabled = false;
+  });
+  window.addEventListener('pagehide', function () { if (names) names.clear(); names = null; });
+})();
+</script>
+</body>
+</html>
