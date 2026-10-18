@@ -1109,8 +1109,9 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 
 
 if st.query_params.get("print") == "week":
+    st.markdown("[← Back to My group](https://staff.wallscourt-farm-academy.co.uk/precision/)")
     st.markdown(logo_html("Print this week"), unsafe_allow_html=True)
-    st.caption(f"Wallscourt Farm Academy · WFA-17.10.26d · Children and targets come from the Precision Teaching page "
+    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26a · Children and targets come from the Precision Teaching page "
                f"(staff.wallscourt-farm-academy.co.uk/precision/).")
     try:
         _load, _cat = _pt_get("load"), _pt_get("catalogue")["catalogue"]
@@ -1145,6 +1146,8 @@ if st.query_params.get("print") == "week":
         st.success(f"Made {_n} sheet(s) for {len(_sel)} child(ren).")
         st.download_button("Download the sheets", _pdf, file_name=f"precision-teaching-week-{date.today().isoformat()}.pdf",
                            mime="application/pdf", type="primary")
+    st.divider()
+    st.markdown("[← Back to My group](https://staff.wallscourt-farm-academy.co.uk/precision/) to change children or targets.")
     st.stop()
 
 # ── Main Teacher App ────────────────────────────────────────────────────────
@@ -1210,7 +1213,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-17.10.26d")
+st.caption("Wallscourt Farm Academy · WFA-18.10.26a")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
