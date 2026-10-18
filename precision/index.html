@@ -91,6 +91,8 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   /* tabs */
   .tabs { display: flex; gap: 6px; background: #e3eef6; padding: 5px; border-radius: 12px; }
   .tabs button { border: 0; background: none; border-radius: 9px; padding: 9px 16px; font-weight: 900; color: var(--muted); }
+  .tabs a { border-radius: 9px; padding: 9px 16px; font-weight: 900; color: var(--muted); text-decoration: none; }
+  .tabs a:hover, .tabs button:hover { color: var(--ink); }
   .tabs button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.1); }
 
   /* end of week review */
@@ -163,7 +165,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div id="banner" class="banner"></div>
 
   <div class="bar">
-    <div class="tabs" role="tablist"><button id="tabGroup" class="on">My group</button><button id="tabWeek">End of week</button><button id="tabProg">Progress</button></div>
+    <div class="tabs" role="tablist"><button id="tabGroup" class="on">My group</button><button id="tabWeek">End of week</button><button id="tabProg">Progress</button><a id="tabPrint" href="https://precision-teaching.wallscourt-farm-academy.co.uk/?print=week">🖨 Print</a></div>
     <select id="pRange" aria-label="Since" hidden>
       <option value="year">This school year</option><option value="6w">Last 6 weeks</option><option value="all">All time</option>
     </select>
@@ -171,7 +173,6 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <select id="fClass" aria-label="Class" hidden></select>
     <span class="grow"></span>
     <span id="namesSlot"></span>
-    <a class="btn ghost" id="btnPrint" href="https://precision-teaching.wallscourt-farm-academy.co.uk/?print=week">🖨 Print this week</a>
   </div>
 
   <div class="card" id="group"><div class="empty">Loading…</div></div>
@@ -190,7 +191,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <button class="btn quiet" id="btnClearSel">Clear</button>
   </div>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-18.10.26d</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-18.10.26e</span></footer>
 
 <div class="veil" id="veil"></div>
 
@@ -464,7 +465,10 @@ function reviewRow(c, t, first) {
   main.appendChild(acts);
   return row;
 }
-function setView(v) { S.view = v; S.sel.clear(); render(); }
+function setView(v) {
+  S.view = v; S.sel.clear(); render();
+  try { history.replaceState(null, '', '#' + v); } catch (e) {}
+}
 $('tabGroup').onclick = function () { setView('group'); };
 $('tabWeek').onclick = function () { setView('week'); };
 $('tabProg').onclick = function () { setView('prog'); };
@@ -843,6 +847,8 @@ if (window.WFANames) {
   NS.init();
   NS._ui();
 }
+// The print screen's tabs link back here with #group / #week / #prog.
+(function () { var h = location.hash.slice(1); if (h === 'week' || h === 'prog') S.view = h; })();
 load();
 </script>
 </body>
