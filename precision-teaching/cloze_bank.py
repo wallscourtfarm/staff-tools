@@ -200,6 +200,19 @@ def bank_groups(words):
     return groups + [[w] for w in rest]
 
 
+# More sentences per word (added 18.10.26) so a child sees different sentences on each day of the week.
+# cloze_more.json: {word: [8 sentences]}, same rules as above (one gap, only that word fits its word bank).
+import json as _json
+import os as _os
+try:
+    with open(_os.path.join(_os.path.dirname(__file__), "cloze_more.json"), encoding="utf-8") as _f:
+        MORE_SENTENCES = _json.load(_f)
+except Exception:
+    MORE_SENTENCES = {}
+
+
 def sentences_for(word):
     """Gap sentences for a word (list), or [] if none written."""
-    return SENTENCES.get(word, [])
+    out = list(SENTENCES.get(word, []))
+    out += [s for s in MORE_SENTENCES.get(word, []) if s not in out]
+    return out

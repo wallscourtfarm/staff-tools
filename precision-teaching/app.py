@@ -588,7 +588,7 @@ def _build_day_papers(c, buf, wk_kids, rows, plan_now, ladders_data, wk_answers,
                 sid = k.split(":", 1)[1]
                 step = get_step(ladders_data, sid)
                 pool = get_active_window(p, sid, step) if is_windowed(step) else None
-                sheet = generate_sheet(p, sid, ladders_data, item_pool=pool, include_review=review)
+                sheet = generate_sheet(p, sid, ladders_data, item_pool=pool, include_review=review, variant=DAYS.index(d))
                 if not sheet:
                     continue
                 sheet["day_label"] = DAY_FULL[d]
@@ -744,7 +744,7 @@ def build_week_pdf(wk_kids, rows, plan_now, ladders_data, wk_answers=True, wk_co
                 sid = k.split(":", 1)[1]
                 step = get_step(ladders_data, sid)
                 pool = get_active_window(p, sid, step) if is_windowed(step) else None
-                sheet = generate_sheet(p, sid, ladders_data, item_pool=pool, include_review=review)
+                sheet = generate_sheet(p, sid, ladders_data, item_pool=pool, include_review=review, variant=DAYS.index(d))
                 if not sheet:
                     continue
                 sheet["day_label"] = DAY_FULL[d]
@@ -1262,7 +1262,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 if st.query_params.get("print") == "week":
     st.markdown("[← Back to My group](https://staff.wallscourt-farm-academy.co.uk/precision/)")
     st.markdown(logo_html("Print this week"), unsafe_allow_html=True)
-    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26c · Children and targets come from the Precision Teaching page "
+    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26d · Children and targets come from the Precision Teaching page "
                f"(staff.wallscourt-farm-academy.co.uk/precision/).")
     try:
         _load, _cat = _pt_get("load"), _pt_get("catalogue")["catalogue"]
@@ -1373,7 +1373,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-18.10.26c")
+st.caption("Wallscourt Farm Academy · WFA-18.10.26d")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
