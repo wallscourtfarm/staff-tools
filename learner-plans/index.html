@@ -57,6 +57,16 @@ nav .brand span { opacity: .7; font-weight: 400; font-size: .88rem; }
 .pill.complete { background: #d4f0e0; color: #1a7a43; }
 
 /* DASHBOARD FILTERS */
+.sort-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.sort-bar .lbl { margin: 0 4px 0 0; }
+.meet-day { margin-bottom: 22px; }
+.meet-day h2 { font-size: 1rem; font-weight: 800; color: var(--ink); padding-bottom: 6px; border-bottom: 2px solid var(--blue); margin-bottom: 10px; display: flex; justify-content: space-between; }
+.meet-day h2 span { font-weight: 400; color: var(--muted); font-size: .8rem; }
+.meet-row { display: flex; gap: 10px; align-items: center; background: white; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.meet-row .pos { font-weight: 800; color: var(--ink); min-width: 22px; text-align: center; }
+.meet-row .who { flex: 1; cursor: pointer; min-width: 0; }
+.meet-row .who:hover b { text-decoration: underline; }
+.meet-row .acts { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
 .yg-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
 .yg-btn { padding: 6px 14px; border-radius: 20px; border: 2px solid var(--border); background: white; font-size: .82rem; font-weight: 700; cursor: pointer; color: var(--muted); transition: all .15s; font-family: inherit; }
 .yg-btn:hover { border-color: var(--blue); color: var(--ink); }
@@ -188,6 +198,7 @@ textarea.fld, .form-group textarea { resize: vertical; min-height: 70px; line-he
       </div>
     </div>
     <div class="yg-nav" id="ygNav"></div>
+    <div class="sort-bar" id="sortBar"></div>
     <input type="text" class="search-bar" placeholder="Search by initials…" oninput="renderDashboard()" id="searchBar">
     <div class="children-grid" id="childrenGrid"></div>
   </div>
@@ -358,6 +369,8 @@ async function init() {
   try { if (window.WFANames) WFANames.screen.init(); } catch (e) { /* names are optional */ }
   showPage('dashboard');
   await fetchChildren();
+  await loadMeet();
+  if (sortMode === 'meeting') renderDashboard();
   // class, teacher, year group and EHCP flag come from the school roster; refresh them on every load
   try {
     const r = await api('POST', '/learner-plans/children/sync-from-roster');
@@ -517,6 +530,87 @@ function setStatus(s) {
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSave(); });
 window.addEventListener('pagehide', () => { flushSave(); });
 
+// ── MEETING ORDER (shared by all staff) ──────────────────────────────────────
+// Stored in the shared key/value store as { "<academic year>": { "<child id>": { day: "Mon"|"Wed", pos: n } } }.
+// Re-read just before every save and only the changed learners are applied, so two people
+// ordering at once do not overwrite each other.
+const MEET_KEY = 'wfa_lp_meetings';
+const MEET_DAYS = [['Mon', 'Monday'], ['Wed', 'Wednesday']];
+let meetData = {};
+let meetReady = false;
+let sortMode = lsGet('wfa_lp_sort') === 'meeting' ? 'meeting' : 'name';
+
+async function loadMeet() {
+  try {
+    const r = await api('GET', '/planning/sharedkv-db?key=' + MEET_KEY);
+    meetData = (r && typeof r === 'object' && !r.error) ? r : {};
+    meetReady = !(r && r.error);
+  } catch (e) { meetReady = false; }
+}
+
+function meetFor(c) { return (meetData[activeYear] || {})[c.id] || null; }
+
+async function saveMeet(changes) {
+  if (!meetReady) { await loadMeet(); if (!meetReady) { toast('Could not load the meeting order, so nothing was changed.', 'error'); return false; } }
+  try {
+    const latest = await api('GET', '/planning/sharedkv-db?key=' + MEET_KEY);
+    if (!latest || typeof latest !== 'object' || latest.error) throw new Error('read failed');
+    const yr = latest[activeYear] = latest[activeYear] || {};
+    Object.entries(changes).forEach(([id, v]) => { if (v === null) delete yr[id]; else yr[id] = v; });
+    const res = await api('POST', '/planning/sharedkv-db?key=' + MEET_KEY, latest);
+    if (!res || res.status !== 'ok') throw new Error('write failed');
+    meetData = latest;
+    return true;
+  } catch (e) { toast('Meeting order not saved: ' + e.message, 'error'); return false; }
+}
+
+function setSortMode(m) { sortMode = m; lsSet('wfa_lp_sort', m); renderDashboard(); }
+
+function meetList(day, list) {
+  return list.filter(c => (meetFor(c) || {}).day === day).sort((a, b) => (meetFor(a).pos - meetFor(b).pos) || childSort(a, b));
+}
+
+async function setMeetDay(id, day) {
+  const c = children.find(x => x.id === id);
+  const all = children.filter(x => normYG(x.year_group) === normYG(c.year_group));
+  const last = meetList(day, all).reduce((m, x) => Math.max(m, meetFor(x).pos), 0);
+  if (await saveMeet({ [id]: day ? { day, pos: last + 1 } : null })) renderDashboard();
+}
+
+async function moveMeet(id, dir) {
+  const c = children.find(x => x.id === id);
+  const day = meetFor(c).day;
+  const list = meetList(day, children.filter(x => normYG(x.year_group) === normYG(c.year_group)));
+  const i = list.findIndex(x => x.id === id), j = i + dir;
+  if (j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  const changes = {};
+  list.forEach((x, n) => { changes[x.id] = { day, pos: n + 1 }; });
+  if (await saveMeet(changes)) renderDashboard();
+}
+
+function renderMeetingView(grid, ygList) {
+  const t = (id, label) => `<button class="btn btn-ghost btn-sm" style="padding:3px 8px" onclick="${id}">${label}</button>`;
+  const row = (c, n, count, day) => `<div class="meet-row"><span class="pos">${n}</span>
+    <div class="who" onclick="openChild('${c.id}')"><b>${childTag(c)}</b>${planIsEhcp(c, planCache[c.id]?.[activeYear]) ? '<span class="ehcp-badge">EHCP</span>' : ''}
+      <div class="meta" style="margin:0">${[c.class_name, c.teacher].filter(Boolean).map(esc).join(' · ')}</div></div>
+    <div class="acts">${n > 1 ? t(`moveMeet('${c.id}',-1)`, '▲') : ''}${n < count ? t(`moveMeet('${c.id}',1)`, '▼') : ''}
+      ${MEET_DAYS.filter(d => d[0] !== day).map(d => t(`setMeetDay('${c.id}','${d[0]}')`, '→ ' + d[1])).join('')}
+      ${t(`setMeetDay('${c.id}',null)`, 'Remove')}</div></div>`;
+  let html = '';
+  MEET_DAYS.forEach(([k, name]) => {
+    const list = meetList(k, ygList);
+    html += `<div class="meet-day"><h2>${name}<span>${list.length} meeting${list.length === 1 ? '' : 's'}</span></h2>`
+      + (list.length ? list.map((c, i) => row(c, i + 1, list.length, k)).join('') : '<div class="help">Nobody yet — use the buttons under "Not yet scheduled".</div>') + '</div>';
+  });
+  const un = ygList.filter(c => !meetFor(c)).sort(childSort);
+  html += `<div class="meet-day"><h2>Not yet scheduled<span>${un.length}</span></h2>` + (un.length ? un.map(c => `<div class="meet-row">
+      <div class="who" onclick="openChild('${c.id}')"><b>${childTag(c)}</b><div class="meta" style="margin:0">${[c.class_name, c.teacher].filter(Boolean).map(esc).join(' · ')}</div></div>
+      <div class="acts">${MEET_DAYS.map(d => t(`setMeetDay('${c.id}','${d[0]}')`, 'Add to ' + d[1])).join('')}</div></div>`).join('') : '<div class="help">Everyone has a day.</div>') + '</div>';
+  grid.style.display = 'block';
+  grid.innerHTML = html;
+}
+
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 const YG_ORDER = ['All','EYFS','Y1','Y2','Y3','Y4','Y5','Y6'];
 
@@ -540,6 +634,7 @@ function renderDashboard() {
   const grid = document.getElementById('childrenGrid');
 
   const ygsPresent = ['All', ...YG_ORDER.filter(y => y !== 'All' && children.some(c => normYG(c.year_group) === y))];
+  if (sortMode === 'meeting' && activeYG === 'All') activeYG = ygsPresent[1] || 'All';
   if (!ygsPresent.includes(activeYG)) activeYG = 'All';
   applyTheme(activeYG);
   const ygNav = document.getElementById('ygNav');
@@ -547,6 +642,16 @@ function renderDashboard() {
     `<button class="yg-btn${activeYG===y?' active':''}" onclick="setYG('${y}')">${ygLabel(y)}</button>`
   ).join('') + `<span style="color:var(--border);margin:0 4px">|</span><button class="yg-btn${showEhcpOnly?' active':''}" style="${showEhcpOnly?'background:#c0392b;border-color:#c0392b;':''}" onclick="toggleEhcpFilter()">EHCP</button>`;
 
+  const sortBar = document.getElementById('sortBar');
+  if (sortBar) sortBar.innerHTML = `<span class="lbl">Order</span>
+    <button class="yg-btn${sortMode === 'name' ? ' active' : ''}" onclick="setSortMode('name')">By initials</button>
+    <button class="yg-btn${sortMode === 'meeting' ? ' active' : ''}" onclick="setSortMode('meeting')">By meeting order (Mon / Wed)</button>`;
+  if (sortMode === 'meeting') {
+    if (sb) sb.style.display = 'none';
+    if (ygNav) ygNav.innerHTML = ygsPresent.filter(y => y !== 'All').map(y => `<button class="yg-btn${activeYG===y?' active':''}" onclick="setYG('${y}')">${ygLabel(y)}</button>`).join('');
+    renderMeetingView(grid, children.filter(c => normYG(c.year_group) === activeYG));
+    return;
+  }
   const ygList = (activeYG === 'All' ? children : children.filter(c => normYG(c.year_group) === activeYG))
     .filter(c => !filter || childLabel(c).toLowerCase().includes(filter) || (c.name || '').toLowerCase().includes(filter))
     .filter(c => !showEhcpOnly || planIsEhcp(c, planCache[c.id]?.[activeYear]));
@@ -601,6 +706,7 @@ function renderArchive() {
   const grid = document.getElementById('childrenGrid');
   if (ygNav) ygNav.innerHTML = '';
   if (searchBar) searchBar.style.display = 'none';
+  const sortBarEl = document.getElementById('sortBar'); if (sortBarEl) sortBarEl.innerHTML = '';
 
   if (!archivedChildren.length) {
     grid.style.display = 'grid';
@@ -1237,7 +1343,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-08.10.26a
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-18.10.26a
 </footer>
 </body>
 </html>
