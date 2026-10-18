@@ -155,7 +155,7 @@ input[type=file]{display:none}
   </div>
 </main>
 
-<div class="version">WFA Roster Import · WFA-14.10.26b</div>
+<div class="version">WFA Roster Import · WFA-18.10.26a</div>
 
 <script>
 // CUT OVER 23.09.26 to the Postgres-backed store (pupil_roster_db.py) —
@@ -450,10 +450,17 @@ function buildPreview(normalised, hubPupils, rejectedNoUpn){
       is_lac: existing.lac, is_eal: existing.eal, is_service_child: !!existing.serviceChild,
       is_disadvantaged: !!existing.disadvantaged
     };
-    // The hub keeps only 3-letter name stubs (10.10.26), so compare names stub to stub or every child looks changed.
+    // The hub keeps only the LETTERS of each child's initials (18.10.26: "I"/"M", or "In"/"Mc"), never the name. A
+    // name in the file is "unchanged" when it begins with the stored letters; otherwise it is shown as a change.
+    const sameStart = function(stored, fileName, last){
+      const a = String(stored || '').toLowerCase().replace(/[^a-z]/g, '');
+      const f = stub3(fileName, last).toLowerCase();
+      return !a ? !f : f.indexOf(a) === 0;
+    };
+    const fNameOk = sameStart(before.first_name, p.first_name, false), lNameOk = sameStart(before.last_name, p.last_name, true);
     const diffText = fieldDiffText(
-      Object.assign({}, before, { first_name: stub3(before.first_name, false), last_name: stub3(before.last_name, true) }),
-      Object.assign({}, p, { first_name: stub3(p.first_name, false), last_name: stub3(p.last_name, true) }));
+      Object.assign({}, before, { first_name: fNameOk ? before.first_name : '', last_name: lNameOk ? before.last_name : '' }),
+      Object.assign({}, p, { first_name: fNameOk ? before.first_name : stub3(p.first_name, false), last_name: lNameOk ? before.last_name : stub3(p.last_name, true) }));
     if (diffText) changed.push({ p: p, diff: diffText });
     else unchanged++;
   });
