@@ -421,6 +421,20 @@ def _draw_handwriting_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
     c.setFillColorRGB(0, 0, 0)
 
 
+def _draw_upside_down_answers(c, margin, usable_w, y_top, questions):
+    """Answer key printed upside down in small grey text (turn the sheet round to check), so it is not easy to copy."""
+    text = "Answers:   " + "     ".join(f"{i}) {q['answer']}" for i, q in enumerate(questions, 1))
+    lines = _wrap_line(c, text, "Helvetica", 7, usable_w)
+    c.saveState()
+    c.setFillColorRGB(*_GREY)
+    c.setFont("Helvetica", 7)
+    c.translate(margin + usable_w, y_top)
+    c.rotate(180)
+    for i, ln in enumerate(lines[:4]):
+        c.drawString(0, -(len(lines[:4]) - 1 - i) * 9, ln)
+    c.restoreState()
+
+
 def _draw_cloze_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
     """Word bank in a box, then numbered sentences with a gap to fill."""
     bank = sheet.get("bank") or []
@@ -468,6 +482,7 @@ def _draw_cloze_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
         x += gap_w
         c.drawString(x, y - pitch * 0.55, after)
         y -= pitch
+    return y
 
 
 
@@ -490,7 +505,10 @@ def render_compact_sheet_slot(c, margin, usable_w, slot_top, slot_bottom, pupil,
     grid_top = header_bottom - 2
     grid_bottom = slot_bottom + footer_h
     if mode == "cloze":
-        _draw_cloze_body(c, margin, usable_w, grid_top, grid_bottom, sheet)
+        end_y = _draw_cloze_body(c, margin, usable_w, grid_top, slot_bottom + (12 * _mm if include_answers else 2 * _mm), sheet)
+        if include_answers:
+            _draw_upside_down_answers(c, margin, usable_w, end_y - 3 * _mm, sheet["questions"])
+        return
     elif mode == "handwriting":
         _draw_handwriting_body(c, margin, usable_w, grid_top, grid_bottom, sheet)
     else:
@@ -1262,7 +1280,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 if st.query_params.get("print") == "week":
     st.markdown("[← Back to My group](https://staff.wallscourt-farm-academy.co.uk/precision/)")
     st.markdown(logo_html("Print this week"), unsafe_allow_html=True)
-    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26d · Children and targets come from the Precision Teaching page "
+    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26e · Children and targets come from the Precision Teaching page "
                f"(staff.wallscourt-farm-academy.co.uk/precision/).")
     try:
         _load, _cat = _pt_get("load"), _pt_get("catalogue")["catalogue"]
@@ -1373,7 +1391,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-18.10.26d")
+st.caption("Wallscourt Farm Academy · WFA-18.10.26e")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
