@@ -45,7 +45,9 @@ add("phonics", "Phonics sounds", "Reading", "recognition", 4, [part(s) for s in 
     hint="Pick a few graphemes. You can type others.")
 cew = [part(s, "Reception and Year 1") for s in by["common_exception_words_y1"]["steps"]] + \
       [part(s, "Year 2") for s in by["common_exception_words_y2"]["steps"]]
-add("cew", "Common exception words", "Spelling", "cloze", 6, cew, hint="The sheet gives sentences with a gap and a word bank.")
+add("cew_spell", "Common exception words: spelling", "Spelling", "fade", 6, cew,
+    hint="Look, trace, fill the gaps, then fold back and write from memory. Fewer letters show each day. No adult needed.")
+add("cew", "Common exception words: sentences", "Spelling", "cloze", 6, cew, hint="The sheet gives sentences with a gap and a word bank.")
 add("homophones", "Homophones", "Spelling", "cloze", 0, [part(s) for s in by["homophones"]["steps"]],
     hint="The sheet gives sentences with a gap and the homophones in a word bank.")
 uls = []
