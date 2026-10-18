@@ -353,6 +353,8 @@ def _is_full_page(sheet):
     Maths and dictation spelling sit two to a page."""
     if sheet.get("display_mode") == "handwriting":
         return len(sheet["questions"]) > 6          # a few letters or joins fit half a page: two sheets per page
+    if sheet.get("display_mode") == "fade":
+        return len(sheet["questions"]) > 6          # up to six words fit half a page
     if sheet.get("display_mode") == "cloze":
         return True
     return sheet["subject"] == "phonics" or (sheet.get("display_mode") == "recognition" and sheet["subject"] != "maths")
@@ -435,6 +437,80 @@ def _draw_upside_down_answers(c, margin, usable_w, y_top, questions):
     c.restoreState()
 
 
+def _draw_fade_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
+    """Look | Trace | Fill the gaps | (fold) | Write it from memory | tick. One row per word."""
+    qs = sheet["questions"]
+    if not qs:
+        return
+    dotted = "SassoInfDotB" if _hw_joined_fonts_available() else None
+    # Column (start, end) as fractions of the width. The fold line is at 62.5% across on a front side. On the BACK of a
+    # double-sided sheet the layout is mirrored (fold at 37.5%), so one crease in the paper works for both sides.
+    span = {"look": (0.0, 0.19), "trace": (0.19, 0.40), "gaps": (0.40, 0.62), "write": (0.65, 0.92), "tick": (0.93, 1.0)}
+    fold = 0.625
+    if sheet.get("mirror"):
+        span = {"write": (0.08, 0.35), "tick": (0.0, 0.07), "look": (0.38, 0.57), "trace": (0.57, 0.78), "gaps": (0.78, 1.0)}
+        fold = 0.375
+    X = {k: margin + v[0] * usable_w for k, v in span.items()}
+    X["fold"] = margin + fold * usable_w
+    W_END = {k: margin + v[1] * usable_w for k, v in span.items()}
+    head_y = grid_top - 5 * _mm
+    c.setFont("Helvetica-Bold", 8.5)
+    c.setFillColorRGB(*_HW_TEAL)
+    for k, lab in (("look", "Look and say"), ("trace", "Trace"), ("gaps", "Fill the gaps"), ("write", "Fold back, then write it")):
+        c.drawString(X[k], head_y, lab)
+    c.drawString(X["tick"], head_y, "Check")
+    c.setFillColorRGB(0, 0, 0)
+    top = head_y - 3 * _mm
+    row_h = min(15 * _mm, (top - grid_bottom) / len(qs))
+    size = min(24, row_h * 0.62)
+    # fold line
+    c.setDash([3, 3], 0)
+    c.setStrokeColorRGB(0.55, 0.55, 0.55)
+    c.setLineWidth(0.7)
+    c.line(X["fold"], top + 1 * _mm, X["fold"], top - row_h * len(qs))
+    c.setDash()
+    for i, q in enumerate(qs):
+        w = q["question"]
+        base = top - (i + 1) * row_h + row_h * 0.28
+        c.setStrokeColorRGB(0.85, 0.88, 0.92)
+        c.setLineWidth(0.4)
+        c.line(margin, top - (i + 1) * row_h, margin + usable_w, top - (i + 1) * row_h)
+        # look
+        c.setFillColorRGB(0, 0, 0)
+        c.setFont(_WORD_FONT, size)
+        c.drawString(X["look"] + 1 * _mm, base, w)
+        # trace
+        if dotted:
+            c.setFont(dotted, size * 1.08)
+            c.setFillColorRGB(*_HW_NAVY)
+        else:
+            c.setFillColorRGB(0.7, 0.7, 0.7)
+        c.drawString(X["trace"] + 1 * _mm, base, w)
+        c.setFillColorRGB(0, 0, 0)
+        # fill the gaps
+        x = X["gaps"] + 1 * _mm
+        c.setFont(_WORD_FONT, size)
+        gaps = set(q.get("gaps") or [])
+        for j, ch in enumerate(w):
+            cw = c.stringWidth(ch, _WORD_FONT, size)
+            if j in gaps:
+                c.setStrokeColorRGB(0.2, 0.2, 0.2)
+                c.setLineWidth(0.9)
+                c.line(x, base - 1, x + max(cw, size * 0.42), base - 1)
+                x += max(cw, size * 0.42) + 2
+            else:
+                c.drawString(x, base, ch)
+                x += cw + 0.5
+        # write from memory
+        c.setStrokeColorRGB(0.35, 0.35, 0.35)
+        c.setLineWidth(0.8)
+        c.line(X["write"] + 1 * _mm, base - 1, W_END["write"] - 2 * _mm, base - 1)
+        # check box
+        bs = min(6 * _mm, row_h * 0.5)
+        c.setLineWidth(0.8)
+        c.rect(X["tick"] + 1.5 * _mm, base - 1, bs, bs)
+
+
 def _draw_cloze_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
     """Word bank in a box, then numbered sentences with a gap to fill."""
     bank = sheet.get("bank") or []
@@ -494,7 +570,7 @@ def render_compact_sheet_slot(c, margin, usable_w, slot_top, slot_bottom, pupil,
         bits.append(sheet["day_label"])
     header_h = min(9 * _mm, (slot_top - slot_bottom) * 0.12)
     mode = sheet.get("display_mode")
-    if mode == "handwriting":
+    if mode in ("handwriting", "fade"):
         right_text = f"Date: {date.today().strftime('%d/%m/%y')}"
         include_answers = False
     else:
@@ -511,6 +587,8 @@ def render_compact_sheet_slot(c, margin, usable_w, slot_top, slot_bottom, pupil,
         return
     elif mode == "handwriting":
         _draw_handwriting_body(c, margin, usable_w, grid_top, grid_bottom, sheet)
+    elif mode == "fade":
+        _draw_fade_body(c, margin, usable_w, grid_top, grid_bottom, sheet)
     else:
         _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, maths_cols=4)
 
@@ -661,6 +739,9 @@ def _build_day_papers(c, buf, wk_kids, rows, plan_now, ladders_data, wk_answers,
                 blank_side()
                 continue
             top = page_h - margin
+            for entry in (top_slot, bottom_slot):
+                if entry:
+                    entry[2]["mirror"] = pages_done[0] % 2 == 1      # this side is the back of the paper
             if top_slot and top_slot[0] == "full":
                 _, d, sh = top_slot
                 y = band(p, d, top, 15 * _mm, 24, note_for(d, page))
@@ -1214,7 +1295,7 @@ if query_params.get("mode") == "self_assess":
 # them and makes the week's sheets with the same sheet code as before.
 
 _PT_API = "https://api.wallscourt-farm-academy.co.uk/planning/precision-db"
-_KIND = {"maths": ("maths", None), "recognition": ("phonics", None), "cloze": ("spellings", "cloze"),
+_KIND = {"maths": ("maths", None), "recognition": ("phonics", None), "cloze": ("spellings", "cloze"), "fade": ("spellings", "fade"),
          "dictation": ("spellings", None), "hw_letters": ("handwriting", "hw_letters"), "hw_joins": ("handwriting", "hw_joins")}
 
 
@@ -1280,7 +1361,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 if st.query_params.get("print") == "week":
     st.markdown("[← Back to My group](https://staff.wallscourt-farm-academy.co.uk/precision/)")
     st.markdown(logo_html("Print this week"), unsafe_allow_html=True)
-    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26e · Children and targets come from the Precision Teaching page "
+    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26f · Children and targets come from the Precision Teaching page "
                f"(staff.wallscourt-farm-academy.co.uk/precision/).")
     try:
         _load, _cat = _pt_get("load"), _pt_get("catalogue")["catalogue"]
@@ -1391,7 +1472,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-18.10.26e")
+st.caption("Wallscourt Farm Academy · WFA-18.10.26f")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
