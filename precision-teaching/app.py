@@ -233,13 +233,13 @@ def _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, maths_
         rows = -(-n // cols)
         gap = 3
         col_w = (usable_w - gap * (cols - 1)) / cols
-        row_h = (grid_top - grid_bottom) / rows
+        row_h = min((grid_top - grid_bottom) / rows, col_w * 0.95)     # roughly square cards, never tall strips
         # Each word gets its own size, capped by row height — NOT a single
         # size fit to the sheet's longest word, which made short words
         # ("do", "to") needlessly tiny just because one long outlier
         # ("different") shared the sheet. _draw_recognition_item shrinks
         # only the individual item that actually needs it.
-        base_font_size = max(7, min(20, row_h * 0.42))
+        base_font_size = max(7, min(24, row_h * 0.45))
         for i, q in enumerate(questions):
             row, col = divmod(i, cols)
             x = margin + col * (col_w + gap)
@@ -357,7 +357,9 @@ def _is_full_page(sheet):
         return len(sheet["questions"]) > 6          # up to six words fit half a page
     if sheet.get("display_mode") == "cloze":
         return True
-    return sheet["subject"] == "phonics" or (sheet.get("display_mode") == "recognition" and sheet["subject"] != "maths")
+    if sheet["subject"] == "phonics":
+        return len(sheet["questions"]) > 32          # a normal sound sheet (about 25) fits half a page
+    return sheet.get("display_mode") == "recognition" and sheet["subject"] != "maths"
 
 
 def _hw_ruled_row(c, margin, usable_w, baseline, spec, show_x, show_desc, tint=False):
@@ -1361,7 +1363,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 if st.query_params.get("print") == "week":
     st.markdown("[← Back to My group](https://staff.wallscourt-farm-academy.co.uk/precision/)")
     st.markdown(logo_html("Print this week"), unsafe_allow_html=True)
-    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26h · Children and targets come from the Precision Teaching page "
+    st.caption(f"Wallscourt Farm Academy · WFA-19.10.26a · Children and targets come from the Precision Teaching page "
                f"(staff.wallscourt-farm-academy.co.uk/precision/).")
     try:
         _load, _cat = _pt_get("load"), _pt_get("catalogue")["catalogue"]
@@ -1489,7 +1491,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-18.10.26h")
+st.caption("Wallscourt Farm Academy · WFA-19.10.26a")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
