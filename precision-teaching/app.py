@@ -1296,7 +1296,7 @@ if query_params.get("mode") == "self_assess":
 # Since 17.10.26 children and targets live in the school database (API /planning/precision-db). This screen reads
 # them and makes the week's sheets with the same sheet code as before.
 
-_PT_API = "https://api.wallscourt-farm-academy.co.uk/planning/precision-db"
+_PT_API = os.environ.get("PT_API_URL", "https://api.wallscourt-farm-academy.co.uk/planning/precision-db")
 _KIND = {"maths": ("maths", None), "recognition": ("phonics", None), "cloze": ("spellings", "cloze"), "fade": ("spellings", "fade"),
          "dictation": ("spellings", None), "hw_letters": ("handwriting", "hw_letters"), "hw_joins": ("handwriting", "hw_joins")}
 
@@ -1360,11 +1360,70 @@ def _targets_to_sheets(load, catalogue, base_ladders):
     return kids, rows, plan, L
 
 
+# The print screen is reached from the Precision Teaching page (staff.*/precision/, "Print" tab). It is dressed
+# like that page (same header, tab bar, cards, chips, buttons; Streamlit's own toolbar hidden) so a teacher does
+# not feel they have left the tool. Only the look is set here: the sheets are made by build_week_pdf as before.
+_PRINT_VER = "WFA-18.10.26i"
+_STAFF_PT = "https://staff.wallscourt-farm-academy.co.uk/precision/"
+_PRINT_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+header[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"],
+#MainMenu, footer, .stDeployButton, [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+[data-testid="stApp"] { background: linear-gradient(135deg, #f0f8fd 0%, #e8f4fc 100%); }
+[data-testid="stApp"], [data-testid="stApp"] p, [data-testid="stApp"] label, [data-testid="stApp"] button,
+[data-testid="stApp"] input { font-family: 'Nunito', sans-serif; }
+[data-testid="stApp"] p, [data-testid="stApp"] label { color: #0a0101; }
+div[data-testid="stMainBlockContainer"] { max-width: 1400px !important; padding: 0 16px 80px !important; }
+.pt-head { margin: 0 calc(50% - 50vw) 20px; background: linear-gradient(135deg, #1798d3 0%, #0d7ab8 100%); color: #fff;
+           padding: 18px 24px; box-shadow: 0 4px 20px rgba(23,152,211,.3); }
+.pt-head .in { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; gap: 20px; padding: 0 16px; }
+.pt-head img { height: 60px; background: #fff; border-radius: 12px; padding: 6px; }
+.pt-head h1 { font-family: 'Nunito', sans-serif; font-size: 1.6rem; font-weight: 900; color: #fff; padding: 0; margin: 0; line-height: 1.2; }
+.pt-head p { color: #fff !important; opacity: .9; font-size: .95rem; margin: 4px 0 0; }
+.pt-tabs { display: inline-flex; gap: 6px; background: #e3eef6; padding: 5px; border-radius: 12px; margin: 4px 0 6px; }
+.pt-tabs a, .pt-tabs span { border-radius: 9px; padding: 9px 16px; font-weight: 900; color: #5b6b7b !important; text-decoration: none !important; font-size: 1rem; }
+.pt-tabs a:hover { color: #0a0101 !important; }
+.pt-tabs span { background: #fff; color: #0a0101 !important; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+.pt-hint { color: #5b6b7b; font-size: .95rem; margin: 6px 0 4px; }
+.pt-step { font-size: .85rem; text-transform: uppercase; letter-spacing: .8px; color: #1798d3; font-weight: 900; margin-bottom: 4px; }
+.pt-foot { text-align: center; color: #5b6b7b; font-size: .85rem; padding: 20px 10px; }
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .pt-step) { background: #fff;
+    border: 0 !important; border-radius: 14px; box-shadow: 0 2px 10px rgba(23,152,211,.10); padding: 14px 18px; }
+div[data-testid="stElementContainer"]:has(style) { display: none; }      /* this style block takes no space */
+div[data-testid="stExpander"] details { background: #fff; border: 0; border-radius: 14px; box-shadow: 0 2px 10px rgba(23,152,211,.10); }
+/* radio buttons as the page's chips */
+div[role="radiogroup"] { gap: 8px; flex-wrap: wrap; }
+div[role="radiogroup"] > label { border: 2px solid #d9e3ec; background: #fff; border-radius: 999px; padding: 7px 15px; margin: 0 !important; }
+div[role="radiogroup"] > label > div:first-child { display: none; }
+div[role="radiogroup"] > label:has(input:checked) { background: #1798d3; border-color: #1798d3; }
+div[role="radiogroup"] > label:has(input:checked) p { color: #fff !important; }
+div[role="radiogroup"] > label p { font-weight: 800; font-size: 1rem; }
+span[data-baseweb="tag"] { background: #1798d3 !important; border-radius: 999px !important; }
+span[data-baseweb="tag"] span { color: #fff !important; font-weight: 800; }
+/* buttons like the page's .btn */
+.stButton > button, .stDownloadButton > button { border-radius: 10px !important; font-weight: 800 !important; padding: 10px 18px !important; }
+button[data-testid="stBaseButton-primary"] { background: #1798d3 !important; border: 0 !important; color: #fff !important; opacity: 1 !important; }
+button[data-testid="stBaseButton-primary"]:hover { background: #0d7ab8 !important; }
+div.stDownloadButton button[data-testid="stBaseButton-primary"], div.stDownloadButton button[data-testid="stBaseButton-primary"] p { background: #1798d3 !important; color: #fff !important; border: 0 !important; }
+.stButton > button p, .stDownloadButton > button p { font-weight: 800 !important; color: inherit !important; }
+</style>
+"""
+
 if st.query_params.get("print") == "week":
-    st.markdown("[← Back to My group](https://staff.wallscourt-farm-academy.co.uk/precision/)")
-    st.markdown(logo_html("Print this week"), unsafe_allow_html=True)
-    st.caption(f"Wallscourt Farm Academy · WFA-19.10.26a · Children and targets come from the Precision Teaching page "
-               f"(staff.wallscourt-farm-academy.co.uk/precision/).")
+    st.markdown(_PRINT_CSS, unsafe_allow_html=True)
+    st.markdown(
+        '<div class="pt-head"><div class="in">'
+        '<img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA">'
+        '<div><h1>Precision Teaching</h1><p>Print: this week\'s sheets for your group</p></div></div></div>'
+        '<div class="pt-tabs">'
+        f'<a href="{_STAFF_PT}#group" target="_self">My group</a>'
+        f'<a href="{_STAFF_PT}#week" target="_self">End of week</a>'
+        f'<a href="{_STAFF_PT}#prog" target="_self">Progress</a>'
+        '<span>🖨 Print</span></div>'
+        '<p class="pt-hint">The children and targets come from My group. Choose whose sheets, how to print, '
+        'then make the PDF.</p>',
+        unsafe_allow_html=True)
     try:
         _load, _cat = _pt_get("load"), _pt_get("catalogue")["catalogue"]
     except Exception as e:
@@ -1374,21 +1433,26 @@ if st.query_params.get("print") == "week":
     if not _kids:
         st.info("No targets yet. Give your children targets on the Precision Teaching page first.")
         st.stop()
+    _card_who = st.container(border=True)
+    _card_how = st.container(border=True)
+    _card_go = st.container(border=True)
     with st.expander("Names file (optional): print real names instead of initials"):
         _nf = st.file_uploader("Names file (CSV)", type=["csv"], key="pw_names_csv")
         if _nf is not None:
             st.session_state["pt_names"] = parse_names_csv(_nf.getvalue().decode("utf-8", errors="ignore"))
             st.success(f"Names loaded for {len(st.session_state['pt_names'])} children (this session only).")
     _classes = sorted({p["class"] for p in _kids})
+    _card_who.markdown('<div class="pt-step">1. Whose sheets</div>', unsafe_allow_html=True)
     _EACH, _ALL = "Each class (a separate file for each)", "All classes together (one file)"
-    _cls = st.radio("Which sheets?", _classes + [_EACH, _ALL], horizontal=True) if len(_classes) > 1 else _ALL
+    _cls = _card_who.radio("Which sheets?", _classes + [_EACH, _ALL], horizontal=True) if len(_classes) > 1 else _ALL
     _pool = [p for p in _kids if _cls in (_EACH, _ALL) or p["class"] == _cls]
-    _ids = st.multiselect("Children", [p["id"] for p in _pool], default=[p["id"] for p in _pool],
+    _ids = _card_who.multiselect("Children", [p["id"] for p in _pool], default=[p["id"] for p in _pool],
                           format_func=lambda i: next(display_name(p) for p in _pool if p["id"] == i), key=f"pw_kids_{_cls}")
-    _duplex = st.checkbox("One piece of paper per day (print double-sided)", value=True,
+    _card_how.markdown('<div class="pt-step">2. How to print</div>', unsafe_allow_html=True)
+    _duplex = _card_how.checkbox("One piece of paper per day (print double-sided)", value=True,
                           help="Each day starts on the front of a new piece of paper, with a big coloured day heading, "
                                "so children can keep the week in their drawer and take out the right day's sheet.")
-    o1, o2, o3 = st.columns(3)
+    o1, o2, o3 = _card_how.columns(3)
     with o1:
         _ans = st.checkbox("Include answer key", value=True)
     with o2:
@@ -1397,16 +1461,17 @@ if st.query_params.get("print") == "week":
         st.selectbox("Handwriting font", list(HW_FONTS), key="hw_font")
     _share = True
     if _duplex:
-        _share = st.checkbox("Save paper: short days can share a piece of paper", value=True,
+        _share = _card_how.checkbox("Save paper: short days can share a piece of paper", value=True,
                              help="A day is never split across two pieces of paper. If a whole day fits in the space "
                                   "left on the paper, it goes there, with its own day heading.")
-        st.caption("Print double-sided (flip on the long edge). Blank sides are added where needed.")
+        _card_how.caption("Print double-sided (flip on the long edge). Blank sides are added where needed.")
     _sel_classes = sorted({p["class"] for p in _pool if p["id"] in _ids})
     _split = _cls == _EACH and len(_sel_classes) > 1
     if st.session_state.get("pw_choice") != _cls:
         st.session_state["pw_choice"] = _cls
         st.session_state.pop("pw_files", None)
-    if st.button("Create this week's sheets (PDF)", type="primary", disabled=not _ids):
+    _card_go.markdown('<div class="pt-step">3. Make the sheets</div>', unsafe_allow_html=True)
+    if _card_go.button("Create this week's sheets (PDF)", type="primary", disabled=not _ids):
         _sel = [p for p in _pool if p["id"] in _ids]
         if _split:
             groups = [(c_, [p for p in _sel if p["class"] == c_]) for c_ in _sel_classes]
@@ -1422,10 +1487,9 @@ if st.query_params.get("print") == "week":
     for c_, nk, n_, pdf_ in st.session_state.get("pw_files", []):
         tag = f"-{c_}" if c_ else ""
         label = f"Download {c_} ({nk} child{'ren' if nk != 1 else ''}, {n_} sheets)" if c_ else f"Download the sheets ({nk} child{'ren' if nk != 1 else ''}, {n_} sheets)"
-        st.download_button(label, pdf_, file_name=f"precision-teaching-week{tag}-{date.today().isoformat()}.pdf",
+        _card_go.download_button(label, pdf_, file_name=f"precision-teaching-week{tag}-{date.today().isoformat()}.pdf",
                            mime="application/pdf", type="primary", key=f"pw_dl_{c_ or 'all'}", on_click="ignore")
-    st.divider()
-    st.markdown("[← Back to My group](https://staff.wallscourt-farm-academy.co.uk/precision/) to change children or targets.")
+    st.markdown(f'<div class="pt-foot">Wallscourt Farm Academy · {_PRINT_VER}</div>', unsafe_allow_html=True)
     st.stop()
 
 # ── Main Teacher App ────────────────────────────────────────────────────────
@@ -1491,7 +1555,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-19.10.26a")
+st.caption("Wallscourt Farm Academy · WFA-18.10.26i")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
