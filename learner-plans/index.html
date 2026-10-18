@@ -198,6 +198,7 @@ textarea.fld, .form-group textarea { resize: vertical; min-height: 70px; line-he
       </div>
     </div>
     <div class="yg-nav" id="ygNav"></div>
+    <div class="yg-nav" id="classBar"></div>
     <div class="sort-bar" id="sortBar"></div>
     <input type="text" class="search-bar" placeholder="Search by initials…" oninput="renderDashboard()" id="searchBar">
     <div class="children-grid" id="childrenGrid"></div>
@@ -539,6 +540,10 @@ const MEET_DAYS = [['Mon', 'Monday'], ['Wed', 'Wednesday']];
 let meetData = {};
 let meetReady = false;
 let sortMode = lsGet('wfa_lp_sort') === 'meeting' ? 'meeting' : 'name';
+let activeClass = lsGet('wfa_lp_class') || 'All';
+
+function setClass(c) { activeClass = c; lsSet('wfa_lp_class', c); renderDashboard(); }
+function classOk(c) { return activeYG === 'All' || activeClass === 'All' || c.class_name === activeClass; }
 
 async function loadMeet() {
   try {
@@ -581,8 +586,10 @@ async function moveMeet(id, dir) {
   const c = children.find(x => x.id === id);
   const day = meetFor(c).day;
   const list = meetList(day, children.filter(x => normYG(x.year_group) === normYG(c.year_group)));
-  const i = list.findIndex(x => x.id === id), j = i + dir;
-  if (j < 0 || j >= list.length) return;
+  const visible = list.filter(classOk);
+  const vi = visible.findIndex(x => x.id === id), vj = vi + dir;
+  if (vj < 0 || vj >= visible.length) return;
+  const i = list.indexOf(visible[vi]), j = list.indexOf(visible[vj]);
   [list[i], list[j]] = [list[j], list[i]];
   const changes = {};
   list.forEach((x, n) => { changes[x.id] = { day, pos: n + 1 }; });
@@ -642,6 +649,12 @@ function renderDashboard() {
     `<button class="yg-btn${activeYG===y?' active':''}" onclick="setYG('${y}')">${ygLabel(y)}</button>`
   ).join('') + `<span style="color:var(--border);margin:0 4px">|</span><button class="yg-btn${showEhcpOnly?' active':''}" style="${showEhcpOnly?'background:#c0392b;border-color:#c0392b;':''}" onclick="toggleEhcpFilter()">EHCP</button>`;
 
+  const classBar = document.getElementById('classBar');
+  const classes = activeYG === 'All' ? [] : [...new Set(children.filter(c => normYG(c.year_group) === activeYG).map(c => c.class_name).filter(Boolean))].sort();
+  if (activeClass !== 'All' && !classes.includes(activeClass)) activeClass = 'All';
+  if (classBar) classBar.innerHTML = classes.length > 1
+    ? `<span class="lbl" style="align-self:center;margin-right:4px">Class</span>` + ['All', ...classes].map(k => `<button class="yg-btn${activeClass===k?' active':''}" onclick="setClass('${k}')">${k === 'All' ? 'All classes' : esc(k)}</button>`).join('')
+    : '';
   const sortBar = document.getElementById('sortBar');
   if (sortBar) sortBar.innerHTML = `<span class="lbl">Order</span>
     <button class="yg-btn${sortMode === 'name' ? ' active' : ''}" onclick="setSortMode('name')">By initials</button>
@@ -649,10 +662,11 @@ function renderDashboard() {
   if (sortMode === 'meeting') {
     if (sb) sb.style.display = 'none';
     if (ygNav) ygNav.innerHTML = ygsPresent.filter(y => y !== 'All').map(y => `<button class="yg-btn${activeYG===y?' active':''}" onclick="setYG('${y}')">${ygLabel(y)}</button>`).join('');
-    renderMeetingView(grid, children.filter(c => normYG(c.year_group) === activeYG));
+    renderMeetingView(grid, children.filter(c => normYG(c.year_group) === activeYG && classOk(c)));
     return;
   }
   const ygList = (activeYG === 'All' ? children : children.filter(c => normYG(c.year_group) === activeYG))
+    .filter(classOk)
     .filter(c => !filter || childLabel(c).toLowerCase().includes(filter) || (c.name || '').toLowerCase().includes(filter))
     .filter(c => !showEhcpOnly || planIsEhcp(c, planCache[c.id]?.[activeYear]));
 
@@ -707,6 +721,7 @@ function renderArchive() {
   if (ygNav) ygNav.innerHTML = '';
   if (searchBar) searchBar.style.display = 'none';
   const sortBarEl = document.getElementById('sortBar'); if (sortBarEl) sortBarEl.innerHTML = '';
+  const classBarEl = document.getElementById('classBar'); if (classBarEl) classBarEl.innerHTML = '';
 
   if (!archivedChildren.length) {
     grid.style.display = 'grid';
@@ -1343,7 +1358,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-18.10.26a
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-18.10.26b
 </footer>
 </body>
 </html>
