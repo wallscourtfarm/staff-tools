@@ -1361,7 +1361,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 if st.query_params.get("print") == "week":
     st.markdown("[← Back to My group](https://staff.wallscourt-farm-academy.co.uk/precision/)")
     st.markdown(logo_html("Print this week"), unsafe_allow_html=True)
-    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26g · Children and targets come from the Precision Teaching page "
+    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26h · Children and targets come from the Precision Teaching page "
                f"(staff.wallscourt-farm-academy.co.uk/precision/).")
     try:
         _load, _cat = _pt_get("load"), _pt_get("catalogue")["catalogue"]
@@ -1378,8 +1378,9 @@ if st.query_params.get("print") == "week":
             st.session_state["pt_names"] = parse_names_csv(_nf.getvalue().decode("utf-8", errors="ignore"))
             st.success(f"Names loaded for {len(st.session_state['pt_names'])} children (this session only).")
     _classes = sorted({p["class"] for p in _kids})
-    _cls = st.selectbox("Class", ["All"] + _classes) if len(_classes) > 1 else "All"
-    _pool = [p for p in _kids if _cls == "All" or p["class"] == _cls]
+    _EACH, _ALL = "Each class (a separate file for each)", "All classes together (one file)"
+    _cls = st.radio("Which sheets?", _classes + [_EACH, _ALL], horizontal=True) if len(_classes) > 1 else _ALL
+    _pool = [p for p in _kids if _cls in (_EACH, _ALL) or p["class"] == _cls]
     _ids = st.multiselect("Children", [p["id"] for p in _pool], default=[p["id"] for p in _pool],
                           format_func=lambda i: next(display_name(p) for p in _pool if p["id"] == i), key=f"pw_kids_{_cls}")
     _duplex = st.checkbox("One piece of paper per day (print double-sided)", value=True,
@@ -1399,13 +1400,16 @@ if st.query_params.get("print") == "week":
                                   "left on the paper, it goes there, with its own day heading.")
         st.caption("Print double-sided (flip on the long edge). Blank sides are added where needed.")
     _sel_classes = sorted({p["class"] for p in _pool if p["id"] in _ids})
-    _split = False
-    if len(_sel_classes) > 1:
-        _split = st.checkbox("A separate file for each class", value=True,
-                             help="So each class teacher gets their own set of sheets to print.")
+    _split = _cls == _EACH and len(_sel_classes) > 1
+    if st.session_state.get("pw_choice") != _cls:
+        st.session_state["pw_choice"] = _cls
+        st.session_state.pop("pw_files", None)
     if st.button("Create this week's sheets (PDF)", type="primary", disabled=not _ids):
         _sel = [p for p in _pool if p["id"] in _ids]
-        groups = [(c_, [p for p in _sel if p["class"] == c_]) for c_ in _sel_classes] if _split else [("", _sel)]
+        if _split:
+            groups = [(c_, [p for p in _sel if p["class"] == c_]) for c_ in _sel_classes]
+        else:
+            groups = [(_cls if _cls in _classes else "", _sel)]      # one class: its name goes on the file
         files = []
         for c_, kids_ in groups:
             ids_ = {p["id"] for p in kids_}
@@ -1485,7 +1489,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-18.10.26g")
+st.caption("Wallscourt Farm Academy · WFA-18.10.26h")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
