@@ -525,7 +525,97 @@ def render_two_per_page_pdf(c, page_w, page_h, margin, usable_w, slot_entries, i
         render_compact_sheet_slot(c, margin, usable_w, bottom_top, bottom_bottom, *slot_entries[1], include_answers)
 
 
-def build_week_pdf(wk_kids, rows, plan_now, ladders_data, wk_answers=True, wk_cover=True, review=False):
+# Day colours on the day-per-paper sheets, so a child can find "Wednesday's" sheet in their drawer at a glance.
+_DAY_COLOURS = {"Mon": (0x17, 0x98, 0xd3), "Tue": (0x2b, 0xae, 0x62), "Wed": (0xe5, 0x7d, 0x24),
+                "Thu": (0x8e, 0x44, 0xad), "Fri": (0xc0, 0x15, 0x7b)}
+
+
+def _build_day_papers(c, buf, wk_kids, rows, plan_now, ladders_data, wk_answers, wk_cover, review,
+                      timetable_page, DAYS, DAY_FULL, page_w, page_h, margin, usable_w):
+    """For double-sided printing: every day starts on the FRONT of a new piece of paper, so each child has one
+    paper (or more) per day to keep in their drawer. Each side carries a big coloured day heading and 'side 1 of 2'.
+    Half-page sheets sit two to a side; full-page sheets take a side each. A blank page is added where needed so
+    the next day never lands on the back of the previous one."""
+    pages = [0]
+    band_h = 16 * _mm
+
+    def end_page():
+        c.showPage()
+        pages[0] += 1
+
+    def to_front():
+        if pages[0] % 2 == 1:            # we are on a back: leave it blank so the next thing starts a new paper
+            c.setFont("Helvetica", 9)
+            c.setFillColorRGB(*_GREY)
+            c.drawCentredString(page_w / 2, page_h / 2, "This side is blank")
+            c.setFillColorRGB(0, 0, 0)
+            end_page()
+
+    def day_band(p, d, side, n_sides):
+        r, g, b = (v / 255 for v in _DAY_COLOURS[d])
+        top = page_h - margin
+        c.setFillColorRGB(r, g, b)
+        c.roundRect(margin, top - band_h, usable_w, band_h, 8, stroke=0, fill=1)
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont("Helvetica-Bold", 26)
+        c.drawString(margin + 6 * _mm, top - band_h + 4.8 * _mm, DAY_FULL[d])
+        c.setFont("Helvetica-Bold", 13)
+        right = f"{display_name(p)}   ·   side {side} of {n_sides}" if n_sides > 1 else display_name(p)
+        c.drawRightString(margin + usable_w - 6 * _mm, top - band_h + 6 * _mm, right)
+        c.setFillColorRGB(0, 0, 0)
+        return top - band_h - 4 * _mm
+
+    n_sheets = 0
+    for p in wk_kids:
+        plan = plan_now.get(p["id"], {})
+        items = [(lab, plan.get(k, [])) for pp, k, lab in rows if pp["id"] == p["id"]]
+        if not any(days for _, days in items):
+            continue
+        if wk_cover:
+            to_front()
+            timetable_page(p, items)
+            pages[0] += 1                  # timetable_page() ends its own page
+        for d in DAYS:
+            halves, fulls = [], []
+            for pp, k, lab in rows:
+                if pp["id"] != p["id"] or not k.startswith("skill:") or d not in plan.get(k, []):
+                    continue
+                sid = k.split(":", 1)[1]
+                step = get_step(ladders_data, sid)
+                pool = get_active_window(p, sid, step) if is_windowed(step) else None
+                sheet = generate_sheet(p, sid, ladders_data, item_pool=pool, include_review=review)
+                if not sheet:
+                    continue
+                sheet["day_label"] = DAY_FULL[d]
+                n_sheets += 1
+                (fulls if _is_full_page(sheet) else halves).append(sheet)
+            sides = [("half", halves[i:i + 2]) for i in range(0, len(halves), 2)] + [("full", [s]) for s in fulls]
+            if not sides:
+                continue
+            to_front()
+            for n, (kind, sheets) in enumerate(sides, 1):
+                top = day_band(p, d, n, len(sides))
+                if kind == "full":
+                    render_compact_sheet_slot(c, margin, usable_w, top, margin, p, sheets[0], wk_answers)
+                else:
+                    gap = 6 * _mm
+                    half = (top - margin - gap) / 2
+                    render_compact_sheet_slot(c, margin, usable_w, top, top - half, p, sheets[0], wk_answers)
+                    if len(sheets) > 1:
+                        cut = top - half - gap / 2
+                        c.setDash([4, 3], 0)
+                        c.setStrokeColorRGB(0.75, 0.75, 0.75)
+                        c.setLineWidth(0.6)
+                        c.line(margin, cut, margin + usable_w, cut)
+                        c.setDash()
+                        render_compact_sheet_slot(c, margin, usable_w, top - half - gap, margin, p, sheets[1], wk_answers)
+                end_page()
+    c.save()
+    buf.seek(0)
+    return buf.getvalue(), n_sheets
+
+
+def build_week_pdf(wk_kids, rows, plan_now, ladders_data, wk_answers=True, wk_cover=True, review=False, day_per_paper=False):
     """One PDF for the chosen children: per child an optional timetable page, then that week's sheets in day order.
     rows: [(pupil, key, label)] where key is "skill:<step id>" (gets a sheet) or anything else (timetable only).
     plan_now: {pupil id: {key: [days]}}. Returns (pdf bytes, number of sheets)."""
@@ -570,6 +660,10 @@ def build_week_pdf(wk_kids, rows, plan_now, ladders_data, wk_answers=True, wk_co
             if y < margin + row_h:
                 break
         c.showPage()
+
+    if day_per_paper:
+        return _build_day_papers(c, buf, wk_kids, rows, plan_now, ladders_data, wk_answers, wk_cover, review,
+                                 _timetable_page, DAYS, DAY_FULL, page_w, page_h, margin, usable_w)
 
     n_sheets = 0
     for p in wk_kids:
@@ -1111,7 +1205,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 if st.query_params.get("print") == "week":
     st.markdown("[← Back to My group](https://staff.wallscourt-farm-academy.co.uk/precision/)")
     st.markdown(logo_html("Print this week"), unsafe_allow_html=True)
-    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26a · Children and targets come from the Precision Teaching page "
+    st.caption(f"Wallscourt Farm Academy · WFA-18.10.26b · Children and targets come from the Precision Teaching page "
                f"(staff.wallscourt-farm-academy.co.uk/precision/).")
     try:
         _load, _cat = _pt_get("load"), _pt_get("catalogue")["catalogue"]
@@ -1132,17 +1226,22 @@ if st.query_params.get("print") == "week":
     _pool = [p for p in _kids if _cls == "All" or p["class"] == _cls]
     _ids = st.multiselect("Children", [p["id"] for p in _pool], default=[p["id"] for p in _pool],
                           format_func=lambda i: next(display_name(p) for p in _pool if p["id"] == i), key=f"pw_kids_{_cls}")
+    _duplex = st.checkbox("One piece of paper per day (print double-sided)", value=True,
+                          help="Each day starts on the front of a new piece of paper, with a big coloured day heading, "
+                               "so children can keep the week in their drawer and take out the right day's sheet.")
     o1, o2, o3 = st.columns(3)
     with o1:
         _ans = st.checkbox("Include answer key", value=True)
     with o2:
-        _cover = st.checkbox("Timetable page for each child", value=True)
+        _cover = st.checkbox("Timetable page for each child", value=False)
     with o3:
         st.selectbox("Handwriting font", list(HW_FONTS), key="hw_font")
+    if _duplex:
+        st.caption("Print double-sided (flip on the long edge). Blank sides are added where needed so every day starts on a new piece of paper.")
     if st.button("Create this week's sheets (PDF)", type="primary", disabled=not _ids):
         _sel = [p for p in _pool if p["id"] in _ids]
         _r = [r for r in _rows if r[0]["id"] in _ids]
-        _pdf, _n = build_week_pdf(_sel, _r, _plan, _L, _ans, _cover, False)
+        _pdf, _n = build_week_pdf(_sel, _r, _plan, _L, _ans, _cover, False, day_per_paper=_duplex)
         st.success(f"Made {_n} sheet(s) for {len(_sel)} child(ren).")
         st.download_button("Download the sheets", _pdf, file_name=f"precision-teaching-week-{date.today().isoformat()}.pdf",
                            mime="application/pdf", type="primary")
@@ -1213,7 +1312,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-18.10.26a")
+st.caption("Wallscourt Farm Academy · WFA-18.10.26b")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
