@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Name Stamper · WFA</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
 <style>
 :root { --brand:#1798d3; --ink:#0a0101; --muted:#667; --bg:#f4f7fb; }
@@ -29,7 +30,7 @@ button:disabled { opacity:.5; cursor: default; }
 </style>
 </head>
 <body>
-<header><h1>🔒 Name Stamper</h1><span class="ver">WFA-18.10.26a</span></header>
+<header><h1>🔒 Name Stamper</h1><span class="ver">WFA-18.10.26b</span></header>
 <main>
   <div class="panel">
     <p><b>What this does.</b> Sheets from the Home Learning generator are made with each child's initials. Here your own browser writes the real first name over the initials, using your names file. Nothing is uploaded: the PDF and the names file stay on this computer, and are forgotten when you close or reload this page.</p>
@@ -41,8 +42,8 @@ button:disabled { opacity:.5; cursor: default; }
     <div id="nameInfo" class="note"></div>
   </div>
   <div class="panel">
-    <h2>2. The Home Learning PDF(s)</h2>
-    <div class="drop" id="drop">Drop the PDF here, or click to choose<input type="file" id="pdfs" accept="application/pdf,.pdf" multiple hidden></div>
+    <h2>2. The Home Learning PDF(s), or the zip you downloaded</h2>
+    <div class="drop" id="drop">Drop the PDF or the zip here, or click to choose<input type="file" id="pdfs" accept="application/pdf,.pdf,application/zip,.zip" multiple hidden></div>
     <div id="pdfInfo" class="note" style="margin-top:8px"></div>
   </div>
   <div class="panel">
@@ -78,7 +79,7 @@ button:disabled { opacity:.5; cursor: default; }
   ['dragover', 'dragenter'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
   ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
   function setPdfs(list) {
-    pdfFiles = Array.prototype.slice.call(list || []).filter(function (f) { return /pdf$/i.test(f.type) || /\.pdf$/i.test(f.name); });
+    pdfFiles = Array.prototype.slice.call(list || []).filter(function (f) { return /\.(pdf|zip)$/i.test(f.name); });
     $('pdfInfo').textContent = pdfFiles.map(function (f) { return f.name; }).join(', ');
     refresh();
   }
@@ -90,7 +91,7 @@ button:disabled { opacity:.5; cursor: default; }
   }
 
   async function stampOne(file) {
-    var bytes = await file.arrayBuffer();
+    var bytes = file.bytes;
     var doc = await PDFLib.PDFDocument.load(bytes, { updateMetadata: false });
     var kw = doc.getKeywords() || '';
     if (kw.indexOf('WFASTAMPS1:') !== 0) return { error: 'No name positions in ' + file.name + ' (was it made by the Home Learning generator?)' };
@@ -112,21 +113,44 @@ button:disabled { opacity:.5; cursor: default; }
     return { bytes: out, done: done, missing: missing };
   }
 
+  async function expand() {   // every PDF to stamp: loose PDFs, plus the PDFs inside any zip
+    var items = [];
+    for (var i = 0; i < pdfFiles.length; i++) {
+      var f = pdfFiles[i];
+      if (/\.zip$/i.test(f.name)) {
+        var z = await JSZip.loadAsync(await f.arrayBuffer());
+        var entries = Object.keys(z.files).filter(function (n) { return /\.pdf$/i.test(n) && !z.files[n].dir && n.indexOf('__MACOSX') < 0; });
+        for (var j = 0; j < entries.length; j++) items.push({ name: entries[j].split('/').pop(), bytes: await z.files[entries[j]].async('arraybuffer') });
+      } else items.push({ name: f.name, bytes: await f.arrayBuffer() });
+    }
+    return items;
+  }
+
   $('go').addEventListener('click', async function () {
     $('go').disabled = true; $('res').innerHTML = ''; urls.forEach(URL.revokeObjectURL); urls = [];
     try {
-      var lines = [];
-      for (var i = 0; i < pdfFiles.length; i++) {
-        status('Adding names to ' + pdfFiles[i].name + '…');
-        var r = await stampOne(pdfFiles[i]);
+      var items = await expand(), lines = [], made = [];
+      if (!items.length) { status('There were no PDFs to stamp.', true); $('go').disabled = false; return; }
+      for (var i = 0; i < items.length; i++) {
+        status('Adding names to ' + items[i].name + ' (' + (i + 1) + ' of ' + items.length + ')…');
+        var r = await stampOne(items[i]);
         if (r.error) { lines.push(r.error); continue; }
-        var url = URL.createObjectURL(new Blob([r.bytes], { type: 'application/pdf' })); urls.push(url);
-        var a = document.createElement('a'); a.href = url; a.download = pdfFiles[i].name.replace(/\.pdf$/i, '') + '-names.pdf';
-        a.textContent = '⬇ ' + a.download + '  (' + r.done + ' names added' + (r.missing ? ', ' + r.missing + ' not in your names file: left as initials' : '') + ')';
-        $('res').appendChild(a);
+        var out = items[i].name.replace(/\.pdf$/i, '') + '-names.pdf';
+        made.push({ name: out, bytes: r.bytes, done: r.done, missing: r.missing });
       }
+      function link(name, blob, label) {
+        var url = URL.createObjectURL(blob); urls.push(url);
+        var a = document.createElement('a'); a.href = url; a.download = name; a.textContent = label; $('res').appendChild(a);
+      }
+      if (made.length > 1) {
+        var zip = new JSZip(); made.forEach(function (m) { zip.file(m.name, m.bytes); });
+        link('WFA-with-names.zip', await zip.generateAsync({ type: 'blob' }), '⬇ All ' + made.length + ' PDFs with names (zip)');
+      }
+      made.forEach(function (m) {
+        link(m.name, new Blob([m.bytes], { type: 'application/pdf' }), '⬇ ' + m.name + '  (' + m.done + ' names added' + (m.missing ? ', ' + m.missing + ' not in your names file: left as initials' : '') + ')');
+      });
       status(lines.length ? lines.join(' ') : 'Done. Download below. Names are in the PDFs only; nothing was sent anywhere.', lines.length > 0);
-    } catch (e) { status('Something went wrong (' + (e && e.name || 'error') + '). Check it is a Home Learning PDF.', true); }
+    } catch (e) { status('Something went wrong (' + (e && e.name || 'error') + '). Check it is a Home Learning PDF or zip.', true); }
     $('go').disabled = false;
   });
   window.addEventListener('pagehide', function () { if (names) names.clear(); names = null; });
