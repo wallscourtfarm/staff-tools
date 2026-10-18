@@ -87,6 +87,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .partlist .opt { border: 0; border-top: 1px solid var(--line); border-radius: 0; width: 100%; }
   .partlist .grp { padding: 6px 12px; background: var(--soft); font-size: .8rem; font-weight: 900; color: var(--muted); position: sticky; top: 0; }
   .err-msg { color: var(--bad); font-weight: 800; }
+  .scroll-x { overflow-x: auto; }
   /* tabs */
   .tabs { display: flex; gap: 6px; background: #e3eef6; padding: 5px; border-radius: 12px; }
   .tabs button { border: 0; background: none; border-radius: 9px; padding: 9px 16px; font-weight: 900; color: var(--muted); }
@@ -110,6 +111,38 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .rv .nxt .new { color: var(--wfa-blue); font-weight: 800; }
   .rv .done-note { color: #1d7a45; font-weight: 800; }
   .rv .acts { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  /* progress */
+  .pg { width: 100%; border-collapse: collapse; }
+  .pg th { font-size: .8rem; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 900; padding: 10px 8px; text-align: left; border-bottom: 2px solid var(--line); }
+  .pg td { padding: 10px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+  .pg td.kid button { border: 0; background: none; padding: 0; text-align: left; }
+  .pg td.kid b { font-size: 1.1rem; color: var(--wfa-blue); text-decoration: underline; display: block; }
+  .pg td.kid small { color: var(--muted); font-weight: 700; }
+  .pg .n { font-size: 1.35rem; font-weight: 900; }
+  .pg .plus { color: #1d7a45; font-weight: 800; font-size: .85rem; display: block; }
+  .pg .back { color: var(--warn); font-weight: 800; font-size: .8rem; display: block; }
+  .pg .none { color: #b9cbdb; }
+  .parea { margin-bottom: 26px; }
+  .parea h4 { font-size: 1.05rem; font-weight: 900; margin-bottom: 4px; }
+  .parea .sum { color: var(--muted); font-weight: 700; font-size: .9rem; margin-bottom: 8px; }
+  .ppart { padding: 10px 0; border-top: 1px solid var(--line); }
+  .ppart .pn { display: flex; gap: 10px; align-items: baseline; font-weight: 800; margin-bottom: 6px; flex-wrap: wrap; }
+  .ppart .pn small { color: var(--muted); font-weight: 800; }
+  .ichip { border: 2px dashed #cfdbe6; background: #fff; border-radius: 999px; padding: 6px 11px; font-weight: 800; font-size: .95rem; color: #9aabbb; }
+  .ichip.conf { border: 2px solid var(--ok); background: #eaf8f0; color: #1d7a45; }
+  .ichip.now { border: 2px solid var(--wfa-blue); background: #fff; color: var(--wfa-blue); }
+  .ichip.back { border: 2px solid var(--warn); background: #fff7ef; color: #b45c10; }
+  .ichip.pick { box-shadow: 0 0 0 3px var(--ink); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .85rem; color: var(--muted); font-weight: 700; margin-bottom: 14px; }
+  .legend .ichip { padding: 3px 9px; font-size: .8rem; }
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 70px; margin: 6px 0 4px; }
+  .bars div { flex: 1; background: var(--ok); border-radius: 4px 4px 0 0; min-height: 2px; position: relative; }
+  .bars div span { position: absolute; top: -17px; left: 0; right: 0; text-align: center; font-size: .72rem; font-weight: 800; color: var(--ink); }
+  .barlbl { display: flex; gap: 4px; font-size: .68rem; color: var(--muted); font-weight: 700; margin-bottom: 18px; }
+  .barlbl span { flex: 1; text-align: center; }
+  .chip.known { border-style: dashed; border-color: var(--ok); }
+  .chip.known:not(.on) { color: #1d7a45; }
+  .chip.known::after { content: ' ✓'; font-size: .8em; }
   .linkish { border: 0; background: none; color: var(--wfa-blue); font-weight: 800; padding: 4px 0; }
   footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 10px; }
   @media (max-width: 720px) {
@@ -130,7 +163,10 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div id="banner" class="banner"></div>
 
   <div class="bar">
-    <div class="tabs" role="tablist"><button id="tabGroup" class="on">My group</button><button id="tabWeek">End of week</button></div>
+    <div class="tabs" role="tablist"><button id="tabGroup" class="on">My group</button><button id="tabWeek">End of week</button><button id="tabProg">Progress</button></div>
+    <select id="pRange" aria-label="Since" hidden>
+      <option value="year">This school year</option><option value="6w">Last 6 weeks</option><option value="all">All time</option>
+    </select>
     <button class="btn" id="btnAdd">+ Add children</button>
     <select id="fClass" aria-label="Class" hidden></select>
     <span class="grow"></span>
@@ -139,6 +175,10 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   </div>
 
   <div class="card" id="group"><div class="empty">Loading…</div></div>
+  <div id="progView" hidden>
+    <p class="wkhint">How many items each child is <b style="color:#1d7a45">confident with now</b>, and how many became confident in the time chosen. Tap a child to see every item, when it became confident, and to put any of them back on practice.</p>
+    <div class="card scroll-x" id="prog"><div class="empty">Loading…</div></div>
+  </div>
   <div id="weekView" hidden>
     <p class="wkhint">For each target, tap what the child is now <b style="color:#1d7a45">confident with</b>. Those drop off; the rest roll on to next week, and new ones fill the gaps. Nothing confident yet? Keep it the same. Then print next week's sheets.</p>
     <div class="card" id="week"></div>
@@ -150,7 +190,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <button class="btn quiet" id="btnClearSel">Clear</button>
   </div>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-18.10.26c</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-18.10.26d</span></footer>
 
 <div class="veil" id="veil"></div>
 
@@ -167,6 +207,12 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div class="chips" id="aList"></div>
   </div>
   <div class="pf"><span class="grow" id="aCount"></span><button class="btn" id="aSave" disabled>Add</button></div>
+</section>
+
+<!-- One child's progress -->
+<section class="panel" id="pProg" aria-label="Progress">
+  <div class="ph"><h3 id="ppTitle">Progress</h3><button class="x" data-close>✕</button></div>
+  <div class="pb" id="ppBody"></div>
 </section>
 
 <!-- Give / edit a target -->
@@ -235,7 +281,11 @@ function post(body) {
       return d;
     });
 }
-function take(d) { S.children = d.children; S.targets = d.targets; S.reviews = d.reviews || []; S.week = d.week || S.week; }
+function take(d) {
+  S.children = d.children; S.targets = d.targets; S.reviews = d.reviews || []; S.week = d.week || S.week;
+  S.confident = d.confident || {};
+  S.progress = null;                         // anything saved may change progress: fetch it again when needed
+}
 function thisMonday() {
   var d = new Date(); d.setDate(d.getDate() - (d.getDay() + 6) % 7);
   return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
@@ -258,6 +308,9 @@ function area(id) { return S.catalogue.areas.find(function (a) { return a.id ===
 function render() {
   $('group').hidden = S.view !== 'group';
   $('weekView').hidden = S.view !== 'week';
+  $('progView').hidden = S.view !== 'prog';
+  $('pRange').hidden = S.view !== 'prog';
+  $('tabProg').className = S.view === 'prog' ? 'on' : '';
   $('btnAdd').hidden = S.view !== 'group';
   $('tabGroup').className = S.view === 'group' ? 'on' : '';
   $('tabWeek').className = S.view === 'week' ? 'on' : '';
@@ -298,6 +351,7 @@ function render() {
     ]));
   });
   if (S.view === 'week') renderWeek();
+  if (S.view === 'prog') renderProgress();
   var n = S.view === 'group' ? S.sel.size : 0;
   $('selbar').className = 'selbar' + (n ? ' show' : '');
   $('selCount').textContent = n + ' child' + (n === 1 ? '' : 'ren') + ' selected';
@@ -413,6 +467,154 @@ function reviewRow(c, t, first) {
 function setView(v) { S.view = v; S.sel.clear(); render(); }
 $('tabGroup').onclick = function () { setView('group'); };
 $('tabWeek').onclick = function () { setView('week'); };
+$('tabProg').onclick = function () { setView('prog'); };
+$('pRange').addEventListener('change', render);
+
+// ── Progress ────────────────────────────────────────────────────────────────────────────────────────────────
+// pt_item on the server: one record per child and item (when it started, first became confident, whether it has
+// been put back on practice). Confident items are never lost: they stay here and can go back on a target.
+function getProgress() {
+  if (S.progress) return Promise.resolve(S.progress);
+  return getJSON(API + '&action=progress').then(function (d) {
+    if (!d.ok) throw new Error(d.error || 'Could not load');
+    S.progress = d; return d;
+  });
+}
+function rangeStart() {
+  var v = $('pRange').value, now = new Date();
+  if (v === 'all') return null;
+  if (v === '6w') return new Date(now.getTime() - 42 * 864e5);
+  var y = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;   // school year starts 1 September
+  return new Date(y, 8, 1);
+}
+function rangeText() { return { year: 'this school year', '6w': 'in the last 6 weeks', all: '' }[$('pRange').value]; }
+function inRange(iso, from) { return iso && (!from || new Date(iso) >= from); }
+var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function dmy(iso) { var d = new Date(iso); return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + String(d.getFullYear()).slice(2); }
+function areaShort(a) { return a.name.replace(/ \(.*\)$/, '').replace('Common exception words: ', 'CEW '); }
+function renderProgress() {
+  var box = $('prog');
+  getProgress().then(function (d) {
+    if (S.view !== 'prog') return;
+    var fc = $('fClass').value, from = rangeStart();
+    var kids = d.children.filter(function (c) { return !fc || c.class === fc; });
+    var used = new Set(d.items.map(function (i) { return i.area; }));
+    var areas = S.catalogue.areas.filter(function (a) { return used.has(a.id); });
+    box.innerHTML = '';
+    if (!kids.length || !areas.length) {
+      box.appendChild(el('div', { class: 'empty' }, [el('b', { text: 'Nothing to show yet' }),
+        'Progress builds up from the End of week reviews.']));
+      return;
+    }
+    var head = el('tr', {}, [el('th', { text: 'Child' })].concat(areas.map(function (a) { return el('th', { text: areaShort(a) }); })));
+    var tb = el('tbody');
+    kids.forEach(function (c) {
+      var mine = d.items.filter(function (i) { return i.pupilCode === c.pupilCode; });
+      var tr = el('tr', {}, [el('td', { class: 'kid' }, [el('button', { on: { click: function () { openProgress(c); } } },
+        [el('b', {}, [kidLabel(c)]), el('small', { text: c.class })])])]);
+      areas.forEach(function (a) {
+        var its = mine.filter(function (i) { return i.area === a.id; });
+        var conf = its.filter(function (i) { return i.status === 'confident'; }).length;
+        var fresh = its.filter(function (i) { return inRange(i.firstConfidentAt, from); }).length;
+        var back = its.filter(function (i) { return i.status === 'learning' && i.timesReadded; }).length;
+        var td = el('td');
+        if (!its.length) td.appendChild(el('span', { class: 'n none', text: '–' }));
+        else {
+          td.appendChild(el('span', { class: 'n', text: String(conf) }));
+          if (from && fresh) td.appendChild(el('span', { class: 'plus', text: '+' + fresh + ' ' + rangeText() }));
+          if (back) td.appendChild(el('span', { class: 'back', text: back + ' back on practice' }));
+        }
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    box.appendChild(el('table', { class: 'pg' }, [el('thead', {}, [head]), tb]));
+  }).catch(function (e) { box.innerHTML = ''; banner('err', 'Could not load progress: ' + e.message, renderProgress); });
+}
+
+var PP = { kid: null, pick: {} };
+function openProgress(c) { PP = { kid: c, pick: {} }; openPanel('pProg'); drawProgress(); }
+function drawProgress() {
+  var c = PP.kid, body = $('ppBody');
+  $('ppTitle').textContent = '';
+  $('ppTitle').appendChild(document.createTextNode('Progress: '));
+  $('ppTitle').appendChild(kidLabel(c));
+  body.innerHTML = 'Loading…';
+  getProgress().then(function (d) {
+    body.innerHTML = '';
+    var mine = d.items.filter(function (i) { return i.pupilCode === c.pupilCode; });
+    var now = new Set();
+    S.targets.forEach(function (t) { if (t.pupilCode === c.pupilCode) t.items.forEach(function (i) { now.add(t.area + '|' + i); }); });
+    body.appendChild(el('div', { class: 'legend' }, [el('span', { class: 'ichip conf', text: 'confident' }), el('span', { class: 'ichip now', text: 'practising now' }),
+      el('span', { class: 'ichip back', text: 'back on practice' }), el('span', { class: 'ichip', text: 'not started' }),
+      'Tap items, then "Practise again" to put them on a target.']));
+    // new confident items per week, last 12 weeks
+    var mon = new Date(); mon.setHours(0, 0, 0, 0); mon.setDate(mon.getDate() - (mon.getDay() + 6) % 7);
+    var weeks = [];
+    for (var w = 11; w >= 0; w--) weeks.push(new Date(mon.getTime() - w * 7 * 864e5));
+    var counts = weeks.map(function (ws, k) {
+      var we = k < 11 ? weeks[k + 1] : new Date(ws.getTime() + 7 * 864e5);
+      return mine.filter(function (i) { var f = i.firstConfidentAt && new Date(i.firstConfidentAt); return f && f >= ws && f < we; }).length;
+    });
+    var max = Math.max.apply(null, counts.concat([1]));
+    body.appendChild(el('h4', { style: 'font-weight:900;margin-bottom:22px', text: 'Newly confident each week (all areas)' }));
+    body.appendChild(el('div', { class: 'bars' }, counts.map(function (n) {
+      return el('div', { style: 'height:' + Math.max(2, Math.round(n / max * 100)) + '%;' + (n ? '' : 'background:#e3eef6') }, [el('span', { text: n ? String(n) : '' })]);
+    })));
+    body.appendChild(el('div', { class: 'barlbl' }, weeks.map(function (ws) { return el('span', { text: ws.getDate() + '/' + (ws.getMonth() + 1) }); })));
+
+    S.catalogue.areas.forEach(function (a) {
+      var its = mine.filter(function (i) { return i.area === a.id; });
+      if (!its.length) return;
+      var byItem = {}; its.forEach(function (i) { byItem[i.item] = i; });
+      var conf = its.filter(function (i) { return i.status === 'confident'; }).length;
+      var sec = el('div', { class: 'parea' }, [el('h4', { text: areaShort(a) }),
+        el('div', { class: 'sum', text: conf + ' confident now · ' + its.filter(function (i) { return i.firstConfidentAt; }).length + ' ever confident · started ' + dmy(its.reduce(function (m, i) { return i.startedAt < m ? i.startedAt : m; }, its[0].startedAt)) })]);
+      var shown = new Set();
+      a.parts.forEach(function (p) {
+        if (/_(own|any)$/.test(p.id)) return;                 // 'any letters' / 'your own': only what is left over
+        var hit = p.items.filter(function (i) { return byItem[i]; });
+        if (!hit.length) return;
+        p.items.forEach(function (i) { shown.add(i); });
+        sec.appendChild(partBlock(a, p, p.items, byItem, now));
+      });
+      var own = its.map(function (i) { return i.item; }).filter(function (i) { return !shown.has(i); });
+      if (own.length) {
+        var ownPart = a.parts.find(function (p) { return /_(own|any)$/.test(p.id); });
+        sec.appendChild(partBlock(a, ownPart || { id: '', name: 'Others' }, own, byItem, now, 'Others'));
+      }
+      body.appendChild(sec);
+    });
+    if (!mine.length) body.appendChild(el('div', { class: 'empty', text: 'Nothing yet: progress builds up from the End of week reviews.' }));
+  }).catch(function (e) { body.textContent = 'Could not load progress: ' + e.message; });
+}
+function partBlock(a, p, list, byItem, now, label) {
+  var key = a.id + '|' + p.id, pick = PP.pick[key] || (PP.pick[key] = new Set());
+  var conf = list.filter(function (i) { return byItem[i] && byItem[i].status === 'confident'; }).length;
+  var blk = el('div', { class: 'ppart' });
+  var pn = el('div', { class: 'pn' }, [label || p.name, el('small', { text: conf + ' / ' + list.length + ' confident' })]);
+  blk.appendChild(pn);
+  var chips = el('div', { class: 'chips' });
+  list.forEach(function (i) {
+    var r = byItem[i], cls = 'ichip', tip = 'Not started';
+    if (now.has(a.id + '|' + i)) { cls += r && r.timesReadded ? ' back' : ' now'; tip = r && r.timesReadded ? 'Back on practice since ' + dmy(r.readdedAt) : 'Practising now'; }
+    else if (r && r.status === 'confident') { cls += ' conf'; tip = 'Confident since ' + dmy(r.confidentAt) + (r.firstConfidentAt !== r.confidentAt ? ' (first ' + dmy(r.firstConfidentAt) + ')' : ''); }
+    else if (r) { tip = 'Practised, not on a target now'; }
+    if (pick.has(i)) cls += ' pick';
+    chips.appendChild(el('button', { class: cls, title: tip, text: i, on: { click: function () {
+      pick.has(i) ? pick.delete(i) : pick.add(i); drawProgress();
+    } } }));
+  });
+  blk.appendChild(chips);
+  if (pick.size && p.id) {
+    blk.appendChild(el('button', { class: 'btn', style: 'margin-top:8px', text: 'Practise again (' + pick.size + ')', on: { click: function () {
+      openTarget({ kids: [PP.kid.pupilCode], preset: { area: a.id, part: p.id, items: list.filter(function (i) { return pick.has(i); }) } });
+    } } }));
+  }
+  var dated = list.filter(function (i) { return byItem[i] && byItem[i].status === 'confident'; });
+  if (dated.length) blk.appendChild(el('div', { class: 'hint', style: 'margin:6px 0 0', text: 'Confident: ' + dated.map(function (i) { return i + ' (' + dmy(byItem[i].confidentAt) + ')'; }).join(', ') }));
+  return blk;
+}
 
 // ── Panels ──────────────────────────────────────────────────────────────────────────────────────────────
 function openPanel(id) { $('veil').className = 'veil show'; $(id).className = 'panel show'; }
@@ -489,10 +691,10 @@ $('aSave').onclick = function () {
 var T = {};
 function openTarget(opts) {
   if (!S.loaded) return;
-  var t = opts.target;
-  T = { edit: t || null, kids: t ? [t.pupilCode] : opts.kids.slice(), area: t ? t.area : null, part: t ? t.part : null,
-        items: new Set(t ? t.items : []), extra: t ? t.items.slice() : [], days: new Set(t ? t.days : DAYS),
-        pickArea: !t, pickPart: !t };
+  var t = opts.target, pre = opts.preset || null;     // preset: "Practise again" from Progress
+  T = { edit: t || null, kids: t ? [t.pupilCode] : opts.kids.slice(), area: t ? t.area : (pre && pre.area), part: t ? t.part : (pre && pre.part),
+        items: new Set(t ? t.items : (pre ? pre.items : [])), extra: t ? t.items.slice() : [], days: new Set(t ? t.days : DAYS),
+        pickArea: !t && !pre, pickPart: !t && !pre };
   $('tTitle').textContent = t ? 'Change target' : (T.kids.length > 1 ? 'Give ' + T.kids.length + ' children a target' : 'Give a target');
   $('tRemove').hidden = $('tDone').hidden = !t;
   $('tErr').textContent = '';
@@ -574,8 +776,11 @@ function drawTarget() {
   var ib = $('tItems'); ib.innerHTML = '';
   var all = part.items.slice();
   Array.from(T.items).forEach(function (i) { if (all.indexOf(i) < 0) all.push(i); });
+  var known = new Set();
+  if (T.kids.length === 1) ((S.confident[T.kids[0]] || {})[T.area] || []).forEach(function (i) { known.add(i); });
+  if (known.size) $('tHint').textContent = (a.hint ? a.hint + ' ' : '') + '✓ = already confident; choosing it puts it back on practice.';
   all.forEach(function (i) {
-    ib.appendChild(el('button', { class: 'chip' + (T.items.has(i) ? ' on' : ''), text: i, on: { click: function () {
+    ib.appendChild(el('button', { class: 'chip' + (T.items.has(i) ? ' on' : '') + (known.has(i) ? ' known' : ''), text: i, on: { click: function () {
       T.items.has(i) ? T.items.delete(i) : T.items.add(i); drawTarget();
     } } }));
   });
