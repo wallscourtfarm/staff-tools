@@ -875,7 +875,7 @@ def check_aim_met(step, probes_data):
 # PRIVACY (10.10.26): this tool no longer stores a child's name or UPN. A tracked pupil is identified by the
 # roster's random pupil code (`pupilCode`, "p_" + 10 chars) and shown by the roster's initials `label`.
 # `firstName` / `lastName` hold only 3-letter stubs (kept so older code paths still work). Real names appear
-# only if the teacher loads their names file for this browser session (st.session_state["pt_names"], memory only).
+# nowhere in this app (18.10.26: the names-file option was removed; printed sheets get names in the browser).
 
 def _letters(token):
     return re.sub(r"[^A-Za-z]", "", token or "")
@@ -900,30 +900,9 @@ def pupil_label(pupil):
 
 
 def display_name(pupil):
-    """What to show for a pupil: their real name only when the teacher has loaded a names file in this
-    browser session; otherwise their initials."""
-    try:
-        import streamlit as st
-        names = st.session_state.get("pt_names") or {}
-    except Exception:
-        names = {}
-    full = names.get(pupil.get("pupilCode") or "")
-    return full or pupil_label(pupil)
-
-
-def parse_names_csv(text):
-    """Teacher's names file (CSV: pupil_id, first_name, last_name, full_name ...) -> {pupil_code: full name}.
-    Kept in memory for the session only; never written anywhere."""
-    import csv, io
-    out = {}
-    rd = csv.DictReader(io.StringIO(text.lstrip("\ufeff")))
-    for row in rd:
-        row = {(k or "").strip().lower(): (v or "").strip() for k, v in row.items()}
-        code = row.get("pupil_id", "")
-        full = row.get("full_name") or f"{row.get('first_name', '')} {row.get('last_name', '')}".strip()
-        if code and full:
-            out[code] = full
-    return out
+    """What to show for a pupil: always their initials. Real names never reach this app: printed sheets get them
+    in the teacher's own browser (Name Stamper), and nothing on screen shows them."""
+    return pupil_label(pupil)
 
 
 def add_pupil(pupils_data, hub_pupil):
