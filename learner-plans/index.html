@@ -506,19 +506,26 @@ async function flushSave() {
   if (currentPlan.child_id !== currentChildId || currentPlan.id !== currentPlanId) { dirty = false; toast('Not saved: the plan on screen does not match the learner shown. Reload the page.', 'error'); return; }
   const sending = JSON.stringify(currentPlan.doc);
   try {
-    const res = await api('POST', `/learner-plans/plans/${currentPlanId}/update`, { terms: currentPlan.doc });
-    if (!res || res.ok !== true) throw new Error('unexpected reply');
+    const res = await api('POST', `/learner-plans/plans/${currentPlanId}/update`, { terms: currentPlan.doc, base_updated_at: currentPlan.base });
+    if (!res || res.ok !== true || !res.updated_at) throw new Error('unexpected reply');
+    currentPlan.base = res.updated_at;
     if (JSON.stringify(currentPlan.doc) === sending) dirty = false;
     // keep the cached copies (dashboard pills, year switching, new-year rollover) in step with what was saved
     if (!planCache[currentPlan.child_id]) planCache[currentPlan.child_id] = {};
     planCache[currentPlan.child_id][currentPlan.academic_year] = { id: currentPlan.id, child_id: currentPlan.child_id, academic_year: currentPlan.academic_year, terms: JSON.parse(sending) };
     const mine = childPlans.find(p => p.id === currentPlanId);
-    if (mine) mine.terms = JSON.parse(sending);
+    if (mine) { mine.terms = JSON.parse(sending); mine.updated_at = currentPlan.base; }
     document.getElementById('saveBanner').style.display = 'none';
     setStatus('saved');
   } catch(e) {
     setStatus('error');
     const b = document.getElementById('saveBanner');
+    if (/changed in another window|out of date/i.test(e.message || '')) {
+      dirty = false;
+      b.innerHTML = '<span><b>Not saved.</b> This plan was changed in another window or by someone else, so saving was stopped to protect their work. Reload the page to see the latest version.</span><button class="btn btn-danger btn-sm" onclick="location.reload()">Reload</button>';
+    } else {
+      b.innerHTML = '<span>Your last change did not save.</span><button class="btn btn-danger btn-sm" onclick="flushSave()">Retry now</button>';
+    }
     b.style.display = 'flex';
   }
 }
@@ -812,7 +819,7 @@ async function loadPlan(planId) {
   const raw = childPlans.find(p => p.id === planId);
   if (!raw || raw.child_id !== currentChildId) { toast('That plan does not belong to this learner, so it was not opened.', 'error'); return; }
   currentPlanId = planId;
-  currentPlan = { id: raw.id, child_id: raw.child_id, academic_year: raw.academic_year, doc: normaliseDoc(JSON.parse(JSON.stringify(raw))) };
+  currentPlan = { id: raw.id, child_id: raw.child_id, academic_year: raw.academic_year, base: raw.updated_at, doc: normaliseDoc(JSON.parse(JSON.stringify(raw))) };
   dirty = false;
   document.getElementById('yearSelector').value = planId;
   document.getElementById('plan-view').classList.remove('loading');
@@ -1379,7 +1386,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-19.10.26a
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-19.10.26b
 </footer>
 </body>
 </html>
