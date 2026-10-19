@@ -162,7 +162,7 @@
     <div class="status" id="status"></div>
   </div>
 </main>
-<footer>Wallscourt Farm Academy — Book Label Generator · WFA-14.10.26a</footer>
+<footer>Wallscourt Farm Academy — Book Label Generator · WFA-19.10.26a</footer>
 
 <script>
 // Year group colours
@@ -461,11 +461,14 @@ async function generatePdf() {
     const BORDER_T = (99.1 - 73) / 2;   // 13.05mm
 
     // Label positions
+    // L7169 is a portrait sheet (side margin 4.65, top margin 9.5, 2.5mm gap between
+    // columns). Turned landscape: 9.5mm left margin, 4.65mm top margin, 2.5mm gap between rows.
+    const ROW_GAP = 2.5;
     const labelPositions = [
-      { x: 9.5, y: 5.4 },                         // top-left
-      { x: 9.5 + 139, y: 5.4 },                   // top-right
-      { x: 9.5, y: 5.4 + 99.1 },                  // bottom-left
-      { x: 9.5 + 139, y: 5.4 + 99.1 }             // bottom-right
+      { x: 9.5, y: 4.65 },                              // top-left
+      { x: 9.5 + 139, y: 4.65 },                        // top-right
+      { x: 9.5, y: 4.65 + 99.1 + ROW_GAP },             // bottom-left
+      { x: 9.5 + 139, y: 4.65 + 99.1 + ROW_GAP }        // bottom-right
     ];
 
     // Build list of labels to generate
@@ -529,8 +532,9 @@ async function generatePdf() {
         // Bleed only on the sides that face the sheet edge, never into a neighbouring label
         const bleedL = (i % 2 === 0) ? BLEED : 0;
         const bleedR = (i % 2 === 1) ? BLEED : 0;
-        const bleedT = (i < 2) ? BLEED : 0;
-        const bleedB = (i >= 2) ? BLEED : 0;
+        // Between the rows, each label bleeds halfway into the 2.5mm gap
+        const bleedT = (i < 2) ? BLEED : ROW_GAP / 2;
+        const bleedB = (i >= 2) ? BLEED : ROW_GAP / 2;
         doc.rect(pos.x - bleedL, pos.y - bleedT, 139 + bleedL + bleedR, 99.1 + bleedT + bleedB, 'F');
 
         // Draw white box
