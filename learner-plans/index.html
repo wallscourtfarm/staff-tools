@@ -82,6 +82,8 @@ nav .brand span { opacity: .7; font-weight: 400; font-size: .88rem; }
 .plan-body { padding: 18px 20px 20px; }
 .ehcp-badge { font-size: .65rem; font-weight: 700; color: #c0392b; background: #fdf0f0; border: 1px solid #f5c6c6; border-radius: 4px; padding: 1px 6px; vertical-align: middle; margin-left: 6px; }
 
+#plan-view.loading .plan-header .btn:not(.back-btn), #plan-view.loading .plan-header select { pointer-events: none; opacity: .45; }
+
 /* CARDS + FORMS */
 .card { background: white; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 16px; overflow: hidden; }
 .card-header { padding: 11px 18px; background: var(--tint); border-bottom: 2px solid var(--blue); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -418,7 +420,7 @@ async function fetchChildren() {
 async function fetchPlansForChild(childId) {
   try {
     return await api('GET', `/learner-plans/plans/${childId}`);
-  } catch(e) { toast('Could not load plans: ' + e.message, 'error'); return []; }
+  } catch(e) { toast('Could not load plans: ' + e.message, 'error'); return null; }
 }
 
 // ── PLAN DOCUMENT ────────────────────────────────────────────────────────────
@@ -501,6 +503,7 @@ function scheduleSave() {
 async function flushSave() {
   clearTimeout(saveTimer);
   if (!currentPlanId || !currentPlan || !dirty) return;
+  if (currentPlan.child_id !== currentChildId || currentPlan.id !== currentPlanId) { dirty = false; toast('Not saved: the plan on screen does not match the learner shown. Reload the page.', 'error'); return; }
   const sending = JSON.stringify(currentPlan.doc);
   try {
     const res = await api('POST', `/learner-plans/plans/${currentPlanId}/update`, { terms: currentPlan.doc });
@@ -745,21 +748,37 @@ function renderArchive() {
 }
 
 // ── OPEN CHILD ────────────────────────────────────────────────────────────────
+let openSeq = 0;
+
 async function openChild(childId) {
+  const mySeq = ++openSeq;
+  await flushSave();
+  if (mySeq !== openSeq) return;
+  // Nothing from the previous learner may stay on screen or stay editable while this one loads.
+  currentPlanId = null; currentPlan = null; dirty = false;
   currentChildId = childId;
   currentChild = children.find(c => c.id === childId) || archivedChildren.find(c => c.id === childId) || null;
   const child = currentChild;
   document.getElementById('planName').innerHTML = childTag(child);
   document.getElementById('planMeta').textContent = [child.year_group, child.class_name, child.teacher].filter(Boolean).join(' · ');
   applyTheme(child.year_group);
+  document.getElementById('profileCard').innerHTML = '';
+  document.getElementById('termNav').innerHTML = '';
+  document.getElementById('termScroller').innerHTML = '<div class="help" style="padding:28px 4px;font-size:.95rem">Loading this learner’s plan…</div>';
+  document.getElementById('plan-view').classList.add('loading');
   showPage('plan-view');
-  childPlans = await fetchPlansForChild(childId);
-  if (!childPlans.length) {
+  let plans = await fetchPlansForChild(childId);
+  if (mySeq !== openSeq) return;
+  if (plans === null) { document.getElementById('termScroller').innerHTML = '<div class="help" style="padding:28px 4px;color:var(--red)">Could not load this plan. Go back and try again.</div>'; return; }
+  if (!plans.length) {
     const made = await createPlan(childId, currentAcademicYear());
+    if (mySeq !== openSeq) return;
     if (!made) return;
-    childPlans = await fetchPlansForChild(childId);
-    if (!childPlans.length) return;
+    plans = await fetchPlansForChild(childId);
+    if (mySeq !== openSeq) return;
+    if (!plans || !plans.length) return;
   }
+  childPlans = plans;
   renderYearSelector();
   const wanted = childPlans.find(p => p.academic_year === activeYear) || childPlans[childPlans.length - 1];
   await loadPlan(wanted.id);
@@ -790,11 +809,13 @@ async function switchYear(planId) {
 }
 
 async function loadPlan(planId) {
-  currentPlanId = planId;
   const raw = childPlans.find(p => p.id === planId);
+  if (!raw || raw.child_id !== currentChildId) { toast('That plan does not belong to this learner, so it was not opened.', 'error'); return; }
+  currentPlanId = planId;
   currentPlan = { id: raw.id, child_id: raw.child_id, academic_year: raw.academic_year, doc: normaliseDoc(JSON.parse(JSON.stringify(raw))) };
   dirty = false;
   document.getElementById('yearSelector').value = planId;
+  document.getElementById('plan-view').classList.remove('loading');
   renderPlan();
 }
 
@@ -806,7 +827,7 @@ async function createPlan(childId, year, doc = null) {
 
 async function createNextYear() {
   await flushSave();
-  childPlans = await fetchPlansForChild(currentChildId);
+  { const fresh = await fetchPlansForChild(currentChildId); if (!fresh) return; childPlans = fresh; }
   const latest = childPlans[childPlans.length - 1];
   const startYear = parseInt(latest.academic_year.slice(0, 4), 10) + 1;
   const year = `${startYear}-${String(startYear + 1).slice(-2)}`;
@@ -820,7 +841,7 @@ async function createNextYear() {
   doc.rowsShown = from.rowsShown;
   const made = await createPlan(currentChildId, year, doc);
   if (!made) return;
-  childPlans = await fetchPlansForChild(currentChildId);
+  { const fresh = await fetchPlansForChild(currentChildId); if (!fresh) return; childPlans = fresh; }
   renderYearSelector();
   await loadPlan(made.id);
   toast(`${year} plan created — Term 6 targets are now the Term 1 targets.`, 'success');
@@ -1085,7 +1106,7 @@ async function restoreVersion(id) {
   try {
     await api('POST', `/learner-plans/plans/${currentPlanId}/restore`, { snapshot_id: id });
   } catch (e) { toast('Restore failed: ' + e.message, 'error'); return; }
-  childPlans = await fetchPlansForChild(currentChildId);
+  { const fresh = await fetchPlansForChild(currentChildId); if (!fresh) return; childPlans = fresh; }
   closeHistory();
   await loadPlan(currentPlanId);
   const cached = planCache[currentChildId]?.[currentPlan.academic_year];
@@ -1344,7 +1365,7 @@ async function downloadTermPdf(n, btn) {
 // ── UTILS ─────────────────────────────────────────────────────────────────────
 function esc(str) { return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(id).classList.add('active'); window.scrollTo(0,0); }
-async function goBack() { await flushSave(); showPage('dashboard'); renderDashboard(); }
+async function goBack() { openSeq++; await flushSave(); showPage('dashboard'); renderDashboard(); }
 function toast(msg, type='') {
   const el = document.createElement('div');
   el.className = 'toast' + (type ? ' ' + type : '');
@@ -1358,7 +1379,7 @@ init();
 </script>
 
 <footer style="text-align:center;padding:16px;color:#bbb;font-size:.73rem;margin-top:28px">
-  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-18.10.26b
+  Learner Plans Tool — Wallscourt Farm Academy &nbsp;·&nbsp; WFA-19.10.26a
 </footer>
 </body>
 </html>
