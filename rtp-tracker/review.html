@@ -80,6 +80,7 @@ td.stmt textarea {
 }
 td.stmt .lbl { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #888; margin-bottom: 2px; }
 td.stmt .lbl.prop { margin-top: 8px; color: var(--blue-dark); }
+td.stmt .lbl.school { color: #5b21b6; }
 td.stmt textarea.proposed {
   display: block; width: 100%; resize: vertical; font-size: 13px; line-height: 1.45;
   border: 1px solid #b6dcef; border-radius: 6px; padding: 5px 7px; background: #f0f8fd; overflow: hidden;
@@ -172,7 +173,7 @@ footer {
 
 <footer>
   <span>Saved to the WFA database. Nothing changes in the RTP Tracker until these are loaded in.</span>
-  <span class="version">WFA-20.10.26a</span>
+  <span class="version">WFA-20.10.26b</span>
 </footer>
 
 <div id="toast"></div>
@@ -344,7 +345,8 @@ function isComplete(r) { return r && r.weight !== '' && r.weight != null && r.se
 // ── Load ───────────────────────────────────────────────────────
 async function loadAll() {
   const [criteria, cfg] = await Promise.all([apiGet('getCriteria'), apiGet('getConfig')]);
-  state.criteria = [...criteria].sort((a, b) => a.order - b.order);
+  // School-added targets are appended last; year then list order keeps them under their own year.
+  state.criteria = [...criteria].sort((a, b) => yearNum(a.year_group) - yearNum(b.year_group) || a.order - b.order);
   const reviews = {};
   Object.entries(cfg).forEach(([k, v]) => {
     if (!k.startsWith(KEY_PREFIX)) return;
@@ -397,12 +399,12 @@ function rowHtml(c) {
   const who = r.by || r.at ? `<span class="who">Last change: ${esc(r.by || 'unnamed')}${r.at ? ' · ' + esc(new Date(r.at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })) : ''}</span>` : '';
   return `<tr data-code="${esc(c.code)}" class="${flagged ? 'flagged' : ''}${isComplete(r) ? ' complete' : ''}">
     <td class="code">${esc(c.code)}</td>
-    <td class="stmt"><span class="lbl">Current</span>${esc(c.description)}
+    <td class="stmt">${c.custom ? `<span class="lbl school">School target</span>${esc(c.description)}` : `<span class="lbl">Current</span>${esc(c.description)}
       <span class="lbl prop">Proposed</span><textarea class="proposed" rows="2">${esc(proposedFor(c.code))}</textarea>
       <div class="use">Use:
         <button class="use-btn ${r.use === 'current' ? 'on' : ''}" data-use="current">Current</button>
         <button class="use-btn ${r.use === 'proposed' ? 'on' : ''}" data-use="proposed">Proposed</button>
-      </div>
+      </div>`}
       <textarea class="note ${flagged ? '' : 'hidden'}" placeholder="What still needs editing or clarifying?">${esc(r.note || '')}</textarea>${who}</td>
     <td><button class="flag-btn ${flagged ? 'on' : ''}" title="Needs editing or clarifying">${flagged ? '✗' : '–'}</button></td>
     <td><input class="weight-input" type="number" inputmode="decimal" min="0" step="any" value="${esc(r.weight ?? '')}" aria-label="Weight for ${esc(c.code)}"></td>
