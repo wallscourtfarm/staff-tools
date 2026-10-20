@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+/* WFA 25.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WFA RTP Weightings Review</title>
+<style>
+:root {
+  --blue: #1798d3;
+  --blue-dark: #0f6a9b;
+  --dark: #0a0101;
+  --bg: #f8fafc;
+  --border: #e2e8f0;
+  --radius: 8px;
+  --shadow: 0 2px 8px rgba(0,0,0,.15);
+  --flag-bg: #fef3c7; --flag-tx: #92400e;
+  --ok-bg: #dcfce7; --ok-tx: #14532d;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px; background: var(--bg); color: var(--dark);
+}
+.hidden { display: none !important; }
+button { font-family: inherit; cursor: pointer; }
+input, textarea { font-family: inherit; }
+
+header {
+  background: var(--blue); color: #fff; padding: 10px 16px;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  box-shadow: var(--shadow); position: sticky; top: 0; z-index: 5;
+}
+header h1 { font-size: 16px; font-weight: 700; }
+header .sub { font-size: 11px; opacity: .85; }
+header label { font-size: 11px; font-weight: 600; opacity: .9; }
+header input { padding: 5px 8px; border-radius: 6px; border: none; font-size: 13px; width: 150px; }
+.tabs { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+.tab-btn {
+  background: rgba(255,255,255,.15); color: #fff; border: none;
+  padding: 7px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
+}
+.tab-btn.active { background: #fff; color: var(--blue); }
+.tab-btn .done { font-weight: 400; opacity: .8; margin-left: 4px; }
+.save-status { font-size: 11px; opacity: .9; white-space: nowrap; min-width: 70px; }
+
+main { padding: 14px 16px 60px; max-width: 1200px; margin: 0 auto; }
+.intro {
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 10px 14px; margin-bottom: 12px; color: #444; line-height: 1.5;
+}
+.intro b { color: var(--dark); }
+.actions { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+.btn {
+  background: var(--blue); color: #fff; border: none; border-radius: 6px;
+  padding: 7px 12px; font-size: 12px; font-weight: 600;
+}
+.btn.secondary { background: #fff; color: var(--blue); border: 1px solid var(--blue); }
+.year-progress { font-size: 12px; color: #666; margin-left: auto; }
+
+h2.year-title { font-size: 18px; margin: 4px 0 10px; color: var(--blue-dark); }
+.strand { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; overflow: hidden; }
+.strand > .hd { padding: 9px 14px; font-weight: 700; background: var(--blue); color: #fff; }
+table { width: 100%; border-collapse: collapse; }
+th {
+  background: #e8f4fb; font-size: 11px; font-weight: 700; color: #334;
+  padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: center;
+}
+th.left { text-align: left; }
+td { padding: 8px; border-top: 1px solid var(--border); vertical-align: top; text-align: center; }
+td.code { font-weight: 700; color: var(--blue-dark); white-space: nowrap; text-align: left; width: 76px; }
+td.stmt { text-align: left; line-height: 1.45; }
+td.stmt textarea {
+  display: block; width: 100%; margin-top: 6px; min-height: 34px; resize: vertical;
+  border: 1px solid #f59e0b; border-radius: 6px; padding: 5px 7px; font-size: 12px; background: #fffbeb;
+}
+td.stmt .lbl { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #888; margin-bottom: 2px; }
+td.stmt .lbl.prop { margin-top: 8px; color: var(--blue-dark); }
+td.stmt textarea.proposed {
+  display: block; width: 100%; resize: vertical; font-size: 13px; line-height: 1.45;
+  border: 1px solid #b6dcef; border-radius: 6px; padding: 5px 7px; background: #f0f8fd; overflow: hidden;
+}
+.use { margin-top: 6px; font-size: 11px; color: #666; display: flex; gap: 6px; align-items: center; }
+.use-btn { border: 1px solid #cbd5e1; background: #fff; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 600; color: #555; }
+.use-btn.on { background: #16a34a; border-color: #15803d; color: #fff; }
+tr.flagged td { background: var(--flag-bg); }
+.who { display: block; font-size: 10px; color: #888; margin-top: 4px; }
+
+.flag-btn, .term-btn {
+  width: 38px; height: 32px; border: 1px solid #cbd5e1; background: #fff;
+  border-radius: 6px; font-size: 15px; font-weight: 700; color: #94a3b8;
+}
+.flag-btn.on { background: #f59e0b; border-color: #d97706; color: #fff; }
+.term-btn { font-size: 16px; }
+.term-btn.on { background: var(--blue); border-color: var(--blue-dark); color: #fff; }
+.weight-input {
+  width: 62px; height: 32px; text-align: center; font-size: 15px; font-weight: 700;
+  border: 1px solid #cbd5e1; border-radius: 6px;
+}
+.weight-input.bad { border-color: #dc2626; background: #fef2f2; }
+tr.complete td.code::after { content: ' ✓'; color: #16a34a; }
+
+footer {
+  position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--border);
+  padding: 6px 16px; font-size: 11px; color: #666; display: flex; justify-content: space-between; gap: 10px;
+}
+#toast {
+  position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
+  background: var(--dark); color: #fff; padding: 8px 16px; border-radius: 8px;
+  font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20;
+}
+#toast.show { opacity: 1; }
+#loading {
+  position: fixed; inset: 0; background: #fff; display: flex; align-items: center;
+  justify-content: center; z-index: 1000; font-size: 14px; color: var(--blue); font-weight: 700;
+  padding: 20px; text-align: center;
+}
+
+@media (max-width: 700px) {
+  td.code { width: auto; }
+  .flag-btn, .term-btn { width: 32px; }
+  .weight-input { width: 50px; }
+}
+
+@media print {
+  header .tabs, header input, header label, .actions, .save-status, footer, #toast { display: none !important; }
+  header { position: static; box-shadow: none; }
+  body { background: #fff; }
+  main { padding: 0; max-width: none; }
+  .year-block { break-before: page; }
+  .year-block:first-of-type { break-before: auto; }
+  .year-block.hidden { display: block !important; }
+  .intro { display: none; }
+  tr { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<div id="loading">Loading Ready to Progress statements…</div>
+
+<header>
+  <h1>RTP Weightings Review</h1>
+  <span class="sub">Ready to Progress · weights and secure-by terms</span>
+  <label for="who">Your name</label>
+  <input id="who" type="text" placeholder="e.g. Innes" autocomplete="off">
+  <span class="save-status" id="save-status"></span>
+  <div class="tabs" id="year-tabs"></div>
+</header>
+
+<main>
+  <div class="intro">
+    One row per Ready to Progress statement, taken from the RTP Tracker.
+    <b>Current / Proposed</b> — the tracker's wording, and a shorter suggested wording you can change; tap <b>Use</b> to choose one.
+    <b>Edit?</b> — tap if it still needs editing or clarifying, then write what in the box that opens.
+    <b>Weight</b> — type a number; bigger counts more in the security score.
+    <b>Secure by</b> — tap the term by which a learner should be secure (tap again to clear).
+    Everything saves as you go, and you both see the same answers — press <b>Refresh</b> to pull in the other person's latest changes.
+  </div>
+  <div class="actions">
+    <button class="btn secondary" id="refresh-btn">Refresh</button>
+    <button class="btn secondary" id="print-btn">Print all years</button>
+    <button class="btn secondary" id="csv-btn">Download CSV</button>
+    <span class="year-progress" id="year-progress"></span>
+  </div>
+  <div id="years"></div>
+</main>
+
+<footer>
+  <span>Saved to the WFA database. Nothing changes in the RTP Tracker until these are loaded in.</span>
+  <span class="version">WFA-20.10.26a</span>
+</footer>
+
+<div id="toast"></div>
+
+<script>
+const BACKEND_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/rtptracker-db';
+const WFA_TOKEN = '__hub__';
+const STRAND_ORDER = ['Number and Place Value','Number Facts','Addition and Subtraction','Multiplication and Division','Fractions','Geometry'];
+const TERMS = [2, 4, 6];
+// One rtp_config row per statement, so two people editing different rows never overwrite each other.
+const KEY_PREFIX = 'review|';
+
+// Claude's suggested plainer wording (20.10.26) — a starting point only; each row's
+// "Proposed wording" box can be edited and what is typed there is saved instead.
+const PROPOSED = {
+  '1NPV–1': 'Count forwards and backwards within 100, starting from any number.',
+  '1NPV–2': 'Place numbers to 20 on a number line and compare them using <, > and =.',
+  '2NPV–1': 'Know the value of each digit in a 2-digit number, and partition it in standard and non-standard ways (e.g. 45 = 40 + 5 = 30 + 15).',
+  '3NPV–1': 'Know 10 tens = 1 hundred (100 is 10 times 10), and use it to find how many tens are in multiples of 10 up to 990 (e.g. 230 = 23 tens).',
+  '3NPV–2': 'Know the value of each digit in a 3-digit number, and partition it in standard and non-standard ways.',
+  '3NPV–3': 'Place any 3-digit number on a number line, and name the multiples of 10 and 100 either side of it.',
+  '3NPV–4': 'Split 100 into 2, 4, 5 or 10 equal parts, and read scales marked in these steps (50s, 25s, 20s, 10s).',
+  '4NPV–1': 'Know 10 hundreds = 1 thousand (1,000 is 10 times 100), and use it to find how many hundreds are in multiples of 100 (e.g. 2,300 = 23 hundreds).',
+  '4NPV–2': 'Know the value of each digit in a 4-digit number, and partition it in standard and non-standard ways.',
+  '4NPV–3': 'Place any 4-digit number on a number line, name the multiples of 100 and 1,000 either side, and round to the nearest 100 and 1,000.',
+  '4NPV–4': 'Split 1,000 into 2, 4, 5 or 10 equal parts, and read scales marked in these steps (500s, 250s, 200s, 100s).',
+  '5NPV–1': 'Know 10 tenths = 1, 100 hundredths = 1 and 10 hundredths = 1 tenth, and that each place is 10 times the size of the one to its right.',
+  '5NPV–2': 'Know the value of each digit in numbers with up to 2 decimal places, and partition them in standard and non-standard ways.',
+  '5NPV–3': 'Place any number with up to 2 decimal places on a number line, name the whole numbers and tenths either side, and round to the nearest whole and tenth.',
+  '5NPV–4': 'Split 1 into 2, 4, 5 or 10 equal parts, and read scales marked in these steps (0.5, 0.25, 0.2, 0.1).',
+  '5NPV–5': 'Convert between units of measure, including with simple decimals and fractions (e.g. 1.5 kg = 1,500 g, ¼ m = 25 cm).',
+  '6NPV–1': 'Multiply and divide any number by 10, 100 and 1,000, understanding place value from thousandths to 10 million.',
+  '6NPV–2': 'Know the value of each digit in numbers up to 10 million and in decimals, and partition them in standard and non-standard ways.',
+  '6NPV–3': 'Place any number up to 10 million (including decimals) on a number line, and round sensibly for the context.',
+  '6NPV–4': 'Split any power of 10 (0.01 to 10 million) into 2, 4, 5 or 10 equal parts, and read scales divided in these steps.',
+  '1NF–1': 'Become fluent in addition and subtraction facts within 10.',
+  '1NF–2': 'Count forwards and backwards in 2s, 5s and 10s (up to 10 steps, from any multiple), and count in odd numbers.',
+  '2NF–1': 'Be secure and fluent in addition and subtraction facts within 10.',
+  '3NF–1': 'Be fluent in addition and subtraction facts that cross 10 (e.g. 8 + 5, 13 − 6).',
+  '3NF–2': 'Recall the 2, 4, 5, 8 and 10 times tables and their division facts, and recognise multiples of these numbers.',
+  '3NF–3': 'Use known facts to work out facts 10 times bigger (e.g. 3 + 4 = 7 so 30 + 40 = 70; 3 × 4 = 12 so 30 × 4 = 120).',
+  '4NF–1': 'Recall all multiplication and division facts up to 12 × 12, and recognise multiples.',
+  '4NF–2': 'Divide 2-digit numbers by 1-digit numbers with remainders, and decide what the remainder means in context (round up, round down or ignore).',
+  '4NF–3': 'Use known facts to work out facts 100 times bigger (e.g. 3 × 4 = 12 so 300 × 4 = 1,200).',
+  '5NF–1': 'Keep times tables and division facts fluent through regular practice.',
+  '5NF–2': 'Use known facts to work out facts with tenths and hundredths (e.g. 3 × 4 = 12 so 0.3 × 4 = 1.2 and 0.03 × 4 = 0.12).',
+  '1AS–1': 'Make numbers to 10 from 2 parts and split them into parts; recognise odd and even numbers.',
+  '1AS–2': 'Read, write and explain number sentences using +, − and =, and link them to real-life situations.',
+  '2AS–1': 'Add and subtract across 10 (e.g. 8 + 5, 13 − 5).',
+  '2AS–2': 'Understand subtraction as finding the difference, and answer "How many more…?" questions.',
+  '2AS–3': 'Add or subtract ones, or tens, to or from a 2-digit number using known facts (e.g. 34 + 5, 34 + 50).',
+  '2AS–4': 'Add and subtract any two 2-digit numbers using known facts.',
+  '3AS–1': 'Find complements to 100 (e.g. 37 + ? = 100).',
+  '3AS–2': 'Add and subtract numbers up to 3 digits using column methods.',
+  '3AS–3': 'Understand addition and subtraction as inverses using part–whole models, and know addition can be done in any order but subtraction cannot.',
+  '6AS/MD–1': 'Describe how 2 numbers are related, by addition (e.g. 4 more) or by multiplication (e.g. 3 times as many).',
+  '6AS/MD–2': 'Use a known calculation to work out related ones (e.g. 24 × 3 = 72 so 72 ÷ 3 = 24 and 24 × 30 = 720).',
+  '6AS/MD–3': 'Solve ratio problems.',
+  '6AS/MD–4': 'Solve problems with 2 unknowns.',
+  '2MD–1': 'Write repeated addition as multiplication and find the answer, using the 2, 5 and 10 times tables.',
+  '2MD–2': 'Solve "How many groups?" problems using a missing-number multiplication or a division (grouping).',
+  '3MD–1': 'Use known multiplication and division facts to solve word problems, including both grouping and sharing.',
+  '4MD–1': 'Multiply and divide whole numbers by 10 and 100 (whole-number answers only), understanding this as making them 10 or 100 times the size.',
+  '4MD–2': 'Rearrange multiplication and division number sentences, and know multiplication can be done in any order.',
+  '4MD–3': 'Use the distributive law (e.g. 7 × 13 = 7 × 10 + 7 × 3).',
+  '5MD–1': 'Multiply and divide numbers by 10 and 100, including where the answer is a decimal.',
+  '5MD–2': 'Find factors, multiples, common factors and common multiples, and write a number as a product of 2 or 3 factors.',
+  '5MD–3': 'Multiply numbers up to 4 digits by a 1-digit number using short multiplication.',
+  '5MD–4': 'Divide numbers up to 4 digits by a 1-digit number using short division, and decide what the remainder means in context.',
+  '3F–1': 'Read and write proper fractions for parts of a whole split into equal parts.',
+  '3F–2': 'Find unit fractions of amounts using division facts (e.g. ⅕ of 35 = 7).',
+  '3F–3': 'Place any fraction between 0 and 1 on a number line.',
+  '3F–4': 'Add and subtract fractions with the same denominator, within 1.',
+  '4F–1': 'Place mixed numbers on a number line.',
+  '4F–2': 'Convert between mixed numbers and improper fractions.',
+  '4F–3': 'Add and subtract mixed numbers and improper fractions with the same denominator, including crossing whole numbers.',
+  '5F–1': 'Find non-unit fractions of amounts (e.g. ¾ of 20).',
+  '5F–2': 'Find equivalent fractions, knowing they are equal and sit at the same point on a number line.',
+  '5F–3': 'Recall decimal equivalents of halves, quarters, fifths and tenths (e.g. ¾ = 0.75, ⅖ = 0.4).',
+  '6F–1': 'Simplify fractions using common factors.',
+  '6F–2': 'Write fractions with a common denominator to compare fractions that are close in value.',
+  '6F–3': 'Compare fractions with different denominators (including above 1) by reasoning, and choose when to use a common denominator instead.',
+  '1G–1': 'Recognise common 2D and 3D shapes in any orientation, and know that shapes with the same name can look different (e.g. long thin and short wide rectangles).',
+  '1G–2': 'Make 2D and 3D shapes from smaller shapes to match an example, turning pieces to fit.',
+  '2G–1': 'Describe the properties of 2D and 3D shapes using precise vocabulary, and compare shapes by their properties.',
+  '3G–1': 'Recognise right angles in shapes (in any orientation) and as a quarter turn.',
+  '3G–2': 'Draw polygons by joining marked points, and identify parallel and perpendicular sides.',
+  '4G–1': 'Plot polygons from coordinates in the first quadrant, and translate them.',
+  '4G–2': 'Know regular polygons have equal sides and equal angles, and find the perimeter of regular and irregular polygons.',
+  '4G–3': 'Find lines of symmetry in 2D shapes in any orientation, reflect shapes in a line, and complete symmetric figures.',
+  '5G–1': 'Compare, estimate, measure and draw angles in degrees.',
+  '5G–2': 'Compare areas, and calculate the area of rectangles and squares in square units.',
+  '6G–1': 'Draw, make and split shapes from given properties (lengths, angles, area), and solve related problems.'
+};
+
+const state = {
+  criteria: [],
+  reviews: {},      // code -> { needs_edit, note, weight, secure_by, by, at }
+  year: 1,
+  saveTimers: {},
+  pending: 0
+};
+
+// ── API helpers (same pattern as the RTP Tracker) ──────────────
+async function apiGet(action, params = {}, timeoutMs = 30000) {
+  const qs = new URLSearchParams({ action, token: WFA_TOKEN, ...params }).toString();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${BACKEND_URL}?${qs}`, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Request timed out — the backend may be cold-starting. Try again.');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function apiPost(data, { retries = 2, timeoutMs = 20000 } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${BACKEND_URL}?token=${WFA_TOKEN}`, {
+        method: 'POST', body: JSON.stringify(data), signal: ctrl.signal
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+      return result;
+    } catch (err) {
+      const transient = err.name === 'AbortError' || err instanceof TypeError || /^HTTP \d/.test(err.message);
+      if (!transient || attempt >= retries) {
+        throw err.name === 'AbortError' ? new Error('Request timed out.') : err;
+      }
+      await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function setSaveStatus(msg) { document.getElementById('save-status').textContent = msg; }
+function yearNum(yg) { return Number(String(yg || '').replace(/\D/g, '')) || 0; }
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+function review(code) {
+  return state.reviews[code] || (state.reviews[code] = { needs_edit: false, note: '', weight: '', secure_by: null, by: '', at: '' });
+}
+function proposedFor(code) {
+  const r = state.reviews[code];
+  return r && typeof r.proposed === 'string' ? r.proposed : (PROPOSED[code] || '');
+}
+function isComplete(r) { return r && r.weight !== '' && r.weight != null && r.secure_by != null; }
+
+// ── Load ───────────────────────────────────────────────────────
+async function loadAll() {
+  const [criteria, cfg] = await Promise.all([apiGet('getCriteria'), apiGet('getConfig')]);
+  state.criteria = [...criteria].sort((a, b) => a.order - b.order);
+  const reviews = {};
+  Object.entries(cfg).forEach(([k, v]) => {
+    if (!k.startsWith(KEY_PREFIX)) return;
+    try { reviews[k.slice(KEY_PREFIX.length)] = JSON.parse(v); } catch (e) { /* ignore a malformed row */ }
+  });
+  // Keep anything still waiting to save so a refresh can't wipe an unsaved edit.
+  Object.keys(state.saveTimers).forEach(code => { if (state.reviews[code]) reviews[code] = state.reviews[code]; });
+  state.reviews = reviews;
+}
+
+async function bootstrap() {
+  try {
+    try { document.getElementById('who').value = localStorage.getItem('rtp_assessed_by') || ''; } catch (e) {}
+    try { state.year = Number(localStorage.getItem('rtp_review_year')) || 1; } catch (e) {}
+    await loadAll();
+    renderAll();
+    document.getElementById('loading').classList.add('hidden');
+  } catch (err) {
+    document.getElementById('loading').textContent = 'Failed to load: ' + err.message;
+  }
+}
+
+// ── Render ─────────────────────────────────────────────────────
+function years() {
+  return [...new Set(state.criteria.map(c => yearNum(c.year_group)))].filter(Boolean).sort((a, b) => a - b);
+}
+
+function renderTabs() {
+  const wrap = document.getElementById('year-tabs');
+  wrap.innerHTML = '';
+  years().forEach(y => {
+    const crit = state.criteria.filter(c => yearNum(c.year_group) === y);
+    const done = crit.filter(c => isComplete(state.reviews[c.code])).length;
+    const b = document.createElement('button');
+    b.className = 'tab-btn' + (y === state.year ? ' active' : '');
+    b.innerHTML = `Y${y}<span class="done">${done}/${crit.length}</span>`;
+    b.addEventListener('click', () => {
+      state.year = y;
+      try { localStorage.setItem('rtp_review_year', String(y)); } catch (e) {}
+      renderAll();
+      window.scrollTo(0, 0);
+    });
+    wrap.appendChild(b);
+  });
+}
+
+function rowHtml(c) {
+  const r = state.reviews[c.code] || {};
+  const flagged = !!r.needs_edit;
+  const who = r.by || r.at ? `<span class="who">Last change: ${esc(r.by || 'unnamed')}${r.at ? ' · ' + esc(new Date(r.at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })) : ''}</span>` : '';
+  return `<tr data-code="${esc(c.code)}" class="${flagged ? 'flagged' : ''}${isComplete(r) ? ' complete' : ''}">
+    <td class="code">${esc(c.code)}</td>
+    <td class="stmt"><span class="lbl">Current</span>${esc(c.description)}
+      <span class="lbl prop">Proposed</span><textarea class="proposed" rows="2">${esc(proposedFor(c.code))}</textarea>
+      <div class="use">Use:
+        <button class="use-btn ${r.use === 'current' ? 'on' : ''}" data-use="current">Current</button>
+        <button class="use-btn ${r.use === 'proposed' ? 'on' : ''}" data-use="proposed">Proposed</button>
+      </div>
+      <textarea class="note ${flagged ? '' : 'hidden'}" placeholder="What still needs editing or clarifying?">${esc(r.note || '')}</textarea>${who}</td>
+    <td><button class="flag-btn ${flagged ? 'on' : ''}" title="Needs editing or clarifying">${flagged ? '✗' : '–'}</button></td>
+    <td><input class="weight-input" type="number" inputmode="decimal" min="0" step="any" value="${esc(r.weight ?? '')}" aria-label="Weight for ${esc(c.code)}"></td>
+    ${TERMS.map(t => `<td><button class="term-btn ${r.secure_by === t ? 'on' : ''}" data-term="${t}" title="Secure by end of Term ${t}">${r.secure_by === t ? '✓' : ''}</button></td>`).join('')}
+  </tr>`;
+}
+
+function yearBlockHtml(y) {
+  const crit = state.criteria.filter(c => yearNum(c.year_group) === y);
+  const strands = STRAND_ORDER.filter(s => crit.some(c => c.strand === s))
+    .concat([...new Set(crit.map(c => c.strand))].filter(s => !STRAND_ORDER.includes(s)));
+  return `<section class="year-block ${y === state.year ? '' : 'hidden'}" data-year="${y}">
+    <h2 class="year-title">Year ${y}</h2>
+    ${strands.map(s => `<div class="strand">
+      <div class="hd">${esc(s)}</div>
+      <table>
+        <thead><tr>
+          <th class="left">Code</th><th class="left">Statement</th><th>Edit?</th><th>Weight</th>
+          <th>Secure by<br>Term 2</th><th>Secure by<br>Term 4</th><th>Secure by<br>Term 6</th>
+        </tr></thead>
+        <tbody>${crit.filter(c => c.strand === s).map(rowHtml).join('')}</tbody>
+      </table>
+    </div>`).join('')}
+  </section>`;
+}
+
+function renderAll() {
+  if (!years().includes(state.year)) state.year = years()[0] || 1;
+  renderTabs();
+  document.getElementById('years').innerHTML = years().map(yearBlockHtml).join('');
+  autosize(document.getElementById('years'));
+  renderProgress();
+}
+
+function autosize(root) {
+  root.querySelectorAll('textarea').forEach(ta => {
+    if (ta.offsetParent === null) return;
+    ta.style.height = 'auto';
+    ta.style.height = (ta.scrollHeight + 2) + 'px';
+  });
+}
+
+function renderProgress() {
+  const crit = state.criteria.filter(c => yearNum(c.year_group) === state.year);
+  const done = crit.filter(c => isComplete(state.reviews[c.code])).length;
+  const flagged = crit.filter(c => state.reviews[c.code]?.needs_edit).length;
+  document.getElementById('year-progress').textContent =
+    `Year ${state.year}: ${done} of ${crit.length} have a weight and a term` + (flagged ? ` · ${flagged} flagged to edit` : '');
+}
+
+function refreshRow(code) {
+  const tr = document.querySelector(`tr[data-code="${CSS.escape(code)}"]`);
+  const c = state.criteria.find(x => x.code === code);
+  if (!tr || !c) return;
+  const focusedWeight = document.activeElement && document.activeElement.classList.contains('weight-input') && tr.contains(document.activeElement);
+  const focusedNote = document.activeElement && document.activeElement.classList.contains('note') && tr.contains(document.activeElement);
+  if (focusedWeight || focusedNote) {
+    // Don't rebuild under the cursor — just update the row state classes.
+    const r = state.reviews[code] || {};
+    tr.classList.toggle('complete', isComplete(r));
+    return;
+  }
+  tr.outerHTML = rowHtml(c);
+  const fresh = document.querySelector(`tr[data-code="${CSS.escape(code)}"]`);
+  if (fresh) autosize(fresh);
+}
+
+// ── Save ───────────────────────────────────────────────────────
+function scheduleSave(code, delay = 500) {
+  const r = review(code);
+  r.by = document.getElementById('who').value.trim();
+  r.at = new Date().toISOString();
+  clearTimeout(state.saveTimers[code]);
+  setSaveStatus('Unsaved…');
+  state.saveTimers[code] = setTimeout(() => saveRow(code), delay);
+  renderTabs();
+  renderProgress();
+}
+
+async function saveRow(code) {
+  delete state.saveTimers[code];
+  state.pending++;
+  setSaveStatus('Saving…');
+  try {
+    await apiPost({ action: 'setConfig', key: KEY_PREFIX + code, value: JSON.stringify(state.reviews[code]) });
+    state.pending--;
+    if (!state.pending && !Object.keys(state.saveTimers).length) setSaveStatus('All saved ✓');
+  } catch (err) {
+    state.pending--;
+    setSaveStatus('Not saved!');
+    toast(`Couldn't save ${code}: ${err.message}. Your change is still on screen — it will retry.`);
+    state.saveTimers[code] = setTimeout(() => saveRow(code), 4000);
+  }
+}
+
+// ── Events ─────────────────────────────────────────────────────
+document.getElementById('years').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-code]');
+  if (!tr) return;
+  const code = tr.dataset.code;
+  if (e.target.closest('.flag-btn')) {
+    const r = review(code);
+    r.needs_edit = !r.needs_edit;
+    scheduleSave(code, 0);
+    refreshRow(code);
+    if (r.needs_edit) {
+      const ta = document.querySelector(`tr[data-code="${CSS.escape(code)}"] .note`);
+      if (ta) ta.focus();
+    }
+    return;
+  }
+  const ub = e.target.closest('.use-btn');
+  if (ub) {
+    const r = review(code);
+    r.use = r.use === ub.dataset.use ? null : ub.dataset.use;
+    scheduleSave(code, 0);
+    refreshRow(code);
+    return;
+  }
+  const tb = e.target.closest('.term-btn');
+  if (tb) {
+    const r = review(code);
+    const t = Number(tb.dataset.term);
+    r.secure_by = r.secure_by === t ? null : t;
+    scheduleSave(code, 0);
+    refreshRow(code);
+  }
+});
+
+document.getElementById('years').addEventListener('input', e => {
+  const tr = e.target.closest('tr[data-code]');
+  if (!tr) return;
+  const code = tr.dataset.code;
+  if (e.target.tagName === 'TEXTAREA') autosize(tr);
+  if (e.target.classList.contains('weight-input')) {
+    const raw = e.target.value.trim();
+    const ok = raw === '' || (Number.isFinite(Number(raw)) && Number(raw) >= 0);
+    e.target.classList.toggle('bad', !ok);
+    if (!ok) return;
+    review(code).weight = raw === '' ? '' : Number(raw);
+    scheduleSave(code, 700);
+    refreshRow(code);
+  } else if (e.target.classList.contains('note')) {
+    review(code).note = e.target.value;
+    scheduleSave(code, 900);
+  } else if (e.target.classList.contains('proposed')) {
+    review(code).proposed = e.target.value;
+    scheduleSave(code, 900);
+  }
+});
+
+document.getElementById('who').addEventListener('change', e => {
+  try { localStorage.setItem('rtp_assessed_by', e.target.value.trim()); } catch (err) {}
+});
+
+document.getElementById('refresh-btn').addEventListener('click', async () => {
+  setSaveStatus('Refreshing…');
+  try {
+    await loadAll();
+    renderAll();
+    setSaveStatus(Object.keys(state.saveTimers).length ? 'Unsaved…' : 'Up to date ✓');
+  } catch (err) {
+    setSaveStatus('');
+    toast('Refresh failed: ' + err.message);
+  }
+});
+
+document.getElementById('print-btn').addEventListener('click', () => window.print());
+
+document.getElementById('csv-btn').addEventListener('click', () => {
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const rows = [['Year', 'Strand', 'Code', 'Current wording', 'Proposed wording', 'Use', 'Needs edit/clarify', 'Note', 'Weight', 'Secure by term', 'Last changed by', 'Last changed']];
+  state.criteria.forEach(c => {
+    const r = state.reviews[c.code] || {};
+    rows.push([c.year_group, c.strand, c.code, c.description, proposedFor(c.code), r.use || '', r.needs_edit ? 'Yes' : '', r.note || '', r.weight ?? '',
+      r.secure_by ? 'Term ' + r.secure_by : '', r.by || '', r.at || '']);
+  });
+  const blob = new Blob(['﻿' + rows.map(row => row.map(q).join(',')).join('\r\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'rtp-weightings-review.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+window.addEventListener('beforeunload', e => {
+  if (Object.keys(state.saveTimers).length || state.pending) { e.preventDefault(); e.returnValue = ''; }
+});
+
+bootstrap();
+</script>
+</body>
+</html>
