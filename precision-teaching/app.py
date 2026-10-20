@@ -636,8 +636,9 @@ def _draw_calc_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
                 for i, ch in enumerate(reversed(B)):
                     put(R - i, 2, ch)
                 put(0, 2, {"−": "-"}.get(q["op"], q["op"]))
-                rule(0, R, 2)                      # line above the answer
-                rule(0, R, 3)                      # line below the answer
+                ans_row = 4 if q["op"] == "×" else 3   # multiplication: an empty row under the sum for carrying
+                rule(0, R, ans_row - 1)            # line above the answer
+                rule(0, R, ans_row)                # line below the answer
         y_line -= label_h + rows * sq + 3 * _mm
     c.setFillColorRGB(0, 0, 0)
 
@@ -1500,7 +1501,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 # The print screen is reached from the Precision Teaching page (staff.*/precision/, "Print" tab). It is dressed
 # like that page (same header, tab bar, cards, chips, buttons; Streamlit's own toolbar hidden) so a teacher does
 # not feel they have left the tool. Only the look is set here: the sheets are made by build_week_pdf as before.
-_PRINT_VER = "WFA-20.10.26b"
+_PRINT_VER = "WFA-20.10.26c"
 _STAFF_PT = "https://staff.wallscourt-farm-academy.co.uk/precision/"
 _PRINT_CSS = """
 <style>
@@ -1678,7 +1679,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-20.10.26b")
+st.caption("Wallscourt Farm Academy · WFA-20.10.26c")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
