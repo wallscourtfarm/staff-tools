@@ -1609,6 +1609,70 @@ def _fade_sheet(pupil, skill_id, step, ladder, pool, variant=None):
     }
 
 
+_CALC_FMT = re.compile(r"^(\d)-digit\s*([+−×÷])\s*(\d)-digit(\s*\(remainders\))?$")
+
+
+def _n_digit(n, rng):
+    return rng.randint(10 ** (n - 1), 10 ** n - 1) if n > 1 else rng.randint(2, 9)
+
+
+def calc_question(fmt, rng):
+    """One written-method question for a format such as '4-digit + 3-digit' or '3-digit ÷ 1-digit (remainders)'.
+    Returns {a, b, op, answer} with whole-number answers (subtraction never negative; division exact unless the
+    format says remainders)."""
+    m = _CALC_FMT.match(fmt.strip())
+    if not m:
+        return None
+    da, op, db, rem = int(m.group(1)), m.group(2), int(m.group(3)), bool(m.group(4))
+    if op == "+":
+        a, b = _n_digit(da, rng), _n_digit(db, rng)
+        return {"a": a, "b": b, "op": op, "answer": str(a + b)}
+    if op == "−":
+        while True:
+            a, b = _n_digit(da, rng), _n_digit(db, rng)
+            if a > b:
+                return {"a": a, "b": b, "op": op, "answer": str(a - b)}
+    if op == "×":
+        a, b = _n_digit(da, rng), rng.randint(2, 9)
+        return {"a": a, "b": b, "op": op, "answer": str(a * b)}
+    # division: up-to-4-digit dividend by a single-digit divisor
+    b = rng.randint(2, 9)
+    if rem:
+        while True:
+            a = _n_digit(da, rng)
+            if a % b:
+                return {"a": a, "b": b, "op": op, "answer": f"{a // b} r {a % b}"}
+    lo, hi = -(-10 ** (da - 1) // b), (10 ** da - 1) // b
+    q = rng.randint(max(lo, 1), hi)
+    return {"a": q * b, "b": b, "op": op, "answer": str(q)}
+
+
+def _calc_sheet(pupil, skill_id, step, ladder, pool):
+    """Written calculation: 2-4 questions a day, each set out on squared paper for the written method."""
+    rng = random.Random()
+    fmts = [i for i in pool if _CALC_FMT.match(i.strip())]
+    count = next((int(i.split()[0]) for i in pool if re.match(r"^[2-4] a day$", i.strip())), 3)
+    order = []
+    while len(order) < count and fmts:
+        batch = fmts[:]
+        rng.shuffle(batch)
+        order += batch
+    qs = []
+    for f in order[:count]:
+        q = calc_question(f, rng)
+        if q:
+            q.update({"item": f, "question": f"{q['a']} {q['op']} {q['b']}", "is_review": False,
+                      "from_skill": skill_id, "from_skill_name": step["name"]})
+            qs.append(q)
+    return {
+        "pupil_name": display_name(pupil), "skill_name": step["name"],
+        "ladder_name": step["ladder_name"] if "ladder_name" in step else (ladder["name"] if ladder else ""),
+        "subject": "maths", "display_mode": "calc", "aim": step["aim"], "untimedAim": step.get("untimedAim"),
+        "calc_layout": "self" if any(i.strip() == "They set it out" for i in pool) else "set",
+        "items": qs, "review_items": [], "questions": qs, "total_questions": len(qs),
+    }
+
+
 def _handwriting_sheet(pupil, skill_id, step, ladder, kind, pool):
     qs = [{"item": it, "question": it, "answer": it, "is_review": False, "from_skill": skill_id,
            "from_skill_name": step["name"]} for it in pool]
@@ -1672,6 +1736,8 @@ def generate_sheet(pupil, skill_id, ladders_data, probes_data=None, include_revi
         return _handwriting_sheet(pupil, skill_id, step, ladder, kind, pool)
     if kind == "fade":
         return _fade_sheet(pupil, skill_id, step, ladder, pool, variant)
+    if kind == "calc":
+        return _calc_sheet(pupil, skill_id, step, ladder, pool)
 
     if target_count is None:
         entry = pupil.get("currentSkills", {}).get(skill_id)

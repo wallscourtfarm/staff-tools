@@ -191,7 +191,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <button class="btn quiet" id="btnClearSel">Clear</button>
   </div>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-18.10.26e</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-20.10.26a</span></footer>
 
 <div class="veil" id="veil"></div>
 
@@ -764,6 +764,7 @@ function drawTarget() {
           T.part = p.id;
           var n = a.pick > 0 ? a.pick : p.items.length;
           T.items = new Set(/_any$/.test(p.id) ? [] : p.items.slice(0, n));   // 'Any letters': you choose
+          if (a.kind === 'calc') T.items = new Set([p.items[0], '3 a day', 'Set out for them']);   // sensible start
         }
         T.pickPart = false;
         drawTarget();
@@ -775,7 +776,7 @@ function drawTarget() {
   if (!T.part) return updateSave();
   var part = a.parts.find(function (p) { return p.id === T.part; });
   // 3. items
-  $('tPickHint').textContent = a.pick > 0 ? '(about ' + a.pick + ' is best)' : '';
+  $('tPickHint').textContent = a.pick > 0 ? '(about ' + a.pick + ' is best)' : (a.kind === 'calc' ? '(kinds of question)' : '');
   $('tHint').textContent = a.hint || '';
   var ib = $('tItems'); ib.innerHTML = '';
   var all = part.items.slice();
@@ -783,11 +784,29 @@ function drawTarget() {
   var known = new Set();
   if (T.kids.length === 1) ((S.confident[T.kids[0]] || {})[T.area] || []).forEach(function (i) { known.add(i); });
   if (known.size) $('tHint').textContent = (a.hint ? a.hint + ' ' : '') + '✓ = already confident; choosing it puts it back on practice.';
+  var isCount = function (i) { return / a day$/.test(i); };
+  var isLayout = function (i) { return i === 'Set out for them' || i === 'They set it out'; };
   all.forEach(function (i) {
+    if (a.kind === 'calc' && (isCount(i) || isLayout(i))) return;
     ib.appendChild(el('button', { class: 'chip' + (T.items.has(i) ? ' on' : '') + (known.has(i) ? ' known' : ''), text: i, on: { click: function () {
       T.items.has(i) ? T.items.delete(i) : T.items.add(i); drawTarget();
     } } }));
   });
+  if (a.kind === 'calc') {
+    // Written calculation: how many questions a day is ONE choice, shown on its own line
+    ib.appendChild(el('div', { class: 'section-name', style: 'width:100%', text: 'How many questions a day' }));
+    all.filter(isCount).forEach(function (i) {
+      ib.appendChild(el('button', { class: 'chip' + (T.items.has(i) ? ' on' : ''), text: i, on: { click: function () {
+        all.filter(isCount).forEach(function (x) { T.items.delete(x); }); T.items.add(i); drawTarget();
+      } } }));
+    });
+    ib.appendChild(el('div', { class: 'section-name', style: 'width:100%', text: 'Layout' }));
+    all.filter(isLayout).forEach(function (i) {
+      ib.appendChild(el('button', { class: 'chip' + (T.items.has(i) ? ' on' : ''), text: i, on: { click: function () {
+        all.filter(isLayout).forEach(function (x) { T.items.delete(x); }); T.items.add(i); drawTarget();
+      } } }));
+    });
+  }
   $('tFreeWrap').hidden = !a.free;
   // 4. days
   var db = $('tDays'); db.innerHTML = '';
@@ -807,7 +826,12 @@ function chosenItems() {
   return out;
 }
 function updateSave() {
-  var n = chosenItems().length;
+  var ch = chosenItems(), n = ch.length, ar = T.area && area(T.area);
+  if (ar && ar.kind === 'calc') {
+    var counts = ch.filter(function (i) { return / a day$/.test(i); }).length;
+    var lays = ch.filter(function (i) { return i === 'Set out for them' || i === 'They set it out'; }).length;
+    n = (counts === 1 && lays === 1 && ch.length > 2) ? ch.length : 0;   // a kind of question, how many, and a layout
+  }
   $('tSave').disabled = !(T.kids.length && T.area && T.part && n && T.days.size);
   $('tSave').textContent = T.edit ? 'Save changes' : (T.kids.length > 1 ? 'Give to ' + T.kids.length + ' children' : 'Save target');
 }

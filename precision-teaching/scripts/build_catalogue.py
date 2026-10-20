@@ -40,6 +40,23 @@ add("times_tables", "Times tables", "Maths", "maths", 5, [part(s) for s in by["t
 add("number_bonds", "Number bonds", "Maths", "maths", 5, [part(s) for s in by["number_bonds"]["steps"]])
 add("doubles_halves", "Doubles and halves", "Maths", "maths", 5, [part(s) for s in by["doubles_halves"]["steps"]])
 add("addition_facts", "Addition facts", "Maths", "maths", 5, [part(s) for s in by["addition_facts"]["steps"]])
+# Written calculation: items are the question formats, plus how many questions a day ("3 a day").
+CALC = {
+    "add": ("Addition", ["2-digit + 1-digit", "2-digit + 2-digit", "3-digit + 2-digit", "3-digit + 3-digit",
+                         "4-digit + 3-digit", "4-digit + 4-digit"]),
+    "sub": ("Subtraction", ["2-digit − 1-digit", "2-digit − 2-digit", "3-digit − 2-digit", "3-digit − 3-digit",
+                            "4-digit − 3-digit", "4-digit − 4-digit"]),
+    "mul": ("Multiplication", ["2-digit × 1-digit", "3-digit × 1-digit", "4-digit × 1-digit"]),
+    "div": ("Division", ["2-digit ÷ 1-digit", "3-digit ÷ 1-digit", "4-digit ÷ 1-digit",
+                         "3-digit ÷ 1-digit (remainders)", "4-digit ÷ 1-digit (remainders)"]),
+}
+COUNTS = ["2 a day", "3 a day", "4 a day"]
+LAYOUTS = ["Set out for them", "They set it out"]
+calc_parts = [{"id": f"calc_{k}", "name": nm, "items": fm + COUNTS + LAYOUTS} for k, (nm, fm) in CALC.items()]
+calc_parts.append({"id": "calc_mix", "name": "Mixed (choose any)",
+                   "items": [f for _, fm in CALC.values() for f in fm] + COUNTS + LAYOUTS})
+add("calc", "Written calculation", "Maths", "calc", 0, calc_parts,
+    hint="Choose the kinds of question, then how many a day. Each question is on squared paper for the written method.")
 add("phonics", "Phonics sounds", "Reading", "recognition", 4, [part(s) for s in by["phonics_gpcs"]["steps"]] +
     [{"id": "ph_own", "name": "Graphemes you choose", "items": []}], free=True,
     hint="Pick a few graphemes. You can type others.")
