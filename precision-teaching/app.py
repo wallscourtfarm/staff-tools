@@ -357,6 +357,8 @@ def _is_full_page(sheet):
     Maths and dictation spelling sit two to a page."""
     if sheet.get("display_mode") == "handwriting":
         return len(sheet["questions"]) > 6          # a few letters or joins fit half a page: two sheets per page
+    if sheet.get("display_mode") == "calc":
+        return _calc_needs_full_page(sheet["questions"])
     if sheet.get("display_mode") == "fade":
         return len(sheet["questions"]) > 6          # up to six words fit half a page
     if sheet.get("display_mode") == "cloze":
@@ -517,82 +519,126 @@ def _draw_fade_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
         c.rect(X["tick"] + 1.5 * _mm, base - 1, bs, bs)
 
 
+# Square size and rows per grid, largest first; the first that fits is used. Never smaller than 6.5 mm:
+# a sheet that does not fit half a page at that size gets a whole page (see _is_full_page).
+_CALC_SIZES = ((7 * _mm, 7), (7 * _mm, 6), (6.5 * _mm, 6))
+
+
+def _calc_needs_full_page(qs):
+    usable_w, half_avail, gap, label_h = 180 * _mm, 92 * _mm, 7 * _mm, 8 * _mm
+    for sq, rows in _CALC_SIZES:
+        n_lines, x = 1, 0
+        for q in qs:
+            w = _calc_cols(q) * sq
+            if x and x + gap + w > usable_w:
+                n_lines, x = n_lines + 1, 0
+            x += (gap if x else 0) + w
+        if n_lines * (label_h + rows * sq) + (n_lines - 1) * 3 * _mm <= half_avail:
+            return False
+    return True
+
+
+def _calc_cols(q):
+    """Squares across for one question: at least 2 more than the most digits in it (sign column + room to
+    exchange); division gets room for the divisor and a remainder."""
+    A, B, ans = str(q["a"]), str(q["b"]), str(q["answer"]).split(" r ")[0]
+    if q["op"] == "÷":
+        return len(A) + 4
+    return max(len(A), len(B), len(ans)) + 2
+
+
 def _draw_calc_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
-    """Written calculation: each question on its own 7 mm squared grid, set out in columns for the written method
-    (column addition, subtraction and multiplication; short division as a bus stop). The rows above and below
-    are left free for exchanging, carrying and working."""
+    """Written calculation: each question on its own squared grid (7 mm squares), set out in columns for the
+    written method (column addition, subtraction and multiplication; short division as a bus stop), or with the
+    sum written above for the child to set out. Each grid is sized to its question; questions that do not fit
+    across go onto the next line."""
     qs = sheet["questions"]
     if not qs:
         return
-    n = len(qs)
-    gap = 5 * _mm
-    box_w = (usable_w - gap * (n - 1)) / n
-    sq = 7 * _mm
-    top = grid_top - 7 * _mm
-    cols = int(box_w // sq)
-    rows = max(5, int((top - grid_bottom) // sq))
+    gap = 7 * _mm
+    label_h = 8 * _mm
+    self_layout = sheet.get("calc_layout") == "self"
+
+    def plan(sq, rows):
+        lines, line, x = [], [], 0
+        for q in qs:
+            w = _calc_cols(q) * sq
+            if line and x + gap + w > usable_w:
+                lines.append(line); line, x = [], 0
+            line.append(q); x += (gap if x else 0) + w
+        lines.append(line)
+        return lines, len(lines) * (label_h + rows * sq) + (len(lines) - 1) * 3 * _mm
+
+    avail = grid_top - grid_bottom
+    for sq, rows in _CALC_SIZES:
+        lines, need = plan(sq, rows)
+        if need <= avail:
+            break
     size = sq * 0.72
-    for k, q in enumerate(qs):
-        bx = margin + k * (box_w + gap)
-        x0 = bx + (box_w - cols * sq) / 2
-        self_layout = sheet.get("calc_layout") == "self"
-        c.setFont("Helvetica", 10)
-        c.setFillColorRGB(*_GREY)
-        c.drawString(bx, grid_top - 5 * _mm, f"{k + 1})")
-        if self_layout:                            # the child sets it out: write the sum, leave the squares empty
-            sym = {"−": "-"}.get(q["op"], q["op"])
-            text = f"{q['a']} {sym} {q['b']} ="
-            fs = 15
-            while fs > 9 and c.stringWidth(text, _WORD_FONT, fs) > box_w - 7 * _mm:
-                fs -= 1
+    y_line = grid_top
+    k = 0
+    for line in lines:
+        bx = margin
+        for q in line:
+            k += 1
+            cols = _calc_cols(q)
+            x0 = bx
+            top = y_line - label_h
+            c.setFont("Helvetica", 10)
+            c.setFillColorRGB(*_GREY)
+            c.drawString(bx, y_line - 5.5 * _mm, f"{k})")
+            if self_layout:                        # the child sets it out: write the sum, leave the squares empty
+                sym = {"−": "-"}.get(q["op"], q["op"])
+                text = f"{q['a']} {sym} {q['b']} ="
+                fs = 15
+                while fs > 9 and c.stringWidth(text, _WORD_FONT, fs) > cols * sq - 6 * _mm:
+                    fs -= 1
+                c.setFillColorRGB(0, 0, 0)
+                c.setFont(_WORD_FONT, fs)
+                c.drawString(bx + 6 * _mm, y_line - 5.5 * _mm, text)
+            # squared paper
+            c.setStrokeColorRGB(0.78, 0.84, 0.9)
+            c.setLineWidth(0.35)
+            for i in range(cols + 1):
+                c.line(x0 + i * sq, top, x0 + i * sq, top - rows * sq)
+            for j in range(rows + 1):
+                c.line(x0, top - j * sq, x0 + cols * sq, top - j * sq)
+            bx += cols * sq + gap
+            if self_layout:
+                continue
+
+            def put(col, row, ch, x0=x0, top=top):
+                c.drawCentredString(x0 + (col + 0.5) * sq, top - (row + 1) * sq + sq * 0.24, ch)
+
+            def rule(c0, c1, row_bottom, x0=x0, top=top):
+                c.setStrokeColorRGB(0.1, 0.1, 0.1)
+                c.setLineWidth(1.1)
+                y = top - (row_bottom + 1) * sq
+                c.line(x0 + c0 * sq + 1, y, x0 + (c1 + 1) * sq - 1, y)
+
+            A, B = str(q["a"]), str(q["b"])
             c.setFillColorRGB(0, 0, 0)
-            c.setFont(_WORD_FONT, fs)
-            c.drawString(bx + 6 * _mm, grid_top - 5 * _mm, text)
-        # squared paper
-        c.setStrokeColorRGB(0.78, 0.84, 0.9)
-        c.setLineWidth(0.35)
-        for i in range(cols + 1):
-            c.line(x0 + i * sq, top, x0 + i * sq, top - rows * sq)
-        for j in range(rows + 1):
-            c.line(x0, top - j * sq, x0 + cols * sq, top - j * sq)
-
-        def put(col, row, ch):
-            c.drawCentredString(x0 + (col + 0.5) * sq, top - (row + 1) * sq + sq * 0.24, ch)
-
-        def rule(c0, c1, row_bottom):
-            c.setStrokeColorRGB(0.1, 0.1, 0.1)
-            c.setLineWidth(1.1)
-            y = top - (row_bottom + 1) * sq
-            c.line(x0 + c0 * sq + 1, y, x0 + (c1 + 1) * sq - 1, y)
-
-        A, B = str(q["a"]), str(q["b"])
-        c.setFillColorRGB(0, 0, 0)
-        c.setFont(_WORD_FONT, size)
-        if self_layout:
-            continue
-        if q["op"] == "÷":
-            need = len(A) + 1
-            R = cols - 2 if cols >= need + 2 else cols - 1
-            first = R - len(A) + 1
-            for i, ch in enumerate(A):
-                put(first + i, 2, ch)
-            put(first - 1, 2, B)
-            c.setStrokeColorRGB(0.1, 0.1, 0.1)
-            c.setLineWidth(1.1)
-            yt = top - 2 * sq                      # top of the dividend row: the bus stop
-            c.line(x0 + first * sq, yt, x0 + (R + 1) * sq, yt)
-            c.line(x0 + first * sq, yt, x0 + first * sq, yt - sq)
-        else:
-            width = max(len(A), len(B), len(q["answer"])) + 1
-            R = cols - 2 if cols >= width + 1 else cols - 1
-            for i, ch in enumerate(reversed(A)):
-                put(R - i, 1, ch)
-            for i, ch in enumerate(reversed(B)):
-                put(R - i, 2, ch)
-            sign_col = max(0, R - max(len(A), len(B), len(q["answer"])))
-            put(sign_col, 2, {"−": "-", "×": "×"}.get(q["op"], q["op"]))
-            rule(sign_col, R, 2)                   # line above the answer
-            rule(sign_col, R, 3)                   # line below the answer
+            c.setFont(_WORD_FONT, size)
+            if q["op"] == "÷":
+                first = 2                          # divisor in column 1, bus stop from column 2
+                for i, ch in enumerate(A):
+                    put(first + i, 2, ch)
+                put(first - 1, 2, B)
+                c.setStrokeColorRGB(0.1, 0.1, 0.1)
+                c.setLineWidth(1.1)
+                yt = top - 2 * sq
+                c.line(x0 + first * sq, yt, x0 + (first + len(A)) * sq, yt)
+                c.line(x0 + first * sq, yt, x0 + first * sq, yt - sq)
+            else:
+                R = cols - 1                       # units column on the right; sign in the first column
+                for i, ch in enumerate(reversed(A)):
+                    put(R - i, 1, ch)
+                for i, ch in enumerate(reversed(B)):
+                    put(R - i, 2, ch)
+                put(0, 2, {"−": "-"}.get(q["op"], q["op"]))
+                rule(0, R, 2)                      # line above the answer
+                rule(0, R, 3)                      # line below the answer
+        y_line -= label_h + rows * sq + 3 * _mm
     c.setFillColorRGB(0, 0, 0)
 
 
@@ -1454,7 +1500,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 # The print screen is reached from the Precision Teaching page (staff.*/precision/, "Print" tab). It is dressed
 # like that page (same header, tab bar, cards, chips, buttons; Streamlit's own toolbar hidden) so a teacher does
 # not feel they have left the tool. Only the look is set here: the sheets are made by build_week_pdf as before.
-_PRINT_VER = "WFA-20.10.26a"
+_PRINT_VER = "WFA-20.10.26b"
 _STAFF_PT = "https://staff.wallscourt-farm-academy.co.uk/precision/"
 _PRINT_CSS = """
 <style>
@@ -1632,7 +1678,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-20.10.26a")
+st.caption("Wallscourt Farm Academy · WFA-20.10.26b")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
