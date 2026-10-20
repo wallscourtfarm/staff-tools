@@ -517,6 +517,85 @@ def _draw_fade_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
         c.rect(X["tick"] + 1.5 * _mm, base - 1, bs, bs)
 
 
+def _draw_calc_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
+    """Written calculation: each question on its own 7 mm squared grid, set out in columns for the written method
+    (column addition, subtraction and multiplication; short division as a bus stop). The rows above and below
+    are left free for exchanging, carrying and working."""
+    qs = sheet["questions"]
+    if not qs:
+        return
+    n = len(qs)
+    gap = 5 * _mm
+    box_w = (usable_w - gap * (n - 1)) / n
+    sq = 7 * _mm
+    top = grid_top - 7 * _mm
+    cols = int(box_w // sq)
+    rows = max(5, int((top - grid_bottom) // sq))
+    size = sq * 0.72
+    for k, q in enumerate(qs):
+        bx = margin + k * (box_w + gap)
+        x0 = bx + (box_w - cols * sq) / 2
+        self_layout = sheet.get("calc_layout") == "self"
+        c.setFont("Helvetica", 10)
+        c.setFillColorRGB(*_GREY)
+        c.drawString(bx, grid_top - 5 * _mm, f"{k + 1})")
+        if self_layout:                            # the child sets it out: write the sum, leave the squares empty
+            sym = {"−": "-"}.get(q["op"], q["op"])
+            text = f"{q['a']} {sym} {q['b']} ="
+            fs = 15
+            while fs > 9 and c.stringWidth(text, _WORD_FONT, fs) > box_w - 7 * _mm:
+                fs -= 1
+            c.setFillColorRGB(0, 0, 0)
+            c.setFont(_WORD_FONT, fs)
+            c.drawString(bx + 6 * _mm, grid_top - 5 * _mm, text)
+        # squared paper
+        c.setStrokeColorRGB(0.78, 0.84, 0.9)
+        c.setLineWidth(0.35)
+        for i in range(cols + 1):
+            c.line(x0 + i * sq, top, x0 + i * sq, top - rows * sq)
+        for j in range(rows + 1):
+            c.line(x0, top - j * sq, x0 + cols * sq, top - j * sq)
+
+        def put(col, row, ch):
+            c.drawCentredString(x0 + (col + 0.5) * sq, top - (row + 1) * sq + sq * 0.24, ch)
+
+        def rule(c0, c1, row_bottom):
+            c.setStrokeColorRGB(0.1, 0.1, 0.1)
+            c.setLineWidth(1.1)
+            y = top - (row_bottom + 1) * sq
+            c.line(x0 + c0 * sq + 1, y, x0 + (c1 + 1) * sq - 1, y)
+
+        A, B = str(q["a"]), str(q["b"])
+        c.setFillColorRGB(0, 0, 0)
+        c.setFont(_WORD_FONT, size)
+        if self_layout:
+            continue
+        if q["op"] == "÷":
+            need = len(A) + 1
+            R = cols - 2 if cols >= need + 2 else cols - 1
+            first = R - len(A) + 1
+            for i, ch in enumerate(A):
+                put(first + i, 2, ch)
+            put(first - 1, 2, B)
+            c.setStrokeColorRGB(0.1, 0.1, 0.1)
+            c.setLineWidth(1.1)
+            yt = top - 2 * sq                      # top of the dividend row: the bus stop
+            c.line(x0 + first * sq, yt, x0 + (R + 1) * sq, yt)
+            c.line(x0 + first * sq, yt, x0 + first * sq, yt - sq)
+        else:
+            width = max(len(A), len(B), len(q["answer"])) + 1
+            R = cols - 2 if cols >= width + 1 else cols - 1
+            for i, ch in enumerate(reversed(A)):
+                put(R - i, 1, ch)
+            for i, ch in enumerate(reversed(B)):
+                put(R - i, 2, ch)
+            sign_col = max(0, R - max(len(A), len(B), len(q["answer"])))
+            put(sign_col, 2, {"−": "-", "×": "×"}.get(q["op"], q["op"]))
+            rule(sign_col, R, 2)                   # line above the answer
+            rule(sign_col, R, 3)                   # line below the answer
+    c.setFillColorRGB(0, 0, 0)
+
+
 def _draw_cloze_body(c, margin, usable_w, grid_top, grid_bottom, sheet):
     """Word bank in a box, then numbered sentences with a gap to fill."""
     bank = sheet.get("bank") or []
@@ -595,6 +674,8 @@ def render_compact_sheet_slot(c, margin, usable_w, slot_top, slot_bottom, pupil,
         _draw_handwriting_body(c, margin, usable_w, grid_top, grid_bottom, sheet)
     elif mode == "fade":
         _draw_fade_body(c, margin, usable_w, grid_top, grid_bottom, sheet)
+    elif mode == "calc":
+        _draw_calc_body(c, margin, usable_w, grid_top, grid_bottom, sheet)
     else:
         _draw_band_content(c, margin, usable_w, grid_top, grid_bottom, sheet, maths_cols=4)
 
@@ -1305,7 +1386,7 @@ if query_params.get("mode") == "self_assess":
 # them and makes the week's sheets with the same sheet code as before.
 
 _PT_API = os.environ.get("PT_API_URL", "https://api.wallscourt-farm-academy.co.uk/planning/precision-db")
-_KIND = {"maths": ("maths", None), "recognition": ("phonics", None), "cloze": ("spellings", "cloze"), "fade": ("spellings", "fade"),
+_KIND = {"maths": ("maths", None), "recognition": ("phonics", None), "cloze": ("spellings", "cloze"), "fade": ("spellings", "fade"), "calc": ("maths", "calc"),
          "dictation": ("spellings", None), "hw_letters": ("handwriting", "hw_letters"), "hw_joins": ("handwriting", "hw_joins")}
 
 
@@ -1341,7 +1422,9 @@ def _targets_to_sheets(load, catalogue, base_ladders):
         sid = f"pt{t['id']}"
         short = a["name"].split(" (")[0]
         name = t["partName"]
-        if kind and kind.startswith("hw"):
+        if kind == "calc":
+            name = "Written calculation" + ("" if t["part"] == "calc_mix" else f": {t['partName'].lower()}")
+        elif kind and kind.startswith("hw"):
             name = f"{short.split(': ')[-1].capitalize()}: {' '.join(t['items'])}"
         elif t["part"].endswith(("_own", "_any")):
             name = f"Sounds: {' '.join(t['items'])}" if a["id"] == "phonics" else f"{short}: {' '.join(t['items'])}"
@@ -1371,7 +1454,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 # The print screen is reached from the Precision Teaching page (staff.*/precision/, "Print" tab). It is dressed
 # like that page (same header, tab bar, cards, chips, buttons; Streamlit's own toolbar hidden) so a teacher does
 # not feel they have left the tool. Only the look is set here: the sheets are made by build_week_pdf as before.
-_PRINT_VER = "WFA-18.10.26k"
+_PRINT_VER = "WFA-20.10.26a"
 _STAFF_PT = "https://staff.wallscourt-farm-academy.co.uk/precision/"
 _PRINT_CSS = """
 <style>
@@ -1549,7 +1632,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-18.10.26k")
+st.caption("Wallscourt Farm Academy · WFA-20.10.26a")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
