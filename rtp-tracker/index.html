@@ -165,9 +165,22 @@ table.rtp-grid thead tr.strand-row th { background: var(--blue); color: #fff; fo
 .weight-row { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-top: 1px solid var(--border); }
 .weight-row .code { width: 70px; font-size: 11px; font-weight: 700; flex-shrink: 0; }
 .weight-row .desc { flex: 1; font-size: 12px; color: #444; }
-.weight-btns { display: flex; gap: 4px; flex-shrink: 0; }
-.wbtn { width: 30px; height: 26px; border: 1px solid var(--border); background: #fff; border-radius: 4px; font-size: 11px; font-weight: 700; }
-.wbtn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.weight-strand > .hd { display: flex; align-items: center; gap: 10px; }
+.weight-strand > .hd > span:first-child { flex: 1; }
+.weight-strand > .hd .wcol, .weight-strand > .hd .tcol { flex-shrink: 0; font-size: 10px; font-weight: 700; color: #555; text-align: center; line-height: 1.2; }
+.weight-strand > .hd .wcol { width: 64px; }
+.weight-strand > .hd .tcol { width: 52px; }
+.weight-input { width: 64px; height: 30px; flex-shrink: 0; text-align: center; font-size: 14px; font-weight: 700; border: 1px solid var(--border); border-radius: 6px; }
+.weight-input.bad { border-color: #dc2626; background: #fef2f2; }
+.tbtn { width: 52px; height: 30px; flex-shrink: 0; border: 1px solid var(--border); background: #fff; border-radius: 6px; font-size: 15px; font-weight: 700; }
+.tbtn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.custom-tag { display: inline-block; background: #ede9fe; color: #5b21b6; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; }
+.link-btn { background: none; border: none; color: var(--blue); font-size: 11px; font-weight: 600; padding: 0 2px; text-decoration: underline; }
+.link-btn.danger { color: #dc2626; }
+.add-row { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-top: 1px dashed var(--border); background: #fafbff; flex-wrap: wrap; }
+.add-row .add-lbl { font-size: 11px; font-weight: 700; color: #5b21b6; }
+.add-row select, .add-row input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+.add-row .add-desc { flex: 1; min-width: 200px; }
 
 /* ── Footer ─────────────────────────────────────────────────── */
 footer {
@@ -203,7 +216,7 @@ footer {
     <button class="tab-btn active" data-view="grid">Class Grid</button>
     <button class="tab-btn" data-view="profile">Pupil Profile</button>
     <button class="tab-btn" data-view="cohort">Cohort Dashboard</button>
-    <button class="tab-btn" data-view="weights">Weights</button>
+    <button class="tab-btn" data-view="weights">Weights &amp; targets</button>
   </div>
   <span class="sync-status" id="sync-status"></span>
 </header>
@@ -278,7 +291,7 @@ footer {
   <!-- WEIGHTS VIEW -->
   <section id="view-weights" class="hidden">
     <div class="toolbar">
-      <span style="color:#666;">Mark specific Ready to Progress skills as higher priority. A x2 or x3 weight makes that skill count more in every weighted security score. Default is x1 for every skill.</span>
+      <span style="color:#666;">Type a weight for each Ready to Progress skill: a bigger number makes that skill count more in every weighted security score (default 1; 0 leaves it out). Tap the term by which learners should be secure in it (tap again to clear). Use "Add a school target" under any area to add your own target for a year group (e.g. know their 2, 5 and 10 times tables). Each change saves on its own.</span>
     </div>
     <div id="weights-body"></div>
   </section>
@@ -292,7 +305,7 @@ footer {
     <span style="margin-left:6px;">Score = weighted average across taught skills only</span>
     <button class="btn secondary" id="sync-roster-btn" style="margin-left:14px;">Sync roster</button>
   </div>
-  <span class="version">WFA-08.10.26a</span>
+  <span class="version">WFA-20.10.26a</span>
 </footer>
 
 <div id="toast"></div>
@@ -305,6 +318,7 @@ footer {
 //   'https://script.google.com/macros/s/AKfycbyCirE0OZEPyV2e0KGxcFgcTy-jnlZi3kiT-PFwVNrJjdinkjgdaXRc1TkjtkpKNoRN/exec'
 const BACKEND_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/rtptracker-db';
 const WFA_TOKEN = '__hub__';
+const SECURE_TERMS = [2, 4, 6];
 const STRAND_ORDER = ['Number and Place Value','Number Facts','Addition and Subtraction','Multiplication and Division','Fractions','Geometry'];
 
 const state = {
@@ -371,8 +385,11 @@ function toast(msg) {
 
 function yearNum(yg) { return Number(String(yg || '').replace(/\D/g, '')) || 0; }
 
+// Area, then year, then list order — so school-added targets (appended last) sit with their own area and year.
 function sortedCriteria() {
-  return [...state.criteria].sort((a, b) => a.order - b.order);
+  const si = s => { const i = STRAND_ORDER.indexOf(s); return i < 0 ? 99 : i; };
+  return [...state.criteria].sort((a, b) =>
+    si(a.strand) - si(b.strand) || yearNum(a.year_group) - yearNum(b.year_group) || a.order - b.order);
 }
 
 // ── Bootstrap ────────────────────────────────────────────────
@@ -529,7 +546,7 @@ function scoreForCriteria(criteria, ratings) {
     if (r !== undefined) { ratedCount++; creditWeight += c.weight * ((Number(r) - 1) / 2); }
   });
   return {
-    pct: Math.round((creditWeight / taughtWeight) * 1000) / 10,
+    pct: taughtWeight ? Math.round((creditWeight / taughtWeight) * 1000) / 10 : null,
     taughtCount: taught.length, ratedCount, totalCount: criteria.length
   };
 }
@@ -561,7 +578,7 @@ function renderGrid() {
     '<th>Score</th></tr><tr><th class="pupil-col">Pupil</th>' +
     cols.map(c => {
       const taught = state.taughtCodes.has(c.code);
-      return `<th class="crit-head${taught ? '' : ' not-taught'}" data-code="${c.code}" title="Click for the full skill"><span class="crit-code">${c.code.replace('–','-')}</span><span class="crit-year">${c.year_group}${c.weight > 1 ? ' <span class=\"crit-weight\">'+'★'.repeat(c.weight-1)+'</span>' : ''}${taught ? ' <span class=\"taught-mark\">✓</span>' : ''}</span></th>`;
+      return `<th class="crit-head${taught ? '' : ' not-taught'}" data-code="${c.code}" title="Click for the full skill"><span class="crit-code">${c.code.replace('–','-')}</span><span class="crit-year">${c.year_group}${weightTag(c, 'crit-weight')}${taught ? ' <span class=\"taught-mark\">✓</span>' : ''}</span></th>`;
     }).join('') +
     '<th>Score</th></tr></thead><tbody>';
 
@@ -599,7 +616,7 @@ function showCriterionInfo(code, headEl) {
   const taught = state.taughtCodes.has(code);
   const body = document.getElementById('criterion-info-body');
   body.innerHTML = `<strong>${c.code.replace('–','-')}</strong> — ${escapeHtml(c.description)}` +
-    `<span class="ci-meta">${c.strand} · ${c.year_group}${c.weight > 1 ? ' · weight x' + c.weight : ''}</span>` +
+    `<span class="ci-meta">${c.strand} · ${c.year_group}${c.weight !== 1 ? ' · weight ' + c.weight : ''}${c.secure_by_term ? ' · secure by Term ' + c.secure_by_term : ''}</span>` +
     `<div style="margin-top:8px;"><button class="btn ${taught ? 'secondary' : ''}" id="ci-taught-toggle">${taught ? '✓ Taught to this class — click to unmark' : 'Not yet taught — mark as taught'}</button></div>`;
   document.getElementById('criterion-info').classList.remove('hidden');
   document.getElementById('ci-taught-toggle').addEventListener('click', () => toggleTaught(code));
@@ -704,6 +721,11 @@ async function flushDirty() {
   }
 }
 window.addEventListener('beforeunload', () => { if (Object.keys(state.dirty).length) flushDirty(); });
+
+// Small marker for any skill whose weight isn't the default 1, e.g. "w2.5".
+function weightTag(c, cls) {
+  return c.weight !== 1 ? ` <span class="${cls}">w${c.weight}</span>` : '';
+}
 
 function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -812,7 +834,7 @@ function renderProfileMain() {
       const dotCls = r ? 'rating-' + r : 'rating-blank';
       html += `<div class="strand-crit-row${taught ? '' : ' not-taught-row'}">
         <span class="rating-dot ${dotCls}">${taught ? (r || '–') : '·'}</span>
-        <span class="code">${c.code.replace('–','-')} <small style="color:#888;">${c.year_group}${c.weight>1?' ★'.repeat(c.weight-1)+'':''}</small></span>
+        <span class="code">${c.code.replace('–','-')} <small style="color:#888;">${c.year_group}${weightTag(c, 'crit-weight')}</small></span>
         <span class="desc">${escapeHtml(c.description)}${taught ? '' : ' <em style=\"color:#94a3b8;\">(not yet taught)</em>'}</span>
       </div>`;
     });
@@ -869,7 +891,7 @@ function renderCohort(data) {
   }
   document.getElementById('cohort-criteria-body').innerHTML = crit.map(c => `
     <div class="bar-row" title="${escapeHtml(c.description)}">
-      <span class="code">${c.code.replace('–','-')}${c.weight>1?' <span class="weight-star">'+'★'.repeat(c.weight-1)+'</span>':''}</span>
+      <span class="code">${c.code.replace('–','-')}${weightTag(c, 'weight-star')}</span>
       <span class="bar-track"><span class="bar-fill" style="width:${c.pctSecure || 0}%;"></span></span>
       <span class="bar-pct">${c.pctSecure === null ? '—' : c.pctSecure + '%'}</span>
       <span class="bar-taught" title="taught to this many pupils in scope">${c.taughtCount}/${c.pupilCount} taught</span>
@@ -895,32 +917,121 @@ function buildWeightsView() {
   wrap.innerHTML = STRAND_ORDER.map(strand => {
     const crit = sortedCriteria().filter(c => c.strand === strand);
     return `<div class="weight-strand">
-      <div class="hd">${strand}</div>
+      <div class="hd"><span>${strand}</span><span class="wcol">Weight</span>${SECURE_TERMS.map(t => `<span class="tcol">Secure by<br>Term ${t}</span>`).join('')}</div>
       ${crit.map(c => `<div class="weight-row" data-code="${c.code}">
         <span class="code">${c.code.replace('–','-')} <small style="color:#888;">${c.year_group}</small></span>
-        <span class="desc">${escapeHtml(c.description)}</span>
-        <div class="weight-btns">
-          ${[1,2,3].map(w => `<button class="wbtn ${c.weight === w ? 'active' : ''}" data-w="${w}">x${w}</button>`).join('')}
-        </div>
+        <span class="desc">${c.custom ? '<span class="custom-tag">School target</span> ' : ''}${escapeHtml(c.description)}${c.custom ? ` <button class="link-btn" data-act="edit">Edit</button> <button class="link-btn danger" data-act="remove">Remove</button>` : ''}</span>
+        <input class="weight-input" type="number" inputmode="decimal" min="0" step="any" value="${c.weight}" aria-label="Weight for ${c.code}">
+        ${SECURE_TERMS.map(t => `<button class="tbtn ${c.secure_by_term === t ? 'active' : ''}" data-t="${t}" title="Secure by the end of Term ${t}">${c.secure_by_term === t ? '✓' : ''}</button>`).join('')}
       </div>`).join('')}
+      <div class="add-row" data-strand="${strand}">
+        <span class="add-lbl">Add a school target</span>
+        <select class="add-year" aria-label="Year group">${[1,2,3,4,5,6].map(y => `<option value="${y}">Y${y}</option>`).join('')}</select>
+        <input class="add-desc" type="text" placeholder="e.g. Know their 2, 5 and 10 times tables" aria-label="New target for ${strand}">
+        <button class="btn add-btn">Add</button>
+      </div>
     </div>`;
   }).join('');
 
+  wrap.querySelectorAll('.add-row').forEach(row => {
+    const btn = row.querySelector('.add-btn');
+    const desc = row.querySelector('.add-desc');
+    const add = async () => {
+      const text = desc.value.trim();
+      if (!text) { desc.focus(); return; }
+      const year = Number(row.querySelector('.add-year').value);
+      btn.disabled = true;
+      try {
+        const res = await apiPost({ action: 'addCustomCriterion', strand: row.dataset.strand, year, description: text }, { retries: 0 });
+        const maxOrder = Math.max(0, ...state.criteria.map(c => c.order || 0));
+        state.criteria.push({ code: res.code, strand: row.dataset.strand, year_group: 'Y' + year, order: maxOrder + 1,
+          description: text, weight: 1, secure_by_term: null, custom: true });
+        cohortCache = null;
+        toast('Added ' + res.code.replace('–','-'));
+        buildWeightsView();
+      } catch (err) {
+        toast('Could not add: ' + err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    btn.addEventListener('click', add);
+    desc.addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
+  });
+
+  wrap.querySelectorAll('.weight-row .link-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const code = btn.closest('.weight-row').dataset.code;
+      const crit = state.criteria.find(c => c.code === code);
+      if (!crit) return;
+      try {
+        if (btn.dataset.act === 'edit') {
+          const text = (prompt('Edit the target for ' + code.replace('–','-') + ':', crit.description) || '').trim();
+          if (!text || text === crit.description) return;
+          await apiPost({ action: 'updateCustomCriterion', code, description: text });
+          crit.description = text;
+          toast('Saved');
+        } else {
+          if (!confirm('Remove ' + code.replace('–','-') + ' — "' + crit.description + '"? Any ratings already given are kept but it will no longer show.')) return;
+          await apiPost({ action: 'removeCustomCriterion', code });
+          state.criteria = state.criteria.filter(c => c.code !== code);
+          toast('Removed ' + code.replace('–','-'));
+        }
+        cohortCache = null;
+        buildWeightsView();
+      } catch (err) {
+        toast('Failed: ' + err.message);
+      }
+    });
+  });
+
   wrap.querySelectorAll('.weight-row').forEach(row => {
     const code = row.dataset.code;
-    row.querySelectorAll('.wbtn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const w = Number(btn.dataset.w);
-        row.querySelectorAll('.wbtn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const crit = state.criteria.find(c => c.code === code);
+    const crit = state.criteria.find(c => c.code === code);
+    const input = row.querySelector('.weight-input');
+    let lastSaved = crit ? crit.weight : 1;
+    const saveWeight = async () => {
+      const raw = input.value.trim();
+      const w = Number(raw);
+      if (raw === '' || !Number.isFinite(w) || w < 0) {
+        input.classList.add('bad');
+        toast('Weight must be a number, 0 or more');
+        return;
+      }
+      input.classList.remove('bad');
+      if (w === lastSaved) return;
+      try {
+        await apiPost({ action: 'setCriterionWeight', code, weight: w });
+        lastSaved = w;
         if (crit) crit.weight = w;
+        toast(code.replace('–','-') + ' weight set to ' + w);
+        cohortCache = null;
+      } catch (err) {
+        input.classList.add('bad');
+        toast('Failed to save weight: ' + err.message);
+      }
+    };
+    input.addEventListener('change', saveWeight);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+
+    row.querySelectorAll('.tbtn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const t = Number(btn.dataset.t);
+        const prev = crit ? crit.secure_by_term : null;
+        const next = prev === t ? null : t;
+        const paint = v => row.querySelectorAll('.tbtn').forEach(b => {
+          const on = Number(b.dataset.t) === v;
+          b.classList.toggle('active', on);
+          b.textContent = on ? '✓' : '';
+        });
+        paint(next);
         try {
-          await apiPost({ action: 'setCriterionWeight', code, weight: w });
-          toast(code + ' weight set to x' + w);
-          cohortCache = null;
+          await apiPost({ action: 'setCriterionSecureBy', code, term: next });
+          if (crit) crit.secure_by_term = next;
+          toast(code.replace('–','-') + (next ? ' secure by Term ' + next : ' term cleared'));
         } catch (err) {
-          toast('Failed to save weight: ' + err.message);
+          paint(prev);
+          toast('Failed to save term: ' + err.message);
         }
       });
     });
