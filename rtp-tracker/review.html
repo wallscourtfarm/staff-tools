@@ -104,6 +104,12 @@ tr.flagged td { background: var(--flag-bg); }
 }
 .weight-input.bad { border-color: #dc2626; background: #fef2f2; }
 tr.complete td.code::after { content: ' ✓'; color: #16a34a; }
+.add-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: #faf5ff; border: 1px dashed #c4b5fd; border-radius: var(--radius); padding: 10px 14px; margin-bottom: 14px; }
+.add-bar .add-lbl { font-weight: 700; color: #5b21b6; font-size: 12px; }
+.add-bar select, .add-bar input { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+.add-bar .add-desc { flex: 1; min-width: 220px; }
+.link-btn { background: none; border: none; color: var(--blue); font-size: 11px; font-weight: 600; padding: 0 2px; text-decoration: underline; }
+.link-btn.danger { color: #dc2626; }
 
 footer {
   position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--border);
@@ -156,7 +162,7 @@ footer {
 <main>
   <div class="intro">
     One row per Ready to Progress statement, taken from the RTP Tracker.
-    <b>Current / Proposed</b> — the tracker's wording, and a shorter suggested wording you can change; tap <b>Use</b> to choose one.
+    <b>Current / Proposed</b> — the tracker's wording, and a shorter suggested wording you can change; tap <b>Use</b> to choose one. Use <b>Add a school target</b> at the top of each year for targets not in Ready to Progress.
     <b>Edit?</b> — tap if it still needs editing or clarifying, then write what in the box that opens.
     <b>Weight</b> — type a number; bigger counts more in the security score.
     <b>Secure by</b> — tap the term by which a learner should be secure (tap again to clear).
@@ -173,7 +179,7 @@ footer {
 
 <footer>
   <span>Saved to the WFA database. Nothing changes in the RTP Tracker until these are loaded in.</span>
-  <span class="version">WFA-20.10.26b</span>
+  <span class="version">WFA-21.10.26a</span>
 </footer>
 
 <div id="toast"></div>
@@ -399,7 +405,7 @@ function rowHtml(c) {
   const who = r.by || r.at ? `<span class="who">Last change: ${esc(r.by || 'unnamed')}${r.at ? ' · ' + esc(new Date(r.at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })) : ''}</span>` : '';
   return `<tr data-code="${esc(c.code)}" class="${flagged ? 'flagged' : ''}${isComplete(r) ? ' complete' : ''}">
     <td class="code">${esc(c.code)}</td>
-    <td class="stmt">${c.custom ? `<span class="lbl school">School target</span>${esc(c.description)}` : `<span class="lbl">Current</span>${esc(c.description)}
+    <td class="stmt">${c.custom ? `<span class="lbl school">School target</span>${esc(c.description)} <button class="link-btn" data-act="edit">Edit</button> <button class="link-btn danger" data-act="remove">Remove</button>` : `<span class="lbl">Current</span>${esc(c.description)}
       <span class="lbl prop">Proposed</span><textarea class="proposed" rows="2">${esc(proposedFor(c.code))}</textarea>
       <div class="use">Use:
         <button class="use-btn ${r.use === 'current' ? 'on' : ''}" data-use="current">Current</button>
@@ -418,6 +424,12 @@ function yearBlockHtml(y) {
     .concat([...new Set(crit.map(c => c.strand))].filter(s => !STRAND_ORDER.includes(s)));
   return `<section class="year-block ${y === state.year ? '' : 'hidden'}" data-year="${y}">
     <h2 class="year-title">Year ${y}</h2>
+    <div class="add-bar" data-year="${y}">
+      <span class="add-lbl">Add a school target for Year ${y}</span>
+      <select class="add-strand" aria-label="Area">${STRAND_ORDER.map(st => `<option>${esc(st)}</option>`).join('')}</select>
+      <input class="add-desc" type="text" placeholder="e.g. Know their 2, 5 and 10 times tables" aria-label="New target">
+      <button class="btn add-btn">Add</button>
+    </div>
     ${strands.map(s => `<div class="strand">
       <div class="hd">${esc(s)}</div>
       <table>
@@ -516,6 +528,8 @@ document.getElementById('years').addEventListener('click', e => {
     }
     return;
   }
+  const lb = e.target.closest('.link-btn');
+  if (lb) { editOrRemoveTarget(code, lb.dataset.act); return; }
   const ub = e.target.closest('.use-btn');
   if (ub) {
     const r = review(code);
@@ -532,6 +546,61 @@ document.getElementById('years').addEventListener('click', e => {
     scheduleSave(code, 0);
     refreshRow(code);
   }
+});
+
+// School targets: same API actions as the tracker's Weights & targets tab, so they appear there too.
+async function addTarget(bar) {
+  const desc = bar.querySelector('.add-desc');
+  const text = desc.value.trim();
+  if (!text) { desc.focus(); return; }
+  const strand = bar.querySelector('.add-strand').value;
+  const year = Number(bar.dataset.year);
+  const btn = bar.querySelector('.add-btn');
+  btn.disabled = true;
+  try {
+    const res = await apiPost({ action: 'addCustomCriterion', strand, year, description: text }, { retries: 0 });
+    const maxOrder = Math.max(0, ...state.criteria.map(c => c.order || 0));
+    state.criteria.push({ code: res.code, strand, year_group: 'Y' + year, order: maxOrder + 1,
+      description: text, weight: 1, secure_by_term: null, custom: true });
+    renderAll();
+    toast('Added ' + res.code + ' under ' + strand);
+    const row = document.querySelector(`tr[data-code="${CSS.escape(res.code)}"]`);
+    if (row) row.scrollIntoView({ block: 'center' });
+  } catch (err) {
+    toast('Could not add: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function editOrRemoveTarget(code, act) {
+  const c = state.criteria.find(x => x.code === code);
+  if (!c || !c.custom) return;
+  try {
+    if (act === 'edit') {
+      const text = (prompt('Edit the target for ' + code + ':', c.description) || '').trim();
+      if (!text || text === c.description) return;
+      await apiPost({ action: 'updateCustomCriterion', code, description: text });
+      c.description = text;
+      toast('Saved');
+    } else {
+      if (!confirm('Remove ' + code + ' — "' + c.description + '"? It will disappear from the tracker too (any ratings already given are kept).')) return;
+      await apiPost({ action: 'removeCustomCriterion', code });
+      state.criteria = state.criteria.filter(x => x.code !== code);
+      toast('Removed ' + code);
+    }
+    renderAll();
+  } catch (err) {
+    toast('Failed: ' + err.message);
+  }
+}
+
+document.getElementById('years').addEventListener('click', e => {
+  const btn = e.target.closest('.add-btn');
+  if (btn) addTarget(btn.closest('.add-bar'));
+});
+document.getElementById('years').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.classList.contains('add-desc')) addTarget(e.target.closest('.add-bar'));
 });
 
 document.getElementById('years').addEventListener('input', e => {
