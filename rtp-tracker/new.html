@@ -154,7 +154,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
         <tr><td>Taught, not used</td><td>Taught, not yet seen them use it</td><td>0% (counts)</td></tr>
         <tr><td>x Not taught · Unreviewed</td><td>No evidence yet</td><td>not counted at all</td></tr>
       </table>
-      <p><b>Non-Negotiables</b> are the previous year's 3 highest-weighted statements, carried up so they stay secure. Each counts at weight 1 and should be secure by Term 2. Year 1's are 3 key EYFS skills, chosen on the Year 1 tab of the review form.</p>
+      <p><b>Non-Negotiables</b> are the previous year's 3 highest-weighted statements, carried up so they stay secure. Each counts at weight 1 and should be secure by Term 2. Year 1's are 4 key EYFS skills, chosen on the Year 1 tab of the review form.</p>
       <p><b>2. Percentages.</b> <b>Expected %</b> = weight earned ÷ weight available across the non-negotiables and expected standards that count. <b>Greater depth %</b> comes from the greater depth statements, which have not been written yet, so no child can show D in this draft.</p>
       <p><b>3. Grade</b> for a child working at their own year group: <b>D</b> = expected ≥ 90% and greater depth ≥ 60% · <b>O1</b> = expected ≥ 75% · <b>O2</b> = expected ≥ 65% · <b>Y</b> = expected ≥ 50%. Below 50% suggests an earlier year's statements: <b>A - Yn</b>. The teacher chooses which year a child is working at.</p>
       <p><b>4. Secure by (new for maths).</b> Each statement has the term it should be secure by: Term 2, 4 or 6. From the term before, a child not yet Secure gets an <b>amber outline</b> (due soon). After that term, they get a <b>red !</b> (overdue), and the summary row counts them. Use "Pretend it is" to see how the grid looks at different points in the year.</p>
@@ -185,7 +185,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 
   <div class="grid-scroll"><table id="grid"></table></div>
 
-  <footer>Proposed new maths tracker · review draft WFA-21.10.26d · statement numbers (Y3_001…) are worked out on this page and would be fixed in the real tool</footer>
+  <footer>Proposed new maths tracker · review draft WFA-21.10.26e · statement numbers (Y3_001…) are worked out on this page and would be fixed in the real tool</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -316,6 +316,13 @@ function splitExample(text){
 
 // Non-Negotiables for a year = the previous year's 3 highest-weighted statements, carried up at weight 1.
 const NON_NEG_COUNT = 3, NON_NEG_WEIGHT = 1, NON_NEG_TERM = 2;
+// Year 1 has 4, all EYFS skills (agreed by Innes 21.10.26; the review form's Year 1 tab replaces these once saved there).
+const EYFS_AGREED = [
+  ['Number and Place Value', 'Recognise and say numbers up to 20, and count objects beyond 10.'],
+  ['Number Facts', 'Know number facts up to 5 (e.g. 2 and 2 make 4).'],
+  ['Number Facts', 'Subitise up to 5 instantly.'],
+  ['Number and Place Value', 'Compare amounts, saying more, less or equal (the same).']
+];
 
 function buildSkills(criteria, reviews){
   SKILLS = {}; SKILL_BY_ID = {}; WEIGHT = {};
@@ -346,11 +353,16 @@ function buildSkills(criteria, reviews){
   });
   // Pass 2: carry the previous year's top 3 up as Non-Negotiables, then number everything in the order shown.
   YEARS.forEach((Y, i) => {
-    // Year 1's non-negotiables are the EYFS skills chosen by hand on the review form's Year 1 tab (no weighting).
-    const prevName = i ? YEARS[i - 1] : 'EYFS', prev = own[prevName] || [];
+    // Year 1's non-negotiables are the EYFS skills chosen by hand on the review form's Year 1 tab (no weighting);
+    // until any are saved there, the 4 Innes agreed on 21.10.26 are shown.
+    const prevName = i ? YEARS[i - 1] : 'EYFS';
+    const prev = (own[prevName] && own[prevName].length) ? own[prevName] : (i ? [] : EYFS_AGREED.map((t, k) => {
+      const parts = splitExample(t[1]);
+      return { ref: 'EY-' + (k + 1), code: 'EY-' + (k + 1), category: t[0], skill: parts.skill, example: parts.example, custom: true, weight: 1 };
+    }));
     const top = prev.map((s, k) => ({ s, k: i ? k : -1000 + k, w: i ? s.weight : 0 }))
       .sort((a, b) => b.w - a.w || (b.s.key_essential - a.s.key_essential) || a.k - b.k)
-      .slice(0, NON_NEG_COUNT).sort((a, b) => a.k - b.k)
+      .slice(0, i ? NON_NEG_COUNT : 4).sort((a, b) => a.k - b.k)
       .map(({ s }) => Object.assign({}, s, { tier: 'non_neg', from: prevName, fromWeight: s.weight,
         weight: NON_NEG_WEIGHT, wSrc: 'nonneg', term: NON_NEG_TERM, tSrc: 'nonneg', key_essential: false }));
     let n = 0;
@@ -540,7 +552,7 @@ function renderGrid(){
       if (tk !== 'non_neg' && s.category !== lastCat){ h += '<tr class="catrow"><td colspan="'+ncol+'">'+esc(s.category)+'</td></tr>'; lastCat = s.category; }
       const w = WEIGHT[s.id];
       h += '<tr><td class="skilltd"><span class="ref" title="Statement number · DfE code">'+s.id+(s.custom ? '' : ' · '+esc(s.ref))+(s.from ? (s.from === 'EYFS' ? ' · EYFS skill' : ' · from '+s.from+' (weight '+s.fromWeight+' there)') : '')+'</span>'+esc(s.skill)
-        +(s.key_essential?'<span class="key">KEY</span>':'')+(s.custom?'<span class="school">SCHOOL</span>':'')+(s.example?'<span class="ex">'+esc(s.example)+'</span>':'')+'</td>'
+        +(s.key_essential?'<span class="key">KEY</span>':'')+(s.custom && !s.from?'<span class="school">SCHOOL</span>':'')+(s.example?'<span class="ex">'+esc(s.example)+'</span>':'')+'</td>'
         +'<td class="wtd"><span class="wlock'+(w===0?' zero':'')+(s.wSrc==='draft'?' wdraft':'')+'" title="Weight '+SRC_TITLE[s.wSrc]+'">'+w+'</span></td>'
         +'<td class="ttd"><span class="term'+(s.tSrc==='draft'?' draft':'')+'" title="Secure by Term '+s.term+', '+SRC_TITLE[s.tSrc]+'">T'+s.term+'</span></td>';
       pupils.forEach(p => {
