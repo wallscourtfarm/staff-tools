@@ -154,6 +154,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
         <tr><td>Taught, not used</td><td>Taught, not yet seen them use it</td><td>0% (counts)</td></tr>
         <tr><td>x Not taught · Unreviewed</td><td>No evidence yet</td><td>not counted at all</td></tr>
       </table>
+      <p><b>Non-Negotiables</b> are the previous year's 3 highest-weighted statements, carried up so they stay secure. Each counts at weight 1 and should be secure by Term 2. Year 1 has none.</p>
       <p><b>2. Percentages.</b> <b>Expected %</b> = weight earned ÷ weight available across the non-negotiables and expected standards that count. <b>Greater depth %</b> comes from the greater depth statements, which have not been written yet, so no child can show D in this draft.</p>
       <p><b>3. Grade</b> for a child working at their own year group: <b>D</b> = expected ≥ 90% and greater depth ≥ 60% · <b>O1</b> = expected ≥ 75% · <b>O2</b> = expected ≥ 65% · <b>Y</b> = expected ≥ 50%. Below 50% suggests an earlier year's statements: <b>A - Yn</b>. The teacher chooses which year a child is working at.</p>
       <p><b>4. Secure by (new for maths).</b> Each statement has the term it should be secure by: Term 2, 4 or 6. From the term before, a child not yet Secure gets an <b>amber outline</b> (due soon). After that term, they get a <b>red !</b> (overdue), and the summary row counts them. Use "Pretend it is" to see how the grid looks at different points in the year.</p>
@@ -184,7 +185,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 
   <div class="grid-scroll"><table id="grid"></table></div>
 
-  <footer>Proposed new maths tracker · review draft WFA-21.10.26a · statement numbers (Y3_001…) are worked out on this page and would be fixed in the real tool</footer>
+  <footer>Proposed new maths tracker · review draft WFA-21.10.26b · statement numbers (Y3_001…) are worked out on this page and would be fixed in the real tool</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -313,15 +314,18 @@ function splitExample(text){
   return m ? { skill: m[1].replace(/[,;]\s*$/, '') + '.', example: m[2] } : { skill: text, example: '' };
 }
 
+// Non-Negotiables for a year = the previous year's 3 highest-weighted statements, carried up at weight 1.
+const NON_NEG_COUNT = 3, NON_NEG_WEIGHT = 1, NON_NEG_TERM = 2;
+
 function buildSkills(criteria, reviews){
   SKILLS = {}; SKILL_BY_ID = {}; WEIGHT = {};
+  const si = s => { const i = STRAND_ORDER.indexOf(s); return i < 0 ? 99 : i; };
+  // Pass 1: each year's own statements (all Expected Standards), with weight and term worked out.
+  const own = {};
   YEARS.forEach(Y => {
-    const si = s => { const i = STRAND_ORDER.indexOf(s); return i < 0 ? 99 : i; };
     const list = criteria.filter(c => 'Y' + yearNum(c.year_group) === Y)
-      // Numbered in the order shown: Non-Negotiables (Number Facts) first, then the other areas.
-      .sort((a, b) => (a.strand === 'Number Facts' ? 0 : 1) - (b.strand === 'Number Facts' ? 0 : 1) || si(a.strand) - si(b.strand) || a.order - b.order);
-    let n = 0;
-    SKILLS[Y] = list.map(c => {
+      .sort((a, b) => si(a.strand) - si(b.strand) || a.order - b.order);
+    own[Y] = list.map(c => {
       const r = reviews[c.code] || {};
       const inStrand = list.filter(x => x.strand === c.strand);
       let wording = c.description, wSrc = 'draft', tSrc = 'draft';
@@ -333,13 +337,25 @@ function buildSkills(criteria, reviews){
       let term = draftTerm(c, inStrand.indexOf(c), inStrand.length);
       if (r.secure_by) { term = r.secure_by; tSrc = 'review'; }
       else if (c.secure_by_term) { term = c.secure_by_term; tSrc = 'tracker'; }
-      const s = {
-        id: Y + '_' + String(++n).padStart(3, '0'), ref: c.code.replace('–', '-'), code: c.code,
-        tier: c.strand === 'Number Facts' ? 'non_neg' : 'expected', category: c.strand,
+      return {
+        ref: c.code.replace('–', '-'), code: c.code, tier: 'expected', category: c.strand,
         skill: parts.skill, example: parts.example, key_essential: KEY_DRAFT.has(c.code), custom: !!c.custom,
-        term, tSrc, wSrc
+        term, tSrc, wSrc, weight: Math.min(10, Math.max(0, Math.round(weight)))
       };
-      SKILL_BY_ID[s.id] = s; WEIGHT[s.id] = Math.min(10, Math.max(0, Math.round(weight)));
+    });
+  });
+  // Pass 2: carry the previous year's top 3 up as Non-Negotiables, then number everything in the order shown.
+  YEARS.forEach((Y, i) => {
+    const prev = i ? own[YEARS[i - 1]] : [];
+    const top = prev.map((s, k) => ({ s, k }))
+      .sort((a, b) => b.s.weight - a.s.weight || (b.s.key_essential - a.s.key_essential) || a.k - b.k)
+      .slice(0, NON_NEG_COUNT).sort((a, b) => a.k - b.k)
+      .map(({ s }) => Object.assign({}, s, { tier: 'non_neg', from: YEARS[i - 1], fromWeight: s.weight,
+        weight: NON_NEG_WEIGHT, wSrc: 'nonneg', term: NON_NEG_TERM, tSrc: 'nonneg', key_essential: false }));
+    let n = 0;
+    SKILLS[Y] = top.concat(own[Y]).map(x => {
+      const s = Object.assign({}, x, { id: Y + '_' + String(++n).padStart(3, '0') });
+      SKILL_BY_ID[s.id] = s; WEIGHT[s.id] = s.weight;
       return s;
     });
   });
@@ -480,7 +496,7 @@ function renderTabs(){
     t.appendChild(b);
   });
 }
-const SRC_TITLE = { review:'from the review form', tracker:'from the tracker', draft:'draft value — not chosen yet' };
+const SRC_TITLE = { review:'from the review form', tracker:'from the tracker', draft:'draft value — not chosen yet', nonneg:'fixed for non-negotiables' };
 function renderGrid(){
   renderClassTabs(); renderTabs(); renderTermPick();
   const t = document.getElementById('grid'), pupils = CLASS[classYear].pupils.filter(p => p.work === level);
@@ -522,7 +538,7 @@ function renderGrid(){
     list.forEach(s => {
       if (tk !== 'non_neg' && s.category !== lastCat){ h += '<tr class="catrow"><td colspan="'+ncol+'">'+esc(s.category)+'</td></tr>'; lastCat = s.category; }
       const w = WEIGHT[s.id];
-      h += '<tr><td class="skilltd"><span class="ref" title="Statement number · DfE code">'+s.id+(s.custom ? '' : ' · '+esc(s.ref))+'</span>'+esc(s.skill)
+      h += '<tr><td class="skilltd"><span class="ref" title="Statement number · DfE code">'+s.id+(s.custom ? '' : ' · '+esc(s.ref))+(s.from ? ' · from '+s.from+' (weight '+s.fromWeight+' there)' : '')+'</span>'+esc(s.skill)
         +(s.key_essential?'<span class="key">KEY</span>':'')+(s.custom?'<span class="school">SCHOOL</span>':'')+(s.example?'<span class="ex">'+esc(s.example)+'</span>':'')+'</td>'
         +'<td class="wtd"><span class="wlock'+(w===0?' zero':'')+(s.wSrc==='draft'?' wdraft':'')+'" title="Weight '+SRC_TITLE[s.wSrc]+'">'+w+'</span></td>'
         +'<td class="ttd"><span class="term'+(s.tSrc==='draft'?' draft':'')+'" title="Secure by Term '+s.term+', '+SRC_TITLE[s.tSrc]+'">T'+s.term+'</span></td>';
