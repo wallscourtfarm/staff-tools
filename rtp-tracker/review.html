@@ -105,6 +105,8 @@ tr.flagged td { background: var(--flag-bg); }
 .weight-input.bad { border-color: #dc2626; background: #fef2f2; }
 tr.complete td.code::after { content: ' ✓'; color: #16a34a; }
 .add-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: #faf5ff; border: 1px dashed #c4b5fd; border-radius: var(--radius); padding: 10px 14px; margin-bottom: 14px; }
+.eyfs-note { margin: 8px 14px; color: #555; font-size: 12px; }
+.strand.nonneg > .hd { background: #0a0101; }
 .add-bar .add-lbl { font-weight: 700; color: #5b21b6; font-size: 12px; }
 .add-bar select, .add-bar input { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
 .add-bar .add-desc { flex: 1; min-width: 220px; }
@@ -179,7 +181,7 @@ footer {
 
 <footer>
   <span>Saved to the WFA database. Nothing changes in the RTP Tracker until these are loaded in.</span>
-  <span class="version">WFA-21.10.26a</span>
+  <span class="version">WFA-22.10.26a</span>
 </footer>
 
 <div id="toast"></div>
@@ -361,12 +363,13 @@ async function loadAll() {
   // Keep anything still waiting to save so a refresh can't wipe an unsaved edit.
   Object.keys(state.saveTimers).forEach(code => { if (state.reviews[code]) reviews[code] = state.reviews[code]; });
   state.reviews = reviews;
+  try { state.y1nonneg = JSON.parse(cfg[NONNEG_KEY] || '[]'); } catch (e) { state.y1nonneg = []; }
 }
 
 async function bootstrap() {
   try {
     try { document.getElementById('who').value = localStorage.getItem('rtp_assessed_by') || ''; } catch (e) {}
-    try { state.year = Number(localStorage.getItem('rtp_review_year')) || 1; } catch (e) {}
+    try { const v = localStorage.getItem('rtp_review_year'); state.year = v === null ? 1 : Number(v); } catch (e) {}
     await loadAll();
     renderAll();
     document.getElementById('loading').classList.add('hidden');
@@ -379,6 +382,7 @@ async function bootstrap() {
 function years() {
   return [...new Set(state.criteria.map(c => yearNum(c.year_group)))].filter(Boolean).sort((a, b) => a - b);
 }
+const yearName = y => y === 0 ? 'EYFS' : 'Year ' + y;
 
 function renderTabs() {
   const wrap = document.getElementById('year-tabs');
@@ -388,7 +392,7 @@ function renderTabs() {
     const done = crit.filter(c => isComplete(state.reviews[c.code])).length;
     const b = document.createElement('button');
     b.className = 'tab-btn' + (y === state.year ? ' active' : '');
-    b.innerHTML = `Y${y}<span class="done">${done}/${crit.length}</span>`;
+    b.innerHTML = `${y === 0 ? 'EYFS' : 'Y' + y}<span class="done">${done}/${crit.length}</span>`;
     b.addEventListener('click', () => {
       state.year = y;
       try { localStorage.setItem('rtp_review_year', String(y)); } catch (e) {}
@@ -418,12 +422,54 @@ function rowHtml(c) {
   </tr>`;
 }
 
+// Year 1's non-negotiables: EYFS skills chosen by hand (4 of them), each weight 1, secure by Term 2.
+// Stored as one rtp_config row (no database change needed), read by the new maths tracker draft.
+const NONNEG_KEY = 'nonneg|Y1';
+const EYFS_AGREED = [
+  'Recognise and say numbers up to 20, and count objects beyond 10.',
+  'Know number facts up to 5 (e.g. 2 and 2 make 4).',
+  'Subitise up to 5 instantly.',
+  'Compare amounts, saying more, less or equal (the same).'
+];
+async function saveNonNeg(next, msg) {
+  const prev = state.y1nonneg;
+  state.y1nonneg = next;
+  renderAll();
+  try {
+    await apiPost({ action: 'setConfig', key: NONNEG_KEY, value: JSON.stringify(next) });
+    toast(msg);
+  } catch (err) {
+    state.y1nonneg = prev;
+    renderAll();
+    toast('Not saved: ' + err.message);
+  }
+}
+
+function y1NonNegHtml() {
+  const nn = state.y1nonneg || [];
+  return `<div class="strand nonneg">
+    <div class="hd">Non-Negotiables · EYFS skills (${nn.length} of 4)</div>
+    <p class="eyfs-note">Choose 4 key EYFS skills that Year 1 children must be secure in. Each counts at weight 1 and should be secure by Term 2, so there is nothing else to fill in.</p>
+    ${nn.length ? `<table><tbody>${nn.map((t, i) => `<tr>
+      <td class="code">EYFS ${i + 1}</td>
+      <td class="stmt">${esc(t)} <button class="link-btn nn-btn" data-i="${i}" data-act="edit">Edit</button> <button class="link-btn danger nn-btn" data-i="${i}" data-act="remove">Remove</button></td>
+    </tr>`).join('')}</tbody></table>` : ''}
+    ${nn.length === 0 ? `<div style="margin:10px 14px"><button class="btn add-agreed">Add the 4 agreed on 21.10.26</button> <span class="eyfs-note" style="margin:0">${EYFS_AGREED.map(esc).join(' · ')}</span></div>` : ''}
+    ${nn.length < 4 ? `<div class="add-bar nn-bar" style="margin:10px 14px">
+      <span class="add-lbl">Add an EYFS skill</span>
+      <input class="nn-desc" type="text" placeholder="e.g. Subitise up to 5 instantly" aria-label="New EYFS skill" style="flex:1;min-width:220px">
+      <button class="btn nn-add">Add</button>
+    </div>` : ''}
+  </div>`;
+}
+
 function yearBlockHtml(y) {
   const crit = state.criteria.filter(c => yearNum(c.year_group) === y);
   const strands = STRAND_ORDER.filter(s => crit.some(c => c.strand === s))
     .concat([...new Set(crit.map(c => c.strand))].filter(s => !STRAND_ORDER.includes(s)));
   return `<section class="year-block ${y === state.year ? '' : 'hidden'}" data-year="${y}">
-    <h2 class="year-title">Year ${y}</h2>
+    <h2 class="year-title">${yearName(y)}</h2>
+    ${y === 1 ? y1NonNegHtml() : ''}
     <div class="add-bar" data-year="${y}">
       <span class="add-lbl">Add a school target for Year ${y}</span>
       <select class="add-strand" aria-label="Area">${STRAND_ORDER.map(st => `<option>${esc(st)}</option>`).join('')}</select>
@@ -464,7 +510,7 @@ function renderProgress() {
   const done = crit.filter(c => isComplete(state.reviews[c.code])).length;
   const flagged = crit.filter(c => state.reviews[c.code]?.needs_edit).length;
   document.getElementById('year-progress').textContent =
-    `Year ${state.year}: ${done} of ${crit.length} have a weight and a term` + (flagged ? ` · ${flagged} flagged to edit` : '');
+    `${yearName(state.year)}: ${done} of ${crit.length} have a weight and a term` + (flagged ? ` · ${flagged} flagged to edit` : '');
 }
 
 function refreshRow(code) {
@@ -596,10 +642,30 @@ async function editOrRemoveTarget(code, act) {
 }
 
 document.getElementById('years').addEventListener('click', e => {
+  if (e.target.closest('.add-agreed')) { saveNonNeg(EYFS_AGREED.slice(), 'Added the 4 Year 1 non-negotiables'); return; }
+  const nb = e.target.closest('.nn-btn');
+  if (nb) {
+    const i = Number(nb.dataset.i), list = (state.y1nonneg || []).slice();
+    if (nb.dataset.act === 'edit') {
+      const text = (prompt('Edit this Year 1 non-negotiable:', list[i]) || '').trim();
+      if (text && text !== list[i]) { list[i] = text; saveNonNeg(list, 'Saved'); }
+    } else if (confirm('Remove "' + list[i] + '"?')) {
+      list.splice(i, 1); saveNonNeg(list, 'Removed');
+    }
+    return;
+  }
+  if (e.target.closest('.nn-add')) { addNonNeg(e.target.closest('.nn-bar')); return; }
   const btn = e.target.closest('.add-btn');
   if (btn) addTarget(btn.closest('.add-bar'));
 });
+function addNonNeg(bar) {
+  const input = bar.querySelector('.nn-desc'), text = input.value.trim();
+  if (!text) { input.focus(); return; }
+  saveNonNeg((state.y1nonneg || []).concat([text]).slice(0, 4), 'Added');
+}
+
 document.getElementById('years').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.classList.contains('nn-desc')) { addNonNeg(e.target.closest('.nn-bar')); return; }
   if (e.key === 'Enter' && e.target.classList.contains('add-desc')) addTarget(e.target.closest('.add-bar'));
 });
 

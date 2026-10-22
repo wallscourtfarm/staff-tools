@@ -185,7 +185,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 
   <div class="grid-scroll"><table id="grid"></table></div>
 
-  <footer>Proposed new maths tracker · review draft WFA-21.10.26e · statement numbers (Y3_001…) are worked out on this page and would be fixed in the real tool</footer>
+  <footer>Proposed new maths tracker · review draft WFA-22.10.26a · statement numbers (Y3_001…) are worked out on this page and would be fixed in the real tool</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -324,7 +324,7 @@ const EYFS_AGREED = [
   ['Number and Place Value', 'Compare amounts, saying more, less or equal (the same).']
 ];
 
-function buildSkills(criteria, reviews){
+function buildSkills(criteria, reviews, y1NonNeg){
   SKILLS = {}; SKILL_BY_ID = {}; WEIGHT = {};
   const si = s => { const i = STRAND_ORDER.indexOf(s); return i < 0 ? 99 : i; };
   // Pass 1: each year's own statements (all Expected Standards), with weight and term worked out.
@@ -353,13 +353,14 @@ function buildSkills(criteria, reviews){
   });
   // Pass 2: carry the previous year's top 3 up as Non-Negotiables, then number everything in the order shown.
   YEARS.forEach((Y, i) => {
-    // Year 1's non-negotiables are the EYFS skills chosen by hand on the review form's Year 1 tab (no weighting);
-    // until any are saved there, the 4 Innes agreed on 21.10.26 are shown.
+    // Year 1's non-negotiables are the EYFS skills typed on the review form's Year 1 tab (rtp_config 'nonneg|Y1',
+    // no weighting); until any are saved there, the 4 Innes agreed on 21.10.26 are shown.
     const prevName = i ? YEARS[i - 1] : 'EYFS';
-    const prev = (own[prevName] && own[prevName].length) ? own[prevName] : (i ? [] : EYFS_AGREED.map((t, k) => {
+    const y1 = (y1NonNeg && y1NonNeg.length) ? y1NonNeg.map(t => ['', t]) : EYFS_AGREED;
+    const prev = i ? (own[prevName] || []) : y1.map((t, k) => {
       const parts = splitExample(t[1]);
       return { ref: 'EY-' + (k + 1), code: 'EY-' + (k + 1), category: t[0], skill: parts.skill, example: parts.example, custom: true, weight: 1 };
-    }));
+    });
     const top = prev.map((s, k) => ({ s, k: i ? k : -1000 + k, w: i ? s.weight : 0 }))
       .sort((a, b) => b.w - a.w || (b.s.key_essential - a.s.key_essential) || a.k - b.k)
       .slice(0, i ? NON_NEG_COUNT : 4).sort((a, b) => a.k - b.k)
@@ -386,7 +387,8 @@ async function loadStatements(){
     const [criteria, cfg] = await Promise.all([apiGet('getCriteria'), apiGet('getConfig')]);
     const reviews = {};
     Object.keys(cfg).forEach(k => { if (k.indexOf('review|') === 0) { try { reviews[k.slice(7)] = JSON.parse(cfg[k]); } catch (e) {} } });
-    buildSkills(criteria, reviews);
+    let y1 = []; try { y1 = JSON.parse(cfg['nonneg|Y1'] || '[]'); } catch (e) {}
+    buildSkills(criteria, reviews, y1);
     const n = Object.keys(reviews).length, t = criteria.filter(c => c.custom).length;
     src.textContent = 'Statements read live: ' + criteria.length + ' (' + t + ' school target' + (t === 1 ? '' : 's') + '), ' + n + ' reviewed in the review form.';
   } catch (e) {
