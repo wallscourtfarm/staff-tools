@@ -87,7 +87,8 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .wbox { width:44px; padding:3px 2px; text-align:center; font-size:13px; font-weight:700; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--fg); }
   .wlock { display:inline-block; min-width:28px; padding:3px 6px; font-size:13px; font-weight:800; color:var(--fg2); background:var(--line); border-radius:6px; font-variant-numeric:tabular-nums; }
   .wlock.zero { color:var(--muted); background:var(--grp); }
-  tr.tierrow td { background:var(--tier); color:#fff; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; padding:5px 10px; position:sticky; left:0; }
+  tr.tierrow td { background:var(--tier); color:#fff; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; padding:5px 10px; }
+  tr.tierrow .stick, tr.catrow .stick, tr.grprow .stick { position:sticky; left:10px; display:inline-block; max-width:470px; }   /* headings stay in view when the grid scrolls sideways */
   tr.catrow td { background:var(--cat); font-size:11px; font-weight:800; padding:4px 10px; color:var(--fg2); }
   tr.grprow td { background:var(--grp); font-size:11px; font-weight:700; padding:3px 10px 3px 22px; color:var(--fg2); font-style:italic; }
   td.cell { width:118px; min-width:118px; height:32px; text-align:center; font-size:11px; font-weight:700; cursor:pointer; user-select:none; border-right:1px solid var(--surface); }
@@ -180,7 +181,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="grid-scroll"><table id="grid"></table></div>
 
   <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
-  <footer>Proposed new scoring tool · review draft WFA-23.10.26g · weights agreed 23.10.26 (locked) · statements as in the current framework (wording may change)</footer>
+  <footer>Proposed new scoring tool · review draft WFA-23.10.26h · weights agreed 23.10.26 (locked) · statements as in the current framework (wording may change)</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -355,12 +356,12 @@ function renderGrid(){
   const ncol = pupils.length + 2;
   ['non_neg','expected','greater_depth'].forEach(tk => {
     const list = SKILLS[level].filter(s => s.tier === tk); if (!list.length) return;
-    h += '<tr class="tierrow"><td colspan="'+ncol+'">'+TIERNAME[tk]+' ('+list.length+')'+(tk==='non_neg' && termMode==='t3' ? ' · weight 1 each from Term 3' : '')+'</td></tr>';
+    h += '<tr class="tierrow"><td colspan="'+ncol+'"><span class="stick">'+TIERNAME[tk]+' ('+list.length+')'+(tk==='non_neg' && termMode==='t3' ? ' · weight 1 each from Term 3' : '')+'</span></td></tr>';
     let lastCat = null, lastGrp = null;
     list.forEach(s => {
-      if (tk !== 'non_neg' && s.category !== lastCat){ h += '<tr class="catrow"><td colspan="'+ncol+'">'+esc(s.category)+'</td></tr>'; lastCat = s.category; lastGrp = null; }
+      if (tk !== 'non_neg' && s.category !== lastCat){ h += '<tr class="catrow"><td colspan="'+ncol+'"><span class="stick">'+esc(s.category)+'</span></td></tr>'; lastCat = s.category; lastGrp = null; }
       const g = s.group || null;
-      if (g !== lastGrp){ if (g) h += '<tr class="grprow"><td colspan="'+ncol+'">'+esc(g)+'</td></tr>'; lastGrp = g; }
+      if (g !== lastGrp){ if (g) h += '<tr class="grprow"><td colspan="'+ncol+'"><span class="stick">'+esc(g)+'</span></td></tr>'; lastGrp = g; }
       const w = effW(s), fixed = termMode === 't3' && s.tier === 'non_neg';
       h += '<tr><td class="skilltd">'+esc(s.skill).replace(/\n/g,' ')+(s.key_essential?'<span class="key">KEY</span>':'')+(s.example?'<span class="ex">'+esc(s.example)+'</span>':'')+'</td>'
         +'<td class="wtd">'+((wLocked || canWrite === false || fixed) ? '<span class="wlock'+(w===0?' zero':'')+'" title="'+(fixed ? 'Every non-negotiable is weight 1 from Term 3' : 'Weight, locked')+'">'+w+'</span>' : '<input type="number" class="wbox'+(w!==dOf(s.id)?' changed':'')+'" min="0" max="10" step="1" value="'+w+'" data-w="'+s.id+'" aria-label="Weight">')+'</td>';
