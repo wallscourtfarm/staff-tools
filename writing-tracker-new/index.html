@@ -143,13 +143,12 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <p><b>4. Below 50% of the year group's expected statements</b> means "at an earlier stage": <b>A - Yn</b>. The teacher chooses which year's statements a child is working at (the "working at" box under the child's initials). If a child on an earlier year's statements is still under 50% of them, the tool flags it and offers to move them one year lower. It is always the teacher's decision. Below Y1 is recorded as <b>A - EY</b>.</p>
       <p><b>5. Weights</b> (0 to 10, whole numbers) are shown next to each statement and start at the draft values. <b>This is the one thing you can change that is kept.</b> Type a new weight in a box and it is saved straight away for all staff, along with your email and the time. A box that differs from the draft turns blue, and the list of changes is under the grid. These are proposals only: they do not change the live writing tracker. In the final tool the weights would be locked.</p>
       <p><b>Marking with the keyboard:</b> click a cell, then type <b>R</b> Reteach, <b>E</b> Emerging, <b>D</b> Developing, <b>S</b> Secure, <b>X</b> Not taught, <b>T</b> Taught, not used, or <b>Delete</b> for Unreviewed. The mark is set and the highlight moves down to the next statement for the same child. The arrow keys move the highlight; Esc lets go of it.</p>
-      <p><b>6. Terms.</b> The weights in the boxes are the <b>Term 1 and 2</b> weights, so the non-negotiables can count for more early in the year. <b>From Term 3, every non-negotiable has a weight of 1</b>; all other weights stay the same. Use the "Term being assessed" switch to see the grid and every child's % and grade with each set of weights. Each term's results always use that term's weights, so a Term 2 result keeps its Term 2 figure when you look back at it later. Non-negotiable weights can only be changed while "Terms 1 and 2" is selected.</p>
+      <p><b>6. Terms.</b> The weights in the boxes are the <b>Term 1 and 2</b> weights, so the non-negotiables can count for more early in the year. <b>From Term 3, every non-negotiable has a weight of 1</b>; all other weights stay the same. The tool reads the current term from the school calendar and uses the right weights automatically. Each term's results always use that term's weights, so a Term 2 result keeps its Term 2 figure when you look back at it later. From Term 3 the non-negotiable weights show as 1 and cannot be changed here.</p>
     </div>
   </details>
 
-  <div class="group-label">Term being assessed</div>
-  <div class="classtabs" id="termtabs"></div>
-  <div class="lvlnote" id="termnote"></div>
+  <div class="group-label">Term</div>
+  <div class="lvlnote" id="termnote">Reading the school calendar…</div>
 
   <div class="group-label">Class year group</div>
   <div class="classtabs" id="classtabs"></div>
@@ -173,7 +172,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="grid-scroll"><table id="grid"></table></div>
 
   <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
-  <footer>Proposed new scoring tool · review draft WFA-23.10.26b · draft weights of 12.10.26 · statements as in the current framework (wording may change)</footer>
+  <footer>Proposed new scoring tool · review draft WFA-23.10.26c · draft weights of 12.10.26 · statements as in the current framework (wording may change)</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -234,7 +233,7 @@ function clearMarks(){ YEARS.forEach(y => { Object.keys(CLASS[y].data).forEach(p
 
 // ---- Scoring ----------------------------------------------------------
 let classYear = 'Y5', level = 'Y5', paint = null, wLocked = false;
-let canWrite = null, SHARED = {}, termMode = 't12';
+let canWrite = null, SHARED = {}, termMode = 't12', termNow = null, termFromCal = false;
 const LATER_NN = 1;                                   // every non-negotiable from Term 3 onwards
 const effW = s => (termMode === 't3' && s.tier === 'non_neg') ? LATER_NN : WEIGHT[s.id];
 const dOf = id => (id in DRAFT ? DRAFT[id] : 1);
@@ -283,8 +282,8 @@ const fmt = n => (Math.round(n*10)/10).toString();
 const pc = n => n === null ? '–' : Math.round(n)+'%';
 
 function renderClassTabs(){
-  document.getElementById('termtabs').innerHTML = [['t12','Terms 1 and 2'],['t3','Term 3 onwards']].map(t => '<button class="ct'+(t[0]===termMode?' active':'')+'" data-term="'+t[0]+'">'+t[1]+'</button>').join('');
-  document.getElementById('termnote').textContent = termMode === 't3' ? 'Term 3 onwards: every non-negotiable counts with a weight of 1. All other weights are as set for Terms 1 and 2.' : 'Terms 1 and 2: the weights in the boxes, including the higher non-negotiable weights.';
+  if (termNow !== null) document.getElementById('termnote').textContent = 'Term ' + termNow + (termFromCal ? ' (from the school calendar)' : ' (worked out from the date: the school calendar could not be read)') + ': '
+    + (termMode === 't3' ? 'every non-negotiable counts with a weight of 1. All other weights are as set.' : 'the weights in the boxes, including the higher non-negotiable weights.');
   document.getElementById('classtabs').innerHTML = YEARS.map(y => '<button class="ct'+(y===classYear?' active':'')+'" data-cy="'+y+'">Year '+y.slice(1)+' class</button>').join('');
 }
 function chip(key){
@@ -422,9 +421,23 @@ document.getElementById('classtabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-cy]'); if (!b) return;
   classYear = b.dataset.cy; level = classYear; document.getElementById('lvlnote').textContent = ''; renderGrid();
 });
-document.getElementById('termtabs').addEventListener('click', e => {
-  const b = e.target.closest('button[data-term]'); if (!b) return; termMode = b.dataset.term; renderGrid();
-});
+// ---- Term: from the school calendar (TermDates in the WFA database) ----
+async function loadTerm(){
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  try {
+    const r = await fetch('https://api.wallscourt-farm-academy.co.uk/planning/tab?tab=TermDates&token=__hub__', { cache:'no-store' });
+    const rows = r.ok ? ((await r.json()).rows || []) : [];
+    let best = null;                                 // the latest term week that has started (holidays count as the term before)
+    rows.forEach(x => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(x.StartDate || ''); if (!m) return;
+      const d = new Date(+m[3], +m[2] - 1, +m[1]); if (d <= today && (!best || d > best.d)) best = { d, term: parseInt(x.Term, 10) }; });
+    if (!best || !best.term) throw new Error('no term');
+    termNow = best.term; termFromCal = true;
+  } catch (e) {
+    const mth = today.getMonth();                   // Sep-Oct = Term 1, Nov-Dec = Term 2, Jan onwards = Term 3+
+    termNow = mth >= 8 ? (mth >= 10 ? 2 : 1) : (mth <= 1 ? 3 : mth <= 3 ? 4 : mth <= 5 ? 5 : 6); termFromCal = false;
+  }
+  termMode = termNow >= 3 ? 't3' : 't12'; renderGrid();
+}
 document.getElementById('lvltabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-lvl]'); if (!b) return; level = b.dataset.lvl; document.getElementById('lvlnote').textContent = ''; renderGrid();
 });
@@ -540,7 +553,7 @@ document.getElementById('chgbody').addEventListener('click', async e => {
 setStatus('Loading the shared weights…');
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshShared(true); });
 setInterval(() => { if (document.visibilityState === 'visible') refreshShared(true); }, 90000);
-renderLegend(); renderGrid(); renderChanges(); refreshShared(false);
+renderLegend(); renderGrid(); renderChanges(); refreshShared(false); loadTerm();
 </script>
 </body>
 </html>
