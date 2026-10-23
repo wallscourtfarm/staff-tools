@@ -149,6 +149,13 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     </div>
   </details>
 
+  <div class="group-label">Children shown</div>
+  <div class="classtabs" id="srctabs">
+    <button class="ct active" data-src="examples">Made-up children</button>
+    <button class="ct" data-src="real">Real classes (read only)</button>
+  </div>
+  <div class="lvlnote" id="srcnote"></div>
+
   <div class="group-label">Term</div>
   <div class="lvlnote" id="termnote">Reading the school calendar…</div>
 
@@ -162,6 +169,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <button class="btn" id="paintOff" style="display:none">Stop painting</button>
     <button class="btn" id="clearBtn">Clear all marks (empty class)</button>
     <button class="btn" id="resetBtn">Reload the example children</button>
+    <button class="btn" id="reloadReal" style="display:none">Reload from the live tracker</button>
     <span id="wstatus" class="wstatus"></span>
   </div>
 
@@ -172,7 +180,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="grid-scroll"><table id="grid"></table></div>
 
   <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
-  <footer>Proposed new scoring tool · review draft WFA-23.10.26f · weights agreed 23.10.26 (locked) · statements as in the current framework (wording may change)</footer>
+  <footer>Proposed new scoring tool · review draft WFA-23.10.26g · weights agreed 23.10.26 (locked) · statements as in the current framework (wording may change)</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -279,14 +287,20 @@ function grade(u){
 }
 
 // ---- Rendering --------------------------------------------------------
+const nameOf = pid => { const p = CLASS[classYear] && CLASS[classYear].pupils.find(x => x.id === pid); return p ? (p.label || p.id) : pid; };
 const esc = s => String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt = n => (Math.round(n*10)/10).toString();
 const pc = n => n === null ? '–' : Math.round(n)+'%';
 
 function renderClassTabs(){
+  if (src === 'real'){
+    const el = document.getElementById('classtabs');
+    el.innerHTML = REAL.classes ? REAL.classes.map(c => '<button class="ct'+(c.class_id===REAL.cls?' active':'')+'" data-rc="'+c.class_id+'">'+esc(c.class_name || c.class_id)+' <small>('+c.year+')</small></button>').join('') : '<span class="lvlnote">Loading classes…</span>';
+  } else {
   if (termNow !== null) document.getElementById('termnote').textContent = 'Term ' + termNow + (termFromCal ? ' (from the school calendar)' : ' (worked out from the date: the school calendar could not be read)') + ': '
     + (termMode === 't3' ? 'every non-negotiable counts with a weight of 1. All other weights are as set.' : 'the weights in the boxes, including the higher non-negotiable weights.');
   document.getElementById('classtabs').innerHTML = YEARS.map(y => '<button class="ct'+(y===classYear?' active':'')+'" data-cy="'+y+'">Year '+y.slice(1)+' class</button>').join('');
+  }
 }
 function chip(key){
   const s = STATUS[key], el = document.createElement('div');
@@ -319,7 +333,7 @@ function renderGrid(){
   let h = '<thead><tr><th class="skillh">'+level+' statements ('+SKILLS[level].length+')</th><th class="wh">Weight</th>';
   sums.forEach(({p,u,g}) => {
     const [bg,fg] = GSTYLE[g.style];
-    h += '<th class="pupilh"><div class="hline">'+p.id+' <span class="hbadge" style="background:'+bg+';color:'+fg+'">'+g.label+'</span> <span class="hexp">'+pc(u.expPct)+'</span></div>'
+    h += '<th class="pupilh"><div class="hline">'+esc(p.label || p.id)+' <span class="hbadge" style="background:'+bg+';color:'+fg+'">'+g.label+'</span> <span class="hexp">'+pc(u.expPct)+'</span></div>'
       +'<select class="wsel" data-p="'+p.id+'" aria-label="Working at">'+levelsFor(classYear).map(L => '<option value="'+L+'"'+(L===p.work?' selected':'')+'>'+(L===classYear?'Working at '+L:'A - '+L)+'</option>').join('')+'</select></th>';
   });
   h += '</tr></thead><tbody>';
@@ -383,8 +397,8 @@ function moveCur(dr, dc){
 function setWork(pid, L, viaButton){
   const p = CLASS[classYear].pupils.find(x => x.id === pid); p.work = L;
   const note = document.getElementById('lvlnote');
-  if (viaButton){ level = L; note.textContent = pid+' moved to '+lbl(L)+'. Now mark them against these statements.'; }
-  else note.textContent = pid+' is now working at '+lbl(L)+(L===level ? '.' : '. See the '+lbl(L)+' tab.');
+  if (viaButton){ level = L; note.textContent = nameOf(pid)+' moved to '+lbl(L)+'. Now mark them against these statements.'; }
+  else note.textContent = nameOf(pid)+' is now working at '+lbl(L)+(L===level ? '.' : '. See the '+lbl(L)+' tab.');
   renderGrid();
 }
 
@@ -394,7 +408,7 @@ const btn = k => { const s = STATUS[k]; return '<button data-k="'+k+'" style="ba
 function openPicker(cell){
   target = { p:cell.dataset.p, s:cell.dataset.s };
   const sk = SKILLS[level].find(x => x.id === target.s);
-  picker.innerHTML = '<h4>'+target.p+' · '+esc(sk.skill).slice(0,90)+(sk.skill.length>90?'…':'')+'</h4>'+JUDGE_ORDER.slice().reverse().map(btn).join('')+'<div class="sep">No evidence yet</div>'+NONE_ORDER.map(btn).join('');
+  picker.innerHTML = '<h4>'+esc(nameOf(target.p))+' · '+esc(sk.skill).slice(0,90)+(sk.skill.length>90?'…':'')+'</h4>'+JUDGE_ORDER.slice().reverse().map(btn).join('')+'<div class="sep">No evidence yet</div>'+NONE_ORDER.map(btn).join('');
   picker.querySelectorAll('button').forEach(b => b.onclick = () => { if (!target) return; CLASS[classYear].data[target.p][target.s] = b.dataset.k; closePicker(); renderGrid(); });
   const r = cell.getBoundingClientRect(); picker.classList.add('open');
   const ph = picker.offsetHeight; let top = r.bottom + 4; if (top + ph > innerHeight - 8) top = Math.max(8, innerHeight - ph - 8);
@@ -418,9 +432,74 @@ grid.addEventListener('change', e => {
   saveWeight(i.dataset.w, clampW(i.value));
 });
 document.getElementById('classtabs').addEventListener('click', e => {
+  const rc = e.target.closest('button[data-rc]'); if (rc){ openReal(rc.dataset.rc); return; }
   const b = e.target.closest('button[data-cy]'); if (!b) return;
   classYear = b.dataset.cy; level = classYear; document.getElementById('lvlnote').textContent = ''; renderGrid();
 });
+// ---- Real classes: read from the live writing tracker, converted, NEVER written ----
+// Old 0-4 scores -> new statuses (agreed with Innes 23.10.26): 4 Secure, 1 Emerging, 2 and 3 Reteach,
+// 0 Taught not used, x and ~ Not taught. Blank or missing = Unreviewed. Nothing here saves.
+const CONVERT = { '4':'secure', '1':'emerging', '2':'reteach', '3':'reteach', '0':'taught', 'x':'x', '~':'x' };
+const WT_API = 'https://api.wallscourt-farm-academy.co.uk/planning/writingtracker-db?token=__hub__';
+let src = 'examples', REAL = { classes:null, cls:null, cache:{} }, EXAMPLES = null;
+async function wtGet(params){
+  const r = await fetch(WT_API + '&' + new URLSearchParams(params), { cache:'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json(); if (j && j.error) throw new Error(j.error); return j;
+}
+function srcNote(t, err){ const n = document.getElementById('srcnote'); n.textContent = t; n.style.color = err ? 'var(--red-fg, #b91c1c)' : ''; }
+async function setSrc(v){
+  if (v === src) return;
+  src = v; closePicker(); selectCell(null);
+  document.querySelectorAll('#srctabs button').forEach(b => b.classList.toggle('active', b.dataset.src === v));
+  ['clearBtn','resetBtn'].forEach(id => document.getElementById(id).style.display = v === 'real' ? 'none' : '');
+  document.getElementById('reloadReal').style.display = v === 'real' ? '' : 'none';
+  document.querySelector('.banner').innerHTML = v === 'real'
+    ? '<b>REAL CLASSES, READ ONLY.</b> These are your real pupils, with their marks from the live writing tracker converted to the new statuses (4 = Secure, 1 = Emerging, 2 and 3 = Reteach, 0 = Taught, not used, x = Not taught). Nothing you do here is saved, and the live writing tracker is not changed.'
+    : BANNER_EXAMPLES;
+  if (v === 'examples'){ CLASS = EXAMPLES; classYear = 'Y5'; level = 'Y5'; srcNote(''); renderGrid(); return; }
+  EXAMPLES = CLASS;
+  if (!REAL.classes){
+    renderGrid(); srcNote('Loading the classes from the live writing tracker…');
+    try {
+      const cls = await wtGet({ action:'getClasses' });
+      REAL.classes = cls.map(c => ({ class_id:c.class_id, class_name:c.class_name, year:'Y' + String(c.year_group || '').replace(/\D/g, '') }))
+        .filter(c => YEARS.includes(c.year)).sort((a, b) => (a.year + (a.class_name||'')).localeCompare(b.year + (b.class_name||'')));
+    } catch (e) { srcNote('Could not load the classes (' + e.message + '). Refresh the page and sign in again.', true); return; }
+  }
+  openReal(REAL.cls || (REAL.classes.find(c => c.year === 'Y5') || REAL.classes[0]).class_id);
+}
+async function openReal(classId, fresh){
+  const c = REAL.classes.find(x => x.class_id === classId); if (!c) return;
+  REAL.cls = classId; closePicker(); selectCell(null);
+  if (fresh || !REAL.cache[classId]){
+    srcNote('Loading ' + (c.class_name || classId) + ' from the live writing tracker…');
+    try {
+      const j = await wtGet({ action:'getAssessments', class_id:classId });
+      const data = {}, pupils = [], unknown = {};
+      (j.pupils || []).forEach(p => {
+        const d = data[p.pupil_id] = {};
+        YEARS.forEach(L => SKILLS[L].forEach(s => d[s.id] = 'none'));
+        Object.entries((j.assessments || {})[p.pupil_id] || {}).forEach(([sid, sc]) => {
+          if (!(sid in d)) return;                                   // Y6 and retired statements are not in the new framework
+          const v = CONVERT[String(sc).trim()]; if (v) d[sid] = v; else if (String(sc).trim()) unknown[sc] = (unknown[sc] || 0) + 1;
+        });
+        const w = String(p.working_at_level || '').toUpperCase();
+        pupils.push({ id:p.pupil_id, label:p.name || p.pupilCode || '?', work: levelsFor(c.year).includes(w) ? w : c.year });
+      });
+      REAL.cache[classId] = { pupils, data, unknown, at:new Date() };
+    } catch (e) { srcNote('Could not load this class (' + e.message + '). Refresh the page and sign in again.', true); return; }
+  }
+  if (REAL.cls !== classId || src !== 'real') return;
+  const k = REAL.cache[classId], marked = k.pupils.filter(p => Object.values(k.data[p.id]).some(v => v !== 'none')).length;
+  CLASS = { [c.year]: { pupils:k.pupils, data:k.data } }; classYear = c.year; level = c.year;
+  srcNote((c.class_name || classId) + ': ' + k.pupils.length + ' pupils, ' + marked + ' with marks. Loaded ' + k.at.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) + '.'
+    + (Object.keys(k.unknown).length ? ' Some old marks could not be converted: ' + Object.entries(k.unknown).map(([a, b]) => '"' + a + '" x' + b).join(', ') + '.' : ''));
+  renderGrid();
+}
+document.getElementById('srctabs').addEventListener('click', e => { const b = e.target.closest('button[data-src]'); if (b) setSrc(b.dataset.src); });
+document.getElementById('reloadReal').onclick = () => { if (REAL.cls) openReal(REAL.cls, true); };
+
 // ---- Term: from the school calendar (TermDates in the WFA database) ----
 async function loadTerm(){
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -548,6 +627,7 @@ document.getElementById('chgbody').addEventListener('click', async e => {
   }
 });
 setStatus('Weights agreed on 23.10.26 and locked.');
+const BANNER_EXAMPLES = document.querySelector('.banner').innerHTML;
 renderLegend(); renderGrid(); renderChanges(); loadTerm();   // weights are built in and locked, so the review store is no longer read or written
 </script>
 </body>
