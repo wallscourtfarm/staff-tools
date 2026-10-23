@@ -140,8 +140,13 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <p><b>3. Grade</b> for a child working at their own year group: <b>D</b> = expected ≥ 90% and greater depth ≥ 60% · <b>O1</b> = expected ≥ 75% · <b>O2</b> = expected ≥ 65% · <b>Y</b> = expected ≥ 50%.</p>
       <p><b>4. Below 50% of the year group's expected statements</b> means "at an earlier stage": <b>A - Yn</b>. The teacher chooses which year's statements a child is working at (the "working at" box under the child's initials). If a child on an earlier year's statements is still under 50% of them, the tool flags it and offers to move them one year lower. It is always the teacher's decision. Below Y1 is recorded as <b>A - EY</b>.</p>
       <p><b>5. Weights</b> (0 to 10, whole numbers) are shown next to each statement and start at the draft values. <b>This is the one thing you can change that is kept.</b> Type a new weight in a box and it is saved straight away for all staff, along with your email and the time. A box that differs from the draft turns blue, and the list of changes is under the grid. These are proposals only: they do not change the live writing tracker. In the final tool the weights would be locked.</p>
+      <p><b>6. Terms.</b> The weights in the boxes are the <b>Term 1 and 2</b> weights, so the non-negotiables can count for more early in the year. <b>From Term 3, every non-negotiable has a weight of 1</b>; all other weights stay the same. Use the "Term being assessed" switch to see the grid and every child's % and grade with each set of weights. Each term's results always use that term's weights, so a Term 2 result keeps its Term 2 figure when you look back at it later. Non-negotiable weights can only be changed while "Terms 1 and 2" is selected.</p>
     </div>
   </details>
+
+  <div class="group-label">Term being assessed</div>
+  <div class="classtabs" id="termtabs"></div>
+  <div class="lvlnote" id="termnote"></div>
 
   <div class="group-label">Class year group</div>
   <div class="classtabs" id="classtabs"></div>
@@ -165,7 +170,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="grid-scroll"><table id="grid"></table></div>
 
   <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
-  <footer>Proposed new scoring tool · review draft WFA-22.10.26a · draft weights of 12.10.26 · statements as in the current framework (wording may change)</footer>
+  <footer>Proposed new scoring tool · review draft WFA-23.10.26a · draft weights of 12.10.26 · statements as in the current framework (wording may change)</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -224,7 +229,9 @@ function clearMarks(){ YEARS.forEach(y => { Object.keys(CLASS[y].data).forEach(p
 
 // ---- Scoring ----------------------------------------------------------
 let classYear = 'Y5', level = 'Y5', paint = null, wLocked = false;
-let canWrite = null, SHARED = {};
+let canWrite = null, SHARED = {}, termMode = 't12';
+const LATER_NN = 1;                                   // every non-negotiable from Term 3 onwards
+const effW = s => (termMode === 't3' && s.tier === 'non_neg') ? LATER_NN : WEIGHT[s.id];
 const dOf = id => (id in DRAFT ? DRAFT[id] : 1);
 const clampW = v => Math.min(10, Math.max(0, Math.round(Number(v)) || 0));
 const SKILL_BY_ID = {}; YEARS.forEach(y => SKILLS[y].forEach(k => SKILL_BY_ID[k.id] = k));
@@ -238,7 +245,7 @@ function summary(p){
   const c = { secure:0, developing:0, emerging:0, reteach:0, taught:0 };
   const exp = { points:0, max:0, counted:0, total:0, wAll:0, wSecure:0 }, gd = { points:0, max:0, counted:0, total:0 };
   SKILLS[L].forEach(s => {
-    const v = d[s.id], w = WEIGHT[s.id], isGd = s.tier === 'greater_depth', g = isGd ? gd : exp;
+    const v = d[s.id], w = effW(s), isGd = s.tier === 'greater_depth', g = isGd ? gd : exp;
     g.total++; if (!isGd) exp.wAll += w;
     if (v in POINTS){ g.points += w*POINTS[v]; g.max += w; g.counted++; if (!isGd){ c[v]++; if (v==='secure') exp.wSecure += w; } }
   });
@@ -271,6 +278,8 @@ const fmt = n => (Math.round(n*10)/10).toString();
 const pc = n => n === null ? '–' : Math.round(n)+'%';
 
 function renderClassTabs(){
+  document.getElementById('termtabs').innerHTML = [['t12','Terms 1 and 2'],['t3','Term 3 onwards']].map(t => '<button class="ct'+(t[0]===termMode?' active':'')+'" data-term="'+t[0]+'">'+t[1]+'</button>').join('');
+  document.getElementById('termnote').textContent = termMode === 't3' ? 'Term 3 onwards: every non-negotiable counts with a weight of 1. All other weights are as set for Terms 1 and 2.' : 'Terms 1 and 2: the weights in the boxes, including the higher non-negotiable weights.';
   document.getElementById('classtabs').innerHTML = YEARS.map(y => '<button class="ct'+(y===classYear?' active':'')+'" data-cy="'+y+'">Year '+y.slice(1)+' class</button>').join('');
 }
 function chip(key){
@@ -328,15 +337,15 @@ function renderGrid(){
   const ncol = pupils.length + 2;
   ['non_neg','expected','greater_depth'].forEach(tk => {
     const list = SKILLS[level].filter(s => s.tier === tk); if (!list.length) return;
-    h += '<tr class="tierrow"><td colspan="'+ncol+'">'+TIERNAME[tk]+' ('+list.length+')</td></tr>';
+    h += '<tr class="tierrow"><td colspan="'+ncol+'">'+TIERNAME[tk]+' ('+list.length+')'+(tk==='non_neg' && termMode==='t3' ? ' · weight 1 each from Term 3' : '')+'</td></tr>';
     let lastCat = null, lastGrp = null;
     list.forEach(s => {
       if (tk !== 'non_neg' && s.category !== lastCat){ h += '<tr class="catrow"><td colspan="'+ncol+'">'+esc(s.category)+'</td></tr>'; lastCat = s.category; lastGrp = null; }
       const g = s.group || null;
       if (g !== lastGrp){ if (g) h += '<tr class="grprow"><td colspan="'+ncol+'">'+esc(g)+'</td></tr>'; lastGrp = g; }
-      const w = WEIGHT[s.id];
+      const w = effW(s), fixed = termMode === 't3' && s.tier === 'non_neg';
       h += '<tr><td class="skilltd">'+esc(s.skill).replace(/\n/g,' ')+(s.key_essential?'<span class="key">KEY</span>':'')+(s.example?'<span class="ex">'+esc(s.example)+'</span>':'')+'</td>'
-        +'<td class="wtd">'+((wLocked || canWrite === false) ? '<span class="wlock'+(w===0?' zero':'')+'" title="Weight, locked">'+w+'</span>' : '<input type="number" class="wbox'+(w!==dOf(s.id)?' changed':'')+'" min="0" max="10" step="1" value="'+w+'" data-w="'+s.id+'" aria-label="Weight">')+'</td>';
+        +'<td class="wtd">'+((wLocked || canWrite === false || fixed) ? '<span class="wlock'+(w===0?' zero':'')+'" title="'+(fixed ? 'Every non-negotiable is weight 1 from Term 3' : 'Weight, locked')+'">'+w+'</span>' : '<input type="number" class="wbox'+(w!==dOf(s.id)?' changed':'')+'" min="0" max="10" step="1" value="'+w+'" data-w="'+s.id+'" aria-label="Weight">')+'</td>';
       pupils.forEach(p => {
         const v = CLASS[classYear].data[p.id][s.id], m = STATUS[v];
         h += '<td class="cell'+(paint?' paint':'')+'" data-p="'+p.id+'" data-s="'+s.id+'" style="background:'+m.bg+';color:'+m.fg+'">'+(v==='none' ? '' : (v==='x' ? 'x' : m.label))+'</td>';
@@ -385,6 +394,9 @@ grid.addEventListener('change', e => {
 document.getElementById('classtabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-cy]'); if (!b) return;
   classYear = b.dataset.cy; level = classYear; document.getElementById('lvlnote').textContent = ''; renderGrid();
+});
+document.getElementById('termtabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-term]'); if (!b) return; termMode = b.dataset.term; renderGrid();
 });
 document.getElementById('lvltabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-lvl]'); if (!b) return; level = b.dataset.lvl; document.getElementById('lvlnote').textContent = ''; renderGrid();
@@ -451,8 +463,8 @@ async function saveWeight(id, v){
 }
 const whenFmt = iso => { try { return new Date(iso).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }); } catch (e) { return ''; } };
 function allRows(){
-  const rows = [['Year','Tier','Category','Group','ID','Statement','Key essential','Draft weight','Current weight','Changed by','Changed at']];
-  YEARS.forEach(y => SKILLS[y].forEach(k => { const x = SHARED[k.id] || {}; rows.push([y, TIERNAME[k.tier], k.category || '', k.group || '', k.id, String(k.skill).replace(/[\t\r\n]+/g,' '), k.key_essential ? 'Yes' : '', dOf(k.id), WEIGHT[k.id], x.by || '', x.at || '']); }));
+  const rows = [['Year','Tier','Category','Group','ID','Statement','Key essential','Draft weight','Current weight','Weight from Term 3','Changed by','Changed at']];
+  YEARS.forEach(y => SKILLS[y].forEach(k => { const x = SHARED[k.id] || {}; rows.push([y, TIERNAME[k.tier], k.category || '', k.group || '', k.id, String(k.skill).replace(/[\t\r\n]+/g,' '), k.key_essential ? 'Yes' : '', dOf(k.id), WEIGHT[k.id], k.tier === 'non_neg' ? LATER_NN : WEIGHT[k.id], x.by || '', x.at || '']); }));
   return rows;
 }
 function renderChanges(){
