@@ -91,6 +91,8 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   td.cell { width:118px; min-width:118px; height:32px; text-align:center; font-size:11px; font-weight:700; cursor:pointer; user-select:none; border-right:1px solid var(--surface); }
   td.cell:hover { filter:brightness(.93); }
   td.cell.paint { cursor:copy; }
+  td.cell.cur { outline:3px solid var(--accent); outline-offset:-3px; }
+  .chip kbd { font:inherit; font-size:10px; font-weight:800; padding:0 4px; border-radius:4px; border:1px solid var(--line); background:var(--surface2); }
   tr.sumrow td { vertical-align:top; background:var(--surface); border-bottom:3px solid var(--line); }
   td.sum { padding:8px; font-size:11px; color:var(--fg); }
   .warn { background:var(--amb-bg); border:1px solid var(--amb-bd); color:var(--amb-fg); border-radius:8px; padding:6px 8px; font-size:11px; font-weight:600; margin:2px 0 6px; line-height:1.35; }
@@ -140,6 +142,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <p><b>3. Grade</b> for a child working at their own year group: <b>D</b> = expected ≥ 90% and greater depth ≥ 60% · <b>O1</b> = expected ≥ 75% · <b>O2</b> = expected ≥ 65% · <b>Y</b> = expected ≥ 50%.</p>
       <p><b>4. Below 50% of the year group's expected statements</b> means "at an earlier stage": <b>A - Yn</b>. The teacher chooses which year's statements a child is working at (the "working at" box under the child's initials). If a child on an earlier year's statements is still under 50% of them, the tool flags it and offers to move them one year lower. It is always the teacher's decision. Below Y1 is recorded as <b>A - EY</b>.</p>
       <p><b>5. Weights</b> (0 to 10, whole numbers) are shown next to each statement and start at the draft values. <b>This is the one thing you can change that is kept.</b> Type a new weight in a box and it is saved straight away for all staff, along with your email and the time. A box that differs from the draft turns blue, and the list of changes is under the grid. These are proposals only: they do not change the live writing tracker. In the final tool the weights would be locked.</p>
+      <p><b>Marking with the keyboard:</b> click a cell, then type <b>R</b> Reteach, <b>E</b> Emerging, <b>D</b> Developing, <b>S</b> Secure, <b>X</b> Not taught, <b>T</b> Taught, not used, or <b>Delete</b> for Unreviewed. The mark is set and the highlight moves down to the next statement for the same child. The arrow keys move the highlight; Esc lets go of it.</p>
       <p><b>6. Terms.</b> The weights in the boxes are the <b>Term 1 and 2</b> weights, so the non-negotiables can count for more early in the year. <b>From Term 3, every non-negotiable has a weight of 1</b>; all other weights stay the same. Use the "Term being assessed" switch to see the grid and every child's % and grade with each set of weights. Each term's results always use that term's weights, so a Term 2 result keeps its Term 2 figure when you look back at it later. Non-negotiable weights can only be changed while "Terms 1 and 2" is selected.</p>
     </div>
   </details>
@@ -151,7 +154,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="group-label">Class year group</div>
   <div class="classtabs" id="classtabs"></div>
 
-  <div class="group-label">Status key (click one, then click cells to paint it; or just click any cell)</div>
+  <div class="group-label">Status key (click a cell, then type a letter: R Reteach · E Emerging · D Developing · S Secure · X Not taught · T Taught, not used · Delete Unreviewed. Arrow keys move. Or click a status to paint it.)</div>
   <div class="legend" id="legendJudge"></div>
   <div class="legend" id="legendNone" style="margin-top:6px"></div>
   <div class="hint">
@@ -170,7 +173,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="grid-scroll"><table id="grid"></table></div>
 
   <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
-  <footer>Proposed new scoring tool · review draft WFA-23.10.26a · draft weights of 12.10.26 · statements as in the current framework (wording may change)</footer>
+  <footer>Proposed new scoring tool · review draft WFA-23.10.26b · draft weights of 12.10.26 · statements as in the current framework (wording may change)</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -188,6 +191,8 @@ const STATUS = {
   x:          { label:'x Not taught',     bg:'#dbeafe', fg:'#1e40af', desc:'Not taught yet, or genre not covered · not counted' },
   none:       { label:'Unreviewed',       bg:'#f0f0f0', fg:'#9ca3af', desc:'Not looked at yet · not counted' }
 };
+const KEYS = { r:'reteach', e:'emerging', d:'developing', s:'secure', x:'x', t:'taught' };   // Delete/Backspace = Unreviewed
+const KEY_OF = Object.fromEntries(Object.entries(KEYS).map(([k, v]) => [v, k.toUpperCase()]));
 const JUDGE_ORDER = ['reteach','emerging','developing','secure'];
 const NONE_ORDER  = ['x','taught','none'];
 const POINTS = { secure:1, developing:0.6, emerging:0.4, reteach:0, taught:0 };
@@ -284,7 +289,7 @@ function renderClassTabs(){
 }
 function chip(key){
   const s = STATUS[key], el = document.createElement('div');
-  el.className = 'chip'+(paint===key?' active':''); el.innerHTML = '<span class="sw" style="background:'+s.bg+'"></span>'+s.label; el.title = s.desc;
+  el.className = 'chip'+(paint===key?' active':''); el.innerHTML = '<span class="sw" style="background:'+s.bg+'"></span>'+s.label+' <kbd>'+(KEY_OF[key] || 'Del')+'</kbd>'; el.title = s.desc;
   el.onclick = () => { paint = (paint===key ? null : key); renderLegend(); renderGrid(); };
   return el;
 }
@@ -354,6 +359,27 @@ function renderGrid(){
     });
   });
   t.innerHTML = h + '</tbody>';
+  markCur();
+}
+function curCell(){ return cur && document.querySelector('#grid td.cell[data-p="'+cur.p+'"][data-s="'+cur.s+'"]'); }
+function markCur(){ const c = curCell(); if (c) c.classList.add('cur'); }
+function selectCell(c){
+  document.querySelectorAll('#grid td.cell.cur').forEach(x => x.classList.remove('cur'));
+  cur = c ? { p:c.dataset.p, s:c.dataset.s } : null;
+  if (c){
+    c.classList.add('cur'); c.scrollIntoView({ block:'nearest', inline:'nearest' });
+    const sc = c.closest('.grid-scroll'), w = c.parentElement.querySelector('td.wtd');   // keep it clear of the sticky statement column
+    if (sc && w){ const over = w.getBoundingClientRect().right - c.getBoundingClientRect().left; if (over > 0) sc.scrollLeft -= over; }
+    const th = sc && sc.querySelector('thead');                                            // and clear of the sticky children's header
+    if (th){ const over = th.getBoundingClientRect().bottom - c.getBoundingClientRect().top; if (over > 0) sc.scrollTop -= over; }
+  }
+}
+function moveCur(dr, dc){
+  const rows = [...document.querySelectorAll('#grid tr')].filter(r => r.querySelector('td.cell'));
+  const c = curCell(); if (!c) return;
+  const r = rows.indexOf(c.parentElement), cells = [...c.parentElement.querySelectorAll('td.cell')], i = cells.indexOf(c);
+  const nr = Math.min(rows.length - 1, Math.max(0, r + dr)), row = [...rows[nr].querySelectorAll('td.cell')];
+  selectCell(row[Math.min(row.length - 1, Math.max(0, i + dc))]);
 }
 function setWork(pid, L, viaButton){
   const p = CLASS[classYear].pupils.find(x => x.id === pid); p.work = L;
@@ -364,7 +390,7 @@ function setWork(pid, L, viaButton){
 }
 
 // ---- Picker -----------------------------------------------------------
-const picker = document.getElementById('picker'); let target = null;
+const picker = document.getElementById('picker'); let target = null, cur = null;   // cur = the cell the keyboard acts on
 const btn = k => { const s = STATUS[k]; return '<button data-k="'+k+'" style="background:'+s.bg+';color:'+s.fg+'"><span>'+s.label+'<small>'+s.desc+'</small></span></button>'; };
 function openPicker(cell){
   target = { p:cell.dataset.p, s:cell.dataset.s };
@@ -383,6 +409,7 @@ grid.addEventListener('click', e => {
   const mv = e.target.closest('button[data-move]');
   if (mv){ e.stopPropagation(); setWork(mv.dataset.move, mv.dataset.to, true); return; }
   const c = e.target.closest('td.cell'); if (!c) return;
+  selectCell(c);
   if (paint){ CLASS[classYear].data[c.dataset.p][c.dataset.s] = paint; renderGrid(); }
   else { e.stopPropagation(); openPicker(c); }
 });
@@ -402,6 +429,16 @@ document.getElementById('lvltabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-lvl]'); if (!b) return; level = b.dataset.lvl; document.getElementById('lvlnote').textContent = ''; renderGrid();
 });
 document.addEventListener('click', e => { if (!picker.contains(e.target)) closePicker(); });
+document.addEventListener('keydown', e => {
+  if (!cur || !curCell() || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.closest && e.target.closest('input, select, textarea')) return;
+  const k = e.key.toLowerCase(), arrows = { arrowdown:[1,0], arrowup:[-1,0], arrowright:[0,1], arrowleft:[0,-1] };
+  if (arrows[k]){ e.preventDefault(); closePicker(); moveCur(...arrows[k]); return; }
+  if (k === 'escape'){ closePicker(); selectCell(null); return; }
+  const v = KEYS[k] || ((k === 'delete' || k === 'backspace') ? 'none' : null); if (!v) return;
+  e.preventDefault(); closePicker();
+  CLASS[classYear].data[cur.p][cur.s] = v; renderGrid(); moveCur(1, 0);   // mark, then step down to the next statement for the same child
+});
 document.getElementById('paintOff').onclick = () => { paint = null; renderLegend(); renderGrid(); };
 document.getElementById('clearBtn').onclick = () => { clearMarks(); level = classYear; document.getElementById('lvlnote').textContent = 'All marks cleared. Every child is back on the class year, ready to mark.'; renderGrid(); };
 document.getElementById('resetBtn').onclick = () => { loadExamples(); level = classYear; document.getElementById('lvlnote').textContent = ''; renderGrid(); };
