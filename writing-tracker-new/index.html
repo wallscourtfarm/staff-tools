@@ -54,8 +54,9 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .ct { padding:9px 18px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--fg); font-size:14px; font-weight:800; cursor:pointer; }
   .ct.active { background:var(--accent); color:var(--accent-fg); border-color:var(--accent); }
   .group-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin:8px 0 4px; }
-  .legend { display:flex; flex-wrap:wrap; gap:6px; }
-  .chip { display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:8px; border:2px solid transparent; font-size:12px; font-weight:600; cursor:pointer; background:var(--surface); color:var(--fg); box-shadow:var(--shadow); }
+  .legend { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .lsep { width:1px; align-self:stretch; background:var(--line); margin:0 4px; }
+  .chip { display:flex; align-items:center; gap:6px; padding:5px 8px; border-radius:8px; border:2px solid transparent; font-size:12px; font-weight:600; cursor:pointer; background:var(--surface); color:var(--fg); box-shadow:var(--shadow); }
   .chip .sw { width:14px; height:14px; border-radius:4px; border:1px solid rgba(0,0,0,.2); }
   .chip.active { border-color:var(--fg); }
   .btn { padding:6px 12px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--fg); font-size:12px; font-weight:600; cursor:pointer; }
@@ -68,16 +69,17 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .lvlnote { font-size:12px; color:var(--amb-fg); margin:3px 0 8px; min-height:16px; }
   button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 
-  .grid-scroll { overflow:auto; max-height:78vh; max-width:100%; background:var(--surface); border-radius:12px; box-shadow:var(--shadow); }
+  .grid-scroll { overflow:auto; max-height:calc(100vh - 16px); max-width:100%; background:var(--surface); border-radius:12px; box-shadow:var(--shadow); }
   table { border-collapse:separate; border-spacing:0; width:auto; font-size:12px; }
   th, td { padding:0; border-bottom:1px solid var(--line2); }
-  thead th { position:sticky; top:0; background:var(--surface); color:var(--fg2); z-index:4; text-align:center; padding:6px 4px; vertical-align:bottom; border-bottom:2px solid var(--line); }
-  th.skillh { text-align:left; padding:8px 10px; width:430px; min-width:430px; max-width:430px; left:0; z-index:6; font-size:13px; }
+  thead th { position:sticky; top:0; background:var(--surface); color:var(--fg2); z-index:4; text-align:center; padding:4px; vertical-align:bottom; border-bottom:2px solid var(--line); }
+  th.skillh { text-align:left; padding:4px 10px; width:430px; min-width:430px; max-width:430px; left:0; z-index:6; font-size:13px; }
   th.wh { font-size:11px; color:var(--muted); width:56px; min-width:56px; left:430px; z-index:6; }
   th.pupilh { width:118px; min-width:118px; font-size:14px; font-weight:800; }
-  .wsel { display:block; margin:3px auto 4px; font-size:11px; font-weight:700; padding:2px 3px; border-radius:6px; border:1px solid var(--line); background:var(--surface); color:var(--fg); max-width:108px; }
-  .hbadge { display:inline-block; font-size:15px; font-weight:900; padding:1px 9px; border-radius:7px; }
-  .hexp { font-size:11px; color:var(--fg2); font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums; }
+  .wsel { display:block; margin:3px auto 0; font-size:11px; font-weight:700; padding:2px 3px; border-radius:6px; border:1px solid var(--line); background:var(--surface); color:var(--fg); max-width:108px; }
+  .hbadge { display:inline-block; font-size:13px; font-weight:900; padding:0 7px; border-radius:6px; }
+  .hline { display:flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap; }
+  .hexp { font-size:11px; color:var(--fg2); font-weight:700; font-variant-numeric:tabular-nums; }
   td.skilltd { position:sticky; left:0; z-index:2; background:var(--surface); color:var(--fg); text-align:left; padding:6px 10px; font-size:12px; line-height:1.35; width:430px; min-width:430px; max-width:430px; border-right:1px solid var(--line); }
   td.skilltd .ex { display:block; font-size:11px; color:var(--muted); margin-top:2px; white-space:pre-line; }
   .key { display:inline-block; background:var(--amb-fill); color:var(--amb-fg); border:1px solid var(--amb-bd); font-size:9px; font-weight:800; padding:0 5px; border-radius:8px; margin-left:6px; vertical-align:middle; }
@@ -94,12 +96,12 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   td.cell.cur { outline:3px solid var(--accent); outline-offset:-3px; }
   .chip kbd { font:inherit; font-size:10px; font-weight:800; padding:0 4px; border-radius:4px; border:1px solid var(--line); background:var(--surface2); }
   tr.sumrow td { vertical-align:top; background:var(--surface); border-bottom:3px solid var(--line); }
-  td.sum { padding:8px; font-size:11px; color:var(--fg); }
-  .warn { background:var(--amb-bg); border:1px solid var(--amb-bd); color:var(--amb-fg); border-radius:8px; padding:6px 8px; font-size:11px; font-weight:600; margin:2px 0 6px; line-height:1.35; }
-  .warn button { margin-top:4px; display:block; padding:4px 8px; border-radius:6px; border:1px solid var(--amb-bd); background:var(--surface); font-size:11px; font-weight:700; cursor:pointer; color:var(--amb-fg); }
+  td.sum { padding:5px 8px; font-size:11px; color:var(--fg); }
+  .warn { background:var(--amb-bg); border:1px solid var(--amb-bd); color:var(--amb-fg); border-radius:8px; padding:3px 6px; cursor:help; font-size:11px; font-weight:600; margin:2px 0 6px; line-height:1.35; }
+  .warn button { margin-top:2px; display:block; padding:2px 6px; border-radius:6px; border:1px solid var(--amb-bd); background:var(--surface); font-size:11px; font-weight:700; cursor:pointer; color:var(--amb-fg); }
   .score { line-height:1; font-variant-numeric:tabular-nums; } .score .big { font-size:22px; font-weight:800; color:var(--accent); } .score .of { font-size:12px; color:var(--muted); font-weight:600; }
-  .pct { font-size:12px; font-weight:700; margin:2px 0 4px; font-variant-numeric:tabular-nums; }
-  .bar { display:flex; height:9px; border-radius:5px; overflow:hidden; background:var(--line2); margin:3px 0 4px; }
+  .pct { font-size:12px; font-weight:700; margin:1px 0 2px; font-variant-numeric:tabular-nums; }
+  .bar { display:flex; height:7px; border-radius:4px; overflow:hidden; background:var(--line2); margin:2px 0 3px; }
   .bar span { display:block; height:100%; }
   .nums { font-size:11px; color:var(--fg2); white-space:nowrap; } .cov { color:var(--muted); font-size:11px; }
   .ready { display:inline-block; background:var(--grn-bg); color:var(--grn-fg); border:1px solid var(--grn-bd); border-radius:10px; padding:0 7px; font-size:10px; font-weight:800; margin-top:3px; }
@@ -154,8 +156,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="classtabs" id="classtabs"></div>
 
   <div class="group-label">Status key (click a cell, then type a letter: R Reteach · E Emerging · D Developing · S Secure · X Not taught · T Taught, not used · Delete Unreviewed. Arrow keys move. Or click a status to paint it.)</div>
-  <div class="legend" id="legendJudge"></div>
-  <div class="legend" id="legendNone" style="margin-top:6px"></div>
+  <div class="legend"><span class="legend" id="legendJudge"></span><span class="lsep"></span><span class="legend" id="legendNone"></span></div>
   <div class="hint">
     <span id="paintHint">Paint mode off.</span>
     <button class="btn" id="paintOff" style="display:none">Stop painting</button>
@@ -171,7 +172,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="grid-scroll"><table id="grid"></table></div>
 
   <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
-  <footer>Proposed new scoring tool · review draft WFA-23.10.26d · weights agreed 23.10.26 (locked) · statements as in the current framework (wording may change)</footer>
+  <footer>Proposed new scoring tool · review draft WFA-23.10.26e · weights agreed 23.10.26 (locked) · statements as in the current framework (wording may change)</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -317,8 +318,8 @@ function renderGrid(){
   let h = '<thead><tr><th class="skillh">'+level+' statements ('+SKILLS[level].length+')</th><th class="wh">Weight</th>';
   sums.forEach(({p,u,g}) => {
     const [bg,fg] = GSTYLE[g.style];
-    h += '<th class="pupilh">'+p.id+'<select class="wsel" data-p="'+p.id+'">'+levelsFor(classYear).map(L => '<option value="'+L+'"'+(L===p.work?' selected':'')+'>'+(L===classYear?'Working at '+L:'A - '+L)+'</option>').join('')+'</select>'
-      +'<span class="hbadge" style="background:'+bg+';color:'+fg+'">'+g.label+'</span><div class="hexp">Expected '+pc(u.expPct)+'</div></th>';
+    h += '<th class="pupilh"><div class="hline">'+p.id+' <span class="hbadge" style="background:'+bg+';color:'+fg+'">'+g.label+'</span> <span class="hexp">'+pc(u.expPct)+'</span></div>'
+      +'<select class="wsel" data-p="'+p.id+'" aria-label="Working at">'+levelsFor(classYear).map(L => '<option value="'+L+'"'+(L===p.work?' selected':'')+'>'+(L===classYear?'Working at '+L:'A - '+L)+'</option>').join('')+'</select></th>';
   });
   h += '</tr></thead><tbody>';
   // summary row
@@ -327,13 +328,11 @@ function renderGrid(){
     const c = u.c, e = u.exp, w = n => e.counted ? 100*n/e.counted : 0;
     const ready = e.wAll && (e.wSecure/e.wAll) >= LEVEL_UP;
     h += '<td class="sum">'
-      +(g.warn ? '<div class="warn">⚠ '+g.warn.text+(g.warn.canMove ? '<button data-move="'+p.id+'" data-to="'+g.warn.move+'">Move to A - '+g.warn.move+'</button>' : '')+'</div>' : '')
-      +'<div class="score"><span class="big">'+fmt(e.points)+'</span><span class="of"> / '+fmt(e.max)+'</span></div>'
-      +'<div class="pct">Expected '+pc(u.expPct)+'</div>'
+      +(g.warn ? '<div class="warn" title="'+esc(g.warn.text)+'">⚠ Under 50%'+(g.warn.canMove ? ' <button data-move="'+p.id+'" data-to="'+g.warn.move+'">Move to A - '+g.warn.move+'</button>' : ' (A - EY)')+'</div>' : '')
+      +'<div class="pct">Expected '+pc(u.expPct)+' <span class="of">('+fmt(e.points)+' / '+fmt(e.max)+')</span></div>'
       +'<div class="bar"><span style="width:'+w(c.reteach+c.taught)+'%;background:#fca5a5"></span><span style="width:'+w(c.emerging)+'%;background:#fed7aa"></span><span style="width:'+w(c.developing)+'%;background:#d9f99d"></span><span style="width:'+w(c.secure)+'%;background:#86efac"></span></div>'
       +(u.L === classYear ? '<div class="pct">Greater depth '+pc(u.gdPct)+'</div>' : '')
-      +'<div class="nums">'+c.secure+' secure · '+c.developing+' dev.</div><div class="nums">'+c.emerging+' emerging · '+c.reteach+' reteach</div>'
-      +'<div class="nums">'+c.taught+' taught, not used</div><div class="cov">'+e.counted+' of '+e.total+' counted</div>'
+      +'<div class="nums" title="Secure · Developing · Emerging · Reteach · Taught, not used">'+c.secure+' S · '+c.developing+' D · '+c.emerging+' E · '+c.reteach+' R · '+c.taught+' T</div><div class="cov">'+e.counted+' of '+e.total+' counted</div>'
       +(ready ? '<div><span class="ready">READY TO MOVE UP</span></div>' : '')+'</td>';
   });
   h += '</tr>';
