@@ -156,6 +156,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <button class="ct" data-src="real">Real classes (read only)</button>
   </div>
   <div class="lvlnote" id="srcnote"></div>
+  <div class="lvlnote" id="groupnote" style="color:var(--fg2)"></div>
 
   <div class="group-label">Term</div>
   <div class="lvlnote" id="termnote">Reading the school calendar…</div>
@@ -171,6 +172,8 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <button class="btn" id="clearBtn">Clear all marks (empty class)</button>
     <button class="btn" id="resetBtn">Reload the example children</button>
     <button class="btn" id="reloadReal" style="display:none">Reload from the live tracker</button>
+    <button class="btn" id="exportReal" style="display:none">Export JSON</button>
+    <span id="savenote" class="wstatus"></span>
     <span id="wstatus" class="wstatus"></span>
   </div>
 
@@ -181,7 +184,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="grid-scroll"><table id="grid"></table></div>
 
   <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
-  <footer>Proposed new scoring tool · review draft WFA-23.10.26h · weights agreed 23.10.26 (locked) · statements as in the current framework (wording may change)</footer>
+  <footer>Proposed new scoring tool · review draft WFA-23.10.26i · weights agreed 23.10.26 (locked) · statements as in the current framework (wording may change)</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -396,7 +399,10 @@ function moveCur(dr, dc){
   selectCell(row[Math.min(row.length - 1, Math.max(0, i + dc))]);
 }
 function setWork(pid, L, viaButton){
-  const p = CLASS[classYear].pupils.find(x => x.id === pid); p.work = L;
+  const p = CLASS[classYear].pupils.find(x => x.id === pid), was = p.work; p.work = L;
+  if (src === 'real' && REAL.live) wtPost({ action:'updatePupil', pupil_id:pid, working_at_level:L })
+    .then(() => saveNote('Saved: ' + nameOf(pid) + ' working at ' + lbl(L) + '.'))
+    .catch(e => { p.work = was; renderGrid(); saveNote('Could not save that (' + e.message + '). It has gone back. Refresh and sign in again if this keeps happening.', true); });
   const note = document.getElementById('lvlnote');
   if (viaButton){ level = L; note.textContent = nameOf(pid)+' moved to '+lbl(L)+'. Now mark them against these statements.'; }
   else note.textContent = nameOf(pid)+' is now working at '+lbl(L)+(L===level ? '.' : '. See the '+lbl(L)+' tab.');
@@ -410,7 +416,7 @@ function openPicker(cell){
   target = { p:cell.dataset.p, s:cell.dataset.s };
   const sk = SKILLS[level].find(x => x.id === target.s);
   picker.innerHTML = '<h4>'+esc(nameOf(target.p))+' · '+esc(sk.skill).slice(0,90)+(sk.skill.length>90?'…':'')+'</h4>'+JUDGE_ORDER.slice().reverse().map(btn).join('')+'<div class="sep">No evidence yet</div>'+NONE_ORDER.map(btn).join('');
-  picker.querySelectorAll('button').forEach(b => b.onclick = () => { if (!target) return; CLASS[classYear].data[target.p][target.s] = b.dataset.k; closePicker(); renderGrid(); });
+  picker.querySelectorAll('button').forEach(b => b.onclick = () => { if (!target) return; setMark(target.p, target.s, b.dataset.k); closePicker(); renderGrid(); });
   const r = cell.getBoundingClientRect(); picker.classList.add('open');
   const ph = picker.offsetHeight; let top = r.bottom + 4; if (top + ph > innerHeight - 8) top = Math.max(8, innerHeight - ph - 8);
   picker.style.top = top+'px'; picker.style.left = Math.max(8, Math.min(r.left, innerWidth - 342))+'px';
@@ -424,7 +430,7 @@ grid.addEventListener('click', e => {
   if (mv){ e.stopPropagation(); setWork(mv.dataset.move, mv.dataset.to, true); return; }
   const c = e.target.closest('td.cell'); if (!c) return;
   selectCell(c);
-  if (paint){ CLASS[classYear].data[c.dataset.p][c.dataset.s] = paint; renderGrid(); }
+  if (paint){ setMark(c.dataset.p, c.dataset.s, paint); renderGrid(); }
   else { e.stopPropagation(); openPicker(c); }
 });
 grid.addEventListener('change', e => {
@@ -442,27 +448,70 @@ document.getElementById('classtabs').addEventListener('click', e => {
 // 0 Taught not used, x and ~ Not taught. Blank or missing = Unreviewed. Nothing here saves.
 const CONVERT = { '4':'secure', '1':'emerging', '2':'reteach', '3':'reteach', '0':'taught', 'x':'x', '~':'x' };
 const WT_API = 'https://api.wallscourt-farm-academy.co.uk/planning/writingtracker-db?token=__hub__';
-let src = 'examples', REAL = { classes:null, cls:null, cache:{} }, EXAMPLES = null;
+let src = 'examples', REAL = { classes:null, cls:null, cache:{}, live:false, year:'' }, EXAMPLES = null;
+// Saving switches on only when the switch-over sets wt_config writing_v2_live = '1' (after the backup and conversion).
+async function wtPost(body){
+  const r = await fetch(WT_API, { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json(); if (!j || j.error || j.success === false) throw new Error((j && j.error) || 'not saved'); return j;
+}
+function saveNote(t, err){ const n = document.getElementById('savenote'); if (!n) return; n.textContent = t; n.style.color = err ? '#dc2626' : ''; }
+function setMark(pid, sid, v){
+  const d = CLASS[classYear].data[pid], was = d[sid]; if (was === v) return;
+  d[sid] = v;
+  if (src !== 'real') return;
+  if (!REAL.live){ saveNote('Not saved: real classes are read only until the switch-over.', true); return; }
+  saveNote('Saving…');
+  wtPost({ action:'saveScore', pupil_id:pid, skill_id:sid, academic_year:REAL.year, score: v === 'none' ? '' : v })
+    .then(() => saveNote('Saved: ' + nameOf(pid) + ', ' + sid + ' = ' + STATUS[v].label + '.'))
+    .catch(e => { d[sid] = was; renderGrid(); saveNote('Could not save ' + nameOf(pid) + ', ' + sid + ' (' + e.message + '). It has gone back to ' + STATUS[was].label + '. Refresh and sign in again if this keeps happening.', true); });
+}
+async function loadGroups(classId){
+  const el = document.getElementById('groupnote'); if (!el) return; el.textContent = '';
+  try {
+    const g = await wtGet({ action:'getGroupStats', class_id:classId });
+    if (g.scale !== 'v2pct'){ el.textContent = 'Group averages (PP, SEN, EAL) will show here after the switch-over.'; return; }
+    const a = k => g[k] && g[k].n ? Math.round(g[k].s / g[k].n) + '% (' + g[k].n + ')' : '–';
+    el.textContent = 'Average Expected % · PP ' + a('pp') + ' vs not PP ' + a('nonPp') + ' · SEN ' + a('sen') + ' vs not SEN ' + a('nonSen') + ' · EAL ' + a('eal') + ' vs not EAL ' + a('nonEal');
+  } catch (e) { el.textContent = 'Group averages could not be loaded.'; }
+}
+function exportJson(){
+  const c = REAL.classes.find(x => x.class_id === REAL.cls); if (!c) return;
+  const out = { class: c.class_name || c.class_id, year_group: c.year, academic_year: REAL.year, term: termNow, exported: new Date().toISOString(),
+    pupils: CLASS[classYear].pupils.map(p => { const u = summary(p), g = grade(u);
+      return { pupil: p.label, working_at: p.work, grade: g.label, expected_pct: u.expPct === null ? null : Math.round(u.expPct * 10) / 10,
+        greater_depth_pct: u.gdPct === null ? null : Math.round(u.gdPct * 10) / 10,
+        marks: Object.fromEntries(Object.entries(CLASS[classYear].data[p.id]).filter(([, v]) => v !== 'none').map(([k, v]) => [k, STATUS[v].label])) }; }) };
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type:'application/json' }));
+  a.download = 'writing-' + (c.class_name || c.class_id) + '-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click(); a.remove();
+}
 async function wtGet(params){
   const r = await fetch(WT_API + '&' + new URLSearchParams(params), { cache:'no-store' });
   if (!r.ok) throw new Error('HTTP ' + r.status);
   const j = await r.json(); if (j && j.error) throw new Error(j.error); return j;
 }
 function srcNote(t, err){ const n = document.getElementById('srcnote'); n.textContent = t; n.style.color = err ? 'var(--red-fg, #b91c1c)' : ''; }
+function setBanner(){
+  const v = src;
+  document.querySelector('.banner').innerHTML = v === 'real'
+    ? '<b>REAL CLASSES' + (REAL.live ? '.</b> Marks and working-at changes are saved as you make them, with your name and the term.' : ', READ ONLY.</b>') + ' These are your real pupils, with their marks from the live writing tracker converted to the new statuses (4 = Secure, 1 = Emerging, 2 and 3 = Reteach, 0 = Taught, not used, x = Not taught).' + (REAL.live ? '' : ' Nothing you do here is saved, and the live writing tracker is not changed.')
+    : BANNER_EXAMPLES;
+}
 async function setSrc(v){
   if (v === src) return;
   src = v; closePicker(); selectCell(null);
   document.querySelectorAll('#srctabs button').forEach(b => b.classList.toggle('active', b.dataset.src === v));
   ['clearBtn','resetBtn'].forEach(id => document.getElementById(id).style.display = v === 'real' ? 'none' : '');
-  document.getElementById('reloadReal').style.display = v === 'real' ? '' : 'none';
-  document.querySelector('.banner').innerHTML = v === 'real'
-    ? '<b>REAL CLASSES, READ ONLY.</b> These are your real pupils, with their marks from the live writing tracker converted to the new statuses (4 = Secure, 1 = Emerging, 2 and 3 = Reteach, 0 = Taught, not used, x = Not taught). Nothing you do here is saved, and the live writing tracker is not changed.'
-    : BANNER_EXAMPLES;
+  ['reloadReal','exportReal'].forEach(id => document.getElementById(id).style.display = v === 'real' ? '' : 'none');
+  document.getElementById('groupnote').textContent = ''; saveNote('');
+  setBanner();
   if (v === 'examples'){ CLASS = EXAMPLES; classYear = 'Y5'; level = 'Y5'; srcNote(''); renderGrid(); return; }
   EXAMPLES = CLASS;
   if (!REAL.classes){
     renderGrid(); srcNote('Loading the classes from the live writing tracker…');
     try {
+      const cfg = await wtGet({ action:'getConfig' });
+      REAL.year = cfg.academic_year || ''; REAL.live = cfg.writing_v2_live === '1'; setBanner();
       const cls = await wtGet({ action:'getClasses' });
       REAL.classes = cls.map(c => ({ class_id:c.class_id, class_name:c.class_name, year:'Y' + String(c.year_group || '').replace(/\D/g, '') }))
         .filter(c => YEARS.includes(c.year)).sort((a, b) => (a.year + (a.class_name||'')).localeCompare(b.year + (b.class_name||'')));
@@ -496,9 +545,10 @@ async function openReal(classId, fresh){
   CLASS = { [c.year]: { pupils:k.pupils, data:k.data } }; classYear = c.year; level = c.year;
   srcNote((c.class_name || classId) + ': ' + k.pupils.length + ' pupils, ' + marked + ' with marks. Loaded ' + k.at.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) + '.'
     + (Object.keys(k.unknown).length ? ' Some old marks could not be converted: ' + Object.entries(k.unknown).map(([a, b]) => '"' + a + '" x' + b).join(', ') + '.' : ''));
-  renderGrid();
+  renderGrid(); loadGroups(classId);
 }
 document.getElementById('srctabs').addEventListener('click', e => { const b = e.target.closest('button[data-src]'); if (b) setSrc(b.dataset.src); });
+document.getElementById('exportReal').onclick = exportJson;
 document.getElementById('reloadReal').onclick = () => { if (REAL.cls) openReal(REAL.cls, true); };
 
 // ---- Term: from the school calendar (TermDates in the WFA database) ----
@@ -530,7 +580,7 @@ document.addEventListener('keydown', e => {
   if (k === 'escape'){ closePicker(); selectCell(null); return; }
   const v = KEYS[k] || ((k === 'delete' || k === 'backspace') ? 'none' : null); if (!v) return;
   e.preventDefault(); closePicker();
-  CLASS[classYear].data[cur.p][cur.s] = v; renderGrid(); moveCur(1, 0);   // mark, then step down to the next statement for the same child
+  setMark(cur.p, cur.s, v); renderGrid(); moveCur(1, 0);   // mark, then step down to the next statement for the same child
 });
 document.getElementById('paintOff').onclick = () => { paint = null; renderLegend(); renderGrid(); };
 document.getElementById('clearBtn').onclick = () => { clearMarks(); level = classYear; document.getElementById('lvlnote').textContent = 'All marks cleared. Every child is back on the class year, ready to mark.'; renderGrid(); };
