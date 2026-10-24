@@ -160,14 +160,14 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <p><b>3. Grade</b> for a child working at their own year group: <b>D</b> = expected ≥ 90% and greater depth ≥ 60% · <b>O1</b> = expected ≥ 75% · <b>O2</b> = expected ≥ 65% · <b>Y</b> = expected ≥ 50%.</p>
       <p><b>4. Below 50% of the year group's expected statements</b> means "at an earlier stage": <b>A - Yn</b>. The teacher chooses which year's statements a child is working at (the "working at" box under the child's initials). If a child on an earlier year's statements is still under 50% of them, the tool flags it and offers to move them one year lower. It is always the teacher's decision. Below Y1 is recorded as <b>A - EY</b>.</p>
       <p><b>5. Weights</b> (0 to 10, whole numbers) are shown next to each statement. They were agreed by staff on 23.10.26 and are locked, so they cannot be changed here. "Agreed weights" under the grid lets you download them.</p>
-      <p><b>Marking with the keyboard:</b> click a cell, then type <b>R</b> Reteach, <b>E</b> Emerging, <b>D</b> Developing, <b>S</b> Secure, <b>X</b> Not taught, <b>T</b> Taught, not used, or <b>Delete</b> for Unreviewed. The mark is set and the highlight moves down to the next statement for the same child. The arrow keys move the highlight; Esc lets go of it.</p>
+      <p><b>Marking with the keyboard:</b> click a cell, then type <b>R</b> Reteach, <b>E</b> Emerging, <b>D</b> Developing, <b>S</b> Secure, <b>X</b> Not taught, <b>T</b> Taught, not used, or <b>Delete</b> for Unreviewed. The highlight stays on that cell. Press <b>Enter</b> or <b>↓</b> to go down, <b>↑</b> (or Shift+Enter) to go up, and <b>←</b> <b>→</b> to go sideways to the next child. Esc lets go.</p>
       <p><b>6. Terms.</b> The weights in the boxes are the <b>Term 1 and 2</b> weights, so the non-negotiables can count for more early in the year. <b>From Term 3, every non-negotiable has a weight of 1</b>; all other weights stay the same. The tool reads the current term from the school calendar and uses the right weights automatically. Each term's results always use that term's weights, so a Term 2 result keeps its Term 2 figure when you look back at it later. From Term 3 the non-negotiable weights show as 1 and cannot be changed here.</p>
     </div>
   </details>
   <div class="tools">
     <span class="tbl">Statements</span><span class="lvltabs" id="lvltabs"></span>
     <span class="lsep"></span>
-    <span class="legend" id="legendJudge" title="Click a cell, then type the letter. Arrow keys move. Click a status to paint it onto cells."></span><span class="legend" id="legendNone"></span>
+    <span class="legend" id="legendJudge" title="Click a cell, then type the letter. Enter or the arrow keys move. Click a status to paint it onto cells."></span><span class="legend" id="legendNone"></span>
     <button class="btn" id="paintOff" style="display:none">Stop painting</button>
   </div>
   <div class="statusline">
@@ -177,7 +177,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="grid-scroll"><table id="grid"></table></div>
 
   <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
-  <footer>Writing Tracker · WFA-24.10.26c · weights agreed 23.10.26 (locked)</footer>
+  <footer>Writing Tracker · WFA-24.10.26d · weights agreed 23.10.26 (locked)</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -540,10 +540,11 @@ document.addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input, select, textarea')) return;
   const k = e.key.toLowerCase(), arrows = { arrowdown:[1,0], arrowup:[-1,0], arrowright:[0,1], arrowleft:[0,-1] };
   if (arrows[k]){ e.preventDefault(); closePicker(); moveCur(...arrows[k]); return; }
+  if (k === 'enter'){ e.preventDefault(); closePicker(); moveCur(e.shiftKey ? -1 : 1, 0); return; }   // like a spreadsheet: Enter down, Shift+Enter up
   if (k === 'escape'){ closePicker(); selectCell(null); return; }
   const v = KEYS[k] || ((k === 'delete' || k === 'backspace') ? 'none' : null); if (!v) return;
   e.preventDefault(); closePicker();
-  setMark(cur.p, cur.s, v); renderGrid(); moveCur(1, 0);   // mark, then step down to the next statement for the same child
+  setMark(cur.p, cur.s, v); renderGrid();   // mark and stay on the cell; Enter or the arrow keys move
 });
 document.getElementById('paintOff').onclick = () => { paint = null; renderLegend(); renderGrid(); };
 
