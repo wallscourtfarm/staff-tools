@@ -12,13 +12,16 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 <title>Phonics Assessment</title>
 <link rel="icon" href="../favicon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&display=swap">
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root { --ink:#0a0101; --muted:#5b6b7b; --line:#d9e3ec; --soft:#f4f9fd; --ok:#2bae62; --warn:#e57d24; --bad:#c62828;
           --t1:#ffd84d; --t2:#8fd694; --t3:#ff9ecb; --t4:#ffb366; --t5:#7fc8f8; --t6:#c3a6ff; --old:#cfd8dc; }
+  /* card fonts: Sassoon Infant (the school's copy, already on this site for Precision Teaching) or OpenDyslexic */
+  @font-face { font-family: 'WFA Sassoon'; src: url('../precision-teaching/fonts/SassoonInfant.ttf') format('truetype'); font-display: swap; }
+  @font-face { font-family: 'OpenDyslexic'; src: url('https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5.2.5/files/opendyslexic-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+  :root { --cardfont: 'WFA Sassoon', system-ui, sans-serif; --cream: #fdf6e3; --cardink: #1f1f1f; }
+  body.font-od { --cardfont: 'OpenDyslexic', system-ui, sans-serif; }
   body { color: var(--ink); }
   [hidden] { display: none !important; }
   header { padding: 18px 24px; }
@@ -91,7 +94,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .tiles { display: flex; flex-wrap: wrap; gap: 8px; }
   .tile { position: relative; border: 2px solid #c9d6e2; background: #fff; border-radius: 12px; min-height: 64px; min-width: 84px; padding: 6px 16px;
           white-space: nowrap;
-          font-family: 'Andika', system-ui, sans-serif; font-size: 1.5rem; line-height: 1.1; color: var(--ink);
+          font-family: var(--cardfont); font-size: 1.5rem; line-height: 1.15; color: var(--ink);
           -webkit-user-select: none; user-select: none; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .tile small { font-family: system-ui, sans-serif; font-size: .68rem; font-weight: 700; color: var(--muted); margin-top: 3px; }
   .tile.say { font-family: system-ui, sans-serif; font-size: 1rem; font-weight: 700; }
@@ -103,11 +106,15 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .flagbox { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
   /* flashcards */
-  .flash { position: fixed; inset: 0; background: #fff; z-index: 50; display: flex; flex-direction: column; }
+  .flash { position: fixed; inset: 0; background: var(--cream); z-index: 50; display: flex; flex-direction: column; }
   .flash .top { display: flex; align-items: center; gap: 12px; padding: 12px 16px; color: var(--muted); font-weight: 800; }
   .flash .card-area { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 10px; }
-  .flash .big { font-family: 'Andika', system-ui, sans-serif; font-size: min(34vh, 24vw); line-height: 1; color: #000; text-align: center; word-break: break-word; }
+  .flash .big { font-family: var(--cardfont); font-size: min(34vh, 24vw); line-height: 1.1; color: var(--cardink); text-align: center; word-break: break-word; }
   .flash .big.word { font-size: min(22vh, 13vw); }
+  body.font-od .flash .big { font-size: min(26vh, 18vw); }
+  body.font-od .flash .big.word { font-size: min(16vh, 9.5vw); }
+  body.font-od .tile { font-size: 1.2rem; }
+  .fontpick select { padding: 6px 10px; }
   .flash .note { margin-top: 14px; color: var(--muted); font-weight: 700; font-size: 1rem; }
   .flash .listen { font-size: min(30vh, 22vw); line-height: 1; }
   .flash .teacher { margin: 0 16px; padding: 10px 14px; border-radius: 12px; background: #eef4f9; font-weight: 800; font-size: 1.05rem; text-align: center; }
@@ -174,17 +181,18 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div class="bar">
       <div class="chips" id="phaseChips"></div>
       <span class="grow"></span>
+      <label class="toggle fontpick">Card font <select class="cardFont" aria-label="Card font"><option value="sassoon">Sassoon Infant</option><option value="od">OpenDyslexic</option></select></label>
       <label class="toggle"><input type="checkbox" id="gapsOnly"> Gaps only</label>
     </div>
     <div class="legend" id="legend" style="margin-bottom:12px"></div>
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-24.10.26b</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-24.10.26c</span></footer>
 
 <!-- full-screen cards -->
 <div class="flash" id="flash" hidden>
-  <div class="top"><span id="fWhere"></span><span class="grow"></span><span id="fCount"></span><button class="btn quiet" id="fClose">Finish</button></div>
+  <div class="top"><span id="fWhere"></span><span class="grow"></span><label class="toggle fontpick"><select class="cardFont" aria-label="Card font"><option value="sassoon">Sassoon Infant</option><option value="od">OpenDyslexic</option></select></label><span id="fCount"></span><button class="btn quiet" id="fClose">Finish</button></div>
   <div class="card-area" id="fCard"></div>
   <div class="teacher" id="fTeacher" hidden></div>
   <div class="bottom" id="fButtons">
@@ -198,7 +206,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 <script>
 'use strict';
 var API = 'https://api.wallscourt-farm-academy.co.uk/planning/phonics-db?token=__hub__';
-var QKEY = 'wfa_ph_queue_v1', PKEY = 'wfa_ph_phases_v1', YKEY = 'wfa_ph_year_v1';
+var QKEY = 'wfa_ph_queue_v1', PKEY = 'wfa_ph_phases_v1', YKEY = 'wfa_ph_year_v1', FKEY = 'wfa_ph_font_v1';
 var TERM_SHORT = ['Aut 1', 'Aut 2', 'Spr 1', 'Spr 2', 'Sum 1', 'Sum 2'];
 var DEFAULT_PHASES = { R: ['p1', 'p2', 'p3', 'p4'] };
 var S = { cat: null, year: 'R', cls: '', children: [], marks: {}, flags: {}, recSecure: {}, ontrack: {},
@@ -661,6 +669,14 @@ $('fClass').onchange = function () { S.cls = this.value; drawClass(); };
 $('btnBack').onclick = closeChild;
 $('btnFlash').onclick = startFlashAll;
 $('gapsOnly').onchange = function () { S.gaps = this.checked; drawBlocks(); };
+function setFont(f) {
+  f = f === 'od' ? 'od' : 'sassoon';
+  document.body.classList.toggle('font-od', f === 'od');
+  Array.prototype.forEach.call(document.querySelectorAll('.cardFont'), function (s) { s.value = f; });
+  store(FKEY, f);
+}
+Array.prototype.forEach.call(document.querySelectorAll('.cardFont'), function (s) { s.onchange = function () { setFont(this.value); }; });
+setFont(recall(FKEY));
 $('btnExport').onclick = exportSheet;
 
 // The shared names helper puts its button in the bottom corner, where it covers this page's buttons; keep it in the toolbar.
