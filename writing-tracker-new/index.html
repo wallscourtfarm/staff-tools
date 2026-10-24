@@ -41,9 +41,23 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   * { box-sizing:border-box; }
   body { margin:0; font-family:var(--hdr-font); background:var(--bg); color:var(--fg); }
   header { background:var(--accent); color:var(--accent-fg); padding:12px 18px; }
+  header.topbar { display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; padding:6px 16px; }
+  header.topbar h1 { font-size:16px; margin:0 6px 0 0; }
+  .tb { display:flex; gap:4px; align-items:center; flex-wrap:wrap; }
+  .tb button, .hbtn { padding:3px 10px; border-radius:6px; border:1px solid rgba(255,255,255,.45); background:transparent; color:var(--accent-fg); font-size:12px; font-weight:700; cursor:pointer; text-decoration:none; }
+  .tb button.active { background:var(--accent-fg); color:var(--accent); border-color:var(--accent-fg); }
+  .tbl { font-size:11px; font-weight:700; opacity:.85; margin-right:2px; text-transform:uppercase; letter-spacing:.03em; }
+  .tbnote { font-size:11px; opacity:.9; }
+  .tbright { margin-left:auto; display:flex; gap:6px; align-items:center; }
+  .tools { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:4px 0 2px; }
+  .tools .tbl { color:var(--muted); }
+  .statusline { display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px; font-size:12px; color:var(--fg2); margin:2px 0 6px; min-height:22px; }
+  .statusline .lvlnote { margin:0; min-height:0; }
+  #howbox > summary { display:none; }
+  th.pupilh.cstart, td.cstart { border-left:3px solid var(--line); }
+  .pcls { font-size:10px; font-weight:700; color:var(--muted); }
   header h1 { margin:0; font-size:17px; text-wrap:balance; } header p { margin:2px 0 0; font-size:12px; opacity:.92; }
-  .wrap { padding-inline:16px; padding-block:12px 40px; max-width:1500px; margin:0 auto; }
-  .banner { background:var(--red-bg); border:2px solid var(--red-bd); color:var(--red-fg); border-radius:8px; padding:8px 12px; font-size:12px; font-weight:600; margin-bottom:10px; }
+  .wrap { padding-inline:16px; padding-block:6px 30px; max-width:1500px; margin:0 auto; }
   details.how { background:var(--surface); border-radius:10px; box-shadow:var(--shadow); margin-bottom:10px; font-size:13px; }
   details.how summary { padding:9px 14px; font-weight:700; cursor:pointer; }
   details.how .body { padding:0 14px 12px; line-height:1.5; max-width:100%; overflow-x:auto; }
@@ -56,20 +70,20 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .group-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin:8px 0 4px; }
   .legend { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
   .lsep { width:1px; align-self:stretch; background:var(--line); margin:0 4px; }
-  .chip { display:flex; align-items:center; gap:6px; padding:5px 8px; border-radius:8px; border:2px solid transparent; font-size:12px; font-weight:600; cursor:pointer; background:var(--surface); color:var(--fg); box-shadow:var(--shadow); }
+  .chip { display:flex; align-items:center; gap:5px; padding:3px 7px; border-radius:8px; border:2px solid transparent; font-size:12px; font-weight:600; cursor:pointer; background:var(--surface); color:var(--fg); box-shadow:var(--shadow); }
   .chip .sw { width:14px; height:14px; border-radius:4px; border:1px solid rgba(0,0,0,.2); }
   .chip.active { border-color:var(--fg); }
   .btn { padding:6px 12px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--fg); font-size:12px; font-weight:600; cursor:pointer; }
   .hint { font-size:12px; color:var(--fg2); margin:8px 0; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
   .lvltabs { display:flex; gap:6px; flex-wrap:wrap; }
-  .lt { padding:7px 14px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--fg); font-size:13px; font-weight:700; cursor:pointer; }
+  .lt { padding:3px 9px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--fg); font-size:13px; font-weight:700; cursor:pointer; }
   .lt.active { background:var(--inv-bg); color:var(--inv-fg); border-color:var(--inv-bg); }
   .lt.below { border-color:var(--amb-bd); }
   .lt small { font-weight:600; opacity:.8; }
   .lvlnote { font-size:12px; color:var(--amb-fg); margin:3px 0 8px; min-height:16px; }
   button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 
-  .grid-scroll { overflow:auto; max-height:calc(100vh - 16px); max-width:100%; background:var(--surface); border-radius:12px; box-shadow:var(--shadow); }
+  .grid-scroll { overflow:auto; max-height:calc(100vh - 8px); max-width:100%; background:var(--surface); border-radius:12px; box-shadow:var(--shadow); }
   table { border-collapse:separate; border-spacing:0; width:auto; font-size:12px; }
   th, td { padding:0; border-bottom:1px solid var(--line2); }
   thead th { position:sticky; top:0; background:var(--surface); color:var(--fg2); z-index:4; text-align:center; padding:4px; vertical-align:bottom; border-bottom:2px solid var(--line); }
@@ -121,15 +135,16 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 </style>
 </head>
 <body>
-<header>
+<header class="topbar">
   <h1>Writing Tracker</h1>
-  <p>Y1 to Y5 · Reteach, Emerging, Developing, Secure with the agreed weightings · Y6 stays on the <a href="/writing-tracker/" style="color:inherit">old tracker</a> for now</p>
+  <span class="tb" id="yeartabs"></span>
+  <span class="tb"><span class="tbl">Class</span><span id="classtabs" class="tb"></span></span>
+  <span class="tbnote" id="termnote"></span>
+  <span class="tbright"><button class="hbtn" id="howBtn">How it works</button><a class="hbtn" href="/writing-tracker/">Y6 (old tracker)</a></span>
 </header>
 <div class="wrap">
-  <div class="banner">PRACTICE. These are made-up children, for trying the tool out. Marks you make here are practice only and are not saved: if you refresh, they disappear. Choose "Your classes" to see and mark your real pupils.</div>
-
-  <details class="how">
-    <summary>How the new scoring works (click to open)</summary>
+  <details class="how" id="howbox">
+    <summary>How it works</summary>
     <div class="body">
       <p><b>1. For each statement, you pick one status</b> (click a cell). The tool never works the status out for you.</p>
       <table>
@@ -149,42 +164,20 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <p><b>6. Terms.</b> The weights in the boxes are the <b>Term 1 and 2</b> weights, so the non-negotiables can count for more early in the year. <b>From Term 3, every non-negotiable has a weight of 1</b>; all other weights stay the same. The tool reads the current term from the school calendar and uses the right weights automatically. Each term's results always use that term's weights, so a Term 2 result keeps its Term 2 figure when you look back at it later. From Term 3 the non-negotiable weights show as 1 and cannot be changed here.</p>
     </div>
   </details>
-
-  <div class="group-label">Children shown</div>
-  <div class="classtabs" id="srctabs">
-    <button class="ct" data-src="real">Your classes</button>
-    <button class="ct active" data-src="examples">Practice (made-up children)</button>
-  </div>
-  <div class="lvlnote" id="srcnote"></div>
-  <div class="lvlnote" id="groupnote" style="color:var(--fg2)"></div>
-
-  <div class="group-label">Term</div>
-  <div class="lvlnote" id="termnote">Reading the school calendar…</div>
-
-  <div class="group-label">Class year group</div>
-  <div class="classtabs" id="classtabs"></div>
-
-  <div class="group-label">Status key (click a cell, then type a letter: R Reteach · E Emerging · D Developing · S Secure · X Not taught · T Taught, not used · Delete Unreviewed. Arrow keys move. Or click a status to paint it.)</div>
-  <div class="legend"><span class="legend" id="legendJudge"></span><span class="lsep"></span><span class="legend" id="legendNone"></span></div>
-  <div class="hint">
-    <span id="paintHint">Paint mode off.</span>
+  <div class="tools">
+    <span class="tbl">Statements</span><span class="lvltabs" id="lvltabs"></span>
+    <span class="lsep"></span>
+    <span class="legend" id="legendJudge" title="Click a cell, then type the letter. Arrow keys move. Click a status to paint it onto cells."></span><span class="legend" id="legendNone"></span>
     <button class="btn" id="paintOff" style="display:none">Stop painting</button>
-    <button class="btn" id="clearBtn">Clear all marks (empty class)</button>
-    <button class="btn" id="resetBtn">Reload the example children</button>
-    <button class="btn" id="reloadReal" style="display:none">Reload from the live tracker</button>
-    <button class="btn" id="exportReal" style="display:none">Export JSON</button>
-    <span id="savenote" class="wstatus"></span>
-    <span id="wstatus" class="wstatus"></span>
   </div>
-
-  <div class="group-label">Which year's statements</div>
-  <div class="lvltabs" id="lvltabs"></div>
-  <div class="lvlnote" id="lvlnote"></div>
-
+  <div class="statusline">
+    <span id="srcnote"></span><span id="groupnote"></span><span id="savenote" class="wstatus"></span><span id="wstatus" class="wstatus" style="display:none"></span><span id="lvlnote" class="lvlnote"></span>
+    <span class="tbright"><button class="btn" id="reloadReal">Reload</button> <button class="btn" id="exportReal">Export JSON</button></span>
+  </div>
   <div class="grid-scroll"><table id="grid"></table></div>
 
   <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
-  <footer>Writing Tracker · WFA-24.10.26b · weights agreed 23.10.26 (locked)</footer>
+  <footer>Writing Tracker · WFA-24.10.26c · weights agreed 23.10.26 (locked)</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -214,36 +207,7 @@ const TIERNAME = { non_neg:'Non-Negotiables', expected:'Expected Standards', gre
 const WEIGHT = {};
 YEARS.forEach(y => SKILLS[y].forEach(s => WEIGHT[s.id] = (s.id in DRAFT ? DRAFT[s.id] : 1)));
 
-// ---- Fictitious children ----------------------------------------------
-function rng(seed){ let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-const PROFILE = { D:{q:.97}, O1:{q:.78}, O2:{q:.72}, Y:{q:.62}, low:{q:.42}, gaps:{q:.80, gap:.22} };
-function fill(rand, p, framework, out){
-  const pr = PROFILE[p];
-  framework.forEach(s => {
-    let v = pr.q + (rand()-.5)*.5; if (s.tier === 'greater_depth') v -= .15;
-    let st = v > .78 ? 'secure' : v > .55 ? 'developing' : v > .30 ? 'emerging' : 'reteach';
-    if (st === 'reteach' && rand() < .25) st = 'taught';
-    if (pr.gap && rand() < pr.gap) st = rand() < .5 ? 'none' : 'x';
-    out[s.id] = st;
-  });
-}
-const INITIALS = ['AB','CD','EF','GH','IJ','KL','MN','OP'];
-function buildClass(y){
-  const n = parseInt(y.slice(1),10), rand = rng(1000+n*77), data = {}, pupils = [];
-  const plan = [['D',y],['O1',y],['gaps',y],['O2',y],['Y',y],['low',y],
-                ['Y', n>=2 ? 'Y'+(n-1) : y], ['low', n>=3 ? 'Y'+(n-2) : (n===2 ? 'Y1' : y)]];
-  plan.forEach(([prof, work], i) => {
-    const id = INITIALS[i]; data[id] = {};
-    YEARS.forEach(L => SKILLS[L].forEach(s => data[id][s.id] = 'none'));
-    fill(rand, prof, SKILLS[work], data[id]);
-    pupils.push({ id, work });
-  });
-  return { pupils, data };
-}
-let CLASS = {};
-function loadExamples(){ CLASS = {}; YEARS.forEach(y => CLASS[y] = buildClass(y)); }
-loadExamples();
-function clearMarks(){ YEARS.forEach(y => { Object.keys(CLASS[y].data).forEach(p => Object.keys(CLASS[y].data[p]).forEach(id => CLASS[y].data[p][id] = 'none')); CLASS[y].pupils.forEach(p => p.work = y); }); }
+let CLASS = {};   // the year group being shown: { [year]: { pupils, data } }
 
 // ---- Scoring ----------------------------------------------------------
 let classYear = 'Y5', level = 'Y5', paint = null, wLocked = true;   // weights agreed 23.10.26: locked, no editing
@@ -297,15 +261,14 @@ const fmt = n => (Math.round(n*10)/10).toString();
 const pc = n => n === null ? '–' : Math.round(n)+'%';
 
 function renderClassTabs(){
-  if (termNow !== null) document.getElementById('termnote').textContent = 'Term ' + termNow + (termFromCal ? ' (from the school calendar)' : ' (worked out from the date: the school calendar could not be read)') + ': '
-    + (termMode === 't3' ? 'every non-negotiable counts with a weight of 1. All other weights are as set.' : 'the weights in the boxes, including the higher non-negotiable weights.');
-  if (src === 'real'){
-    const el = document.getElementById('classtabs');
-    el.innerHTML = REAL.classes ? REAL.classes.map(c => '<button class="ct'+(c.class_id===REAL.cls?' active':'')+'" data-rc="'+c.class_id+'">'+esc(c.class_name || c.class_id)+' <small>('+c.year+')</small></button>').join('') : '<span class="lvlnote">Loading classes…</span>';
-  } else {
-  document.getElementById('classtabs').innerHTML = YEARS.map(y => '<button class="ct'+(y===classYear?' active':'')+'" data-cy="'+y+'">Year '+y.slice(1)+' class</button>').join('');
-  }
+  if (termNow !== null){ const t = document.getElementById('termnote'); t.textContent = 'Term ' + termNow; t.title = (termFromCal ? 'From the school calendar. ' : 'Worked out from the date (the school calendar could not be read). ') + (termMode === 't3' ? 'Every non-negotiable counts with a weight of 1 from Term 3.' : 'Terms 1 and 2: the higher non-negotiable weights apply.'); }
+  document.getElementById('yeartabs').innerHTML = YEARS.map(y => '<button class="'+(y===classYear?'active':'')+'" data-y="'+y+'">'+y+'</button>').join('');
+  const cls = REAL.classes ? REAL.classes.filter(c => c.year === classYear) : [];
+  document.getElementById('classtabs').innerHTML = cls.length > 1
+    ? ['<button class="'+(classFilter==='all'?'active':'')+'" data-cf="all">All</button>'].concat(cls.map(c => '<button class="'+(classFilter===c.class_id?'active':'')+'" data-cf="'+c.class_id+'">'+esc(c.class_name || c.class_id)+'</button>')).join('')
+    : cls.map(c => '<button class="active" data-cf="all">'+esc(c.class_name || c.class_id)+'</button>').join('');
 }
+const shown = () => CLASS[classYear] ? CLASS[classYear].pupils.filter(p => classFilter === 'all' || p.classId === classFilter) : [];
 function chip(key){
   const s = STATUS[key], el = document.createElement('div');
   el.className = 'chip'+(paint===key?' active':''); el.innerHTML = '<span class="sw" style="background:'+s.bg+'"></span>'+s.label+' <kbd>'+(KEY_OF[key] || 'Del')+'</kbd>'; el.title = s.desc;
@@ -316,28 +279,31 @@ function renderLegend(){
   const a = document.getElementById('legendJudge'), b = document.getElementById('legendNone');
   a.innerHTML=''; b.innerHTML='';
   JUDGE_ORDER.forEach(k => a.appendChild(chip(k))); NONE_ORDER.forEach(k => b.appendChild(chip(k)));
-  document.getElementById('paintHint').textContent = paint ? 'Painting "'+STATUS[paint].label+'": click cells to set them.' : 'Paint mode off.';
   document.getElementById('paintOff').style.display = paint ? '' : 'none';
 }
 function renderTabs(){
   const t = document.getElementById('lvltabs'); t.innerHTML = '';
   levelsFor(classYear).slice().reverse().forEach(L => {
-    const n = CLASS[classYear].pupils.filter(p => p.work === L).length;
+    const n = shown().filter(p => p.work === L).length;
     const b = document.createElement('button');
     b.className = 'lt'+(L===level?' active':'')+(L!==classYear?' below':''); b.dataset.lvl = L;
-    b.innerHTML = (L===classYear ? L+' (class year)' : 'A - '+L)+' <small>· '+n+' pupil'+(n===1?'':'s')+'</small>';
+    b.innerHTML = (L===classYear ? L : 'A - '+L)+' <small>· '+n+'</small>';
     t.appendChild(b);
   });
 }
 function renderGrid(){
-  renderClassTabs(); renderTabs();
-  const t = document.getElementById('grid'), pupils = CLASS[classYear].pupils.filter(p => p.work === level);
+  renderClassTabs();
+  const t = document.getElementById('grid');
+  if (!CLASS[classYear]){ document.getElementById('lvltabs').innerHTML = ''; t.innerHTML = '<tbody><tr><td class="empty">Loading…</td></tr></tbody>'; return; }
+  renderTabs();
+  const pupils = shown().filter(p => p.work === level);
+  pupils.forEach((p, i) => p.cstart = classFilter === 'all' && i > 0 && pupils[i-1].classId !== p.classId);
   if (!pupils.length){ t.innerHTML = '<tbody><tr><td class="empty">No children are working at '+lbl(level)+' right now. Use a child\'s "working at" box on another tab to move them here.</td></tr></tbody>'; return; }
   const sums = pupils.map(p => { const u = summary(p); return { p, u, g: grade(u) }; });
   let h = '<thead><tr><th class="skillh">'+level+' statements ('+SKILLS[level].length+')</th><th class="wh">Weight</th>';
   sums.forEach(({p,u,g}) => {
     const [bg,fg] = GSTYLE[g.style];
-    h += '<th class="pupilh"><div class="hline">'+esc(p.label || p.id)+' <span class="hbadge" style="background:'+bg+';color:'+fg+'">'+g.label+'</span> <span class="hexp">'+pc(u.expPct)+'</span></div>'
+    h += '<th class="pupilh'+(p.cstart?' cstart':'')+'" title="'+esc(p.cls || '')+'"><div class="hline">'+esc(p.label || p.id)+(classFilter==='all' && p.cls ? ' <span class="pcls">'+esc(p.cls)+'</span>' : '')+' <span class="hbadge" style="background:'+bg+';color:'+fg+'">'+g.label+'</span> <span class="hexp">'+pc(u.expPct)+'</span></div>'
       +'<select class="wsel" data-p="'+p.id+'" aria-label="Working at">'+levelsFor(classYear).map(L => '<option value="'+L+'"'+(L===p.work?' selected':'')+'>'+(L===classYear?'Working at '+L:'A - '+L)+'</option>').join('')+'</select></th>';
   });
   h += '</tr></thead><tbody>';
@@ -346,7 +312,7 @@ function renderGrid(){
   sums.forEach(({p,u,g}) => {
     const c = u.c, e = u.exp, w = n => e.counted ? 100*n/e.counted : 0;
     const ready = e.wAll && (e.wSecure/e.wAll) >= LEVEL_UP;
-    h += '<td class="sum">'
+    h += '<td class="sum'+(p.cstart?' cstart':'')+'">'
       +(g.warn ? '<div class="warn" title="'+esc(g.warn.text)+'">⚠ Under 50%'+(g.warn.canMove ? ' <button data-move="'+p.id+'" data-to="'+g.warn.move+'">Move to A - '+g.warn.move+'</button>' : ' (A - EY)')+'</div>' : '')
       +'<div class="pct">Expected '+pc(u.expPct)+' <span class="of">('+fmt(e.points)+' / '+fmt(e.max)+')</span></div>'
       +'<div class="bar"><span style="width:'+w(c.reteach+c.taught)+'%;background:#fca5a5"></span><span style="width:'+w(c.emerging)+'%;background:#fed7aa"></span><span style="width:'+w(c.developing)+'%;background:#d9f99d"></span><span style="width:'+w(c.secure)+'%;background:#86efac"></span></div>'
@@ -370,7 +336,7 @@ function renderGrid(){
         +'<td class="wtd">'+((wLocked || canWrite === false || fixed) ? '<span class="wlock'+(w===0?' zero':'')+'" title="'+(fixed ? 'Every non-negotiable is weight 1 from Term 3' : 'Weight, locked')+'">'+w+'</span>' : '<input type="number" class="wbox'+(w!==dOf(s.id)?' changed':'')+'" min="0" max="10" step="1" value="'+w+'" data-w="'+s.id+'" aria-label="Weight">')+'</td>';
       pupils.forEach(p => {
         const v = CLASS[classYear].data[p.id][s.id], m = STATUS[v];
-        h += '<td class="cell'+(paint?' paint':'')+'" data-p="'+p.id+'" data-s="'+s.id+'" style="background:'+m.bg+';color:'+m.fg+'">'+(v==='none' ? '' : (v==='x' ? 'x' : m.label))+'</td>';
+        h += '<td class="cell'+(paint?' paint':'')+(p.cstart?' cstart':'')+'" data-p="'+p.id+'" data-s="'+s.id+'" style="background:'+m.bg+';color:'+m.fg+'">'+(v==='none' ? '' : (v==='x' ? 'x' : m.label))+'</td>';
       });
       h += '</tr>';
     });
@@ -400,7 +366,7 @@ function moveCur(dr, dc){
 }
 function setWork(pid, L, viaButton){
   const p = CLASS[classYear].pupils.find(x => x.id === pid), was = p.work; p.work = L;
-  if (src === 'real' && REAL.live) wtPost({ action:'updatePupil', pupil_id:pid, working_at_level:L })
+  if (REAL.live) wtPost({ action:'updatePupil', pupil_id:pid, working_at_level:L })
     .then(() => saveNote('Saved: ' + nameOf(pid) + ' working at ' + lbl(L) + '.'))
     .catch(e => { p.work = was; renderGrid(); saveNote('Could not save that (' + e.message + '). It has gone back. Refresh and sign in again if this keeps happening.', true); });
   const note = document.getElementById('lvlnote');
@@ -438,17 +404,18 @@ grid.addEventListener('change', e => {
   const i = e.target.closest('input[data-w]'); if (!i) return;
   saveWeight(i.dataset.w, clampW(i.value));
 });
+document.getElementById('yeartabs').addEventListener('click', e => { const b = e.target.closest('button[data-y]'); if (b) openYear(b.dataset.y); });
 document.getElementById('classtabs').addEventListener('click', e => {
-  const rc = e.target.closest('button[data-rc]'); if (rc){ openReal(rc.dataset.rc); return; }
-  const b = e.target.closest('button[data-cy]'); if (!b) return;
-  classYear = b.dataset.cy; level = classYear; document.getElementById('lvlnote').textContent = ''; renderGrid();
+  const b = e.target.closest('button[data-cf]'); if (!b) return;
+  classFilter = b.dataset.cf; remember(); closePicker(); selectCell(null); renderGrid(); loadGroups(); yearNote();
 });
-// ---- Real classes: read from the live writing tracker, converted, NEVER written ----
-// Old 0-4 scores -> new statuses (agreed with Innes 23.10.26): 4 Secure, 1 Emerging, 2 and 3 Reteach,
-// 0 Taught not used, x and ~ Not taught. Blank or missing = Unreviewed. Nothing here saves.
+document.getElementById('howBtn').onclick = () => { const d = document.getElementById('howbox'); d.open = !d.open; };
+// ---- Data: one year group at a time from the writing tracker database, filtered by class ----
+// Marks are stored as the new statuses since the 24.10.26 switch-over; any old 0-4 mark still met is converted the agreed way.
 const CONVERT = { '4':'secure', '1':'emerging', '2':'reteach', '3':'reteach', '0':'taught', 'x':'x', '~':'x' };
 const WT_API = 'https://api.wallscourt-farm-academy.co.uk/planning/writingtracker-db?token=__hub__';
-let src = 'examples', REAL = { classes:null, cls:null, cache:{}, live:false, year:'' }, EXAMPLES = null;
+let REAL = { classes:null, cache:{}, live:false, year:'' }, classFilter = 'all';
+const remember = () => { try { localStorage.setItem('wfa_wt_view', JSON.stringify({ y:classYear, c:classFilter })); } catch (e) {} };
 // Saving switches on only when the switch-over sets wt_config writing_v2_live = '1' (after the backup and conversion).
 async function wtPost(body){
   const r = await fetch(WT_API, { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(body) });
@@ -459,27 +426,27 @@ function saveNote(t, err){ const n = document.getElementById('savenote'); if (!n
 function setMark(pid, sid, v){
   const d = CLASS[classYear].data[pid], was = d[sid]; if (was === v) return;
   d[sid] = v;
-  if (src !== 'real') return;
-  if (!REAL.live){ saveNote('Not saved: real classes are read only until the switch-over.', true); return; }
+  if (!REAL.live){ saveNote('Not saved: saving is switched off.', true); return; }
   saveNote('Saving…');
   wtPost({ action:'saveScore', pupil_id:pid, skill_id:sid, academic_year:REAL.year, score: v === 'none' ? '' : v })
     .then(() => saveNote('Saved: ' + nameOf(pid) + ', ' + sid + ' = ' + STATUS[v].label + '.'))
     .catch(e => { d[sid] = was; renderGrid(); saveNote('Could not save ' + nameOf(pid) + ', ' + sid + ' (' + e.message + '). It has gone back to ' + STATUS[was].label + '. Refresh and sign in again if this keeps happening.', true); });
 }
-async function loadGroups(classId){
+async function loadGroups(){
   const el = document.getElementById('groupnote'); if (!el) return; el.textContent = '';
+  const ids = (REAL.classes || []).filter(c => c.year === classYear && (classFilter === 'all' || c.class_id === classFilter)).map(c => c.class_id);
   try {
-    const g = await wtGet({ action:'getGroupStats', class_id:classId });
-    if (g.scale !== 'v2pct'){ el.textContent = 'Group averages (PP, SEN, EAL) will show here after the switch-over.'; return; }
-    const a = k => g[k] && g[k].n ? Math.round(g[k].s / g[k].n) + '% (' + g[k].n + ')' : '–';
-    el.textContent = 'Average Expected % · PP ' + a('pp') + ' vs not PP ' + a('nonPp') + ' · SEN ' + a('sen') + ' vs not SEN ' + a('nonSen') + ' · EAL ' + a('eal') + ' vs not EAL ' + a('nonEal');
+    const all = await Promise.all(ids.map(id => wtGet({ action:'getGroupStats', class_id:id })));
+    if (!all.length || all.some(g => g.scale !== 'v2pct')) return;
+    const a = k => { let s = 0, n = 0; all.forEach(g => { if (g[k]){ s += g[k].s; n += g[k].n; } }); return n ? Math.round(s / n) + '% (' + n + ')' : '–'; };
+    el.textContent = 'Average Expected %: PP ' + a('pp') + ' / not ' + a('nonPp') + ' · SEN ' + a('sen') + ' / not ' + a('nonSen') + ' · EAL ' + a('eal') + ' / not ' + a('nonEal');
   } catch (e) { el.textContent = 'Group averages could not be loaded.'; }
 }
 function exportJson(){
-  const c = REAL.classes.find(x => x.class_id === REAL.cls); if (!c) return;
-  const out = { class: c.class_name || c.class_id, year_group: c.year, academic_year: REAL.year, term: termNow, exported: new Date().toISOString(),
-    pupils: CLASS[classYear].pupils.map(p => { const u = summary(p), g = grade(u);
-      return { pupil: p.label, working_at: p.work, grade: g.label, expected_pct: u.expPct === null ? null : Math.round(u.expPct * 10) / 10,
+  const c = classFilter === 'all' ? { class_name:'All ' + classYear, year:classYear } : REAL.classes.find(x => x.class_id === classFilter); if (!c || !CLASS[classYear]) return;
+  const out = { class: c.class_name || c.class_id, year_group: classYear, academic_year: REAL.year, term: termNow, exported: new Date().toISOString(),
+    pupils: shown().map(p => { const u = summary(p), g = grade(u);
+      return { pupil: p.label, class: p.cls, working_at: p.work, grade: g.label, expected_pct: u.expPct === null ? null : Math.round(u.expPct * 10) / 10,
         greater_depth_pct: u.gdPct === null ? null : Math.round(u.gdPct * 10) / 10,
         marks: Object.fromEntries(Object.entries(CLASS[classYear].data[p.id]).filter(([, v]) => v !== 'none').map(([k, v]) => [k, STATUS[v].label])) }; }) };
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type:'application/json' }));
@@ -491,66 +458,61 @@ async function wtGet(params){
   const j = await r.json(); if (j && j.error) throw new Error(j.error); return j;
 }
 function srcNote(t, err){ const n = document.getElementById('srcnote'); n.textContent = t; n.style.color = err ? 'var(--red-fg, #b91c1c)' : ''; }
-function setBanner(){
-  const v = src;
-  document.querySelector('.banner').innerHTML = v === 'real'
-    ? '<b>YOUR CLASSES' + (REAL.live ? '.</b> Marks and working-at changes are saved as you make them, with your name and the term.' : ', READ ONLY.</b>') + ' These are your real pupils, with their marks from the live writing tracker converted to the new statuses (4 = Secure, 1 = Emerging, 2 and 3 = Reteach, 0 = Taught, not used, x = Not taught).' + (REAL.live ? '' : ' Nothing you do here is saved, and the live writing tracker is not changed.')
-    : BANNER_EXAMPLES;
+function yearNote(){
+  const P = shown(), marked = P.filter(p => Object.values(CLASS[classYear].data[p.id]).some(v => v !== 'none')).length;
+  const by = {}; CLASS[classYear].pupils.forEach(p => by[p.cls] = (by[p.cls] || 0) + 1);
+  const unknown = {}; (REAL.classes || []).filter(c => c.year === classYear).forEach(c => Object.entries((REAL.cache[c.class_id] || {}).unknown || {}).forEach(([k, n]) => unknown[k] = (unknown[k] || 0) + n));
+  srcNote(P.length + ' pupils' + (classFilter === 'all' ? ' (' + Object.entries(by).map(([k, n]) => k + ' ' + n).join(', ') + ')' : '') + ', ' + marked + ' with marks'
+    + (Object.keys(unknown).length ? ' · marks not recognised: ' + Object.entries(unknown).map(([a, b]) => '"' + a + '" x' + b).join(', ') : ''), Object.keys(unknown).length > 0);
 }
-async function setSrc(v){
-  if (v === src) return;
-  src = v; closePicker(); selectCell(null);
-  document.querySelectorAll('#srctabs button').forEach(b => b.classList.toggle('active', b.dataset.src === v));
-  ['clearBtn','resetBtn'].forEach(id => document.getElementById(id).style.display = v === 'real' ? 'none' : '');
-  ['reloadReal','exportReal'].forEach(id => document.getElementById(id).style.display = v === 'real' ? '' : 'none');
-  document.getElementById('groupnote').textContent = ''; saveNote('');
-  setBanner();
-  if (v === 'examples'){ CLASS = EXAMPLES; classYear = 'Y5'; level = 'Y5'; srcNote(''); renderGrid(); return; }
-  EXAMPLES = CLASS;
-  if (!REAL.classes){
-    renderGrid(); srcNote('Loading the classes from the live writing tracker…');
-    try {
-      const cfg = await wtGet({ action:'getConfig' });
-      REAL.year = cfg.academic_year || ''; REAL.live = cfg.writing_v2_live === '1'; setBanner();
-      const cls = await wtGet({ action:'getClasses' });
-      REAL.classes = cls.map(c => ({ class_id:c.class_id, class_name:c.class_name, year:'Y' + String(c.year_group || '').replace(/\D/g, '') }))
-        .filter(c => YEARS.includes(c.year)).sort((a, b) => (a.year + (a.class_name||'')).localeCompare(b.year + (b.class_name||'')));
-    } catch (e) { srcNote('Could not load the classes (' + e.message + '). Refresh the page and sign in again.', true); return; }
-  }
-  openReal(REAL.cls || (REAL.classes.find(c => c.year === 'Y5') || REAL.classes[0]).class_id);
+async function loadClass(c, fresh){
+  if (!fresh && REAL.cache[c.class_id]) return REAL.cache[c.class_id];
+  const j = await wtGet({ action:'getAssessments', class_id:c.class_id });
+  const data = {}, pupils = [], unknown = {};
+  (j.pupils || []).forEach(p => {
+    const d = data[p.pupil_id] = {};
+    YEARS.forEach(L => SKILLS[L].forEach(s => d[s.id] = 'none'));
+    Object.entries((j.assessments || {})[p.pupil_id] || {}).forEach(([sid, sc]) => {
+      if (!(sid in d)) return;                                   // Y6 and retired statements are not in this framework
+      const t = String(sc).trim(), v = (t in STATUS && t !== 'none') ? t : CONVERT[t];
+      if (v) d[sid] = v; else if (t) unknown[sc] = (unknown[sc] || 0) + 1;
+    });
+    const w = String(p.working_at_level || '').toUpperCase();
+    pupils.push({ id:p.pupil_id, label:p.name || p.pupilCode || '?', cls:c.class_name || c.class_id, classId:c.class_id, work: levelsFor(c.year).includes(w) ? w : c.year });
+  });
+  return REAL.cache[c.class_id] = { pupils, data, unknown };
 }
-async function openReal(classId, fresh){
-  const c = REAL.classes.find(x => x.class_id === classId); if (!c) return;
-  REAL.cls = classId; closePicker(); selectCell(null);
-  if (fresh || !REAL.cache[classId]){
-    srcNote('Loading ' + (c.class_name || classId) + ' from the live writing tracker…');
-    try {
-      const j = await wtGet({ action:'getAssessments', class_id:classId });
-      const data = {}, pupils = [], unknown = {};
-      (j.pupils || []).forEach(p => {
-        const d = data[p.pupil_id] = {};
-        YEARS.forEach(L => SKILLS[L].forEach(s => d[s.id] = 'none'));
-        Object.entries((j.assessments || {})[p.pupil_id] || {}).forEach(([sid, sc]) => {
-          if (!(sid in d)) return;                                   // Y6 and retired statements are not in the new framework
-          const t = String(sc).trim(), v = (t in STATUS && t !== 'none') ? t : CONVERT[t];   // new statuses as stored since 24.10.26; old 0-4 converted
-          if (v) d[sid] = v; else if (t) unknown[sc] = (unknown[sc] || 0) + 1;
-        });
-        const w = String(p.working_at_level || '').toUpperCase();
-        pupils.push({ id:p.pupil_id, label:p.name || p.pupilCode || '?', work: levelsFor(c.year).includes(w) ? w : c.year });
-      });
-      REAL.cache[classId] = { pupils, data, unknown, at:new Date() };
-    } catch (e) { srcNote('Could not load this class (' + e.message + '). Refresh the page and sign in again.', true); return; }
-  }
-  if (REAL.cls !== classId || src !== 'real') return;
-  const k = REAL.cache[classId], marked = k.pupils.filter(p => Object.values(k.data[p.id]).some(v => v !== 'none')).length;
-  CLASS = { [c.year]: { pupils:k.pupils, data:k.data } }; classYear = c.year; level = c.year;
-  srcNote((c.class_name || classId) + ': ' + k.pupils.length + ' pupils, ' + marked + ' with marks. Loaded ' + k.at.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) + '.'
-    + (Object.keys(k.unknown).length ? ' Some old marks could not be converted: ' + Object.entries(k.unknown).map(([a, b]) => '"' + a + '" x' + b).join(', ') + '.' : ''));
-  renderGrid(); loadGroups(classId);
+async function openYear(y, fresh){
+  closePicker(); selectCell(null);
+  const cls = (REAL.classes || []).filter(c => c.year === y);
+  if (y !== classYear) classFilter = 'all';
+  classYear = y; level = y; CLASS = {}; remember(); renderGrid(); srcNote('Loading ' + y + '…'); document.getElementById('groupnote').textContent = '';
+  try {
+    const parts = await Promise.all(cls.map(c => loadClass(c, fresh)));
+    if (classYear !== y) return;
+    const pupils = [], data = {};
+    parts.forEach(k => { pupils.push(...k.pupils); Object.assign(data, k.data); });
+    CLASS = { [y]: { pupils, data } };
+  } catch (e) { srcNote('Could not load ' + y + ' (' + e.message + '). Refresh the page and sign in again.', true); return; }
+  if (!cls.some(c => c.class_id === classFilter)) classFilter = 'all';
+  renderGrid(); yearNote(); loadGroups();
 }
-document.getElementById('srctabs').addEventListener('click', e => { const b = e.target.closest('button[data-src]'); if (b) setSrc(b.dataset.src); });
+async function start(){
+  let v = {}; try { v = JSON.parse(localStorage.getItem('wfa_wt_view') || '{}'); } catch (e) {}
+  classYear = YEARS.includes(v.y) ? v.y : 'Y5'; level = classYear;
+  renderGrid(); srcNote('Loading…');
+  try {
+    const [cfg, cls] = await Promise.all([wtGet({ action:'getConfig' }), wtGet({ action:'getClasses' })]);
+    REAL.year = cfg.academic_year || ''; REAL.live = cfg.writing_v2_live === '1';
+    REAL.classes = cls.map(c => ({ class_id:c.class_id, class_name:c.class_name, year:'Y' + String(c.year_group || '').replace(/\D/g, '') }))
+      .filter(c => YEARS.includes(c.year)).sort((a, b) => (a.year + (a.class_name||'')).localeCompare(b.year + (b.class_name||'')));
+  } catch (e) { srcNote('Could not load the classes (' + e.message + '). Refresh the page and sign in again.', true); return; }
+  classFilter = v.c || 'all';
+  await openYear(classYear);
+  if (!REAL.live) saveNote('Saving is switched off.', true);
+}
 document.getElementById('exportReal').onclick = exportJson;
-document.getElementById('reloadReal').onclick = () => { if (REAL.cls) openReal(REAL.cls, true); };
+document.getElementById('reloadReal').onclick = () => openYear(classYear, true);
 
 // ---- Term: from the school calendar (TermDates in the WFA database) ----
 async function loadTerm(){
@@ -584,8 +546,6 @@ document.addEventListener('keydown', e => {
   setMark(cur.p, cur.s, v); renderGrid(); moveCur(1, 0);   // mark, then step down to the next statement for the same child
 });
 document.getElementById('paintOff').onclick = () => { paint = null; renderLegend(); renderGrid(); };
-document.getElementById('clearBtn').onclick = () => { clearMarks(); level = classYear; document.getElementById('lvlnote').textContent = 'All marks cleared. Every child is back on the class year, ready to mark.'; renderGrid(); };
-document.getElementById('resetBtn').onclick = () => { loadExamples(); level = classYear; document.getElementById('lvlnote').textContent = ''; renderGrid(); };
 
 
 // ---- Weights: shared through the school database (device fallback) ----------
@@ -679,8 +639,7 @@ document.getElementById('chgbody').addEventListener('click', async e => {
   }
 });
 setStatus('Weights agreed on 23.10.26 and locked.');
-const BANNER_EXAMPLES = document.querySelector('.banner').innerHTML;
-renderLegend(); renderGrid(); renderChanges(); loadTerm(); setSrc('real');   // opens on the real classes; weights are built in and locked, so the review store is no longer read or written
+renderLegend(); renderChanges(); loadTerm(); start();   // weights are built in and locked, so the review store is no longer read or written
 </script>
 </body>
 </html>
