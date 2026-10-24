@@ -568,9 +568,13 @@ body.paint-mode .score-cell:not(.disabled) { cursor: crosshair !important; }
         <button class="header-nav-link" id="nav-weights" onclick="showTab('weights')">⭐ Weights</button>
         <button class="header-nav-link" id="nav-admin" onclick="showTab('admin')">⚙ Admin</button>
       </div>
-      <span class="version">WFA-08.10.26a</span>
+      <span class="version">WFA-24.10.26a</span>
     </div>
   </header>
+
+  <div id="moved-banner" style="display:none;margin:10px 16px;padding:12px 14px;border-radius:10px;background:#fef3c7;color:#78350f;border:1px solid #f59e0b;font-weight:600">
+    Y1 to Y5 writing has moved to the <a href="/writing-tracker-new/" style="color:#1d4ed8">new writing tracker</a>, with everyone's marks carried across. This page is now for Y6 only: Y1 to Y5 marks here are read only and may look wrong.
+  </div>
 
   <div id="save-error-banner" class="hidden">
     <span id="save-error-text"></span>
@@ -873,7 +877,22 @@ async function apiGet(action, params = {}, timeoutMs = 45000) {
   }
 }
 
+// 24.10.26: Y1-Y5 writing moved to the new writing tracker (new scoring); their marks were converted there.
+// This page stays for Y6 only, so any save that touches Y1-Y5 is refused here.
+const NEW_TRACKER = '/writing-tracker-new/';
+function movedYear(yg){ return /^Y[1-5]$/.test(String(yg || '')); }
+function refusesSave(d){
+  const ids = [d.skill_id, ...((d.scores || []).map(x => x.skill_id))].filter(Boolean);
+  if (ids.length) return ids.some(id => !/^Y6_/.test(String(id)));
+  if (d.action === 'updatePupil' || d.action === 'setWeight') return movedYear(state.currentYearGroup);
+  return false;
+}
+function showMovedBanner(){
+  const b = document.getElementById('moved-banner'); if (!b) return;
+  b.style.display = movedYear(state.currentYearGroup) ? '' : 'none';
+}
 async function apiPost(data, { retries = 2, timeoutMs = 20000 } = {}) {
+  if (refusesSave(data)) throw new Error('Y1 to Y5 writing has moved to the new writing tracker (' + location.origin + NEW_TRACKER + '). Nothing was saved here.');
   for (let attempt = 0; ; attempt++) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -991,7 +1010,7 @@ async function onClassChange() {
   }
 
   const yg = val.startsWith('yg:') ? val.slice(3) : val;
-  state.currentYearGroup = yg;
+  state.currentYearGroup = yg; showMovedBanner();
   document.documentElement.style.setProperty('--yr', YG_COLOURS[yg] || '#1798d3');
   state.yearGroupClasses = state.classes.filter(c => c.year_group === yg);
   localStorage.setItem('wfa_last_yg', `yg:${yg}`);
@@ -1035,6 +1054,7 @@ async function onYearChange() {
 }
 
 async function loadClassData() {
+  showMovedBanner();
   await loadCohortData();
   renderAdminPupils();
 }
