@@ -184,7 +184,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="grid-scroll"><table id="grid"></table></div>
 
   <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
-  <footer>Writing Tracker · WFA-24.10.26a · weights agreed 23.10.26 (locked)</footer>
+  <footer>Writing Tracker · WFA-24.10.26b · weights agreed 23.10.26 (locked)</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -297,12 +297,12 @@ const fmt = n => (Math.round(n*10)/10).toString();
 const pc = n => n === null ? '–' : Math.round(n)+'%';
 
 function renderClassTabs(){
+  if (termNow !== null) document.getElementById('termnote').textContent = 'Term ' + termNow + (termFromCal ? ' (from the school calendar)' : ' (worked out from the date: the school calendar could not be read)') + ': '
+    + (termMode === 't3' ? 'every non-negotiable counts with a weight of 1. All other weights are as set.' : 'the weights in the boxes, including the higher non-negotiable weights.');
   if (src === 'real'){
     const el = document.getElementById('classtabs');
     el.innerHTML = REAL.classes ? REAL.classes.map(c => '<button class="ct'+(c.class_id===REAL.cls?' active':'')+'" data-rc="'+c.class_id+'">'+esc(c.class_name || c.class_id)+' <small>('+c.year+')</small></button>').join('') : '<span class="lvlnote">Loading classes…</span>';
   } else {
-  if (termNow !== null) document.getElementById('termnote').textContent = 'Term ' + termNow + (termFromCal ? ' (from the school calendar)' : ' (worked out from the date: the school calendar could not be read)') + ': '
-    + (termMode === 't3' ? 'every non-negotiable counts with a weight of 1. All other weights are as set.' : 'the weights in the boxes, including the higher non-negotiable weights.');
   document.getElementById('classtabs').innerHTML = YEARS.map(y => '<button class="ct'+(y===classYear?' active':'')+'" data-cy="'+y+'">Year '+y.slice(1)+' class</button>').join('');
   }
 }
@@ -532,7 +532,8 @@ async function openReal(classId, fresh){
         YEARS.forEach(L => SKILLS[L].forEach(s => d[s.id] = 'none'));
         Object.entries((j.assessments || {})[p.pupil_id] || {}).forEach(([sid, sc]) => {
           if (!(sid in d)) return;                                   // Y6 and retired statements are not in the new framework
-          const v = CONVERT[String(sc).trim()]; if (v) d[sid] = v; else if (String(sc).trim()) unknown[sc] = (unknown[sc] || 0) + 1;
+          const t = String(sc).trim(), v = (t in STATUS && t !== 'none') ? t : CONVERT[t];   // new statuses as stored since 24.10.26; old 0-4 converted
+          if (v) d[sid] = v; else if (t) unknown[sc] = (unknown[sc] || 0) + 1;
         });
         const w = String(p.working_at_level || '').toUpperCase();
         pupils.push({ id:p.pupil_id, label:p.name || p.pupilCode || '?', work: levelsFor(c.year).includes(w) ? w : c.year });
