@@ -1502,7 +1502,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 # The print screen is reached from the Precision Teaching page (staff.*/precision/, "Print" tab). It is dressed
 # like that page (same header, tab bar, cards, chips, buttons; Streamlit's own toolbar hidden) so a teacher does
 # not feel they have left the tool. Only the look is set here: the sheets are made by build_week_pdf as before.
-_PRINT_VER = "WFA-24.10.26a"
+_PRINT_VER = "WFA-24.10.26b"
 _STAFF_PT = "https://staff.wallscourt-farm-academy.co.uk/precision/"
 _PRINT_CSS = """
 <style>
@@ -1533,8 +1533,14 @@ div[data-testid="stElementContainer"]:has(style) { display: none; }      /* this
 div[data-testid="stExpander"] details { background: #fff; border: 0; border-radius: 14px; box-shadow: 0 2px 10px rgba(23,152,211,.10); }
 /* chips (st.pills) like the page's: blue when chosen */
 div[data-testid="stButtonGroup"] button { border-radius: 999px !important; border: 2px solid #d9e3ec !important; font-weight: 800 !important; padding: 6px 16px !important; }
-div[data-testid="stButtonGroup"] button[kind$="Active"], div[data-testid="stButtonGroup"] button[aria-checked="true"] { background: #1798d3 !important; border-color: #1798d3 !important; color: #fff !important; }
-div[data-testid="stButtonGroup"] button[kind$="Active"] p, div[data-testid="stButtonGroup"] button[aria-checked="true"] p { color: #fff !important; }
+/* "chosen" is marked differently in different Streamlit versions (kind=pillsActive up to 1.57; aria-checked for
+   one-choice and aria-pressed / data-selected for several-choice in 1.66): all of them get the same solid blue */
+div[data-testid="stButtonGroup"] button { background: #fff !important; color: #0a0101 !important; }
+div[data-testid="stButtonGroup"] button[kind$="Active"], div[data-testid="stButtonGroup"] button[aria-checked="true"],
+div[data-testid="stButtonGroup"] button[aria-pressed="true"], div[data-testid="stButtonGroup"] button[data-selected="true"] {
+    background: #1798d3 !important; border-color: #1798d3 !important; color: #fff !important; }
+div[data-testid="stButtonGroup"] button[kind$="Active"] *, div[data-testid="stButtonGroup"] button[aria-checked="true"] *,
+div[data-testid="stButtonGroup"] button[aria-pressed="true"] *, div[data-testid="stButtonGroup"] button[data-selected="true"] * { color: #fff !important; }
 /* radio buttons as the page's chips */
 div[role="radiogroup"] { gap: 8px; flex-wrap: wrap; }
 div[role="radiogroup"] > label { border: 2px solid #d9e3ec; background: #fff; border-radius: 999px; padding: 7px 15px; margin: 0 !important; }
@@ -1708,7 +1714,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-24.10.26a")
+st.caption("Wallscourt Farm Academy · WFA-24.10.26b")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
