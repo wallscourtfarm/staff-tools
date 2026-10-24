@@ -1458,6 +1458,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
     by_code = {}
     for c in load["children"]:
         p = {"id": c["pupilCode"], "pupilCode": c["pupilCode"], "label": c["label"], "class": c["class"],
+             "yearGroup": c.get("yearGroup") or (f"Y{c['class'][0]}" if c.get("class", "")[:1].isdigit() else ""),
              "currentSkills": {}}
         by_code[c["pupilCode"]] = p
     for t in load["targets"]:
@@ -1501,7 +1502,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 # The print screen is reached from the Precision Teaching page (staff.*/precision/, "Print" tab). It is dressed
 # like that page (same header, tab bar, cards, chips, buttons; Streamlit's own toolbar hidden) so a teacher does
 # not feel they have left the tool. Only the look is set here: the sheets are made by build_week_pdf as before.
-_PRINT_VER = "WFA-20.10.26d"
+_PRINT_VER = "WFA-24.10.26a"
 _STAFF_PT = "https://staff.wallscourt-farm-academy.co.uk/precision/"
 _PRINT_CSS = """
 <style>
@@ -1530,6 +1531,10 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     border: 0 !important; border-radius: 14px; box-shadow: 0 2px 10px rgba(23,152,211,.10); padding: 14px 18px; }
 div[data-testid="stElementContainer"]:has(style) { display: none; }      /* this style block takes no space */
 div[data-testid="stExpander"] details { background: #fff; border: 0; border-radius: 14px; box-shadow: 0 2px 10px rgba(23,152,211,.10); }
+/* chips (st.pills) like the page's: blue when chosen */
+div[data-testid="stButtonGroup"] button { border-radius: 999px !important; border: 2px solid #d9e3ec !important; font-weight: 800 !important; padding: 6px 16px !important; }
+div[data-testid="stButtonGroup"] button[kind$="Active"], div[data-testid="stButtonGroup"] button[aria-checked="true"] { background: #1798d3 !important; border-color: #1798d3 !important; color: #fff !important; }
+div[data-testid="stButtonGroup"] button[kind$="Active"] p, div[data-testid="stButtonGroup"] button[aria-checked="true"] p { color: #fff !important; }
 /* radio buttons as the page's chips */
 div[role="radiogroup"] { gap: 8px; flex-wrap: wrap; }
 div[role="radiogroup"] > label { border: 2px solid #d9e3ec; background: #fff; border-radius: 999px; padding: 7px 15px; margin: 0 !important; }
@@ -1577,13 +1582,36 @@ if st.query_params.get("print") == "week":
     st.info("Sheets are made with each child's initials. To print real names, download the PDF and add them with the "
             "[Name stamper](https://staff.wallscourt-farm-academy.co.uk/name-stamper/): it works in your own browser, so "
             "your names file never comes to this website.", icon="🔒")
-    _classes = sorted({p["class"] for p in _kids})
+    # Whose sheets: a year group first (a Year 5 teacher never sees Year 6 children), then one or more of its
+    # classes. The year (and a class) can come in the link from the Precision Teaching page (?year=Y5&class=5IM)
+    # and is kept in the address, so a bookmark opens on the same year.
     _card_who.markdown('<div class="pt-step">1. Whose sheets</div>', unsafe_allow_html=True)
-    _EACH, _ALL = "Each class (a separate file for each)", "All classes together (one file)"
-    _cls = _card_who.radio("Which sheets?", _classes + [_EACH, _ALL], horizontal=True) if len(_classes) > 1 else _ALL
-    _pool = [p for p in _kids if _cls in (_EACH, _ALL) or p["class"] == _cls]
-    _ids = _card_who.multiselect("Children", [p["id"] for p in _pool], default=[p["id"] for p in _pool],
+    _years = sorted({p["yearGroup"] for p in _kids if p["yearGroup"]}, key=lambda y: (len(y), y))
+    _qy, _qc = st.query_params.get("year", ""), st.query_params.get("class", "")
+    if not _qy and _qc:
+        _qy = next((p["yearGroup"] for p in _kids if p["class"] == _qc), "")
+    if len(_years) == 1:
+        _year = _years[0]
+    else:
+        _year = _card_who.pills("Year group", _years, default=_qy if _qy in _years else None, key="pw_year",
+                                format_func=lambda y: f"Year {y[1:]}" if y[:1] == "Y" and y[1:].isdigit() else y)
+        if not _year:
+            _card_who.markdown('<p class="pt-hint">Choose your year group.</p>', unsafe_allow_html=True)
+    if _year and st.query_params.get("year") != _year:
+        st.query_params["year"] = _year
+    _in_year = [p for p in _kids if not _years or p["yearGroup"] == _year] if _year or not _years else []
+    _classes = sorted({p["class"] for p in _in_year})
+    if len(_classes) > 1:
+        _picked = _card_who.pills("Classes (tap to choose one or more)", _classes, selection_mode="multi",
+                                  default=[_qc] if _qc in _classes else _classes, key=f"pw_cls_{_year}")
+    else:
+        _picked = _classes
+    _picked = [c_ for c_ in _classes if c_ in (_picked or [])]
+    _pool = [p for p in _in_year if p["class"] in _picked]
+    _cls = "|".join(_picked)
+    _ids = [] if not _pool else _card_who.multiselect("Children", [p["id"] for p in _pool], default=[p["id"] for p in _pool],
                           format_func=lambda i: next(display_name(p) for p in _pool if p["id"] == i), key=f"pw_kids_{_cls}")
+    _each = len(_picked) > 1 and _card_who.checkbox("A separate file for each class", value=False, key="pw_each")
     _card_how.markdown('<div class="pt-step">2. How to print</div>', unsafe_allow_html=True)
     _duplex = _card_how.checkbox("One piece of paper per day (print double-sided)", value=True,
                           help="Each day starts on the front of a new piece of paper, with a big coloured day heading, "
@@ -1602,9 +1630,9 @@ if st.query_params.get("print") == "week":
                                   "left on the paper, it goes there, with its own day heading.")
         _card_how.caption("Print double-sided (flip on the long edge). Blank sides are added where needed.")
     _sel_classes = sorted({p["class"] for p in _pool if p["id"] in _ids})
-    _split = _cls == _EACH and len(_sel_classes) > 1
-    if st.session_state.get("pw_choice") != _cls:
-        st.session_state["pw_choice"] = _cls
+    _split = bool(_each) and len(_sel_classes) > 1
+    if st.session_state.get("pw_choice") != (_cls, _split):
+        st.session_state["pw_choice"] = (_cls, _split)
         st.session_state.pop("pw_files", None)
     _card_go.markdown('<div class="pt-step">3. Make the sheets</div>', unsafe_allow_html=True)
     if _card_go.button("Create this week's sheets (PDF)", type="primary", disabled=not _ids):
@@ -1612,7 +1640,8 @@ if st.query_params.get("print") == "week":
         if _split:
             groups = [(c_, [p for p in _sel if p["class"] == c_]) for c_ in _sel_classes]
         else:
-            groups = [(_cls if _cls in _classes else "", _sel)]      # one class: its name goes on the file
+            groups = [("-".join(_sel_classes) if len(_sel_classes) < len(_classes) or len(_classes) == 1
+                       else (_year or ""), _sel)]          # the class(es), or the year group, go on the file name
         files = []
         for c_, kids_ in groups:
             ids_ = {p["id"] for p in kids_}
@@ -1679,7 +1708,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-20.10.26d")
+st.caption("Wallscourt Farm Academy · WFA-24.10.26a")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")
