@@ -87,12 +87,14 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .bhead { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
   .bhead .count { color: var(--muted); font-weight: 800; font-size: .9rem; }
   .bhead .lnk { border: 0; background: none; color: var(--wfa-blue); font-weight: 800; padding: 4px 6px; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
-  .tile { position: relative; border: 2px solid #c9d6e2; background: #fff; border-radius: 12px; min-height: 64px; padding: 6px 4px;
+  /* tiles grow to fit their word (polysyllabic words were squashed in a fixed grid) */
+  .tiles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tile { position: relative; border: 2px solid #c9d6e2; background: #fff; border-radius: 12px; min-height: 64px; min-width: 84px; padding: 6px 16px;
+          white-space: nowrap;
           font-family: 'Andika', system-ui, sans-serif; font-size: 1.5rem; line-height: 1.1; color: var(--ink);
           -webkit-user-select: none; user-select: none; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .tile small { font-family: system-ui, sans-serif; font-size: .68rem; font-weight: 700; color: var(--muted); margin-top: 3px; }
-  .tile.say { font-family: system-ui, sans-serif; font-size: 1rem; font-weight: 700; grid-column: span 2; white-space: nowrap; }
+  .tile.say { font-family: system-ui, sans-serif; font-size: 1rem; font-weight: 700; }
   .tile .mk { position: absolute; top: 3px; right: 6px; font-family: system-ui, sans-serif; font-size: .8rem; font-weight: 900; }
   .tile.secure { border-color: rgba(0,0,0,.18); }
   .tile.not { background: #fff3f3; border-color: #f0b4b4; }
@@ -107,7 +109,8 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .flash .big { font-family: 'Andika', system-ui, sans-serif; font-size: min(34vh, 24vw); line-height: 1; color: #000; text-align: center; word-break: break-word; }
   .flash .big.word { font-size: min(22vh, 13vw); }
   .flash .note { margin-top: 14px; color: var(--muted); font-weight: 700; font-size: 1rem; }
-  .flash .say { font-size: 2rem; font-weight: 800; color: var(--ink); }
+  .flash .listen { font-size: min(30vh, 22vw); line-height: 1; }
+  .flash .teacher { margin: 0 16px; padding: 10px 14px; border-radius: 12px; background: #eef4f9; font-weight: 800; font-size: 1.05rem; text-align: center; }
   .flash .bottom { display: grid; grid-template-columns: 1.4fr .8fr .8fr 1.4fr; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
   .flash .bottom button { border: 0; border-radius: 14px; padding: 18px 10px; font-size: 1.15rem; font-weight: 900; }
   .fNot { background: #fdecec; color: var(--bad); }
@@ -118,7 +121,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .flash .done b { font-size: 2rem; display: block; margin-bottom: 8px; }
 
   @media (max-width: 720px) {
-    .tiles { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
+    .tile { min-width: 70px; padding: 6px 12px; }
     .flash .bottom { grid-template-columns: 1fr 1fr; }
   }
 </style>
@@ -139,7 +142,6 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div class="bar">
       <select id="fYear" aria-label="Year group">
         <option value="R">Reception</option><option value="Y1">Year 1</option><option value="Y2">Year 2</option>
-        <option value="Y3">Year 3</option><option value="Y4">Year 4</option><option value="Y5">Year 5</option><option value="Y6">Year 6</option>
       </select>
       <select id="fClass" aria-label="Class"></select>
       <span class="grow"></span>
@@ -178,12 +180,13 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-24.10.26a</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-24.10.26b</span></footer>
 
 <!-- full-screen cards -->
 <div class="flash" id="flash" hidden>
   <div class="top"><span id="fWhere"></span><span class="grow"></span><span id="fCount"></span><button class="btn quiet" id="fClose">Finish</button></div>
   <div class="card-area" id="fCard"></div>
+  <div class="teacher" id="fTeacher" hidden></div>
   <div class="bottom" id="fButtons">
     <button class="fNot" id="fNot">✗ Not yet</button>
     <button class="fNav" id="fPrev">‹ Back</button>
@@ -360,7 +363,7 @@ function drawClass() {
   fc.value = S.cls;
   fc.hidden = classes.length < 2;
 
-  // Reception and Year 1: this term's answer. Older children: the end of Year 1 standard (Summer 2).
+  // Reception and Year 1: this term's answer. Year 2: the end of Year 1 standard (Summer 2).
   var kids = visibleChildren(), current = S.year === 'R' || S.year === 'Y1';
   var t = current ? S.term - 1 : 5;
   var std = current ? S.cat.terms[t] : 'end of Year 1 standard';
@@ -552,6 +555,7 @@ function drawFlash() {
   var done = F.pos >= F.list.length;
   $('fButtons').style.visibility = done ? 'hidden' : 'visible';
   if (done) {
+    $('fTeacher').hidden = true;
     var nowSec = F.list.filter(function (i) { return markState(S.child, i) === 'secure' && F.before[i] !== 'secure'; }).length;
     var notYet = F.list.filter(function (i) { return markState(S.child, i) === 'not'; }).length;
     box.appendChild(el('div', { class: 'done' }, [el('b', { text: 'All done' }),
@@ -565,10 +569,12 @@ function drawFlash() {
   var blk = S.cat.blocks.find(function (b) { return b.key === it.block; });
   $('fWhere').textContent = blk ? blk.title : '';
   $('fCount').textContent = (F.pos + 1) + ' of ' + F.list.length;
+  // Oral blending: nothing for the child to read. The sounds to say sit by the adult's buttons, small.
+  $('fTeacher').textContent = it.say ? 'Say the sounds: ' + it.say + '  ·  the child blends them into the word' : '';
+  $('fTeacher').hidden = !it.say;
   if (it.say) {
-    box.appendChild(el('div', { class: 'say', text: '👂' }));
-    box.appendChild(el('div', { class: 'say', text: 'Say: ' + it.say }));
-    box.appendChild(el('div', { class: 'note', text: 'Say the sounds; the child says the word.' }));
+    box.appendChild(el('div', { class: 'listen', text: '👂' }));
+    box.appendChild(el('div', { class: 'note', text: 'Listen' }));
   } else {
     box.appendChild(el('div', { class: 'big' + (it.show.length > 3 ? ' word' : ''), text: it.show }));
     if (it.hint) box.appendChild(el('div', { class: 'note', text: it.hint }));
@@ -673,7 +679,7 @@ if (window.WFANames) {
   NS._ui();
 }
 S.queue = recall(QKEY) || {};
-S.year = recall(YKEY) || 'R';
+S.year = ['R', 'Y1', 'Y2'].indexOf(recall(YKEY)) >= 0 ? recall(YKEY) : 'R';
 $('fYear').value = S.year;
 showSave();
 load().then(function () { if (Object.keys(S.queue).length) scheduleSave(0); });
