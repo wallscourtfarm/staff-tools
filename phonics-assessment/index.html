@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+/* WFA 25.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Phonics Assessment</title>
+<link rel="icon" href="../favicon.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&display=swap">
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root { --ink:#0a0101; --muted:#5b6b7b; --line:#d9e3ec; --soft:#f4f9fd; --ok:#2bae62; --warn:#e57d24; --bad:#c62828;
+          --t1:#ffd84d; --t2:#8fd694; --t3:#ff9ecb; --t4:#ffb366; --t5:#7fc8f8; --t6:#c3a6ff; --old:#cfd8dc; }
+  body { color: var(--ink); }
+  [hidden] { display: none !important; }
+  header { padding: 18px 24px; }
+  header h1 { font-size: 1.6rem; }
+  main { max-width: 1400px; padding: 20px 16px 90px; }
+  button { font: inherit; cursor: pointer; touch-action: manipulation; }
+  .btn { border: 0; border-radius: 10px; padding: 10px 16px; font-weight: 800; background: var(--wfa-blue); color: #fff; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.ghost { background: #fff; color: var(--wfa-blue); border: 2px solid var(--wfa-blue); }
+  .btn.quiet { background: #eef4f9; color: var(--ink); }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .grow { flex: 1; }
+  select { font: inherit; font-size: 16px; padding: 9px 12px; border: 2px solid var(--line); border-radius: 10px; background: #fff; }
+  .banner { padding: 12px 16px; border-radius: 10px; margin-bottom: 14px; font-weight: 700; display: none; }
+  .banner.show { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .banner.err { background: #fdecec; color: var(--bad); }
+  .banner.ok { background: #e8f7ee; color: #1d7a45; }
+  .banner.info { background: #eef6fc; color: #1f5f86; }
+  .card { background: #fff; border-radius: 14px; box-shadow: 0 2px 10px rgba(23,152,211,.10); }
+  .empty { padding: 40px 20px; text-align: center; color: var(--muted); }
+  .empty b { display: block; color: var(--ink); font-size: 1.2rem; margin-bottom: 6px; }
+  .hint { color: var(--muted); font-size: .92rem; margin: 0 0 12px; }
+  .save-state { font-size: .85rem; font-weight: 800; color: var(--muted); }
+  .save-state.bad { color: var(--bad); }
+
+  /* class view */
+  .summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .stat { background: #fff; border-radius: 14px; padding: 12px 16px; box-shadow: 0 2px 10px rgba(23,152,211,.10); min-width: 170px; }
+  .stat b { font-size: 1.5rem; display: block; }
+  .stat small { color: var(--muted); font-weight: 700; }
+  .scroll-x { overflow-x: auto; }
+  table.cls { border-collapse: collapse; width: 100%; }
+  table.cls th, table.cls td { padding: 10px 10px; border-top: 1px solid var(--line); text-align: left; white-space: nowrap; }
+  table.cls th { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; border-top: 0; }
+  table.cls tr.kid { cursor: pointer; }
+  table.cls tr.kid:hover td { background: var(--soft); }
+  .who b { font-size: 1.1rem; }
+  .who small { color: var(--muted); font-weight: 700; margin-left: 6px; }
+  .yn { display: inline-block; min-width: 46px; text-align: center; padding: 3px 8px; border-radius: 999px; font-weight: 800; font-size: .85rem; }
+  .yn.Yes { background: #e2f6ea; color: #1d7a45; }
+  .yn.No { background: #fdecec; color: var(--bad); }
+  .yn.na { background: #eef1f4; color: var(--muted); }
+  .ph { display: inline-block; width: 74px; margin-right: 6px; vertical-align: middle; }
+  .ph .lbl { font-size: .72rem; font-weight: 800; color: var(--muted); display: flex; justify-content: space-between; }
+  .ph .track { height: 8px; border-radius: 6px; background: #edf2f6; overflow: hidden; }
+  .ph .fill { height: 100%; background: var(--ok); }
+
+  /* child view */
+  .childhead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .childhead h2 { margin: 0; font-size: 1.6rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border: 2px solid var(--line); background: #fff; border-radius: 999px; padding: 7px 13px; font-weight: 800; }
+  .chip.on { background: var(--wfa-blue); border-color: var(--wfa-blue); color: #fff; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; }
+  .toggle input { width: 22px; height: 22px; }
+  .otgrid { border-collapse: collapse; font-size: .85rem; }
+  .otgrid th, .otgrid td { padding: 4px 6px; text-align: center; }
+  .otgrid th { color: var(--muted); font-weight: 800; }
+  .otgrid th.now { color: var(--wfa-blue); text-decoration: underline; }
+  .panelrow { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; align-items: stretch; }
+  .panelrow .card { padding: 12px 14px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .82rem; font-weight: 700; color: var(--muted); }
+  .sw { display: inline-block; width: 16px; height: 16px; border-radius: 4px; vertical-align: -3px; margin-right: 3px; border: 1px solid rgba(0,0,0,.1); }
+  .block { padding: 14px; margin-bottom: 14px; }
+  .block h3 { margin: 0; font-size: 1.05rem; }
+  .bhead { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .bhead .count { color: var(--muted); font-weight: 800; font-size: .9rem; }
+  .bhead .lnk { border: 0; background: none; color: var(--wfa-blue); font-weight: 800; padding: 4px 6px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+  .tile { position: relative; border: 2px solid #c9d6e2; background: #fff; border-radius: 12px; min-height: 64px; padding: 6px 4px;
+          font-family: 'Andika', system-ui, sans-serif; font-size: 1.5rem; line-height: 1.1; color: var(--ink);
+          -webkit-user-select: none; user-select: none; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .tile small { font-family: system-ui, sans-serif; font-size: .68rem; font-weight: 700; color: var(--muted); margin-top: 3px; }
+  .tile.say { font-family: system-ui, sans-serif; font-size: 1rem; font-weight: 700; grid-column: span 2; white-space: nowrap; }
+  .tile .mk { position: absolute; top: 3px; right: 6px; font-family: system-ui, sans-serif; font-size: .8rem; font-weight: 900; }
+  .tile.secure { border-color: rgba(0,0,0,.18); }
+  .tile.not { background: #fff3f3; border-color: #f0b4b4; }
+  .tile.not .mk { color: var(--bad); }
+  .tile.pend::after { content: ''; position: absolute; left: 6px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+  .flagbox { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  /* flashcards */
+  .flash { position: fixed; inset: 0; background: #fff; z-index: 50; display: flex; flex-direction: column; }
+  .flash .top { display: flex; align-items: center; gap: 12px; padding: 12px 16px; color: var(--muted); font-weight: 800; }
+  .flash .card-area { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 10px; }
+  .flash .big { font-family: 'Andika', system-ui, sans-serif; font-size: min(34vh, 24vw); line-height: 1; color: #000; text-align: center; word-break: break-word; }
+  .flash .big.word { font-size: min(22vh, 13vw); }
+  .flash .note { margin-top: 14px; color: var(--muted); font-weight: 700; font-size: 1rem; }
+  .flash .say { font-size: 2rem; font-weight: 800; color: var(--ink); }
+  .flash .bottom { display: grid; grid-template-columns: 1.4fr .8fr .8fr 1.4fr; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .flash .bottom button { border: 0; border-radius: 14px; padding: 18px 10px; font-size: 1.15rem; font-weight: 900; }
+  .fNot { background: #fdecec; color: var(--bad); }
+  .fSec { background: var(--ok); color: #fff; }
+  .fNav { background: #eef4f9; color: var(--ink); }
+  .flash .state { font-weight: 900; }
+  .flash .done { text-align: center; }
+  .flash .done b { font-size: 2rem; display: block; margin-bottom: 8px; }
+
+  @media (max-width: 720px) {
+    .tiles { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
+    .flash .bottom { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-content">
+    <img class="logo" src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA">
+    <div><h1>Phonics Assessment</h1><p>Unlocking Letters and Sounds: one-to-one assessment, straight into the tracker and the CLF spreadsheet</p></div>
+  </div>
+</header>
+
+<main>
+  <div id="banner" class="banner"></div>
+
+  <!-- class view -->
+  <section id="vClass">
+    <div class="bar">
+      <select id="fYear" aria-label="Year group">
+        <option value="R">Reception</option><option value="Y1">Year 1</option><option value="Y2">Year 2</option>
+        <option value="Y3">Year 3</option><option value="Y4">Year 4</option><option value="Y5">Year 5</option><option value="Y6">Year 6</option>
+      </select>
+      <select id="fClass" aria-label="Class"></select>
+      <span class="grow"></span>
+      <span class="save-state" id="saveState"></span>
+      <button class="btn ghost" id="btnExport">⬇ CLF spreadsheet</button>
+      <span id="namesSlot"></span>
+    </div>
+    <div class="summary" id="summary"></div>
+    <p class="hint">Tap a child to assess them. Every tap is saved straight away, and this term's "on track" answers go to the Pupil Tracker.</p>
+    <div class="card scroll-x" id="classList"><div class="empty">Loading…</div></div>
+  </section>
+
+  <!-- one child -->
+  <section id="vChild" hidden>
+    <div class="childhead">
+      <button class="btn quiet" id="btnBack">‹ Class</button>
+      <h2 id="cName"></h2>
+      <span class="grow"></span>
+      <span class="save-state" id="saveState2"></span>
+      <button class="btn" id="btnFlash">▶ Show cards to the child</button>
+    </div>
+    <div class="panelrow">
+      <div class="card"><div style="font-weight:800;margin-bottom:6px" id="otTitle">On track</div><table class="otgrid" id="otGrid"></table></div>
+      <div class="card" id="flagCard" hidden>
+        <div style="font-weight:800;margin-bottom:6px">Secured all Phase 2 and 3 GPCs and words in Reception?</div>
+        <div class="hint" id="flagHint" style="margin-bottom:8px"></div>
+        <div class="flagbox" id="flagBox"></div>
+      </div>
+    </div>
+    <div class="bar">
+      <div class="chips" id="phaseChips"></div>
+      <span class="grow"></span>
+      <label class="toggle"><input type="checkbox" id="gapsOnly"> Gaps only</label>
+    </div>
+    <div class="legend" id="legend" style="margin-bottom:12px"></div>
+    <div id="blocks"></div>
+  </section>
+</main>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-24.10.26a</span></footer>
+
+<!-- full-screen cards -->
+<div class="flash" id="flash" hidden>
+  <div class="top"><span id="fWhere"></span><span class="grow"></span><span id="fCount"></span><button class="btn quiet" id="fClose">Finish</button></div>
+  <div class="card-area" id="fCard"></div>
+  <div class="bottom" id="fButtons">
+    <button class="fNot" id="fNot">✗ Not yet</button>
+    <button class="fNav" id="fPrev">‹ Back</button>
+    <button class="fNav" id="fSkip">Skip ›</button>
+    <button class="fSec" id="fSec">✓ Secure</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+var API = 'https://api.wallscourt-farm-academy.co.uk/planning/phonics-db?token=__hub__';
+var QKEY = 'wfa_ph_queue_v1', PKEY = 'wfa_ph_phases_v1', YKEY = 'wfa_ph_year_v1';
+var TERM_SHORT = ['Aut 1', 'Aut 2', 'Spr 1', 'Spr 2', 'Sum 1', 'Sum 2'];
+var DEFAULT_PHASES = { R: ['p1', 'p2', 'p3', 'p4'] };
+var S = { cat: null, year: 'R', cls: '', children: [], marks: {}, flags: {}, recSecure: {}, ontrack: {},
+          academicYear: '', term: 1, child: null, phases: null, gaps: false, queue: {}, saving: false, failed: false };
+
+function $(id) { return document.getElementById(id); }
+function el(tag, attrs, kids) {
+  var e = document.createElement(tag);
+  Object.keys(attrs || {}).forEach(function (k) {
+    if (k === 'text') e.textContent = attrs[k];
+    else if (k === 'on') Object.keys(attrs.on).forEach(function (ev) { e.addEventListener(ev, attrs.on[ev]); });
+    else e.setAttribute(k, attrs[k]);
+  });
+  (kids || []).forEach(function (k) { if (k) e.appendChild(typeof k === 'string' ? document.createTextNode(k) : k); });
+  return e;
+}
+function kidLabel(c) { return el('span', { 'data-pupil-id': c.pupilCode, text: c.label || '?' }); }
+function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function recall(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+function banner(kind, msg, action, actionLabel) {
+  var b = $('banner');
+  b.className = 'banner show ' + kind;
+  b.textContent = msg;
+  if (action) b.appendChild(el('button', { class: 'btn quiet', text: actionLabel || 'Try again', on: { click: action } }));
+  if (kind === 'ok') setTimeout(function () { if (b.textContent.indexOf(msg) === 0) b.className = 'banner'; }, 4000);
+}
+function clearBanner() { $('banner').className = 'banner'; }
+
+// ── API (check res.ok AND the body; never report success we did not get) ─────────────────────────────
+function getJSON(url) {
+  return fetch(url, { cache: 'no-store' }).then(function (r) {
+    if (!r.ok) throw new Error('the server said ' + r.status);
+    return r.json();
+  }).then(function (d) { if (!d || d.ok !== true) throw new Error((d && d.error) || 'no answer'); return d; });
+}
+function postJSON(body) {
+  return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(function (r) { if (!r.ok) throw new Error('the server said ' + r.status); return r.json(); })
+    .then(function (d) { if (!d || d.ok !== true) throw new Error((d && d.error) || 'not saved'); return d; });
+}
+
+function load() {
+  var need = S.cat ? Promise.resolve({ catalogue: S.cat }) : getJSON(API + '&action=catalogue');
+  $('classList').innerHTML = '<div class="empty">Loading…</div>';
+  return Promise.all([need, getJSON(API + '&action=load&year=' + S.year)]).then(function (res) {
+    S.cat = res[0].catalogue;
+    var d = res[1];
+    S.children = d.children; S.marks = d.marks || {}; S.flags = d.flags || {}; S.recSecure = d.recSecure || {};
+    S.ontrack = d.ontrack || {}; S.academicYear = d.academicYear; S.term = d.term || 1;
+    applyQueueLocally();
+    if (!S.failed) clearBanner();
+    drawClass();
+    if (S.child) drawChild();
+  }).catch(function (e) {
+    banner('err', 'Could not load: ' + e.message + '. Nothing has been changed.', load);
+    $('classList').innerHTML = '<div class="empty">Not loaded.</div>';
+  });
+}
+
+// ── Saving: every tap goes into a queue that is sent within a second, kept on this iPad until the server
+//    confirms it (pupil codes and item names only, never a name), and retried when the connection is back. ──
+function markState(code, item) { var m = (S.marks[code] || {})[item]; return m ? m[0] : ''; }
+function setMark(code, item, state) {
+  var m = S.marks[code] = S.marks[code] || {};
+  var old = m[item];
+  if (state) m[item] = [state, state === 'secure' ? ((old && old[0] === 'secure' && old[1]) || S.academicYear + ':' + S.term) : '', today()];
+  else delete m[item];
+  S.queue[code + '|' + item] = state;
+  store(QKEY, S.queue);
+  scheduleSave();
+}
+function applyQueueLocally() {
+  Object.keys(S.queue).forEach(function (k) {
+    var p = k.split('|'), code = p[0], item = p[1], st = S.queue[k];
+    if (!S.children.some(function (c) { return c.pupilCode === code; })) return;
+    var m = S.marks[code] = S.marks[code] || {};
+    if (st) m[item] = [st, st === 'secure' ? ((m[item] && m[item][1]) || S.academicYear + ':' + S.term) : '', today()]; else delete m[item];
+  });
+}
+function today() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+var saveTimer = null;
+function scheduleSave(delay) { clearTimeout(saveTimer); saveTimer = setTimeout(flush, delay == null ? 700 : delay); showSave(); }
+function flush() {
+  if (S.saving) return scheduleSave(500);
+  var keys = Object.keys(S.queue).slice(0, 400);
+  if (!keys.length) { showSave(); return Promise.resolve(); }
+  var sent = {};
+  var marks = keys.map(function (k) { var p = k.split('|'); sent[k] = S.queue[k]; return { pupilCode: p[0], item: p[1], state: S.queue[k] }; });
+  S.saving = true; showSave();
+  return postJSON({ action: 'save', marks: marks }).then(function (d) {
+    keys.forEach(function (k) { if (S.queue[k] === sent[k]) delete S.queue[k]; });
+    store(QKEY, Object.keys(S.queue).length ? S.queue : null);
+    takeChildren(d);
+    if (S.failed) { S.failed = false; banner('ok', 'Saved. Everything is now on the server.'); }
+    if (d.trackerError) banner('err', d.trackerError);
+  }).catch(function (e) {
+    S.failed = true;
+    banner('err', 'Not saved yet (' + e.message + '). Your marks are kept on this iPad and will be sent when the connection is back.', function () { scheduleSave(0); }, 'Send now');
+    scheduleSave(20000);
+  }).then(function () {
+    S.saving = false; showSave();
+    if (Object.keys(S.queue).length && !S.failed) scheduleSave(200);
+  });
+}
+function takeChildren(d) {
+  // server copies for the children just saved, but never over a tap that is still waiting to be sent
+  Object.keys(d.marks || {}).forEach(function (code) {
+    var mine = S.marks[code] = S.marks[code] || {}, srv = d.marks[code];
+    Object.keys(mine).forEach(function (i) { if (!(code + '|' + i in S.queue) && !srv[i]) delete mine[i]; });
+    Object.keys(srv).forEach(function (i) { if (!(code + '|' + i in S.queue)) mine[i] = srv[i]; });
+  });
+  Object.keys(d.ontrack || {}).forEach(function (code) {        // the reply covers exactly the children saved
+    S.ontrack[code] = d.ontrack[code];
+    if (d.recSecure && d.recSecure[code]) S.recSecure[code] = d.recSecure[code];
+    if (d.flags && d.flags[code]) S.flags[code] = d.flags[code]; else delete S.flags[code];
+  });
+  if (S.child) { drawChildTop(true); refreshPending(); } else drawClass();
+}
+function refreshPending() {
+  Array.prototype.forEach.call(document.querySelectorAll('.tile.pend'), function (t) {
+    var i = t.getAttribute('data-item');
+    if (!((S.child + '|' + i) in S.queue)) t.classList.remove('pend');
+  });
+}
+function showSave() {
+  var n = Object.keys(S.queue).length;
+  var txt = S.failed ? n + ' not sent yet' : (S.saving || n ? 'Saving…' : 'All saved');
+  [$('saveState'), $('saveState2')].forEach(function (e) { e.textContent = txt; e.className = 'save-state' + (S.failed ? ' bad' : ''); });
+}
+window.addEventListener('online', function () { if (Object.keys(S.queue).length) scheduleSave(0); });
+window.addEventListener('pagehide', function () { if (Object.keys(S.queue).length) flush(); });
+
+// ── Helpers on the catalogue ────────────────────────────────────────────────────────────────────────
+function items(blockKey) { var b = S.cat.blocks.find(function (x) { return x.key === blockKey; }); return b ? b.items : []; }
+function phaseItems(ph) { return Object.keys(S.cat.items).filter(function (i) { return S.cat.items[i].phase === ph; }); }
+function sheetKey(c) { return c.yearGroup === 'R' ? 'R' : 'Y1'; }
+function phasesFor(year) { return DEFAULT_PHASES[year] || ['p2', 'p3', 'p4', 'p5a', 'y1nc', 'p5b', 'p5c']; }
+function chosenPhases() {
+  var saved = recall(PKEY) || {};
+  return saved[S.year] || phasesFor(S.year);
+}
+function termColour(sec) {
+  if (!sec) return null;
+  var p = sec.split(':');
+  if (p[0] !== S.academicYear) return 'var(--old)';
+  return 'var(--t' + Math.max(1, Math.min(6, +p[1] || 1)) + ')';
+}
+function yn(v) {
+  if (v === 'n/a') return el('span', { class: 'yn na', text: 'n/a' });
+  if (v !== 'Yes' && v !== 'No') return el('span', { class: 'yn na', text: '–' });
+  return el('span', { class: 'yn ' + v, text: v });
+}
+function visibleChildren() { return S.children.filter(function (c) { return !S.cls || c.class === S.cls; }); }
+
+// ── Class view ──────────────────────────────────────────────────────────────────────────────────────
+function drawClass() {
+  var fc = $('fClass'), classes = Array.from(new Set(S.children.map(function (c) { return c.class; }))).sort();
+  fc.innerHTML = '';
+  fc.appendChild(el('option', { value: '', text: 'All classes (' + S.children.length + ')' }));
+  classes.forEach(function (c) { fc.appendChild(el('option', { value: c, text: c })); });
+  if (classes.indexOf(S.cls) < 0) S.cls = '';
+  fc.value = S.cls;
+  fc.hidden = classes.length < 2;
+
+  // Reception and Year 1: this term's answer. Older children: the end of Year 1 standard (Summer 2).
+  var kids = visibleChildren(), current = S.year === 'R' || S.year === 'Y1';
+  var t = current ? S.term - 1 : 5;
+  var std = current ? S.cat.terms[t] : 'end of Year 1 standard';
+  var ans = function (c, k) { return (((S.ontrack[c.pupilCode] || {})[sheetKey(c)] || {})[k] || [])[t]; };
+  var gYes = kids.filter(function (c) { return ans(c, 'gpc') === 'Yes'; }).length;
+  var wVals = kids.map(function (c) { return ans(c, 'bw'); });
+  var wYes = wVals.filter(function (v) { return v === 'Yes'; }).length;
+  var assessed = kids.filter(function (c) { return Object.keys(S.marks[c.pupilCode] || {}).length; }).length;
+  var sum = $('summary');
+  sum.innerHTML = '';
+  sum.appendChild(el('div', { class: 'stat' }, [el('b', { text: assessed + ' / ' + kids.length }), el('small', { text: 'children with any assessment' })]));
+  sum.appendChild(el('div', { class: 'stat' }, [el('b', { text: gYes + ' / ' + kids.length }), el('small', { text: 'on track in GPCs · ' + std })]));
+  sum.appendChild(el('div', { class: 'stat' }, [el('b', { text: wVals.every(function (v) { return v === 'n/a'; }) && kids.length ? 'n/a' : wYes + ' / ' + kids.length }),
+                                                el('small', { text: 'on track in blended words · ' + std })]));
+
+  var box = $('classList');
+  box.innerHTML = '';
+  if (!kids.length) { box.appendChild(el('div', { class: 'empty' }, [el('b', { text: 'No children found' }), 'Check the year group and class.'])); return; }
+  var phases = phasesFor(S.year);
+  var head = el('tr', {}, [el('th', { text: 'Child' }), el('th', { text: 'GPCs' }), el('th', { text: 'Words' })]
+    .concat(phases.map(function (p) { return el('th', { text: S.cat.phases.find(function (x) { return x.key === p; }).name }); }))
+    .concat([el('th', { text: 'Last assessed' })]));
+  var table = el('table', { class: 'cls' }, [el('thead', {}, [head])]);
+  var tb = el('tbody');
+  kids.forEach(function (c) {
+    var m = S.marks[c.pupilCode] || {}, on = (S.ontrack[c.pupilCode] || {})[sheetKey(c)] || { gpc: [], bw: [] };
+    var last = Object.keys(m).reduce(function (a, i) { return m[i][2] > a ? m[i][2] : a; }, '');
+    var started = Object.keys(m).length > 0;          // not assessed yet: no answer rather than "No"
+    var row = el('tr', { class: 'kid', on: { click: function () { openChild(c.pupilCode); } } }, [
+      el('td', { class: 'who' }, [el('b', {}, [kidLabel(c)]), el('small', { text: c.class })]),
+      el('td', {}, [yn(started ? on.gpc[t] : '')]), el('td', {}, [yn(started ? on.bw[t] : '')])
+    ].concat(phases.map(function (p) {
+      var all = phaseItems(p), sec = all.filter(function (i) { return m[i] && m[i][0] === 'secure'; }).length;
+      return el('td', {}, [el('div', { class: 'ph' }, [el('div', { class: 'lbl' }, [el('span', { text: sec + '/' + all.length })]),
+        el('div', { class: 'track' }, [el('div', { class: 'fill', style: 'width:' + Math.round(100 * sec / all.length) + '%' })])])]);
+    })).concat([el('td', { text: last ? last.split('-').reverse().join('/') : '–' })]));
+    tb.appendChild(row);
+  });
+  table.appendChild(tb);
+  box.appendChild(table);
+}
+
+// ── One child ───────────────────────────────────────────────────────────────────────────────────────
+function childObj() { return S.children.find(function (c) { return c.pupilCode === S.child; }); }
+function openChild(code) {
+  S.child = code;
+  S.phases = chosenPhases();
+  $('vClass').hidden = true; $('vChild').hidden = false;
+  window.scrollTo(0, 0);
+  drawChild();
+}
+function closeChild() {
+  S.child = null;
+  $('vChild').hidden = true; $('vClass').hidden = false;
+  drawClass();
+}
+function drawChild() {
+  var c = childObj();
+  if (!c) { closeChild(); return; }
+  $('cName').innerHTML = '';
+  $('cName').appendChild(kidLabel(c));
+  $('cName').appendChild(el('small', { text: '  ' + c.class, style: 'color:var(--muted);font-size:1rem' }));
+  var chips = $('phaseChips');
+  chips.innerHTML = '';
+  S.cat.phases.forEach(function (p) {
+    var on = S.phases.indexOf(p.key) >= 0;
+    chips.appendChild(el('button', { class: 'chip' + (on ? ' on' : ''), text: p.name, on: { click: function () {
+      S.phases = on ? S.phases.filter(function (x) { return x !== p.key; }) : S.phases.concat([p.key]);
+      var saved = recall(PKEY) || {}; saved[S.year] = S.phases; store(PKEY, saved);
+      drawChild();
+    } } }));
+  });
+  $('gapsOnly').checked = S.gaps;
+  var lg = $('legend');
+  lg.innerHTML = '';
+  lg.appendChild(document.createTextNode('Secure since:'));
+  S.cat.terms.forEach(function (t, i) { lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--t' + (i + 1) + ')' }), t])); });
+  lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--old)' }), 'an earlier year']));
+  lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:#fff3f3;border-color:#f0b4b4' }), 'not yet']));
+  lg.appendChild(el('span', { text: '· Tap once for secure, again for not yet, again to clear.' }));
+  drawChildTop();
+}
+function drawChildTop(keepBlocks) {
+  var c = childObj();
+  if (!c) return;
+  var key = sheetKey(c), on = (S.ontrack[c.pupilCode] || {})[key] || { gpc: [], bw: [] };
+  $('otTitle').textContent = 'On track (' + (key === 'R' ? 'Reception' : 'Year 1') + ' sheet)';
+  var g = $('otGrid');
+  g.innerHTML = '';
+  var nowCol = (c.yearGroup === 'R' || c.yearGroup === 'Y1') ? S.term - 1 : -1;
+  g.appendChild(el('tr', {}, [el('th')].concat(TERM_SHORT.map(function (t, i) { return el('th', { class: i === nowCol ? 'now' : '', text: t }); }))));
+  [['GPCs', on.gpc], ['Words', on.bw]].forEach(function (r) {
+    g.appendChild(el('tr', {}, [el('th', { text: r[0], style: 'text-align:left' })].concat(r[1].map(function (v) { return el('td', {}, [yn(v)]); }))));
+  });
+  var fcard = $('flagCard');
+  fcard.hidden = c.yearGroup === 'R';
+  if (!fcard.hidden) {
+    var flag = S.flags[c.pupilCode] || '', worked = S.recSecure[c.pupilCode] || 'No';
+    $('flagHint').textContent = flag ? 'You chose "' + flag + '". From the records it would be "' + worked + '".'
+      : 'Worked out from the records: ' + worked + '. Every Year 1 "on track" answer needs this to be Yes.';
+    var fb = $('flagBox');
+    fb.innerHTML = '';
+    [['Yes', 'Yes'], ['No', 'No'], ['', 'Work it out']].forEach(function (o) {
+      fb.appendChild(el('button', { class: 'chip' + (flag === o[0] ? ' on' : ''), text: o[1], on: { click: function () { setFlag(c.pupilCode, o[0]); } } }));
+    });
+  }
+  if (!keepBlocks) drawBlocks();
+}
+function setFlag(code, value) {
+  postJSON({ action: 'setFlag', pupilCode: code, value: value }).then(function (d) {
+    if (value) S.flags[code] = value; else delete S.flags[code];
+    takeChildren(d);
+  }).catch(function (e) { banner('err', 'Not saved: ' + e.message, function () { setFlag(code, value); }); });
+}
+function shownItems(block) {
+  var m = S.marks[S.child] || {};
+  return block.items.filter(function (i) { return !S.gaps || !(m[i] && m[i][0] === 'secure'); });
+}
+// "Gaps only" decides which tiles show when the record is drawn; a tile tapped secure stays on screen until the
+// record is drawn again, so the list does not jump about mid-assessment.
+function drawBlocks() {
+  var box = $('blocks');
+  var keepY = window.scrollY;
+  box.innerHTML = '';
+  var any = false;
+  S.cat.blocks.forEach(function (b) {
+    if (S.phases.indexOf(b.phase) < 0) return;
+    var list = shownItems(b);
+    if (!list.length) return;
+    any = true;
+    box.appendChild(blockCard(b, list));
+  });
+  if (!any) box.appendChild(el('div', { class: 'card empty' }, [el('b', { text: S.gaps ? 'No gaps in the phases chosen' : 'Choose a phase' }),
+    S.gaps ? 'Everything shown is secure. Choose more phases above, or untick "Gaps only".' : '']));
+  window.scrollTo(0, keepY);
+}
+function blockCard(b, list) {
+  var m = S.marks[S.child] || {};
+  var sec = b.items.filter(function (i) { return m[i] && m[i][0] === 'secure'; }).length;
+  var card = el('div', { class: 'card block' });
+  var redraw = function () { card.replaceWith(blockCard(b, list)); };
+  card.appendChild(el('div', { class: 'bhead' }, [el('h3', { text: b.title }),
+    el('span', { class: 'count', text: sec + ' / ' + b.items.length + ' secure' }),
+    el('span', { class: 'grow' }),
+    el('button', { class: 'lnk', text: '▶ Cards', on: { click: function () { startFlash(list, b.title); } } }),
+    el('button', { class: 'lnk', text: '✓ All secure', on: { click: function () {
+      list.forEach(function (i) { if (markState(S.child, i) !== 'secure') setMark(S.child, i, 'secure'); });
+      redraw();
+    } } })]));
+  var tiles = el('div', { class: 'tiles' });
+  list.forEach(function (i) { tiles.appendChild(tile(i, redraw)); });
+  card.appendChild(tiles);
+  return card;
+}
+function tile(i, redraw) {
+  var it = S.cat.items[i], st = markState(S.child, i), mk = (S.marks[S.child] || {})[i];
+  var t = el('button', { class: 'tile' + (it.say ? ' say' : '') + (st ? ' ' + st : '') + ((S.child + '|' + i) in S.queue ? ' pend' : ''),
+                         title: it.label, 'data-item': i });
+  if (st === 'secure') t.style.background = termColour(mk[1]) || 'var(--t' + S.term + ')';
+  t.appendChild(document.createTextNode(it.say || it.show));
+  if (it.hint) t.appendChild(el('small', { text: it.hint }));
+  if (st) t.appendChild(el('span', { class: 'mk', text: st === 'secure' ? '✓' : '✗' }));
+  t.addEventListener('click', function () {
+    setMark(S.child, i, st === '' ? 'secure' : st === 'secure' ? 'not' : '');
+    if (redraw) redraw(); else t.replaceWith(tile(i));
+  });
+  return t;
+}
+
+// ── Cards for the child ─────────────────────────────────────────────────────────────────────────────
+var F = null;
+function startFlash(list, where) {
+  if (!list.length) return;
+  F = { list: list.slice(), pos: 0, where: where, before: {} };
+  list.forEach(function (i) { F.before[i] = markState(S.child, i); });
+  $('flash').hidden = false;
+  document.body.style.overflow = 'hidden';
+  drawFlash();
+}
+function startFlashAll() {
+  var list = [];
+  S.cat.blocks.forEach(function (b) { if (S.phases.indexOf(b.phase) >= 0) list = list.concat(shownItems(b)); });
+  if (!list.length) { banner('info', 'Nothing to show: choose a phase, or untick "Gaps only".'); return; }
+  startFlash(list, S.gaps ? 'Gaps' : 'Everything chosen');
+}
+function drawFlash() {
+  var box = $('fCard');
+  box.innerHTML = '';
+  var done = F.pos >= F.list.length;
+  $('fButtons').style.visibility = done ? 'hidden' : 'visible';
+  if (done) {
+    var nowSec = F.list.filter(function (i) { return markState(S.child, i) === 'secure' && F.before[i] !== 'secure'; }).length;
+    var notYet = F.list.filter(function (i) { return markState(S.child, i) === 'not'; }).length;
+    box.appendChild(el('div', { class: 'done' }, [el('b', { text: 'All done' }),
+      el('div', { text: nowSec + ' newly secure · ' + notYet + ' not yet' }),
+      el('div', { style: 'margin-top:18px' }, [el('button', { class: 'btn', text: 'Back to the record', on: { click: closeFlash } })])]));
+    $('fCount').textContent = '';
+    $('fWhere').textContent = F.where;
+    return;
+  }
+  var i = F.list[F.pos], it = S.cat.items[i], st = markState(S.child, i);
+  var blk = S.cat.blocks.find(function (b) { return b.key === it.block; });
+  $('fWhere').textContent = blk ? blk.title : '';
+  $('fCount').textContent = (F.pos + 1) + ' of ' + F.list.length;
+  if (it.say) {
+    box.appendChild(el('div', { class: 'say', text: '👂' }));
+    box.appendChild(el('div', { class: 'say', text: 'Say: ' + it.say }));
+    box.appendChild(el('div', { class: 'note', text: 'Say the sounds; the child says the word.' }));
+  } else {
+    box.appendChild(el('div', { class: 'big' + (it.show.length > 3 ? ' word' : ''), text: it.show }));
+    if (it.hint) box.appendChild(el('div', { class: 'note', text: it.hint }));
+  }
+  box.appendChild(el('div', { class: 'note state', text: st === 'secure' ? '✓ secure' : st === 'not' ? '✗ not yet' : '' }));
+}
+function flashMark(state) {
+  if (!F || F.pos >= F.list.length) return;
+  var i = F.list[F.pos];
+  if (markState(S.child, i) !== state) setMark(S.child, i, state);
+  F.pos++;
+  drawFlash();
+}
+function closeFlash() {
+  $('flash').hidden = true;
+  document.body.style.overflow = '';
+  F = null;
+  drawChildTop();
+}
+$('fSec').onclick = function () { flashMark('secure'); };
+$('fNot').onclick = function () { flashMark('not'); };
+$('fSkip').onclick = function () { if (F) { F.pos++; drawFlash(); } };
+$('fPrev').onclick = function () { if (F && F.pos > 0) { F.pos--; drawFlash(); } };
+$('fClose').onclick = closeFlash;
+document.addEventListener('keydown', function (e) {
+  if (!F) return;
+  if (e.key === 'ArrowRight' || e.key === 'Enter') flashMark('secure');
+  else if (e.key === 'ArrowLeft') flashMark('not');
+  else if (e.key === 'ArrowDown') $('fSkip').click();
+  else if (e.key === 'ArrowUp') $('fPrev').click();
+  else if (e.key === 'Escape') closeFlash();
+});
+
+// ── The CLF spreadsheet ─────────────────────────────────────────────────────────────────────────────
+function xmlEscape(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function exportSheet() {
+  var btn = $('btnExport');
+  btn.disabled = true;
+  var go = function () {
+    return getJSON(API + '&action=export&year=' + S.year + (S.cls ? '&class=' + encodeURIComponent(S.cls) : ''));
+  };
+  (Object.keys(S.queue).length ? flush().then(go) : go()).then(function (d) {
+    var names = (window.WFANames && WFANames.screen.active && WFANames.screen.file) || null;
+    var pick = names ? Promise.resolve(names) : (window.WFANames ? WFANames.pick({
+      purpose: 'The CLF spreadsheet needs the children\'s full names. Choose your names file: it is read on this device only and never uploaded.',
+      skipLabel: 'Use initials' }) : Promise.resolve(null));
+    return pick.then(function (file) {
+      return JSZip.loadAsync(d.file_b64, { base64: true }).then(function (zip) {
+        var byPart = {};
+        d.names.forEach(function (n) { (byPart[n.part] = byPart[n.part] || []).push(n); });
+        var missing = 0;
+        return Promise.all(Object.keys(byPart).map(function (part) {
+          return zip.file(part).async('string').then(function (xml) {
+            byPart[part].forEach(function (n) {
+              var who = file && file.get(n.pupilCode);
+              var full = who ? (who.name || (who.first + ' ' + who.last)).trim() : '';
+              if (!full) { missing++; return; }
+              var re = new RegExp('(<c r="' + n.cell + '"[^>]*t="inlineStr"><is><t[^>]*>)[^<]*(</t></is></c>)');
+              xml = xml.replace(re, function (_, a, b) { return a + xmlEscape(full) + b; });
+            });
+            zip.file(part, xml);
+          });
+        })).then(function () {
+          return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', mimeType: 'application/vnd.ms-excel.sheet.macroEnabled.12' });
+        }).then(function (blob) {
+          var a = el('a', { href: URL.createObjectURL(blob), download: d.filename });
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 60000);
+          var kids = d.children;
+          if (!file) banner('info', 'Spreadsheet downloaded for ' + kids + ' children, with initials instead of names (no names file chosen).');
+          else if (missing) banner('info', 'Spreadsheet downloaded. ' + Math.ceil(missing / 3) + ' child(ren) were not in your names file, so they show initials.');
+          else banner('ok', 'Spreadsheet downloaded for ' + kids + ' children: ' + d.filename);
+        });
+      });
+    });
+  }).catch(function (e) {
+    banner('err', 'The spreadsheet could not be made: ' + e.message, exportSheet);
+  }).then(function () { btn.disabled = false; });
+}
+
+// ── Wiring ──────────────────────────────────────────────────────────────────────────────────────────
+$('fYear').onchange = function () { S.year = this.value; S.cls = ''; S.child = null; store(YKEY, S.year); load(); };
+$('fClass').onchange = function () { S.cls = this.value; drawClass(); };
+$('btnBack').onclick = closeChild;
+$('btnFlash').onclick = startFlashAll;
+$('gapsOnly').onchange = function () { S.gaps = this.checked; drawBlocks(); };
+$('btnExport').onclick = exportSheet;
+
+// The shared names helper puts its button in the bottom corner, where it covers this page's buttons; keep it in the toolbar.
+if (window.WFANames) {
+  var NS = WFANames.screen, slot = $('namesSlot'), baseUi = NS._ui;
+  NS._ui = function () {
+    baseUi.apply(NS, arguments);
+    [NS._btn, NS._bar].forEach(function (e) {
+      if (!e || e.parentNode === slot) return;
+      e.style.position = 'static'; e.style.transform = 'none'; e.style.boxShadow = 'none';
+      e.style.right = e.style.bottom = e.style.left = 'auto';
+      slot.appendChild(e);
+    });
+  };
+  NS.init();
+  NS._ui();
+}
+S.queue = recall(QKEY) || {};
+S.year = recall(YKEY) || 'R';
+$('fYear').value = S.year;
+showSave();
+load().then(function () { if (Object.keys(S.queue).length) scheduleSave(0); });
+</script>
+</body>
+</html>
