@@ -14,6 +14,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa.css">
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root { --ink:#0a0101; --muted:#5b6b7b; --line:#d9e3ec; --soft:#f4f9fd; --ok:#2bae62; --warn:#e57d24; --bad:#c62828;
           --t1:#ffd84d; --t2:#8fd694; --t3:#ff9ecb; --t4:#ffb366; --t5:#7fc8f8; --t6:#c3a6ff; --old:#cfd8dc; }
@@ -105,19 +106,33 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .tile.pend::after { content: ''; position: absolute; left: 6px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
   .flagbox { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-  /* flashcards */
-  .flash { position: fixed; inset: 0; background: var(--cream); z-index: 50; display: flex; flex-direction: column; }
-  .flash .top { display: flex; align-items: center; gap: 12px; padding: 12px 16px; color: var(--muted); font-weight: 800; }
-  .flash .card-area { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 10px; }
-  .flash .big { font-family: var(--cardfont); font-size: min(34vh, 24vw); line-height: 1.1; color: var(--cardink); text-align: center; word-break: break-word; }
-  .flash .big.word { font-size: min(22vh, 13vw); }
-  body.font-od .flash .big { font-size: min(26vh, 18vw); }
-  body.font-od .flash .big.word { font-size: min(16vh, 9.5vw); }
+  /* card mode = the TEACHER version (the child sees child.html on a second screen) */
+  .flash { position: fixed; inset: 0; background: #fff; z-index: 50; display: flex; flex-direction: column; }
+  .flash .top { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; padding: 12px 16px; color: var(--muted); font-weight: 800; }
+  .flash .top > * { white-space: nowrap; }
+  .flash .card-area { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 10px 16px; }
+  .flash .preview { background: var(--cream); border: 2px solid #eadfc2; border-radius: 18px; width: min(560px, 92%); min-height: 34vh;
+                    display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; }
+  .flash .plabel { font-size: .8rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  .flash .big { font-family: var(--cardfont); font-size: min(22vh, 15vw); line-height: 1.1; color: var(--cardink); text-align: center; word-break: break-word; }
+  .flash .big.word { font-size: min(13vh, 9vw); }
+  body.font-od .flash .big { font-size: min(17vh, 11vw); }
+  body.font-od .flash .big.word { font-size: min(10vh, 6.5vw); }
   body.font-od .tile { font-size: 1.2rem; }
   .fontpick select { padding: 6px 10px; }
   .flash .note { margin-top: 14px; color: var(--muted); font-weight: 700; font-size: 1rem; }
-  .flash .listen { font-size: min(30vh, 22vw); line-height: 1; }
-  .flash .teacher { margin: 0 16px; padding: 10px 14px; border-radius: 12px; background: #eef4f9; font-weight: 800; font-size: 1.05rem; text-align: center; }
+  .flash .listen { font-size: min(20vh, 14vw); line-height: 1; }
+  .flash .teacher { margin-top: 14px; padding: 12px 16px; border-radius: 12px; background: #eef4f9; font-weight: 800; font-size: 1.5rem; text-align: center; }
+  .flash .teacher small { display: block; font-size: .9rem; color: var(--muted); font-weight: 700; margin-top: 4px; }
+  .scr { border: 2px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 12px; font-weight: 800; color: var(--ink); white-space: nowrap; flex: none; }
+  .scr .d { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #b9c5d0; margin-right: 6px; }
+  .scr.on .d { background: var(--ok); }
+  .modal { position: fixed; inset: 0; background: rgba(10,1,1,.45); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal .box { background: #fff; border-radius: 16px; padding: 20px; max-width: 460px; width: 100%; text-align: center; }
+  .modal h3 { margin: 0 0 6px; }
+  .modal .code { font-size: 2.2rem; font-weight: 900; letter-spacing: .25em; margin: 10px 0; }
+  .modal #qr { display: flex; justify-content: center; margin: 12px 0; }
+  .modal .status { font-weight: 800; margin: 8px 0 14px; }
   .flash .bottom { display: grid; grid-template-columns: 1.4fr .8fr .8fr 1.4fr; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
   .flash .bottom button { border: 0; border-radius: 14px; padding: 18px 10px; font-size: 1.15rem; font-weight: 900; }
   .fNot { background: #fdecec; color: var(--bad); }
@@ -168,7 +183,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <h2 id="cName"></h2>
       <span class="grow"></span>
       <span class="save-state" id="saveState2"></span>
-      <button class="btn" id="btnFlash">▶ Show cards to the child</button>
+      <button class="btn" id="btnFlash">▶ Card mode</button>
     </div>
     <div class="panelrow">
       <div class="card"><div style="font-weight:800;margin-bottom:6px" id="otTitle">On track</div><table class="otgrid" id="otGrid"></table></div>
@@ -188,13 +203,25 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-24.10.26c</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-24.10.26d</span></footer>
 
-<!-- full-screen cards -->
+<!-- link a child screen -->
+<div class="modal" id="scrModal" hidden>
+  <div class="box">
+    <h3>Child screen</h3>
+    <p class="hint">On the device in front of the child (signed in to the staff site), scan this code, or open the address below and type the code. It then shows only the card, and follows this iPad.</p>
+    <div id="qr"></div>
+    <div class="code" id="scrCode"></div>
+    <div class="hint" id="scrLink" style="word-break:break-all"></div>
+    <div class="status" id="scrStatus"></div>
+    <button class="btn quiet" id="scrNew">New code</button> <button class="btn" id="scrClose">Done</button>
+  </div>
+</div>
+
+<!-- card mode: the teacher version -->
 <div class="flash" id="flash" hidden>
-  <div class="top"><span id="fWhere"></span><span class="grow"></span><label class="toggle fontpick"><select class="cardFont" aria-label="Card font"><option value="sassoon">Sassoon Infant</option><option value="od">OpenDyslexic</option></select></label><span id="fCount"></span><button class="btn quiet" id="fClose">Finish</button></div>
+  <div class="top"><span id="fWhere"></span><span class="grow"></span><button class="scr" id="fScreen"><span class="d"></span>Link child screen</button><label class="toggle fontpick"><select class="cardFont" aria-label="Card font"><option value="sassoon">Sassoon Infant</option><option value="od">OpenDyslexic</option></select></label><span id="fCount"></span><button class="btn quiet" id="fClose">Finish</button></div>
   <div class="card-area" id="fCard"></div>
-  <div class="teacher" id="fTeacher" hidden></div>
   <div class="bottom" id="fButtons">
     <button class="fNot" id="fNot">✗ Not yet</button>
     <button class="fNav" id="fPrev">‹ Back</button>
@@ -541,7 +568,8 @@ function tile(i, redraw) {
   return t;
 }
 
-// ── Cards for the child ─────────────────────────────────────────────────────────────────────────────
+// ── Card mode (teacher version). The card itself shows on the child's own screen (child.html), linked by a
+//    6-character screen code; this iPad shows a preview, the sounds to say and the buttons. ──────────────
 var F = null;
 function startFlash(list, where) {
   if (!list.length) return;
@@ -550,6 +578,7 @@ function startFlash(list, where) {
   $('flash').hidden = false;
   document.body.style.overflow = 'hidden';
   drawFlash();
+  checkScreen();
 }
 function startFlashAll() {
   var list = [];
@@ -563,7 +592,7 @@ function drawFlash() {
   var done = F.pos >= F.list.length;
   $('fButtons').style.visibility = done ? 'hidden' : 'visible';
   if (done) {
-    $('fTeacher').hidden = true;
+    sendScreen('');
     var nowSec = F.list.filter(function (i) { return markState(S.child, i) === 'secure' && F.before[i] !== 'secure'; }).length;
     var notYet = F.list.filter(function (i) { return markState(S.child, i) === 'not'; }).length;
     box.appendChild(el('div', { class: 'done' }, [el('b', { text: 'All done' }),
@@ -577,16 +606,14 @@ function drawFlash() {
   var blk = S.cat.blocks.find(function (b) { return b.key === it.block; });
   $('fWhere').textContent = blk ? blk.title : '';
   $('fCount').textContent = (F.pos + 1) + ' of ' + F.list.length;
-  // Oral blending: nothing for the child to read. The sounds to say sit by the adult's buttons, small.
-  $('fTeacher').textContent = it.say ? 'Say the sounds: ' + it.say + '  ·  the child blends them into the word' : '';
-  $('fTeacher').hidden = !it.say;
-  if (it.say) {
-    box.appendChild(el('div', { class: 'listen', text: '👂' }));
-    box.appendChild(el('div', { class: 'note', text: 'Listen' }));
-  } else {
-    box.appendChild(el('div', { class: 'big' + (it.show.length > 3 ? ' word' : ''), text: it.show }));
-    if (it.hint) box.appendChild(el('div', { class: 'note', text: it.hint }));
-  }
+  sendScreen(i);
+  var pv = el('div', { class: 'preview' }, [it.say ? el('div', { class: 'listen', text: '👂' })
+                                                   : el('div', { class: 'big' + (it.show.length > 3 ? ' word' : ''), text: it.show })]);
+  box.appendChild(el('div', { class: 'plabel', text: "On the child's screen" }));
+  box.appendChild(pv);
+  // Oral blending: the child reads nothing; the adult says the sounds and the child blends them
+  if (it.say) box.appendChild(el('div', { class: 'teacher' }, ['Say: ' + it.say, el('small', { text: 'The child blends the sounds into the word.' })]));
+  else if (it.hint) box.appendChild(el('div', { class: 'note', text: 'For you: ' + it.hint }));
   box.appendChild(el('div', { class: 'note state', text: st === 'secure' ? '✓ secure' : st === 'not' ? '✗ not yet' : '' }));
 }
 function flashMark(state) {
@@ -597,6 +624,7 @@ function flashMark(state) {
   drawFlash();
 }
 function closeFlash() {
+  sendScreen('');
   $('flash').hidden = true;
   document.body.style.overflow = '';
   F = null;
@@ -607,6 +635,56 @@ $('fNot').onclick = function () { flashMark('not'); };
 $('fSkip').onclick = function () { if (F) { F.pos++; drawFlash(); } };
 $('fPrev').onclick = function () { if (F && F.pos > 0) { F.pos--; drawFlash(); } };
 $('fClose').onclick = closeFlash;
+
+// child screen link
+var SKEY = 'wfa_ph_screen_v1', SCR = { code: recall(SKEY) || '', ago: null, last: null, timer: null, chain: Promise.resolve() };
+function newScreenCode() {
+  var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', c = '', r = new Uint32Array(6);
+  crypto.getRandomValues(r);
+  for (var k = 0; k < 6; k++) c += A[r[k] % A.length];
+  SCR.code = c; SCR.ago = null; store(SKEY, c);
+}
+function childUrl() { return location.origin + location.pathname.replace(/[^/]*$/, '') + 'child.html#' + SCR.code; }
+function screenOn() { return SCR.ago != null && SCR.ago < 10; }
+function sendScreen(item) {
+  // only once a child screen has been linked, so a single iPad on its own writes nothing
+  if (!SCR.code || SCR.ago == null || SCR.ago > 120) { SCR.last = item; return; }
+  SCR.last = item;
+  var font = document.body.classList.contains('font-od') ? 'od' : 'sassoon';
+  SCR.chain = SCR.chain.then(function () {               // one at a time, so the child screen never shows an older card
+    return postJSON({ action: 'screen', code: SCR.code, item: item, font: font })
+      .then(function (d) { SCR.ago = d.childAgo; drawScreenState(); });
+  }).catch(function () {});
+}
+function checkScreen() {
+  clearTimeout(SCR.timer);
+  if (!SCR.code || ($('flash').hidden && $('scrModal').hidden)) return;
+  getJSON(API + '&action=screen&code=' + SCR.code).then(function (d) {
+    var was = screenOn();
+    SCR.ago = d.childAgo;
+    drawScreenState();
+    if (screenOn() && !was && F) sendScreen(SCR.last || '');     // a child screen has just joined: show it the card
+  }).catch(function () {}).then(function () { SCR.timer = setTimeout(checkScreen, 3000); });
+}
+function drawScreenState() {
+  $('fScreen').className = 'scr' + (screenOn() ? ' on' : '');
+  $('fScreen').lastChild.textContent = screenOn() ? 'Child screen on' : 'Link child screen';
+  $('scrStatus').textContent = screenOn() ? '✓ The child screen is showing the cards.' : 'Waiting for the child screen…';
+  $('scrStatus').style.color = screenOn() ? '#1d7a45' : 'var(--muted)';
+}
+function openScreenPanel() {
+  if (!SCR.code) newScreenCode();
+  $('scrCode').textContent = SCR.code;
+  $('scrLink').textContent = childUrl();
+  $('qr').innerHTML = '';
+  if (window.QRCode) new QRCode($('qr'), { text: childUrl(), width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+  $('scrModal').hidden = false;
+  drawScreenState();
+  checkScreen();
+}
+$('fScreen').onclick = openScreenPanel;
+$('scrClose').onclick = function () { $('scrModal').hidden = true; if (F) { sendScreen(SCR.last || ''); checkScreen(); } };
+$('scrNew').onclick = function () { newScreenCode(); openScreenPanel(); };
 document.addEventListener('keydown', function (e) {
   if (!F) return;
   if (e.key === 'ArrowRight' || e.key === 'Enter') flashMark('secure');
@@ -674,6 +752,7 @@ function setFont(f) {
   document.body.classList.toggle('font-od', f === 'od');
   Array.prototype.forEach.call(document.querySelectorAll('.cardFont'), function (s) { s.value = f; });
   store(FKEY, f);
+  if (typeof F !== 'undefined' && F && F.pos < F.list.length) sendScreen(F.list[F.pos]);
 }
 Array.prototype.forEach.call(document.querySelectorAll('.cardFont'), function (s) { s.onchange = function () { setFont(this.value); }; });
 setFont(recall(FKEY));
