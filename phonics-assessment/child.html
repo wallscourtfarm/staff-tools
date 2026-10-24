@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+/* WFA 25.09.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Phonics cards</title>
+<link rel="icon" href="../favicon.png">
+<style>
+  /* The CHILD's screen: a card and nothing else. The adult's iPad (index.html, card mode) chooses what shows.
+     Cream background and soft black text (dyslexia-friendly); font Sassoon Infant or OpenDyslexic, as the adult chose. */
+  @font-face { font-family: 'WFA Sassoon'; src: url('../precision-teaching/fonts/SassoonInfant.ttf') format('truetype'); font-display: swap; }
+  @font-face { font-family: 'OpenDyslexic'; src: url('https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5.2.5/files/opendyslexic-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+  :root { --cardfont: 'WFA Sassoon', system-ui, sans-serif; }
+  body.font-od { --cardfont: 'OpenDyslexic', system-ui, sans-serif; }
+  html, body { margin: 0; height: 100%; background: #fdf6e3; color: #1f1f1f; font-family: system-ui, sans-serif; overflow: hidden;
+               -webkit-user-select: none; user-select: none; }
+  [hidden] { display: none !important; }
+  #card { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 4vw; box-sizing: border-box; }
+  .big { font-family: var(--cardfont); font-size: min(40vh, 28vw); line-height: 1.1; text-align: center; word-break: break-word; }
+  .big.word { font-size: min(26vh, 15vw); }
+  body.font-od .big { font-size: min(30vh, 21vw); }
+  body.font-od .big.word { font-size: min(19vh, 11vw); }
+  .listen { font-size: min(40vh, 30vw); line-height: 1; }
+  #dot { position: fixed; left: 12px; bottom: 12px; width: 10px; height: 10px; border-radius: 50%; background: #c9c2b0; }
+  #dot.bad { background: #e57d24; }
+  #menu { position: fixed; right: 8px; top: 8px; border: 0; background: none; color: #c9c2b0; font-size: 1.6rem; padding: 6px 10px; }
+  #lost { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px; text-align: center; color: #8a6d3b; font-weight: 700; }
+  #setup { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #fdf6e3; }
+  #setup .box { text-align: center; max-width: 520px; padding: 20px; }
+  #setup h1 { font-size: 1.5rem; margin: 0 0 10px; }
+  #setup p { color: #5b6b7b; margin: 0 0 16px; }
+  #setup input { font: inherit; font-size: 2rem; letter-spacing: .3em; text-transform: uppercase; text-align: center; width: 9ch;
+                 padding: 10px; border: 3px solid #d9e3ec; border-radius: 12px; }
+  #setup button { font: inherit; font-weight: 800; font-size: 1.1rem; margin-left: 8px; padding: 14px 20px; border: 0; border-radius: 12px; background: #1798d3; color: #fff; }
+  #setup .err { color: #c62828; font-weight: 700; margin-top: 12px; min-height: 1.2em; }
+  #ver { position: fixed; right: 10px; bottom: 8px; font-size: .7rem; color: #c9c2b0; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<span id="dot" title="Connection"></span>
+<button id="menu" aria-label="Change screen code">⋯</button>
+<div id="lost" hidden>Waiting for the adult's iPad… check the wifi.</div>
+<div id="setup" hidden>
+  <div class="box">
+    <h1>Phonics cards: child's screen</h1>
+    <p>On the adult's iPad open Phonics Assessment, start the cards and tap "📺 Child screen". Scan the QR code with this device, or type the code here.</p>
+    <div><input id="code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false"><button id="go">Start</button></div>
+    <div class="err" id="err"></div>
+  </div>
+</div>
+<span id="ver">WFA-24.10.26d</span>
+
+<script>
+'use strict';
+var API = 'https://api.wallscourt-farm-academy.co.uk/planning/phonics-db?token=__hub__';
+var CKEY = 'wfa_ph_childscreen_v1', OK = /^[A-HJ-NP-Z2-9]{6}$/;
+var C = { code: '', seq: -1, items: null, fails: 0, timer: null };
+
+function $(id) { return document.getElementById(id); }
+function remember(v) { try { if (v) localStorage.setItem(CKEY, v); else localStorage.removeItem(CKEY); } catch (e) {} }
+function recalled() { try { return localStorage.getItem(CKEY) || ''; } catch (e) { return ''; } }
+function getJSON(url) {
+  return fetch(url, { cache: 'no-store' }).then(function (r) {
+    if (!r.ok) throw new Error('the server said ' + r.status);
+    return r.json();
+  }).then(function (d) { if (!d || d.ok !== true) throw new Error((d && d.error) || 'no answer'); return d; });
+}
+
+function show(item, font) {
+  document.body.classList.toggle('font-od', font === 'od');
+  var box = $('card');
+  box.innerHTML = '';
+  var it = item && C.items[item];
+  if (!it) return;                                   // a blank card between children
+  var d = document.createElement('div');
+  if (it.say) { d.className = 'listen'; d.textContent = '👂'; }       // oral blending: nothing to read
+  else { d.className = 'big' + (it.show.length > 3 ? ' word' : ''); d.textContent = it.show; }
+  box.appendChild(d);
+}
+
+function poll() {
+  clearTimeout(C.timer);
+  getJSON(API + '&action=screen&role=child&code=' + C.code + '&seq=' + C.seq).then(function (d) {
+    C.fails = 0; $('dot').className = ''; $('lost').hidden = true;
+    if (d.seq !== C.seq) { C.seq = d.seq; show(d.item, d.font); }
+  }).catch(function () {
+    C.fails++;
+    $('dot').className = 'bad';
+    if (C.fails > 12) $('lost').hidden = false;
+  }).then(function () { C.timer = setTimeout(poll, document.hidden ? 3000 : 600); });
+}
+
+// keep the screen on while it is showing cards (Safari 16.4+; ignored elsewhere)
+var lock = null;
+function stayAwake() {
+  if (!('wakeLock' in navigator) || document.hidden) return;
+  navigator.wakeLock.request('screen').then(function (l) { lock = l; }).catch(function () {});
+}
+document.addEventListener('visibilitychange', function () { if (!document.hidden) { stayAwake(); poll(); } });
+
+function start(code) {
+  code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!OK.test(code)) { $('setup').hidden = false; $('err').textContent = code ? 'That code is not right: it has 6 letters and numbers.' : ''; return; }
+  C.code = code; C.seq = -1;
+  remember(code);
+  if (location.hash.slice(1) !== code) history.replaceState(null, '', '#' + code);
+  $('setup').hidden = true;
+  stayAwake();
+  poll();
+}
+function setup() { clearTimeout(C.timer); $('card').innerHTML = ''; $('code').value = C.code; $('setup').hidden = false; $('code').focus(); }
+
+$('go').onclick = function () { start($('code').value); };
+$('code').addEventListener('keydown', function (e) { if (e.key === 'Enter') start(this.value); });
+$('menu').onclick = setup;
+window.addEventListener('hashchange', function () { start(location.hash.slice(1)); });
+
+getJSON(API + '&action=catalogue').then(function (d) {
+  C.items = d.catalogue.items;
+  start(location.hash.slice(1) || recalled());
+}).catch(function (e) {
+  $('setup').hidden = false;
+  $('err').textContent = 'Could not load (' + e.message + '). Check this device is signed in to the staff site.';
+});
+</script>
+</body>
+</html>
