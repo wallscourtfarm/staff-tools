@@ -214,7 +214,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26b</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26c</span></footer>
 
 <!-- import a filled-in ULS spreadsheet -->
 <div class="modal" id="impModal" hidden>
@@ -801,7 +801,7 @@ $('showAll').onchange = function () { S.showAll = this.checked; drawClass(); };
 var IMP = null;
 var YEAR_NAMES = { R: 'Reception', Y1: 'Year 1', Y2: 'Year 2', Y3: 'Year 3' };
 function openImport() {
-  IMP = { file: null, plan: null, choice: {} };
+  IMP = { file: null, plan: null, choice: {}, how: {}, names: (window.WFANames && WFANames.screen.active && WFANames.screen.file) || null };
   $('impTitle').textContent = 'Import a ULS spreadsheet: ' + YEAR_NAMES[S.year];
   $('impFile').value = '';
   $('impBody').innerHTML = '';
@@ -820,27 +820,85 @@ function impPreview() {
   impPost('importPreview').then(function (d) {
     if (!IMP.plan) d.rows.forEach(function (r) { IMP.choice[r.name] = r.pupilCode || ''; });
     IMP.plan = d;
+    if (IMP.names) matchWithNames();
     drawImport();
   }).catch(function (e) { $('impMsg').textContent = 'Could not read it: ' + e.message; });
+}
+// The teacher's names file (full name per pupil code, held on this device only) matches the spreadsheet's names
+// to children far better than initials can. Nothing about it is sent anywhere: only the chosen pupil codes are.
+function nameWords(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^a-z\s'-]/g, ' ').split(/[\s]+/).map(function (w) { return w.replace(/[^a-z]/g, ''); }).filter(Boolean);
+}
+function matchWithNames() {
+  var d = IMP.plan, nf = IMP.names, kids = [];
+  d.roster.forEach(function (p) {
+    var who = nf.get(p.pupilCode);
+    if (!who) return;
+    var f = nameWords(who.first), l = nameWords(who.last);
+    if (!f.length) { var all = nameWords(who.name); f = all.slice(0, 1); l = all.slice(1); }
+    kids.push({ code: p.pupilCode, first: f[0] || '', last: l, lastWord: l[l.length - 1] || '' });
+  });
+  var tests = [
+    function (w, k) { return w.length > 1 && w[0] === k.first && w[w.length - 1] === k.lastWord; },               // First Last
+    function (w, k) { return w.length > 1 && w[0] === k.first && (k.last.indexOf(w[w.length - 1]) >= 0 || w.indexOf(k.lastWord) > 0); }, // middle names, two surnames
+    function (w, k) { return w.length > 1 && w[w.length - 1] === k.first && w[0] === k.lastWord; },              // Last First
+    function (w, k) { return w.length === 1 && w[0] === k.first; }                                                // first name only
+  ];
+  var taken = {}, done = {};
+  tests.forEach(function (test) {
+    d.rows.forEach(function (r) {
+      if (done[r.name]) return;
+      var w = nameWords(r.name);
+      var c = kids.filter(function (k) { return !taken[k.code] && test(w, k); });
+      if (c.length === 1) { IMP.choice[r.name] = c[0].code; IMP.how[r.name] = 'names'; taken[c[0].code] = 1; done[r.name] = 1; }
+    });
+  });
+}
+function rosterText(p) {
+  var who = IMP.names && IMP.names.get(p.pupilCode);
+  return (who ? (who.name || (who.first + ' ' + who.last)).trim() : p.label) + ' (' + p.class + ')';
+}
+function needsLook(r) {
+  if (!IMP.choice[r.name]) return true;                                   // not matched yet
+  if (IMP.how[r.name] === 'names' || IMP.how[r.name] === 'chosen') return false;
+  return r.status === 'firstname';                                        // a guess from a first name alone
 }
 function drawImport() {
   var d = IMP.plan, box = $('impBody');
   box.innerHTML = '';
   var picked = d.rows.filter(function (r) { return IMP.choice[r.name]; }).length;
+  var look = d.rows.filter(needsLook).length;
+  var nb = el('div', { class: 'bar', style: 'margin:6px 0' });
+  if (!IMP.names && window.WFANames) {
+    nb.appendChild(el('button', { class: 'btn', text: '📇 Match using my names file', on: { click: function () {
+      WFANames.pick({ purpose: 'Your names file matches the spreadsheet\'s names to the children. It is read on this device only and never uploaded.', skipLabel: 'Cancel' })
+        .then(function (f) { if (f) { IMP.names = f; matchWithNames(); drawImport(); } });
+    } } }));
+    nb.appendChild(el('span', { class: 'hint', text: 'Matches by full name: far fewer to sort out by hand.' }));
+  } else if (IMP.names) {
+    var byNames = d.rows.filter(function (r) { return IMP.how[r.name] === 'names'; }).length;
+    nb.appendChild(el('span', { class: 'st ok', text: '📇 Names file used: ' + byNames + ' matched by name.' }));
+  }
+  box.appendChild(nb);
+  box.appendChild(el('p', { style: 'font-weight:800;color:' + (look ? 'var(--warn)' : '#1d7a45'),
+    text: look ? look + ' row' + (look === 1 ? ' needs' : 's need') + ' your attention (listed first).' : 'Every row is matched. Check the list, then press Import.' }));
   box.appendChild(el('p', { text: 'Sheets read: ' + d.sheets.map(function (s) { return s.name + ' (' + s.children + ')'; }).join(', ') + '. ' +
     d.rows.length + ' children with results; ' + picked + ' will be imported.' }));
   if (d.keep) box.appendChild(el('p', { class: 'hint', text: d.keep + ' results are already recorded in the tool and will be kept.' }));
   var words = d.unmatchedColumns.filter(function (u) { return u.charAt(0) !== '/' && u.length > 2; });
   if (words.length) box.appendChild(el('p', { class: 'hint', text: 'Not in the current ULS list, so not imported: ' + words.join(', ') + '.' }));
   var t = el('table', {}, [el('tr', {}, [el('th', { text: 'In the spreadsheet' }), el('th', { text: 'Child' }), el('th', { text: 'Results' })])]);
-  d.rows.forEach(function (r) {
+  var opts = d.roster.slice().sort(function (a, b) { return rosterText(a).localeCompare(rosterText(b)); });
+  var order = d.rows.slice().sort(function (a, b) { return needsLook(b) - needsLook(a); });
+  order.forEach(function (r) {
     var sel = el('select');
     sel.appendChild(el('option', { value: '', text: '— do not import —' }));
-    d.roster.forEach(function (p) { sel.appendChild(el('option', { value: p.pupilCode, text: p.label + ' (' + p.class + ')' })); });
+    opts.forEach(function (p) { sel.appendChild(el('option', { value: p.pupilCode, text: rosterText(p) })); });
     sel.value = IMP.choice[r.name] || '';
-    sel.onchange = function () { IMP.choice[r.name] = this.value; drawImport(); };
-    var st = IMP.choice[r.name] ? (IMP.choice[r.name] !== r.pupilCode ? ['ok', 'chosen'] : r.status === 'firstname' ? ['ask', 'check: matched on first name only']
-           : r.status === 'matched' ? ['ok', 'matched'] : ['ok', 'chosen'])
+    sel.onchange = function () { IMP.choice[r.name] = this.value; IMP.how[r.name] = 'chosen'; drawImport(); };
+    var st = IMP.choice[r.name] ? (IMP.how[r.name] === 'names' ? ['ok', 'matched by names file'] : IMP.how[r.name] === 'chosen' || IMP.choice[r.name] !== r.pupilCode ? ['ok', 'chosen']
+           : r.status === 'firstname' ? ['ask', 'check: matched on first name only'] : r.status === 'matched' ? ['ok', 'matched'] : ['ok', 'chosen'])
            : r.status === 'ambiguous' ? ['ask', 'choose: more than one match'] : r.status === 'duplicate' ? ['ask', 'choose: two names match one child']
            : ['no', 'not found: choose, or leave out'];
     t.appendChild(el('tr', {}, [el('td', { text: r.name }),
@@ -848,7 +906,10 @@ function drawImport() {
       el('td', { text: r.secure + ' secure · ' + r.notYet + ' not yet' })]));
   });
   box.appendChild(t);
-  if (d.notInFile.length) box.appendChild(el('p', { class: 'hint', text: 'On the class list but not matched: ' + d.notInFile.join(', ') + '.' }));
+  var chosenCodes = {};
+  Object.keys(IMP.choice).forEach(function (n) { if (IMP.choice[n]) chosenCodes[IMP.choice[n]] = 1; });
+  var left = d.roster.filter(function (p) { return !chosenCodes[p.pupilCode]; }).map(rosterText);
+  if (left.length) box.appendChild(el('p', { class: 'hint', text: 'On the class list with nothing to import: ' + left.join(', ') + '.' }));
   var dup = {};
   var clash = Object.keys(IMP.choice).some(function (n) { var c = IMP.choice[n]; if (!c) return false; if (dup[c]) return true; dup[c] = 1; return false; });
   $('impMsg').textContent = clash ? 'Two rows are set to the same child: fix that first.' : '';
