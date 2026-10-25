@@ -133,6 +133,15 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .modal .code { font-size: 2.2rem; font-weight: 900; letter-spacing: .25em; margin: 10px 0; }
   .modal #qr { display: flex; justify-content: center; margin: 12px 0; }
   .modal .status { font-weight: 800; margin: 8px 0 14px; }
+  .modal .box.imp { max-width: 760px; text-align: left; max-height: 90vh; display: flex; flex-direction: column; }
+  .imp #impBody { overflow-y: auto; margin: 10px 0; }
+  .imp table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  .imp th, .imp td { padding: 6px 8px; border-top: 1px solid var(--line); text-align: left; }
+  .imp th { font-size: .75rem; color: var(--muted); text-transform: uppercase; border-top: 0; }
+  .imp select { font-size: 15px; padding: 5px 8px; }
+  .imp .st { font-weight: 800; font-size: .8rem; }
+  .imp .st.ok { color: #1d7a45; } .imp .st.ask { color: var(--warn); } .imp .st.no { color: var(--muted); }
+  .imp .impfoot { display: flex; gap: 8px; align-items: center; }
   .flash .bottom { display: grid; grid-template-columns: 1.4fr .8fr .8fr 1.4fr; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
   .flash .bottom button { border: 0; border-radius: 14px; padding: 18px 10px; font-size: 1.15rem; font-weight: 900; }
   .fNot { background: #fdecec; color: var(--bad); }
@@ -163,16 +172,18 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <section id="vClass">
     <div class="bar">
       <select id="fYear" aria-label="Year group">
-        <option value="R">Reception</option><option value="Y1">Year 1</option><option value="Y2">Year 2</option>
+        <option value="R">Reception</option><option value="Y1">Year 1</option><option value="Y2">Year 2</option><option value="Y3">Year 3</option>
       </select>
       <select id="fClass" aria-label="Class"></select>
+      <label class="toggle" id="allWrap" hidden><input type="checkbox" id="showAll"> Show every child</label>
       <span class="grow"></span>
       <span class="save-state" id="saveState"></span>
+      <button class="btn quiet" id="btnImport">⬆ Import spreadsheet</button>
       <button class="btn ghost" id="btnExport">⬇ CLF spreadsheet</button>
       <span id="namesSlot"></span>
     </div>
     <div class="summary" id="summary"></div>
-    <p class="hint">Tap a child to assess them. Every tap is saved straight away, and this term's "on track" answers go to the Pupil Tracker.</p>
+    <p class="hint" id="classHint">Tap a child to assess them. Every tap is saved straight away, and this term's "on track" answers go to the Pupil Tracker.</p>
     <div class="card scroll-x" id="classList"><div class="empty">Loading…</div></div>
   </section>
 
@@ -203,7 +214,18 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-24.10.26d</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26a</span></footer>
+
+<!-- import a filled-in ULS spreadsheet -->
+<div class="modal" id="impModal" hidden>
+  <div class="box imp">
+    <h3 id="impTitle">Import a ULS spreadsheet</h3>
+    <p class="hint">Choose the filled-in ULS tracker for this year group (any version of the CLF spreadsheet). Nothing is saved until you press Import, and anything already recorded here is kept: the spreadsheet only fills in what is missing. Names are matched to the class lists on this screen and are not stored.</p>
+    <input type="file" id="impFile" accept=".xlsm,.xlsx">
+    <div id="impBody"></div>
+    <div class="impfoot"><span class="grow" id="impMsg"></span><button class="btn quiet" id="impCancel">Cancel</button> <button class="btn" id="impGo" disabled>Import</button></div>
+  </div>
+</div>
 
 <!-- link a child screen -->
 <div class="modal" id="scrModal" hidden>
@@ -386,7 +408,19 @@ function yn(v) {
   if (v !== 'Yes' && v !== 'No') return el('span', { class: 'yn na', text: '–' });
   return el('span', { class: 'yn ' + v, text: v });
 }
-function visibleChildren() { return S.children.filter(function (c) { return !S.cls || c.class === S.cls; }); }
+// Year 3: most children are secure in all of phonics, so only those still learning it are listed (have results,
+// and not every Phase 2-5c item secure), unless "Show every child" is ticked.
+function stillLearning(code) {
+  var m = S.marks[code] || {};
+  if (!Object.keys(m).length) return false;
+  return Object.keys(S.cat.items).some(function (i) { return S.cat.items[i].phase !== 'p1' && !(m[i] && m[i][0] === 'secure'); });
+}
+function visibleChildren() {
+  return S.children.filter(function (c) {
+    if (S.cls && c.class !== S.cls) return false;
+    return S.year !== 'Y3' || S.showAll || stillLearning(c.pupilCode);
+  });
+}
 
 // ── Class view ──────────────────────────────────────────────────────────────────────────────────────
 function drawClass() {
@@ -397,6 +431,10 @@ function drawClass() {
   if (classes.indexOf(S.cls) < 0) S.cls = '';
   fc.value = S.cls;
   fc.hidden = classes.length < 2;
+  $('allWrap').hidden = S.year !== 'Y3';
+  $('classHint').textContent = S.year === 'Y3' && !S.showAll
+    ? 'Year 3: only children still learning phonics are listed (tick "Show every child" to add someone). Tap a child to assess them.'
+    : 'Tap a child to assess them. Every tap is saved straight away, and this term\'s "on track" answers go to the Pupil Tracker.';
 
   // Reception and Year 1: this term's answer. Year 2: the end of Year 1 standard (Summer 2).
   var kids = visibleChildren(), current = S.year === 'R' || S.year === 'Y1';
@@ -476,7 +514,7 @@ function drawChild() {
   lg.innerHTML = '';
   lg.appendChild(document.createTextNode('Secure since:'));
   S.cat.terms.forEach(function (t, i) { lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--t' + (i + 1) + ')' }), t])); });
-  lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--old)' }), 'an earlier year']));
+  lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--old)' }), 'an earlier year, or imported']));
   lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:#fff3f3;border-color:#f0b4b4' }), 'not yet']));
   lg.appendChild(el('span', { text: '· Tap once for secure, again for not yet, again to clear.' }));
   drawChildTop();
@@ -757,6 +795,83 @@ function setFont(f) {
 Array.prototype.forEach.call(document.querySelectorAll('.cardFont'), function (s) { s.onchange = function () { setFont(this.value); }; });
 setFont(recall(FKEY));
 $('btnExport').onclick = exportSheet;
+$('showAll').onchange = function () { S.showAll = this.checked; drawClass(); };
+
+// ── Import a filled-in ULS spreadsheet ─────────────────────────────────────────────────────────────
+var IMP = null;
+var YEAR_NAMES = { R: 'Reception', Y1: 'Year 1', Y2: 'Year 2', Y3: 'Year 3' };
+function openImport() {
+  IMP = { file: null, plan: null, choice: {} };
+  $('impTitle').textContent = 'Import a ULS spreadsheet: ' + YEAR_NAMES[S.year];
+  $('impFile').value = '';
+  $('impBody').innerHTML = '';
+  $('impMsg').textContent = '';
+  $('impGo').disabled = true;
+  $('impModal').hidden = false;
+}
+function impPost(action) {
+  var overrides = {};
+  if (IMP.plan) IMP.plan.rows.forEach(function (r) { overrides[r.name] = IMP.choice[r.name] || ''; });
+  return postJSON({ action: action, year: S.year, file_b64: IMP.file, overrides: action === 'importPreview' && !IMP.plan ? {} : overrides });
+}
+function impPreview() {
+  $('impMsg').textContent = 'Reading the spreadsheet…';
+  $('impGo').disabled = true;
+  impPost('importPreview').then(function (d) {
+    if (!IMP.plan) d.rows.forEach(function (r) { IMP.choice[r.name] = r.pupilCode || ''; });
+    IMP.plan = d;
+    drawImport();
+  }).catch(function (e) { $('impMsg').textContent = 'Could not read it: ' + e.message; });
+}
+function drawImport() {
+  var d = IMP.plan, box = $('impBody');
+  box.innerHTML = '';
+  var picked = d.rows.filter(function (r) { return IMP.choice[r.name]; }).length;
+  box.appendChild(el('p', { text: 'Sheets read: ' + d.sheets.map(function (s) { return s.name + ' (' + s.children + ')'; }).join(', ') + '. ' +
+    d.rows.length + ' children with results; ' + picked + ' will be imported.' }));
+  if (d.keep) box.appendChild(el('p', { class: 'hint', text: d.keep + ' results are already recorded in the tool and will be kept.' }));
+  var words = d.unmatchedColumns.filter(function (u) { return u.charAt(0) !== '/' && u.length > 2; });
+  if (words.length) box.appendChild(el('p', { class: 'hint', text: 'Not in the current ULS list, so not imported: ' + words.join(', ') + '.' }));
+  var t = el('table', {}, [el('tr', {}, [el('th', { text: 'In the spreadsheet' }), el('th', { text: 'Child' }), el('th', { text: 'Results' })])]);
+  d.rows.forEach(function (r) {
+    var sel = el('select');
+    sel.appendChild(el('option', { value: '', text: '— do not import —' }));
+    d.roster.forEach(function (p) { sel.appendChild(el('option', { value: p.pupilCode, text: p.label + ' (' + p.class + ')' })); });
+    sel.value = IMP.choice[r.name] || '';
+    sel.onchange = function () { IMP.choice[r.name] = this.value; drawImport(); };
+    var st = IMP.choice[r.name] ? (r.status === 'matched' ? ['ok', 'matched'] : ['ok', 'chosen'])
+           : r.status === 'ambiguous' ? ['ask', 'choose: more than one match'] : r.status === 'duplicate' ? ['ask', 'choose: two names match one child']
+           : ['no', 'not found: choose, or leave out'];
+    t.appendChild(el('tr', {}, [el('td', { text: r.name }),
+      el('td', {}, [sel, el('div', { class: 'st ' + st[0], text: st[1] })]),
+      el('td', { text: r.secure + ' secure · ' + r.notYet + ' not yet' })]));
+  });
+  box.appendChild(t);
+  if (d.notInFile.length) box.appendChild(el('p', { class: 'hint', text: 'On the class list but not matched: ' + d.notInFile.join(', ') + '.' }));
+  var dup = {};
+  var clash = Object.keys(IMP.choice).some(function (n) { var c = IMP.choice[n]; if (!c) return false; if (dup[c]) return true; dup[c] = 1; return false; });
+  $('impMsg').textContent = clash ? 'Two rows are set to the same child: fix that first.' : '';
+  $('impGo').disabled = clash || !picked;
+}
+$('btnImport').onclick = openImport;
+$('impCancel').onclick = function () { $('impModal').hidden = true; IMP = null; };
+$('impFile').onchange = function () {
+  var f = this.files && this.files[0];
+  if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function () { IMP.file = String(rd.result).split(',')[1]; IMP.plan = null; IMP.choice = {}; impPreview(); };
+  rd.readAsDataURL(f);
+};
+$('impGo').onclick = function () {
+  $('impGo').disabled = true;
+  $('impMsg').textContent = 'Importing…';
+  impPost('importApply').then(function (d) {
+    $('impModal').hidden = true; IMP = null;
+    banner('ok', 'Imported ' + d.added + ' results for ' + d.children + ' children' + (d.kept ? ' (' + d.kept + ' already recorded were kept)' : '') + '.');
+    if (d.trackerError) banner('err', d.trackerError);
+    load();
+  }).catch(function (e) { $('impMsg').textContent = 'Not imported: ' + e.message; $('impGo').disabled = false; });
+};
 
 // The shared names helper puts its button in the bottom corner, where it covers this page's buttons; keep it in the toolbar.
 if (window.WFANames) {
@@ -774,7 +889,7 @@ if (window.WFANames) {
   NS._ui();
 }
 S.queue = recall(QKEY) || {};
-S.year = ['R', 'Y1', 'Y2'].indexOf(recall(YKEY)) >= 0 ? recall(YKEY) : 'R';
+S.year = ['R', 'Y1', 'Y2', 'Y3'].indexOf(recall(YKEY)) >= 0 ? recall(YKEY) : 'R';
 $('fYear').value = S.year;
 showSave();
 load().then(function () { if (Object.keys(S.queue).length) scheduleSave(0); });
