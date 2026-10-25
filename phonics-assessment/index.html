@@ -17,7 +17,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root { --ink:#0a0101; --muted:#5b6b7b; --line:#d9e3ec; --soft:#f4f9fd; --ok:#2bae62; --warn:#e57d24; --bad:#c62828;
-          --t1:#ffd84d; --t2:#8fd694; --t3:#ff9ecb; --t4:#ffb366; --t5:#7fc8f8; --t6:#c3a6ff; --old:#cfd8dc; }
+          --t1:#7fc8f8; --t2:#8fd694; --t3:#ffb366; --t4:#ff9ecb; --t5:#c3a6ff; --t6:#ffd84d; --old:#cfd8dc; }
   /* card fonts: Sassoon Infant (the school's copy, already on this site for Precision Teaching) or OpenDyslexic */
   @font-face { font-family: 'WFA Sassoon'; src: url('../precision-teaching/fonts/SassoonInfant.ttf') format('truetype'); font-display: swap; }
   @font-face { font-family: 'OpenDyslexic'; src: url('https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5.2.5/files/opendyslexic-latin-400-normal.woff2') format('woff2'); font-display: swap; }
@@ -100,6 +100,9 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .tile small { font-family: system-ui, sans-serif; font-size: .68rem; font-weight: 700; color: var(--muted); margin-top: 3px; }
   .tile.say { font-family: system-ui, sans-serif; font-size: 1rem; font-weight: 700; }
   .tile .mk { position: absolute; top: 3px; right: 6px; font-family: system-ui, sans-serif; font-size: .8rem; font-weight: 900; }
+  .tile .yg { position: absolute; bottom: 3px; left: 5px; font-family: system-ui, sans-serif; font-size: .62rem; font-weight: 900;
+              background: rgba(255,255,255,.85); color: var(--ink); border-radius: 5px; padding: 0 4px; line-height: 1.35; }
+  .legend .yg { font-size: .7rem; font-weight: 900; background: #fff; border: 1px solid #c9d6e2; border-radius: 5px; padding: 0 4px; color: var(--ink); }
   .tile.secure { border-color: rgba(0,0,0,.18); }
   .tile.not { background: #fff3f3; border-color: #f0b4b4; }
   .tile.not .mk { color: var(--bad); }
@@ -216,7 +219,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26e</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26f</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -413,11 +416,18 @@ function chosenPhases() {
   var saved = recall(PKEY) || {};
   return saved[S.year] || phasesFor(S.year);
 }
-function termColour(sec) {
-  if (!sec) return null;
-  var p = sec.split(':');
-  if (p[0] !== S.academicYear) return 'var(--old)';
-  return 'var(--t' + Math.max(1, Math.min(6, +p[1] || 1)) + ')';
+// When an item was first secured: "2026-27:1" = academic year 2026-27, term 1. The colour is the term; the year
+// group at the time is worked out from how many school years ago that was ("R", "Y1"...). 'earlier' = imported
+// with no date (grey).
+var YG_ORDER = ['R', 'Y1', 'Y2', 'Y3', 'Y4', 'Y5', 'Y6'];
+function securedInfo(sec, child) {
+  var p = String(sec || '').split(':'), y = /^(\d{4})-\d{2}$/.exec(p[0]), now = /^(\d{4})/.exec(S.academicYear || '');
+  if (!y || !now) return { colour: 'var(--old)', yg: '', ago: 0, text: 'secure (imported, date not known)' };
+  var term = Math.max(1, Math.min(6, +p[1] || 1)), ago = +now[1] - +y[1];
+  var idx = YG_ORDER.indexOf(child && child.yearGroup) - ago, yg = idx >= 0 ? YG_ORDER[idx] : '';
+  var names = { R: 'Reception', Y1: 'Year 1', Y2: 'Year 2', Y3: 'Year 3', Y4: 'Year 4', Y5: 'Year 5', Y6: 'Year 6' };
+  return { colour: 'var(--t' + term + ')', yg: yg, ago: ago,
+           text: 'secure since ' + (S.cat ? S.cat.terms[term - 1] : 'term ' + term) + (yg ? ', ' + names[yg] : ', ' + p[0]) };
 }
 function yn(v) {
   if (v === 'n/a') return el('span', { class: 'yn na', text: 'n/a' });
@@ -534,7 +544,8 @@ function drawChild() {
   lg.innerHTML = '';
   lg.appendChild(document.createTextNode('Secure since:'));
   S.cat.terms.forEach(function (t, i) { lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--t' + (i + 1) + ')' }), t])); });
-  lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--old)' }), 'an earlier year, or imported']));
+  lg.appendChild(el('span', {}, [el('span', { class: 'yg', text: 'R' }), ' in the corner: secured in that earlier year group']));
+  lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--old)' }), 'imported, date not known']));
   lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:#fff3f3;border-color:#f0b4b4' }), 'not yet']));
   lg.appendChild(el('span', { text: '· Tap once for secure, again for not yet, again to clear.' }));
   drawChildTop();
@@ -614,12 +625,14 @@ function blockCard(b, list) {
 }
 function tile(i, redraw) {
   var it = S.cat.items[i], st = markState(S.child, i), mk = (S.marks[S.child] || {})[i];
+  var info = st === 'secure' ? securedInfo(mk[1], childObj()) : null;
   var t = el('button', { class: 'tile' + (it.say ? ' say' : '') + (st ? ' ' + st : '') + ((S.child + '|' + i) in S.queue ? ' pend' : ''),
-                         title: it.label, 'data-item': i });
-  if (st === 'secure') t.style.background = termColour(mk[1]) || 'var(--t' + S.term + ')';
+                         title: it.label + (info ? ': ' + info.text : st === 'not' ? ': not yet' : ''), 'data-item': i });
+  if (info) t.style.background = info.colour;
   t.appendChild(document.createTextNode(it.say || it.show));
   if (it.hint) t.appendChild(el('small', { text: it.hint }));
   if (st) t.appendChild(el('span', { class: 'mk', text: st === 'secure' ? '✓' : '✗' }));
+  if (info && info.ago > 0 && info.yg) t.appendChild(el('span', { class: 'yg', text: info.yg }));   // secured in an earlier year group
   t.addEventListener('click', function () {
     setMark(S.child, i, st === '' ? 'secure' : st === 'secure' ? 'not' : '');
     if (redraw) redraw(); else t.replaceWith(tile(i));
