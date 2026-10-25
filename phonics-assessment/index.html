@@ -172,10 +172,11 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <section id="vClass">
     <div class="bar">
       <select id="fYear" aria-label="Year group">
-        <option value="R">Reception</option><option value="Y1">Year 1</option><option value="Y2">Year 2</option><option value="Y3">Year 3</option>
+        <option value="R">Reception</option><option value="Y1">Year 1</option><option value="Y2">Year 2</option><option value="Y3">Year 3</option><option value="Y4">Year 4</option><option value="Y5">Year 5</option><option value="Y6">Year 6</option>
       </select>
       <select id="fClass" aria-label="Class"></select>
-      <label class="toggle" id="allWrap" hidden><input type="checkbox" id="showAll"> Show every child</label>
+      <button class="btn quiet" id="btnAdd" hidden>+ Add a child</button>
+      <label class="toggle" id="finWrap" hidden><input type="checkbox" id="showFin"> Show finished</label>
       <span class="grow"></span>
       <span class="save-state" id="saveState"></span>
       <button class="btn quiet" id="btnImport">⬆ Import spreadsheet</button>
@@ -191,6 +192,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <section id="vChild" hidden>
     <div class="childhead">
       <button class="btn quiet" id="btnBack">‹ Class</button>
+      <button class="btn quiet" id="btnUnlist" hidden title="Added by mistake? Take this child off the phonics list">Remove from the list</button>
       <h2 id="cName"></h2>
       <span class="grow"></span>
       <span class="save-state" id="saveState2"></span>
@@ -214,7 +216,17 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26c</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26d</span></footer>
+
+<!-- Years 3-6: put a child on the phonics list -->
+<div class="modal" id="addModal" hidden>
+  <div class="box imp">
+    <h3>Add a child to the phonics list</h3>
+    <p class="hint">Years 3 to 6 list only the children still on the phonics programme. Choose a child to add; they stay on the list until they are secure in everything.</p>
+    <div id="addList" class="chips" style="overflow-y:auto;margin:10px 0"></div>
+    <div class="impfoot"><span class="grow"></span><button class="btn quiet" id="addCancel">Cancel</button></div>
+  </div>
+</div>
 
 <!-- import a filled-in ULS spreadsheet -->
 <div class="modal" id="impModal" hidden>
@@ -259,7 +271,7 @@ var QKEY = 'wfa_ph_queue_v1', PKEY = 'wfa_ph_phases_v1', YKEY = 'wfa_ph_year_v1'
 var TERM_SHORT = ['Aut 1', 'Aut 2', 'Spr 1', 'Spr 2', 'Sum 1', 'Sum 2'];
 var DEFAULT_PHASES = { R: ['p1', 'p2', 'p3', 'p4'] };
 var S = { cat: null, year: 'R', cls: '', children: [], marks: {}, flags: {}, recSecure: {}, ontrack: {},
-          academicYear: '', term: 1, child: null, phases: null, gaps: false, queue: {}, saving: false, failed: false };
+          academicYear: '', term: 1, programme: new Set(), child: null, phases: null, gaps: false, queue: {}, saving: false, failed: false };
 
 function $(id) { return document.getElementById(id); }
 function el(tag, attrs, kids) {
@@ -305,6 +317,7 @@ function load() {
     var d = res[1];
     S.children = d.children; S.marks = d.marks || {}; S.flags = d.flags || {}; S.recSecure = d.recSecure || {};
     S.ontrack = d.ontrack || {}; S.academicYear = d.academicYear; S.term = d.term || 1;
+    S.programme = new Set(d.programme || []);
     applyQueueLocally();
     if (!S.failed) clearBanner();
     drawClass();
@@ -361,6 +374,9 @@ function flush() {
   });
 }
 function takeChildren(d) {
+  if (d.programme && d.ontrack) Object.keys(d.ontrack).forEach(function (code) {   // the reply covers the children touched
+    if (d.programme.indexOf(code) >= 0) S.programme.add(code); else S.programme.delete(code);
+  });
   // server copies for the children just saved, but never over a tap that is still waiting to be sent
   Object.keys(d.marks || {}).forEach(function (code) {
     var mine = S.marks[code] = S.marks[code] || {}, srv = d.marks[code];
@@ -408,17 +424,21 @@ function yn(v) {
   if (v !== 'Yes' && v !== 'No') return el('span', { class: 'yn na', text: '–' });
   return el('span', { class: 'yn ' + v, text: v });
 }
-// Year 3: most children are secure in all of phonics, so only those still learning it are listed (have results,
-// and not every Phase 2-5c item secure), unless "Show every child" is ticked.
-function stillLearning(code) {
+// Years 3-6: most children have finished the programme, so only the children ON it are listed: added with
+// "+ Add a child", or with results, until secure in every Phase 2-5c item (finished: "Show finished" shows them).
+var OLDER = ['Y3', 'Y4', 'Y5', 'Y6'];
+var YEAR_NAMES = { R: 'Reception', Y1: 'Year 1', Y2: 'Year 2', Y3: 'Year 3', Y4: 'Year 4', Y5: 'Year 5', Y6: 'Year 6' };
+function older() { return OLDER.indexOf(S.year) >= 0; }
+function finished(code) {
   var m = S.marks[code] || {};
   if (!Object.keys(m).length) return false;
-  return Object.keys(S.cat.items).some(function (i) { return S.cat.items[i].phase !== 'p1' && !(m[i] && m[i][0] === 'secure'); });
+  return Object.keys(S.cat.items).every(function (i) { return S.cat.items[i].phase === 'p1' || (m[i] && m[i][0] === 'secure'); });
 }
+function onProgramme(code) { return (S.programme.has(code) || Object.keys(S.marks[code] || {}).length > 0) && !finished(code); }
 function visibleChildren() {
   return S.children.filter(function (c) {
     if (S.cls && c.class !== S.cls) return false;
-    return S.year !== 'Y3' || S.showAll || stillLearning(c.pupilCode);
+    return !older() || onProgramme(c.pupilCode) || (S.showFin && finished(c.pupilCode));
   });
 }
 
@@ -431,9 +451,9 @@ function drawClass() {
   if (classes.indexOf(S.cls) < 0) S.cls = '';
   fc.value = S.cls;
   fc.hidden = classes.length < 2;
-  $('allWrap').hidden = S.year !== 'Y3';
-  $('classHint').textContent = S.year === 'Y3' && !S.showAll
-    ? 'Year 3: only children still learning phonics are listed (tick "Show every child" to add someone). Tap a child to assess them.'
+  $('btnAdd').hidden = $('finWrap').hidden = !older();
+  $('classHint').textContent = older()
+    ? YEAR_NAMES[S.year] + ': only the children still on the phonics programme are listed. "+ Add a child" puts someone on it; a child secure in everything leaves the list. Tap a child to assess them.'
     : 'Tap a child to assess them. Every tap is saved straight away, and this term\'s "on track" answers go to the Pupil Tracker.';
 
   // Reception and Year 1: this term's answer. Year 2: the end of Year 1 standard (Summer 2).
@@ -522,6 +542,7 @@ function drawChild() {
 function drawChildTop(keepBlocks) {
   var c = childObj();
   if (!c) return;
+  $('btnUnlist').hidden = !(older() && S.programme.has(c.pupilCode) && !Object.keys(S.marks[c.pupilCode] || {}).length);
   var key = sheetKey(c), on = (S.ontrack[c.pupilCode] || {})[key] || { gpc: [], bw: [] };
   $('otTitle').textContent = 'On track (' + (key === 'R' ? 'Reception' : 'Year 1') + ' sheet)';
   var g = $('otGrid');
@@ -795,11 +816,33 @@ function setFont(f) {
 Array.prototype.forEach.call(document.querySelectorAll('.cardFont'), function (s) { s.onchange = function () { setFont(this.value); }; });
 setFont(recall(FKEY));
 $('btnExport').onclick = exportSheet;
-$('showAll').onchange = function () { S.showAll = this.checked; drawClass(); };
+$('showFin').onchange = function () { S.showFin = this.checked; drawClass(); };
+function openAdd() {
+  var list = $('addList');
+  list.innerHTML = '';
+  var rest = S.children.filter(function (c) { return !onProgramme(c.pupilCode); });
+  if (!rest.length) list.appendChild(el('p', { class: 'hint', text: 'Every child in this year group is already on the list.' }));
+  rest.forEach(function (c) {
+    list.appendChild(el('button', { class: 'chip', on: { click: function () {
+      postJSON({ action: 'addToProgramme', pupilCode: c.pupilCode }).then(function (d) {
+        $('addModal').hidden = true;
+        takeChildren(d);
+        openChild(c.pupilCode);
+      }).catch(function (e) { banner('err', 'Not added: ' + e.message); });
+    } } }, [kidLabel(c), document.createTextNode(' ' + c.class + (finished(c.pupilCode) ? ' · finished' : ''))]));
+  });
+  $('addModal').hidden = false;
+}
+$('btnAdd').onclick = openAdd;
+$('addCancel').onclick = function () { $('addModal').hidden = true; };
+$('btnUnlist').onclick = function () {
+  var code = S.child;
+  postJSON({ action: 'removeFromProgramme', pupilCode: code }).then(function (d) { takeChildren(d); closeChild(); })
+    .catch(function (e) { banner('err', 'Not removed: ' + e.message); });
+};
 
 // ── Import a filled-in ULS spreadsheet ─────────────────────────────────────────────────────────────
 var IMP = null;
-var YEAR_NAMES = { R: 'Reception', Y1: 'Year 1', Y2: 'Year 2', Y3: 'Year 3' };
 function openImport() {
   IMP = { file: null, plan: null, choice: {}, how: {}, names: (window.WFANames && WFANames.screen.active && WFANames.screen.file) || null };
   $('impTitle').textContent = 'Import a ULS spreadsheet: ' + YEAR_NAMES[S.year];
@@ -848,7 +891,7 @@ function matchWithNames() {
   var taken = {}, done = {};
   tests.forEach(function (test) {
     d.rows.forEach(function (r) {
-      if (done[r.name]) return;
+      if (done[r.name] || r.status === 'finished') return;               // Years 3-6: finished children stay out
       var w = nameWords(r.name);
       var c = kids.filter(function (k) { return !taken[k.code] && test(w, k); });
       if (c.length === 1) { IMP.choice[r.name] = c[0].code; IMP.how[r.name] = 'names'; taken[c[0].code] = 1; done[r.name] = 1; }
@@ -860,7 +903,7 @@ function rosterText(p) {
   return (who ? (who.name || (who.first + ' ' + who.last)).trim() : p.label) + ' (' + p.class + ')';
 }
 function needsLook(r) {
-  if (!IMP.choice[r.name]) return true;                                   // not matched yet
+  if (!IMP.choice[r.name]) return r.status !== 'finished';               // not matched yet (finished: left out on purpose)
   if (IMP.how[r.name] === 'names' || IMP.how[r.name] === 'chosen') return false;
   return r.status === 'firstname';                                        // a guess from a first name alone
 }
@@ -897,7 +940,8 @@ function drawImport() {
     opts.forEach(function (p) { sel.appendChild(el('option', { value: p.pupilCode, text: rosterText(p) })); });
     sel.value = IMP.choice[r.name] || '';
     sel.onchange = function () { IMP.choice[r.name] = this.value; IMP.how[r.name] = 'chosen'; drawImport(); };
-    var st = IMP.choice[r.name] ? (IMP.how[r.name] === 'names' ? ['ok', 'matched by names file'] : IMP.how[r.name] === 'chosen' || IMP.choice[r.name] !== r.pupilCode ? ['ok', 'chosen']
+    var st = !IMP.choice[r.name] && r.status === 'finished' ? ['no', 'secure in all of phonics, so left out (choose the child to include)']
+           : IMP.choice[r.name] ? (IMP.how[r.name] === 'names' ? ['ok', 'matched by names file'] : IMP.how[r.name] === 'chosen' || IMP.choice[r.name] !== r.pupilCode ? ['ok', 'chosen']
            : r.status === 'firstname' ? ['ask', 'check: matched on first name only'] : r.status === 'matched' ? ['ok', 'matched'] : ['ok', 'chosen'])
            : r.status === 'ambiguous' ? ['ask', 'choose: more than one match'] : r.status === 'duplicate' ? ['ask', 'choose: two names match one child']
            : ['no', 'not found: choose, or leave out'];
@@ -951,7 +995,7 @@ if (window.WFANames) {
   NS._ui();
 }
 S.queue = recall(QKEY) || {};
-S.year = ['R', 'Y1', 'Y2', 'Y3'].indexOf(recall(YKEY)) >= 0 ? recall(YKEY) : 'R';
+S.year = ['R', 'Y1', 'Y2', 'Y3', 'Y4', 'Y5', 'Y6'].indexOf(recall(YKEY)) >= 0 ? recall(YKEY) : 'R';
 $('fYear').value = S.year;
 showSave();
 load().then(function () { if (Object.keys(S.queue).length) scheduleSave(0); });
