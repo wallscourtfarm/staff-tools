@@ -317,6 +317,10 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .wt-enq-chip:hover { border-color: #94a3b8; }
   .wt-enq-chip.active { border-color: #6d28d9; background: #6d28d9; color: #fff; }
   .wider-enquiries { padding: 4px 14px 10px; }
+  .weekly-strip { display: flex; gap: 12px; align-items: baseline; border: 1px dashed; border-radius: 10px; padding: 10px 14px; margin: 4px 0 14px; background: #f8fafc; font-size: 13px; color: #475569; }
+  .weekly-strip-wk { font-weight: 800; font-size: 12px; color: #334155; white-space: nowrap; }
+  .cell-weekly { font-size: 10px; color: #64748b; font-style: italic; line-height: 1.3; margin-top: 2px; }
+  .gantt-bar-weekly { opacity: .45; cursor: default; }
 
   /* ── Edit modal ── */
   #edit-modal { display: none; position: fixed; inset: 0; z-index: 1000; }
@@ -754,7 +758,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">25.10.26b</span>
+  <span class="nav-version">25.10.26c</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -1532,6 +1536,28 @@ function scrollToEnq(id) {
   if (el) { el.scrollIntoView({behavior:'smooth', block:'start'}); el.style.outline='3px solid var(--brand)'; setTimeout(()=>el.style.outline='',1500); }
 }
 
+// Each term's Jigsaw unit (ids cit-y1-1 … cit-y6-6) is taught as weekly Citizenship
+// lessons, not as an enquiry, so it never gets an enquiry card or bar of its own.
+function isTermlyUnit(e) { return /^cit-y\d-\d$/.test(e.id); }
+// A wider subject's own termly unit (first row of its table) for term t (1-6), or ''
+// when there isn't one ("No DT unit this term").
+function termlyUnitName(k, w, t) {
+  const v = (getWiderCell(k, w.key, w.rows[0].label, t-1) || '').split('\n')[0].trim();
+  return /^no\b/i.test(v) ? '' : ganttBarLabel(w.key, v);
+}
+// The weeks of term t its real enquiries leave free, as runs of term-local weeks: [[2,7]].
+function freeWeekRuns(termEnqs, t) {
+  const used = new Set();
+  termEnqs.forEach(e => { for (let wk = e.weekStart; wk <= e.weekEnd; wk++) used.add(wk); });
+  const runs = [];
+  for (let wk = 1; wk <= TERM_WK[t-1]; wk++) {
+    if (used.has(wk)) continue;
+    const last = runs[runs.length-1];
+    if (last && last[1] === wk-1) last[1] = wk; else runs.push([wk, wk]);
+  }
+  return runs;
+}
+function fmtRuns(runs) { return runs.map(([a,b]) => a===b ? `W${a}` : `W${a}–${b}`).join(', '); }
 function wkRange(e) {
   const ti = e.term - 1;
   const gs = TERM_GS[ti];
@@ -1695,6 +1721,16 @@ function renderEnquirySection(k, state, sEnqs, bg) {
   return h;
 }
 
+function termDividerHTML(t) {
+  const dr = termDateRange(t);
+  const td = fmtTeachDays(TERM_TEACHING_DAYS[t - 1]);
+  return `<div class="term-divider">
+        <span class="term-divider-label">Term ${t}</span>
+        ${dr ? `<span class="term-divider-dates">w/c ${dr}</span>` : ''}
+        <span class="term-divider-dates" style="color:#cbd5e1">${td}</span>
+        <span class="term-divider-line"></span>
+      </div>`;
+}
 function renderEnquiryCards(k, state, sEnqs, bg) {
   let h = '';
   let lastTerm = null;
@@ -1704,14 +1740,7 @@ function renderEnquiryCards(k, state, sEnqs, bg) {
     const statusCls = enq.planningStatus && enq.planningStatus !== 'unknown' ? `tag-status-${enq.planningStatus}` : '';
     if (e.term !== lastTerm) {
       lastTerm = e.term;
-      const dr = termDateRange(e.term);
-      const td = fmtTeachDays(TERM_TEACHING_DAYS[e.term - 1]);
-      h += `<div class="term-divider">
-        <span class="term-divider-label">Term ${e.term}</span>
-        ${dr ? `<span class="term-divider-dates">w/c ${dr}</span>` : ''}
-        <span class="term-divider-dates" style="color:#cbd5e1">${td}</span>
-        <span class="term-divider-line"></span>
-      </div>`;
+      h += termDividerHTML(e.term);
     }
     const wkDate = weekDate(e.term, e.weekStart);
     const termTag = `T${e.term} · W${e.weekStart}${e.weekStart!==e.weekEnd?'–'+e.weekEnd:''}${wkDate?' · w/c '+wkDate:''}`;
@@ -1807,10 +1836,13 @@ function renderGlanceGrid(k, enqs, yc, yd, yl, activeStates) {
   }
 
   // Renders one term cell for a subject in the enquiry-card style (key question for that term)
-  const glanceEnquiryCell = (state, bg, term) => {
-    const termEnqs = enqs.filter(e => e.stateOfBeing === state && e.term === term);
+  const glanceEnquiryCell = (state, bg, term, w) => {
+    const termEnqs = enqs.filter(e => e.stateOfBeing === state && e.term === term && !isTermlyUnit(e));
     const last = term === 6 ? ' no-right' : '';
-    if (!termEnqs.length) return `<div class="grid-cell cell-empty${last}"></div>`;
+    const runs = w ? freeWeekRuns(termEnqs, term) : [];
+    const unit = w && runs.length ? termlyUnitName(k, w, term) : '';
+    const weekly = unit ? `<div class="cell-weekly">${fmtRuns(runs)} · weekly lessons: ${esc(unit)}</div>` : '';
+    if (!termEnqs.length) return weekly ? `<div class="grid-cell${last}">${weekly}</div>` : `<div class="grid-cell cell-empty${last}"></div>`;
     let hh = `<div class="grid-cell${last}" style="background:${bg}20">`;
     termEnqs.forEach(e => {
       const enq = getEnq(k, e.id, e.stateOfBeing);
@@ -1821,7 +1853,7 @@ function renderGlanceGrid(k, enqs, yc, yd, yl, activeStates) {
         ${enq.linkedText ? `<div class="cell-book">${esc(enq.linkedText.split('·')[0].trim())}</div>` : ''}
       </div>`;
     });
-    hh += `</div>`;
+    hh += weekly + `</div>`;
     return hh;
   };
 
@@ -1852,7 +1884,7 @@ function renderGlanceGrid(k, enqs, yc, yd, yl, activeStates) {
       h += `<div class="grid-cell grid-subject" style="color:${w.colour}">${wi} ${w.name}</div>`;
       const enqTerms = SOB_META[w.name] ? getEnquiryTerms(k, w.key) : new Set();
     for (let t = 0; t < 6; t++) {
-      if (enqTerms.has(t+1)) { h += glanceEnquiryCell(w.name, w.colour, t+1); continue; }
+      if (enqTerms.has(t+1)) { h += glanceEnquiryCell(w.name, w.colour, t+1, w); continue; }
       const firstRow = w.rows[0];
       const last = t === 5 ? ' no-right' : '';
       if (w.key === 'reader') {
@@ -1891,7 +1923,7 @@ function renderEnqTermPicker(k, wkey, enqTerms) {
 
 function renderWiderSection(k, w, yc, yd, canEnquiry) {
   const enqTerms = canEnquiry ? getEnquiryTerms(k, w.key) : new Set();
-  const stateEnqs = enqTerms.size ? getMergedEnqs(k).filter(e => e.stateOfBeing === w.name) : [];
+  const stateEnqs = enqTerms.size ? getMergedEnqs(k).filter(e => e.stateOfBeing === w.name && !isTermlyUnit(e)) : [];
 
   let h = `<div class="wider-section" id="s-wider-${w.key}" style="border-left:3px solid ${w.colour}">
     <div class="wider-header" style="color:${w.colour}">
@@ -1921,7 +1953,7 @@ function renderWiderSection(k, w, yc, yd, canEnquiry) {
       // below, it doesn't replace this cell's own content.
       let pointer = '';
       if (isEnq && ri === 0) {
-        const e = stateEnqs.find(x => x.term === t+1);
+        const e = stateEnqs.find(x => x.term === t+1); // termly units already left out
         pointer = e
           ? `<div class="wt-enquiry-pointer" onclick="event.stopPropagation();scrollToEnq('${e.id}')">📋 Full enquiry ↓</div>`
           : `<div class="wt-enquiry-pointer wt-enquiry-pointer-empty">📋 No enquiry yet this term</div>`;
@@ -1939,8 +1971,22 @@ function renderWiderSection(k, w, yc, yd, canEnquiry) {
   h += `</div>`; // .wider-table
 
   if (enqTerms.size) {
-    const cards = stateEnqs.filter(e => enqTerms.has(e.term)).sort((a,b)=>a.term-b.term);
-    h += `<div class="wider-enquiries">${renderEnquiryCards(k, w.name, cards, w.colour)}</div>`;
+    // Per enquiry term: its real enquiry cards, then a plain strip for the weeks they leave,
+    // which run as the subject's normal weekly lessons (the termly unit in the table above).
+    h += `<div class="wider-enquiries">`;
+    [...enqTerms].sort((a,b)=>a-b).forEach(t => {
+      const cards = stateEnqs.filter(e => e.term === t).sort((a,b)=>a.order-b.order||a.weekStart-b.weekStart);
+      h += cards.length ? renderEnquiryCards(k, w.name, cards, w.colour) : termDividerHTML(t);
+      const runs = freeWeekRuns(cards, t);
+      const unit = termlyUnitName(k, w, t);
+      if (runs.length && unit) {
+        h += `<div class="weekly-strip" style="border-color:${w.colour}55">
+          <span class="weekly-strip-wk">T${t} · ${fmtRuns(runs)}</span>
+          <span class="weekly-strip-txt">Weekly ${esc(w.name)} lessons, not an enquiry: <b>${esc(unit)}</b></span>
+        </div>`;
+      }
+    });
+    h += `</div>`;
   }
 
   h += `</div>`; // .wider-section
@@ -3185,7 +3231,7 @@ function showGantt(k) {
 
     // Draggable/resizable enquiry bars for this subject's enquiry terms (all 6 for the
     // core Writer/Geographer/Historian/Scientist rows), stacked into lanes if they overlap.
-    const items = enqs.filter(e => e.stateOfBeing === name && enqTerms.has(e.term)).map(e => ({
+    const items = enqs.filter(e => e.stateOfBeing === name && enqTerms.has(e.term) && !isTermlyUnit(e)).map(e => ({
       id: e.id, keyQuestion: e.keyQuestion,
       gStart: TERM_GS[e.term - 1] + e.weekStart - 1,
       gEnd: TERM_GS[e.term - 1] + e.weekEnd - 1,
@@ -3220,7 +3266,20 @@ function showGantt(k) {
       const wKey = widerEntry.key;
       const rowLabel = widerEntry.rows[0].label;
       for (let ti = 0; ti < 6; ti++) {
-        if (enqTerms.has(ti+1)) continue;
+        if (enqTerms.has(ti+1)) {
+          // Enquiry term: the weeks its enquiries leave are ordinary weekly lessons.
+          const unit = termlyUnitName(k, widerEntry, ti+1);
+          if (!unit) continue;
+          const termItems = items.filter(it => it.gStart >= TERM_GS[ti] && it.gStart < TERM_GS[ti] + TERM_WK[ti])
+            .map(it => ({ weekStart: it.gStart - TERM_GS[ti] + 1, weekEnd: it.gEnd - TERM_GS[ti] + 1 }));
+          freeWeekRuns(termItems, ti+1).forEach(([a, b]) => {
+            h += `<div class="gantt-bar gantt-bar-weekly" style="left:${(TERM_GS[ti]+a-1)*WK}px;width:${Math.max((b-a+1)*WK-3,4)}px;top:${GANTT_ROW_PAD}px;height:${GANTT_LANE_H}px;background:${widerEntry.colour}"
+                    title="Weekly lessons, not an enquiry: ${esc(unit)}">
+              <span class="gantt-bar-label">${esc(unit)}</span>
+            </div>`;
+          });
+          continue;
+        }
         const val = getWiderCell(k, wKey, rowLabel, ti);
         if (!val) continue;
         const left = TERM_GS[ti] * WK;
