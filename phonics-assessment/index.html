@@ -216,15 +216,15 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26d</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26e</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
   <div class="box imp">
     <h3>Add a child to the phonics list</h3>
-    <p class="hint">Years 3 to 6 list only the children still on the phonics programme. Choose a child to add; they stay on the list until they are secure in everything.</p>
+    <p class="hint">Years 3 to 6 list only the children still on the phonics programme. Tap the children to add, then press Add; they stay on the list until they are secure in everything.</p>
     <div id="addList" class="chips" style="overflow-y:auto;margin:10px 0"></div>
-    <div class="impfoot"><span class="grow"></span><button class="btn quiet" id="addCancel">Cancel</button></div>
+    <div class="impfoot"><span class="grow" id="addMsg"></span><button class="btn quiet" id="addCancel">Cancel</button> <button class="btn" id="addGo" disabled>Add</button></div>
   </div>
 </div>
 
@@ -817,22 +817,45 @@ Array.prototype.forEach.call(document.querySelectorAll('.cardFont'), function (s
 setFont(recall(FKEY));
 $('btnExport').onclick = exportSheet;
 $('showFin').onchange = function () { S.showFin = this.checked; drawClass(); };
+var ADD = new Set();
+function addButton() {
+  $('addGo').disabled = !ADD.size;
+  $('addGo').textContent = ADD.size ? 'Add ' + ADD.size + (ADD.size === 1 ? ' child' : ' children') : 'Add';
+}
 function openAdd() {
   var list = $('addList');
   list.innerHTML = '';
+  ADD = new Set();
+  $('addMsg').textContent = '';
   var rest = S.children.filter(function (c) { return !onProgramme(c.pupilCode); });
   if (!rest.length) list.appendChild(el('p', { class: 'hint', text: 'Every child in this year group is already on the list.' }));
   rest.forEach(function (c) {
-    list.appendChild(el('button', { class: 'chip', on: { click: function () {
-      postJSON({ action: 'addToProgramme', pupilCode: c.pupilCode }).then(function (d) {
-        $('addModal').hidden = true;
-        takeChildren(d);
-        openChild(c.pupilCode);
-      }).catch(function (e) { banner('err', 'Not added: ' + e.message); });
-    } } }, [kidLabel(c), document.createTextNode(' ' + c.class + (finished(c.pupilCode) ? ' · finished' : ''))]));
+    var chip = el('button', { class: 'chip', on: { click: function () {
+      if (ADD.has(c.pupilCode)) ADD.delete(c.pupilCode); else ADD.add(c.pupilCode);
+      chip.className = 'chip' + (ADD.has(c.pupilCode) ? ' on' : '');
+      addButton();
+    } } }, [kidLabel(c), document.createTextNode(' ' + c.class + (finished(c.pupilCode) ? ' · finished' : ''))]);
+    list.appendChild(chip);
   });
+  addButton();
   $('addModal').hidden = false;
 }
+$('addGo').onclick = function () {
+  var codes = Array.from(ADD), done = 0;
+  $('addGo').disabled = true;
+  $('addMsg').textContent = 'Adding…';
+  codes.reduce(function (p, code) {                       // one at a time, so every child is confirmed by the server
+    return p.then(function () { return postJSON({ action: 'addToProgramme', pupilCode: code }).then(function (d) { takeChildren(d); done++; }); });
+  }, Promise.resolve()).then(function () {
+    $('addModal').hidden = true;
+    banner('ok', done + (done === 1 ? ' child' : ' children') + ' added to the phonics list.');
+    drawClass();
+  }).catch(function (e) {
+    $('addMsg').textContent = 'Added ' + done + ' of ' + codes.length + '; the rest were not added (' + e.message + '). Try again.';
+    codes.slice(0, done).forEach(function (c) { ADD.delete(c); });
+    addButton();
+  });
+};
 $('btnAdd').onclick = openAdd;
 $('addCancel').onclick = function () { $('addModal').hidden = true; };
 $('btnUnlist').onclick = function () {
