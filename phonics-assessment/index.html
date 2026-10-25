@@ -214,7 +214,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26a</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26b</span></footer>
 
 <!-- import a filled-in ULS spreadsheet -->
 <div class="modal" id="impModal" hidden>
@@ -839,7 +839,8 @@ function drawImport() {
     d.roster.forEach(function (p) { sel.appendChild(el('option', { value: p.pupilCode, text: p.label + ' (' + p.class + ')' })); });
     sel.value = IMP.choice[r.name] || '';
     sel.onchange = function () { IMP.choice[r.name] = this.value; drawImport(); };
-    var st = IMP.choice[r.name] ? (r.status === 'matched' ? ['ok', 'matched'] : ['ok', 'chosen'])
+    var st = IMP.choice[r.name] ? (IMP.choice[r.name] !== r.pupilCode ? ['ok', 'chosen'] : r.status === 'firstname' ? ['ask', 'check: matched on first name only']
+           : r.status === 'matched' ? ['ok', 'matched'] : ['ok', 'chosen'])
            : r.status === 'ambiguous' ? ['ask', 'choose: more than one match'] : r.status === 'duplicate' ? ['ask', 'choose: two names match one child']
            : ['no', 'not found: choose, or leave out'];
     t.appendChild(el('tr', {}, [el('td', { text: r.name }),
