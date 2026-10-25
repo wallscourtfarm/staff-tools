@@ -317,6 +317,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .wt-enq-chip:hover { border-color: #94a3b8; }
   .wt-enq-chip.active { border-color: #6d28d9; background: #6d28d9; color: #fff; }
   .wider-enquiries { padding: 4px 14px 10px; }
+  .wt-enq-chip-auto { cursor: default; opacity: .85; }
   .weekly-strip { display: flex; gap: 12px; align-items: baseline; border: 1px dashed; border-radius: 10px; padding: 10px 14px; margin: 4px 0 14px; background: #f8fafc; font-size: 13px; color: #475569; }
   .weekly-strip-wk { font-weight: 800; font-size: 12px; color: #334155; white-space: nowrap; }
   .gantt-bar-weekly { opacity: .45; cursor: default; }
@@ -742,7 +743,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA" style="height:44px;width:auto;border-radius:8px;flex-shrink:0">
     <div>
       <div class="nav-title">39 Week Plan</div>
-      <div class="nav-sub">Wallscourt Farm Academy · 25.10.26f</div>
+      <div class="nav-sub">Wallscourt Farm Academy · 25.10.26g</div>
     </div>
   </a>
   <div id="year-bar-inline" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"></div>
@@ -757,7 +758,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     </div>
   </div>
   <span id="sync-status" style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap"></span>
-  <span class="nav-version">25.10.26f</span>
+  <span class="nav-version">25.10.26g</span>
 </nav>
 
 <!-- ── Year chips (second row) ── -->
@@ -769,7 +770,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 
 <footer>
   <span>39 Week Plan &mdash; 2026&ndash;27 &mdash; Wallscourt Farm Academy</span>
-  <strong>25.10.26f</strong>
+  <strong>25.10.26g</strong>
 </footer>
 
 <!-- ── Edit modal ── -->
@@ -1492,10 +1493,23 @@ function saveWiderCell(k, wkey, rowLabel, termIdx, value) {
 // an object) is the legacy whole-subject toggle from before per-term granularity existed —
 // treated as "every term", so old saved data doesn't crash or silently vanish.
 function getEnquiryTerms(k, wkey) {
+  const terms = new Set([...getManualEnquiryTerms(k, wkey), ...getScheduledEnquiryTerms(k, wkey)]);
+  return terms;
+}
+function getManualEnquiryTerms(k, wkey) {
   const v = (loadData(k).enquiryMode || {})[wkey];
   if (v === true) return new Set([1,2,3,4,5,6]);
   if (!v || typeof v !== 'object') return new Set();
   return new Set(Object.keys(v).filter(t => v[t]).map(Number));
+}
+// Terms where this subject has a specific enquiry with its weeks set: these always show
+// (Innes, 25.10.26), alongside the subject's own termly curriculum content.
+function getScheduledEnquiryTerms(k, wkey) {
+  const w = WIDER_DEF.find(x => x.key === wkey);
+  if (!w) return new Set();
+  return new Set(getMergedEnqs(k)
+    .filter(e => e.stateOfBeing === w.name && !isTermlyUnit(e) && e.weekStart > 0 && e.weekEnd >= e.weekStart)
+    .map(e => e.term));
 }
 function toggleEnquiryTerm(k, wkey, term, val) {
   const d = loadData(k);
@@ -1921,7 +1935,11 @@ function renderGlanceGrid(k, enqs, yc, yd, yl, activeStates) {
 // subject is a genuine one-off enquiry (e.g. a single Citizens or Computer Science unit),
 // rather than switching the whole subject/year into enquiry view.
 function renderEnqTermPicker(k, wkey, enqTerms) {
+  const auto = getScheduledEnquiryTerms(k, wkey);
   const chips = [1,2,3,4,5,6].map(t => {
+    if (auto.has(t)) {
+      return `<button type="button" class="wt-enq-chip active wt-enq-chip-auto" disabled title="T${t} has a specific enquiry with its weeks set, so it always shows">T${t}</button>`;
+    }
     const on = enqTerms.has(t);
     const tip = on ? `Showing T${t} as a full enquiry — click to switch it back to the summary table` : `Show T${t} as a full enquiry`;
     return `<button type="button" class="wt-enq-chip${on?' active':''}" onclick="toggleEnquiryTerm('${k}','${wkey}',${t},${!on})" title="${tip}">T${t}</button>`;
