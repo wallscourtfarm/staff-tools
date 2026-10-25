@@ -255,7 +255,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
       <div>
         <div class="app-title" id="appTitle">Resource Booking</div>
-        <div class="app-subtitle">Wallscourt Farm Academy · 10.10.26a</div>
+        <div class="app-subtitle">Wallscourt Farm Academy · 25.10.26a</div>
       </div>
     </div>
     <div class="top-bar">
@@ -537,7 +537,10 @@ function getCpSportsBars(weekIdx) {
   // (e.g. the whole school has PM Sports on the same day) and each needs its
   // own bar — deduping on day+session alone silently dropped every year group
   // but the first one encountered.
-  (coverPlanData.sportsSchedule || []).forEach(s => {
+  // A term's own sports times (sportsByTerm) win over the standing schedule.
+  const termSports = (coverPlanData.sportsByTerm || {})[String(WEEKS[weekIdx]?.term)] || [];
+  const termYgs = new Set(termSports.map(s => s.yg));
+  [...termSports, ...(coverPlanData.sportsSchedule || []).filter(s => !termYgs.has(s.yg))].forEach(s => {
     const timeRange = CP_SESSION_TIMES[s.session];
     if (!timeRange || s.day < 0 || s.day > 4) return;
     const key = `${s.day}-${s.session}-${s.yg || ''}`;

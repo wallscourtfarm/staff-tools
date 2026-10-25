@@ -503,7 +503,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-08.10.26b</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-25.10.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -846,7 +846,7 @@ let ACTIVITY_EXCEPTIONS = []; // { date, staff, activity, session, type? }
 let FAB_DATA = null; // { weekKey: { lower: [[...]], upper: [[...]] } } - zones x days
 let FAB_STAFF = []; // [{ id, name, init, col }] - staff from FAB tool for ID→initials mapping
 let FAB_EXCEPTIONS = []; // { date, staffId, zone }
-let COVER_DATA = null; // { weekSlots: {weekIdx: [slots]}, staff: [{id, name, yg, col}], sportsSchedule: [{yg, day, session, provider}] } - from cover-plan tool
+let COVER_DATA = null; // { weekSlots: {weekIdx: [slots]}, staff: [{id, name, yg, col}], sportsSchedule: [{yg, day, session, provider}], sportsByTerm: {term: [...]} } - from cover-plan tool
 let COVER_STAFF_LOOKUP = {}; // name -> {id, yg, col} for quick lookup
 let LC_DATA = null; // { state: { slots: {weekIdx: {dutyId: [[staffId,...],...]}} }, duties: [...], staffColours: {} }
 let BOOKINGS = {}; // day (lowercase) -> [booking, ...], for whichever week was last loaded — see loadBookingOverlay()
@@ -2566,7 +2566,10 @@ function renderBody() {
     // the class teacher runs it themselves or an external coach covers it —
     // does not depend on any staff-out/cover assignment.
     if (view === 'master' && COVER_DATA && COVER_DATA.sportsSchedule) {
-      const fixture = COVER_DATA.sportsSchedule.find(s => yearGroupMatches(s.yg, YEAR_GROUP));
+      // A term's own sports time (cover-plan's sportsByTerm) wins over the standing schedule.
+      const termSports = (COVER_DATA.sportsByTerm || {})[String(WEEKS[state.weekIdx]?.term)] || [];
+      const fixture = termSports.find(s => yearGroupMatches(s.yg, YEAR_GROUP))
+        || COVER_DATA.sportsSchedule.find(s => yearGroupMatches(s.yg, YEAR_GROUP));
       if (fixture && !nsd[fixture.day]) {
         const sessionMap = COVER_SESSION_MAP[fixture.session];
         if (sessionMap) {
@@ -4440,7 +4443,8 @@ async function init() {
       COVER_DATA = {
         weekSlots: coverDataRaw.weekSlots,
         staff: coverDataRaw.staff || [],
-        sportsSchedule: coverDataRaw.sportsSchedule || []
+        sportsSchedule: coverDataRaw.sportsSchedule || [],
+        sportsByTerm: coverDataRaw.sportsByTerm || {}
       };
       // Build staff lookup from ALL_SHEET_STAFF (use same ID format as cover-plan)
       COVER_STAFF_LOOKUP = {};

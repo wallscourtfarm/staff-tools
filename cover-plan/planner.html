@@ -241,6 +241,8 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     /* Whole-school events manager modal */
     .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px 0; }
     .modal-overlay.hidden { display:none; }
+    #sportPasteBox.hidden { display:none; }
+    #wsModal .modal { width:580px; }
     .modal { background:white; border-radius:10px; width:460px; max-width:94vw; max-height:calc(100vh - 40px); box-shadow:0 12px 40px rgba(0,0,0,.25); display:flex; flex-direction:column; overflow:hidden; }
     .modal-hd { display:flex; align-items:center; justify-content:space-between; padding:22px 24px 16px; flex-shrink:0; }
     .modal-body { overflow-y:auto; flex:1; padding:0 24px 22px; }
@@ -264,6 +266,26 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     .sport-table .yg-cell { font-weight:bold; font-size:12px; display:flex; align-items:center; gap:6px; }
     .sport-table .yg-pip-sm { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
     .sport-table select { padding:4px 6px; border:1px solid #e2e8f0; border-radius:4px; font-size:12px; color:#111; background:white; }
+    .sport-table tr.sport-inherited select { color:#94a3b8; font-style:italic; }
+    .sport-table .sport-note { font-size:10px; color:#94a3b8; }
+    .sport-table .sport-reset { border:none; background:none; color:#94a3b8; cursor:pointer; font-size:12px; padding:2px 4px; }
+    .sport-table .sport-reset:hover { color:#dc2626; }
+    .sport-term-tabs { display:flex; flex-wrap:wrap; gap:4px; margin:4px 0 8px; }
+    .sport-term-tabs button { padding:3px 9px; border:1px solid #e2e8f0; border-radius:4px; background:white; color:#475569; cursor:pointer; font-size:12px; }
+    .sport-term-tabs button.on { background:#1798d3; border-color:#1798d3; color:white; }
+    .sport-paste { margin:-6px 0 16px; }
+    .sport-paste-toggle { border:1px dashed #93c5fd; background:#f0f9ff; color:#1e3a8a; border-radius:4px; padding:5px 10px; font-size:12px; cursor:pointer; }
+    .sport-paste-help { font-size:11px; color:#475569; margin:8px 0 6px; line-height:1.4; }
+    .sport-paste-help code { background:#f1f5f9; padding:0 3px; border-radius:2px; }
+    #sportPasteText { width:100%; box-sizing:border-box; font-size:12px; font-family:monospace; border:1px solid #cbd5e1; border-radius:4px; padding:6px; }
+    .sport-preview { width:100%; border-collapse:collapse; font-size:11px; margin-top:8px; }
+    .sport-preview th, .sport-preview td { border:1px solid #e2e8f0; padding:3px 5px; text-align:center; }
+    .sport-preview th:first-child, .sport-preview td:first-child { text-align:left; font-weight:bold; }
+    .sport-preview td.changed { background:#fef9c3; }
+    .sport-preview td.bad { background:#fee2e2; color:#b91c1c; }
+    .sport-paste-msg { font-size:11px; margin-top:6px; color:#475569; }
+    .sport-paste-msg.err { color:#b91c1c; }
+    .sport-paste-load { margin-top:8px; background:#1798d3; color:white; border:none; border-radius:4px; padding:6px 14px; font-size:12px; font-weight:bold; cursor:pointer; }
     .ws-add-form h3 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#64748b; font-weight:bold; margin:0 0 10px; }
     .ws-add-row { display:flex; gap:7px; align-items:flex-end; flex-wrap:wrap; }
     .ws-add-row label { font-size:11px; color:#475569; }
@@ -414,7 +436,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(05.10.26b)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(25.10.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -480,8 +502,17 @@ body.edit-locked .notify-btn   { display:none; }
     </div>
     <div class="modal-body">
       <!-- Sports section -->
-      <div class="ws-section-hd">Sports <small style="font-weight:normal;color:#94a3b8;text-transform:none;letter-spacing:0">— every year group, every term</small></div>
+      <div class="ws-section-hd">Sports <small style="font-weight:normal;color:#94a3b8;text-transform:none;letter-spacing:0">— every year group, set for each term</small></div>
+      <div class="sport-term-tabs" id="sportTermTabs"></div>
       <table class="sport-table" id="sportTable"></table>
+      <div class="sport-paste">
+        <button type="button" class="sport-paste-toggle" onclick="toggleSportPaste()">📋 Load the whole year from a spreadsheet</button>
+        <div id="sportPasteBox" class="hidden">
+          <p class="sport-paste-help">In Excel, select the sports table <b>including the Term 1 … Term 6 heading row</b> and the year group names, copy it, then paste it here. Cells like <code>Tue AM</code>, <code>Thurs AM</code>, <code>Fri PM ABS</code> are understood (ABS = AB Sports). Oak = Reception.</p>
+          <textarea id="sportPasteText" rows="6" placeholder="Paste here" oninput="previewSportPaste()"></textarea>
+          <div id="sportPastePreview"></div>
+        </div>
+      </div>
       <!-- Other events section -->
       <div class="ws-section-hd">Other events</div>
       <div class="ws-list" id="wsEventList"></div>
@@ -528,7 +559,7 @@ body.edit-locked .notify-btn   { display:none; }
   <button onclick="closeDeleteMenu()" style="display:block;width:100%;text-align:left;background:none;border:none;color:#64748b;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:12px">Cancel</button>
 </div>
 
-<footer>Wallscourt Farm Academy · Release Schedule · 05.10.26b</footer>
+<footer>Wallscourt Farm Academy · Release Schedule · 25.10.26a</footer>
 
 <script>
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -609,7 +640,9 @@ let HIDDEN_EVENT_DATES = JSON.parse(localStorage.getItem('hiddenEventDates')||'{
 
 // ── Whole-school events (localStorage-backed; defaults loaded from sheet) ─────
 let WS_SHEET_DEFAULTS = [];
-let SERVER_SPORTS_SCHEDULE = []; // last-fetched server sportsSchedule, for ensureAllSports() to hydrate from
+let SERVER_SPORTS_SCHEDULE = []; // last-fetched server sportsSchedule: the standing (all-terms) sports schedule
+let SERVER_SPORTS_BY_TERM = {};  // {"1":[{yg,day,session,provider}],...}: a term's own sports times, overriding the standing schedule
+let SPORTS_BY_TERM_LOADED = false; // sportsByTerm is only sent back once it has been read from the server (an old cached copy has none, and sending {} would wipe it)
 function wsLoad() {
   try { const s = localStorage.getItem('wfa_ws_events'); return s ? JSON.parse(s) : WS_SHEET_DEFAULTS; }
   catch(e) { return WS_SHEET_DEFAULTS; }
@@ -963,13 +996,15 @@ async function init() {
         if (Array.isArray(slots)) slots.forEach(s => { if (s.reason==='Day Off') s.reason='Non-working Day'; });
       });
     }
-    // Must run after stateLoad(): a device whose local sports table is
-    // missing a year group should pick up the real shared schedule from the
-    // server, not silently invent one — see ensureAllSports() for why this
-    // ordering matters (a stale/empty local cache used to regenerate wrong
-    // defaults and then overwrite the real server copy on the next save).
+    // Sports come from the server copy only (a stale/empty local cache used
+    // to regenerate wrong defaults and then overwrite the real server copy
+    // on the next save).
     SERVER_SPORTS_SCHEDULE = saved?.sportsSchedule || [];
-    ensureAllSports(SERVER_SPORTS_SCHEDULE);
+    SPORTS_BY_TERM_LOADED = !!(saved && saved.sportsByTerm && typeof saved.sportsByTerm === 'object');
+    SERVER_SPORTS_BY_TERM = SPORTS_BY_TERM_LOADED ? saved.sportsByTerm : {};
+    // Sports now come only from the server copy (per term), never from this
+    // browser's wfa_ws_events cache — drop any old cached sports entries.
+    if (wsEvents.some(e => e.sport)) { wsEvents = wsEvents.filter(e => !e.sport); wsSave(); }
     state.weekIdx=currentWeekIdx();
     if (!state.weekSlots[state.weekIdx] || state.weekSlots[state.weekIdx].length===0) state.weekSlots[state.weekIdx]=JSON.parse(JSON.stringify(RECURRING_SLOTS));
     fillNonWorkingSlots();
@@ -1138,7 +1173,7 @@ function stateSave() {
   // updated in lockstep by updateSport() when an admin actually changes a
   // fixture) — every save just echoes it straight back unchanged.
   try {
-    localStorage.setItem('wfa_planner_state', JSON.stringify({ weekSlots: state.weekSlots, cellNotes: state.cellNotes, nextId: state.nextId, sportsSchedule: SERVER_SPORTS_SCHEDULE }));
+    localStorage.setItem('wfa_planner_state', JSON.stringify(statePayload_()));
   } catch(e) {}
   setSyncStatus('syncing');
   // Found 19.09.26 — a real live incident: a genuine PPA entry vanished with
@@ -1160,9 +1195,15 @@ function stateSave() {
   _fireStateSave();
 }
 
+function statePayload_() {
+  const p = { weekSlots: state.weekSlots, cellNotes: state.cellNotes, nextId: state.nextId, sportsSchedule: SERVER_SPORTS_SCHEDULE };
+  if (SPORTS_BY_TERM_LOADED) p.sportsByTerm = SERVER_SPORTS_BY_TERM;
+  return p;
+}
+
 function _fireStateSave() {
   _saveInFlight = true;
-  const json = JSON.stringify({ weekSlots: state.weekSlots, cellNotes: state.cellNotes, nextId: state.nextId, sportsSchedule: SERVER_SPORTS_SCHEDULE });
+  const json = JSON.stringify(statePayload_());
   // Found 18.09.26: `.then(() => setSyncStatus('ok'))` treated ANY resolved
   // fetch as success — fetch() only rejects on a true network failure, never
   // on a non-2xx status or an {"error":...} body, so a backend rejecting the
@@ -1544,7 +1585,7 @@ function renderGrid() {
         data-day="${dayIdx}" data-session="${session}">`;
 
       // Collect all session events (wsEvents + session info events)
-      const wsEventMatches = wsEvents.filter(e => e.day === dayIdx && e.session === session);
+      const wsEventMatches = recurringEventsForWeek(state.weekIdx).filter(e => e.day === dayIdx && e.session === session);
       const sessionInfoEvents = getSessionInfoEvents(state.weekIdx, dayIdx, session);
       const allEvents = [...wsEventMatches, ...sessionInfoEvents];
 
@@ -1715,7 +1756,7 @@ function positionSpanStrips(spans) {
       if (session === 'Before School' || session === 'After School') continue; // Skip short rows for position calculation
 
       // Check for event in this cell
-      const wsEv = wsEvents.find(e => e.day === s.day && e.session === session);
+      const wsEv = recurringEventsForWeek(state.weekIdx).find(e => e.day === s.day && e.session === session);
       const sessEv = getSessionInfoEvents(state.weekIdx, s.day, session);
       if (wsEv || sessEv.length > 0) {
         anyCellHasEvent = true;
@@ -2224,6 +2265,7 @@ function copyToNextWeek() {
 // ── Whole-school events modal ─────────────────────────────────────────────────
 
 function openWsModal() {
+  sportEditTerm = WEEKS[state.weekIdx]?.term || sportTerms_()[0];
   renderWsModal();
   document.getElementById('wsModal').classList.remove('hidden');
 }
@@ -2235,52 +2277,67 @@ const SPORT_YGS = ['Reception','Y1','Y2','Y3','Y4','Y5','Y6'];
 const SPORT_YG_COLOURS = {Reception:'#93c5fd',Y1:'#fb923c',Y2:'#6ee7b7',Y3:'#f5aad4',Y4:'#60a5fa',Y5:'#fdba74',Y6:'#4ade80'};
 const SPORT_DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 
-function getSportEntry(yg) {
-  return wsEvents.find(e => e.sport && e.yg === yg);
+const SPORT_DAY_ABBR = ['Mon','Tue','Wed','Thu','Fri'];
+let sportEditTerm = 1;   // the term the School events sports table is showing
+
+// The sports entry a year group has in a term: the term's own entry, else
+// the standing (all-terms) schedule. fromTerm says which.
+function sportEntryFor(yg, term) {
+  const own = (SERVER_SPORTS_BY_TERM[String(term)] || []).find(s => s.yg === yg);
+  if (own) return { ...own, fromTerm: true };
+  const std = SERVER_SPORTS_SCHEDULE.find(s => s.yg === yg);
+  return std ? { ...std, fromTerm: false } : null;
 }
-function ensureAllSports(serverSportsSchedule) {
-  // For any year group with no local sport entry, hydrate it from the
-  // server's copy (the shared, last-known-good schedule everyone else's
-  // saves have been building) rather than inventing a Monday/PM default —
-  // a fabricated default here is exactly what silently overwrote the real
-  // schedule before (see the caller in init() for the full story). If a
-  // year group genuinely has no entry anywhere yet, leave it unset — the
-  // School events modal lets it be configured from a blank state.
-  let changed = false;
-  SPORT_YGS.forEach(yg => {
-    if (wsEvents.find(e => e.sport && e.yg === yg)) return;
-    const fromServer = (serverSportsSchedule || []).find(s => s.yg === yg);
-    if (fromServer) {
-      wsEvents.push({ day:fromServer.day, session:fromServer.session, label:yg+' Sports', bg:SPORT_YG_COLOURS[yg], sport:true, yg, provider:fromServer.provider||'' });
-      changed = true;
-    }
-  });
-  if (changed) wsSave();
+function sportEventsForTerm(term) {
+  return SPORT_YGS.map(yg => sportEntryFor(yg, term))
+    .filter(s => s && s.day != null && s.session)
+    .map(s => ({ day:s.day, session:s.session, label:s.yg+' Sports'+(s.provider?` (${s.provider})`:''),
+                 bg:SPORT_YG_COLOURS[s.yg], sport:true, yg:s.yg, provider:s.provider||'' }));
 }
+// Everything that repeats every week of a given week's term.
+function recurringEventsForWeek(weekIdx) {
+  return [...wsEvents.filter(e => !e.sport), ...sportEventsForTerm(WEEKS[weekIdx]?.term)];
+}
+function sportTerms_() {
+  const ts = [...new Set(WEEKS.map(w => w.term))].filter(Boolean).sort((a,b) => a-b);
+  return ts.length ? ts : [1,2,3,4,5,6];
+}
+function sportsEditable_() {
+  if (SPORTS_BY_TERM_LOADED) return true;
+  alert('The shared sports schedule could not be loaded from the server, so it cannot be changed from this device just now. Try again when the connection is back (the sync status at the top shows it).');
+  return false;
+}
+function setSportTerm(t) { sportEditTerm = t; renderWsModal(); }
 
 function renderWsModal() {
   const days = SPORT_DAYS;
-  ensureAllSports(SERVER_SPORTS_SCHEDULE);
 
-  // Sports table — every YG always present, editable day/session/provider.
-  // A year group with no entry yet (no local data, nothing on the server
-  // either) shows blank "— Select —" prompts rather than a fabricated
-  // default — see ensureAllSports() for why guessing a default is exactly
-  // what caused the real schedule to get silently overwritten before.
-  let sportHtml = '<tr><th></th><th>Day</th><th>Session</th><th>Provider</th></tr>';
+  document.getElementById('sportTermTabs').innerHTML = sportTerms_().map(t =>
+    `<button type="button" class="${t===sportEditTerm?'on':''}" onclick="setSportTerm(${t})">Term ${t}</button>`).join('');
+
+  // Sports table for the chosen term. A year group with nothing set for the
+  // term shows the standing schedule greyed; changing it gives the term its
+  // own entry. Nothing set anywhere shows blank "— Select —" prompts rather
+  // than a made-up default (a guessed default once overwrote the real one).
+  let sportHtml = '<tr><th></th><th>Day</th><th>Session</th><th>Provider</th><th></th></tr>';
   SPORT_YGS.forEach(yg => {
-    const ev = getSportEntry(yg) || { day:null, session:null, provider:'' };
+    const ev = sportEntryFor(yg, sportEditTerm) || { day:null, session:null, provider:'', fromTerm:false };
     const col = SPORT_YG_COLOURS[yg];
     const dayOpts = '<option value=""' + (ev.day==null?' selected':'') + '>— Select —</option>'
       + days.map((d,i) => `<option value="${i}"${ev.day===i?' selected':''}>${d}</option>`).join('');
     const sessOpts = '<option value=""' + (ev.session==null?' selected':'') + '>— Select —</option>'
       + ['AM','PM'].map(s => `<option${ev.session===s?' selected':''}>${s}</option>`).join('');
     const provOpts = [['','None'],['AB','AB'],['Brs','Brs']].map(([v,l]) => `<option value="${v}"${ev.provider===v?' selected':''}>${l}</option>`).join('');
-    sportHtml += `<tr>
+    const inherited = !ev.fromTerm && ev.day != null;
+    const last = ev.fromTerm
+      ? `<button type="button" class="sport-reset" title="Remove this term's own time (use the standing schedule)" onclick="resetSportTerm('${yg}')">✕</button>`
+      : (inherited ? '<span class="sport-note">standing</span>' : '');
+    sportHtml += `<tr class="${inherited?'sport-inherited':''}">
       <td><div class="yg-cell"><div class="yg-pip-sm" style="background:${col}"></div>${yg}</div></td>
       <td><select onchange="updateSport('${yg}','day',this.value===''?null:+this.value)">${dayOpts}</select></td>
       <td><select onchange="updateSport('${yg}','session',this.value||null)">${sessOpts}</select></td>
       <td><select onchange="updateSport('${yg}','provider',this.value)">${provOpts}</select></td>
+      <td>${last}</td>
     </tr>`;
   });
   document.getElementById('sportTable').innerHTML = sportHtml;
@@ -2306,30 +2363,129 @@ function renderWsModal() {
   document.getElementById('wsEventList').innerHTML = otherHtml;
 }
 function updateSport(yg, field, value) {
-  let ev = getSportEntry(yg);
-  if (!ev) {
-    ev = { day:null, session:null, provider:'', sport:true, yg };
-    wsEvents.push(ev);
+  if (!sportsEditable_()) { renderWsModal(); return; }
+  const key = String(sportEditTerm);
+  const list = SERVER_SPORTS_BY_TERM[key] || (SERVER_SPORTS_BY_TERM[key] = []);
+  let entry = list.find(s => s.yg === yg);
+  if (!entry) {
+    const base = sportEntryFor(yg, sportEditTerm);
+    entry = { yg, day: base ? base.day : null, session: base ? base.session : null, provider: (base && base.provider) || '' };
+    list.push(entry);
   }
-  if (field === 'day') ev.day = value;
-  else if (field === 'session') ev.session = value;
-  else if (field === 'provider') ev.provider = value;
-  // Rebuild label and colour
-  ev.label = yg + ' Sports' + (ev.provider ? ` (${ev.provider})` : '');
-  ev.bg = SPORT_YG_COLOURS[yg];
-  wsSave();
-  // Keep SERVER_SPORTS_SCHEDULE (what every stateSave() now echoes back
-  // unchanged) in lockstep with this edit — it's the only place that's
-  // allowed to change it.
-  if (ev.day != null && ev.session) {
-    const entry = { yg, day: ev.day, session: ev.session, provider: ev.provider || '' };
-    const idx = SERVER_SPORTS_SCHEDULE.findIndex(s => s.yg === yg);
-    if (idx >= 0) SERVER_SPORTS_SCHEDULE[idx] = entry; else SERVER_SPORTS_SCHEDULE.push(entry);
-  }
-  // Push to the server immediately rather than waiting for some unrelated
-  // edit to carry it along — this is what let the schedule drift out of
-  // sync before (see ensureAllSports()).
+  if (field === 'day') entry.day = value;
+  else if (field === 'session') entry.session = value;
+  else if (field === 'provider') entry.provider = value;
+  // Push straight away (a half-filled row is kept here until it has a day
+  // and a session; the server only stores complete rows).
+  if (entry.day != null && entry.session) stateSave();
+  renderWsModal();
+  render();
+}
+function resetSportTerm(yg) {
+  if (!sportsEditable_()) return;
+  const key = String(sportEditTerm);
+  SERVER_SPORTS_BY_TERM[key] = (SERVER_SPORTS_BY_TERM[key] || []).filter(s => s.yg !== yg);
   stateSave();
+  renderWsModal();
+  render();
+}
+
+// ── Load a whole year's sports from a pasted spreadsheet table ──────────────
+let _sportPasteParsed = null;  // {terms:[n], rows:[{yg, cells:{term:{day,session,provider}|{bad:text}}}]}
+function toggleSportPaste() {
+  document.getElementById('sportPasteBox').classList.toggle('hidden');
+}
+function sportYgFromName_(name) {
+  const n = (name || '').trim().toLowerCase();
+  if (/^(oak|reception|eyfs|yr|rec)\b/.test(n)) return 'Reception';
+  const m = n.match(/^(?:year|yr|y)\s*([1-6])\b/);
+  return m ? 'Y' + m[1] : null;
+}
+function parseSportCell_(text) {
+  const t = (text || '').trim();
+  if (!t) return null;
+  const dm = t.match(/^(mon|tue|wed|th|fri)/i);
+  const sm = t.match(/\b(am|pm)\b/i);
+  if (!dm || !sm) return { bad: t };
+  const day = ['mon','tue','wed','th','fri'].indexOf(dm[1].toLowerCase());
+  const provider = /\bbrs\b/i.test(t) ? 'Brs' : (/\bab(s|\s+sports)?\b/i.test(t) ? 'AB' : '');
+  return { day, session: sm[1].toUpperCase(), provider };
+}
+function parseSportPaste_(text) {
+  const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
+  const split = l => l.includes('\t') ? l.split('\t') : l.split(/\s{2,}|,/);
+  let headerIdx = -1, termCols = {};
+  for (let i = 0; i < lines.length; i++) {
+    const cells = split(lines[i]);
+    const found = {};
+    cells.forEach((c, ci) => { const m = c.trim().match(/^term\s*([1-6])$/i); if (m) found[ci] = +m[1]; });
+    if (Object.keys(found).length) { headerIdx = i; termCols = found; break; }
+  }
+  if (headerIdx < 0) return { error: 'No "Term 1 … Term 6" heading row found. Copy the table again including its heading row.' };
+  const rows = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const cells = split(lines[i]);
+    const yg = sportYgFromName_(cells[0]);
+    if (!yg) continue;
+    const out = {};
+    Object.entries(termCols).forEach(([ci, term]) => { const p = parseSportCell_(cells[ci]); if (p) out[term] = p; });
+    rows.push({ yg, cells: out });
+  }
+  if (!rows.length) return { error: 'No year group rows found (the first column should say Oak / Reception, Year 1 … Year 6).' };
+  return { terms: [...new Set(Object.values(termCols))].sort((a,b) => a-b), rows };
+}
+function sportCellText_(c) {
+  return c ? `${SPORT_DAY_ABBR[c.day]} ${c.session}${c.provider ? ' ' + c.provider : ''}` : '—';
+}
+function previewSportPaste() {
+  const box = document.getElementById('sportPastePreview');
+  const text = document.getElementById('sportPasteText').value;
+  _sportPasteParsed = null;
+  if (!text.trim()) { box.innerHTML = ''; return; }
+  const parsed = parseSportPaste_(text);
+  if (parsed.error) { box.innerHTML = `<div class="sport-paste-msg err">${parsed.error}</div>`; return; }
+  let bad = 0, changed = 0, good = 0;
+  let html = '<table class="sport-preview"><tr><th></th>' + parsed.terms.map(t => `<th>Term ${t}</th>`).join('') + '</tr>';
+  parsed.rows.forEach(r => {
+    html += `<tr><td>${r.yg}</td>`;
+    parsed.terms.forEach(t => {
+      const c = r.cells[t];
+      if (c && c.bad) { bad++; html += `<td class="bad" title="Not understood — left as it is">${c.bad.replace(/</g,'&lt;')}</td>`; return; }
+      if (!c) { html += '<td>—</td>'; return; }
+      good++;
+      const cur = sportEntryFor(r.yg, t);
+      const diff = !cur || cur.day !== c.day || cur.session !== c.session || (cur.provider || '') !== c.provider;
+      if (diff) changed++;
+      html += `<td class="${diff?'changed':''}">${sportCellText_(c)}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</table>';
+  html += `<div class="sport-paste-msg">${good} entr${good===1?'y':'ies'} read; <span style="background:#fef9c3">${changed} different</span> from what is set now.`
+    + (bad ? ` <span style="color:#b91c1c">${bad} not understood (red) — those stay as they are.</span>` : '') + '</div>';
+  if (good) html += `<button type="button" class="sport-paste-load" onclick="loadSportPaste()">Load into Term${parsed.terms.length>1?'s':''} ${parsed.terms.join(', ')}</button>`;
+  box.innerHTML = html;
+  _sportPasteParsed = parsed;
+}
+function loadSportPaste() {
+  const parsed = _sportPasteParsed;
+  if (!parsed || !sportsEditable_()) return;
+  let n = 0;
+  parsed.rows.forEach(r => {
+    Object.entries(r.cells).forEach(([term, c]) => {
+      if (!c || c.bad) return;
+      const key = String(term);
+      const list = (SERVER_SPORTS_BY_TERM[key] || []).filter(s => s.yg !== r.yg);
+      list.push({ yg: r.yg, day: c.day, session: c.session, provider: c.provider });
+      SERVER_SPORTS_BY_TERM[key] = list;
+      n++;
+    });
+  });
+  stateSave();
+  document.getElementById('sportPasteText').value = '';
+  document.getElementById('sportPastePreview').innerHTML = `<div class="sport-paste-msg">✓ ${n} sports times loaded and saved. Use the term buttons above to check each term.</div>`;
+  _sportPasteParsed = null;
+  renderWsModal();
   render();
 }
 function addWsEvent() {
@@ -2638,6 +2794,7 @@ function renderTermView() {
 
   const today = new Date(); today.setHours(0,0,0,0);
   const allTerms = [...new Set(WEEKS.map(w => w.term))];
+  const termRecurring = [...wsEvents.filter(e => !e.sport), ...sportEventsForTerm(currentTerm)];
 
   let html = `<div class="term-view">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
@@ -2701,8 +2858,8 @@ function renderTermView() {
         });
       });
 
-      // Recurring wsEvents
-      wsEvents.filter(ev=>ev.day===di).forEach(ev => {
+      // Recurring events (other events + this term's sports)
+      termRecurring.filter(ev=>ev.day===di).forEach(ev => {
         const fg = contrastColor(ev.bg);
         html += `<div class="term-event" style="background:${ev.bg};color:${fg}">${ev.label}</div>`;
       });
