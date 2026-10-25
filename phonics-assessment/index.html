@@ -219,7 +219,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26g</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26h</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -271,7 +271,8 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 'use strict';
 var API = 'https://api.wallscourt-farm-academy.co.uk/planning/phonics-db?token=__hub__';
 var QKEY = 'wfa_ph_queue_v1', PKEY = 'wfa_ph_phases_v1', YKEY = 'wfa_ph_year_v1', FKEY = 'wfa_ph_font_v1';
-var TERM_SHORT = ['Aut 1', 'Aut 2', 'Spr 1', 'Spr 2', 'Sum 1', 'Sum 2'];
+var TERM_SHORT = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'];                        // the school says Term 1-6 (Innes, 25.10.26)
+var TERM_NAMES = ['Term 1', 'Term 2', 'Term 3', 'Term 4', 'Term 5', 'Term 6'];
 var DEFAULT_PHASES = { R: ['p1', 'p2', 'p3', 'p4'] };
 var S = { cat: null, year: 'R', cls: '', children: [], marks: {}, flags: {}, recSecure: {}, ontrack: {},
           academicYear: '', term: 1, programme: new Set(), child: null, phases: null, gaps: false, queue: {}, saving: false, failed: false };
@@ -427,7 +428,7 @@ function securedInfo(sec, child) {
   var idx = YG_ORDER.indexOf(child && child.yearGroup) - ago, yg = idx >= 0 ? YG_ORDER[idx] : '';
   var names = { R: 'Reception', Y1: 'Year 1', Y2: 'Year 2', Y3: 'Year 3', Y4: 'Year 4', Y5: 'Year 5', Y6: 'Year 6' };
   return { colour: 'var(--t' + term + ')', yg: yg, ago: ago,
-           text: 'secure since ' + (S.cat ? S.cat.terms[term - 1] : 'term ' + term) + (yg ? ', ' + names[yg] : ', ' + p[0]) };
+           text: 'secure since ' + TERM_NAMES[term - 1] + (yg ? ', ' + names[yg] : ', ' + p[0]) };
 }
 function yn(v) {
   if (v === 'n/a') return el('span', { class: 'yn na', text: 'n/a' });
@@ -466,10 +467,10 @@ function drawClass() {
     ? YEAR_NAMES[S.year] + ': only the children still on the phonics programme are listed. "+ Add a child" puts someone on it; a child secure in everything leaves the list. Tap a child to assess them.'
     : 'Tap a child to assess them. Every tap is saved straight away, and this term\'s "on track" answers go to the Pupil Tracker.';
 
-  // Reception and Year 1: this term's answer. Year 2: the end of Year 1 standard (Summer 2).
+  // Reception and Year 1: this term's answer. Year 2 on: the end of Year 1 standard (Term 6).
   var kids = visibleChildren(), current = S.year === 'R' || S.year === 'Y1';
   var t = current ? S.term - 1 : 5;
-  var std = current ? S.cat.terms[t] : 'end of Year 1 standard';
+  var std = current ? TERM_NAMES[t] : 'end of Year 1 standard';
   var ans = function (c, k) { return (((S.ontrack[c.pupilCode] || {})[sheetKey(c)] || {})[k] || [])[t]; };
   var gYes = kids.filter(function (c) { return ans(c, 'gpc') === 'Yes'; }).length;
   var wVals = kids.map(function (c) { return ans(c, 'bw'); });
@@ -543,7 +544,7 @@ function drawChild() {
   var lg = $('legend');
   lg.innerHTML = '';
   lg.appendChild(document.createTextNode('Secure since:'));
-  S.cat.terms.forEach(function (t, i) { lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--t' + (i + 1) + ')' }), t])); });
+  TERM_NAMES.forEach(function (t, i) { lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--t' + (i + 1) + ')' }), t])); });
   lg.appendChild(el('span', {}, [el('span', { class: 'yg', text: 'YR' }), ' ', el('span', { class: 'yg', text: 'Y1' }), ' in the corner: secured in that earlier year group']));
   lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--old)' }), 'imported, date not known']));
   lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:#fff3f3;border-color:#f0b4b4' }), 'not yet']));
