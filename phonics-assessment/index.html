@@ -219,7 +219,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-25.10.26h</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-26.10.26a</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -908,7 +908,7 @@ function impPreview() {
 // to children far better than initials can. Nothing about it is sent anywhere: only the chosen pupil codes are.
 function nameWords(s) {
   return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-    .replace(/[^a-z\s'-]/g, ' ').split(/[\s]+/).map(function (w) { return w.replace(/[^a-z]/g, ''); }).filter(Boolean);
+    .replace(/[^a-z\s'-]/g, ' ').split(/[\s-]+/).map(function (w) { return w.replace(/[^a-z]/g, ''); }).filter(Boolean);
 }
 function matchWithNames() {
   var d = IMP.plan, nf = IMP.names, kids = [];
@@ -922,6 +922,7 @@ function matchWithNames() {
   var tests = [
     function (w, k) { return w.length > 1 && w[0] === k.first && w[w.length - 1] === k.lastWord; },               // First Last
     function (w, k) { return w.length > 1 && w[0] === k.first && (k.last.indexOf(w[w.length - 1]) >= 0 || w.indexOf(k.lastWord) > 0); }, // middle names, two surnames
+    function (w, k) { return w.length > 1 && w[0] === k.first && w.slice(1).join('') === k.last.join(''); },      // surname spaced differently (AlHlayel / Al Hlayel)
     function (w, k) { return w.length > 1 && w[w.length - 1] === k.first && w[0] === k.lastWord; },              // Last First
     function (w, k) { return w.length === 1 && w[0] === k.first; }                                                // first name only
   ];
