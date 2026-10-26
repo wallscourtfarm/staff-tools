@@ -9,6 +9,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 <meta charset="UTF-8">
 <title>RNP Certificate Generator — Wallscourt Farm Academy</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa.css">
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
 @font-face {
@@ -206,11 +207,32 @@ function getMilestones() {
     .sort(function(a,b){ return a - b; });
 }
 
+// 26.10.26: progress is stored against the pupil CODE, never a name. The names come from the uploaded RNP
+// report (they stay in this browser); the code comes from the teacher's names file, matched on last+first.
+var nameToCode = null, nameFileDupes = {};
+function nameKey(last, first) {
+  return (last + '|' + first).toLowerCase().replace(/\s+/g, ' ').trim();
+}
+async function ensureNames() {
+  if (nameToCode) return true;
+  var nf = window.WFANames ? await WFANames.pick({ purpose: 'The names file links each pupil in the RNP report to their pupil code, so no names are stored.' }) : null;
+  if (!nf) return false;
+  var map = {}, dup = {};
+  nf.ids().forEach(function(id) {
+    var p = nf.get(id); if (!p) return;
+    var k = nameKey(p.last, p.first);
+    if (map[k]) dup[k] = 1; else map[k] = id;
+  });
+  Object.keys(dup).forEach(function(k) { delete map[k]; });
+  nameToCode = map; nameFileDupes = dup;
+  return true;
+}
 function pupilKey(last, first) {
-  return (last + '|' + first).toLowerCase();
+  return nameToCode ? (nameToCode[nameKey(last, first)] || '') : '';
 }
 
-function processData() {
+async function processData() {
+  if (!(await ensureNames())) { alert('Load your names file to continue. It is only used in this browser to match pupils to their pupil codes.'); return; }
   var milestones = getMilestones();
   if (!milestones.length) { alert('Please enter at least one milestone value.'); return; }
   if (!xlsxData) { alert('Please upload the RNP report first.'); return; }
@@ -228,10 +250,12 @@ function processData() {
 
       newTracking = { issued: {} };
       certsToGenerate = [];
+      var unmatched = [];
 
       for (var p = 0; p < xlsxData.length; p++) {
         var pupil = xlsxData[p];
         var key = pupilKey(pupil.last, pupil.first);
+        if (!key) { unmatched.push(pupil); continue; }
         var alreadyIssued = issued[key] || [];
         for (var m = 0; m < milestones.length; m++) {
           var ms = milestones[m];
@@ -245,6 +269,8 @@ function processData() {
         }
       }
 
+      window.rnpUnmatched = unmatched.length;
+      certsToGenerate.forEach(function(c){ c.code = pupilKey(c.last, c.first); });
       certsToGenerate.sort(function(a,b){
         if (a.milestone !== b.milestone) return a.milestone - b.milestone;
         return a.last.localeCompare(b.last);
@@ -286,7 +312,7 @@ function renderResults() {
   document.getElementById('res-card').style.display = 'block';
   var sum = document.getElementById('res-sum');
   if (certsToGenerate.length === 0) {
-    sum.innerHTML = '&#10003; <strong>No new certificates needed</strong> &mdash; no pupils have reached a new milestone since the last run.';
+    sum.innerHTML = (window.rnpUnmatched ? '<div style="color:#c05621;margin-bottom:6px;">&#9888; ' + window.rnpUnmatched + ' pupil(s) in the report are not in your names file (or share a name with another pupil) and were skipped.</div>' : '') + '&#10003; <strong>No new certificates needed</strong> &mdash; no pupils have reached a new milestone since the last run.';
   } else {
     var byMs = {};
     for (var i = 0; i < certsToGenerate.length; i++) {
@@ -295,7 +321,7 @@ function renderResults() {
     }
     var parts = [];
     for (var k in byMs) parts.push('<strong>' + byMs[k] + '</strong> &times; ' + k + '-point');
-    sum.innerHTML = '&#127881; <strong>' + certsToGenerate.length + ' certificate' + (certsToGenerate.length !== 1 ? 's' : '') + ' to print</strong> this week &mdash; ' + parts.join(', ') + '.';
+    sum.innerHTML = (window.rnpUnmatched ? '<div style="color:#c05621;margin-bottom:6px;">&#9888; ' + window.rnpUnmatched + ' pupil(s) in the report are not in your names file (or share a name with another pupil) and were skipped.</div>' : '') + '&#127881; <strong>' + certsToGenerate.length + ' certificate' + (certsToGenerate.length !== 1 ? 's' : '') + ' to print</strong> this week &mdash; ' + parts.join(', ') + '.';
   }
 
   var tblDiv = document.getElementById('cert-tbl');
@@ -303,10 +329,12 @@ function renderResults() {
     tblDiv.innerHTML = '<p style="padding:14px;color:#888;font-size:.85rem">Nothing to print this week.</p>';
     return;
   }
-  var html = '<table><thead><tr><th>Name</th><th>Year</th><th>Points</th><th>Milestone</th></tr></thead><tbody>';
+  var labs = null;
+  try { labs = WFANames.initialsLabels(certsToGenerate.map(function(c){ return [c.first, c.last]; })); } catch(e) {}
+  var html = '<table><thead><tr><th>Pupil</th><th>Year</th><th>Points</th><th>Milestone</th></tr></thead><tbody>';
   for (var j = 0; j < certsToGenerate.length; j++) {
     var c = certsToGenerate[j];
-    html += '<tr><td>' + c.first + ' ' + c.last + '</td><td>' + c.year + '</td><td>' + c.pts + '</td><td>' + badgeHTML(c.milestone) + '</td></tr>';
+    html += '<tr><td>' + (labs ? labs[j] : '') + '</td><td>' + c.year + '</td><td>' + c.pts + '</td><td>' + badgeHTML(c.milestone) + '</td></tr>';
   }
   html += '</tbody></table>';
   tblDiv.innerHTML = html;
@@ -372,8 +400,8 @@ function confirmPrinted() {
   // Build unique key→fullMilestoneList map from certs being confirmed
   var keysToSave = {};
   certsToGenerate.forEach(function(c) {
-    var key = pupilKey(c.last, c.first);
-    if (newTracking.issued[key]) keysToSave[key] = newTracking.issued[key];
+    var key = c.code;
+    if (key && newTracking.issued[key]) keysToSave[key] = newTracking.issued[key];
   });
   // Save sequentially to avoid Apps Script race conditions
   var keys = Object.keys(keysToSave);
@@ -415,6 +443,6 @@ function confirmPrinted() {
 }
 
 </script>
-<footer style="text-align:center;font-size:11px;color:#a0aec0;padding:8px 0;">Wallscourt Farm Academy &middot; RNP Certificate Tracker &middot; WFA-15.10.26b</footer>
+<footer style="text-align:center;font-size:11px;color:#a0aec0;padding:8px 0;">Wallscourt Farm Academy &middot; RNP Certificate Tracker &middot; WFA-26.10.26a</footer>
 </body>
 </html>
