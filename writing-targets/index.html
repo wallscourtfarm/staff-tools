@@ -111,12 +111,12 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   select:disabled { opacity:.5; }
   .hist { font-size:13px; border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-bottom:6px; }
   footer { text-align:center; font-size:11px; color:var(--muted); margin-top:16px; }
-  /* Printed strips: three to an A4 landscape page, the same size front and back (front: the child's checklist or targets; back: the spelling strip).
+  /* Printed strips: three to an A4 landscape page, the same size front and back (front: the child's checklist or targets; back: the school's spelling strip artwork, 81 x 195 mm, its own shape).
      Slots are centred and evenly spaced, so a double-sided print lines up whichever way the printer flips. Nothing on a strip says a year or a level. */
   #print { position:fixed; left:-10000px; top:0; }
-  #print .sheet { width:297mm; height:210mm; display:flex; justify-content:center; align-items:center; gap:5mm; background:#fff; }
-  #print .slot { width:92mm; height:194mm; }
-  #print .wc { width:92mm; height:194mm; border:0.6mm solid #0a0101; display:flex; flex-direction:column; color:#000; font-family:Lexend, Arial, sans-serif; overflow:hidden; }
+  #print .sheet { width:297mm; height:210mm; display:flex; justify-content:center; align-items:center; gap:8mm; background:#fff; }
+  #print .slot { width:81mm; height:195mm; }
+  #print .wc { width:81mm; height:195mm; border:0.6mm solid #0a0101; display:flex; flex-direction:column; color:#000; font-family:Lexend, Arial, sans-serif; overflow:hidden; }
   #print .wc .hd { border-bottom:0.3mm solid #999; padding:3mm 3mm 2.5mm; text-align:center; }
   #print .wc .hd .nm { font-size:17pt; font-weight:700; line-height:1.15; }
   #print .wc .hd .ti { font-family:"Playpen Sans", Lexend, Arial, sans-serif; font-size:14pt; margin-top:1mm; }
@@ -127,12 +127,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   #print .wc li .n { flex:0 0 1.2em; font-weight:700; }
   #print .wc li .eg { display:block; font-size:0.78em; color:#333; font-style:italic; margin-top:0.15em; }
   #print .wc .ft { border-top:0.3mm solid #999; padding:2mm 3mm; text-align:center; font-family:"Playpen Sans", Lexend, Arial, sans-serif; font-size:10.5pt; }
-  #print .sp .top { display:flex; align-items:center; justify-content:space-between; padding:2.5mm 3mm; border-bottom:0.3mm solid #999; }
-  #print .sp .top svg { width:19mm; height:19mm; flex:0 0 19mm; }
-  #print .sp .top .ti { font-family:"Playpen Sans", Lexend, Arial, sans-serif; font-size:19pt; }
-  #print .sp .lines { flex:1; display:flex; flex-direction:column; }
-  #print .sp .lines div { flex:1; border-bottom:0.3mm solid #b5b5b5; }
-  #print .sp .lines div:last-child { border-bottom:0; }
+  #print img.sp { display:block; width:81mm; height:195mm; object-fit:fill; }   /* the school's own strip artwork, same shape as the strip */
   @media print {
     @page { size:A4 landscape; margin:0; }
     body { background:#fff; }
@@ -164,7 +159,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   </div>
   <div class="note" id="srcnote">Loading…</div>
   <div id="lists"></div>
-  <footer>Writing Targets · WFA-26.10.26d · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
+  <footer>Writing Targets · WFA-26.10.26e · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
 </main>
 
 <div id="ed" role="dialog" aria-modal="true" aria-labelledby="edt">
@@ -432,25 +427,15 @@ async function saveEditor(){
 }
 
 // ---- Printing ----------------------------------------------------------
-const ICON_SEGMENT = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="47" fill="none" stroke="#666" stroke-width="2"/>'
-  + '<g font-family="Playpen Sans, Arial, sans-serif" font-size="24" text-anchor="middle"><text x="29" y="50">c</text><text x="50" y="50">a</text><text x="71" y="50">t</text></g>'
-  + '<circle cx="29" cy="61" r="3.6"/><circle cx="50" cy="61" r="3.6"/><circle cx="71" cy="61" r="3.6"/>'
-  + '<text x="50" y="83" font-family="Playpen Sans, Arial, sans-serif" font-size="11" text-anchor="middle">segment</text></svg>';
-const ICON_BEE = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="47" fill="none" stroke="#666" stroke-width="2"/>'
-  + '<ellipse cx="42" cy="30" rx="8" ry="11" transform="rotate(-25 42 30)" fill="#fff" stroke="#000" stroke-width="1.6"/>'
-  + '<ellipse cx="55" cy="29" rx="8" ry="11" transform="rotate(20 55 29)" fill="#fff" stroke="#000" stroke-width="1.6"/>'
-  + '<path d="M27 48 L21 50 L27 52" fill="#000"/>'
-  + '<ellipse cx="47" cy="50" rx="20" ry="13" fill="#fff" stroke="#000" stroke-width="2"/>'
-  + '<path d="M40 38.5 Q36 50 40 61.5 L46 62.9 Q42 50 46 37.1 Z M52 37.3 Q48 50 52 62.7 L58 61.6 Q54 50 58 38.4 Z" fill="#000"/>'
-  + '<circle cx="70" cy="47" r="8" fill="#fff" stroke="#000" stroke-width="2"/><circle cx="72.5" cy="45" r="1.6"/>'
-  + '<path d="M68 39.5 Q66 32 62 30 M73 39.5 Q76 32 80 31" fill="none" stroke="#000" stroke-width="1.5"/>'
-  + '<text x="50" y="83" font-family="Playpen Sans, Arial, sans-serif" font-size="10.5" text-anchor="middle">spelling rules</text></svg>';
-const STRIP_LINES = 16;
-function spellingStrip(){
-  return '<div class="wc sp"><div class="top">' + ICON_SEGMENT + '<span class="ti">Spelling Strip</span>' + ICON_BEE + '</div>'
-    + '<div class="lines">' + '<div></div>'.repeat(STRIP_LINES) + '</div>'
-    + '<div class="ft">Use this as a bookmark for your latest page.</div></div>';
+let STRIP_URL = null;   // the school's spelling strip artwork, fetched from the WFA API after sign-in (it is not kept in this public repo)
+async function stripUrl(){
+  if (STRIP_URL) return STRIP_URL;
+  const r = await fetch(API + '?action=strip&token=__hub__');
+  const type = r.headers.get('Content-Type') || '';
+  if (!r.ok || !type.startsWith('image/')) throw new Error('the spelling strip picture could not be loaded');
+  return STRIP_URL = URL.createObjectURL(await r.blob());
 }
+function spellingStrip(){ return '<img class="sp" src="' + STRIP_URL + '" alt="Spelling Strip">'; }
 function backsOn(){ try { return localStorage.getItem('wfa_wtg_backs') !== '0'; } catch (e) { return true; } }
 async function printCards(){
   const P = shown().filter(p => (S.selected.size ? S.selected.has(p.key) : true) && p.card && p.card.items.length);
@@ -471,16 +456,18 @@ async function printCards(){
   });
   if (names) try { names.clear(); } catch (e) {}
   const withBacks = $('backs').checked, pages = [];
+  if (withBacks) try { await stripUrl(); } catch (e) { banner('Not printed: ' + e.message + '. Refresh and sign in again, or untick "Spelling strip on the back".', true); return; }
   for (let i = 0; i < fronts.length; i += 3) {
     pages.push(fronts.slice(i, i + 3));
     if (withBacks) pages.push([spellingStrip(), spellingStrip(), spellingStrip()]);   // every back page is full, so it lines up however the sheet flips
   }
   printPages(pages);
 }
-function printBacks(){
+async function printBacks(){
   const want = shown().filter(p => !S.selected.size || S.selected.has(p.key)).length;
   const n = parseInt(prompt('How many spelling strips? (three to a page)', String(Math.max(3, want))), 10);
   if (!n || n < 1) return;
+  try { await stripUrl(); } catch (e) { banner('Not printed: ' + e.message + '. Refresh the page and sign in again.', true); return; }
   const strips = Array.from({ length:Math.min(n, 300) }, spellingStrip), pages = [];
   for (let i = 0; i < strips.length; i += 3) pages.push(strips.slice(i, i + 3));
   printPages(pages);
@@ -488,6 +475,7 @@ function printBacks(){
 async function printPages(pages){
   $('print').innerHTML = pages.map(pg => '<div class="sheet">' + [0, 1, 2].map(k => pg[k] || '<div class="slot"></div>').join('') + '</div>').join('');
   try { await document.fonts.ready; } catch (e) {}
+  await Promise.all([...$('print').querySelectorAll('img')].map(im => im.decode().catch(() => {})));
   fitLists();
   setTimeout(() => { window.print(); setTimeout(() => { $('print').innerHTML = ''; }, 500); }, 50);
 }
