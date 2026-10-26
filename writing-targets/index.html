@@ -11,7 +11,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 <meta name="robots" content="noindex">
 <title>Writing Targets</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700&family=Playpen+Sans:wght@400;600&display=swap" rel="stylesheet">
 <style>
   /* Layout: a year switcher over two lists of children (development targets, checklists); one editor panel for a child or a group; cards print from a hidden sheet. Palette as the writing tracker. */
   :root {
@@ -111,29 +111,35 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   select:disabled { opacity:.5; }
   .hist { font-size:13px; border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-bottom:6px; }
   footer { text-align:center; font-size:11px; color:var(--muted); margin-top:16px; }
-  /* Printed cards: two A5 cards side by side on A4 landscape. Nothing on a card says a year or a level. */
-  #print { display:none; }
+  /* Printed strips: three to an A4 landscape page, the same size front and back (front: the child's checklist or targets; back: the spelling strip).
+     Slots are centred and evenly spaced, so a double-sided print lines up whichever way the printer flips. Nothing on a strip says a year or a level. */
+  #print { position:fixed; left:-10000px; top:0; }
+  #print .sheet { width:297mm; height:210mm; display:flex; justify-content:center; align-items:center; gap:5mm; background:#fff; }
+  #print .slot { width:92mm; height:194mm; }
+  #print .wc { width:92mm; height:194mm; border:0.6mm solid #0a0101; display:flex; flex-direction:column; color:#000; font-family:Lexend, Arial, sans-serif; overflow:hidden; }
+  #print .wc .hd { border-bottom:0.3mm solid #999; padding:3mm 3mm 2.5mm; text-align:center; }
+  #print .wc .hd .nm { font-size:17pt; font-weight:700; line-height:1.15; }
+  #print .wc .hd .ti { font-family:"Playpen Sans", Lexend, Arial, sans-serif; font-size:14pt; margin-top:1mm; }
+  #print .wc .list { flex:1; overflow:hidden; padding:4mm 4mm 2mm; font-size:14pt; }
+  #print .wc ul { list-style:none; margin:0; padding:0; }
+  #print .wc li { line-height:1.25; margin:0 0 0.75em; display:flex; gap:0.45em; }
+  #print .wc li .bx { flex:0 0 0.95em; height:0.95em; border:0.5mm solid #000; margin-top:0.12em; }
+  #print .wc li .n { flex:0 0 1.2em; font-weight:700; }
+  #print .wc li .eg { display:block; font-size:0.78em; color:#333; font-style:italic; margin-top:0.15em; }
+  #print .wc .ft { border-top:0.3mm solid #999; padding:2mm 3mm; text-align:center; font-family:"Playpen Sans", Lexend, Arial, sans-serif; font-size:10.5pt; }
+  #print .sp .top { display:flex; align-items:center; justify-content:space-between; padding:2.5mm 3mm; border-bottom:0.3mm solid #999; }
+  #print .sp .top svg { width:19mm; height:19mm; flex:0 0 19mm; }
+  #print .sp .top .ti { font-family:"Playpen Sans", Lexend, Arial, sans-serif; font-size:19pt; }
+  #print .sp .lines { flex:1; display:flex; flex-direction:column; }
+  #print .sp .lines div { flex:1; border-bottom:0.3mm solid #b5b5b5; }
+  #print .sp .lines div:last-child { border-bottom:0; }
   @media print {
     @page { size:A4 landscape; margin:0; }
     body { background:#fff; }
     body > *:not(#print) { display:none !important; }
-    #print { display:block; }
-    .sheet { width:297mm; height:210mm; display:flex; page-break-after:always; break-after:page; }
-    .sheet:last-child { page-break-after:auto; break-after:auto; }
-    .card { width:148.5mm; height:210mm; padding:14mm 13mm; font-family:Lexend, Arial, sans-serif; color:#000; border-right:0.3mm dashed #bbb; overflow:hidden; }
-    .card:last-child { border-right:0; }
-    .card h1 { text-align:center; font-size:21pt; margin:0 0 2mm; line-height:1.15; }
-    .card h2 { text-align:center; font-size:17pt; margin:0 0 9mm; font-weight:600; }
-    .card ul { list-style:none; margin:0; padding:0; }
-    .card li { font-size:15pt; line-height:1.3; margin:0 0 4.5mm; display:flex; gap:3mm; }
-    .card li .bx { flex:0 0 6mm; height:6mm; border:0.6mm solid #000; margin-top:0.8mm; }
-    .card li .n { flex:0 0 7mm; font-weight:700; }
-    .card li .eg { display:block; font-size:11pt; color:#333; font-style:italic; margin-top:1mm; }
-    .card.back h1 { margin-bottom:6mm; }
-    .strip { width:100%; border-collapse:collapse; table-layout:fixed; }
-    .strip th { font-size:11pt; font-weight:600; padding:0 0 2mm; text-align:left; }
-    .strip td { border:0.4mm solid #000; height:14.5mm; }
-    .card .who { text-align:center; font-size:12pt; margin:-4mm 0 6mm; }
+    #print { position:static; }
+    #print .sheet { page-break-after:always; break-after:page; }
+    #print .sheet:last-child { page-break-after:auto; break-after:auto; }
   }
 </style>
 </head>
@@ -151,13 +157,14 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <label><input type="checkbox" id="selAll"> Select all</label>
     <button class="b p" id="giveSel" disabled>Give selected children…</button>
     <button class="b" id="printSel">Print cards</button>
+    <label class="note"><input type="checkbox" id="backs"> Spelling strip on the back (print double-sided)</label>
     <button class="b" id="printBacks">Print spelling strips</button>
     <span class="spacer"></span>
     <button class="b" id="reload">Reload</button>
   </div>
   <div class="note" id="srcnote">Loading…</div>
   <div id="lists"></div>
-  <footer>Writing Targets · WFA-26.10.26b · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
+  <footer>Writing Targets · WFA-26.10.26c · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
 </main>
 
 <div id="ed" role="dialog" aria-modal="true" aria-labelledby="edt">
@@ -425,36 +432,71 @@ async function saveEditor(){
 }
 
 // ---- Printing ----------------------------------------------------------
+const ICON_SEGMENT = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="47" fill="none" stroke="#666" stroke-width="2"/>'
+  + '<g font-family="Playpen Sans, Arial, sans-serif" font-size="24" text-anchor="middle"><text x="29" y="50">c</text><text x="50" y="50">a</text><text x="71" y="50">t</text></g>'
+  + '<circle cx="29" cy="61" r="3.6"/><circle cx="50" cy="61" r="3.6"/><circle cx="71" cy="61" r="3.6"/>'
+  + '<text x="50" y="83" font-family="Playpen Sans, Arial, sans-serif" font-size="11" text-anchor="middle">segment</text></svg>';
+const ICON_BEE = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="47" fill="none" stroke="#666" stroke-width="2"/>'
+  + '<ellipse cx="42" cy="30" rx="8" ry="11" transform="rotate(-25 42 30)" fill="#fff" stroke="#000" stroke-width="1.6"/>'
+  + '<ellipse cx="55" cy="29" rx="8" ry="11" transform="rotate(20 55 29)" fill="#fff" stroke="#000" stroke-width="1.6"/>'
+  + '<path d="M27 48 L21 50 L27 52" fill="#000"/>'
+  + '<ellipse cx="47" cy="50" rx="20" ry="13" fill="#fff" stroke="#000" stroke-width="2"/>'
+  + '<path d="M40 38.5 Q36 50 40 61.5 L46 62.9 Q42 50 46 37.1 Z M52 37.3 Q48 50 52 62.7 L58 61.6 Q54 50 58 38.4 Z" fill="#000"/>'
+  + '<circle cx="70" cy="47" r="8" fill="#fff" stroke="#000" stroke-width="2"/><circle cx="72.5" cy="45" r="1.6"/>'
+  + '<path d="M68 39.5 Q66 32 62 30 M73 39.5 Q76 32 80 31" fill="none" stroke="#000" stroke-width="1.5"/>'
+  + '<text x="50" y="83" font-family="Playpen Sans, Arial, sans-serif" font-size="10.5" text-anchor="middle">spelling rules</text></svg>';
+const STRIP_LINES = 16;
+function spellingStrip(){
+  return '<div class="wc sp"><div class="top">' + ICON_SEGMENT + '<span class="ti">Spelling Strip</span>' + ICON_BEE + '</div>'
+    + '<div class="lines">' + '<div></div>'.repeat(STRIP_LINES) + '</div>'
+    + '<div class="ft">Use this as a bookmark for your latest page.</div></div>';
+}
+function backsOn(){ try { return localStorage.getItem('wfa_wtg_backs') !== '0'; } catch (e) { return true; } }
 async function printCards(){
   const P = shown().filter(p => (S.selected.size ? S.selected.has(p.key) : true) && p.card && p.card.items.length);
   if (!P.length) { banner(S.selected.size ? 'None of the selected children has a card yet.' : 'Nobody has a card yet.', true); return; }
   let names = null;
-  try { names = await WFANames.pick({ purpose:'print names on the writing cards' }); } catch (e) { names = null; }
+  try { names = await WFANames.pick({ purpose:'print names on the writing strips' }); } catch (e) { names = null; }
   const name = p => { const n = names && p.code ? names.get(p.code) : null; return n ? (n.first + ' ' + (n.last || '')).trim() : p.label; };
-  const cards = P.map(p => {
+  const fronts = P.map(p => {
     const t = p.card.format === 'targets';
     const lis = p.card.items.filter(i => !(t && i.met)).map((i, n) => {
       const it = S.items[i.id] || { text:i.id, eg:'' };
       return '<li>' + (t ? '<span class="n">' + (n + 1) + '.</span>' : '<span class="bx"></span>') + '<span>' + esc(itemText(i.id, i.words)).replace('……………………', '______________')
         + (t && it.eg ? '<span class="eg">' + esc(it.eg) + '</span>' : '') + '</span></li>';
     }).join('');
-    return '<div class="card"><h1>' + esc(name(p)) + '</h1><h2>' + (t ? 'My Writing Targets' : 'My Writing Checklist') + '</h2><ul>' + lis + '</ul></div>';
+    return '<div class="wc"><div class="hd"><div class="nm">' + esc(name(p)) + '</div><div class="ti">' + (t ? 'My Writing Targets' : 'My Writing Checklist') + '</div></div>'
+      + '<div class="list"><ul>' + lis + '</ul></div>'
+      + '<div class="ft">' + (t ? 'Show these in every piece of writing.' : 'Check every piece of writing.') + '</div></div>';
   });
   if (names) try { names.clear(); } catch (e) {}
-  printSheets(cards);
+  const withBacks = $('backs').checked, pages = [];
+  for (let i = 0; i < fronts.length; i += 3) {
+    pages.push(fronts.slice(i, i + 3));
+    if (withBacks) pages.push([spellingStrip(), spellingStrip(), spellingStrip()]);   // every back page is full, so it lines up however the sheet flips
+  }
+  printPages(pages);
 }
 function printBacks(){
-  const n = parseInt(prompt('How many spelling strips? (two to a page)', String(Math.max(2, shown().filter(p => !S.selected.size || S.selected.has(p.key)).length))), 10);
+  const want = shown().filter(p => !S.selected.size || S.selected.has(p.key)).length;
+  const n = parseInt(prompt('How many spelling strips? (three to a page)', String(Math.max(3, want))), 10);
   if (!n || n < 1) return;
-  const rows = Array.from({ length:11 }, () => '<tr><td></td><td></td><td></td></tr>').join('');
-  const back = '<div class="card back"><h1>My Spelling Strip</h1><table class="strip"><tr><th>Have a go</th><th>Have another go</th><th>Correct spelling</th></tr>' + rows + '</table></div>';
-  printSheets(Array.from({ length:Math.min(n, 200) }, () => back));
+  const strips = Array.from({ length:Math.min(n, 300) }, spellingStrip), pages = [];
+  for (let i = 0; i < strips.length; i += 3) pages.push(strips.slice(i, i + 3));
+  printPages(pages);
 }
-function printSheets(cards){
-  let h = '';
-  for (let i = 0; i < cards.length; i += 2) h += '<div class="sheet">' + cards[i] + (cards[i + 1] || '<div class="card"></div>') + '</div>';
-  $('print').innerHTML = h;
+async function printPages(pages){
+  $('print').innerHTML = pages.map(pg => '<div class="sheet">' + [0, 1, 2].map(k => pg[k] || '<div class="slot"></div>').join('') + '</div>').join('');
+  try { await document.fonts.ready; } catch (e) {}
+  fitLists();
   setTimeout(() => { window.print(); setTimeout(() => { $('print').innerHTML = ''; }, 500); }, 50);
+}
+function fitLists(){   // shrink a strip's text until every statement fits
+  document.querySelectorAll('#print .list').forEach(el => {
+    let pt = 14;
+    el.style.fontSize = pt + 'pt';
+    while (el.scrollHeight > el.clientHeight + 1 && pt > 8) { pt -= 0.5; el.style.fontSize = pt + 'pt'; }
+  });
 }
 
 // ---- Events ------------------------------------------------------------
@@ -471,6 +513,8 @@ $('lists').addEventListener('click', e => {
 $('giveSel').addEventListener('click', () => { const keys = shown().map(p => p.key).filter(k => S.selected.has(k)); if (keys.length) openEditor(keys); });
 $('printSel').addEventListener('click', printCards);
 $('printBacks').addEventListener('click', printBacks);
+$('backs').checked = backsOn();
+$('backs').addEventListener('change', e => { try { localStorage.setItem('wfa_wtg_backs', e.target.checked ? '1' : '0'); } catch (err) {} });
 $('edx').addEventListener('click', closeEditor);
 $('edcancel').addEventListener('click', closeEditor);
 $('edsave').addEventListener('click', saveEditor);
