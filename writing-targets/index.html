@@ -107,6 +107,8 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .ri button:disabled { border-color:var(--line); color:var(--muted); cursor:default; }
   .filters { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
   .filters input { flex:1; min-width:220px; }
+  #fsel { display:contents; }
+  select:disabled { opacity:.5; }
   .hist { font-size:13px; border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-bottom:6px; }
   footer { text-align:center; font-size:11px; color:var(--muted); margin-top:16px; }
   /* Printed cards: two A5 cards side by side on A4 landscape. Nothing on a card says a year or a level. */
@@ -155,7 +157,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   </div>
   <div class="note" id="srcnote">Loading…</div>
   <div id="lists"></div>
-  <footer>Writing Targets · WFA-26.10.26a · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
+  <footer>Writing Targets · WFA-26.10.26b · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
 </main>
 
 <div id="ed" role="dialog" aria-modal="true" aria-labelledby="edt">
@@ -345,9 +347,7 @@ function renderEditor(){
       : '<div class="note">' + ((one.suggestions || []).length ? 'All the suggestions are on the card.' : 'No suggestions: this child has no marked statements below Secure in ' + one.level + ' yet.') + '</div>';
   }
   h += '<h3>Find any statement</h3><div class="filters"><input type="search" id="q" placeholder="Search, e.g. finger spaces, full stops, speech" value="' + esc(E.q) + '">'
-    + '<select id="fkind"><option value="">Targets and checklists</option><option value="target"' + (E.f.kind === 'target' ? ' selected' : '') + '>Targets</option><option value="check"' + (E.f.kind === 'check' ? ' selected' : '') + '>Checklists</option></select>'
-    + '<select id="fyear"><option value="">Any year</option>' + YEARS.map(y => '<option' + (E.f.year === y ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>'
-    + '<select id="fgroup"><option value="">Any area</option>' + [...new Set(S.index.map(i => i.group))].sort().map(g => '<option' + (E.f.group === g ? ' selected' : '') + '>' + esc(g) + '</option>').join('') + '</select></div>';
+    + '<span id="fsel">' + filterSelects() + '</span></div>';
   h += '<div class="res" id="results"></div>';
   if (S.sets.length || E.items.length) {
     h += '<h3>Saved sets</h3><div class="bar">';
@@ -360,6 +360,15 @@ function renderEditor(){
       + c.items.map(i => '<div>' + (i.met ? '✓ ' : '• ') + esc(itemText(i.id, i.words)) + '</div>').join('') + '</div>').join('') : '<div class="note">No earlier cards.</div>');
   $('edb').innerHTML = h;
   renderResults();
+}
+function matchesKindYear(it, f){ return (!f.kind || it.kind === f.kind) && (!f.year || it.year === f.year); }
+function groupsFor(f){ return [...new Set(S.index.filter(it => matchesKindYear(it, f)).map(it => it.group))]; }   // bank order
+function filterSelects(){
+  const f = E.f, groups = groupsFor(f);
+  if (f.group && !groups.includes(f.group)) f.group = '';
+  return '<select id="fkind"><option value="">Targets and checklists</option><option value="target"' + (f.kind === 'target' ? ' selected' : '') + '>Targets</option><option value="check"' + (f.kind === 'check' ? ' selected' : '') + '>Checklists</option></select>'
+    + '<select id="fyear"' + (f.kind === 'check' ? ' disabled title="Checklists are not tied to a year"' : '') + '><option value="">Any year</option>' + YEARS.map(y => '<option' + (f.year === y ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>'
+    + '<select id="fgroup"><option value="">Any area</option>' + groups.map(g => '<option' + (f.group === g ? ' selected' : '') + '>' + esc(g) + '</option>').join('') + '</select>';
 }
 function d8(iso){ if (!iso) return '?'; const d = new Date(iso); return d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'2-digit' }); }
 function resultRow(id){
@@ -506,8 +515,10 @@ $('edb').addEventListener('change', e => {
   const t = e.target;
   if (t.classList.contains('met')) { E.items[+t.dataset.n].met = t.checked; return; }
   if (t.classList.contains('wordsin')) { E.items[+t.dataset.n].words = t.value; return; }
-  if (t.id === 'fkind') { E.f.kind = t.value; renderResults(); return; }
-  if (t.id === 'fyear') { E.f.year = t.value; renderResults(); return; }
+  if (t.id === 'fkind' || t.id === 'fyear') {
+    if (t.id === 'fkind') { E.f.kind = t.value; if (t.value === 'check') E.f.year = ''; } else E.f.year = t.value;
+    $('fsel').innerHTML = filterSelects(); renderResults(); return;
+  }
   if (t.id === 'fgroup') { E.f.group = t.value; renderResults(); return; }
   if (t.id === 'setpick' && t.value) {
     const s = S.sets.find(x => String(x.id) === t.value);
