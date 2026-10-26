@@ -164,7 +164,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   </div>
   <div class="note" id="srcnote">Loading…</div>
   <div id="lists"></div>
-  <footer>Writing Targets · WFA-26.10.26c · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
+  <footer>Writing Targets · WFA-26.10.26d · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
 </main>
 
 <div id="ed" role="dialog" aria-modal="true" aria-labelledby="edt">
@@ -189,7 +189,7 @@ const API = 'https://api.wallscourt-farm-academy.co.uk/planning/writingtargets-d
 const YEARS = ['Y1','Y2','Y3','Y4','Y5','Y6'];
 const MAX_ITEMS = 12;
 const STATUS_LABEL = { secure:'Secure', developing:'Developing', emerging:'Emerging', reteach:'Reteach', taught:'Taught', x:'Not taught' };
-const TIER_LABEL = { non_neg:'Non-negotiable', expected:'Expected', greater_depth:'Greater depth', working_towards:'Working towards' };
+const TIER_LABEL = { non_neg:'Non-negotiable', expected:'Expected', greater_depth:'Greater depth', working_towards:'Working towards', school:'School target' };
 const S = { bank:null, items:{}, index:[], year:'Y5', cls:'all', data:null, selected:new Set(), sets:[] };
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -383,7 +383,7 @@ function resultRow(id){
   const one = E.keys.length === 1 ? pupil(E.keys[0]) : null;
   const on = E.items.some(i => i.id === it.id), full = E.items.length >= MAX_ITEMS;
   const st = one && one.statuses[it.id] ? ' <span class="st st-' + one.statuses[it.id] + '">' + STATUS_LABEL[one.statuses[it.id]] + '</span>' : '';
-  const tag = it.kind === 'check' ? '<span class="badge yr">✓ list</span>' : '<span class="badge yr">' + it.year + '</span>';
+  const tag = it.kind === 'check' ? '<span class="badge yr">✓ list</span>' : '<span class="badge yr">' + (it.year || 'Any') + '</span>';
   return '<div class="ri">' + tag + '<div><div>' + esc(it.text.replace('{words}', '…')) + st + '</div>'
     + '<div class="src">' + esc(it.group) + (it.tier ? ' · ' + TIER_LABEL[it.tier] : '') + (it.eg ? ' · e.g. ' + esc(it.eg) : '') + '</div></div>'
     + '<button data-add="' + esc(it.id) + '"' + (on || full ? ' disabled' : '') + '>' + (on ? 'Added' : 'Add') + '</button></div>';
