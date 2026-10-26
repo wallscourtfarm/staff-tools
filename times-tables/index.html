@@ -848,13 +848,9 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
                         <input type="checkbox" id="mtc-teacher-mode" onchange="toggleTeacherMode()">
                         Teacher mode: record this child's result
                     </label>
-                    <div class="mtc-name-row" id="mtc-name-row" style="display:none;">
-                        <label for="mtc-child-name">Child's name:</label>
-                        <input type="text" id="mtc-child-name" placeholder="e.g. Amy" autocomplete="off">
-                    </div>
                     <div class="mtc-name-row" id="mtc-year-row" style="display:none;">
                         <label for="mtc-year-group">Year group:</label>
-                        <select id="mtc-year-group">
+                        <select id="mtc-year-group" onchange="loadMtcPupils()">
                             <option value="">Choose...</option>
                             <option value="Y3">Y3</option>
                             <option value="Y4">Y4</option>
@@ -862,7 +858,11 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
                             <option value="Y6">Y6</option>
                         </select>
                     </div>
-                    <div class="mtc-name-error" id="mtc-name-error" style="display:none;">Enter the child's name and year group first.</div>
+                    <div class="mtc-name-row" id="mtc-name-row" style="display:none;">
+                        <label for="mtc-child-name">Child:</label>
+                        <select id="mtc-child-name"><option value="">Choose a year group first</option></select>
+                    </div>
+                    <div class="mtc-name-error" id="mtc-name-error" style="display:none;">Choose the year group and the child first.</div>
                 </div>
                 <button class="start-btn" onclick="startMTC()">Start now</button>
             </div>
@@ -988,7 +988,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
             <button class="btn-home" id="btn-home" onclick="goHome()">Change Tables</button>
         </div>
 
-        <div class="version-footer">26.09.26a</div>
+        <div class="version-footer">26.10.26a</div>
     </div>
 
     <script>
@@ -1010,6 +1010,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
         let mtcWaitBetween = false;
         let mtcTeacherMode = false;
         let mtcChildName = '';
+        let mtcPupilCode = '';
         let mtcYearGroup = '';
 
         // CUT OVER 23.09.26 to the Postgres-backed store (mtc_results_db.py).
@@ -1339,6 +1340,34 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
             }
         }
 
+        // 26.10.26: the child is picked from the class list by initials (no names typed or stored); the result
+        // is saved against the pupil code.
+        let mtcPupilCache = null;
+        function loadMtcPupils() {
+            const sel = document.getElementById('mtc-child-name');
+            const yg = document.getElementById('mtc-year-group').value;
+            if (!yg) { sel.innerHTML = '<option value="">Choose a year group first</option>'; return; }
+            const fill = () => {
+                const list = (mtcPupilCache || []).filter(p => p.yearGroup === yg && p.pupilId)
+                    .sort((a, b) => String(a.class).localeCompare(String(b.class)) || String(a.label).localeCompare(String(b.label)));
+                sel.innerHTML = '<option value="">Choose...</option>' + list.map(p =>
+                    '<option value="' + escapeHtml_(p.pupilId) + '" data-label="' + escapeHtml_(p.label || '?') + '">' +
+                    escapeHtml_(p.label || '?') + ' (' + escapeHtml_(p.class || '') + ')</option>').join('');
+            };
+            if (mtcPupilCache) return fill();
+            sel.innerHTML = '<option value="">Loading…</option>';
+            fetch('https://api.wallscourt-farm-academy.co.uk/planning/pupils?token=__hub__')
+                .then(r => r.json())
+                .then(d => { mtcPupilCache = d.pupils || []; fill(); })
+                .catch(() => { sel.innerHTML = '<option value="">Could not load the class list</option>'; });
+        }
+        function readMtcChild() {
+            const sel = document.getElementById('mtc-child-name');
+            const opt = sel.options[sel.selectedIndex];
+            mtcPupilCode = sel.value || '';
+            mtcChildName = (opt && opt.dataset.label) || '';
+        }
+
         function toggleTeacherMode() {
             mtcTeacherMode = document.getElementById('mtc-teacher-mode').checked;
             document.getElementById('mtc-name-row').style.display = mtcTeacherMode ? 'flex' : 'none';
@@ -1518,6 +1547,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
                 method: 'POST',
                 body: JSON.stringify({
                     childName: mtcChildName,
+                    pupilCode: mtcPupilCode,
                     yearGroup: mtcYearGroup,
                     score: score,
                     total: questions.length,
@@ -1596,11 +1626,11 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 
         function startMTC() {
             mtcTeacherMode = document.getElementById('mtc-teacher-mode').checked;
-            mtcChildName = document.getElementById('mtc-child-name').value.trim();
+            readMtcChild();
             mtcYearGroup = document.getElementById('mtc-year-group').value;
-            if (mtcTeacherMode && (!mtcChildName || !mtcYearGroup)) {
+            if (mtcTeacherMode && (!mtcPupilCode || !mtcYearGroup)) {
                 document.getElementById('mtc-name-error').style.display = 'block';
-                (mtcChildName ? document.getElementById('mtc-year-group') : document.getElementById('mtc-child-name')).focus();
+                (mtcYearGroup ? document.getElementById('mtc-child-name') : document.getElementById('mtc-year-group')).focus();
                 return;
             }
             document.getElementById('mtc-name-error').style.display = 'none';
