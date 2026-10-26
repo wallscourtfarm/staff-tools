@@ -89,7 +89,12 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .seg button.on { background:var(--accent); color:var(--accent-fg); font-weight:600; }
   #edb h3 { font-size:14px; margin:16px 0 6px; color:var(--fg2); text-transform:uppercase; letter-spacing:.04em; }
   .cur { border:1px solid var(--line); border-radius:10px; }
-  .ci { display:grid; grid-template-columns:1fr auto; gap:6px; padding:8px 10px; border-bottom:1px solid var(--line); }
+  .ci { display:grid; grid-template-columns:auto 1fr auto; gap:6px; padding:8px 10px 8px 4px; border-bottom:1px solid var(--line); background:var(--surface); cursor:grab; }
+  .ci .grip { color:var(--muted); font-size:18px; line-height:1.2; padding:0 4px; touch-action:none; user-select:none; cursor:grab; }
+  .ci.dragging { opacity:.45; }
+  .ci.drop-before { box-shadow:inset 0 3px 0 var(--accent); }
+  .ci.drop-after { box-shadow:inset 0 -3px 0 var(--accent); }
+  body.dragging-now, body.dragging-now * { user-select:none; cursor:grabbing !important; }
   .ci:last-child { border-bottom:0; }
   .ci .t { font-weight:600; }
   .ci .eg { color:var(--muted); font-size:13px; font-style:italic; }
@@ -164,7 +169,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   </div>
   <div class="note" id="srcnote">Loading…</div>
   <div id="lists"></div>
-  <footer>Writing Targets · WFA-26.10.26f · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
+  <footer>Writing Targets · WFA-26.10.26g · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
 </main>
 
 <div id="ed" role="dialog" aria-modal="true" aria-labelledby="edt">
@@ -341,7 +346,7 @@ function renderEditor(){
     }
     const st = one && one.statuses[i.id] ? ' <span class="st st-' + one.statuses[i.id] + '">' + STATUS_LABEL[one.statuses[i.id]] + '</span>' : '';
     const yr = it.year && one && it.year !== one.level ? ' <span class="badge yr">' + it.year + '</span>' : '';
-    return '<div class="ci"><div><div class="t">' + esc(it.text.replace('{words}', '…')) + yr + st + '</div>' + (it.eg ? '<div class="eg">' + esc(it.eg) + '</div>' : '') + w + '</div>'
+    return '<div class="ci" data-n="' + n + '"><span class="grip" title="Drag to move" aria-hidden="true">⠿</span><div><div class="t">' + esc(it.text.replace('{words}', '…')) + yr + st + '</div>' + (it.eg ? '<div class="eg">' + esc(it.eg) + '</div>' : '') + w + '</div>'
       + '<div class="ctl">' + (one && E.format === 'targets' ? '<label class="note"><input type="checkbox" class="met" data-n="' + n + '"' + (i.met ? ' checked' : '') + '> Met</label>' : '')
       + '<button data-up="' + n + '" aria-label="Move up">↑</button><button data-rm="' + n + '" aria-label="Remove">✕</button></div></div>';
   }).join('') : '<div class="empty">Nothing yet. Add statements from the suggestions or the search below.</div>';
@@ -567,6 +572,39 @@ $('edb').addEventListener('input', e => {
   if (e.target.id === 'q') { E.q = e.target.value; renderResults(); }
   else if (e.target.classList.contains('wordsin')) E.items[+e.target.dataset.n].words = e.target.value;
 });
+
+// Drag a statement to a new place: with a mouse anywhere on its row, on a touch screen by its ⠿ handle (so the list still scrolls).
+let DRAG = null;
+$('edb').addEventListener('pointerdown', e => {
+  const row = e.target.closest('.cur .ci'); if (!row || !E || e.button > 0) return;
+  const grip = e.target.closest('.grip');
+  if (!grip && (e.pointerType !== 'mouse' || e.target.closest('input, button, label, select, textarea, a'))) return;
+  DRAG = { n:+row.dataset.n, row, y0:e.clientY, on:false, to:null };
+  e.preventDefault();
+});
+document.addEventListener('pointermove', e => {
+  if (!DRAG) return;
+  if (!DRAG.on) { if (Math.abs(e.clientY - DRAG.y0) < 5) return; DRAG.on = true; DRAG.row.classList.add('dragging'); document.body.classList.add('dragging-now'); }
+  e.preventDefault();
+  const rows = [...document.querySelectorAll('.cur .ci')];
+  rows.forEach(r => r.classList.remove('drop-before', 'drop-after'));
+  let to = rows.length;
+  for (let i = 0; i < rows.length; i++) { const b = rows[i].getBoundingClientRect(); if (e.clientY < b.top + b.height / 2) { to = i; break; } }
+  DRAG.to = to;
+  if (to < rows.length) rows[to].classList.add('drop-before'); else rows[rows.length - 1].classList.add('drop-after');
+  const box = $('edb').getBoundingClientRect();
+  if (e.clientY < box.top + 40) $('edb').scrollTop -= 12; else if (e.clientY > box.bottom - 40) $('edb').scrollTop += 12;
+}, { passive:false });
+function endDrag(){
+  if (!DRAG) return;
+  const d = DRAG; DRAG = null; document.body.classList.remove('dragging-now');
+  if (!d.on || !E) return;
+  let to = d.to; if (to > d.n) to--;
+  if (to !== d.n) { const [it] = E.items.splice(d.n, 1); E.items.splice(to, 0, it); }
+  renderEditor();
+}
+document.addEventListener('pointerup', endDrag);
+document.addEventListener('pointercancel', endDrag);
 
 async function start(){
   try { WFANames.screen.init(); } catch (e) { console.warn('Names helper unavailable', e); }
