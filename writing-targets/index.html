@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+/* WFA 13.10.26: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Writing Targets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Layout: a year switcher over two lists of children (development targets, checklists); one editor panel for a child or a group; cards print from a hidden sheet. Palette as the writing tracker. */
+  :root {
+    --bg:#f1f5f9; --surface:#ffffff; --surface2:#f8fafc; --fg:#0f172a; --fg2:#334155; --muted:#64748b;
+    --line:#e2e8f0; --accent:#1798d3; --accent-fg:#ffffff; --sel:#e0f2fe;
+    --red-bg:#fef2f2; --red-bd:#f87171; --red-fg:#991b1b;
+    --amb-bg:#fffbeb; --amb-bd:#fcd34d; --amb-fg:#92400e;
+    --grn-bg:#dcfce7; --grn-bd:#86efac; --grn-fg:#166534;
+    --shadow:0 1px 4px rgba(0,0,0,.1); --shadow-pop:0 6px 24px rgba(0,0,0,.25);
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#0b1220; --surface:#111a2b; --surface2:#16213a; --fg:#e6edf7; --fg2:#c3cfe0; --muted:#8a9bb5;
+    --line:#26344d; --accent:#38bdf8; --accent-fg:#06202e; --sel:#12324a;
+    --red-bg:#3b1414; --red-bd:#b91c1c; --red-fg:#fecaca;
+    --amb-bg:#33260a; --amb-bd:#a16207; --amb-fg:#fde68a;
+    --grn-bg:#0b2e1a; --grn-bd:#166534; --grn-fg:#bbf7d0;
+    --shadow:0 1px 4px rgba(0,0,0,.5); --shadow-pop:0 6px 24px rgba(0,0,0,.6); color-scheme:dark; } }
+  :root[data-theme="dark"] {
+    --bg:#0b1220; --surface:#111a2b; --surface2:#16213a; --fg:#e6edf7; --fg2:#c3cfe0; --muted:#8a9bb5;
+    --line:#26344d; --accent:#38bdf8; --accent-fg:#06202e; --sel:#12324a;
+    --red-bg:#3b1414; --red-bd:#b91c1c; --red-fg:#fecaca;
+    --amb-bg:#33260a; --amb-bd:#a16207; --amb-fg:#fde68a;
+    --grn-bg:#0b2e1a; --grn-bd:#166534; --grn-fg:#bbf7d0;
+    --shadow:0 1px 4px rgba(0,0,0,.5); --shadow-pop:0 6px 24px rgba(0,0,0,.6); color-scheme:dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  header { background:#0a0101; color:#fff; padding:12px 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:19px; font-weight:700; }
+  header img { height:34px; }
+  .years { display:flex; gap:4px; flex-wrap:wrap; }
+  .years button { border:1px solid #475569; background:transparent; color:#fff; border-radius:8px; padding:5px 11px; font-weight:600; cursor:pointer; }
+  .years button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .spacer { flex:1; }
+  main { max-width:1200px; margin:0 auto; padding:14px 16px 40px; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  button.b { border:1px solid var(--line); background:var(--surface); color:var(--fg); border-radius:8px; padding:7px 12px; cursor:pointer; font:inherit; font-size:14px; }
+  button.b:hover { border-color:var(--accent); }
+  button.p { background:var(--accent); border-color:var(--accent); color:var(--accent-fg); font-weight:600; }
+  button.b:disabled { opacity:.5; cursor:default; }
+  select, input[type=text], input[type=search] { font:inherit; font-size:14px; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--fg); }
+  .note { color:var(--muted); font-size:13px; }
+  .banner { padding:9px 12px; border-radius:8px; margin-bottom:10px; display:none; }
+  .banner.err { display:block; background:var(--red-bg); border:1px solid var(--red-bd); color:var(--red-fg); }
+  .banner.ok { display:block; background:var(--grn-bg); border:1px solid var(--grn-bd); color:var(--grn-fg); }
+  section.group { background:var(--surface); border:1px solid var(--line); border-radius:12px; margin-bottom:16px; box-shadow:var(--shadow); overflow:hidden; }
+  section.group h2 { margin:0; font-size:16px; padding:10px 14px; border-bottom:1px solid var(--line); display:flex; gap:10px; align-items:center; }
+  section.group h2 .note { font-weight:400; }
+  .row { display:grid; grid-template-columns:28px 64px 56px 74px 1fr auto; gap:8px; align-items:start; padding:8px 14px; border-bottom:1px solid var(--line); }
+  .row:last-child { border-bottom:0; }
+  .row.sel { background:var(--sel); }
+  .row .who { font-weight:700; }
+  .row .cls { color:var(--muted); font-size:13px; }
+  .row .items { font-size:13px; color:var(--fg2); }
+  .row .items div { margin:1px 0; }
+  .row .items .none { color:var(--muted); font-style:italic; }
+  .row .items .met { color:var(--grn-fg); }
+  .badge { display:inline-block; border-radius:6px; padding:1px 7px; font-size:12px; font-weight:700; white-space:nowrap; }
+  .g-D { background:#bfdbfe; color:#1e3a8a; } .g-O1 { background:#86efac; color:#14532d; } .g-O2 { background:#d9f99d; color:#3f6212; }
+  .g-Y { background:#fde68a; color:#92400e; } .g-A { background:#e9d5ff; color:#581c87; } .g-x { background:#e5e7eb; color:#6b7280; }
+  .yr { background:var(--surface2); border:1px solid var(--line); color:var(--fg2); }
+  .st { font-size:11px; border-radius:5px; padding:0 5px; font-weight:600; }
+  .st-secure { background:#86efac; color:#14532d; } .st-developing { background:#d9f99d; color:#3f6212; }
+  .st-emerging { background:#fed7aa; color:#9a3412; } .st-reteach { background:#fca5a5; color:#7f1d1d; }
+  .st-taught { background:#fef9c3; color:#7a4f00; } .st-x { background:#dbeafe; color:#1e40af; }
+  /* Editor */
+  #ed { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; z-index:20; }
+  #ed.open { display:block; }
+  #edp { position:absolute; right:0; top:0; bottom:0; width:min(760px, 100%); background:var(--surface); box-shadow:var(--shadow-pop); display:flex; flex-direction:column; }
+  #edh { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  #edh h2 { margin:0; font-size:18px; flex:1; }
+  #edb { overflow:auto; padding:12px 16px 20px; flex:1; }
+  #edf { padding:10px 16px; border-top:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .seg button { border:0; background:var(--surface); color:var(--fg); padding:6px 12px; cursor:pointer; font:inherit; font-size:14px; }
+  .seg button.on { background:var(--accent); color:var(--accent-fg); font-weight:600; }
+  h3 { font-size:14px; margin:16px 0 6px; color:var(--fg2); text-transform:uppercase; letter-spacing:.04em; }
+  .cur { border:1px solid var(--line); border-radius:10px; }
+  .ci { display:grid; grid-template-columns:1fr auto; gap:6px; padding:8px 10px; border-bottom:1px solid var(--line); }
+  .ci:last-child { border-bottom:0; }
+  .ci .t { font-weight:600; }
+  .ci .eg { color:var(--muted); font-size:13px; font-style:italic; }
+  .ci .ctl { display:flex; gap:4px; align-items:start; }
+  .ci .ctl button { border:1px solid var(--line); background:var(--surface); color:var(--fg); border-radius:6px; cursor:pointer; padding:2px 7px; }
+  .ci .words { margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .ci .words input { flex:1; min-width:200px; }
+  .chip { border:1px solid var(--accent); color:var(--accent); background:transparent; border-radius:999px; padding:1px 9px; font-size:13px; cursor:pointer; }
+  .empty { padding:12px; color:var(--muted); font-style:italic; }
+  .res { border:1px solid var(--line); border-radius:10px; max-height:46vh; overflow:auto; }
+  .ri { display:grid; grid-template-columns:auto 1fr auto; gap:8px; padding:7px 10px; border-bottom:1px solid var(--line); align-items:start; }
+  .ri:last-child { border-bottom:0; }
+  .ri .src { color:var(--muted); font-size:12px; }
+  .ri button { border:1px solid var(--accent); background:transparent; color:var(--accent); border-radius:6px; cursor:pointer; padding:2px 9px; font-weight:600; }
+  .ri button:disabled { border-color:var(--line); color:var(--muted); cursor:default; }
+  .filters { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .filters input { flex:1; min-width:220px; }
+  .hist { font-size:13px; border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-bottom:6px; }
+  footer { text-align:center; font-size:11px; color:var(--muted); margin-top:16px; }
+  /* Printed cards: two A5 cards side by side on A4 landscape. Nothing on a card says a year or a level. */
+  #print { display:none; }
+  @media print {
+    @page { size:A4 landscape; margin:0; }
+    body { background:#fff; }
+    body > *:not(#print) { display:none !important; }
+    #print { display:block; }
+    .sheet { width:297mm; height:210mm; display:flex; page-break-after:always; break-after:page; }
+    .sheet:last-child { page-break-after:auto; break-after:auto; }
+    .card { width:148.5mm; height:210mm; padding:14mm 13mm; font-family:Lexend, Arial, sans-serif; color:#000; border-right:0.3mm dashed #bbb; overflow:hidden; }
+    .card:last-child { border-right:0; }
+    .card h1 { text-align:center; font-size:21pt; margin:0 0 2mm; line-height:1.15; }
+    .card h2 { text-align:center; font-size:17pt; margin:0 0 9mm; font-weight:600; }
+    .card ul { list-style:none; margin:0; padding:0; }
+    .card li { font-size:15pt; line-height:1.3; margin:0 0 4.5mm; display:flex; gap:3mm; }
+    .card li .bx { flex:0 0 6mm; height:6mm; border:0.6mm solid #000; margin-top:0.8mm; }
+    .card li .n { flex:0 0 7mm; font-weight:700; }
+    .card li .eg { display:block; font-size:11pt; color:#333; font-style:italic; margin-top:1mm; }
+    .card.back h1 { margin-bottom:6mm; }
+    .strip { width:100%; border-collapse:collapse; table-layout:fixed; }
+    .strip th { font-size:11pt; font-weight:600; padding:0 0 2mm; text-align:left; }
+    .strip td { border:0.4mm solid #000; height:14.5mm; }
+    .card .who { text-align:center; font-size:12pt; margin:-4mm 0 6mm; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <img src="../logo.png" alt="">
+  <h1>Writing Targets</h1>
+  <div class="years" id="years"></div>
+  <span class="spacer"></span>
+  <select id="cls" aria-label="Class"></select>
+</header>
+<main>
+  <div class="banner" id="banner"></div>
+  <div class="bar">
+    <label><input type="checkbox" id="selAll"> Select all</label>
+    <button class="b p" id="giveSel" disabled>Give selected children…</button>
+    <button class="b" id="printSel">Print cards</button>
+    <button class="b" id="printBacks">Print spelling strips</button>
+    <span class="spacer"></span>
+    <button class="b" id="reload">Reload</button>
+  </div>
+  <div class="note" id="srcnote">Loading…</div>
+  <div id="lists"></div>
+  <footer>Writing Targets · WFA-26.10.26a · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
+</main>
+
+<div id="ed" role="dialog" aria-modal="true" aria-labelledby="edt">
+  <div id="edp">
+    <div id="edh"><h2 id="edt"></h2>
+      <div class="seg" id="fmt"><button data-f="checklist">Checklist</button><button data-f="targets">Targets</button></div>
+      <button class="b" id="edx" aria-label="Close">✕</button>
+    </div>
+    <div id="edb"></div>
+    <div id="edf">
+      <button class="b p" id="edsave">Save</button>
+      <button class="b" id="edcancel">Cancel</button>
+      <span class="note" id="edmsg"></span>
+    </div>
+  </div>
+</div>
+<div id="print"></div>
+
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
+<script>
+const API = 'https://api.wallscourt-farm-academy.co.uk/planning/writingtargets-db';
+const YEARS = ['Y1','Y2','Y3','Y4','Y5','Y6'];
+const MAX_ITEMS = 12;
+const STATUS_LABEL = { secure:'Secure', developing:'Developing', emerging:'Emerging', reteach:'Reteach', taught:'Taught', x:'Not taught' };
+const TIER_LABEL = { non_neg:'Non-negotiable', expected:'Expected', greater_depth:'Greater depth', working_towards:'Working towards' };
+const S = { bank:null, items:{}, index:[], year:'Y5', cls:'all', data:null, selected:new Set(), sets:[] };
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ---- API ---------------------------------------------------------------
+async function apiGet(params){
+  const r = await fetch(API + '?' + new URLSearchParams(Object.assign({ token:'__hub__' }, params)), { cache:'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  if (j.ok === false) throw new Error(j.error || 'refused');
+  return j;
+}
+async function apiPost(body){
+  const r = await fetch(API + '?token=__hub__', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  if (j.ok === false) throw new Error(j.error || 'refused');
+  return j;
+}
+function banner(text, err){ const b = $('banner'); b.textContent = text || ''; b.className = 'banner' + (text ? (err ? ' err' : ' ok') : ''); }
+
+// ---- The statements bank and search -----------------------------------
+function buildIndex(bank){
+  S.items = {}; S.index = [];
+  Object.entries(bank.targets).forEach(([id, t]) => {
+    const it = { id, kind:'target', year:t.year, tier:t.tier, group:t.category, text:t.text, eg:t.eg || '', src:t.taf || t.framework || '' };
+    S.items[id] = it; S.index.push(it);
+  });
+  bank.checklists.forEach(c => c.items.forEach(i => {
+    const it = { id:i.id, kind:'check', year:'', tier:'', group:c.name, text:i.text, eg:'', src:'', fill:i.fill || '' };
+    S.items[i.id] = it; S.index.push(it);
+  }));
+  S.index.forEach(it => { it.hayText = it.text.toLowerCase() + ' ' + it.eg.toLowerCase(); it.hay = it.hayText + ' ' + it.src.toLowerCase() + ' ' + it.group.toLowerCase() + ' ' + it.id.toLowerCase(); });
+}
+function stem(w){
+  let t = w;
+  for (const suf of ['ing','ed','es','s']) if (t.endsWith(suf) && t.length - suf.length >= 3) { t = t.slice(0, -suf.length); break; }
+  if (t.endsWith('e') && t.length >= 5) t = t.slice(0, -1);
+  return t;
+}
+function search(q, f){
+  const toks = q.toLowerCase().split(/[^a-z0-9'/-]+/).filter(Boolean).map(stem);
+  const level = f.level || '';
+  return S.index.filter(it => {
+    if (f.kind === 'check' && it.kind !== 'check') return false;
+    if (f.kind === 'target' && it.kind !== 'target') return false;
+    if (f.year && it.year !== f.year) return false;
+    if (f.group && it.group !== f.group) return false;
+    return toks.every(t => it.hay.includes(t));
+  }).map(it => ({ it, score: (toks.length && toks.every(t => it.hayText.includes(t)) ? 0 : 1) * 10
+      + (f.format === 'checklist' ? (it.kind === 'check' ? 0 : it.year === level ? 1 : 2) : (it.year === level ? 0 : it.kind === 'check' ? 2 : 1)) }))
+    .sort((a, b) => a.score - b.score || a.it.id.localeCompare(b.it.id)).map(x => x.it);
+}
+function itemText(id, words){
+  const it = S.items[id]; if (!it) return id;
+  return it.fill === 'words' ? it.text.replace('{words}', words ? words : '……………………') : it.text;
+}
+
+// ---- Loading ----------------------------------------------------------
+function gradeClass(g){ return !g ? 'g-x' : g.startsWith('A') ? 'g-A' : g === 'below Y' ? 'g-x' : 'g-' + g; }
+function fmtOf(p){ return p.card ? p.card.format : p.defaultFormat; }
+function shown(){ return (S.data ? S.data.pupils : []).filter(p => S.cls === 'all' || p.cls === S.cls); }
+function remember(){ try { localStorage.setItem('wfa_wtg_view', JSON.stringify({ y:S.year, c:S.cls })); } catch (e) {} }
+
+async function openYear(y){
+  S.year = y; S.selected.clear(); S.data = null; remember(); renderYears(); renderLists();
+  $('srcnote').textContent = 'Loading ' + y + '…';
+  try {
+    const d = await apiGet({ action:'year', year:y });
+    if (S.year !== y) return;
+    S.data = d;
+  } catch (e) { $('srcnote').textContent = ''; banner('Could not load ' + y + ' (' + e.message + '). Refresh the page and sign in again.', true); return; }
+  const classes = [...new Set(S.data.pupils.map(p => p.cls))];
+  if (S.cls !== 'all' && !classes.includes(S.cls)) S.cls = 'all';
+  $('cls').innerHTML = '<option value="all">All classes</option>' + classes.map(c => '<option' + (c === S.cls ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+  renderLists();
+}
+function yearNote(){
+  if (!S.data) return;
+  const n = shown().length, withCard = shown().filter(p => p.card).length;
+  $('srcnote').textContent = n + ' children, ' + withCard + ' with a card. Grades come from the writing tracker'
+    + (S.year === 'Y6' ? ' (Year 6 has no grades in the new tracker yet: choose each child\'s card yourself).' : '.')
+    + (S.data.stuckError ? ' Stuck spellings could not be read: ' + S.data.stuckError + '.' : '');
+}
+
+// ---- Lists -----------------------------------------------------------
+function renderYears(){
+  $('years').innerHTML = YEARS.map(y => '<button data-y="' + y + '" class="' + (y === S.year ? 'on' : '') + '">' + y + '</button>').join('');
+}
+function cardLines(p){
+  if (!p.card || !p.card.items.length) return '<div class="none">No card yet' + (p.suggestions && p.suggestions.length && fmtOf(p) === 'targets' ? ': ' + p.suggestions.length + ' suggested targets ready' : '') + '</div>';
+  return p.card.items.map(i => '<div class="' + (i.met ? 'met' : '') + '">' + (i.met ? '✓ ' : '• ') + esc(itemText(i.id, i.words)) + '</div>').join('');
+}
+function renderLists(){
+  const P = shown();
+  const groups = [
+    { f:'targets', title:'Development targets', sub:'D and O1: 2-3 targets to develop their writing' },
+    { f:'checklist', title:'Checklists', sub:'O2 and below: checks after every piece of writing' },
+  ];
+  $('lists').innerHTML = groups.map(g => {
+    const rows = P.filter(p => fmtOf(p) === g.f);
+    return '<section class="group"><h2>' + g.title + ' <span class="note">' + g.sub + ' · ' + rows.length + '</span></h2>'
+      + (rows.length ? rows.map(p => '<div class="row' + (S.selected.has(p.key) ? ' sel' : '') + '" data-k="' + esc(p.key) + '">'
+        + '<input type="checkbox" class="pick" aria-label="Select" ' + (S.selected.has(p.key) ? 'checked' : '') + '>'
+        + '<span class="who"><span' + (p.code ? ' data-pupil-id="' + esc(p.code) + '"' : '') + '>' + esc(p.label) + '</span></span>'
+        + '<span class="cls">' + esc(p.cls) + '</span>'
+        + '<span><span class="badge ' + gradeClass(p.grade) + '">' + esc(p.grade || 'no grade') + '</span></span>'
+        + '<div class="items">' + cardLines(p) + '</div>'
+        + '<button class="b edit">Edit</button></div>').join('') : '<div class="empty">Nobody here.</div>')
+      + '</section>';
+  }).join('');
+  $('giveSel').disabled = !S.selected.size;
+  $('giveSel').textContent = S.selected.size ? 'Give ' + S.selected.size + ' selected ' + (S.selected.size === 1 ? 'child' : 'children') + '…' : 'Give selected children…';
+  $('selAll').checked = P.length > 0 && P.every(p => S.selected.has(p.key));
+  yearNote();
+}
+
+// ---- Editor (one child, or a group) ------------------------------------
+let E = null;   // { keys, format, items:[{id, words, met}], mode:'replace'|'add', q, f:{kind, year, group} }
+function pupil(key){ return S.data.pupils.find(p => p.key === key); }
+function openEditor(keys){
+  const one = keys.length === 1 ? pupil(keys[0]) : null;
+  const fmt = one ? fmtOf(one) : (keys.map(k => fmtOf(pupil(k))).every((f, _, a) => f === a[0]) ? fmtOf(pupil(keys[0])) : 'checklist');
+  E = { keys, format:fmt, mode:'replace', q:'', hist:null,
+        items: one && one.card ? one.card.items.map(i => Object.assign({}, i)) : [],
+        f:{ kind:'', year:'', group:'' } };
+  if (one && !one.card && fmt === 'targets') E.items = (one.suggestions || []).map(id => ({ id }));
+  $('edt').innerHTML = one ? '<span' + (one.code ? ' data-pupil-id="' + esc(one.code) + '"' : '') + '>' + esc(one.label) + '</span> <span class="badge ' + gradeClass(one.grade) + '">' + esc(one.grade || 'no grade') + '</span>'
+    : esc(keys.length + ' children');
+  $('edmsg').textContent = '';
+  $('ed').classList.add('open');
+  renderEditor();
+}
+function closeEditor(){ $('ed').classList.remove('open'); E = null; }
+function renderEditor(){
+  const one = E.keys.length === 1 ? pupil(E.keys[0]) : null;
+  document.querySelectorAll('#fmt button').forEach(b => b.classList.toggle('on', b.dataset.f === E.format));
+  let h = '';
+  if (!one) h += '<div class="bar"><span class="seg" id="mode"><button data-m="replace" class="' + (E.mode === 'replace' ? 'on' : '') + '">Replace their cards</button><button data-m="add" class="' + (E.mode === 'add' ? 'on' : '') + '">Add to their cards</button></span>'
+    + '<span class="note">' + (E.mode === 'replace' ? 'Each child gets exactly these statements (their old card is kept in history).' : 'These statements are added to what each child already has.') + '</span></div>';
+  h += '<h3>' + (one ? 'On the card' : 'Statements to give') + ' (' + E.items.length + '/' + MAX_ITEMS + ')</h3><div class="cur">';
+  h += E.items.length ? E.items.map((i, n) => {
+    const it = S.items[i.id] || { text:i.id, eg:'' };
+    let w = '';
+    if (it.fill === 'words') {
+      w = '<div class="words"><input type="text" class="wordsin" data-n="' + n + '" value="' + esc(i.words || '') + '" placeholder="' + (one ? 'Words this child keeps getting wrong, e.g. because, friend' : 'Add each child\'s words on their own card') + '"' + (one ? '' : ' disabled') + '>';
+      if (one && one.stuckWords && one.stuckWords.length) w += '<span class="note">Stuck key spellings:</span>' + one.stuckWords.map(x => '<button class="chip" data-n="' + n + '" data-w="' + esc(x) + '">+ ' + esc(x) + '</button>').join('');
+      w += '</div>';
+    }
+    const st = one && one.statuses[i.id] ? ' <span class="st st-' + one.statuses[i.id] + '">' + STATUS_LABEL[one.statuses[i.id]] + '</span>' : '';
+    const yr = it.year && one && it.year !== one.level ? ' <span class="badge yr">' + it.year + '</span>' : '';
+    return '<div class="ci"><div><div class="t">' + esc(it.text.replace('{words}', '…')) + yr + st + '</div>' + (it.eg ? '<div class="eg">' + esc(it.eg) + '</div>' : '') + w + '</div>'
+      + '<div class="ctl">' + (one && E.format === 'targets' ? '<label class="note"><input type="checkbox" class="met" data-n="' + n + '"' + (i.met ? ' checked' : '') + '> Met</label>' : '')
+      + '<button data-up="' + n + '" aria-label="Move up">↑</button><button data-rm="' + n + '" aria-label="Remove">✕</button></div></div>';
+  }).join('') : '<div class="empty">Nothing yet. Add statements from the suggestions or the search below.</div>';
+  h += '</div>';
+  if (one && E.format === 'targets') {
+    const sug = (one.suggestions || []).filter(id => !E.items.some(i => i.id === id));
+    h += '<h3>Suggested from the writing tracker</h3>';
+    h += one.level === 'Y6' ? '<div class="note">Year 6 weights are not agreed yet, so there are no suggestions. Use the search.</div>'
+      : sug.length ? '<div class="res">' + sug.map(resultRow).join('') + '</div>'
+      : '<div class="note">' + ((one.suggestions || []).length ? 'All the suggestions are on the card.' : 'No suggestions: this child has no marked statements below Secure in ' + one.level + ' yet.') + '</div>';
+  }
+  h += '<h3>Find any statement</h3><div class="filters"><input type="search" id="q" placeholder="Search, e.g. finger spaces, full stops, speech" value="' + esc(E.q) + '">'
+    + '<select id="fkind"><option value="">Targets and checklists</option><option value="target"' + (E.f.kind === 'target' ? ' selected' : '') + '>Targets</option><option value="check"' + (E.f.kind === 'check' ? ' selected' : '') + '>Checklists</option></select>'
+    + '<select id="fyear"><option value="">Any year</option>' + YEARS.map(y => '<option' + (E.f.year === y ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>'
+    + '<select id="fgroup"><option value="">Any area</option>' + [...new Set(S.index.map(i => i.group))].sort().map(g => '<option' + (E.f.group === g ? ' selected' : '') + '>' + esc(g) + '</option>').join('') + '</select></div>';
+  h += '<div class="res" id="results"></div>';
+  if (S.sets.length || E.items.length) {
+    h += '<h3>Saved sets</h3><div class="bar">';
+    if (S.sets.length) h += '<select id="setpick"><option value="">Use a saved set…</option>' + S.sets.map(s => '<option value="' + s.id + '">' + esc(s.name) + ' (' + s.items.length + ')</option>').join('') + '</select><button class="b" id="setdel">Delete set</button>';
+    if (E.items.length) h += '<button class="b" id="setsave">Save these statements as a set</button>';
+    h += '</div>';
+  }
+  if (one) h += '<h3>Earlier cards</h3>' + (E.hist === null ? '<button class="b" id="histload">Show earlier cards</button>'
+    : E.hist.length ? E.hist.map(c => '<div class="hist"><b>' + (c.format === 'targets' ? 'Targets' : 'Checklist') + '</b> · ' + d8(c.setAt) + ' to ' + d8(c.endedAt)
+      + c.items.map(i => '<div>' + (i.met ? '✓ ' : '• ') + esc(itemText(i.id, i.words)) + '</div>').join('') + '</div>').join('') : '<div class="note">No earlier cards.</div>');
+  $('edb').innerHTML = h;
+  renderResults();
+}
+function d8(iso){ if (!iso) return '?'; const d = new Date(iso); return d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'2-digit' }); }
+function resultRow(id){
+  const it = typeof id === 'string' ? S.items[id] : id;
+  const one = E.keys.length === 1 ? pupil(E.keys[0]) : null;
+  const on = E.items.some(i => i.id === it.id), full = E.items.length >= MAX_ITEMS;
+  const st = one && one.statuses[it.id] ? ' <span class="st st-' + one.statuses[it.id] + '">' + STATUS_LABEL[one.statuses[it.id]] + '</span>' : '';
+  const tag = it.kind === 'check' ? '<span class="badge yr">✓ list</span>' : '<span class="badge yr">' + it.year + '</span>';
+  return '<div class="ri">' + tag + '<div><div>' + esc(it.text.replace('{words}', '…')) + st + '</div>'
+    + '<div class="src">' + esc(it.group) + (it.tier ? ' · ' + TIER_LABEL[it.tier] : '') + (it.eg ? ' · e.g. ' + esc(it.eg) : '') + '</div></div>'
+    + '<button data-add="' + esc(it.id) + '"' + (on || full ? ' disabled' : '') + '>' + (on ? 'Added' : 'Add') + '</button></div>';
+}
+function renderResults(){
+  const box = $('results'); if (!box) return;
+  const one = E.keys.length === 1 ? pupil(E.keys[0]) : null;
+  const hasFilter = E.q.trim() || E.f.year || E.f.group;
+  if (!hasFilter) { box.innerHTML = '<div class="empty">Type a word or choose a year or area.</div>'; return; }
+  const r = search(E.q, Object.assign({ level: one ? one.level : '', format:E.format }, E.f));
+  box.innerHTML = r.length ? r.slice(0, 80).map(resultRow).join('') + (r.length > 80 ? '<div class="empty">' + (r.length - 80) + ' more: narrow the search.</div>' : '')
+    : '<div class="empty">Nothing matches.</div>';
+}
+function addItem(id){
+  if (E.items.length >= MAX_ITEMS || E.items.some(i => i.id === id)) return;
+  E.items.push({ id });
+  renderEditor();
+}
+
+async function saveEditor(){
+  const btn = $('edsave'); btn.disabled = true; $('edmsg').textContent = 'Saving…';
+  const cards = E.keys.map(k => {
+    const p = pupil(k), cur = p.card ? p.card.items : [];
+    let items;
+    if (E.keys.length === 1) items = E.items.map(i => Object.assign({ id:i.id }, i.words ? { words:i.words } : {}, i.met ? { met:true } : {}));
+    else if (E.mode === 'replace') items = E.items.map(i => { const had = cur.find(c => c.id === i.id); return Object.assign({ id:i.id }, had && had.words ? { words:had.words } : {}); });
+    else items = cur.concat(E.items.filter(i => !cur.some(c => c.id === i.id)).map(i => ({ id:i.id })));
+    const format = E.keys.length > 1 && E.mode === 'add' && p.card ? p.card.format : E.format;
+    return { key:k, base: p.card ? p.card.updatedAt : '', format, items: items.slice(0, MAX_ITEMS) };
+  });
+  const tooMany = E.keys.length > 1 && E.mode === 'add' ? E.keys.filter(k => { const p = pupil(k), cur = p.card ? p.card.items : []; return cur.length + E.items.filter(i => !cur.some(c => c.id === i.id)).length > MAX_ITEMS; }) : [];
+  try {
+    const parts = [];
+    for (let i = 0; i < cards.length; i += 100) parts.push(await apiPost({ action:'saveCards', cards:cards.slice(i, i + 100) }));
+    let conflicts = 0;
+    parts.forEach(r => {
+      Object.entries(r.saved || {}).forEach(([k, c]) => { const p = pupil(k); if (p) p.card = c; });
+      Object.entries(r.conflicts || {}).forEach(([k, c]) => { const p = pupil(k); if (p) { p.card = c; conflicts++; } });
+    });
+    closeEditor(); S.selected.clear(); renderLists();
+    banner(conflicts ? conflicts + (conflicts === 1 ? ' card was' : ' cards were') + ' changed by someone else while you worked, so ' + (conflicts === 1 ? 'it was' : 'they were') + ' not saved. ' + (conflicts === 1 ? 'It now shows' : 'They now show') + ' the latest version: check and try again.'
+      : 'Saved.' + (tooMany.length ? ' ' + tooMany.length + ' card(s) had more than ' + MAX_ITEMS + ' statements, so only the first ' + MAX_ITEMS + ' were kept.' : ''), conflicts > 0);
+  } catch (e) {
+    $('edmsg').textContent = 'Not saved (' + e.message + '). Try again; refresh and sign in again if this keeps happening.';
+  } finally { btn.disabled = false; }
+}
+
+// ---- Printing ----------------------------------------------------------
+async function printCards(){
+  const P = shown().filter(p => (S.selected.size ? S.selected.has(p.key) : true) && p.card && p.card.items.length);
+  if (!P.length) { banner(S.selected.size ? 'None of the selected children has a card yet.' : 'Nobody has a card yet.', true); return; }
+  let names = null;
+  try { names = await WFANames.pick({ purpose:'print names on the writing cards' }); } catch (e) { names = null; }
+  const name = p => { const n = names && p.code ? names.get(p.code) : null; return n ? (n.first + ' ' + (n.last || '')).trim() : p.label; };
+  const cards = P.map(p => {
+    const t = p.card.format === 'targets';
+    const lis = p.card.items.filter(i => !(t && i.met)).map((i, n) => {
+      const it = S.items[i.id] || { text:i.id, eg:'' };
+      return '<li>' + (t ? '<span class="n">' + (n + 1) + '.</span>' : '<span class="bx"></span>') + '<span>' + esc(itemText(i.id, i.words)).replace('……………………', '______________')
+        + (t && it.eg ? '<span class="eg">' + esc(it.eg) + '</span>' : '') + '</span></li>';
+    }).join('');
+    return '<div class="card"><h1>' + esc(name(p)) + '</h1><h2>' + (t ? 'My Writing Targets' : 'My Writing Checklist') + '</h2><ul>' + lis + '</ul></div>';
+  });
+  if (names) try { names.clear(); } catch (e) {}
+  printSheets(cards);
+}
+function printBacks(){
+  const n = parseInt(prompt('How many spelling strips? (two to a page)', String(Math.max(2, shown().filter(p => !S.selected.size || S.selected.has(p.key)).length))), 10);
+  if (!n || n < 1) return;
+  const rows = Array.from({ length:11 }, () => '<tr><td></td><td></td><td></td></tr>').join('');
+  const back = '<div class="card back"><h1>My Spelling Strip</h1><table class="strip"><tr><th>Have a go</th><th>Have another go</th><th>Correct spelling</th></tr>' + rows + '</table></div>';
+  printSheets(Array.from({ length:Math.min(n, 200) }, () => back));
+}
+function printSheets(cards){
+  let h = '';
+  for (let i = 0; i < cards.length; i += 2) h += '<div class="sheet">' + cards[i] + (cards[i + 1] || '<div class="card"></div>') + '</div>';
+  $('print').innerHTML = h;
+  setTimeout(() => { window.print(); setTimeout(() => { $('print').innerHTML = ''; }, 500); }, 50);
+}
+
+// ---- Events ------------------------------------------------------------
+$('years').addEventListener('click', e => { const b = e.target.closest('button[data-y]'); if (b && b.dataset.y !== S.year) openYear(b.dataset.y); });
+$('cls').addEventListener('change', e => { S.cls = e.target.value; S.selected.clear(); remember(); renderLists(); });
+$('reload').addEventListener('click', () => { banner(''); openYear(S.year); });
+$('selAll').addEventListener('change', e => { shown().forEach(p => e.target.checked ? S.selected.add(p.key) : S.selected.delete(p.key)); renderLists(); });
+$('lists').addEventListener('click', e => {
+  const row = e.target.closest('.row'); if (!row) return;
+  const k = row.dataset.k;
+  if (e.target.closest('.edit')) { openEditor([k]); return; }
+  if (e.target.classList.contains('pick')) { e.target.checked ? S.selected.add(k) : S.selected.delete(k); renderLists(); }
+});
+$('giveSel').addEventListener('click', () => { const keys = shown().map(p => p.key).filter(k => S.selected.has(k)); if (keys.length) openEditor(keys); });
+$('printSel').addEventListener('click', printCards);
+$('printBacks').addEventListener('click', printBacks);
+$('edx').addEventListener('click', closeEditor);
+$('edcancel').addEventListener('click', closeEditor);
+$('edsave').addEventListener('click', saveEditor);
+$('ed').addEventListener('click', e => { if (e.target === $('ed')) closeEditor(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && E) closeEditor(); });
+$('fmt').addEventListener('click', e => {
+  const b = e.target.closest('button[data-f]'); if (!b || !E) return;
+  E.format = b.dataset.f;
+  renderEditor();
+});
+$('edb').addEventListener('click', async e => {
+  const t = e.target;
+  if (t.dataset.add) { addItem(t.dataset.add); return; }
+  if (t.dataset.rm !== undefined) { E.items.splice(+t.dataset.rm, 1); renderEditor(); return; }
+  if (t.dataset.up !== undefined) { const n = +t.dataset.up; if (n > 0) { [E.items[n - 1], E.items[n]] = [E.items[n], E.items[n - 1]]; renderEditor(); } return; }
+  if (t.classList.contains('chip')) {
+    const i = E.items[+t.dataset.n], have = (i.words || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (!have.includes(t.dataset.w)) i.words = have.concat(t.dataset.w).join(', ');
+    renderEditor(); return;
+  }
+  const m = t.closest('#mode button'); if (m) { E.mode = m.dataset.m; renderEditor(); return; }
+  if (t.id === 'histload') {
+    t.disabled = true;
+    try { E.hist = (await apiGet({ action:'history', key:E.keys[0] })).history; } catch (err) { E.hist = []; $('edmsg').textContent = 'Could not load earlier cards (' + err.message + ').'; }
+    if (E) renderEditor(); return;
+  }
+  if (t.id === 'setsave') {
+    const name = prompt('Name for this set (e.g. Spelling: first steps)'); if (!name) return;
+    try { await apiPost({ action:'saveSet', name, items:E.items.map(i => ({ id:i.id })) }); S.sets = (await apiGet({ action:'sets' })).sets; $('edmsg').textContent = 'Set saved.'; renderEditor(); }
+    catch (err) { $('edmsg').textContent = 'Set not saved (' + err.message + ').'; }
+    return;
+  }
+  if (t.id === 'setdel') {
+    const sel = $('setpick'); const s = S.sets.find(x => String(x.id) === sel.value);
+    if (!s) { $('edmsg').textContent = 'Choose a set first.'; return; }
+    if (!confirm('Delete the set "' + s.name + '" for everyone? Children\'s cards are not changed.')) return;
+    try { await apiPost({ action:'deleteSet', id:s.id }); S.sets = (await apiGet({ action:'sets' })).sets; renderEditor(); }
+    catch (err) { $('edmsg').textContent = 'Not deleted (' + err.message + ').'; }
+  }
+});
+$('edb').addEventListener('change', e => {
+  const t = e.target;
+  if (t.classList.contains('met')) { E.items[+t.dataset.n].met = t.checked; return; }
+  if (t.classList.contains('wordsin')) { E.items[+t.dataset.n].words = t.value; return; }
+  if (t.id === 'fkind') { E.f.kind = t.value; renderResults(); return; }
+  if (t.id === 'fyear') { E.f.year = t.value; renderResults(); return; }
+  if (t.id === 'fgroup') { E.f.group = t.value; renderResults(); return; }
+  if (t.id === 'setpick' && t.value) {
+    const s = S.sets.find(x => String(x.id) === t.value);
+    if (s) s.items.forEach(i => { if (S.items[i.id] && E.items.length < MAX_ITEMS && !E.items.some(x => x.id === i.id)) E.items.push({ id:i.id }); });
+    renderEditor();
+  }
+});
+$('edb').addEventListener('input', e => {
+  if (e.target.id === 'q') { E.q = e.target.value; renderResults(); }
+  else if (e.target.classList.contains('wordsin')) E.items[+e.target.dataset.n].words = e.target.value;
+});
+
+async function start(){
+  try { WFANames.screen.init(); } catch (e) { console.warn('Names helper unavailable', e); }
+  let v = {}; try { v = JSON.parse(localStorage.getItem('wfa_wtg_view') || '{}'); } catch (e) {}
+  S.year = YEARS.includes(v.y) ? v.y : 'Y5'; S.cls = v.c || 'all';
+  renderYears();
+  try {
+    const [b, s] = await Promise.all([apiGet({ action:'bank' }), apiGet({ action:'sets' })]);
+    S.bank = b.bank; S.sets = s.sets; buildIndex(S.bank);
+  } catch (e) { $('srcnote').textContent = ''; banner('Could not load the statements (' + e.message + '). Refresh the page and sign in again.', true); return; }
+  openYear(S.year);
+}
+start();
+</script>
+</body>
+</html>
