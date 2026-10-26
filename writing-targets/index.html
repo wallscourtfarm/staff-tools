@@ -87,7 +87,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .seg { display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
   .seg button { border:0; background:var(--surface); color:var(--fg); padding:6px 12px; cursor:pointer; font:inherit; font-size:14px; }
   .seg button.on { background:var(--accent); color:var(--accent-fg); font-weight:600; }
-  h3 { font-size:14px; margin:16px 0 6px; color:var(--fg2); text-transform:uppercase; letter-spacing:.04em; }
+  #edb h3 { font-size:14px; margin:16px 0 6px; color:var(--fg2); text-transform:uppercase; letter-spacing:.04em; }
   .cur { border:1px solid var(--line); border-radius:10px; }
   .ci { display:grid; grid-template-columns:1fr auto; gap:6px; padding:8px 10px; border-bottom:1px solid var(--line); }
   .ci:last-child { border-bottom:0; }
@@ -112,9 +112,14 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .hist { font-size:13px; border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-bottom:6px; }
   footer { text-align:center; font-size:11px; color:var(--muted); margin-top:16px; }
   /* Printed strips: three to an A4 landscape page, the same size front and back (front: the child's checklist or targets; back: the school's spelling strip artwork, 81 x 195 mm, its own shape).
-     Slots are centred and evenly spaced, so a double-sided print lines up whichever way the printer flips. Nothing on a strip says a year or a level. */
+     Strips are centred and touch, so a double-sided print lines up whichever way the printer flips. Nothing on a strip says a year or a level. */
   #print { position:fixed; left:-10000px; top:0; }
-  #print .sheet { width:297mm; height:210mm; display:flex; justify-content:center; align-items:center; gap:8mm; background:#fff; }
+  #print .sheet { width:297mm; height:210mm; display:flex; justify-content:center; background:#fff; }
+  /* Strips touch, with a dotted cutting line down the full page at each edge: three equal strips from four straight cuts. */
+  #print .col { position:relative; height:210mm; display:flex; align-items:center; }
+  #print .col::before, #print .col:last-child::after { content:''; position:absolute; top:0; bottom:0; border-left:0.35mm dashed #666; }
+  #print .col::before { left:0; }
+  #print .col:last-child::after { right:0; }
   #print .slot { width:81mm; height:195mm; }
   #print .wc { width:81mm; height:195mm; border:0.6mm solid #0a0101; display:flex; flex-direction:column; color:#000; font-family:Lexend, Arial, sans-serif; overflow:hidden; }
   #print .wc .hd { border-bottom:0.3mm solid #999; padding:3mm 3mm 2.5mm; text-align:center; }
@@ -159,7 +164,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   </div>
   <div class="note" id="srcnote">Loading…</div>
   <div id="lists"></div>
-  <footer>Writing Targets · WFA-26.10.26e · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
+  <footer>Writing Targets · WFA-26.10.26f · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
 </main>
 
 <div id="ed" role="dialog" aria-modal="true" aria-labelledby="edt">
@@ -441,7 +446,7 @@ async function printCards(){
   const P = shown().filter(p => (S.selected.size ? S.selected.has(p.key) : true) && p.card && p.card.items.length);
   if (!P.length) { banner(S.selected.size ? 'None of the selected children has a card yet.' : 'Nobody has a card yet.', true); return; }
   let names = null;
-  try { names = await WFANames.pick({ purpose:'print names on the writing strips' }); } catch (e) { names = null; }
+  try { names = await WFANames.pick({ purpose:'For the names on the writing strips.' }); } catch (e) { names = null; }
   const name = p => { const n = names && p.code ? names.get(p.code) : null; return n ? (n.first + ' ' + (n.last || '')).trim() : p.label; };
   const fronts = P.map(p => {
     const t = p.card.format === 'targets';
@@ -473,7 +478,7 @@ async function printBacks(){
   printPages(pages);
 }
 async function printPages(pages){
-  $('print').innerHTML = pages.map(pg => '<div class="sheet">' + [0, 1, 2].map(k => pg[k] || '<div class="slot"></div>').join('') + '</div>').join('');
+  $('print').innerHTML = pages.map(pg => '<div class="sheet">' + [0, 1, 2].map(k => '<div class="col">' + (pg[k] || '<div class="slot"></div>') + '</div>').join('') + '</div>').join('');
   try { await document.fonts.ready; } catch (e) {}
   await Promise.all([...$('print').querySelectorAll('img')].map(im => im.decode().catch(() => {})));
   fitLists();
