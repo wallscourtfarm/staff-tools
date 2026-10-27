@@ -291,6 +291,18 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     .ws-add-row label { font-size:11px; color:#475569; }
     .ws-add-row select, .ws-add-row input[type=text] { display:block; margin-top:3px; padding:5px 7px; border:1px solid #e2e8f0; border-radius:4px; font-size:12px; color:#111; background:white; }
     .ws-add-row input[type=color] { width:32px; height:30px; border:1px solid #e2e8f0; border-radius:4px; padding:1px; cursor:pointer; }
+    .ws-edit { background:none; border:none; cursor:pointer; color:#94a3b8; font-size:12px; padding:2px 4px; border-radius:3px; }
+    .ws-edit:hover { color:#1798d3; background:#e0f2fe; }
+    .ws-row.editing { background:#f0f9ff; }
+    .ws-msg { font-size:11.5px; margin-top:8px; }
+    .ws-msg:empty { display:none; }
+    .ws-msg.err { color:#b91c1c; }
+    .ws-msg.ok { color:#166534; }
+    .ws-cancel-btn { padding:5px 10px; background:white; color:#475569; border:1px solid #e2e8f0; border-radius:4px; cursor:pointer; font-size:12px; }
+    .ws-local { background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:10px 12px; font-size:12px; color:#78350f; margin-bottom:12px; }
+    .ws-local:empty { display:none; }
+    .ws-local button { margin:6px 6px 0 0; }
+    .ws-save-btn:disabled { opacity:.5; cursor:default; }
     .ws-save-btn { padding:5px 14px; background:#1798d3; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold; white-space:nowrap; }
     .ws-save-btn:hover { background:#1282b8; }
     .ws-open-btn { padding:8px 12px; border:1px solid #e2e8f0; border-radius:5px; background:white; cursor:pointer; font-size:14px; color:#475569; transition:all .12s; }
@@ -478,7 +490,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(27.10.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(27.10.26b)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -556,7 +568,8 @@ body.edit-locked .notify-btn   { display:none; }
         </div>
       </div>
       <!-- Other events section -->
-      <div class="ws-section-hd">Other events</div>
+      <div class="ws-section-hd">Other events <small style="font-weight:normal;color:#94a3b8;text-transform:none;letter-spacing:0">— every week, shared with all staff</small></div>
+      <div class="ws-local" id="wsLocalNotice"></div>
       <div class="ws-list" id="wsEventList"></div>
       <div class="ws-add-form">
         <div class="ws-add-row">
@@ -570,8 +583,10 @@ body.edit-locked .notify-btn   { display:none; }
           </select></label>
           <label>Label<input type="text" id="ws-label" placeholder="e.g. Staff Meeting" style="width:130px"></label>
           <label>Colour<input type="color" id="ws-bg" value="#1e3a8a"></label>
-          <button class="ws-save-btn" onclick="addWsEvent()">Add</button>
+          <button class="ws-save-btn" id="ws-save" onclick="saveWsEvent()">Add</button>
+          <button class="ws-cancel-btn" id="ws-cancel" style="display:none" onclick="cancelWsEdit()">Cancel</button>
         </div>
+        <div class="ws-msg" id="wsEventMsg"></div>
       </div>
     </div>
   </div>
@@ -601,7 +616,7 @@ body.edit-locked .notify-btn   { display:none; }
   <button onclick="closeDeleteMenu()" style="display:block;width:100%;text-align:left;background:none;border:none;color:#64748b;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:12px">Cancel</button>
 </div>
 
-<footer>Wallscourt Farm Academy · Release Schedule · 27.10.26a</footer>
+<footer>Wallscourt Farm Academy · Release Schedule · 27.10.26b</footer>
 
 <script>
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -681,17 +696,19 @@ let SESSION_INFO_EVENTS= {};  // 'YYYY-MM-DD|Session' → [{label,type}]        
 let RECURRING_SLOTS  = [];   // master copy of recurring, used to seed new weeks
 let HIDDEN_EVENT_DATES = JSON.parse(localStorage.getItem('hiddenEventDates')||'{}'); // {id:[dateKey,...]}
 
-// ── Whole-school events (localStorage-backed; defaults loaded from sheet) ─────
-let WS_SHEET_DEFAULTS = [];
+// ── Weekly "Other events": the EventsMeetings tab in the WFA database ───────
+// Until 27.10.26 these were kept only in this browser (localStorage
+// 'wfa_ws_events'), so an event added on one device never reached anyone
+// else. Now every add/edit/delete writes the shared tab straight away.
+const WS_ADMIN_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/admin/tab';
+let WS_ROWS = [];        // EventsMeetings rows in stored order (row_index = position)
+let WS_LOADED = false;   // never write before the shared list has been read
+let wsEditing = null;    // the event being edited, or null when adding
+let wsBusy = false;
 let SERVER_SPORTS_SCHEDULE = []; // last-fetched server sportsSchedule: the standing (all-terms) sports schedule
 let SERVER_SPORTS_BY_TERM = {};  // {"1":[{yg,day,session,provider}],...}: a term's own sports times, overriding the standing schedule
 let SPORTS_BY_TERM_LOADED = false; // sportsByTerm is only sent back once it has been read from the server (an old cached copy has none, and sending {} would wipe it)
-function wsLoad() {
-  try { const s = localStorage.getItem('wfa_ws_events'); return s ? JSON.parse(s) : WS_SHEET_DEFAULTS; }
-  catch(e) { return WS_SHEET_DEFAULTS; }
-}
-function wsSave() { localStorage.setItem('wfa_ws_events', JSON.stringify(wsEvents)); }
-let wsEvents = [];
+let wsEvents = [];       // non-sport events built from WS_ROWS
 
 // ── Edit mode ─────────────────────────────────────────────────────────────────
 let editMode = localStorage.getItem('wfa_edit_mode') !== '0';
@@ -923,8 +940,8 @@ function eventTipHtml(ev) {
   return `<div class="ev-tip"><b>${ev.label}</b>${ev.attendees?.length ? '<br>' + ev.attendees.join(', ') : ''}${ev.notes ? '<br>' + ev.notes : ''}</div>`;
 }
 function buildSchoolEvents(rows) {
-  return rows.map(r=>{
-    const ev = { day:DAY_IDX[r.Day]??0, session:r.Session, label:r.Label, bg:r.Colour||'#1e3a8a' };
+  return rows.map((r,rowIndex)=>{
+    const ev = { day:DAY_IDX[r.Day]??0, session:r.Session, label:r.Label, bg:r.Colour||'#1e3a8a', rowIndex, row:r };
     // Parse Sports entries: "Y4 Sports", "Y3 (AB) Sports", "Y6 (Brs) Sports"
     const sportMatch = r.Label?.match(/^(Reception|Y[1-6]|YR)\s*(?:\((AB|Brs)\)\s*)?Sports$/i);
     if (sportMatch) {
@@ -1008,7 +1025,7 @@ async function init() {
   fetch('notify-config.json').then(r=>r.json()).then(cfg=>{ if(cfg.url) EVENT_WRITE_URL=cfg.url; }).catch(()=>{});
 
   document.getElementById('centerPane').innerHTML=
-    '<div style="padding:60px;text-align:center;color:#94a3b8;font-size:14px">Loading from Google Sheets…</div>';
+    '<div style="padding:60px;text-align:center;color:#94a3b8;font-size:14px">Loading…</div>';
   try {
     const cacheBuster = `&_cb=${Date.now()}`;
     // One combined request, not 5 separate ones: Apps Script doesn't run
@@ -1020,8 +1037,10 @@ async function init() {
     // project_teaching_schedule_perf for the numbers this is based on).
     // Now via the Railway read-through proxy rather than Apps Script
     // directly — see project_shared_gateway_apps_script_ceiling in Claude's
-    // memory. This page never writes to these 5 tabs, only reads them (its
-    // own writes go to the separate cover-plan-state endpoint below).
+    // memory. Of these 5 tabs this page writes only CalendarEvents (term
+    // events, /planning/events/write) and, since 27.10.26, EventsMeetings
+    // (weekly "Other events", /planning/admin/tab/*); its own plan goes to
+    // the separate cover-plan-state endpoint below.
     const TABS = ['Staff','TermDates','CalendarEvents','EventsMeetings','RecurringCover'];
     const tabsRes = await fetch('https://api.wallscourt-farm-academy.co.uk/planning/tabs?token='+SHARED_TOKEN+'&tabs='+TABS.join(',')+cacheBuster, { signal: AbortSignal.timeout(30000) });
     if (!tabsRes.ok) throw new Error('getSheetTabs request failed');
@@ -1049,8 +1068,7 @@ async function init() {
         });
       });
     });
-    WS_SHEET_DEFAULTS=buildSchoolEvents(wseRows);
-    wsEvents=wsLoad();
+    wsSetRows(wseRows);
     RECURRING_SLOTS=buildRecurring(recRows);
     // Restore saved planner state, falling back to recurring slots for current week
     const saved=await stateLoad();
@@ -1069,9 +1087,6 @@ async function init() {
     SERVER_SPORTS_SCHEDULE = saved?.sportsSchedule || [];
     SPORTS_BY_TERM_LOADED = !!(saved && saved.sportsByTerm && typeof saved.sportsByTerm === 'object');
     SERVER_SPORTS_BY_TERM = SPORTS_BY_TERM_LOADED ? saved.sportsByTerm : {};
-    // Sports now come only from the server copy (per term), never from this
-    // browser's wfa_ws_events cache — drop any old cached sports entries.
-    if (wsEvents.some(e => e.sport)) { wsEvents = wsEvents.filter(e => !e.sport); wsSave(); }
     state.weekIdx=currentWeekIdx();
     if (!state.weekSlots[state.weekIdx] || state.weekSlots[state.weekIdx].length===0) state.weekSlots[state.weekIdx]=JSON.parse(JSON.stringify(RECURRING_SLOTS));
     fillNonWorkingSlots();
@@ -2423,24 +2438,25 @@ function renderWsModal() {
   document.getElementById('sportTable').innerHTML = sportHtml;
 
   // Other events list
-  const otherEvents = wsEvents.filter(e => !e.sport);
+  const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   let otherHtml = '';
-  if (!otherEvents.length) {
+  if (!wsEvents.length) {
     otherHtml = '<p style="color:#94a3b8;font-size:12px;padding:4px 0 10px">No other events.</p>';
   } else {
-    otherEvents.forEach((ev) => {
-      const i = wsEvents.indexOf(ev);
-      otherHtml += `<div class="ws-row">
-        <div class="ws-swatch" style="background:${ev.bg}"></div>
+    wsEvents.forEach((ev, i) => {
+      otherHtml += `<div class="ws-row${wsEditing === ev ? ' editing' : ''}">
+        <div class="ws-swatch" style="background:${esc(ev.bg)}"></div>
         <div class="ws-info">
-          <strong>${ev.label}</strong>
-          <span>${days[ev.day]} · ${ev.session}</span>
+          <strong>${esc(ev.label)}</strong>
+          <span>${days[ev.day]} · ${esc(ev.session)}${ev.row.Time ? ' · ' + esc(ev.row.Time) : ''}</span>
         </div>
-        <button class="ws-del" onclick="removeWsEvent(${i})">×</button>
+        <button class="ws-edit" title="Change this event" onclick="editWsEvent(${i})">✎</button>
+        <button class="ws-del" title="Remove this event for everyone" onclick="removeWsEvent(${i})">×</button>
       </div>`;
     });
   }
   document.getElementById('wsEventList').innerHTML = otherHtml;
+  renderWsLocalNotice_();
 }
 function updateSport(yg, field, value) {
   if (!sportsEditable_()) { renderWsModal(); return; }
@@ -2568,25 +2584,174 @@ function loadSportPaste() {
   renderWsModal();
   render();
 }
-function addWsEvent() {
-  const label = document.getElementById('ws-label').value.trim();
-  if (!label) { alert('Please enter a label.'); return; }
-  wsEvents.push({
-    day:     parseInt(document.getElementById('ws-day').value),
-    session: document.getElementById('ws-session').value,
-    label,
-    bg:      document.getElementById('ws-bg').value,
-  });
-  wsSave();
-  document.getElementById('ws-label').value = '';
-  renderWsModal();
-  render();
+function wsSetRows(rows) {
+  WS_ROWS = Array.isArray(rows) ? rows : [];
+  WS_LOADED = true;
+  wsEvents = buildSchoolEvents(WS_ROWS).filter(e => !e.sport);
 }
-function removeWsEvent(i) {
-  wsEvents.splice(i, 1);
-  wsSave();
+async function wsRefresh_() {
+  const res = await fetch(WS_ADMIN_URL + '?tab=EventsMeetings&token=' + SHARED_TOKEN + '&_cb=' + Date.now(), { signal: AbortSignal.timeout(20000) });
+  if (!res.ok) throw new Error('could not reach the server (' + res.status + ')');
+  const j = await res.json();
+  if (j.error) throw new Error(j.error);
+  wsSetRows(j.rows || []);
+}
+async function wsPost_(action, body) {
+  const res = await fetch(WS_ADMIN_URL + '/' + action + '?token=' + SHARED_TOKEN, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ tab: 'EventsMeetings' }, body)),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) throw new Error('could not reach the server (' + res.status + ')');
+  const j = await res.json();
+  if (j.status !== 'ok') throw new Error(j.message || 'not saved');
+  return j;
+}
+// The columns this page shows/edits; used to check a row is still the one
+// that was on screen before changing or removing it (positions can shift
+// when someone else edits the list from another device).
+function wsExpect_(row) {
+  return { Day: row.Day || '', Session: row.Session || '', Label: row.Label || '', Colour: row.Colour || '' };
+}
+function wsSameRow_(a, b) {
+  const x = wsExpect_(a), y = wsExpect_(b);
+  return Object.keys(x).every(k => String(x[k]).trim() === String(y[k]).trim());
+}
+// Re-read the shared list, then find where the on-screen row is now.
+async function wsLocate_(ev) {
+  const orig = ev.row;
+  await wsRefresh_();
+  const idx = WS_ROWS.findIndex(r => wsSameRow_(r, orig));
+  if (idx < 0) throw new Error('someone else has changed or removed this event since you opened the list');
+  return { idx, expect: wsExpect_(WS_ROWS[idx]) };
+}
+function wsMsg_(text, kind) {
+  const el = document.getElementById('wsEventMsg');
+  if (!el) return;
+  el.textContent = text || '';
+  el.className = 'ws-msg' + (kind ? ' ' + kind : '');
+}
+function wsSetBusy_(on) {
+  wsBusy = on;
+  const b = document.getElementById('ws-save');
+  if (b) b.disabled = on;
+}
+async function wsRun_(work, doneText) {
+  if (wsBusy) return false;
+  if (!WS_LOADED) { wsMsg_('The shared list has not loaded yet, so nothing can be changed. Reload the page and try again.', 'err'); return false; }
+  wsSetBusy_(true);
+  wsMsg_('Saving…');
+  let ok = false;
+  try {
+    await work();
+    ok = true;
+    wsMsg_(doneText, 'ok');
+  } catch (e) {
+    wsMsg_('Not saved: ' + e.message + '. Nothing else was changed.', 'err');
+    try { await wsRefresh_(); } catch (_) {}
+  } finally {
+    wsSetBusy_(false);
+    renderWsModal();
+    render();
+  }
+  return ok;
+}
+async function wsEnsureColour_() {
+  if (WS_ROWS.length && 'Colour' in WS_ROWS[0]) return;
+  await wsPost_('add_column', { column: 'Colour' });
+}
+function wsFormValues_() {
+  return {
+    Day:     SPORT_DAYS[parseInt(document.getElementById('ws-day').value)],
+    Session: document.getElementById('ws-session').value,
+    Label:   document.getElementById('ws-label').value.trim(),
+    Colour:  document.getElementById('ws-bg').value,
+  };
+}
+function wsResetForm_() {
+  wsEditing = null;
+  document.getElementById('ws-label').value = '';
+  document.getElementById('ws-save').textContent = 'Add';
+  document.getElementById('ws-cancel').style.display = 'none';
+}
+async function saveWsEvent() {
+  const values = wsFormValues_();
+  if (!values.Label) { alert('Please enter a label.'); return; }
+  const editing = wsEditing;
+  const ok = await wsRun_(async () => {
+    await wsEnsureColour_();
+    if (editing) {
+      const { idx, expect } = await wsLocate_(editing);
+      await wsPost_('update', { row_index: idx, values, expect });
+    } else {
+      await wsPost_('add', { values });
+    }
+    await wsRefresh_();
+  }, editing ? `✓ "${values.Label}" changed for everyone.` : `✓ "${values.Label}" added for everyone.`);
+  if (ok) wsResetForm_();
   renderWsModal();
-  render();
+}
+function editWsEvent(i) {
+  const ev = wsEvents[i];
+  if (!ev) return;
+  wsEditing = ev;
+  document.getElementById('ws-day').value = String(ev.day);
+  document.getElementById('ws-session').value = ev.session;
+  document.getElementById('ws-label').value = ev.label;
+  document.getElementById('ws-bg').value = /^#[0-9a-f]{6}$/i.test(ev.bg) ? ev.bg : '#1e3a8a';
+  document.getElementById('ws-save').textContent = 'Save';
+  document.getElementById('ws-cancel').style.display = '';
+  wsMsg_('');
+  renderWsModal();
+}
+function cancelWsEdit() { wsResetForm_(); wsMsg_(''); renderWsModal(); }
+async function removeWsEvent(i) {
+  const ev = wsEvents[i];
+  if (!ev) return;
+  if (!confirm(`Remove "${ev.label}" (${SPORT_DAYS[ev.day]}, ${ev.session}) for everyone?`)) return;
+  if (wsEditing === ev) wsResetForm_();
+  await wsRun_(async () => {
+    const { idx, expect } = await wsLocate_(ev);
+    await wsPost_('delete', { row_index: idx, expect });
+    await wsRefresh_();
+  }, `✓ "${ev.label}" removed for everyone.`);
+}
+
+// Events this browser saved under the old device-only key that the shared
+// list does not have. Offered once to add for everyone (or forget); never
+// shown on the timetable, because nobody else could see them.
+function wsLocalOnly_() {
+  let local;
+  try { local = JSON.parse(localStorage.getItem('wfa_ws_events') || 'null'); } catch (e) { return []; }
+  if (!Array.isArray(local)) return [];
+  return local.filter(e => e && !e.sport && e.label && SPORT_DAYS[e.day] &&
+    !wsEvents.some(s => s.day === e.day && s.session === e.session && s.label.trim().toLowerCase() === String(e.label).trim().toLowerCase()));
+}
+function renderWsLocalNotice_() {
+  const el = document.getElementById('wsLocalNotice');
+  if (!el) return;
+  const list = WS_LOADED ? wsLocalOnly_() : [];
+  if (!list.length) { el.innerHTML = ''; return; }
+  const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  el.innerHTML = `<b>Only on this device:</b> ${list.length === 1 ? 'this event was' : 'these events were'} saved on this computer before the list was shared, so nobody else could see ${list.length === 1 ? 'it' : 'them'}:
+    <ul style="margin:4px 0 0 18px;padding:0">${list.map(e => `<li>${esc(e.label)} — ${SPORT_DAYS[e.day]} · ${esc(e.session)}</li>`).join('')}</ul>
+    <button class="ws-save-btn" onclick="shareLocalWsEvents()">Add to the shared list</button><button class="ws-cancel-btn" onclick="forgetLocalWsEvents()">Forget ${list.length === 1 ? 'it' : 'them'}</button>`;
+}
+async function shareLocalWsEvents() {
+  const list = wsLocalOnly_();
+  if (!list.length) return;
+  const ok = await wsRun_(async () => {
+    await wsEnsureColour_();
+    for (const e of list) {
+      await wsPost_('add', { values: { Day: SPORT_DAYS[e.day], Session: e.session, Label: String(e.label).trim(), Colour: e.bg || '#1e3a8a' } });
+    }
+    await wsRefresh_();
+  }, `✓ ${list.length} event${list.length === 1 ? '' : 's'} added for everyone.`);
+  if (ok) forgetLocalWsEvents();
+}
+function forgetLocalWsEvents() {
+  try { localStorage.removeItem('wfa_ws_events'); } catch (e) {}
+  renderWsLocalNotice_();
 }
 // ── Notification panel ──────────────────────────────────────────────────────────
 
