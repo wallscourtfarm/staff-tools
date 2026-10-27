@@ -88,7 +88,7 @@
 
 <div class="toast" id="toast"></div>
 
-<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-27.10.26a</footer>
+<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-27.10.26b</footer>
 
 <script>
 // Calls go through the site's own /_api proxy, which checks the staff login and adds the
@@ -152,6 +152,8 @@ const SECTIONS = {
         hint: 'Leave on Automatic unless the cover planner is getting it wrong for this person.' },
       { key: 'Phone', label: 'Mobile number for text notifications', type: 'text', optional: true,
         hint: 'The cover planner texts this number when cover changes affect them. Type it normally, e.g. 07700 900123. Leave blank for no texts.' },
+      { key: 'Colour', label: 'Colour', type: 'color', optional: true,
+        hint: 'Their dot here, their avatar in the cover planner and their strip on the teaching schedule when they are off.' },
       { key: 'CoverRole', label: 'Gives cover as (blank = not on the cover list)', type: 'text', optional: true, list: ['Cover Supervisor', 'Teaching Partner', 'Learning Partner'],
         hint: 'Fill this in to make them appear in the cover planner\'s Cover Staff panel, available to cover other classes.' },
     ],
@@ -306,7 +308,9 @@ function openForm(editIndex, prefill) {
       });
       html += '</div>';
     } else if (f.type === 'color') {
-      html += '<input type="color" name="' + f.key + '" value="' + (rawVal || '#1798d3') + '">';
+      html += '<input type="color" name="' + f.key + '" value="' + (rawVal || '#1798d3') + '"' + (f.optional ? ' style="opacity:' + (rawVal ? 1 : .35) + '" oninput="const n = this.form.elements[this.name + \'_none\']; n.checked = false; this.style.opacity = 1"' : '') + '>';
+      // optional colours can stay blank, so saving other changes never gives someone a colour by accident
+      if (f.optional) html += ' <label style="display:inline-flex;align-items:center;gap:5px;font-weight:normal;margin-left:10px"><input type="checkbox" name="' + f.key + '_none" ' + (rawVal ? '' : 'checked') + ' onchange="this.closest(\'.field\').querySelector(\'input[type=color]\').style.opacity = this.checked ? .35 : 1"> No colour</label>';
     } else if (f.list) {
       html += '<input type="' + f.type + '" name="' + f.key + '" value="' + rawVal.replace(/"/g, '&quot;') + '" list="dl_' + f.key + '">';
       html += '<datalist id="dl_' + f.key + '">' + f.list.map(o => '<option value="' + o + '">').join('') + '</datalist>';
@@ -343,6 +347,8 @@ async function handleFormSubmit(e) {
       values['WorkingDays'] = days.join(',');
     } else if (f.type === 'yeargroups') {
       values[f.key] = YG_CHECKS.filter(([code]) => formData.get('yg_' + code)).map(([code]) => code).join(',');
+    } else if (f.type === 'color' && f.optional && formData.get(f.key + '_none')) {
+      values[f.key] = '';
     } else if (f.valueMap) {
       const display = formData.get(f.key);
       values[f.key] = f.valueMap[display] !== undefined ? f.valueMap[display] : display;
