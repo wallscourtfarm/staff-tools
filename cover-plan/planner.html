@@ -375,7 +375,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     .term-ev-btn { background:rgba(0,0,0,.18); border:none; cursor:pointer; color:inherit; font-size:9px; padding:1px 3px; border-radius:2px; line-height:1.3; }
     .term-ev-btn:hover { background:rgba(0,0,0,.35); }
     /* Term event popup */
-    .term-popup { position:fixed; background:white; border:2px solid #1798d3; border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.2); z-index:10000; padding:14px 16px; width:240px; }
+    .term-popup { position:fixed; background:white; border:2px solid #1798d3; border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.2); z-index:10000; padding:14px 16px; width:300px; max-height:calc(100vh - 16px); overflow-y:auto; }
     .term-popup h4 { font-family:Nunito,sans-serif; font-weight:900; font-size:13px; color:#1e3a8a; margin:0 0 10px; }
     .tp-label { display:block; font-size:10px; font-weight:bold; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px; margin-top:8px; }
     .tp-label:first-of-type { margin-top:0; }
@@ -396,6 +396,48 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     .tp-day-btn.active { background:#1798d3; border-color:#1798d3; color:white; }
     .tp-weeks-row { display:none; margin-top:6px; align-items:center; gap:5px; font-size:12px; color:#475569; }
     .tp-weeks-row input { width:44px; padding:3px 5px; border:1.5px solid #e2e8f0; border-radius:4px; font-size:12px; }
+    /* Term popup: session, who's going, dates */
+    .tp-seg { display:flex; flex-wrap:wrap; gap:4px; }
+    .tp-seg button { padding:4px 7px; border:1.5px solid #e2e8f0; border-radius:4px; background:white; color:#475569; font-size:11px; font-weight:700; cursor:pointer; font-family:Nunito,sans-serif; }
+    .tp-seg button.on { background:#1798d3; border-color:#1798d3; color:white; }
+    .tp-who-chips { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:5px; }
+    .tp-who-chip { display:inline-flex; align-items:center; gap:4px; background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; border-radius:12px; padding:2px 4px 2px 3px; font-size:11px; font-weight:bold; }
+    .tp-who-chip .av { min-width:18px; height:18px; padding:0 2px; border-radius:9px; background:#1798d3; color:white; font-size:9px; display:flex; align-items:center; justify-content:center; }
+    .tp-who-chip button { background:none; border:none; color:#64748b; cursor:pointer; font-size:12px; line-height:1; padding:0 2px; }
+    .tp-who-empty { font-size:11px; color:#94a3b8; font-style:italic; margin-bottom:3px; }
+    .tp-who-list { border:1.5px solid #e2e8f0; border-radius:4px; max-height:132px; overflow-y:auto; margin-top:4px; }
+    .tp-who-grp { font-size:9px; font-weight:bold; color:#94a3b8; text-transform:uppercase; letter-spacing:.06em; padding:5px 8px 2px; background:#f8fafc; position:sticky; top:0; }
+    .tp-who-row { display:flex; align-items:center; gap:7px; padding:3px 8px; font-size:12px; cursor:pointer; text-transform:none; letter-spacing:0; font-weight:normal; color:#1e293b; }
+    .tp-who-row:hover { background:#f0f9ff; }
+    .term-popup .tp-who-row input { width:auto; accent-color:#1798d3; }
+    .tp-who-row .ini { margin-left:auto; color:#94a3b8; font-size:10.5px; font-weight:bold; }
+    .tp-date-chips { display:flex; flex-wrap:wrap; gap:4px; }
+    .tp-date-chip { display:inline-flex; align-items:center; gap:3px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:3px 4px 3px 7px; font-size:11px; font-weight:bold; color:#334155; }
+    .tp-date-chip button { background:none; border:none; color:#94a3b8; cursor:pointer; font-size:12px; padding:0 2px; }
+    .tp-date-add { display:flex; gap:4px; margin-top:5px; }
+    .tp-date-add input { flex:1; }
+    .tp-date-add button { padding:4px 8px; border:1.5px dashed #93c5fd; border-radius:4px; background:#f0f9ff; color:#1798d3; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap; }
+    .tp-link { background:none; border:none; color:#1798d3; font-size:10.5px; cursor:pointer; padding:0; margin-top:5px; text-decoration:underline; }
+    .tp-hint { font-size:10.5px; color:#94a3b8; margin-top:3px; line-height:1.35; }
+    .tp-release { margin-top:10px; background:#fff7ed; border:1px solid #fed7aa; border-radius:5px; padding:7px 8px; font-size:11.5px; color:#7c2d12; line-height:1.4; }
+    .tp-release label { display:flex; gap:6px; align-items:flex-start; cursor:pointer; }
+    .term-popup .tp-release input, .term-popup .tp-scope input { width:auto; margin-top:2px; }
+    .tp-scope { margin-top:10px; font-size:11.5px; color:#334155; display:flex; flex-direction:column; gap:3px; }
+    .tp-scope label { display:flex; gap:6px; align-items:center; cursor:pointer; }
+    /* Event attendees: initials on banners, hover for names */
+    .ev-avs { display:inline-flex; gap:2px; flex-shrink:0; }
+    .ev-avs span { min-width:19px; height:17px; padding:0 3px; border-radius:9px; background:rgba(255,255,255,.92); color:#1e293b; font-size:9px; font-weight:bold; display:inline-flex; align-items:center; justify-content:center; }
+    .ev-avs span.more { background:rgba(255,255,255,.55); }
+    .ev-tip { display:none; position:absolute; left:0; top:calc(100% + 4px); z-index:60; background:#0f172a; color:white; font-weight:normal; font-size:11px; line-height:1.45; padding:7px 9px; border-radius:5px; width:220px; box-shadow:0 4px 14px rgba(0,0,0,.25); text-align:left; white-space:normal; }
+    .ev-tip b { color:#93c5fd; }
+    .srow-after .ev-tip { top:auto; bottom:calc(100% + 4px); } /* last row: open upwards so the grid edge doesn't clip it */
+    .session-banner.has-tip { position:relative; cursor:default; }
+    .session-banner.has-tip:hover { z-index:60; }
+    .session-banner.has-tip:hover .ev-tip { display:block; }
+    .session-banner .ev-lbl { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .session-banner.with-avs .ev-lbl { text-align:left; }
+    .term-event .ev-sess { opacity:.7; font-size:9px; }
+    .term-event .ev-who { display:block; font-weight:normal; font-size:9.5px; opacity:.9; }
 
     /* Locked state — disable interactive elements */
     body.edit-locked .teacher-chip { cursor:default; pointer-events:none; }
@@ -436,7 +478,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(25.10.26a)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(27.10.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -559,7 +601,7 @@ body.edit-locked .notify-btn   { display:none; }
   <button onclick="closeDeleteMenu()" style="display:block;width:100%;text-align:left;background:none;border:none;color:#64748b;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:12px">Cancel</button>
 </div>
 
-<footer>Wallscourt Farm Academy · Release Schedule · 25.10.26a</footer>
+<footer>Wallscourt Farm Academy · Release Schedule · 27.10.26a</footer>
 
 <script>
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -574,12 +616,12 @@ function initials(name) { if (!name) return ''; const p = name.trim().split(/\s+
 const REASONS       = ['PPA','Phase Lead','Leadership','Training','ECT','ECT1','ECT2','RA','SENCO','Sports','Illness','Non-working Day','Trip','Other'];
 const REASON_CLS    = {'PPA':'PPA','Phase Lead':'Phase','Leadership':'Leadership','Training':'Training',
                        'ECT':'ECT1','ECT1':'ECT1','ECT2':'ECT2','RA':'RA','SENCO':'SENCO','Sports':'Sports',
-                       'Illness':'Illness','Day Off':'Illness','Non-working Day':'Illness','Trip':'Training','Other':'Other'};
+                       'Illness':'Illness','Day Off':'Illness','Non-working Day':'Illness','Trip':'Training','Subject Network':'Training','Other':'Other'};
 const COUNTED_SESSIONS = new Set(['Before School','AM','Lunch','PM','After School']);
 const BLOCKING_TYPES   = new Set(['Half Term','Christmas','Easter','Summer Holiday','INSET','CLF Conference','Bank Holiday']);
 
 // Off-site / in-school defaults by reason
-const OFF_SITE_REASONS  = new Set(['Illness','Training','Trip','CLF Conference','Day Off','Non-working Day']);
+const OFF_SITE_REASONS  = new Set(['Illness','Training','Trip','CLF Conference','Day Off','Non-working Day','Subject Network']);
 const IN_SCHOOL_REASONS = new Set(['PPA','Phase Lead','Leadership','ECT','ECT1','ECT2','RA','SENCO','Sports','Staff Meeting','FLC','PAC','Supervision']);
 function offSiteDefault(reason) {
   if (OFF_SITE_REASONS.has(reason)) return true;
@@ -632,6 +674,7 @@ let EVENT_WRITE_URL = 'https://api.wallscourt-farm-academy.co.uk/planning/events
 let WEEKS    = [];
 let TEACHERS = [];
 let COVER    = [];
+let ALL_STAFF = []; // {name, init, yg, role} for every named staff member — the term popup's "Who's going" list
 let EVENTS             = {};  // YYYY-MM-DD → {label,type:'bank-holiday'|'inset'}  — blocking
 let INFO_EVENTS        = {};  // YYYY-MM-DD → [{label,type}]                       — day header banners
 let SESSION_INFO_EVENTS= {};  // 'YYYY-MM-DD|Session' → [{label,type}]             — cell banners
@@ -756,6 +799,10 @@ function dateKey(d) {
 // ── Data builders ─────────────────────────────────────────────────────────────
 function buildStaff(rows) {
   const teachers=[], cover=[];
+  ALL_STAFF = rows.filter(r => r.Name && r.CoverRole !== 'External').map(r => ({
+    name:r.Name, init:r.Initials||initials(r.Name),
+    yg:r.YearGroup==='YR' ? 'Reception' : (r.YearGroup||''), role:r.Role||''
+  }));
   rows.forEach(r=>{
     if (!r.Name) return;
     const id=r.Name.toLowerCase().replace(/[^a-z0-9]+/g,'_');
@@ -828,8 +875,11 @@ function buildEvents(rows) {
     const id = r.ID || (isFE ? '' : 'sheet_row_' + (rowIdx + 2));
     // Collect FrontEnd events for editing (single-day only)
     if (isFE && r.ID) {
-      frontEnd.push({ id:r.ID, date:dateKey(start), label:r.Label||'', colour:r.Colour||'#1798d3', session:r.Session||'', notes:r.Notes||'' });
+      const fe = { id:r.ID, date:dateKey(start), label:r.Label||'', colour:r.Colour||'#1798d3', session:r.Session||'', notes:r.Notes||'', attendees:parseAttendees(r.Attendees) };
+      if (r.SeriesID) fe.seriesId = r.SeriesID;
+      frontEnd.push(fe);
     }
+    const attendees = parseAttendees(r.Attendees), notes = r.Notes || '';
     const isBlock=BLOCKING_TYPES.has(r.Type);
     const btype=(r.Type==='INSET'||r.Type==='CLF Conference')?'inset':'bank-holiday';
     const bg = r.Colour || null;
@@ -844,16 +894,33 @@ function buildEvents(rows) {
         if (r.Session) {
           const sk=`${k}|${r.Session}`;
           if (!sessionInfo[sk]) sessionInfo[sk]=[];
-          sessionInfo[sk].push({label:r.Label||r.Type, type:r.Type, bg:bg||'#1e3a8a', source, id});
+          sessionInfo[sk].push({label:r.Label||r.Type, type:r.Type, bg:bg||'#1e3a8a', source, id, attendees, notes});
         } else {
           if (!info[k]) info[k]=[];
-          info[k].push({label:lbl, type:r.Type, bg, source, id});
+          info[k].push({label:lbl, type:r.Type, bg, source, id, attendees, notes});
         }
       }
       cur.setDate(cur.getDate()+1);
     }
   });
   return {blocking,info,sessionInfo,frontEnd};
+}
+function parseAttendees(v) {
+  return String(v||'').split(',').map(x => x.trim()).filter(Boolean);
+}
+function attendeeInit(name) {
+  return ALL_STAFF.find(s => s.name === name)?.init || initials(name);
+}
+// Initials pills for an event's attendees (first 3, then "+N")
+function attendeeAvsHtml(names, max = 3) {
+  if (!names || !names.length) return '';
+  const shown = names.slice(0, max).map(n => `<span>${attendeeInit(n)}</span>`).join('');
+  const more = names.length > max ? `<span class="more">+${names.length - max}</span>` : '';
+  return `<span class="ev-avs">${shown}${more}</span>`;
+}
+function eventTipHtml(ev) {
+  if (!(ev.attendees && ev.attendees.length) && !ev.notes) return '';
+  return `<div class="ev-tip"><b>${ev.label}</b>${ev.attendees?.length ? '<br>' + ev.attendees.join(', ') : ''}${ev.notes ? '<br>' + ev.notes : ''}</div>`;
 }
 function buildSchoolEvents(rows) {
   return rows.map(r=>{
@@ -1555,7 +1622,7 @@ function renderGrid() {
       const ev = getDayEvent(state.weekIdx, i);
       const infoEvs = getDayInfoEvents(state.weekIdx, i);
       const evHtml = ev ? `<div class="event-day-header ${ev.type==='inset'?'inset':''}">${ev.type==='bank-holiday'?'🏦':'📋'} ${ev.label}</div>` : '';
-      const infoHtml = infoEvs.map(e=>`<div class="event-day-header" style="color:#7c3aed">📌 ${e.label}</div>`).join('');
+      const infoHtml = infoEvs.map(e=>`<div class="event-day-header" style="color:#7c3aed" title="${e.attendees?.length ? e.attendees.join(', ') : ''}">📌 ${e.label}${e.attendees?.length ? ' · ' + e.attendees.map(attendeeInit).join(', ') : ''}</div>`).join('');
       const hasSlots = (state.weekSlots[state.weekIdx]||[]).some(s => s.day === i);
       const resetBtn = hasSlots && !ev ? `<button class="day-reset-btn" onclick="resetDay(${i})" title="Clear ${d}">✕</button>` : '';
       return `<th style="position:relative">${d.slice(0,3)}<br><span style="font-size:10px;font-weight:normal;opacity:.7">${dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span>${evHtml}${infoHtml}${resetBtn}</th>`;
@@ -1594,18 +1661,27 @@ function renderGrid() {
       const hasEvents = allEvents.length > 0;
 
       if (hasEvents) {
-        const ev = allEvents[0];
-        const bg = ev.bg || '#7c3aed';
         if (isShortRow) {
-          // Horizontal banner for short rows
-          html += `<div class="session-banner" style="background:${bg};color:${contrastColor(bg)}">${ev.label}</div>`;
+          // Horizontal banners for short rows, one per event (stacked), with
+          // attendee initials and a hover card for names/notes
+          allEvents.forEach(ev => {
+            const bg = ev.bg || '#7c3aed';
+            const avs = attendeeAvsHtml(ev.attendees);
+            const tip = eventTipHtml(ev);
+            html += `<div class="session-banner${tip ? ' has-tip' : ''}${avs ? ' with-avs' : ''}" style="background:${bg};color:${contrastColor(bg)}"><span class="ev-lbl">${ev.label}</span>${avs}${tip}</div>`;
+          });
         } else {
-          // Vertical strip for AM/Lunch/PM
-          html += `<div class="event-strip">
-            <div class="event-strip-content" style="background:${bg};color:${contrastColor(bg)}">
-              <div class="event-strip-text">${ev.label}</div>
-            </div>
-          </div>`;
+          // Vertical strips for AM/Lunch/PM, side by side
+          allEvents.forEach((ev, i) => {
+            const bg = ev.bg || '#7c3aed';
+            const who = ev.attendees?.length ? ` (${ev.attendees.map(attendeeInit).join(', ')})` : '';
+            const title = `${ev.label}${ev.attendees?.length ? ' — ' + ev.attendees.join(', ') : ''}${ev.notes ? ' — ' + ev.notes : ''}`;
+            html += `<div class="event-strip" style="left:${5 + i * 24}px" title="${title.replace(/"/g,'&quot;')}">
+              <div class="event-strip-content" style="background:${bg};color:${contrastColor(bg)}">
+                <div class="event-strip-text">${ev.label}${who}</div>
+              </div>
+            </div>`;
+          });
         }
       }
 
@@ -1622,7 +1698,11 @@ function renderGrid() {
       // Horizontal layout: slots side by side (adjusted for event strip in tall rows)
       if (cellSlots.length > 0) {
         const hasVerticalEvent = hasEvents && !isShortRow;
-        html += `<div class="slots-row" ${hasVerticalEvent ? 'style="left:25px"' : ''}>`;
+        // Short rows with banners: let slots flow below the banners (and grow
+        // the row) instead of being absolutely positioned over them
+        const slotsStyle = hasVerticalEvent ? `left:${1 + allEvents.length * 24}px`
+          : (hasEvents && isShortRow) ? 'position:static' : '';
+        html += `<div class="slots-row" ${slotsStyle ? `style="${slotsStyle}"` : ''}>`;
         cellSlots.forEach(s => {
           const t = teacher(s.tid);
           const yg = t?.yg || null;
@@ -2833,8 +2913,8 @@ function renderTermView() {
         const bg = ev.bg || '#1e3a8a';
         const fg = contrastColor(bg);
         const owned = ev.source==='FrontEnd';
-        html += `<div class="term-event term-event-wrap" style="background:${bg};color:${fg}">
-          <span>${ev.label}</span>
+        html += `<div class="term-event term-event-wrap" style="background:${bg};color:${fg}" title="${[ev.attendees?.join(', '), ev.notes].filter(Boolean).join(' — ').replace(/"/g,'&quot;')}">
+          <span>${ev.label}${ev.attendees?.length ? `<span class="ev-who">${ev.attendees.map(attendeeInit).join(', ')}</span>` : ''}</span>
           <span class="term-ev-controls">
             ${owned?`<button class="term-ev-btn" onclick="openEditEvent('${ev.id}',event)" title="Edit">✏</button>`:''}
             <button class="term-ev-btn" onclick="deleteTermEvent('${ev.id}','${ev.source}','${dk}',event)" title="Remove">✕</button>
@@ -2848,8 +2928,8 @@ function renderTermView() {
           const bg = ev.bg||'#1e3a8a';
           const fg = contrastColor(bg);
           const owned = ev.source==='FrontEnd';
-          html += `<div class="term-event term-event-wrap" style="background:${bg};color:${fg}">
-            <span>${ev.label} <span style="opacity:.65;font-size:9px">${s}</span></span>
+          html += `<div class="term-event term-event-wrap" style="background:${bg};color:${fg}" title="${[ev.attendees?.join(', '), ev.notes].filter(Boolean).join(' — ').replace(/"/g,'&quot;')}">
+            <span>${ev.label} <span class="ev-sess">${s}</span>${ev.attendees?.length ? `<span class="ev-who">${ev.attendees.map(attendeeInit).join(', ')}</span>` : ''}</span>
             <span class="term-ev-controls">
               ${owned?`<button class="term-ev-btn" onclick="openEditEvent('${ev.id}',event)" title="Edit">✏</button>`:''}
               <button class="term-ev-btn" onclick="deleteTermEvent('${ev.id}','${ev.source}','${dk}',event)" title="Remove">✕</button>
@@ -2889,7 +2969,7 @@ let _tpEl = null;
 
 function openAddEvent(dk, e) {
   e.stopPropagation();
-  _showTermPopup({ mode:'add', date:dk, id:'', label:'', colour:'#1798d3', session:'', notes:'' }, e);
+  _showTermPopup({ mode:'add', date:dk, id:'', label:'', colour:'#1798d3', session:'', notes:'', attendees:[] }, e);
 }
 
 function openEditEvent(id, e) {
@@ -2899,9 +2979,17 @@ function openEditEvent(id, e) {
   _showTermPopup({ mode:'edit', ...ev }, e);
 }
 
-function _showTermPopup({ mode, date, id, label, colour, session, notes }, triggerEvent) {
+// Popup working state: session, who's going (staff Names) and, when adding,
+// the list of dates (meetings that happen a few times a term on no pattern)
+let _tp = null;
+const TP_SESSIONS = [['', 'Whole day'], ...SESSIONS.map(s => [s, s])];
+const TP_YG_ORDER = ['Reception','Y1','Y2','Y3','Y4','Y5','Y6'];
+
+function _showTermPopup({ mode, date, id, label, colour, session, notes, attendees, seriesId }, triggerEvent) {
   _closeTermPopup();
   _tpColour = colour || '#1798d3';
+  const seriesN = seriesId ? FRONT_END_EVENTS.filter(f => f.seriesId === seriesId).length : 0;
+  _tp = { mode, session: session || '', picked: new Set(attendees || []), dates: mode === 'add' ? [date] : [], seriesN };
   const swatches = COLOUR_PRESETS.map(c=>`<div class="tp-swatch${c===_tpColour?' active':''}" style="background:${c}" data-c="${c}" onclick="selectTermColour('${c}')"></div>`).join('');
   const el = document.createElement('div');
   el.className = 'term-popup';
@@ -2910,33 +2998,126 @@ function _showTermPopup({ mode, date, id, label, colour, session, notes }, trigg
   el.innerHTML = `
     <h4>${mode==='add'?'Add event':'Edit event'}</h4>
     <label class="tp-label">Event &amp; Time</label>
-    <input id="tp-label" type="text" placeholder="e.g. Y4 Museum Trip, 9am" value="${label.replace(/"/g,'&quot;')}">
+    <input id="tp-label" type="text" placeholder="e.g. Maths Network, 3:45–5pm" value="${label.replace(/"/g,'&quot;')}">
+    <label class="tp-label">Session</label>
+    <div class="tp-seg" id="tpSeg"></div>
+    <label class="tp-label">Who's going</label>
+    <div class="tp-who-chips" id="tpWhoChips"></div>
+    <input id="tp-who-search" type="text" placeholder="Search staff…" oninput="_tpRenderWhoList()">
+    <div class="tp-who-list" id="tpWhoList"></div>
+    ${mode==='add'?`
+    <label class="tp-label">Dates</label>
+    <div class="tp-date-chips" id="tpDates"></div>
+    <div class="tp-date-add"><input id="tp-date-new" type="date"><button type="button" onclick="_tpAddDate()">+ Add date</button></div>
+    <div class="tp-hint" id="tpDateHint">Add each date it happens. They're saved as one series: edit or delete one date or all of them.</div>
+    <button type="button" class="tp-link" id="tpRepeatLink" onclick="_tpShowRepeat()">or repeat on the same day each week…</button>
+    <div id="tpRepeat" style="display:none">
+      <label class="tp-label">Repeat on days</label>
+      <div class="tp-days">
+        ${['M','T','W','T','F'].map((d,i)=>`<button type="button" class="tp-day-btn" data-di="${i}" onclick="toggleRepeatDay(${i})">${d}</button>`).join('')}
+      </div>
+      <div class="tp-weeks-row" id="tp-weeks-row">
+        for <input id="tp-weeks-n" type="number" min="1" max="52" value="2"> weeks
+      </div>
+    </div>
+    <div class="tp-release" id="tpRelease" style="display:none">
+      <label><input type="checkbox" id="tp-release-cb" checked> <span><b>Add release bars</b> for the ticked teachers on each date (reason “Subject Network”, off-site, needs cover)</span></label>
+    </div>`:''}
     <label class="tp-label">Colour</label>
     <div class="tp-swatches" id="tpSwatches">${swatches}</div>
     <label class="tp-label">Notes (optional)</label>
-    <input id="tp-notes" type="text" placeholder="Any extra detail" value="${(notes||'').replace(/"/g,'&quot;')}">
-    ${mode==='add'?`
-    <label class="tp-label">Repeat on days</label>
-    <div class="tp-days">
-      ${['M','T','W','T','F'].map((d,i)=>`<button type="button" class="tp-day-btn" data-di="${i}" onclick="toggleRepeatDay(${i})">${d}</button>`).join('')}
-    </div>
-    <div class="tp-weeks-row" id="tp-weeks-row">
-      for <input id="tp-weeks-n" type="number" min="1" max="52" value="2"> weeks
+    <input id="tp-notes" type="text" placeholder="Any extra detail, e.g. venue" value="${(notes||'').replace(/"/g,'&quot;')}">
+    ${mode==='edit' && seriesN>1?`
+    <div class="tp-scope">
+      <label><input type="radio" name="tp-scope" value="one" checked> This date only</label>
+      <label><input type="radio" name="tp-scope" value="all"> All ${seriesN} dates in this series</label>
     </div>`:''}
     <div class="term-popup-btns">
       <button class="tp-cancel" onclick="_closeTermPopup()">Cancel</button>
       ${mode==='edit'?`<button class="tp-delete" onclick="deleteTermEvent('${id}','FrontEnd','${date}',event)">Delete</button>`:''}
-      <button class="tp-save" onclick="saveTermEvent('${mode}','${date}','${id}')">Save</button>
+      <button class="tp-save" id="tpSave" onclick="saveTermEvent('${mode}','${date}','${id}')">Save</button>
     </div>`;
   document.body.appendChild(el);
   _tpEl = el;
+  _tpRenderSeg(); _tpRenderWho(); _tpRenderDates();
   // Position near click, keep on screen
-  const x = Math.min(triggerEvent.clientX + 8, window.innerWidth - 260);
-  const y = Math.min(triggerEvent.clientY + 8, window.innerHeight - 340);
-  el.style.left = x + 'px';
-  el.style.top = y + 'px';
+  const x = Math.min(triggerEvent.clientX + 8, window.innerWidth - 316);
+  const y = Math.min(triggerEvent.clientY + 8, window.innerHeight - el.offsetHeight - 8);
+  el.style.left = Math.max(8, x) + 'px';
+  el.style.top = Math.max(8, y) + 'px';
   document.getElementById('tp-label').focus();
   setTimeout(() => document.addEventListener('click', _closeTermPopup, { once:true }), 0);
+}
+
+function _tpRenderSeg() {
+  document.getElementById('tpSeg').innerHTML = TP_SESSIONS.map(([v, lbl]) =>
+    `<button type="button" class="${v===_tp.session?'on':''}" onclick="_tpSetSession('${v}')">${lbl}</button>`).join('');
+  _tpRenderRelease();
+}
+function _tpSetSession(v) { _tp.session = v; _tpRenderSeg(); }
+
+function _tpRenderWho() {
+  const chips = document.getElementById('tpWhoChips');
+  chips.innerHTML = _tp.picked.size
+    ? [..._tp.picked].map(n => `<span class="tp-who-chip"><span class="av">${attendeeInit(n)}</span>${n}<button type="button" onclick="_tpTogglePick(${JSON.stringify(n).replace(/"/g,'&quot;')})">×</button></span>`).join('')
+    : '<div class="tp-who-empty">Nobody picked: shows as a general event</div>';
+  _tpRenderWhoList();
+  _tpRenderRelease();
+}
+function _tpRenderWhoList() {
+  const q = (document.getElementById('tp-who-search').value || '').trim().toLowerCase();
+  const grpOf = s => TP_YG_ORDER.includes(s.yg) ? s.yg : 'Other staff';
+  const order = [...TP_YG_ORDER, 'Other staff'];
+  const list = ALL_STAFF
+    .filter(s => !q || s.name.toLowerCase().includes(q) || s.init.toLowerCase().includes(q) || (s.yg||'').toLowerCase().includes(q))
+    .sort((a,b) => order.indexOf(grpOf(a)) - order.indexOf(grpOf(b)) || a.name.localeCompare(b.name));
+  let html = '', last = '';
+  list.forEach(s => {
+    const g = grpOf(s);
+    if (g !== last) { html += `<div class="tp-who-grp">${g}</div>`; last = g; }
+    html += `<label class="tp-who-row"><input type="checkbox" ${_tp.picked.has(s.name)?'checked':''} onchange="_tpTogglePick(${JSON.stringify(s.name).replace(/"/g,'&quot;')})">${s.name}<span class="ini">${s.init}</span></label>`;
+  });
+  document.getElementById('tpWhoList').innerHTML = html || '<div class="tp-who-row" style="color:#94a3b8">No match</div>';
+}
+function _tpTogglePick(name) {
+  _tp.picked.has(name) ? _tp.picked.delete(name) : _tp.picked.add(name);
+  _tpRenderWho();
+}
+
+function _tpRenderDates() {
+  const box = document.getElementById('tpDates');
+  if (!box) return;
+  _tp.dates.sort();
+  const fmt = dk => new Date(dk+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+  box.innerHTML = _tp.dates.map(dk =>
+    `<span class="tp-date-chip">${fmt(dk)}${_tp.dates.length>1?`<button type="button" onclick="_tpRemoveDate('${dk}')">×</button>`:''}</span>`).join('');
+  const btn = document.getElementById('tpSave');
+  if (btn) btn.textContent = _tp.dates.length > 1 ? `Save ${_tp.dates.length} dates` : 'Save';
+}
+function _tpAddDate() {
+  const inp = document.getElementById('tp-date-new');
+  const dk = inp.value;
+  const hint = document.getElementById('tpDateHint');
+  if (!dk) { inp.focus(); return; }
+  if (EVENTS[dk]) { hint.textContent = `${EVENTS[dk].label} that day, so it wasn't added.`; return; }
+  const dow = new Date(dk+'T00:00:00').getDay();
+  if (dow === 0 || dow === 6) { hint.textContent = 'That date is a weekend, so it wasn\'t added.'; return; }
+  if (!_tp.dates.includes(dk)) _tp.dates.push(dk);
+  inp.value = '';
+  hint.textContent = 'Saved as one series: edit or delete one date or all of them.';
+  _tpRenderDates();
+}
+function _tpRemoveDate(dk) { _tp.dates = _tp.dates.filter(d => d !== dk); _tpRenderDates(); }
+function _tpShowRepeat() {
+  document.getElementById('tpRepeat').style.display = '';
+  document.getElementById('tpRepeatLink').style.display = 'none';
+}
+function _tpRenderRelease() {
+  const box = document.getElementById('tpRelease');
+  if (!box) return;
+  // Only meaningful for the teaching day, and only for staff who appear on the grid
+  const anyTeacher = [..._tp.picked].some(n => TEACHERS.some(t => t.name === n));
+  box.style.display = (_tp.session === 'AM' || _tp.session === 'PM') && anyTeacher ? '' : 'none';
 }
 
 function selectTermColour(c) {
@@ -2962,36 +3143,82 @@ function saveTermEvent(mode, date, id) {
   if (!label) { document.getElementById('tp-label').focus(); return; }
   const notes = (document.getElementById('tp-notes').value||'').trim();
   const colour = _tpColour;
+  const session = _tp.session;
+  const attendees = [..._tp.picked];
 
-  let selectedDays = [], repeatWeeks = 1;
+  let selectedDays = [], repeatWeeks = 1, release = false;
   if (mode === 'add') {
     document.querySelectorAll('.tp-day-btn.active').forEach(b => selectedDays.push(parseInt(b.dataset.di)));
     repeatWeeks = Math.max(1, parseInt(document.getElementById('tp-weeks-n')?.value||'1', 10) || 1);
+    release = document.getElementById('tpRelease')?.style.display !== 'none' && !!document.getElementById('tp-release-cb')?.checked;
   }
+  const scopeAll = document.querySelector('input[name="tp-scope"]:checked')?.value === 'all';
+  const datesToAdd = mode === 'add'
+    ? [...new Set([..._tp.dates, ...(selectedDays.length ? _generateRepeatDates(date, selectedDays, repeatWeeks) : [])])].sort()
+    : [];
   _closeTermPopup();
 
   if (mode === 'add') {
-    const dates = _generateRepeatDates(date, selectedDays, repeatWeeks);
-    const seriesId = dates.length > 1 ? ('series_' + Date.now()) : null;
-    dates.forEach((d, i) => {
+    const seriesId = datesToAdd.length > 1 ? ('series_' + Date.now()) : null;
+    datesToAdd.forEach((d, i) => {
       const evId = 'fe_' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + i;
-      const ev = { id:evId, date:d, label, colour, session:'', notes };
+      const ev = { id:evId, date:d, label, colour, session, notes, attendees };
       if (seriesId) ev.seriesId = seriesId;
       FRONT_END_EVENTS.push(ev);
       const payload = { type:'event_write', action:'add', event: ev };
       writeEvent_(payload);
     });
+    if (release) {
+      const n = _addReleaseBars(datesToAdd, session, attendees, label);
+      if (n) alert(`${n} release bar${n>1?'s':''} added for “${label}”. They need cover arranging on the week grid.`);
+    }
   } else {
     const existing = FRONT_END_EVENTS.find(f=>f.id===id);
-    const ev = { id, date, label, colour, session:'', notes };
-    if (existing?.seriesId) ev.seriesId = existing.seriesId;
-    const idx = FRONT_END_EVENTS.findIndex(f=>f.id===id);
-    if (idx>=0) FRONT_END_EVENTS[idx]=ev; else FRONT_END_EVENTS.push(ev);
-    const payload = { type:'event_write', action:'update', event: ev };
-    writeEvent_(payload);
+    const targets = scopeAll && existing?.seriesId
+      ? FRONT_END_EVENTS.filter(f => f.seriesId === existing.seriesId)
+      : [existing || { id, date }];
+    targets.forEach(t => {
+      const ev = { id:t.id, date:t.date, label, colour, session, notes, attendees };
+      if (t.seriesId) ev.seriesId = t.seriesId;
+      const idx = FRONT_END_EVENTS.findIndex(f=>f.id===t.id);
+      if (idx>=0) FRONT_END_EVENTS[idx]=ev; else FRONT_END_EVENTS.push(ev);
+      writeEvent_({ type:'event_write', action:'update', event: ev });
+    });
   }
+  _tp = null;
   _syncFrontEndToInfoEvents();
   renderTermView();
+}
+
+// Release bars for teachers going to a daytime meeting: one bar per teacher
+// per date, in that date's week (seeding the week from the recurring
+// pattern first, as opening the week would). Skips staff not on the grid
+// and bars that already exist.
+function _addReleaseBars(dates, session, names, label) {
+  let added = 0;
+  dates.forEach(dk => {
+    const d = new Date(dk + 'T00:00:00');
+    const day = (d.getDay() + 6) % 7;
+    if (day > 4) return;
+    const wi = WEEKS.findIndex(w => {
+      const s = new Date(w.start); s.setHours(0,0,0,0);
+      const e = new Date(s); e.setDate(s.getDate() + 4);
+      return d >= s && d <= e;
+    });
+    if (wi < 0) return;
+    if (!state.weekSlots[wi] || state.weekSlots[wi].length === 0)
+      state.weekSlots[wi] = JSON.parse(JSON.stringify(RECURRING_SLOTS));
+    names.forEach(name => {
+      const t = TEACHERS.find(t => t.name === name);
+      if (!t) return;
+      if (state.weekSlots[wi].some(s => s.tid === t.id && s.day === day && s.session === session && s.reason === 'Subject Network')) return;
+      state.weekSlots[wi].push({ id:state.nextId++, day, session, endSession:session, tid:t.id,
+        reason:'Subject Network', reasonNote:label, cover:null, nocover:!!t.isInfoOnly, offSite:true });
+      added++;
+    });
+  });
+  if (added) stateSave();
+  return added;
 }
 
 function _generateRepeatDates(startDate, selectedDays, weeks) {
@@ -3146,10 +3373,10 @@ function _syncFrontEndToInfoEvents() {
     if (ev.session) {
       const sk = `${ev.date}|${ev.session}`;
       if (!SESSION_INFO_EVENTS[sk]) SESSION_INFO_EVENTS[sk]=[];
-      SESSION_INFO_EVENTS[sk].push({label:ev.label, type:'Event', bg, source:'FrontEnd', id:ev.id});
+      SESSION_INFO_EVENTS[sk].push({label:ev.label, type:'Event', bg, source:'FrontEnd', id:ev.id, attendees:ev.attendees||[], notes:ev.notes||''});
     } else {
       if (!INFO_EVENTS[ev.date]) INFO_EVENTS[ev.date]=[];
-      INFO_EVENTS[ev.date].push({label:ev.label, type:'Event', bg, source:'FrontEnd', id:ev.id});
+      INFO_EVENTS[ev.date].push({label:ev.label, type:'Event', bg, source:'FrontEnd', id:ev.id, attendees:ev.attendees||[], notes:ev.notes||''});
     }
   });
 }
