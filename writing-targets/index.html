@@ -169,7 +169,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   </div>
   <div class="note" id="srcnote">Loading…</div>
   <div id="lists"></div>
-  <footer>Writing Targets · WFA-26.10.26g · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
+  <footer>Writing Targets · WFA-27.10.26a · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
 </main>
 
 <div id="ed" role="dialog" aria-modal="true" aria-labelledby="edt">
@@ -194,8 +194,8 @@ const API = 'https://api.wallscourt-farm-academy.co.uk/planning/writingtargets-d
 const YEARS = ['Y1','Y2','Y3','Y4','Y5','Y6'];
 const MAX_ITEMS = 12;
 const STATUS_LABEL = { secure:'Secure', developing:'Developing', emerging:'Emerging', reteach:'Reteach', taught:'Taught', x:'Not taught' };
-const TIER_LABEL = { non_neg:'Non-negotiable', expected:'Expected', greater_depth:'Greater depth', working_towards:'Working towards', school:'School target' };
-const S = { bank:null, items:{}, index:[], year:'Y5', cls:'all', data:null, selected:new Set(), sets:[] };
+const TIER_LABEL = { non_neg:'Non-negotiable', expected:'Expected', greater_depth:'Greater depth', working_towards:'Working towards', school:'School target', own:'Written by staff' };
+const S = { bank:null, own:[], items:{}, index:[], year:'Y5', cls:'all', data:null, selected:new Set(), sets:[] };
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -217,7 +217,7 @@ async function apiPost(body){
 function banner(text, err){ const b = $('banner'); b.textContent = text || ''; b.className = 'banner' + (text ? (err ? ' err' : ' ok') : ''); }
 
 // ---- The statements bank and search -----------------------------------
-function buildIndex(bank){
+function buildIndex(bank, own){
   S.items = {}; S.index = [];
   Object.entries(bank.targets).forEach(([id, t]) => {
     const it = { id, kind:'target', year:t.year, tier:t.tier, group:t.category, text:t.text, eg:t.eg || '', src:t.taf || t.framework || '' };
@@ -227,6 +227,10 @@ function buildIndex(bank){
     const it = { id:i.id, kind:'check', year:'', tier:'', group:c.name, text:i.text, eg:'', src:'', fill:i.fill || '' };
     S.items[i.id] = it; S.index.push(it);
   }));
+  (own || []).forEach(o => {           // written by staff: shared with everyone; hidden ones stay on the cards that have them
+    const it = { id:o.id, kind:o.kind, year:'', tier:'own', group:o.area, text:o.text, eg:o.eg || '', src:'written by staff', own:true, by:o.createdBy || '' };
+    S.items[o.id] = it; if (o.active) S.index.push(it);
+  });
   S.index.forEach(it => { it.hayText = it.text.toLowerCase() + ' ' + it.eg.toLowerCase(); it.hay = it.hayText + ' ' + it.src.toLowerCase() + ' ' + it.group.toLowerCase() + ' ' + it.id.toLowerCase(); });
 }
 function stem(w){
@@ -320,7 +324,7 @@ function openEditor(keys){
   const fmt = one ? fmtOf(one) : (keys.map(k => fmtOf(pupil(k))).every((f, _, a) => f === a[0]) ? fmtOf(pupil(keys[0])) : 'checklist');
   E = { keys, format:fmt, mode:'replace', q:'', hist:null,
         items: one && one.card ? one.card.items.map(i => Object.assign({}, i)) : [],
-        f:{ kind:'', year:'', group:'' } };
+        f:{ kind:'', year:'', group:'' }, own:{ kind: fmt === 'checklist' ? 'check' : 'target', area:'', text:'', eg:'' } };
   if (one && !one.card && fmt === 'targets') E.items = (one.suggestions || []).map(id => ({ id }));
   $('edt').innerHTML = one ? '<span' + (one.code ? ' data-pupil-id="' + esc(one.code) + '"' : '') + '>' + esc(one.label) + '</span> <span class="badge ' + gradeClass(one.grade) + '">' + esc(one.grade || 'no grade') + '</span>'
     : esc(keys.length + ' children');
@@ -361,6 +365,7 @@ function renderEditor(){
   h += '<h3>Find any statement</h3><div class="filters"><input type="search" id="q" placeholder="Search, e.g. finger spaces, full stops, speech" value="' + esc(E.q) + '">'
     + '<span id="fsel">' + filterSelects() + '</span></div>';
   h += '<div class="res" id="results"></div>';
+  h += '<h3>Write your own</h3><div id="ownbox">' + ownForm() + '</div>';
   if (S.sets.length || E.items.length) {
     h += '<h3>Saved sets</h3><div class="bar">';
     if (S.sets.length) h += '<select id="setpick"><option value="">Use a saved set…</option>' + S.sets.map(s => '<option value="' + s.id + '">' + esc(s.name) + ' (' + s.items.length + ')</option>').join('') + '</select><button class="b" id="setdel">Delete set</button>';
@@ -391,7 +396,22 @@ function resultRow(id){
   const tag = it.kind === 'check' ? '<span class="badge yr">✓ list</span>' : '<span class="badge yr">' + (it.year || 'Any') + '</span>';
   return '<div class="ri">' + tag + '<div><div>' + esc(it.text.replace('{words}', '…')) + st + '</div>'
     + '<div class="src">' + esc(it.group) + (it.tier ? ' · ' + TIER_LABEL[it.tier] : '') + (it.eg ? ' · e.g. ' + esc(it.eg) : '') + '</div></div>'
+    + (it.own ? '<div class="src"><a href="#" data-own-edit="' + esc(it.id) + '">Change wording</a> · <a href="#" data-own-hide="' + esc(it.id) + '">Remove from search</a></div>' : '')
     + '<button data-add="' + esc(it.id) + '"' + (on || full ? ' disabled' : '') + '>' + (on ? 'Added' : 'Add') + '</button></div>';
+}
+function ownAreas(kind){ return kind === 'check' ? S.bank.checklists.map(c => c.name) : [...new Set(Object.values(S.bank.targets).map(t => t.category))].sort(); }
+function ownForm(){
+  const o = E.own, areas = ownAreas(o.kind);
+  if (!areas.includes(o.area)) o.area = areas[0];
+  return '<div class="filters"><select id="okind"><option value="target"' + (o.kind === 'target' ? ' selected' : '') + '>Target</option><option value="check"' + (o.kind === 'check' ? ' selected' : '') + '>Checklist line</option></select>'
+    + '<select id="oarea">' + areas.map(a => '<option' + (a === o.area ? ' selected' : '') + '>' + esc(a) + '</option>').join('') + '</select></div>'
+    + '<div class="filters"><input type="text" id="otext" maxlength="160" value="' + esc(o.text) + '" placeholder="' + (o.kind === 'check' ? 'e.g. I have checked my letters sit on the line.' : 'e.g. I use a question to hook my reader.') + '"></div>'
+    + (o.kind === 'target' ? '<div class="filters"><input type="text" id="oeg" maxlength="100" value="' + esc(o.eg) + '" placeholder="Example (optional), e.g. Have you ever wondered…?"></div>' : '')
+    + '<div class="bar"><button class="b" id="oadd">Add to ' + (E.keys.length === 1 ? 'this card' : 'these cards') + '</button><span class="note">It is saved for everyone, so any teacher can find it in the search.</span></div>';
+}
+async function reloadOwn(){
+  const b = await apiGet({ action:'bank' });
+  S.own = b.own || []; buildIndex(S.bank, S.own);
 }
 function renderResults(){
   const box = $('results'); if (!box) return;
@@ -526,6 +546,37 @@ $('fmt').addEventListener('click', e => {
 $('edb').addEventListener('click', async e => {
   const t = e.target;
   if (t.dataset.add) { addItem(t.dataset.add); return; }
+  if (t.id === 'oadd') {
+    const o = E.own; o.text = ($('otext').value || '').trim(); o.eg = $('oeg') ? ($('oeg').value || '').trim() : '';
+    if (o.text.length < 3) { $('edmsg').textContent = 'Write the statement first.'; return; }
+    if (E.items.length >= MAX_ITEMS) { $('edmsg').textContent = 'The card already has ' + MAX_ITEMS + ' statements.'; return; }
+    t.disabled = true;
+    try {
+      const r = await apiPost({ action:'addStatement', kind:o.kind, area:o.area, text:o.text, eg:o.kind === 'target' ? o.eg : '' });
+      await reloadOwn(); E.own = { kind:o.kind, area:o.area, text:'', eg:'' };
+      if (!E.items.some(i => i.id === r.id)) E.items.push({ id:r.id });
+      $('edmsg').textContent = r.existing ? 'That statement was already saved, so the saved one was added.' : 'Added, and saved for everyone. Remember to Save the card.';
+      renderEditor();
+    } catch (err) { $('edmsg').textContent = 'Not saved (' + err.message + ').'; t.disabled = false; }
+    return;
+  }
+  if (t.dataset.ownEdit || t.dataset.ownHide) {
+    e.preventDefault();
+    const id = t.dataset.ownEdit || t.dataset.ownHide, it = S.items[id];
+    try {
+      if (t.dataset.ownEdit) {
+        const text = prompt('Change the wording (this changes it on every card that has it):', it.text);
+        if (text === null || !text.trim()) return;
+        const eg = it.kind === 'target' ? prompt('Example (optional):', it.eg || '') : '';
+        await apiPost({ action:'editStatement', id, text, eg: eg === null ? it.eg : eg });
+      } else {
+        if (!confirm('Remove "' + it.text + '" from the search for everyone? Children who already have it keep it.')) return;
+        await apiPost({ action:'showStatement', id, active:false });
+      }
+      await reloadOwn(); renderEditor(); renderLists();
+    } catch (err) { $('edmsg').textContent = 'Not changed (' + err.message + ').'; }
+    return;
+  }
   if (t.dataset.rm !== undefined) { E.items.splice(+t.dataset.rm, 1); renderEditor(); return; }
   if (t.dataset.up !== undefined) { const n = +t.dataset.up; if (n > 0) { [E.items[n - 1], E.items[n]] = [E.items[n], E.items[n - 1]]; renderEditor(); } return; }
   if (t.classList.contains('chip')) {
@@ -562,6 +613,11 @@ $('edb').addEventListener('change', e => {
     $('fsel').innerHTML = filterSelects(); renderResults(); return;
   }
   if (t.id === 'fgroup') { E.f.group = t.value; renderResults(); return; }
+  if (t.id === 'okind' || t.id === 'oarea') {
+    E.own.text = ($('otext').value || ''); if ($('oeg')) E.own.eg = $('oeg').value || '';
+    if (t.id === 'okind') E.own.kind = t.value; else E.own.area = t.value;
+    $('ownbox').innerHTML = ownForm(); return;
+  }
   if (t.id === 'setpick' && t.value) {
     const s = S.sets.find(x => String(x.id) === t.value);
     if (s) s.items.forEach(i => { if (S.items[i.id] && E.items.length < MAX_ITEMS && !E.items.some(x => x.id === i.id)) E.items.push({ id:i.id }); });
@@ -570,6 +626,8 @@ $('edb').addEventListener('change', e => {
 });
 $('edb').addEventListener('input', e => {
   if (e.target.id === 'q') { E.q = e.target.value; renderResults(); }
+  else if (e.target.id === 'otext') E.own.text = e.target.value;
+  else if (e.target.id === 'oeg') E.own.eg = e.target.value;
   else if (e.target.classList.contains('wordsin')) E.items[+e.target.dataset.n].words = e.target.value;
 });
 
@@ -613,7 +671,7 @@ async function start(){
   renderYears();
   try {
     const [b, s] = await Promise.all([apiGet({ action:'bank' }), apiGet({ action:'sets' })]);
-    S.bank = b.bank; S.sets = s.sets; buildIndex(S.bank);
+    S.bank = b.bank; S.own = b.own || []; S.sets = s.sets; buildIndex(S.bank, S.own);
   } catch (e) { $('srcnote').textContent = ''; banner('Could not load the statements (' + e.message + '). Refresh the page and sign in again.', true); return; }
   openYear(S.year);
 }
