@@ -291,6 +291,10 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     .ws-add-row label { font-size:11px; color:#475569; }
     .ws-add-row select, .ws-add-row input[type=text] { display:block; margin-top:3px; padding:5px 7px; border:1px solid #e2e8f0; border-radius:4px; font-size:12px; color:#111; background:white; }
     .ws-add-row input[type=color] { width:32px; height:30px; border:1px solid #e2e8f0; border-radius:4px; padding:1px; cursor:pointer; }
+    .ws-yg { display:flex; gap:4px; align-items:center; flex-wrap:wrap; font-size:11px; color:#475569; margin-top:8px; }
+    .ws-yg label { display:inline-flex; align-items:center; gap:2px; padding:2px 6px; border:1px solid #e2e8f0; border-radius:10px; background:white; cursor:pointer; }
+    .ws-yg small { color:#94a3b8; }
+    .ws-for { display:inline-block; margin-left:4px; padding:0 5px; border-radius:8px; background:#e0f2fe; color:#075985; font-size:10px; }
     .ws-edit { background:none; border:none; cursor:pointer; color:#94a3b8; font-size:12px; padding:2px 4px; border-radius:3px; }
     .ws-edit:hover { color:#1798d3; background:#e0f2fe; }
     .ws-row.editing { background:#f0f9ff; }
@@ -490,7 +494,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(27.10.26b)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(27.10.26c)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -586,6 +590,10 @@ body.edit-locked .notify-btn   { display:none; }
           <button class="ws-save-btn" id="ws-save" onclick="saveWsEvent()">Add</button>
           <button class="ws-cancel-btn" id="ws-cancel" style="display:none" onclick="cancelWsEdit()">Cancel</button>
         </div>
+        <div class="ws-yg" id="ws-yg">For:
+          <label><input type="checkbox" value="R">Reception</label><label><input type="checkbox" value="1">Y1</label><label><input type="checkbox" value="2">Y2</label><label><input type="checkbox" value="3">Y3</label><label><input type="checkbox" value="4">Y4</label><label><input type="checkbox" value="5">Y5</label><label><input type="checkbox" value="6">Y6</label>
+          <small>none ticked = whole school; shows in those year groups' teaching schedules</small>
+        </div>
         <div class="ws-msg" id="wsEventMsg"></div>
       </div>
     </div>
@@ -616,7 +624,7 @@ body.edit-locked .notify-btn   { display:none; }
   <button onclick="closeDeleteMenu()" style="display:block;width:100%;text-align:left;background:none;border:none;color:#64748b;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:12px">Cancel</button>
 </div>
 
-<footer>Wallscourt Farm Academy · Release Schedule · 27.10.26b</footer>
+<footer>Wallscourt Farm Academy · Release Schedule · 27.10.26c</footer>
 
 <script>
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -941,7 +949,7 @@ function eventTipHtml(ev) {
 }
 function buildSchoolEvents(rows) {
   return rows.map((r,rowIndex)=>{
-    const ev = { day:DAY_IDX[r.Day]??0, session:r.Session, label:r.Label, bg:r.Colour||'#1e3a8a', rowIndex, row:r };
+    const ev = { day:DAY_IDX[r.Day]??0, session:r.Session, label:r.Label, bg:r.Colour||'#1e3a8a', yearGroups:r.YearGroups||'', rowIndex, row:r };
     // Parse Sports entries: "Y4 Sports", "Y3 (AB) Sports", "Y6 (Brs) Sports"
     const sportMatch = r.Label?.match(/^(Reception|Y[1-6]|YR)\s*(?:\((AB|Brs)\)\s*)?Sports$/i);
     if (sportMatch) {
@@ -1683,7 +1691,7 @@ function renderGrid() {
             const bg = ev.bg || '#7c3aed';
             const avs = attendeeAvsHtml(ev.attendees);
             const tip = eventTipHtml(ev);
-            html += `<div class="session-banner${tip ? ' has-tip' : ''}${avs ? ' with-avs' : ''}" style="background:${bg};color:${contrastColor(bg)}"><span class="ev-lbl">${ev.label}</span>${avs}${tip}</div>`;
+            html += `<div class="session-banner${tip ? ' has-tip' : ''}${avs ? ' with-avs' : ''}" style="background:${bg};color:${contrastColor(bg)}"><span class="ev-lbl">${ev.label}${wsTag_(ev)}</span>${avs}${tip}</div>`;
           });
         } else {
           // Vertical strips for AM/Lunch/PM, side by side
@@ -1693,7 +1701,7 @@ function renderGrid() {
             const title = `${ev.label}${ev.attendees?.length ? ' — ' + ev.attendees.join(', ') : ''}${ev.notes ? ' — ' + ev.notes : ''}`;
             html += `<div class="event-strip" style="left:${5 + i * 24}px" title="${title.replace(/"/g,'&quot;')}">
               <div class="event-strip-content" style="background:${bg};color:${contrastColor(bg)}">
-                <div class="event-strip-text">${ev.label}${who}</div>
+                <div class="event-strip-text">${ev.label}${wsTag_(ev)}${who}</div>
               </div>
             </div>`;
           });
@@ -2447,7 +2455,7 @@ function renderWsModal() {
       otherHtml += `<div class="ws-row${wsEditing === ev ? ' editing' : ''}">
         <div class="ws-swatch" style="background:${esc(ev.bg)}"></div>
         <div class="ws-info">
-          <strong>${esc(ev.label)}</strong>
+          <strong>${esc(ev.label)}${ev.yearGroups ? `<span class="ws-for">${esc(wsYgText_(ev.yearGroups))}</span>` : ''}</strong>
           <span>${days[ev.day]} · ${esc(ev.session)}${ev.row.Time ? ' · ' + esc(ev.row.Time) : ''}</span>
         </div>
         <button class="ws-edit" title="Change this event" onclick="editWsEvent(${i})">✎</button>
@@ -2611,7 +2619,15 @@ async function wsPost_(action, body) {
 // that was on screen before changing or removing it (positions can shift
 // when someone else edits the list from another device).
 function wsExpect_(row) {
-  return { Day: row.Day || '', Session: row.Session || '', Label: row.Label || '', Colour: row.Colour || '' };
+  return { Day: row.Day || '', Session: row.Session || '', Label: row.Label || '', Colour: row.Colour || '', YearGroups: row.YearGroups || '' };
+}
+// "R,4,5" -> "Reception, Y4, Y5"; '' (whole school) -> ''
+function wsYgText_(yg) {
+  return String(yg || '').split(',').map(x => x.trim()).filter(Boolean).map(x => x === 'R' ? 'Reception' : 'Y' + x).join(', ');
+}
+function wsTag_(ev) {
+  const t = ev && !ev.sport ? wsYgText_(ev.yearGroups) : '';
+  return t ? ` (${t})` : '';
 }
 function wsSameRow_(a, b) {
   const x = wsExpect_(a), y = wsExpect_(b);
@@ -2666,11 +2682,17 @@ function wsFormValues_() {
     Session: document.getElementById('ws-session').value,
     Label:   document.getElementById('ws-label').value.trim(),
     Colour:  document.getElementById('ws-bg').value,
+    YearGroups: [...document.querySelectorAll('#ws-yg input:checked')].map(c => c.value).join(','),
   };
+}
+function wsSetYg_(yg) {
+  const on = new Set(String(yg || '').split(',').map(x => x.trim()));
+  document.querySelectorAll('#ws-yg input').forEach(c => { c.checked = on.has(c.value); });
 }
 function wsResetForm_() {
   wsEditing = null;
   document.getElementById('ws-label').value = '';
+  wsSetYg_('');
   document.getElementById('ws-save').textContent = 'Add';
   document.getElementById('ws-cancel').style.display = 'none';
 }
@@ -2699,6 +2721,7 @@ function editWsEvent(i) {
   document.getElementById('ws-session').value = ev.session;
   document.getElementById('ws-label').value = ev.label;
   document.getElementById('ws-bg').value = /^#[0-9a-f]{6}$/i.test(ev.bg) ? ev.bg : '#1e3a8a';
+  wsSetYg_(ev.yearGroups);
   document.getElementById('ws-save').textContent = 'Save';
   document.getElementById('ws-cancel').style.display = '';
   wsMsg_('');
@@ -3106,7 +3129,7 @@ function renderTermView() {
       // Recurring events (other events + this term's sports)
       termRecurring.filter(ev=>ev.day===di).forEach(ev => {
         const fg = contrastColor(ev.bg);
-        html += `<div class="term-event" style="background:${ev.bg};color:${fg}">${ev.label}</div>`;
+        html += `<div class="term-event" style="background:${ev.bg};color:${fg}">${ev.label}${wsTag_(ev)}</div>`;
       });
 
       html += `<button class="term-add-btn" onclick="openAddEvent('${dk}',event)">+ Add event</button>`;

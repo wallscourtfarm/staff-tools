@@ -503,7 +503,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-25.10.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-27.10.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -2708,11 +2708,11 @@ function renderBody() {
           let afterEvents = '';
           if (row.afterSchool) {
             const evts = state.afterSchoolEvents[dk] || [];
-            const recurring = recurringAfterSchool.filter(r => r.dayIdx === di);
+            const recurring = recurringFor_(recurringAfterSchool, di);
             const allEvts = [...recurring.map(r => ({ label: r.label, bg: r.bg })), ...evts.map(e => ({ label: e.label, bg: e.bg }))];
             afterEvents = allEvts.map(ev => `<div class="cell-chip" style="background:${ev.bg}25"><div class="chip-top"><span class="chip-colour" style="background:${ev.bg}"></span><span class="chip-name" style="color:${ev.bg}">${escHtml(ev.label)}</span></div></div>`).join('');
           } else if (row.beforeSchool) {
-            const recurring = recurringBeforeSchool.filter(r => r.dayIdx === di);
+            const recurring = recurringFor_(recurringBeforeSchool, di);
             afterEvents = recurring.map(ev => `<div class="cell-chip" style="background:${ev.bg}25"><div class="chip-top"><span class="chip-colour" style="background:${ev.bg}"></span><span class="chip-name" style="color:${ev.bg}">${escHtml(ev.label)}</span></div></div>`).join('');
           }
           // Staff-out colour strips + tag badges (supports overlapping spans)
@@ -3812,8 +3812,14 @@ function setView(view) {
 
 // ── After-school events from sheet ──────────────────────────────────────────
 const DAY_NAME_MAP = {'monday':0,'tuesday':1,'wednesday':2,'thursday':3,'friday':4,'saturday':5,'sunday':6};
-let recurringAfterSchool = []; // [{dayIdx, label, bg}]
-let recurringBeforeSchool = []; // [{dayIdx, label, bg}]
+let recurringAfterSchool = []; // [{dayIdx, label, bg, yearGroups}]
+let recurringBeforeSchool = []; // [{dayIdx, label, bg, yearGroups}]
+// A weekly meeting set "For" some year groups (EventsMeetings YearGroups,
+// "R,4,5" style, set in the cover planner or School Info) shows only in
+// those year groups; blank = whole school (27.10.26).
+function recurringFor_(list, di) {
+  return list.filter(r => r.dayIdx === di && yearGroupMatches(r.yearGroups, YEAR_GROUP));
+}
 
 function buildAfterSchoolEvents(rows) {
   const events = {};
@@ -3852,7 +3858,8 @@ function buildRecurringAfterSchool(rows) {
     .map(r => ({
       dayIdx: DAY_NAME_MAP[String(r.Day).trim().toLowerCase()],
       label: withTime_(r),
-      bg: r.Colour || '#1e3a8a'
+      bg: r.Colour || '#1e3a8a',
+      yearGroups: String(r.YearGroups || '').trim()
     }))
     .filter(r => r.dayIdx !== undefined && r.label);
 }
@@ -3863,7 +3870,8 @@ function buildRecurringBeforeSchool(rows) {
     .map(r => ({
       dayIdx: DAY_NAME_MAP[String(r.Day).trim().toLowerCase()],
       label: withTime_(r),
-      bg: r.Colour || '#1e3a8a'
+      bg: r.Colour || '#1e3a8a',
+      yearGroups: String(r.YearGroups || '').trim()
     }))
     .filter(r => r.dayIdx !== undefined && r.label);
 }
