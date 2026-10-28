@@ -78,6 +78,13 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .ct.active { background:var(--accent); color:var(--accent-fg); border-color:var(--accent); }
   .group-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin:8px 0 4px; }
   .legend { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .sbox { position:relative; display:inline-flex; align-items:center; }
+  .sbox input { font:inherit; font-size:13px; padding:4px 24px 4px 8px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--fg); width:210px; }
+  .sbox input:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+  .sbox button { position:absolute; right:4px; border:0; background:none; color:var(--muted); cursor:pointer; font-size:14px; padding:0 2px; }
+  .snote { font-size:12px; color:var(--muted); }
+  td.skilltd mark { background:#fde68a; color:#1f2937; border-radius:3px; padding:0 1px; }
+  .lt .sfound { color:var(--accent); font-weight:800; }
   .lsep { width:1px; align-self:stretch; background:var(--line); margin:0 4px; }
   .chip { display:flex; align-items:center; gap:5px; padding:3px 7px; border-radius:8px; border:2px solid transparent; font-size:12px; font-weight:600; cursor:pointer; background:var(--surface); color:var(--fg); box-shadow:var(--shadow); }
   .chip .sw { width:14px; height:14px; border-radius:4px; border:1px solid rgba(0,0,0,.2); }
@@ -171,11 +178,13 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <p><b>4. Below 50% of the year group's expected statements</b> means "at an earlier stage": <b>A - Yn</b>. The teacher chooses which year's statements a child is working at (the "working at" box under the child's initials). If a child on an earlier year's statements is still under 50% of them, the tool flags it and offers to move them one year lower. It is always the teacher's decision. Below Y1 is recorded as <b>A - EY</b>. On an <b>A - Yn</b> tab only that year's non-negotiables and expected standards are shown: the child needs to secure those to move on, so greater depth is not assessed there. When <b>75%</b> of that year's weight (non-negotiables and expected standards) is <b>Secure</b>, the child shows <b>READY TO MOVE UP</b> with a button to move them to the next year's statements. They do not need everything secure; the few gaps stay marked on the earlier year.</p>
       <p><b>5. Weights</b> (0 to 10, whole numbers) are shown next to each statement. They were agreed by staff on 23.10.26 and are locked, so they cannot be changed here. "Agreed weights" under the grid lets you download them.</p>
       <p><b>Marking with the keyboard:</b> click a cell, then type <b>R</b> Reteach, <b>E</b> Emerging, <b>D</b> Developing, <b>S</b> Secure, <b>X</b> Not taught, <b>T</b> Taught, not used, or <b>Delete</b> for Unreviewed. The highlight stays on that cell. Press <b>Enter</b> or <b>↓</b> to go down, <b>↑</b> (or Shift+Enter) to go up, and <b>←</b> <b>→</b> to go sideways to the next child. Esc lets go.</p>
+      <p><b>Finding a statement:</b> type a few words into <b>Find a statement</b> (or press <b>/</b>). Only matching statements show, with the words highlighted, and each tab says how many it has found. Marking works as normal while a search is on. Press Esc or × to show everything again.</p>
       <p><b>6. Terms.</b> The weights in the boxes are the <b>Term 1 and 2</b> weights, so the non-negotiables can count for more early in the year. <b>From Term 3, every non-negotiable has a weight of 1</b>; all other weights stay the same. The tool reads the current term from the school calendar and uses the right weights automatically. Each term's results always use that term's weights, so a Term 2 result keeps its Term 2 figure when you look back at it later. From Term 3 the non-negotiable weights show as 1 and cannot be changed here.</p>
     </div>
   </details>
   <div class="tools">
     <span class="tbl">Statements</span><span class="lvltabs" id="lvltabs"></span>
+    <span class="sbox"><input type="search" id="sq" placeholder="Find a statement…" aria-label="Find a statement" autocomplete="off"><button id="sqx" title="Clear" style="display:none">×</button></span><span class="snote" id="snote"></span>
     <span class="lsep"></span>
     <span class="legend" id="legendJudge" title="Click a cell, then type the letter. Enter or the arrow keys move. Click a status to paint it onto cells."></span><span class="legend" id="legendNone"></span>
     <button class="btn" id="paintOff" style="display:none">Stop painting</button>
@@ -187,7 +196,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="grid-scroll"><table id="grid"></table></div>
 
   <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
-  <footer>Writing Tracker · WFA-28.10.26c · weights agreed 23.10.26 (locked)</footer>
+  <footer>Writing Tracker · WFA-28.10.26d · weights agreed 23.10.26 (locked)</footer>
 </div>
 <div class="picker" id="picker"></div>
 <div class="cmtpop" id="cmtpop" role="dialog" aria-label="Comment"></div>
@@ -293,13 +302,27 @@ function renderLegend(){
   JUDGE_ORDER.forEach(k => a.appendChild(chip(k))); NONE_ORDER.forEach(k => b.appendChild(chip(k)));
   document.getElementById('paintOff').style.display = paint ? '' : 'none';
 }
+// ---- Statement search: words in any order, in the statement or its example ----
+let query = '';
+const qWords = () => query.toLowerCase().split(/\s+/).filter(Boolean);
+const hay = s => [s.skill, s.example, s.id].join(' ').toLowerCase();
+const matches = (s, ws) => ws.every(w => hay(s).includes(w));
+const reEsc = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function hilite(html, ws){   // html is already escaped; mark the (escaped) words
+  if (!ws.length) return html;
+  const re = new RegExp('(' + ws.map(w => reEsc(esc(w))).join('|') + ')', 'gi');
+  return html.split(/(<[^>]*>)/).map(x => x.startsWith('<') ? x : x.replace(re, '<mark>$1</mark>')).join('');
+}
+const tiersFor = L => L === classYear ? ['non_neg','expected','greater_depth'] : ['non_neg','expected'];
+const foundIn = (L, ws) => SKILLS[L].filter(s => tiersFor(L).includes(s.tier) && matches(s, ws)).length;
 function renderTabs(){
   const t = document.getElementById('lvltabs'); t.innerHTML = '';
   levelsFor(classYear).slice().reverse().forEach(L => {
     const n = shown().filter(p => p.work === L).length;
     const b = document.createElement('button');
     b.className = 'lt'+(L===level?' active':'')+(L!==classYear?' below':''); b.dataset.lvl = L;
-    b.innerHTML = (L===classYear ? L : 'A - '+L)+' <small>· '+n+'</small>';
+    const ws = qWords(), f = ws.length ? foundIn(L, ws) : 0;
+    b.innerHTML = (L===classYear ? L : 'A - '+L)+' <small>· '+n+'</small>'+(ws.length ? ' <small class="sfound" title="Statements found on this tab">'+f+' found</small>' : '');
     t.appendChild(b);
   });
 }
@@ -312,7 +335,10 @@ function renderGrid(){
   pupils.forEach((p, i) => p.cstart = classFilter === 'all' && i > 0 && pupils[i-1].classId !== p.classId);
   if (!pupils.length){ t.innerHTML = '<tbody><tr><td class="empty">No children are working at '+lbl(level)+' right now. Use a child\'s "working at" box on another tab to move them here.</td></tr></tbody>'; return; }
   const sums = pupils.map(p => { const u = summary(p); return { p, u, g: grade(u) }; });
-  const tiers = level === classYear ? ['non_neg','expected','greater_depth'] : ['non_neg','expected'];   // an earlier year is only about securing its NN and expected statements
+  const tiers = tiersFor(level);   // an earlier year is only about securing its NN and expected statements
+  const ws = qWords(), nFound = ws.length ? foundIn(level, ws) : 0;
+  const sn = document.getElementById('snote');
+  sn.textContent = !ws.length ? '' : nFound ? nFound + ' statement' + (nFound === 1 ? '' : 's') + ' found' : 'No statements found on this tab' + (levelsFor(classYear).some(L => L !== level && foundIn(L, ws)) ? ' (see "found" on the other tabs)' : '');
   let h = '<thead><tr><th class="skillh">'+level+' statements ('+SKILLS[level].filter(s => tiers.includes(s.tier)).length+')</th><th class="wh">Weight</th>';
   sums.forEach(({p,u,g}) => {
     const [bg,fg] = GSTYLE[g.style];
@@ -338,7 +364,7 @@ function renderGrid(){
   // statements
   const ncol = pupils.length + 2;
   tiers.forEach(tk => {
-    const list = SKILLS[level].filter(s => s.tier === tk); if (!list.length) return;
+    const list = SKILLS[level].filter(s => s.tier === tk && (!ws.length || matches(s, ws))); if (!list.length) return;
     h += '<tr class="tierrow"><td colspan="'+ncol+'"><span class="stick">'+TIERNAME[tk]+' ('+list.length+')'+(tk==='non_neg' && termMode==='t3' ? ' · weight 1 each from Term 3' : '')+'</span></td></tr>';
     let lastCat = null, lastGrp = null;
     list.forEach(s => {
@@ -346,7 +372,7 @@ function renderGrid(){
       const g = s.group || null;
       if (g !== lastGrp){ if (g) h += '<tr class="grprow"><td colspan="'+ncol+'"><span class="stick">'+esc(g)+'</span></td></tr>'; lastGrp = g; }
       const w = effW(s), fixed = termMode === 't3' && s.tier === 'non_neg';
-      h += '<tr><td class="skilltd">'+esc(s.skill).replace(/\n/g,' ')+(s.key_essential?'<span class="key">KEY</span>':'')+(s.example?'<span class="ex">'+esc(s.example)+'</span>':'')+'</td>'
+      h += '<tr><td class="skilltd">'+hilite(esc(s.skill).replace(/\n/g,' '), ws)+(s.key_essential?'<span class="key">KEY</span>':'')+(s.example?'<span class="ex">'+hilite(esc(s.example), ws)+'</span>':'')+'</td>'
         +'<td class="wtd">'+((wLocked || canWrite === false || fixed) ? '<span class="wlock'+(w===0?' zero':'')+'" title="'+(fixed ? 'Every non-negotiable is weight 1 from Term 3' : 'Weight, locked')+'">'+w+'</span>' : '<input type="number" class="wbox'+(w!==dOf(s.id)?' changed':'')+'" min="0" max="10" step="1" value="'+w+'" data-w="'+s.id+'" aria-label="Weight">')+'</td>';
       pupils.forEach(p => {
         const v = CLASS[classYear].data[p.id][s.id], m = STATUS[v];
@@ -591,6 +617,14 @@ document.addEventListener('keydown', e => {
   const v = KEYS[k] || ((k === 'delete' || k === 'backspace') ? 'none' : null); if (!v) return;
   e.preventDefault(); closePicker();
   setMark(cur.p, cur.s, v); renderGrid();   // mark and stay on the cell; Enter or the arrow keys move
+});
+const sq = document.getElementById('sq'), sqx = document.getElementById('sqx');
+const setQuery = v => { query = v; sq.value = v; sqx.style.display = v ? '' : 'none'; selectCell(null); renderGrid(); };
+sq.addEventListener('input', () => setQuery(sq.value));
+sq.addEventListener('keydown', e => { if (e.key === 'Escape'){ e.stopPropagation(); setQuery(''); sq.blur(); } });
+sqx.onclick = () => { setQuery(''); sq.focus(); };
+document.addEventListener('keydown', e => {   // "/" jumps to the search box, as on many sites
+  if (e.key === '/' && !(e.target.closest && e.target.closest('input, select, textarea'))){ e.preventDefault(); sq.focus(); sq.select(); }
 });
 document.getElementById('paintOff').onclick = () => { paint = null; renderLegend(); renderGrid(); };
 
