@@ -56,6 +56,15 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   #howbox > summary { display:none; }
   th.pupilh.cstart, td.cstart { border-left:3px solid var(--line); }
   .pcls { font-size:10px; font-weight:700; color:var(--muted); }
+  .cmt { border:0; background:transparent; cursor:pointer; font-size:11px; line-height:1; padding:1px 2px; color:var(--muted); opacity:.55; }
+  .cmt:hover { opacity:1; }
+  .cmt.has { opacity:1; font-size:12px; }
+  .cmtpop { position:fixed; z-index:60; display:none; width:min(340px, calc(100vw - 16px)); background:var(--surface); color:var(--fg); border-radius:12px; box-shadow:var(--shadow-pop); padding:10px; }
+  .cmtpop.open { display:block; }
+  .cmtpop h4 { margin:0 0 6px; font-size:12px; color:var(--fg2); }
+  .cmtpop textarea { width:100%; min-height:96px; box-sizing:border-box; font:inherit; font-size:13px; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:var(--surface2); color:var(--fg); resize:vertical; }
+  .cmtpop .row { display:flex; gap:6px; align-items:center; margin-top:6px; }
+  .cmtpop .hint2 { font-size:11px; color:var(--muted); margin-top:4px; }
   header h1 { margin:0; font-size:17px; text-wrap:balance; } header p { margin:2px 0 0; font-size:12px; opacity:.92; }
   .wrap { padding-inline:16px; padding-block:6px 30px; max-width:1500px; margin:0 auto; }
   details.how { background:var(--surface); border-radius:10px; box-shadow:var(--shadow); margin-bottom:10px; font-size:13px; }
@@ -178,9 +187,10 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="grid-scroll"><table id="grid"></table></div>
 
   <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
-  <footer>Writing Tracker · WFA-28.10.26b · weights agreed 23.10.26 (locked)</footer>
+  <footer>Writing Tracker · WFA-28.10.26c · weights agreed 23.10.26 (locked)</footer>
 </div>
 <div class="picker" id="picker"></div>
+<div class="cmtpop" id="cmtpop" role="dialog" aria-label="Comment"></div>
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
 
 <script>
@@ -306,7 +316,8 @@ function renderGrid(){
   let h = '<thead><tr><th class="skillh">'+level+' statements ('+SKILLS[level].filter(s => tiers.includes(s.tier)).length+')</th><th class="wh">Weight</th>';
   sums.forEach(({p,u,g}) => {
     const [bg,fg] = GSTYLE[g.style];
-    h += '<th class="pupilh'+(p.cstart?' cstart':'')+'" title="'+esc(p.cls || '')+'"><div class="hline"><span'+(p.code ? ' data-pupil-id="'+esc(p.code)+'"' : '')+'>'+esc(p.label || p.id)+'</span>'+(classFilter==='all' && p.cls ? ' <span class="pcls">'+esc(p.cls)+'</span>' : '')+' <span class="hbadge" style="background:'+bg+';color:'+fg+'">'+g.label+'</span> <span class="hexp">'+pc(u.expPct)+'</span></div>'
+    h += '<th class="pupilh'+(p.cstart?' cstart':'')+'" title="'+esc(p.cls || '')+'"><div class="hline"><span'+(p.code ? ' data-pupil-id="'+esc(p.code)+'"' : '')+'>'+esc(p.label || p.id)+'</span>'+(classFilter==='all' && p.cls ? ' <span class="pcls">'+esc(p.cls)+'</span>' : '')+' <span class="hbadge" style="background:'+bg+';color:'+fg+'">'+g.label+'</span> <span class="hexp">'+pc(u.expPct)+'</span>'
+      +'<button class="cmt'+(p.notes ? ' has' : '')+'" data-cmt="'+p.id+'" title="'+(p.notes ? esc(p.notes) : 'Add a comment')+'" aria-label="'+(p.notes ? 'Comment: ' + esc(p.notes) : 'Add a comment')+'">'+(p.notes ? '💬' : '＋')+'</button></div>'
       +'<select class="wsel" data-p="'+p.id+'" aria-label="Working at">'+levelsFor(classYear).map(L => '<option value="'+L+'"'+(L===p.work?' selected':'')+'>'+(L===classYear?'Working at '+L:'A - '+L)+'</option>').join('')+'</select></th>';
   });
   h += '</tr></thead><tbody>';
@@ -395,6 +406,7 @@ function closePicker(){ picker.classList.remove('open'); target = null; }
 // ---- Events -----------------------------------------------------------
 const grid = document.getElementById('grid');
 grid.addEventListener('click', e => {
+  const cb = e.target.closest('button[data-cmt]'); if (cb){ e.stopPropagation(); openComment(cb); return; }
   const mv = e.target.closest('button[data-move]');
   if (mv){ e.stopPropagation(); setWork(mv.dataset.move, mv.dataset.to, true); return; }
   const c = e.target.closest('td.cell'); if (!c) return;
@@ -449,7 +461,7 @@ function exportJson(){
   const c = classFilter === 'all' ? { class_name:'All ' + classYear, year:classYear } : REAL.classes.find(x => x.class_id === classFilter); if (!c || !CLASS[classYear]) return;
   const out = { class: c.class_name || c.class_id, year_group: classYear, academic_year: REAL.year, term: termNow, exported: new Date().toISOString(),
     pupils: shown().map(p => { const u = summary(p), g = grade(u);
-      return { pupil: p.label, class: p.cls, working_at: p.work, grade: g.label, expected_pct: u.expPct === null ? null : Math.round(u.expPct * 10) / 10,
+      return { pupil: p.label, class: p.cls, comment: p.notes || '', working_at: p.work, grade: g.label, expected_pct: u.expPct === null ? null : Math.round(u.expPct * 10) / 10,
         greater_depth_pct: u.gdPct === null || p.work !== classYear ? null : Math.round(u.gdPct * 10) / 10,
         marks: Object.fromEntries(Object.entries(CLASS[classYear].data[p.id]).filter(([, v]) => v !== 'none').map(([k, v]) => [k, STATUS[v].label])) }; }) };
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type:'application/json' }));
@@ -481,7 +493,7 @@ async function loadClass(c, fresh){
       if (v) d[sid] = v; else if (t) unknown[sc] = (unknown[sc] || 0) + 1;
     });
     const w = String(p.working_at_level || '').toUpperCase();
-    pupils.push({ id:p.pupil_id, code:p.pupilCode || '', label:p.name || p.pupilCode || '?', cls:c.class_name || c.class_id, classId:c.class_id, work: levelsFor(c.year).includes(w) ? w : c.year });
+    pupils.push({ id:p.pupil_id, code:p.pupilCode || '', notes:String(p.notes || ''), label:p.name || p.pupilCode || '?', cls:c.class_name || c.class_id, classId:c.class_id, work: levelsFor(c.year).includes(w) ? w : c.year });
   });
   return REAL.cache[c.class_id] = { pupils, data, unknown };
 }
@@ -538,7 +550,37 @@ async function loadTerm(){
 document.getElementById('lvltabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-lvl]'); if (!b) return; level = b.dataset.lvl; document.getElementById('lvlnote').textContent = ''; renderGrid();
 });
-document.addEventListener('click', e => { if (!picker.contains(e.target)) closePicker(); });
+document.addEventListener('click', e => { if (!picker.contains(e.target)) closePicker(); if (!cmtpop.contains(e.target)) closeComment(); });
+// ---- Comments: optional teacher note per child (wt_pupil.notes); hover the icon to read, click to edit ----
+const cmtpop = document.getElementById('cmtpop'); let cmtFor = null;
+function closeComment(){ cmtpop.classList.remove('open'); cmtFor = null; }
+function openComment(btn){
+  closePicker(); selectCell(null);
+  const p = CLASS[classYear].pupils.find(x => x.id === btn.dataset.cmt); if (!p) return;
+  cmtFor = p.id;
+  cmtpop.innerHTML = '<h4>Comment · <span'+(p.code ? ' data-pupil-id="'+esc(p.code)+'"' : '')+'>'+esc(p.label)+'</span> ('+esc(p.cls || '')+')</h4>'
+    + '<textarea id="cmttext" maxlength="1000" placeholder="e.g. gaps being worked on, the intervention in place, or how a special educational need affects their writing">'+esc(p.notes)+'</textarea>'
+    + '<div class="hint2">Optional. Seen by staff who can open the writing tracker. Saved with the child, not shown on the grid.</div>'
+    + '<div class="row"><button class="btn" id="cmtsave">Save</button><button class="btn" id="cmtcancel">Cancel</button>'
+    + (p.notes ? '<button class="btn" id="cmtdel" style="margin-left:auto">Delete comment</button>' : '') + '</div>';
+  cmtpop.classList.add('open');
+  const r = btn.getBoundingClientRect(), ph = cmtpop.offsetHeight;
+  let top = r.bottom + 4; if (top + ph > innerHeight - 8) top = Math.max(8, innerHeight - ph - 8);
+  cmtpop.style.top = top + 'px'; cmtpop.style.left = Math.max(8, Math.min(r.left - 150, innerWidth - cmtpop.offsetWidth - 8)) + 'px';
+  const ta = document.getElementById('cmttext'); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  document.getElementById('cmtsave').onclick = () => saveComment(p, ta.value.trim());
+  document.getElementById('cmtcancel').onclick = closeComment;
+  const del = document.getElementById('cmtdel'); if (del) del.onclick = () => { if (confirm('Delete the comment for ' + p.label + '?')) saveComment(p, ''); };
+  ta.onkeydown = e => { if (e.key === 'Escape') closeComment(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveComment(p, ta.value.trim()); };
+}
+function saveComment(p, text){
+  const was = p.notes; if (text === was){ closeComment(); return; }
+  if (!REAL.live){ saveNote('Not saved: saving is switched off.', true); return; }
+  p.notes = text; closeComment(); renderGrid(); saveNote('Saving…');
+  wtPost({ action:'updatePupil', pupil_id:p.id, notes:text })
+    .then(() => saveNote(text ? 'Comment saved for ' + nameOf(p.id) + '.' : 'Comment deleted for ' + nameOf(p.id) + '.'))
+    .catch(e => { p.notes = was; renderGrid(); saveNote('Could not save the comment (' + e.message + '). It has gone back. Refresh and sign in again if this keeps happening.', true); });
+}
 document.addEventListener('keydown', e => {
   if (!cur || !curCell() || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.target.closest && e.target.closest('input, select, textarea')) return;
