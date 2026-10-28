@@ -158,7 +158,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       </table>
       <p><b>2. Percentages.</b> A child's <b>Expected %</b> = weight earned ÷ weight available across the non-negotiables and expected standards that count. <b>Greater depth %</b> is worked out separately from the greater depth statements. Non-negotiables are part of the percentage; there is no pass/fail on them.</p>
       <p><b>3. Grade</b> for a child working at their own year group: <b>D</b> = expected ≥ 90% and greater depth ≥ 60% · <b>O1</b> = expected ≥ 75% · <b>O2</b> = expected ≥ 65% · <b>Y</b> = expected ≥ 50%.</p>
-      <p><b>4. Below 50% of the year group's expected statements</b> means "at an earlier stage": <b>A - Yn</b>. The teacher chooses which year's statements a child is working at (the "working at" box under the child's initials). If a child on an earlier year's statements is still under 50% of them, the tool flags it and offers to move them one year lower. It is always the teacher's decision. Below Y1 is recorded as <b>A - EY</b>.</p>
+      <p><b>4. Below 50% of the year group's expected statements</b> means "at an earlier stage": <b>A - Yn</b>. The teacher chooses which year's statements a child is working at (the "working at" box under the child's initials). If a child on an earlier year's statements is still under 50% of them, the tool flags it and offers to move them one year lower. It is always the teacher's decision. Below Y1 is recorded as <b>A - EY</b>. On an <b>A - Yn</b> tab only that year's non-negotiables and expected standards are shown: the child needs to secure those to move on, so greater depth is not assessed there.</p>
       <p><b>5. Weights</b> (0 to 10, whole numbers) are shown next to each statement. They were agreed by staff on 23.10.26 and are locked, so they cannot be changed here. "Agreed weights" under the grid lets you download them.</p>
       <p><b>Marking with the keyboard:</b> click a cell, then type <b>R</b> Reteach, <b>E</b> Emerging, <b>D</b> Developing, <b>S</b> Secure, <b>X</b> Not taught, <b>T</b> Taught, not used, or <b>Delete</b> for Unreviewed. The highlight stays on that cell. Press <b>Enter</b> or <b>↓</b> to go down, <b>↑</b> (or Shift+Enter) to go up, and <b>←</b> <b>→</b> to go sideways to the next child. Esc lets go.</p>
       <p><b>6. Terms.</b> The weights in the boxes are the <b>Term 1 and 2</b> weights, so the non-negotiables can count for more early in the year. <b>From Term 3, every non-negotiable has a weight of 1</b>; all other weights stay the same. The tool reads the current term from the school calendar and uses the right weights automatically. Each term's results always use that term's weights, so a Term 2 result keeps its Term 2 figure when you look back at it later. From Term 3 the non-negotiable weights show as 1 and cannot be changed here.</p>
@@ -177,7 +177,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="grid-scroll"><table id="grid"></table></div>
 
   <details class="how" id="chgbox" style="margin-top:12px"><summary id="chgsum">Weight changes from the draft</summary><div class="body" id="chgbody"></div></details>
-  <footer>Writing Tracker · WFA-24.10.26e · weights agreed 23.10.26 (locked)</footer>
+  <footer>Writing Tracker · WFA-28.10.26a · weights agreed 23.10.26 (locked)</footer>
 </div>
 <div class="picker" id="picker"></div>
 <script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
@@ -301,7 +301,8 @@ function renderGrid(){
   pupils.forEach((p, i) => p.cstart = classFilter === 'all' && i > 0 && pupils[i-1].classId !== p.classId);
   if (!pupils.length){ t.innerHTML = '<tbody><tr><td class="empty">No children are working at '+lbl(level)+' right now. Use a child\'s "working at" box on another tab to move them here.</td></tr></tbody>'; return; }
   const sums = pupils.map(p => { const u = summary(p); return { p, u, g: grade(u) }; });
-  let h = '<thead><tr><th class="skillh">'+level+' statements ('+SKILLS[level].length+')</th><th class="wh">Weight</th>';
+  const tiers = level === classYear ? ['non_neg','expected','greater_depth'] : ['non_neg','expected'];   // an earlier year is only about securing its NN and expected statements
+  let h = '<thead><tr><th class="skillh">'+level+' statements ('+SKILLS[level].filter(s => tiers.includes(s.tier)).length+')</th><th class="wh">Weight</th>';
   sums.forEach(({p,u,g}) => {
     const [bg,fg] = GSTYLE[g.style];
     h += '<th class="pupilh'+(p.cstart?' cstart':'')+'" title="'+esc(p.cls || '')+'"><div class="hline"><span'+(p.code ? ' data-pupil-id="'+esc(p.code)+'"' : '')+'>'+esc(p.label || p.id)+'</span>'+(classFilter==='all' && p.cls ? ' <span class="pcls">'+esc(p.cls)+'</span>' : '')+' <span class="hbadge" style="background:'+bg+';color:'+fg+'">'+g.label+'</span> <span class="hexp">'+pc(u.expPct)+'</span></div>'
@@ -324,7 +325,7 @@ function renderGrid(){
   h += '</tr>';
   // statements
   const ncol = pupils.length + 2;
-  ['non_neg','expected','greater_depth'].forEach(tk => {
+  tiers.forEach(tk => {
     const list = SKILLS[level].filter(s => s.tier === tk); if (!list.length) return;
     h += '<tr class="tierrow"><td colspan="'+ncol+'"><span class="stick">'+TIERNAME[tk]+' ('+list.length+')'+(tk==='non_neg' && termMode==='t3' ? ' · weight 1 each from Term 3' : '')+'</span></td></tr>';
     let lastCat = null, lastGrp = null;
@@ -448,7 +449,7 @@ function exportJson(){
   const out = { class: c.class_name || c.class_id, year_group: classYear, academic_year: REAL.year, term: termNow, exported: new Date().toISOString(),
     pupils: shown().map(p => { const u = summary(p), g = grade(u);
       return { pupil: p.label, class: p.cls, working_at: p.work, grade: g.label, expected_pct: u.expPct === null ? null : Math.round(u.expPct * 10) / 10,
-        greater_depth_pct: u.gdPct === null ? null : Math.round(u.gdPct * 10) / 10,
+        greater_depth_pct: u.gdPct === null || p.work !== classYear ? null : Math.round(u.gdPct * 10) / 10,
         marks: Object.fromEntries(Object.entries(CLASS[classYear].data[p.id]).filter(([, v]) => v !== 'none').map(([k, v]) => [k, STATUS[v].label])) }; }) };
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type:'application/json' }));
   a.download = 'writing-' + (c.class_name || c.class_id) + '-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click(); a.remove();
