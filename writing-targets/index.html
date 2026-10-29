@@ -161,6 +161,8 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="bar">
     <label><input type="checkbox" id="selAll"> Select all</label>
     <button class="b p" id="giveSel" disabled>Give selected children…</button>
+    <button class="b" id="boxSel" disabled title="The selected children's cards print with tick boxes">☐ Tick boxes</button>
+    <button class="b" id="numSel" disabled title="The selected children's cards print with 1. 2. 3.">1. 2. 3.</button>
     <button class="b" id="printSel">Print cards</button>
     <label class="note"><input type="checkbox" id="backs"> Spelling strip on the back (print double-sided)</label>
     <button class="b" id="printBacks">Print spelling strips</button>
@@ -169,7 +171,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   </div>
   <div class="note" id="srcnote">Loading…</div>
   <div id="lists"></div>
-  <footer>Writing Targets · WFA-29.10.26b · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
+  <footer>Writing Targets · WFA-29.10.26c · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
 </main>
 
 <div id="ed" role="dialog" aria-modal="true" aria-labelledby="edt">
@@ -312,7 +314,7 @@ function renderLists(){
         + '<button class="b edit">Edit</button></div>').join('') : '<div class="empty">Nobody here.</div>')
       + '</section>';
   }).join('');
-  $('giveSel').disabled = !S.selected.size;
+  $('giveSel').disabled = $('boxSel').disabled = $('numSel').disabled = !S.selected.size;
   $('giveSel').textContent = S.selected.size ? 'Give ' + S.selected.size + ' selected ' + (S.selected.size === 1 ? 'child' : 'children') + '…' : 'Give selected children…';
   $('selAll').checked = P.length > 0 && P.every(p => S.selected.has(p.key));
   yearNote();
@@ -339,11 +341,11 @@ function closeEditor(){ $('ed').classList.remove('open'); E = null; }
 function renderEditor(){
   const one = E.keys.length === 1 ? pupil(E.keys[0]) : null;
   document.querySelectorAll('#fmt button').forEach(b => b.classList.toggle('on', b.dataset.f === E.format));
-  $('tks').style.display = E.format === 'targets' || (!one && E.mode === 'add') ? '' : 'none';
+  $('tks').style.display = E.format === 'targets' ? '' : 'none';
   document.querySelectorAll('#tks button').forEach(b => b.classList.toggle('on', (b.dataset.t === '1') === E.ticks));
   let h = '';
   if (!one) h += '<div class="bar"><span class="seg" id="mode"><button data-m="replace" class="' + (E.mode === 'replace' ? 'on' : '') + '">Replace their cards</button><button data-m="add" class="' + (E.mode === 'add' ? 'on' : '') + '">Add to their cards</button></span>'
-    + '<span class="note">' + (E.mode === 'replace' ? 'Each child gets exactly these statements (their old card is kept in history).' : 'These statements are added to what each child already has' + (E.ticksSet ? ', and every targets card is printed with ' + (E.ticks ? 'tick boxes.' : 'numbers.') : '. Each card keeps its own Checklist / Targets. With no statements chosen, Save changes only 1. 2. 3. / tick boxes.')) + '</span></div>';
+    + '<span class="note">' + (E.mode === 'replace' ? 'Each child gets exactly these statements (their old card is kept in history).' : 'These statements are added to what each child already has.') + '</span></div>';
   h += '<h3>' + (one ? 'On the card' : 'Statements to give') + ' (' + E.items.length + '/' + MAX_ITEMS + ')</h3><div class="cur">';
   h += E.items.length ? E.items.map((i, n) => {
     const it = S.items[i.id] || { text:i.id, eg:'' };
@@ -434,8 +436,7 @@ function addItem(id){
 }
 
 async function saveEditor(){
-  if (E.keys.length > 1 && E.mode === 'add' && !E.items.length && !E.ticksSet) { $('edmsg').textContent = 'Choose statements to add, or choose 1. 2. 3. / tick boxes.'; return; }
-  if (E.keys.length > 1 && E.mode === 'replace' && !E.items.length) { $('edmsg').textContent = 'Choose the statements to give first. To change only 1. 2. 3. / tick boxes, use "Add to their cards".'; return; }
+  if (E.keys.length > 1 && !E.items.length) { $('edmsg').textContent = 'Choose the statements to give first.'; return; }
   const btn = $('edsave'); btn.disabled = true; $('edmsg').textContent = 'Saving…';
   const cards = E.keys.map(k => {
     const p = pupil(k), cur = p.card ? p.card.items : [];
@@ -443,8 +444,8 @@ async function saveEditor(){
     if (E.keys.length === 1) items = E.items.map(i => Object.assign({ id:i.id }, i.words ? { words:i.words } : {}, i.met ? { met:true } : {}));
     else if (E.mode === 'replace') items = E.items.map(i => { const had = cur.find(c => c.id === i.id); return Object.assign({ id:i.id }, had && had.words ? { words:had.words } : {}); });
     else items = cur.concat(E.items.filter(i => !cur.some(c => c.id === i.id)).map(i => ({ id:i.id })));
-    const keep = E.keys.length > 1 && E.mode === 'add' && p.card;   // adding to cards keeps each card's own format, and its numbering unless the switch was used
-    const format = keep ? p.card.format : E.format, ticks = keep && !E.ticksSet ? !!p.card.ticks : E.ticks;
+    const keep = E.keys.length > 1 && E.mode === 'add' && p.card;   // adding to cards keeps each card's own format and look
+    const format = keep ? p.card.format : E.format, ticks = keep ? !!p.card.ticks : E.ticks;
     return { key:k, base: p.card ? p.card.updatedAt : '', format, ticks: format === 'targets' && ticks, items: items.slice(0, MAX_ITEMS) };
   }).filter(c => c.items.length || pupil(c.key).card);   // never make an empty card for a child who has none
   if (!cards.length) { $('edmsg').textContent = 'None of these children has a card yet, so there is nothing to change.'; btn.disabled = false; return; }
@@ -537,6 +538,20 @@ $('lists').addEventListener('click', e => {
   if (e.target.closest('.edit')) { openEditor([k]); return; }
   if (e.target.classList.contains('pick')) { e.target.checked ? S.selected.add(k) : S.selected.delete(k); renderLists(); }
 });
+async function setLook(ticks){
+  const P = shown().filter(p => S.selected.has(p.key) && p.card && p.card.items.length && p.card.format === 'targets');   // checklists always print with tick boxes
+  if (!P.length) { banner('Nothing to change: checklists always print with tick boxes, and children with no card have nothing to print.', true); return; }
+  try {
+    const r = await apiPost({ action:'saveCards', cards: P.map(p => ({ key:p.key, base:p.card.updatedAt, format:p.card.format, ticks, items:p.card.items })) });
+    Object.entries(r.saved || {}).forEach(([k, c]) => { const p = pupil(k); if (p) p.card = c; });
+    Object.entries(r.conflicts || {}).forEach(([k, c]) => { const p = pupil(k); if (p) p.card = c; });
+    const n = Object.keys(r.conflicts || {}).length;
+    S.selected.clear(); renderLists();
+    banner('Saved: ' + (P.length - n) + (P.length - n === 1 ? ' card prints' : ' cards print') + ' with ' + (ticks ? 'tick boxes.' : '1. 2. 3.') + (n ? ' ' + n + ' changed by someone else meanwhile, so not changed: try again.' : ''), n > 0);
+  } catch (e) { banner('Not saved (' + e.message + '). Try again; refresh and sign in again if this keeps happening.', true); }
+}
+$('boxSel').addEventListener('click', () => setLook(true));
+$('numSel').addEventListener('click', () => setLook(false));
 $('giveSel').addEventListener('click', () => { const keys = shown().map(p => p.key).filter(k => S.selected.has(k)); if (keys.length) openEditor(keys); });
 $('printSel').addEventListener('click', printCards);
 $('printBacks').addEventListener('click', printBacks);
@@ -549,7 +564,7 @@ $('ed').addEventListener('click', e => { if (e.target === $('ed')) closeEditor()
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && E) closeEditor(); });
 $('tks').addEventListener('click', e => {
   const b = e.target.closest('button[data-t]'); if (!b || !E) return;
-  E.ticks = b.dataset.t === '1'; E.ticksSet = true;
+  E.ticks = b.dataset.t === '1';
   renderEditor();
 });
 $('fmt').addEventListener('click', e => {
