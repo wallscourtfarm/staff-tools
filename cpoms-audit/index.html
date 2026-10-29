@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>CPOMS Incident Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sticky top bar with term picker + tabs; one working view at a time; forms as stacked section cards */
+:root{
+  --bg:#f3f6f8; --surface:#ffffff; --sunk:#e8eef2; --ink:#0a0101; --muted:#56636c; --line:#d3dde3;
+  --accent:#1798d3; --accent-ink:#ffffff; --accent-soft:#dff0f9; --focus:#0d6e9c;
+  --green:#2e8b4e; --green-soft:#dcf1e3; --amber:#b77a00; --amber-soft:#fbefcf; --red:#c4372b; --red-soft:#f9dedb;
+  --display:"Barlow Semi Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1418; --surface:#151d23; --sunk:#1c262d; --ink:#e9eef1; --muted:#9aa8b1; --line:#2a363e;
+  --accent:#4ab4e6; --accent-ink:#06141c; --accent-soft:#16303d; --focus:#8fd2f2;
+  --green:#5cc07e; --green-soft:#16301f; --amber:#e3b04b; --amber-soft:#33290f; --red:#ef7d72; --red-soft:#3a1a17; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1418; --surface:#151d23; --sunk:#1c262d; --ink:#e9eef1; --muted:#9aa8b1; --line:#2a363e;
+  --accent:#4ab4e6; --accent-ink:#06141c; --accent-soft:#16303d; --focus:#8fd2f2;
+  --green:#5cc07e; --green-soft:#16301f; --amber:#e3b04b; --amber-soft:#33290f; --red:#ef7d72; --red-soft:#3a1a17; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-block:12px 8px}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto;min-width:0}
+.brand h1{font-family:var(--display);font-weight:700;font-size:1.45rem;margin:0;letter-spacing:.01em;text-wrap:balance}
+.brand small{color:var(--muted);font-size:.8rem}
+.pick{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pick label{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+select,input[type=text],input[type=date],textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 10px;max-width:100%}
+textarea{width:100%;min-height:64px;resize:vertical}
+select:focus-visible,input:focus-visible,textarea:focus-visible,button:focus-visible,.seg input:focus-visible+span{outline:2px solid var(--focus);outline-offset:2px}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{font:600 .9rem var(--body);background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:8px 12px 9px;cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs button:hover{color:var(--ink)}
+main{padding-block:22px 40px}
+.banner{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:var(--amber-soft);color:var(--ink);border:1px solid var(--amber);border-radius:8px;padding:10px 14px;margin-bottom:18px;font-size:.9rem}
+.banner.info{background:var(--accent-soft);border-color:var(--accent)}
+.banner.err{background:var(--red-soft);border-color:var(--red)}
+h2{font-family:var(--display);font-weight:700;font-size:1.6rem;margin:0 0 4px;text-wrap:balance}
+h3{font-family:var(--display);font-weight:600;font-size:1.2rem;margin:0 0 10px;text-wrap:balance}
+.lede{color:var(--muted);margin:0 0 18px;max-width:70ch}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:12px;margin-bottom:16px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.tile .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.tile .v{font-family:var(--display);font-weight:700;font-size:2.3rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile .s{font-size:.82rem;color:var(--muted)}
+.tile.hero{border-color:var(--accent);background:var(--accent-soft)}
+.btn{font:600 .9rem var(--body);border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--red);border-color:var(--red)}
+.btn.small{padding:4px 10px;font-size:.8rem}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--sunk);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);white-space:nowrap}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.mono{font-family:var(--mono);font-size:.85rem}
+.pill{display:inline-block;font-size:.75rem;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.Green{background:var(--green-soft);color:var(--green)}
+.pill.Amber{background:var(--amber-soft);color:var(--amber)}
+.pill.Red{background:var(--red-soft);color:var(--red)}
+.pill.ok{background:var(--green-soft);color:var(--green)}
+.pill.no{background:var(--red-soft);color:var(--red)}
+.pill.muted{background:var(--sunk);color:var(--muted)}
+.pct{font-weight:700;font-variant-numeric:tabular-nums}
+.pct.hi{color:var(--green)} .pct.mid{color:var(--amber)} .pct.lo{color:var(--red)}
+.meter{height:8px;background:var(--sunk);border-radius:4px;overflow:hidden;min-width:60px}
+.meter>i{display:block;height:100%;background:var(--accent)}
+.stack{display:flex;height:14px;border-radius:4px;overflow:hidden;background:var(--sunk);min-width:80px}
+.stack i.G{background:var(--green)} .stack i.A{background:var(--amber)} .stack i.R{background:var(--red)}
+.empty{text-align:center;color:var(--muted);padding:30px 16px}
+.muted{color:var(--muted)}
+.note{font-size:.82rem;color:var(--muted)}
+/* form */
+form.audit{display:grid;gap:16px}
+fieldset{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:16px 18px 18px;margin:0;min-width:0}
+legend{font-family:var(--display);font-weight:700;font-size:1.2rem;padding:0 6px}
+.sec-note{font-size:.84rem;color:var(--muted);margin:-2px 0 10px}
+.q{display:grid;grid-template-columns:2.4em 1fr auto;gap:4px 10px;align-items:start;padding:10px 0;border-top:1px solid var(--line)}
+.q:first-of-type{border-top:0}
+.q .num{font-family:var(--display);font-weight:600;color:var(--muted);padding-top:5px;font-variant-numeric:tabular-nums}
+.q .txt{padding-top:5px;min-width:0}
+.q .follow{grid-column:2 / -1;display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));background:var(--sunk);border-radius:8px;padding:10px}
+.q .follow label{font-size:.8rem;font-weight:600;color:var(--muted);display:grid;gap:4px}
+.q.missing .txt{color:var(--red)}
+.q.missing .seg{outline:2px solid var(--red);outline-offset:2px;border-radius:7px}
+@media (max-width:640px){.q{grid-template-columns:2em 1fr}.q .seg{grid-column:2}}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;flex-wrap:wrap}
+.seg label{position:relative;cursor:pointer}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg span{display:block;padding:6px 13px;font-weight:600;font-size:.88rem;border-left:1px solid var(--line);min-width:3.2em;text-align:center}
+.seg label:first-child span{border-left:0}
+.seg input:checked+span{background:var(--accent);color:var(--accent-ink)}
+.seg input[value="No"]:checked+span,.seg input[value="Red"]:checked+span{background:var(--red);color:#fff}
+.seg input[value="Green"]:checked+span{background:var(--green);color:#fff}
+.seg input[value="Amber"]:checked+span{background:var(--amber);color:#fff}
+.seg input[value="N/A"]:checked+span{background:var(--muted);color:var(--surface)}
+.fields{display:grid;gap:12px 16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.f{display:grid;gap:5px;min-width:0}
+.f>span{font-size:.8rem;font-weight:600;color:var(--muted)}
+.f.missing>span{color:var(--red)}
+.f.missing select,.f.missing input{border-color:var(--red)}
+.f.wide{grid-column:1 / -1}
+.checks{display:grid;gap:6px 14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+.checks label{display:flex;gap:8px;align-items:center;font-size:.92rem}
+.checks input{width:18px;height:18px;accent-color:var(--accent)}
+.formbar{position:sticky;bottom:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding-bottom:max(12px,env(safe-area-inset-bottom,0px))}
+.formbar .msg{margin-right:auto;font-size:.9rem}
+.toast{position:fixed;left:50%;bottom:max(20px,calc(env(safe-area-inset-bottom,0px) + 12px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:8px;font-weight:600;z-index:20;max-width:calc(100% - 32px)}
+.confirm{background:var(--red-soft);border:1px solid var(--red);border-radius:8px;padding:10px 12px;margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bars{display:grid;gap:8px}
+.bars .b{display:grid;grid-template-columns:minmax(0,1fr) 2.6em;gap:4px 10px;align-items:center;font-size:.88rem}
+.bars .b .lab{grid-column:1 / -1;min-width:0}
+.bars .b .meter{height:10px}
+.cols{display:flex;align-items:flex-end;gap:10px;height:170px;padding:10px 4px 0;border-bottom:1px solid var(--line)}
+.cols .c{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px;min-width:0}
+.cols .c i{display:block;width:70%;max-width:46px;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
+.cols .c b{font-size:.8rem;font-variant-numeric:tabular-nums}
+.cols-x{display:flex;gap:10px;padding:4px 4px 0}
+.cols-x span{flex:1;text-align:center;font-size:.75rem;color:var(--muted)}
+.gov p{margin:0 0 10px;max-width:72ch}
+.gov p b{font-variant-numeric:tabular-nums}
+.foot{color:var(--muted);font-size:.8rem;padding-block:10px 30px;border-top:1px solid var(--line)}
+.done-row td{color:var(--muted);text-decoration:line-through}
+.done-row td:last-child{text-decoration:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media print{header.top,.formbar,.btn,nav{display:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="bar">
+      <div class="brand"><h1>CPOMS Incident Audit</h1><small id="academyLabel">Wallscourt Farm Academy</small></div>
+      <div class="pick">
+        <label for="yearPick">Year</label>
+        <select id="yearPick"></select>
+        <label for="termPick">Term</label>
+        <select id="termPick"></select>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Sections">
+      <button data-view="audit">New audit</button>
+      <button data-view="dashboard">Dashboard</button>
+      <button data-view="termly">Termly review</button>
+      <button data-view="council">Academy Council</button>
+      <button data-view="followups">Follow-ups</button>
+      <button data-view="records">Records</button>
+      <button data-view="setup">Set-up</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="status"></div>
+  <section id="view-audit" data-v hidden></section>
+  <section id="view-dashboard" data-v hidden></section>
+  <section id="view-termly" data-v hidden></section>
+  <section id="view-council" data-v hidden></section>
+  <section id="view-followups" data-v hidden></section>
+  <section id="view-records" data-v hidden></section>
+  <section id="view-setup" data-v hidden></section>
+</main>
+<div class="wrap"><div class="foot">CPOMS Incident Audit · version <span id="ver"></span> · Record CPOMS incident IDs only, never pupil names or initials.</div></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+"use strict";
+const VERSION = "WFA-29.10.26a";
+document.getElementById("ver").textContent = VERSION;
+
+/* ------------------------------------------------------------------ schema */
+const TERMS = ["Term 1","Term 2","Term 3","Term 4","Term 5","Term 6"];
+const YNA = ["Yes","No","N/A"];
+const CATEGORIES = {
+  "Attendance": [],
+  "Behaviour Incident": [],
+  "Brook Traffic Light Tool": ["Red","Orange","Green"],
+  "Cause for Concern": [],
+  "Child on Child": ["Ableist bullying","Abuse in intimate personal relationships","Child physical","Faith bullying",
+    "Homophobic, transphobic, biphobic bullying","Initiation, hazing or violence rituals","Online bullying","Physical bullying",
+    "Racism bullying","Sexual harassment (in person)","Sexual harassment (online)","Sexual violence","Sharing nudes / semi nudes",
+    "Sharing nudes / semi nudes including AI generated","Upskirting","Verbal","Verbal bullying"],
+  "Mental Health and Wellbeing": ["Anxiety, panic attacks and phobias","Bereavement","Body image","Low mood","Obsessions and compulsions",
+    "Parental wellbeing","Self-injury","Suicidal ideation","Suspected eating concerns","Visual and auditory hallucinations"],
+  "Positive Handling": [],
+  "Prejudicial Related Incident": ["Ableist","Disablist","Gender based (inc. misogyny/misandry)","Homophobic, transphobic, biphobic","Racial","Religion"],
+  "Safeguarding": ["ASB","CAPVA","CCE","Choking incident","Clinical incident","Criminality","CSE","DA","DI Notification","Emotional Abuse",
+    "FGM","FII","Forced Marriage","Gang affiliation","Gender questioning","Hate crime","HBV","Health Conditions","HSB",
+    "Missing person notification","Modern slavery","Neglect","Offensive weapon","Online safety","Parental substance misuse",
+    "Physical abuse","Pregnancy","Radicalisation","SENSO","Serious physical assault","Sexual abuse","Smoking and vaping",
+    "Substance misuse","Threat of harm with a weapon","Trafficking","Young parent"]
+};
+const ONLINE_SUBS = ["Online bullying","Sexual harassment (online)","Sharing nudes / semi nudes","Sharing nudes / semi nudes including AI generated","Online safety"];
+const EVIDENCE = ["Pupil voice","Parent discussion","Staff statement","Witness account","Body map","Medical evidence","External agency information","CCTV","Screenshots or online evidence","Other"];
+const INTERVENTIONS = ["Family contact","DSL discussion","Pupil meeting","Restorative conversation","Behaviour intervention","Pastoral intervention","Referral to external agency","Monitoring","Safety plan","Other"];
+const FOCUS = ["Child on Child Abuse","Positive Handling","Online Safety"];
+
+/* Every Yes / No / N/A check. `core` = counts toward the headline "fully compliant" measure (proposal Q1-24).
+   `when` decides whether the question applies to this record. A "No" opens issue + required action. */
+const CHECKS = [
+  {sec:"rec", id:"rs1", t:"Was the incident recorded appropriately?", core:1, short:"Recorded appropriately"},
+  {sec:"rec", id:"rs2", t:"Was the record completed as soon as practical following the incident?", core:1, short:"Logged promptly"},
+  {sec:"rec", id:"rs3", t:"Was the correct CPOMS category assigned?", core:1, short:"Correct category"},
+  {sec:"rec", id:"rs4", t:"Does the record contain factual information only?", core:1, short:"Factual only"},
+  {sec:"rec", id:"rs5", t:"Are verbatim quotes used where appropriate?", core:1, short:"Verbatim quotes"},
+  {sec:"rec", id:"rs6", t:"Was TED questioning evident (if applicable)?", core:1, short:"TED questioning"},
+  {sec:"rec", id:"rs7", t:"Were leading questions avoided?", core:1, short:"No leading questions"},
+  {sec:"rec", id:"rs8", t:"Was a body map used when physical injury/symptoms were reported?", core:1, short:"Body map when needed"},
+  {sec:"rec", id:"rs9", t:"Were individuals clearly identified in line with school expectations?", core:1, short:"Individuals identified"},
+  {sec:"rec", id:"rs10", t:"Is there sufficient evidence to support any professional judgement?", core:1, short:"Evidence supports judgement"},
+  {sec:"rec", id:"rs11", t:"Is rationale provided for key decisions?", core:1, short:"Rationale for decisions"},
+  {sec:"time", id:"tm1", t:"Was the safeguarding response timely?", core:1, short:"Timely response", noLabel:"What was delayed?"},
+  {sec:"time", id:"tm2", t:"If Child Protection, was action immediate?", core:1, short:"CP action immediate"},
+  {sec:"time", id:"tm3", t:"If high-risk safeguarding, was action taken before the learner left site?", core:1, short:"High-risk: actioned before leaving site"},
+  {sec:"time", id:"tm4", t:"If pastoral concern, was action taken within 24 hours?", core:1, short:"Pastoral: actioned within 24 hours"},
+  {sec:"voice", id:"pv1", t:"Was pupil voice recorded?", core:1, short:"Pupil voice recorded", noFollow:true},
+  {sec:"voice", id:"pv2", t:"Was pupil voice meaningful and relevant?", core:1, short:"Pupil voice meaningful", opts:["Yes","No"], when:a=>a.pv1==="Yes"},
+  {sec:"voice", id:"pf1", t:"Is parental feedback recorded?", core:0, short:"Parental feedback recorded"},
+  {sec:"int", id:"ii1", t:"Is the intervention clearly recorded?", core:1, short:"Intervention clearly recorded"},
+  {sec:"int", id:"ii2", t:"Is evidence included that interventions were completed?", core:1, short:"Evidence interventions completed"},
+  {sec:"int", id:"ii3", t:"Is the outcome clearly recorded?", core:1, short:"Clear outcome recorded"},
+  {sec:"int", id:"ii4", t:"Is the impact of interventions recorded?", core:1, short:"Impact recorded"},
+  {sec:"int", id:"ii5", t:"For repeat concerns, have interventions escalated appropriately?", core:1, short:"Escalation for repeat concerns"},
+  {sec:"ph", id:"ph1", t:"Was the positive handling record completed in full?", core:0, short:"PH record complete", when:a=>a.category==="Positive Handling"},
+  {sec:"ph", id:"ph2", t:"Were parents/carers informed on the same day?", core:0, short:"PH parents informed same day", when:a=>a.category==="Positive Handling"},
+  {sec:"ph", id:"ph3", t:"Was there a debrief with the pupil afterwards?", core:0, short:"PH pupil debrief", when:a=>a.category==="Positive Handling"},
+  {sec:"ph", id:"ph4", t:"Was any injury recorded on a body map?", core:0, short:"PH injury on body map", when:a=>a.category==="Positive Handling"},
+];
+const SECTIONS = {
+  rec:{title:"Recording standards", note:"For each, a No opens boxes for the issue found and the action needed."},
+  time:{title:"Timeliness", note:"Use N/A where the situation did not apply."},
+  voice:{title:"Pupil and parent voice", note:""},
+  int:{title:"Intervention and impact", note:""},
+  ph:{title:"Positive handling", note:"Shown because the category is Positive Handling. Check these against the Positive Handling policy."}
+};
+const CHECK = Object.fromEntries(CHECKS.map(c=>[c.id,c]));
+const applies = (c,a)=>!c.when || c.when(a);
+
+/* ------------------------------------------------------------------ state */
+const state = {
+  view:"audit", records:[], loaded:false, example:false, exampleRecords:[],
+  settings:{academy:"Wallscourt Farm Academy", year:currentYear()},
+  term:"", year:"", editing:null, names:{}, canWrite:null, me:null, fuShow:"open", recQuery:"", termlyScope:"focus",
+  confirmDelete:null
+};
+const API="/_api/planning/cpomsaudit-db?token=__hub__";
+
+function currentYear(){const d=new Date();const y=d.getMonth()>=8?d.getFullYear():d.getFullYear()-1;return `${y}-${String(y+1).slice(2)}`;}
+function guessTerm(){const m=new Date().getMonth();return m>=8&&m<=9?"Term 1":m>=10?"Term 2":m<=1?"Term 3":m<=3?"Term 4":m===4?"Term 5":"Term 6";}
+const esc = s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtDate = s=>{if(!s)return "";const [y,m,d]=String(s).split("-");return d?`${d}/${m}/${y.slice(2)}`:esc(s);};
+const pct = (n,d)=>d?n/d:null;
+const pctTxt = v=>v==null?"–":Math.round(v*100)+"%";
+const pctCls = v=>v==null?"":v>=0.95?"hi":v>=0.8?"mid":"lo";
+const todayISO = ()=>new Date().toISOString().slice(0,10);
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2600);}
+
+/* ------------------------------------------------------------------ derived */
+function ragOf(r){return r.rag||"";}
+function focusAreas(r){
+  const f=[];
+  if(r.category==="Child on Child") f.push("Child on Child Abuse");
+  if(r.category==="Positive Handling") f.push("Positive Handling");
+  if(r.onlineSafety==="Yes") f.push("Online Safety");
+  return f;
+}
+function coreFails(r){return CHECKS.filter(c=>c.core&&applies(c,r)&&r.answers?.[c.id]==="No").map(c=>c.id);}
+function allFails(r){return CHECKS.filter(c=>applies(c,r)&&r.answers?.[c.id]==="No").map(c=>c.id);}
+const fullyCompliant = r=>coreFails(r).length===0;
+function allRecords(){return state.example?state.exampleRecords:state.records;}
+function inScope(r,term=state.term,year=state.year){return (!year||r.year===year)&&(term==="Whole year"||r.term===term);}
+function scoped(){return allRecords().filter(r=>inScope(r));}
+function listActions(r){
+  const out=[];
+  for(const id of Object.keys(r.issues||{})){
+    const c=CHECK[id]; const it=r.issues[id];
+    if(!c||!applies(c,r)||r.answers?.[id]!=="No") continue;
+    if(it&&(it.action||it.issue)) out.push({key:id, kind:"Check", label:c.short, issue:it.issue||"", action:it.action||"", owner:"", target:"", done:!!r.done?.[id]});
+  }
+  if(r.rag==="Amber"||r.rag==="Red") out.unshift({key:"fu", kind:r.rag, label:"RAG follow-up", issue:"", action:r.fuAction||"", owner:r.fuOwner||"", target:r.fuTarget||"", done:!!r.done?.fu});
+  return out;
+}
+
+function metrics(recs){
+  const m={n:recs.length, compliant:recs.filter(fullyCompliant).length, rag:{Green:0,Amber:0,Red:0}, checks:{}, ev:{}, int:{}, cats:{}, subs:{}, focus:{}, actions:{}, open:0, overdue:0, evYes:0, evNo:0, intYes:0, intNo:0, repeat:0};
+  for(const c of CHECKS) m.checks[c.id]={Yes:0,No:0,"N/A":0};
+  for(const e of EVIDENCE) m.ev[e]=0;
+  for(const e of INTERVENTIONS) m.int[e]=0;
+  for(const f of FOCUS) m.focus[f]=0;
+  for(const r of recs){
+    if(m.rag[r.rag]!=null) m.rag[r.rag]++;
+    for(const c of CHECKS){if(!applies(c,r))continue;const v=r.answers?.[c.id];if(m.checks[c.id][v]!=null)m.checks[c.id][v]++;}
+    if(r.evidence==="Yes"){m.evYes++;for(const e of r.evTypes||[]) if(m.ev[e]!=null) m.ev[e]++;} else if(r.evidence==="No") m.evNo++;
+    if(r.interventions==="Yes"){m.intYes++;for(const e of r.intTypes||[]) if(m.int[e]!=null) m.int[e]++;} else if(r.interventions==="No") m.intNo++;
+    const cat=r.category||"Unknown";
+    m.cats[cat]=m.cats[cat]||{n:0,Green:0,Amber:0,Red:0,compliant:0};
+    m.cats[cat].n++; if(r.rag) m.cats[cat][r.rag]++; if(fullyCompliant(r)) m.cats[cat].compliant++;
+    if(r.sub){const k=cat+" › "+r.sub;m.subs[k]=(m.subs[k]||0)+1;}
+    for(const f of focusAreas(r)) m.focus[f]++;
+    if(r.repeat==="Yes") m.repeat++;
+    for(const a of listActions(r)){
+      const k=(a.action||"").trim().toLowerCase(); if(k) m.actions[k]=(m.actions[k]||{text:a.action.trim(),n:0}), m.actions[k].n++;
+      if(!a.done){m.open++; if(a.target&&a.target<todayISO()) m.overdue++;}
+    }
+  }
+  m.pctYes = id=>{const c=m.checks[id];return pct(c.Yes,c.Yes+c.No);};
+  return m;
+}
+
+/* ------------------------------------------------------------------ data layer (WFA API via the signed-in /_api proxy) */
+async function api(method,body){
+  const opt={method,headers:{"X-WFA-Proxy":"1"},credentials:"same-origin",cache:"no-store"};
+  if(body){opt.headers["Content-Type"]="application/json";opt.body=JSON.stringify(body);}
+  let res;
+  try{res=await fetch(method==="GET"?API+"&action=load":API,opt);}catch(e){throw {kind:"net",message:"No connection. Check the network and try again."};}
+  if(res.status===401) throw {kind:"signin",message:"Your sign-in has run out. Reload the page to sign in again."};
+  let j=null; try{j=await res.json();}catch(e){}
+  if(!res.ok||!j) throw {kind:"server",message:"The school server did not answer properly (status "+res.status+")."};
+  if(j.error==="not allowed") throw {kind:"denied",message:j.message||"This tool is for the DSL only."};
+  if(j.error) throw {kind:"server",message:j.error};
+  return j;
+}
+async function boot(){
+  try{
+    const j=await api("GET");
+    state.me=j.me||""; state.records=j.audits||[];
+    if(j.settings&&j.settings.academy) state.settings={...state.settings,...j.settings};
+    state.year=state.settings.year; state.loaded=true; state.canWrite=true; showStatus(null);
+  }catch(e){showStatus(e.kind==="signin"||e.kind==="denied"?e.kind:"err",e.message);}
+  render();
+}
+function nameFromEmail(e){if(!e)return "";const p=e.split("@")[0].split(/[._-]+/).filter(Boolean);return p.map(w=>{w=w[0].toUpperCase()+w.slice(1);return /^Mc./.test(w)?"Mc"+w[2].toUpperCase()+w.slice(3):w;}).join(" ");}
+const auditorName = r=>r.example?"Example":(r.createdBy?(r.createdBy===state.me?"You":nameFromEmail(r.createdBy)):"You");
+function putLocal(rec){const i=state.records.findIndex(x=>x.id===rec.id);if(i>=0)state.records[i]=rec;else state.records.push(rec);}
+async function saveRecord(rec){
+  if(state.example){toast("Example mode: nothing is saved. Turn it off in Set-up.");return false;}
+  if(!state.loaded){toast("Audits have not loaded yet, so nothing was saved. Reload the page.");return false;}
+  const base=rec.id?(state.records.find(x=>x.id===rec.id)?.updatedAt||""):"";
+  try{
+    const j=await api("POST",{action:"save",audit:rec,base});
+    if(j.conflict){putLocal(j.audit);render();toast("This audit was changed somewhere else. The latest version is now shown; make your change again.");return false;}
+    if(!j.ok){toast("Not saved: "+(j.error||"unknown problem"));return false;}
+    putLocal(j.audit); return true;
+  }catch(e){if(e.kind==="signin")showStatus("signin",e.message);toast("Not saved: "+e.message);return false;}
+}
+async function patchRecord(id,patch){
+  if(state.example){const r=state.exampleRecords.find(x=>x.id===id);if(r){Object.assign(r,patch,{done:{...(r.done||{}),...(patch.done||{})}});render();}return;}
+  const [key,value]=Object.entries(patch.done||{}).find(([k,v])=>{const r=state.records.find(x=>x.id===id);return !!r?.done?.[k]!==v;})||[];
+  if(!key) return;
+  try{const j=await api("POST",{action:"setDone",id,key,value});if(!j.ok){toast("Not saved: "+j.error);return;}putLocal(j.audit);render();toast(value?"Marked done":"Reopened");}
+  catch(e){toast("Not saved: "+e.message);}
+}
+async function deleteRecord(id){
+  if(state.example){state.exampleRecords=state.exampleRecords.filter(r=>r.id!==id);render();return;}
+  try{const j=await api("POST",{action:"delete",id});if(!j.ok){toast("Not deleted: "+j.error);return;}state.records=state.records.filter(r=>r.id!==id);render();toast("Audit deleted");}
+  catch(e){toast("Not deleted: "+e.message);}
+}
+function showStatus(kind,msg){
+  if(kind!==undefined){state.statusKind=kind;state.statusMsg=msg;} else {kind=state.statusKind;msg=state.statusMsg;}
+  const el=document.getElementById("status");
+  if(state.example){el.innerHTML=`<div class="banner"><b>Example data.</b> These audits are made up so you can see how the reports look. Nothing you do is saved. <button class="btn small" data-act="example-off">Turn off examples</button></div>`;return;}
+  if(kind==="signin"){el.innerHTML=`<div class="banner err"><b>Signed out.</b> ${esc(msg)} <button class="btn small" data-act="reload">Reload</button></div>`;return;}
+  if(kind==="denied"){el.innerHTML=`<div class="banner err"><b>No access.</b> ${esc(msg)}</div>`;return;}
+  if(kind==="err"){el.innerHTML=`<div class="banner err"><b>Audits could not be loaded.</b> ${esc(msg||"")} <button class="btn small" data-act="reload">Reload</button></div>`;return;}
+  el.innerHTML="";
+}
+
+/* ------------------------------------------------------------------ pickers + nav */
+function years(){const s=new Set([state.settings.year,...allRecords().map(r=>r.year).filter(Boolean)]);return [...s].sort();}
+function renderPickers(){
+  if(!state.year) state.year=state.settings.year;
+  if(!state.term) state.term=guessTerm();
+  const yp=document.getElementById("yearPick"), tp=document.getElementById("termPick");
+  yp.innerHTML=years().map(y=>`<option${y===state.year?" selected":""}>${esc(y)}</option>`).join("");
+  tp.innerHTML=[...TERMS,"Whole year"].map(t=>`<option${t===state.term?" selected":""}>${t}</option>`).join("");
+  document.getElementById("academyLabel").textContent=state.settings.academy+" · "+state.year;
+}
+document.getElementById("yearPick").addEventListener("change",e=>{state.year=e.target.value;render();});
+document.getElementById("termPick").addEventListener("change",e=>{state.term=e.target.value;render();});
+document.querySelector("nav.tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-view]");if(b)go(b.dataset.view);});
+function go(v){state.view=v;try{history.replaceState(null,"","#"+v);}catch(e){}render();window.scrollTo(0,0);}
+
+function render(){
+  renderPickers(); showStatus();
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.view===state.view?"page":"false"));
+  document.querySelectorAll("[data-v]").forEach(s=>s.hidden=s.id!=="view-"+state.view);
+  const fn={audit:renderAudit,dashboard:renderDashboard,termly:renderTermly,council:renderCouncil,followups:renderFollowups,records:renderRecords,setup:renderSetup}[state.view];
+  fn&&fn();
+}
+
+/* ------------------------------------------------------------------ audit form */
+let formBuilt=false;
+function seg(name,opts,val){return `<div class="seg" role="radiogroup">${opts.map(o=>`<label><input type="radio" name="${name}" value="${esc(o)}"${o===val?" checked":""}><span>${esc(o)}</span></label>`).join("")}</div>`;}
+function renderAudit(){
+  const el=document.getElementById("view-audit");
+  if(formBuilt&&el.dataset.for===(state.editing?.id||"new")){updateForm();return;}
+  const r=state.editing||{};
+  el.dataset.for=r.id||"new";
+  const a=r.answers||{};
+  let n=0;
+  const checkHtml=sec=>CHECKS.filter(c=>c.sec===sec).map(c=>{n++;const iss=r.issues?.[c.id]||{};
+    return `<div class="q" data-q="${c.id}"><div class="num">${n}</div><div class="txt">${esc(c.t)}</div>${seg(c.id,c.opts||YNA,a[c.id])}
+      ${c.noFollow?"":`<div class="follow" data-follow="${c.id}" hidden>
+        <label>${esc(c.noLabel||"Evidence / issue identified")}<input type="text" name="${c.id}_issue" value="${esc(iss.issue)}" maxlength="300"></label>
+        <label>Required action<input type="text" name="${c.id}_action" value="${esc(iss.action)}" maxlength="300"></label></div>`}</div>`;}).join("");
+  const sec=k=>`<fieldset data-sec="${k}"><legend>${SECTIONS[k].title}</legend>${SECTIONS[k].note?`<p class="sec-note">${SECTIONS[k].note}</p>`:""}${checkHtml(k)}</fieldset>`;
+  const catOpts=Object.keys(CATEGORIES).map(c=>`<option${c===r.category?" selected":""}>${esc(c)}</option>`).join("");
+  el.innerHTML=`
+  <h2>${r.id?"Edit audit":"New audit"}</h2>
+  <p class="lede">One audit per CPOMS record. Most answers are a single tap. Use the CPOMS incident ID only, never a pupil's name or initials, in any box.</p>
+  <form class="audit" id="auditForm" novalidate>
+    <fieldset><legend>Incident information</legend>
+      <div class="fields">
+        <label class="f" data-f="term"><span>Term</span><select name="term"><option value="">Choose…</option>${TERMS.map(t=>`<option${t===(r.term||state.term)?" selected":""}>${t}</option>`).join("")}</select></label>
+        <label class="f" data-f="year"><span>Academic year</span><input type="text" name="year" value="${esc(r.year||state.year||state.settings.year)}" maxlength="9"></label>
+        <label class="f" data-f="cpomsId"><span>CPOMS incident ID</span><input type="text" name="cpomsId" inputmode="numeric" class="mono" value="${esc(r.cpomsId)}" maxlength="20" autocomplete="off"></label>
+        <label class="f" data-f="incidentDate"><span>Incident date</span><input type="date" name="incidentDate" value="${esc(r.incidentDate)}"></label>
+        <label class="f" data-f="category"><span>Category</span><select name="category"><option value="">Choose…</option>${catOpts}</select></label>
+        <label class="f" data-f="sub" id="subWrap"><span>Sub-category</span><select name="sub"></select></label>
+        <label class="f" data-f="auditDate"><span>Audit date</span><input type="date" name="auditDate" value="${esc(r.auditDate||todayISO())}"></label>
+        <div class="f"><span>Auditor</span><div style="padding-top:6px">${r.id?esc(auditorName(r)):"You (recorded automatically)"}</div></div>
+      </div>
+      <div class="q" data-q="onlineSafety" style="margin-top:8px"><div class="num">·</div><div class="txt">Does this incident involve online safety? <span class="note">(counts toward the termly Online Safety total)</span></div>${seg("onlineSafety",["Yes","No"],r.onlineSafety)}</div>
+      <div class="q" data-q="repeat"><div class="num">·</div><div class="txt">Is this a repeat concern for the same pupil?</div>${seg("repeat",["Yes","No","Not known"],r.repeat)}</div>
+      <label class="f wide" style="margin-top:6px"><span>Incident type / context (optional, for the termly review table — no names)</span><textarea name="context" maxlength="600">${esc(r.context)}</textarea></label>
+    </fieldset>
+    ${sec("rec")}${sec("time")}
+    <fieldset data-sec="voice"><legend>${SECTIONS.voice.title}</legend>${checkHtml("voice")}
+      <div class="q" data-q="pvReason" data-cond="pvReason" hidden><div class="num"></div><label class="f" style="grid-column:2/-1"><span>Reason pupil voice not recorded</span><input type="text" name="pvReason" value="${esc(r.pvReason)}" maxlength="300"></label></div>
+    </fieldset>
+    ${sec("int")}${sec("ph")}
+    <fieldset data-sec="evidence"><legend>Evidence and actions</legend>
+      <div class="q" data-q="evidence"><div class="num">${++n}</div><div class="txt">Was evidence obtained?</div>${seg("evidence",["Yes","No"],r.evidence)}</div>
+      <div data-cond="evTypes" hidden style="padding:4px 0 12px">
+        <p class="sec-note">Evidence type (tick all that apply)</p>
+        <div class="checks">${EVIDENCE.map(e=>`<label><input type="checkbox" name="evTypes" value="${esc(e)}"${(r.evTypes||[]).includes(e)?" checked":""}>${esc(e)}</label>`).join("")}</div>
+        <label class="f" data-cond="evOther" hidden style="margin-top:8px"><span>Other evidence</span><input type="text" name="evOther" value="${esc(r.evOther)}" maxlength="200"></label>
+      </div>
+      <div class="q" data-q="interventions"><div class="num">${++n}</div><div class="txt">Were interventions implemented?</div>${seg("interventions",["Yes","No"],r.interventions)}</div>
+      <div data-cond="intTypes" hidden style="padding:4px 0 12px">
+        <p class="sec-note">Intervention type (tick all that apply)</p>
+        <div class="checks">${INTERVENTIONS.map(e=>`<label><input type="checkbox" name="intTypes" value="${esc(e)}"${(r.intTypes||[]).includes(e)?" checked":""}>${esc(e)}</label>`).join("")}</div>
+        <label class="f" data-cond="intOther" hidden style="margin-top:8px"><span>Other intervention</span><input type="text" name="intOther" value="${esc(r.intOther)}" maxlength="200"></label>
+      </div>
+      <div class="fields" style="margin-top:6px">
+        <label class="f"><span>Academy response (optional, for the termly review table)</span><textarea name="response" maxlength="600">${esc(r.response)}</textarea></label>
+        <label class="f"><span>Impact of interventions / follow-up (optional)</span><textarea name="impactText" maxlength="600">${esc(r.impactText)}</textarea></label>
+      </div>
+    </fieldset>
+    <fieldset data-sec="rag"><legend>RAG rating</legend>
+      <div class="q" data-q="rag"><div class="num">${++n}</div><div class="txt">Audit outcome</div>${seg("rag",["Green","Amber","Red"],r.rag)}</div>
+      <p class="sec-note">Green: fully actioned · Amber: actioned with considerations · Red: action required</p>
+      <div class="fields" data-cond="fu" hidden>
+        <label class="f wide" data-f="fuAction"><span>What follow-up action is required?</span><textarea name="fuAction" maxlength="600">${esc(r.fuAction)}</textarea></label>
+        <label class="f" data-f="fuOwner"><span>Who is responsible?</span><input type="text" name="fuOwner" value="${esc(r.fuOwner)}" maxlength="120"></label>
+        <label class="f" data-f="fuTarget"><span>Target completion date</span><input type="date" name="fuTarget" value="${esc(r.fuTarget)}"></label>
+      </div>
+    </fieldset>
+    <div class="formbar"><span class="msg" id="formMsg"></span>
+      ${r.id?`<button type="button" class="btn" data-act="cancel-edit">Cancel</button>`:`<button type="button" class="btn" data-act="clear-form">Clear</button>`}
+      <button type="submit" class="btn primary" id="saveBtn">${r.id?"Save changes":"Save audit"}</button></div>
+  </form>`;
+  formBuilt=true;
+  const f=document.getElementById("auditForm");
+  f.addEventListener("change",updateForm);
+  f.addEventListener("submit",submitForm);
+  fillSubs(r.sub);
+  updateForm();
+}
+function fillSubs(selected){
+  const f=document.getElementById("auditForm"); if(!f) return;
+  const subs=CATEGORIES[f.category.value]||[];
+  const cur=selected!==undefined?selected:f.sub.value;
+  f.sub.innerHTML=`<option value="">Choose…</option>`+subs.map(s=>`<option${s===cur?" selected":""}>${esc(s)}</option>`).join("");
+  document.getElementById("subWrap").hidden=!subs.length;
+}
+function readForm(){
+  const f=document.getElementById("auditForm"); const fd=new FormData(f);
+  const g=k=>(fd.get(k)||"").toString().trim();
+  const rec={term:g("term"),year:g("year"),cpomsId:g("cpomsId"),incidentDate:g("incidentDate"),category:g("category"),sub:g("sub"),
+    auditDate:g("auditDate"),onlineSafety:g("onlineSafety"),repeat:g("repeat"),context:g("context"),answers:{},issues:{},
+    pvReason:g("pvReason"),evidence:g("evidence"),evTypes:fd.getAll("evTypes"),evOther:g("evOther"),
+    interventions:g("interventions"),intTypes:fd.getAll("intTypes"),intOther:g("intOther"),response:g("response"),impactText:g("impactText"),
+    rag:g("rag"),fuAction:g("fuAction"),fuOwner:g("fuOwner"),fuTarget:g("fuTarget")};
+  for(const c of CHECKS){rec.answers[c.id]=g(c.id); const i=g(c.id+"_issue"), a=g(c.id+"_action"); if(i||a) rec.issues[c.id]={issue:i,action:a};}
+  return rec;
+}
+function updateForm(e){
+  const f=document.getElementById("auditForm"); if(!f) return;
+  if(e&&e.target&&e.target.name==="category"){fillSubs("");}
+  if(e&&e.target&&e.target.name==="sub"&&ONLINE_SUBS.includes(e.target.value)){const y=f.querySelector('input[name="onlineSafety"][value="Yes"]');if(y&&!f.querySelector('input[name="onlineSafety"]:checked'))y.checked=true;}
+  const r=readForm();
+  for(const c of CHECKS){
+    const q=f.querySelector(`[data-q="${c.id}"]`); const on=applies(c,r); q.hidden=!on;
+    const fl=f.querySelector(`[data-follow="${c.id}"]`); if(fl) fl.hidden=!(on&&r.answers[c.id]==="No");
+  }
+  f.querySelector('[data-sec="ph"]').hidden=r.category!=="Positive Handling";
+  f.querySelector('[data-cond="pvReason"]').hidden=r.answers.pv1!=="No";
+  f.querySelector('[data-cond="evTypes"]').hidden=r.evidence!=="Yes";
+  f.querySelector('[data-cond="evOther"]').hidden=!r.evTypes.includes("Other");
+  f.querySelector('[data-cond="intTypes"]').hidden=r.interventions!=="Yes";
+  f.querySelector('[data-cond="intOther"]').hidden=!r.intTypes.includes("Other");
+  f.querySelector('[data-cond="fu"]').hidden=!(r.rag==="Amber"||r.rag==="Red");
+  if(e) {const left=missing(r).length;document.getElementById("formMsg").textContent=left?`${left} answer${left>1?"s":""} still to give`:"Ready to save";}
+}
+function missing(r){
+  const m=[];
+  for(const k of ["term","year","cpomsId","incidentDate","category","auditDate","onlineSafety","repeat","evidence","interventions","rag"]) if(!r[k]) m.push(k);
+  if((CATEGORIES[r.category]||[]).length&&!r.sub) m.push("sub");
+  for(const c of CHECKS) if(applies(c,r)&&!r.answers[c.id]) m.push(c.id);
+  if(r.rag==="Amber"||r.rag==="Red") for(const k of ["fuAction","fuOwner","fuTarget"]) if(!r[k]) m.push(k);
+  return m;
+}
+async function submitForm(e){
+  e.preventDefault();
+  const f=e.target; const r=readForm(); const miss=missing(r);
+  f.querySelectorAll(".missing").forEach(x=>x.classList.remove("missing"));
+  if(miss.length){
+    for(const k of miss){const el=f.querySelector(`[data-q="${k}"],[data-f="${k}"]`);if(el)el.classList.add("missing");}
+    const first=f.querySelector(".missing"); if(first) first.scrollIntoView({block:"center",behavior:"smooth"});
+    document.getElementById("formMsg").textContent=`${miss.length} answer${miss.length>1?"s":""} still to give (marked in red)`;
+    return;
+  }
+  // drop answers to questions that no longer apply
+  for(const c of CHECKS) if(!applies(c,r)){delete r.answers[c.id];delete r.issues[c.id];}
+  for(const id of Object.keys(r.issues)) if(r.answers[id]!=="No") delete r.issues[id];
+  if(r.answers.pv1!=="No") r.pvReason="";
+  if(r.evidence!=="Yes"){r.evTypes=[];r.evOther="";}
+  if(r.interventions!=="Yes"){r.intTypes=[];r.intOther="";}
+  if(!(r.rag==="Amber"||r.rag==="Red")){r.fuAction="";r.fuOwner="";r.fuTarget="";}
+  const prev=state.editing;
+  const rec={...r,v:1,done:prev?.done||{},createdAt:prev?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
+  if(prev?.id) rec.id=prev.id;
+  if(state.example){rec.id=rec.id||"ex"+Date.now();rec.example=true;state.exampleRecords=state.exampleRecords.filter(x=>x.id!==rec.id).concat(rec);toast("Example mode: added to the example data only");}
+  else {document.getElementById("saveBtn").disabled=true; const ok=await saveRecord(rec); document.getElementById("saveBtn").disabled=false; if(!ok) return; toast(prev?"Changes saved":"Audit saved");}
+  const keepTerm=r.term, keepYear=r.year;
+  state.editing=null; formBuilt=false;
+  if(prev){go("records");return;}
+  renderAudit();
+  const nf=document.getElementById("auditForm"); nf.term.value=keepTerm; nf.year.value=keepYear;
+  window.scrollTo(0,0);
+}
+
+/* ------------------------------------------------------------------ dashboard */
+function pctCell(v){return `<span class="pct ${pctCls(v)}">${pctTxt(v)}</span>`;}
+function stackBar(g,a,r){const t=g+a+r;if(!t)return `<div class="stack"></div>`;return `<div class="stack" title="${g} green, ${a} amber, ${r} red"><i class="G" style="width:${g/t*100}%"></i><i class="A" style="width:${a/t*100}%"></i><i class="R" style="width:${r/t*100}%"></i></div>`;}
+function bars(entries,total){
+  const max=Math.max(1,...entries.map(e=>e[1]));
+  return `<div class="bars">${entries.map(([k,v])=>`<div class="b"><span class="lab">${esc(k)}</span><div class="meter"><i style="width:${v/max*100}%"></i></div><span class="n" style="text-align:right;font-variant-numeric:tabular-nums">${v}</span></div>`).join("")}</div>`;
+}
+function emptyState(msg){return `<div class="card empty"><p><b>${msg}</b></p><p>Add audits on the <b>New audit</b> tab, or look around with example data from <b>Set-up</b>.</p></div>`;}
+function scopeLabel(){return state.term==="Whole year"?state.year:`${state.term} ${state.year}`;}
+function renderDashboard(){
+  const el=document.getElementById("view-dashboard"); const recs=scoped(); const m=metrics(recs);
+  if(!recs.length){el.innerHTML=`<h2>Dashboard · ${esc(scopeLabel())}</h2>`+emptyState(state.loaded||state.example?"No audits for this term yet":"Loading audits…");return;}
+  const comp=[["Logged promptly","rs2"],["Correct category assigned","rs3"],["Pupil voice recorded","pv1"],["Clear outcome recorded","ii3"],["Evidence interventions completed","ii2"],["Timely response","tm1"]];
+  const prac=[["Pupil voice recorded","pv1"],["Pupil voice meaningful","pv2"],["Parental feedback recorded","pf1"],["Impact of interventions recorded","ii4"],["Escalation for repeat concerns","ii5"],["Body map used when required","rs8"]];
+  const errors=CHECKS.map(c=>[c.short,m.checks[c.id].No]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+  const acts=Object.values(m.actions).sort((a,b)=>b.n-a.n).slice(0,8);
+  const ev=Object.entries(m.ev).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+  const iv=Object.entries(m.int).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+  const cats=Object.entries(m.cats).sort((a,b)=>b[1].n-a[1].n);
+  const subs=Object.entries(m.subs).sort((a,b)=>b[1]-a[1]);
+  const trend=TERMS.map(t=>{const rs=allRecords().filter(r=>inScope(r,t));return {t,n:rs.length,p:pct(rs.filter(fullyCompliant).length,rs.length)};});
+  el.innerHTML=`
+  <h2>Dashboard · ${esc(scopeLabel())}</h2>
+  <p class="lede">A record is <b>fully compliant</b> when none of the recording, timeliness, pupil voice or intervention checks (Q1–24 in the proposal) is answered No. Percentages leave out N/A.</p>
+  <div class="tiles">
+    <div class="tile hero"><div class="k">Fully compliant records</div><div class="v">${pctTxt(pct(m.compliant,m.n))}</div><div class="s">${m.compliant} of ${m.n} audited</div></div>
+    <div class="tile"><div class="k">Records audited</div><div class="v">${m.n}</div><div class="s">${m.repeat} repeat concern${m.repeat===1?"":"s"}</div></div>
+    <div class="tile"><div class="k">RAG outcome</div><div class="v" style="font-size:1.6rem;padding-top:6px"><span class="pill Green">${m.rag.Green} G</span> <span class="pill Amber">${m.rag.Amber} A</span> <span class="pill Red">${m.rag.Red} R</span></div><div style="margin-top:8px">${stackBar(m.rag.Green,m.rag.Amber,m.rag.Red)}</div></div>
+    <div class="tile"><div class="k">Open actions</div><div class="v">${m.open}</div><div class="s">${m.overdue} overdue</div></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h3>Compliance</h3><div class="tablewrap"><table><thead><tr><th>Measure</th><th class="n">% Yes</th><th></th></tr></thead><tbody>
+      ${comp.map(([l,id])=>{const v=m.pctYes(id);return `<tr><td>${l}</td><td class="n">${pctCell(v)}</td><td style="width:35%"><div class="meter"><i style="width:${(v||0)*100}%"></i></div></td></tr>`;}).join("")}
+    </tbody></table></div></div>
+    <div class="card"><h3>Safeguarding practice</h3><div class="tablewrap"><table><thead><tr><th>Measure</th><th class="n">% Yes</th><th></th></tr></thead><tbody>
+      ${prac.map(([l,id])=>{const v=m.pctYes(id);return `<tr><td>${l}</td><td class="n">${pctCell(v)}</td><td style="width:35%"><div class="meter"><i style="width:${(v||0)*100}%"></i></div></td></tr>`;}).join("")}
+    </tbody></table></div></div>
+    <div class="card"><h3>Most common recording errors</h3>${errors.length?bars(errors.slice(0,10)):`<p class="muted">No checks answered No.</p>`}</div>
+    <div class="card"><h3>Most common follow-up actions</h3>${acts.length?`<div class="tablewrap"><table><thead><tr><th>Action</th><th class="n">Times</th></tr></thead><tbody>${acts.map(a=>`<tr><td>${esc(a.text)}</td><td class="n">${a.n}</td></tr>`).join("")}</tbody></table></div>`:`<p class="muted">No actions recorded.</p>`}</div>
+    <div class="card"><h3>Evidence types</h3><p class="note">Evidence obtained in ${m.evYes} of ${m.evYes+m.evNo} records</p>${ev.length?bars(ev):`<p class="muted">None recorded.</p>`}</div>
+    <div class="card"><h3>Intervention types</h3><p class="note">Interventions implemented in ${m.intYes} of ${m.intYes+m.intNo} records</p>${iv.length?bars(iv):`<p class="muted">None recorded.</p>`}</div>
+  </div>
+  <div class="card" style="margin-top:16px"><h3>By category</h3><div class="tablewrap"><table><thead><tr><th>Category</th><th class="n">Audited</th><th class="n">Green</th><th class="n">Amber</th><th class="n">Red</th><th>RAG</th><th class="n">Fully compliant</th></tr></thead><tbody>
+    ${cats.map(([c,v])=>`<tr><td>${esc(c)}</td><td class="n">${v.n}</td><td class="n">${v.Green}</td><td class="n">${v.Amber}</td><td class="n">${v.Red}</td><td style="min-width:110px">${stackBar(v.Green,v.Amber,v.Red)}</td><td class="n">${pctCell(pct(v.compliant,v.n))}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="note" style="margin-top:10px">Termly focus areas: ${FOCUS.map(f=>`${f} <b>${m.focus[f]}</b>`).join(" · ")}</p></div>
+  <div class="grid g2" style="margin-top:16px">
+    <div class="card"><h3>Sub-categories</h3>${subs.length?bars(subs.slice(0,15)):`<p class="muted">None recorded.</p>`}</div>
+    <div class="card"><h3>Fully compliant by term · ${esc(state.year)}</h3>
+      <div class="cols">${trend.map(x=>`<div class="c"><b>${x.n?pctTxt(x.p):""}</b><i style="height:${x.p==null?0:Math.max(2,x.p*130)}px"></i></div>`).join("")}</div>
+      <div class="cols-x">${trend.map(x=>`<span>${x.t.replace("Term ","T")}<br>${x.n} audit${x.n===1?"":"s"}</span>`).join("")}</div></div>
+  </div>
+  <div class="card" style="margin-top:16px"><h3>Every check</h3><div class="tablewrap"><table><thead><tr><th>#</th><th>Question</th><th class="n">Yes</th><th class="n">No</th><th class="n">N/A</th><th class="n">% Yes</th><th>In headline</th></tr></thead><tbody>
+    ${CHECKS.map((c,i)=>{const x=m.checks[c.id];return `<tr><td class="n">${i+1}</td><td>${esc(c.t)}</td><td class="n">${x.Yes}</td><td class="n">${x.No}</td><td class="n">${x["N/A"]}</td><td class="n">${pctCell(m.pctYes(c.id))}</td><td>${c.core?"Yes":"<span class='muted'>No</span>"}</td></tr>`;}).join("")}
+  </tbody></table></div></div>`;
+}
+
+/* ------------------------------------------------------------------ termly review (trust template) */
+function termlyRows(){
+  let recs=scoped();
+  if(state.termlyScope==="focus") recs=recs.filter(r=>focusAreas(r).length);
+  const order=r=>{const f=focusAreas(r);return f.length?FOCUS.indexOf(f[0]):3;};
+  return recs.slice().sort((a,b)=>order(a)-order(b)||String(a.incidentDate).localeCompare(String(b.incidentDate)));
+}
+function termlyCells(r){
+  const type=(r.category==="Child on Child"||!r.sub?(r.sub||r.category):r.category+" › "+r.sub)+(r.onlineSafety==="Yes"&&r.category!=="Child on Child"?" (online)":"")+(r.context?" — "+r.context:"");
+  const ivs=(r.intTypes||[]).map(x=>x==="Other"&&r.intOther?r.intOther:x);
+  const evs=(r.evTypes||[]).map(x=>x==="Other"&&r.evOther?r.evOther:x);
+  const resp=[r.response, ivs.length?"Interventions: "+ivs.join(", "):"No interventions recorded", evs.length?"Evidence: "+evs.join(", "):""].filter(Boolean).join(". ");
+  const pv=r.answers?.pv1==="Yes"?"Y":r.answers?.pv1==="No"?"N":"N/A";
+  const imp=[r.impactText, r.answers?.ii4==="Yes"?"Impact recorded.":r.answers?.ii4==="No"?"Impact not recorded.":"",
+    (r.rag==="Amber"||r.rag==="Red")&&r.fuAction?`Follow-up: ${r.fuAction} (${r.fuOwner}${r.fuTarget?", by "+fmtDate(r.fuTarget):""}).`:""].filter(Boolean).join(" ");
+  const cat=focusAreas(r).join(" / ")||r.category;
+  return [fmtDate(r.incidentDate), cat, `${type} (CPOMS ${r.cpomsId})`, resp, pv, imp, r.rag];
+}
+function renderTermly(){
+  const el=document.getElementById("view-termly"); const recs=scoped(); const rows=termlyRows(); const m=metrics(recs); const mf=metrics(rows);
+  const head=["Incident Date","Category","Incident Type/Context","Academy Response","Pupil Voice (Y or N)","Impact of Interventions/Follow Up","RAG"];
+  const pvY=mf.checks.pv1.Yes, pfY=mf.checks.pf1.Yes;
+  el.innerHTML=`
+  <div class="row" style="justify-content:space-between;align-items:flex-end;margin-bottom:12px">
+    <div><h2>CPOMS Termly Incident Review</h2><p class="lede" style="margin:0">Child on Child Abuse / Positive Handling / Online Safety · filled in from the audits</p></div>
+    <div class="row">
+      <div class="seg" role="radiogroup" aria-label="Which records"><label><input type="radio" name="tscope" value="focus"${state.termlyScope==="focus"?" checked":""}><span>Focus areas</span></label><label><input type="radio" name="tscope" value="all"${state.termlyScope==="all"?" checked":""}><span>All categories</span></label></div>
+      <button class="btn" data-act="copy-termly">Copy table</button>
+      <button class="btn" data-act="csv-termly">Download CSV</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="fields" style="margin-bottom:14px">
+      <div><span class="note">Academy</span><div><b>${esc(state.settings.academy)}</b></div></div>
+      <div><span class="note">Term</span><div><b>${esc(scopeLabel())}</b></div></div>
+      ${FOCUS.map(f=>`<div><span class="note">No. of ${f} incidents</span><div style="font-family:var(--display);font-size:1.6rem;font-weight:700">${m.focus[f]}</div></div>`).join("")}
+    </div>
+    ${rows.length?`<div class="tablewrap"><table id="termlyTable"><thead><tr>${head.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>
+      ${rows.map(r=>{const c=termlyCells(r);return `<tr><td class="n">${esc(c[0])}</td><td>${esc(c[1])}</td><td>${esc(c[2])}</td><td>${esc(c[3])}</td><td style="text-align:center">${esc(c[4])}</td><td>${esc(c[5])}</td><td>${c[6]?`<span class="pill ${c[6]}">${c[6]}</span>`:""}</td></tr>`;}).join("")}
+    </tbody></table></div>`:`<p class="empty">No audits in ${state.termlyScope==="focus"?"the three focus areas":"any category"} for ${esc(scopeLabel())}.</p>`}
+  </div>
+  <div class="card" style="margin-top:16px"><h3>Review of incidents</h3>
+    <div class="tablewrap"><table><tbody>
+      <tr><td>Total number of incidents and breakdown</td><td>${mf.n} audited${state.termlyScope==="focus"?" in the focus areas":""}: ${FOCUS.map(f=>`${f} ${mf.focus[f]}`).join(", ")}</td></tr>
+      <tr><td>What evidence was obtained?</td><td>${mf.evYes} of ${mf.n} records. ${Object.entries(mf.ev).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k} ${v}`).join(", ")||"—"}</td></tr>
+      <tr><td>What interventions were implemented?</td><td>${mf.intYes} of ${mf.n} records. ${Object.entries(mf.int).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k} ${v}`).join(", ")||"—"}</td></tr>
+      <tr><td>Is pupil voice recorded?</td><td>${pvY} records (${pctTxt(mf.pctYes("pv1"))} where it applied)</td></tr>
+      <tr><td>Is parental feedback recorded?</td><td>${pfY} records (${pctTxt(mf.pctYes("pf1"))} where it applied)</td></tr>
+      <tr><td>What was the impact of the interventions?</td><td>Impact recorded in ${mf.checks.ii4.Yes} records (${pctTxt(mf.pctYes("ii4"))}). Outcome clearly recorded in ${pctTxt(mf.pctYes("ii3"))}.</td></tr>
+      <tr><td>Have interventions escalated for repeat perpetrators?</td><td>${mf.repeat} repeat concern${mf.repeat===1?"":"s"}; escalation evident in ${pctTxt(mf.pctYes("ii5"))} where it applied.</td></tr>
+      <tr><td>RAG rating</td><td><span class="pill Green">${mf.rag.Green} Green</span> <span class="pill Amber">${mf.rag.Amber} Amber</span> <span class="pill Red">${mf.rag.Red} Red</span></td></tr>
+      <tr><td>What follow-up actions are required?</td><td>${rows.flatMap(listActions).filter(a=>a.action).map(a=>esc(a.action)+(a.done?" (done)":"")).join("; ")||"None"}</td></tr>
+    </tbody></table></div></div>`;
+  el.querySelectorAll('input[name="tscope"]').forEach(i=>i.addEventListener("change",()=>{state.termlyScope=i.value;renderTermly();}));
+}
+
+/* ------------------------------------------------------------------ Academy Council */
+function governorLines(){
+  const recs=scoped(); const m=metrics(recs);
+  const errs=CHECKS.map(c=>[c.short,m.checks[c.id].No]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const prevTerm=TERMS[TERMS.indexOf(state.term)-1];
+  let trend="";
+  if(prevTerm){const pr=allRecords().filter(r=>inScope(r,prevTerm));if(pr.length&&recs.length){const a=pct(m.compliant,m.n),b=pct(pr.filter(fullyCompliant).length,pr.length);const d=Math.round((a-b)*100);trend=` This is ${d===0?"the same as":Math.abs(d)+" points "+(d>0?"up on":"down on")} ${prevTerm} (${pctTxt(b)}).`;}}
+  return [
+    `${m.n} CPOMS record${m.n===1?" was":"s were"} audited in ${scopeLabel()}: ${FOCUS.map(f=>`${f} ${m.focus[f]}`).join(", ")}.`,
+    `Fully compliant records: ${pctTxt(pct(m.compliant,m.n))} (${m.compliant} of ${m.n}).${trend}`,
+    `RAG outcomes: ${m.rag.Green} Green, ${m.rag.Amber} Amber, ${m.rag.Red} Red.`,
+    `Records logged promptly: ${pctTxt(m.pctYes("rs2"))}. Correct category: ${pctTxt(m.pctYes("rs3"))}. Timely response: ${pctTxt(m.pctYes("tm1"))}.`,
+    `Pupil voice recorded: ${pctTxt(m.pctYes("pv1"))}. Parental feedback recorded: ${pctTxt(m.pctYes("pf1"))}. Impact of interventions recorded: ${pctTxt(m.pctYes("ii4"))}.`,
+    `Escalation for repeat concerns: ${pctTxt(m.pctYes("ii5"))}. Body maps used when required: ${pctTxt(m.pctYes("rs8"))}.`,
+    `Checks most often answered No: ${errs.length?errs.map(([k,v])=>`${k.toLowerCase()} (${v})`).join(", "):"none"}.`,
+    `Follow-up actions: ${m.open} open${m.overdue?`, ${m.overdue} overdue`:""}.`
+  ];
+}
+function renderCouncil(){
+  const el=document.getElementById("view-council"); const recs=scoped();
+  const rowsT=TERMS.map(t=>{const rs=allRecords().filter(r=>inScope(r,t));return {t,m:metrics(rs)};});
+  const tr=(lab,f)=>`<tr><td>${lab}</td>${rowsT.map(x=>`<td class="n">${x.m.n?f(x.m):"–"}</td>`).join("")}</tr>`;
+  el.innerHTML=`
+  <div class="row" style="justify-content:space-between;align-items:flex-end;margin-bottom:12px">
+    <div><h2>Academy Council summary · ${esc(scopeLabel())}</h2><p class="lede" style="margin:0">Aggregate figures only. No incident detail appears here.</p></div>
+    <button class="btn" data-act="copy-gov">Copy summary</button>
+  </div>
+  ${recs.length?`<div class="card gov">${governorLines().map(l=>`<p>${esc(l)}</p>`).join("")}</div>`:emptyState("No audits for this term yet")}
+  <div class="card" style="margin-top:16px"><h3>Year trend · ${esc(state.year)}</h3><div class="tablewrap"><table><thead><tr><th>Measure</th>${TERMS.map(t=>`<th class="n">${t}</th>`).join("")}</tr></thead><tbody>
+    ${tr("Records audited",m=>m.n)}
+    ${tr("Fully compliant",m=>pctTxt(pct(m.compliant,m.n)))}
+    ${tr("Logged promptly",m=>pctTxt(m.pctYes("rs2")))}
+    ${tr("Correct category",m=>pctTxt(m.pctYes("rs3")))}
+    ${tr("Timely response",m=>pctTxt(m.pctYes("tm1")))}
+    ${tr("Pupil voice recorded",m=>pctTxt(m.pctYes("pv1")))}
+    ${tr("Parental feedback recorded",m=>pctTxt(m.pctYes("pf1")))}
+    ${tr("Impact recorded",m=>pctTxt(m.pctYes("ii4")))}
+    ${tr("Escalation for repeat concerns",m=>pctTxt(m.pctYes("ii5")))}
+    ${tr("Green",m=>m.rag.Green)}${tr("Amber",m=>m.rag.Amber)}${tr("Red",m=>m.rag.Red)}
+    ${FOCUS.map(f=>tr(f,m=>m.focus[f])).join("")}
+  </tbody></table></div></div>`;
+}
+
+/* ------------------------------------------------------------------ follow-ups */
+function renderFollowups(){
+  const el=document.getElementById("view-followups");
+  const items=scoped().flatMap(r=>listActions(r).map(a=>({...a,r}))).filter(a=>state.fuShow==="all"||!a.done)
+    .sort((a,b)=>(a.done-b.done)||String(a.target||"9").localeCompare(String(b.target||"9"))||String(a.r.incidentDate).localeCompare(String(b.r.incidentDate)));
+  el.innerHTML=`
+  <div class="row" style="justify-content:space-between;align-items:flex-end;margin-bottom:12px">
+    <div><h2>Follow-up actions · ${esc(scopeLabel())}</h2><p class="lede" style="margin:0">Amber/Red follow-ups and every action raised against a No answer.</p></div>
+    <div class="seg" role="radiogroup" aria-label="Show"><label><input type="radio" name="fushow" value="open"${state.fuShow==="open"?" checked":""}><span>Open</span></label><label><input type="radio" name="fushow" value="all"${state.fuShow==="all"?" checked":""}><span>All</span></label></div>
+  </div>
+  ${items.length?`<div class="tablewrap"><table><thead><tr><th>CPOMS</th><th>Type</th><th>About</th><th>Action</th><th>Who</th><th>Target</th><th>Done</th></tr></thead><tbody>
+    ${items.map(a=>{const over=!a.done&&a.target&&a.target<todayISO();return `<tr class="${a.done?"done-row":""}"><td class="mono">${esc(a.r.cpomsId)}</td><td>${a.kind==="Check"?`<span class="pill muted">Check</span>`:`<span class="pill ${a.kind}">${a.kind}</span>`}</td><td>${esc(a.label)}${a.issue?`<div class="note">${esc(a.issue)}</div>`:""}</td><td>${esc(a.action)||"<span class='muted'>No action written</span>"}</td><td>${esc(a.owner)}</td><td class="n">${a.target?fmtDate(a.target):""}${over?` <span class="pill no">Overdue</span>`:""}</td><td><button class="btn small" data-act="toggle-done" data-id="${a.r.id}" data-key="${a.key}">${a.done?"Reopen":"Mark done"}</button></td></tr>`;}).join("")}
+  </tbody></table></div>`:emptyState(state.fuShow==="open"?"No open actions for this term":"No actions for this term")}`;
+  el.querySelectorAll('input[name="fushow"]').forEach(i=>i.addEventListener("change",()=>{state.fuShow=i.value;renderFollowups();}));
+}
+
+/* ------------------------------------------------------------------ records */
+function renderRecords(){
+  const el=document.getElementById("view-records");
+  const q=state.recQuery.trim().toLowerCase();
+  const recs=scoped().filter(r=>!q||String(r.cpomsId).toLowerCase().includes(q)||String(r.category).toLowerCase().includes(q)||String(r.sub).toLowerCase().includes(q))
+    .sort((a,b)=>String(b.auditDate).localeCompare(String(a.auditDate)));
+  el.innerHTML=`
+  <div class="row" style="justify-content:space-between;align-items:flex-end;margin-bottom:12px">
+    <div><h2>Audit records · ${esc(scopeLabel())}</h2><p class="lede" style="margin:0">${recs.length} shown. Edit to correct an audit; changes update every report.</p></div>
+    <div class="row"><label class="f" style="min-width:220px"><span>Search CPOMS ID or category</span><input type="text" id="recSearch" value="${esc(state.recQuery)}"></label></div>
+  </div>
+  ${recs.length?`<div class="tablewrap"><table><thead><tr><th>CPOMS</th><th>Incident</th><th>Category</th><th>Audited</th><th>By</th><th>Compliant</th><th>RAG</th><th></th></tr></thead><tbody>
+    ${recs.map(r=>{const fails=coreFails(r);return `<tr><td class="mono">${esc(r.cpomsId)}</td><td class="n">${fmtDate(r.incidentDate)}</td><td>${esc(r.category)}${r.sub?`<div class="note">${esc(r.sub)}</div>`:""}</td><td class="n">${fmtDate(r.auditDate)}</td><td>${esc(auditorName(r))}</td>
+      <td>${fails.length?`<span class="pill no" title="${esc(fails.map(id=>CHECK[id].short).join(", "))}">${fails.length} No</span>`:`<span class="pill ok">Yes</span>`}</td><td>${r.rag?`<span class="pill ${r.rag}">${r.rag}</span>`:""}</td>
+      <td style="white-space:nowrap"><button class="btn small" data-act="edit" data-id="${r.id}">Edit</button> <button class="btn small danger" data-act="ask-delete" data-id="${r.id}">Delete</button>
+      ${state.confirmDelete===r.id?`<div class="confirm">Delete this audit for good? <button class="btn small danger" data-act="delete" data-id="${r.id}">Delete</button><button class="btn small" data-act="cancel-delete">Keep</button></div>`:""}</td></tr>`;}).join("")}
+  </tbody></table></div>`:emptyState(q?"No audits match that search":"No audits for this term yet")}`;
+  const s=document.getElementById("recSearch");
+  s.addEventListener("input",()=>{state.recQuery=s.value;clearTimeout(s._t);s._t=setTimeout(()=>{renderRecords();const n=document.getElementById("recSearch");n.focus();n.setSelectionRange(n.value.length,n.value.length);},250);});
+}
+
+/* ------------------------------------------------------------------ setup */
+function renderSetup(){
+  const el=document.getElementById("view-setup");
+  el.innerHTML=`
+  <h2>Set-up</h2>
+  <div class="grid g2">
+    <div class="card"><h3>School details</h3>
+      <div class="fields">
+        <label class="f"><span>Academy name</span><input type="text" id="setAcademy" value="${esc(state.settings.academy)}" maxlength="100"></label>
+        <label class="f"><span>Current academic year</span><input type="text" id="setYear" value="${esc(state.settings.year)}" maxlength="9" placeholder="2026-27"></label>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="btn primary" data-act="save-settings">Save details</button></div>
+    </div>
+    <div class="card"><h3>Export</h3><p class="note">Every audit, every answer, one row each. Opens in Excel.</p>
+      <div class="row"><button class="btn" data-act="csv-all">Download all audits (CSV)</button></div>
+      <p class="note" style="margin-top:10px">${allRecords().length} audit${allRecords().length===1?"":"s"} stored${state.example?" (example data)":""}.</p>
+    </div>
+    <div class="card"><h3>Example data</h3><p class="note">Fills the reports with made-up audits so you can see how everything looks. Nothing is saved while it is on.</p>
+      <div class="row"><button class="btn" data-act="${state.example?"example-off":"example-on"}">${state.example?"Turn off example data":"Show example data"}</button></div>
+    </div>
+    <div class="card"><h3>How it counts</h3>
+      <p class="note"><b>Fully compliant</b>: no recording, timeliness, pupil voice or intervention check answered No (Q1–24 in the proposal). Parental feedback and the positive handling checks are reported separately.</p>
+      <p class="note"><b>% Yes</b>: Yes ÷ (Yes + No). N/A and questions that did not apply are left out.</p>
+      <p class="note"><b>Focus areas</b> (termly review): Child on Child Abuse = category Child on Child; Positive Handling = category Positive Handling; Online Safety = answered Yes to the online safety question. One incident can count in two.</p>
+    </div>
+  </div>`;
+}
+async function saveSettings(){
+  const academy=document.getElementById("setAcademy").value.trim()||"Wallscourt Farm Academy";
+  const year=document.getElementById("setYear").value.trim()||currentYear();
+  if(state.example){state.settings={academy,year};state.year=year;render();toast("Example mode: details not saved");return;}
+  try{const j=await api("POST",{action:"saveSettings",settings:{academy,year}});if(!j.ok){toast("Not saved: "+j.error);return;}state.settings={...state.settings,...j.settings};state.year=year;render();toast("Details saved");}
+  catch(e){toast("Not saved: "+e.message);}
+}
+
+/* ------------------------------------------------------------------ export + copy */
+function csvEsc(v){v=Array.isArray(v)?v.join("; "):String(v??"");return /[",\n\r]/.test(v)?`"${v.replace(/"/g,'""')}"`:v;}
+function toCSV(rows){return "﻿"+rows.map(r=>r.map(csvEsc).join(",")).join("\r\n");}
+function offer(filename,data){
+  const url=URL.createObjectURL(new Blob([data],{type:"text/csv;charset=utf-8"}));
+  const a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+function allCSV(){
+  const head=["Year","Term","CPOMS ID","Incident date","Category","Sub-category","Online safety","Repeat concern","Audit date","Auditor","Incident type/context",
+    ...CHECKS.flatMap((c,i)=>[`Q${i+1} ${c.t}`,`Q${i+1} issue`,`Q${i+1} required action`]),
+    "Reason pupil voice not recorded","Evidence obtained","Evidence types","Other evidence","Interventions implemented","Intervention types","Other intervention",
+    "Academy response","Impact / follow-up","RAG","Follow-up action","Responsible","Target date","Follow-up done","Fully compliant","Checks answered No"];
+  const rows=allRecords().slice().sort((a,b)=>String(a.year+a.term+a.incidentDate).localeCompare(String(b.year+b.term+b.incidentDate))).map(r=>[
+    r.year,r.term,r.cpomsId,r.incidentDate,r.category,r.sub,r.onlineSafety,r.repeat,r.auditDate,auditorName(r),r.context,
+    ...CHECKS.flatMap(c=>[applies(c,r)?(r.answers?.[c.id]||""):"",r.issues?.[c.id]?.issue||"",r.issues?.[c.id]?.action||""]),
+    r.pvReason,r.evidence,r.evTypes||[],r.evOther,r.interventions,r.intTypes||[],r.intOther,r.response,r.impactText,r.rag,r.fuAction,r.fuOwner,r.fuTarget,
+    r.done?.fu?"Yes":"",fullyCompliant(r)?"Yes":"No",allFails(r).map(id=>CHECK[id].short)]);
+  return toCSV([head,...rows]);
+}
+async function copyText(text,ok){
+  try{await navigator.clipboard.writeText(text);toast(ok);}catch(e){
+    const ta=document.createElement("textarea");ta.value=text;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();
+    let done=false;try{done=document.execCommand("copy");}catch(_){}ta.remove();toast(done?ok:"Copy blocked here. Use Download CSV instead.");
+  }
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]"); if(!b) return;
+  const act=b.dataset.act, id=b.dataset.id;
+  if(act==="example-on"){state.example=true;state.exampleRecords=makeExamples();state.year=state.settings.year;render();toast("Showing example data");}
+  else if(act==="example-off"){state.example=false;state.exampleRecords=[];render();}
+  else if(act==="edit"){state.editing=allRecords().find(r=>r.id===id)||null;formBuilt=false;go("audit");}
+  else if(act==="cancel-edit"){state.editing=null;formBuilt=false;go("records");}
+  else if(act==="clear-form"){formBuilt=false;renderAudit();}
+  else if(act==="ask-delete"){state.confirmDelete=id;renderRecords();}
+  else if(act==="cancel-delete"){state.confirmDelete=null;renderRecords();}
+  else if(act==="delete"){state.confirmDelete=null;deleteRecord(id);}
+  else if(act==="toggle-done"){const r=allRecords().find(x=>x.id===id);if(r){const v=!r.done?.[b.dataset.key];patchRecord(id,{done:{...(r.done||{}),[b.dataset.key]:v}});}}
+  else if(act==="save-settings"){saveSettings();}
+  else if(act==="reload"){location.reload();}
+  else if(act==="csv-all"){offer(`CPOMS audits ${state.year}.csv`,allCSV());}
+  else if(act==="csv-termly"){offer(`CPOMS termly review ${scopeLabel()}.csv`,toCSV([["Academy",state.settings.academy],["Term",scopeLabel()],...FOCUS.map(f=>[`No. of ${f} incidents`,metrics(scoped()).focus[f]]),[],["Incident Date","Category","Incident Type/Context","Academy Response","Pupil Voice (Y or N)","Impact of Interventions/Follow Up","RAG"],...termlyRows().map(termlyCells)]));}
+  else if(act==="copy-termly"){copyText([["Incident Date","Category","Incident Type/Context","Academy Response","Pupil Voice (Y or N)","Impact of Interventions/Follow Up","RAG"],...termlyRows().map(termlyCells)].map(r=>r.map(c=>String(c??"").replace(/[\t\n]/g," ")).join("\t")).join("\n"),"Table copied. Paste it into the Word template.");}
+  else if(act==="copy-gov"){copyText(`Safeguarding record audit — ${state.settings.academy}, ${scopeLabel()}\n\n`+governorLines().join("\n"),"Summary copied");}
+});
+
+/* ------------------------------------------------------------------ example data (never saved) */
+function makeExamples(){
+  let s=20261029; const rnd=()=>(s=(s*1103515245+12345)%2147483648)/2147483648; const pick=a=>a[Math.floor(rnd()*a.length)];
+  const cats=["Child on Child","Child on Child","Child on Child","Positive Handling","Positive Handling","Safeguarding","Mental Health and Wellbeing","Behaviour Incident","Cause for Concern","Prejudicial Related Incident","Attendance","Brook Traffic Light Tool"];
+  const acts=["Remind staff to record within 24 hours","Add pupil voice to the record","Re-categorise in CPOMS","Upload body map","Record outcome of parent meeting","Add rationale for decision","DSL to review escalation"];
+  const out=[]; const y=state.settings.year;
+  ["Term 1","Term 1","Term 2","Term 3"].forEach((t,ti)=>{for(let i=0;i<9;i++){
+    const category=pick(cats), subs=CATEGORIES[category], sub=subs.length?pick(subs):"";
+    const r={id:`ex${ti}-${i}`,example:true,year:y,term:t,cpomsId:String(40000+ti*100+i*7),incidentDate:`20${y.slice(0,2)==="20"?y.slice(2,4):"26"}-${["09","10","11","12"][ti]}-${String(1+Math.floor(rnd()*27)).padStart(2,"0")}`,
+      category,sub,onlineSafety:ONLINE_SUBS.includes(sub)||rnd()<.15?"Yes":"No",repeat:rnd()<.25?"Yes":"No",auditDate:todayISO(),context:"",answers:{},issues:{},done:{}};
+    const q=ti>=2?.93:.85;
+    for(const c of CHECKS){if(!applies(c,r))continue;
+      let v=rnd()<q?"Yes":rnd()<.6?"No":"N/A"; if(c.opts&&v==="N/A") v="Yes"; if(c.id==="ii5"&&r.repeat!=="Yes") v="N/A";
+      r.answers[c.id]=v; if(v==="No"&&!c.noFollow) r.issues[c.id]={issue:"Example issue",action:pick(acts)};}
+    if(r.answers.pv1==="No") r.pvReason="Pupil not available";
+    r.evidence=rnd()<.85?"Yes":"No"; r.evTypes=r.evidence==="Yes"?EVIDENCE.filter(()=>rnd()<.3):[];
+    r.interventions=rnd()<.9?"Yes":"No"; r.intTypes=r.interventions==="Yes"?INTERVENTIONS.filter(()=>rnd()<.28):[];
+    const nos=allFails(r).length; r.rag=nos===0?"Green":nos<3?"Amber":"Red";
+    if(r.rag!=="Green"){r.fuAction=pick(acts);r.fuOwner="DSL";r.fuTarget=`20${y.slice(2,4)}-${["10","11","12","01"][ti]}-15`.replace(/^20(\d\d)-01/,(m,a)=>`20${+a+1}-01`);r.done.fu=rnd()<.4;}
+    out.push(r);}});
+  return out;
+}
+
+/* ------------------------------------------------------------------ start */
+const startHash=(location.hash||"").slice(1);
+if(["audit","dashboard","termly","council","followups","records","setup"].includes(startHash)) state.view=startHash;
+state.year=state.settings.year; state.term=guessTerm();
+render();
+boot();
+</script>
+
+</body>
+</html>
