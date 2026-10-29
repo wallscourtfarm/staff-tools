@@ -169,13 +169,14 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   </div>
   <div class="note" id="srcnote">Loading…</div>
   <div id="lists"></div>
-  <footer>Writing Targets · WFA-28.10.26a · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
+  <footer>Writing Targets · WFA-29.10.26a · targets from the writing framework (weights as the writing tracker) and the KS2 teacher assessment framework</footer>
 </main>
 
 <div id="ed" role="dialog" aria-modal="true" aria-labelledby="edt">
   <div id="edp">
     <div id="edh"><h2 id="edt"></h2>
       <div class="seg" id="fmt"><button data-f="checklist">Checklist</button><button data-f="targets">Targets</button></div>
+      <div class="seg" id="tks" title="How the targets are printed on the strip"><button data-t="0">1. 2. 3.</button><button data-t="1">☐ Tick boxes</button></div>
       <button class="b" id="edx" aria-label="Close">✕</button>
     </div>
     <div id="edb"></div>
@@ -290,7 +291,8 @@ function renderYears(){
 }
 function cardLines(p){
   if (!p.card || !p.card.items.length) return '<div class="none">No card yet' + (p.suggestions && p.suggestions.length && fmtOf(p) === 'targets' ? ': ' + p.suggestions.length + ' suggested targets ready' : '') + '</div>';
-  return p.card.items.map(i => '<div class="' + (i.met ? 'met' : '') + '">' + (i.met ? '✓ ' : '• ') + esc(itemText(i.id, i.words)) + '</div>').join('');
+  return (p.card.format === 'targets' && p.card.ticks ? '<div class="note">☐ Printed with tick boxes</div>' : '')
+    + p.card.items.map(i => '<div class="' + (i.met ? 'met' : '') + '">' + (i.met ? '✓ ' : '• ') + esc(itemText(i.id, i.words)) + '</div>').join('');
 }
 function renderLists(){
   const P = shown();
@@ -322,7 +324,8 @@ function pupil(key){ return S.data.pupils.find(p => p.key === key); }
 function openEditor(keys){
   const one = keys.length === 1 ? pupil(keys[0]) : null;
   const fmt = one ? fmtOf(one) : (keys.map(k => fmtOf(pupil(k))).every((f, _, a) => f === a[0]) ? fmtOf(pupil(keys[0])) : 'checklist');
-  E = { keys, format:fmt, mode:'replace', q:'', hist:null,
+  const tk = keys.map(k => !!(pupil(k).card && pupil(k).card.ticks));
+  E = { keys, format:fmt, ticks: tk.every(t => t === tk[0]) && tk[0], mode:'replace', q:'', hist:null,
         items: one && one.card ? one.card.items.map(i => Object.assign({}, i)) : [],
         f:{ kind:'', year:'', group:'' }, own:{ kind: fmt === 'checklist' ? 'check' : 'target', area:'', text:'', eg:'' } };
   if (one && !one.card && fmt === 'targets') E.items = (one.suggestions || []).map(id => ({ id }));
@@ -336,6 +339,8 @@ function closeEditor(){ $('ed').classList.remove('open'); E = null; }
 function renderEditor(){
   const one = E.keys.length === 1 ? pupil(E.keys[0]) : null;
   document.querySelectorAll('#fmt button').forEach(b => b.classList.toggle('on', b.dataset.f === E.format));
+  $('tks').style.display = E.format === 'targets' ? '' : 'none';
+  document.querySelectorAll('#tks button').forEach(b => b.classList.toggle('on', (b.dataset.t === '1') === E.ticks));
   let h = '';
   if (!one) h += '<div class="bar"><span class="seg" id="mode"><button data-m="replace" class="' + (E.mode === 'replace' ? 'on' : '') + '">Replace their cards</button><button data-m="add" class="' + (E.mode === 'add' ? 'on' : '') + '">Add to their cards</button></span>'
     + '<span class="note">' + (E.mode === 'replace' ? 'Each child gets exactly these statements (their old card is kept in history).' : 'These statements are added to what each child already has.') + '</span></div>';
@@ -373,7 +378,7 @@ function renderEditor(){
     h += '</div>';
   }
   if (one) h += '<h3>Earlier cards</h3>' + (E.hist === null ? '<button class="b" id="histload">Show earlier cards</button>'
-    : E.hist.length ? E.hist.map(c => '<div class="hist"><b>' + (c.format === 'targets' ? 'Targets' : 'Checklist') + '</b> · ' + d8(c.setAt) + ' to ' + d8(c.endedAt)
+    : E.hist.length ? E.hist.map(c => '<div class="hist"><b>' + (c.format === 'targets' ? 'Targets' + (c.ticks ? ' (tick boxes)' : '') : 'Checklist') + '</b> · ' + d8(c.setAt) + ' to ' + d8(c.endedAt)
       + c.items.map(i => '<div>' + (i.met ? '✓ ' : '• ') + esc(itemText(i.id, i.words)) + '</div>').join('') + '</div>').join('') : '<div class="note">No earlier cards.</div>');
   $('edb').innerHTML = h;
   renderResults();
@@ -436,8 +441,9 @@ async function saveEditor(){
     if (E.keys.length === 1) items = E.items.map(i => Object.assign({ id:i.id }, i.words ? { words:i.words } : {}, i.met ? { met:true } : {}));
     else if (E.mode === 'replace') items = E.items.map(i => { const had = cur.find(c => c.id === i.id); return Object.assign({ id:i.id }, had && had.words ? { words:had.words } : {}); });
     else items = cur.concat(E.items.filter(i => !cur.some(c => c.id === i.id)).map(i => ({ id:i.id })));
-    const format = E.keys.length > 1 && E.mode === 'add' && p.card ? p.card.format : E.format;
-    return { key:k, base: p.card ? p.card.updatedAt : '', format, items: items.slice(0, MAX_ITEMS) };
+    const keep = E.keys.length > 1 && E.mode === 'add' && p.card;   // adding to cards keeps each card's own format and numbering
+    const format = keep ? p.card.format : E.format, ticks = keep ? !!p.card.ticks : E.ticks;
+    return { key:k, base: p.card ? p.card.updatedAt : '', format, ticks: format === 'targets' && ticks, items: items.slice(0, MAX_ITEMS) };
   });
   const tooMany = E.keys.length > 1 && E.mode === 'add' ? E.keys.filter(k => { const p = pupil(k), cur = p.card ? p.card.items : []; return cur.length + E.items.filter(i => !cur.some(c => c.id === i.id)).length > MAX_ITEMS; }) : [];
   try {
@@ -474,15 +480,15 @@ async function printCards(){
   try { names = await WFANames.pick({ purpose:'For the names on the writing strips.' }); } catch (e) { names = null; }
   const name = p => { const n = names && p.code ? names.get(p.code) : null; return n && n.first ? n.first.trim() : p.label; };   // first name only on anything a child holds
   const fronts = P.map(p => {
-    const t = p.card.format === 'targets';
+    const t = p.card.format === 'targets', num = t && !p.card.ticks;
     const lis = p.card.items.filter(i => !(t && i.met)).map((i, n) => {
       const it = S.items[i.id] || { text:i.id, eg:'' };
-      return '<li>' + (t ? '<span class="n">' + (n + 1) + '.</span>' : '<span class="bx"></span>') + '<span>' + esc(itemText(i.id, i.words)).replace('……………………', '______________')
+      return '<li>' + (num ? '<span class="n">' + (n + 1) + '.</span>' : '<span class="bx"></span>') + '<span>' + esc(itemText(i.id, i.words)).replace('……………………', '______________')
         + (t && it.eg ? '<span class="eg">' + esc(it.eg) + '</span>' : '') + '</span></li>';
     }).join('');
     return '<div class="wc"><div class="hd"><div class="nm">' + esc(name(p)) + '</div><div class="ti">' + (t ? 'My Writing Targets' : 'My Writing Checklist') + '</div></div>'
       + '<div class="list"><ul>' + lis + '</ul></div>'
-      + '<div class="ft">' + (t ? 'Show these in every piece of writing.' : 'Check every piece of writing.') + '</div></div>';
+      + '<div class="ft">' + (num ? 'Show these in every piece of writing.' : t ? 'Tick each one as you write and when you check.' : 'Check every piece of writing.') + '</div></div>';
   });
   if (names) try { names.clear(); } catch (e) {}
   const withBacks = $('backs').checked, pages = [];
@@ -538,6 +544,11 @@ $('edcancel').addEventListener('click', closeEditor);
 $('edsave').addEventListener('click', saveEditor);
 $('ed').addEventListener('click', e => { if (e.target === $('ed')) closeEditor(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && E) closeEditor(); });
+$('tks').addEventListener('click', e => {
+  const b = e.target.closest('button[data-t]'); if (!b || !E) return;
+  E.ticks = b.dataset.t === '1';
+  renderEditor();
+});
 $('fmt').addEventListener('click', e => {
   const b = e.target.closest('button[data-f]'); if (!b || !E) return;
   E.format = b.dataset.f;
