@@ -1502,7 +1502,7 @@ def _targets_to_sheets(load, catalogue, base_ladders):
 # The print screen is reached from the Precision Teaching page (staff.*/precision/, "Print" tab). It is dressed
 # like that page (same header, tab bar, cards, chips, buttons; Streamlit's own toolbar hidden) so a teacher does
 # not feel they have left the tool. Only the look is set here: the sheets are made by build_week_pdf as before.
-_PRINT_VER = "WFA-24.10.26b"
+_PRINT_VER = "WFA-01.11.26a"
 _STAFF_PT = "https://staff.wallscourt-farm-academy.co.uk/precision/"
 _PRINT_CSS = """
 <style>
@@ -1593,9 +1593,10 @@ if st.query_params.get("print") == "week":
     # and is kept in the address, so a bookmark opens on the same year.
     _card_who.markdown('<div class="pt-step">1. Whose sheets</div>', unsafe_allow_html=True)
     _years = sorted({p["yearGroup"] for p in _kids if p["yearGroup"]}, key=lambda y: (len(y), y))
-    _qy, _qc = st.query_params.get("year", ""), st.query_params.get("class", "")
+    _qy = st.query_params.get("year", "")
+    _qc = [c_ for c_ in st.query_params.get("class", "").split(",") if c_]     # one or more classes, comma separated
     if not _qy and _qc:
-        _qy = next((p["yearGroup"] for p in _kids if p["class"] == _qc), "")
+        _qy = next((p["yearGroup"] for p in _kids if p["class"] in _qc), "")
     if len(_years) == 1:
         _year = _years[0]
     else:
@@ -1609,7 +1610,7 @@ if st.query_params.get("print") == "week":
     _classes = sorted({p["class"] for p in _in_year})
     if len(_classes) > 1:
         _picked = _card_who.pills("Classes (tap to choose one or more)", _classes, selection_mode="multi",
-                                  default=[_qc] if _qc in _classes else _classes, key=f"pw_cls_{_year}")
+                                  default=[c_ for c_ in _classes if c_ in _qc] or _classes, key=f"pw_cls_{_year}")
     else:
         _picked = _classes
     _picked = [c_ for c_ in _classes if c_ in (_picked or [])]
@@ -1714,7 +1715,7 @@ with st.sidebar:
         st.download_button("Download pupils JSON", pupils_json, "pupils.json", "application/json")
 
 st.markdown(logo_html("Precision Teaching"), unsafe_allow_html=True)
-st.caption("Wallscourt Farm Academy · WFA-24.10.26b")
+st.caption("Wallscourt Farm Academy · WFA-01.11.26a")
 st.info("**New:** add children and give them targets on the new Precision Teaching page: "
         "[staff.wallscourt-farm-academy.co.uk/precision](https://staff.wallscourt-farm-academy.co.uk/precision/). "
         "Print their week from there with **Print this week**. The tabs below are the old way and will be retired.")

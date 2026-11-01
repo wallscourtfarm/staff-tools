@@ -145,6 +145,11 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .chip.known { border-style: dashed; border-color: var(--ok); }
   .chip.known:not(.on) { color: #1d7a45; }
   .chip.known::after { content: ' ✓'; font-size: .8em; }
+  /* which children: a whole year group, or one or more of its classes */
+  .filt { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin: -4px 0 14px; }
+  .filt .grp { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .filt .lbl { font-size: .8rem; font-weight: 900; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-right: 2px; }
+  .filt .chip { padding: 7px 14px; font-size: .95rem; }
   .linkish { border: 0; background: none; color: var(--wfa-blue); font-weight: 800; padding: 4px 0; }
   footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 10px; }
   @media (max-width: 720px) {
@@ -170,11 +175,11 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <option value="year">This school year</option><option value="6w">Last 6 weeks</option><option value="all">All time</option>
     </select>
     <button class="btn" id="btnAdd">+ Add children</button>
-    <select id="fClass" aria-label="Class" hidden></select>
     <span class="grow"></span>
     <span id="namesSlot"></span>
   </div>
 
+  <div class="filt" id="filt" hidden></div>
   <div class="card" id="group"><div class="empty">Loading…</div></div>
   <div id="progView" hidden>
     <p class="wkhint">How many items each child is <b style="color:#1d7a45">confident with now</b>, and how many became confident in the time chosen. Tap a child to see every item, when it became confident, and to put any of them back on practice.</p>
@@ -191,7 +196,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <button class="btn quiet" id="btnClearSel">Clear</button>
   </div>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-24.10.26a</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-01.11.26a</span></footer>
 
 <div class="veil" id="veil"></div>
 
@@ -306,6 +311,53 @@ function load() {
 function area(id) { return S.catalogue.areas.find(function (a) { return a.id === id; }); }
 
 // ── My group ────────────────────────────────────────────────────────────────────────────────────────────
+// ── Which children: a whole year group, or one or more of its classes (remembered in this browser) ─────
+var F = { year: '', classes: null };              // classes null = the whole year
+try { var _f = JSON.parse(localStorage.getItem('pt_filter') || 'null'); if (_f) F = { year: _f.year || '', classes: _f.classes || null }; } catch (e) {}
+function saveFilter() { try { localStorage.setItem('pt_filter', JSON.stringify(F)); } catch (e) {} }
+function yearOf(c) { return c.yearGroup || (/^\d/.test(c.class || '') ? 'Y' + c.class[0] : ''); }
+function yearName(y) { return /^Y\d+$/.test(y) ? 'Year ' + y.slice(1) : y; }
+function inFilter(c) {
+  if (!F.year) return true;
+  if (yearOf(c) !== F.year) return false;
+  return !F.classes || F.classes.indexOf(c.class) >= 0;
+}
+function drawFilter() {
+  var box = $('filt'); box.innerHTML = '';
+  var years = Array.from(new Set(S.children.map(yearOf).filter(Boolean))).sort(function (a, b) { return a.length - b.length || (a < b ? -1 : 1); });
+  if (F.year && years.indexOf(F.year) < 0) { F.year = ''; F.classes = null; }
+  if (!F.year && years.length === 1) F.year = years[0];
+  var classes = Array.from(new Set(S.children.filter(function (c) { return yearOf(c) === F.year; }).map(function (c) { return c.class; }))).sort();
+  if (F.classes) { F.classes = F.classes.filter(function (k) { return classes.indexOf(k) >= 0; }); if (!F.classes.length || F.classes.length === classes.length) F.classes = null; }
+  box.hidden = years.length < 2 && classes.length < 2;
+  if (years.length > 1) {
+    var yg = el('div', { class: 'grp' }, [el('span', { class: 'lbl', text: 'Year' })]);
+    yg.appendChild(el('button', { class: 'chip' + (!F.year ? ' on' : ''), text: 'All', on: { click: function () { F = { year: '', classes: null }; saveFilter(); render(); } } }));
+    years.forEach(function (y) {
+      yg.appendChild(el('button', { class: 'chip' + (F.year === y ? ' on' : ''), text: yearName(y), on: { click: function () {
+        F = { year: y, classes: null }; saveFilter(); render();
+      } } }));
+    });
+    box.appendChild(yg);
+  }
+  if (F.year && classes.length > 1) {
+    var cg = el('div', { class: 'grp' }, [el('span', { class: 'lbl', text: 'Classes' })]);
+    classes.forEach(function (k) {
+      var on = !F.classes || F.classes.indexOf(k) >= 0;
+      cg.appendChild(el('button', { class: 'chip' + (on ? ' on' : ''), text: k, 'aria-pressed': on ? 'true' : 'false', on: { click: function () {
+        var cur = F.classes ? F.classes.slice() : classes.slice();
+        if (on) cur = cur.filter(function (x) { return x !== k; }); else cur.push(k);
+        F.classes = cur.length ? cur : null;            // tapping the last one off goes back to the whole year
+        saveFilter(); render();
+      } } }));
+    });
+    box.appendChild(cg);
+  }
+  // Print opens on the same year and classes
+  var q = F.year ? '&year=' + encodeURIComponent(F.year) + (F.classes ? '&class=' + encodeURIComponent(F.classes.join(',')) : '') : '';
+  $('tabPrint').href = 'https://precision-teaching.wallscourt-farm-academy.co.uk/?print=week' + q;
+}
+
 function render() {
   $('group').hidden = S.view !== 'group';
   $('weekView').hidden = S.view !== 'week';
@@ -315,17 +367,11 @@ function render() {
   $('btnAdd').hidden = S.view !== 'group';
   $('tabGroup').className = S.view === 'group' ? 'on' : '';
   $('tabWeek').className = S.view === 'week' ? 'on' : '';
-  var classes = Array.from(new Set(S.children.map(function (c) { return c.class; }))).sort();
-  var fc = $('fClass'), keep = fc.value;
-  fc.innerHTML = '';
-  fc.appendChild(el('option', { value: '', text: 'All classes (' + S.children.length + ')' }));
-  classes.forEach(function (c) { fc.appendChild(el('option', { value: c, text: c })); });
-  if (classes.indexOf(keep) >= 0) fc.value = keep;
-  fc.hidden = classes.length < 2;
+  drawFilter();
 
   var g = $('group');
   g.innerHTML = '';
-  var shown = S.children.filter(function (c) { return !fc.value || c.class === fc.value; });
+  var shown = S.children.filter(inFilter);
   if (!shown.length) {
     g.appendChild(el('div', { class: 'empty' }, [el('b', { text: 'No children in your group yet' }),
       'Press "+ Add children" to choose them from the school roster.']));
@@ -351,8 +397,6 @@ function render() {
       el('button', { class: 'rowmenu', title: 'Remove from my group', text: '✕', on: { click: function () { removeChild(c); } } })
     ]));
   });
-  // Print opens on the class shown here (and so on its year group)
-  $('tabPrint').href = 'https://precision-teaching.wallscourt-farm-academy.co.uk/?print=week' + (fc.value ? '&class=' + encodeURIComponent(fc.value) : '');
   if (S.view === 'week') renderWeek();
   if (S.view === 'prog') renderProgress();
   var n = S.view === 'group' ? S.sel.size : 0;
@@ -374,7 +418,6 @@ function removeChild(c) {
     .then(function () { banner('ok', 'Removed from your group.'); })
     .catch(function (e) { banner('err', 'Not removed: ' + e.message); });
 }
-$('fClass').addEventListener('change', render);
 $('btnClearSel').onclick = function () { S.sel.clear(); render(); };
 $('btnGiveSel').onclick = function () { openTarget({ kids: Array.from(S.sel) }); };
 
@@ -403,9 +446,9 @@ function reviewOf(t) {
   return null;
 }
 function renderWeek() {
-  var fc = $('fClass').value, box = $('week');
+  var box = $('week');
   box.innerHTML = '';
-  var kids = S.children.filter(function (c) { return (!fc || c.class === fc) && S.targets.some(function (t) { return t.pupilCode === c.pupilCode; }); });
+  var kids = S.children.filter(function (c) { return inFilter(c) && S.targets.some(function (t) { return t.pupilCode === c.pupilCode; }); });
   if (!kids.length) {
     box.appendChild(el('div', { class: 'empty' }, [el('b', { text: 'No targets yet' }), 'Give your children targets on "My group" first.']));
     return;
@@ -502,8 +545,8 @@ function renderProgress() {
   var box = $('prog');
   getProgress().then(function (d) {
     if (S.view !== 'prog') return;
-    var fc = $('fClass').value, from = rangeStart();
-    var kids = d.children.filter(function (c) { return !fc || c.class === fc; });
+    var from = rangeStart();
+    var kids = d.children.filter(inFilter);
     var used = new Set(d.items.map(function (i) { return i.area; }));
     var areas = S.catalogue.areas.filter(function (a) { return used.has(a.id); });
     box.innerHTML = '';
@@ -643,7 +686,7 @@ $('btnAdd').onclick = function () {
     $('aYear').innerHTML = '';
     $('aYear').appendChild(el('option', { value: '', text: 'All years' }));
     years.forEach(function (y) { $('aYear').appendChild(el('option', { value: y, text: y })); });
-    var mostYear = S.children.length ? S.children[0].yearGroup : '';
+    var mostYear = F.year || (S.children.length ? S.children[0].yearGroup : '');
     if (years.indexOf(mostYear) >= 0) $('aYear').value = mostYear;
     fillAdd();
   }).catch(function (e) { $('aList').textContent = 'Could not load the roster: ' + e.message; });
