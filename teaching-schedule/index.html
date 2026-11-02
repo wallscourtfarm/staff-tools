@@ -503,7 +503,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-27.10.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-02.11.26a</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1911,7 +1911,7 @@ function debouncedNoteSave_(input, handler) {
 function onFixedNoteBlur(e) {
   const { wk, view, day, row } = e.target.dataset;
   setFixedNote(wk, view, day, row, e.target.value);
-  persistLocal(); syncSave();
+  persistLocal(); syncSave(wk);
 }
 
 function persistLocal() {
@@ -1951,7 +1951,7 @@ async function postScheduleSave_(weekKey, data) {
     let json = null;
     try { json = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
     const ok = !!(res.ok && json && json.status !== 'error');
-    if (ok && json.updatedAt) weekStamps[weekKey] = json.updatedAt;
+    if (ok && json.updatedAt) { weekStamps[weekKey] = json.updatedAt; weekBase[weekKey] = clone_(data || {}); saveSeq++; }
     return ok;
   } catch (err) {
     return false;
@@ -1966,12 +1966,19 @@ async function postScheduleSave_(weekKey, data) {
 // page left open overnight, or two people on the same week, then one small edit
 // pushed the whole stale week over everything saved since).
 const weekStamps = {};
+// The server's copy of each week as this page last saw it (same moment as
+// weekStamps). On a conflict it lets the page work out what THIS page changed
+// and put just those changes on top of the newer server copy (02.11.26).
+const weekBase = {};
+// Goes up on every successful save, so a refresh that was already on its way
+// before the save landed can tell its answer is out of date.
+let saveSeq = 0;
 let saveChain = Promise.resolve();
 let savesPending = 0;
 
-function syncSave() {
+function syncSave(wk) {
   if (!SYNC_URL) return;
-  const wk = schedKey();
+  wk = wk || schedKey();
   if (!syncedWeeks.has(wk)) return; // haven't confirmed the real backend state for this week yet — don't risk overwriting it
   // Saves run one at a time: a second save sent before the first returns would
   // carry the old version stamp and be refused as a conflict with our own edit.
@@ -1980,7 +1987,7 @@ function syncSave() {
   saveChain = saveChain.then(() => doSave_(wk)).catch(() => updateSyncStatus('err')).then(() => { savesPending--; });
 }
 
-async function doSave_(wk) {
+async function doSave_(wk, attempt = 0) {
   const body = JSON.stringify({ action:'save', yearGroup: YEAR_GROUP, weekKey: wk, data: state.schedule[wk] || {}, baseUpdatedAt: weekStamps[wk] || null });
   // Found 18.09.26 (cover-plan-state incident): `.then(() => updateSyncStatus('ok'))`
   // treated ANY resolved fetch as success — the backend can reject a save
@@ -1991,27 +1998,110 @@ async function doSave_(wk) {
     res = await fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, { method:'POST', body, headers:{'Content-Type':'text/plain'}, keepalive: body.length < 60000 });
     try { json = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
   } catch (err) { updateSyncStatus('err'); return; }
-  if (json && json.status === 'conflict') { handleSaveConflict_(wk, json); return; }
+  if (json && json.status === 'conflict') { await handleSaveConflict_(wk, json, attempt); return; }
   if (!res.ok || !json || json.status === 'error') { updateSyncStatus('err'); return; }
-  if (json.updatedAt) weekStamps[wk] = json.updatedAt;
+  if (json.updatedAt) { weekStamps[wk] = json.updatedAt; weekBase[wk] = JSON.parse(body).data; saveSeq++; }
   updateSyncStatus('ok');
 }
 
-// The server's copy of this week is newer than what this page was based on.
-// Keep the page's own version in localStorage (so nothing typed is ever truly
-// lost), show the server's newer version, and tell the teacher plainly.
-function handleSaveConflict_(wk, json) {
+// The server's copy of this week is newer than what this page was based on
+// (someone else saved it from another iPad or tab). Until 02.11.26 this threw
+// the edit away, redrew the week under the teacher's cursor and asked them to
+// type it again, so notes typed while a colleague was also editing the week
+// simply vanished and were never saved anywhere a restore could find them.
+// Now the page merges: everything it changed since it last saw the server copy
+// goes on top of the newer copy, everything else comes from the server, and the
+// merged week is saved straight away. A copy is still kept in localStorage.
+async function handleSaveConflict_(wk, json, attempt) {
   try { localStorage.setItem(`wfa_ts_conflict_${YEAR_GROUP}_${wk}_${Date.now()}`, JSON.stringify(state.schedule[wk] || {})); } catch {}
-  if (json.data && json.data.master) state.schedule[wk] = json.data;
+  const server = json.data && json.data.master ? json.data : null;
+  if (!server || !weekBase[wk] || attempt >= 3) {
+    // Nothing safe to merge with: fall back to the old behaviour, but never
+    // redraw while the teacher is still typing.
+    if (server) state.schedule[wk] = server;
+    weekStamps[wk] = json.updatedAt || null;
+    weekBase[wk] = clone_(server || {});
+    persistLocal();
+    if (wk === schedKey()) renderWhenIdle_();
+    updateSyncStatus('err');
+    showSyncBanner_('This week was changed on another device or tab at the same time, and your last edit could not be added to it. The latest saved version is now showing — please check your last change is there.');
+    return;
+  }
+  flushActiveNote_();
+  state.schedule[wk] = merge3_(weekBase[wk], state.schedule[wk] || {}, server);
+  weekBase[wk] = clone_(server);
   weekStamps[wk] = json.updatedAt || null;
   persistLocal();
-  if (wk === schedKey()) renderGrid();
-  updateSyncStatus('err');
-  showSyncBanner_('This week was changed on another device or tab, so your last edit was NOT saved (this stops newer work being overwritten). The latest saved version is now showing — please re-enter that last change.');
+  if (wk === schedKey()) renderWhenIdle_();
+  await doSave_(wk, attempt + 1);
+}
+
+function clone_(o) { return o === undefined ? undefined : JSON.parse(JSON.stringify(o)); }
+
+// Key order is ignored: the database hands objects back with their keys sorted.
+function deepEq_(a, b) {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) return a.length === b.length && a.every((v, i) => deepEq_(v, b[i]));
+  const ka = Object.keys(a), kb = Object.keys(b);
+  return ka.length === kb.length && ka.every(k => Object.prototype.hasOwnProperty.call(b, k) && deepEq_(a[k], b[k]));
+}
+
+// Three-way merge of a week: base = server copy this page started from,
+// local = this page now, server = the newer server copy. A part only one side
+// changed takes that side's version; a part both changed differently keeps
+// this page's (the edit just made). A session's list of activities is merged
+// item by item when no one added or removed an activity in it.
+function merge3_(base, local, server) {
+  if (deepEq_(local, base)) return clone_(server);
+  if (deepEq_(server, base) || deepEq_(local, server)) return clone_(local);
+  const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  if (isObj(local) && isObj(server)) {
+    const b = isObj(base) ? base : {};
+    const out = {};
+    new Set([...Object.keys(server), ...Object.keys(local)]).forEach(k => {
+      const inL = k in local, inS = k in server, inB = k in b;
+      if (inL && inS) out[k] = merge3_(b[k], local[k], server[k]);
+      else if (inL) { if (!inB || !deepEq_(local[k], b[k])) out[k] = clone_(local[k]); }  // removed on the server: keep only if changed here
+      else { if (!inB || !deepEq_(server[k], b[k])) out[k] = clone_(server[k]); }         // removed here: keep only if changed on the server
+    });
+    return out;
+  }
+  if (Array.isArray(local) && Array.isArray(server) && Array.isArray(base)
+      && local.length === base.length && server.length === base.length) {
+    return local.map((v, i) => merge3_(base[i], v, server[i]));
+  }
+  return clone_(local);
+}
+
+// A note still being typed has not reached state.schedule yet (it is written
+// 1.5s after typing pauses). Put it there before merging so it is not lost.
+function flushActiveNote_() {
+  const a = document.activeElement;
+  if (!a || !a.dataset) return;
+  if (a.classList.contains('item-note')) {
+    const { wk, view, day, session, idx, side } = a.dataset;
+    const item = getSlot(wk, view, day, session)[Number(idx)];
+    if (item) { if (item.split && side) item[side === 'left' ? 'noteLeft' : 'noteRight'] = a.value; else item.note = a.value; }
+  } else if (a.classList.contains('fixed-note-input')) {
+    const { wk, view, day, row } = a.dataset;
+    setFixedNote(wk, view, day, row, a.value);
+  }
+}
+
+// Redrawing the grid replaces every note box, so never do it under someone's
+// cursor: wait until they have left the box (its own save runs on the way out).
+let renderWaiting_ = false;
+function renderWhenIdle_() {
+  if (!isEditingField_()) { renderWaiting_ = false; renderGrid(); return; }
+  if (renderWaiting_) return;
+  renderWaiting_ = true;
+  setTimeout(() => { renderWaiting_ = false; renderWhenIdle_(); }, 1000);
 }
 
 // ── Restore an earlier version of this week ─────────────────────────────────
-// Every save keeps the version it replaced (up to 40 per week). This lists them
+// Every save keeps the version it replaced (up to 300 per week since 02.11.26). This lists them
 // with a summary of the notes in each, and puts the chosen one back. Restoring
 // first backs up what is there now, so it can itself be undone from this list.
 async function openRestoreModal() {
@@ -2097,11 +2187,17 @@ async function syncLoad(weekKey, background) {
   // A redraw while someone is typing in a note would wipe what they've typed.
   if (isEditingField_()) { setTimeout(() => syncLoad(weekKey, background), 2000); return; }
   if (background && (savesPending > 0 || !syncedWeeks.has(weekKey))) return;
+  if (!background && savesPending > 0) await saveChain; // let an edit still going out land first
+  const seqAtStart = saveSeq;
   try {
     const res = await fetch(`${TEACHING_SCHEDULE_READ_URL}?yearGroup=${encodeURIComponent(YEAR_GROUP)}&weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
     if (!res.ok) return;
     const json = await res.json();
     if (isEditingField_() || (background && savesPending > 0)) { setTimeout(() => syncLoad(weekKey, background), 2000); return; }
+    // A save landed while this was on its way, so this answer is older than what
+    // the page now holds. Using it would put the old version back on screen
+    // and wind the version stamp back (02.11.26). Ask again instead.
+    if (saveSeq !== seqAtStart) { if (background) setTimeout(() => syncLoad(weekKey, background), 2000); else syncLoad(weekKey, background); return; }
     if (background && json && json.updatedAt && json.updatedAt === weekStamps[weekKey]) return; // nothing newer
     if (json && json.data && json.data.master) {
       // Basic sanity check only (must look like real schedule data). The backend
@@ -2122,7 +2218,11 @@ async function syncLoad(weekKey, background) {
     // treating it as "confirmed empty" would let syncSave() overwrite real
     // saved data with nothing. See cover-plan's 15.09.26 data-loss incident,
     // same bug class. Must check for the error shape, not just "reached here".
-    if (!(json && json.status === 'error')) { syncedWeeks.add(weekKey); weekStamps[weekKey] = json.updatedAt || null; }
+    if (!(json && json.status === 'error')) {
+      syncedWeeks.add(weekKey);
+      weekStamps[weekKey] = json.updatedAt || null;
+      weekBase[weekKey] = clone_(json.data || {});
+    }
   } catch {}
 }
 
@@ -3236,7 +3336,7 @@ function onNoteBlur(e) {
     } else {
       slot[Number(idx)].note = e.target.value;
     }
-    persistLocal(); syncSave();
+    persistLocal(); syncSave(wk);
   }
 }
 
@@ -3519,6 +3619,8 @@ async function copyWeekToNext() {
   const idx = state.weekIdx;
   if (!WEEKS[idx + 1]) { alert('No next week available.'); return; }
   const nextKey = WEEKS[idx + 1].key;
+  const lost = await notesInWeeks_([nextKey]);
+  if (!confirm(`Copy ${wk} over next week (${nextKey})? Everything in next week is replaced.` + (lost ? `\n\nNext week already has ${lost} typed note${lost === 1 ? ' — it' : 's — they'} will be replaced by this week's.` : ''))) return;
   state.schedule[nextKey] = JSON.parse(JSON.stringify(state.schedule[wk] || {}));
   persistLocal();
   // Sync next week to cloud (syncSave only syncs current week)
@@ -3540,7 +3642,8 @@ async function copyWeekToTerm() {
   const weeksToCopy = WEEKS.slice(idx + 1).filter(w => w.term === currentTerm);
   if (!weeksToCopy.length) { alert('No more weeks in this term.'); return; }
 
-  if (!confirm(`Copy ${wk} to ${weeksToCopy.length} remaining week${weeksToCopy.length > 1 ? 's' : ''} in Term ${currentTerm}?`)) return;
+  const lost = await notesInWeeks_(weeksToCopy.map(w => w.key));
+  if (!confirm(`Copy ${wk} to ${weeksToCopy.length} remaining week${weeksToCopy.length > 1 ? 's' : ''} in Term ${currentTerm}? Everything in those weeks is replaced.` + (lost ? `\n\nThose weeks already have ${lost} typed note${lost === 1 ? ' — it' : 's between them — they'} will be replaced by this week's.` : ''))) return;
 
   for (const week of weeksToCopy) {
     state.schedule[week.key] = JSON.parse(JSON.stringify(currentData));
@@ -3560,6 +3663,31 @@ async function copyWeekToTerm() {
   } else {
     alert(`${wk} copied to ${weeksToCopy.length} week${weeksToCopy.length > 1 ? 's' : ''} in Term ${currentTerm}.`);
   }
+}
+
+// "Copy week" replaces whole weeks, typed notes included, so say how many notes
+// the target weeks hold before going ahead (02.11.26). Reads the saved copies.
+function countNotes_(o) {
+  if (Array.isArray(o)) return o.reduce((n, v) => n + countNotes_(v), 0);
+  if (!o || typeof o !== 'object') return 0;
+  let n = 0;
+  for (const [k, v] of Object.entries(o)) {
+    if ((k === 'note' || k === 'noteLeft' || k === 'noteRight') && typeof v === 'string') n += v.trim() ? 1 : 0;
+    else if (k === '_notes' && v && typeof v === 'object') n += Object.values(v).filter(t => typeof t === 'string' && t.trim()).length;
+    else n += countNotes_(v);
+  }
+  return n;
+}
+async function notesInWeeks_(keys) {
+  let n = 0;
+  for (const k of keys) {
+    try {
+      const r = await fetch(`${TEACHING_SCHEDULE_READ_URL}?yearGroup=${encodeURIComponent(YEAR_GROUP)}&weekKey=${encodeURIComponent(k)}&token=${OWN_BACKEND_TOKEN}`);
+      const j = await r.json();
+      n += countNotes_(j && j.data);
+    } catch { n += countNotes_(state.schedule[k]); }
+  }
+  return n;
 }
 
 function clearActiveView() {
