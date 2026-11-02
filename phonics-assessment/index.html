@@ -257,7 +257,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26e</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26f</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -273,7 +273,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 <div class="modal" id="limModal" hidden>
   <div class="box imp">
     <h3>Taught up to</h3>
-    <p class="hint">Choose the last set these children have been taught. Sounds and words after it count as "not taught yet": they are faded, left out of card mode and never suggested for an intervention. "Not yet" is only for something taught, assessed and not recalled. Tap a child to leave them out (for example a child in a different phonics group).</p>
+    <p class="hint">Choose the last set these children have been taught (its GPCs are shown). Up to that set, a blank box counts as not yet secure. After it, sounds and words are "not taught yet": faded, left out of card mode and never suggested for an intervention. Tap a child to leave them out (for example a child in a different phonics group).</p>
     <select id="limSet" aria-label="Last set taught"></select>
     <div id="limList" class="chips" style="overflow-y:auto;margin:12px 0"></div>
     <div class="impfoot"><span class="grow" id="limMsg"></span><button class="btn quiet" id="limCancel">Cancel</button> <button class="btn" id="limGo">Save</button></div>
@@ -482,6 +482,14 @@ function shortSet(key) {
   var b = S.cat.blocks.find(function (x) { return x.key === key; });
   return b ? b.title.replace('Phase ', 'P').replace(' · Common exception words', ' tricky words').replace(' · ', ' ') : '';
 }
+// what a set teaches, so the teacher can find it: its GPCs (or, for a set without GPCs, its first words)
+function setContents(b, most) {
+  var its = b.items.map(function (i) { return S.cat.items[i]; });
+  var g = its.filter(function (it) { return it.section === 'gpc'; });
+  var list = (g.length ? g : its).map(function (it) { return card(it.section === 'gpc' ? it.show : (it.say || it.label)); });
+  list = list.filter(function (x, k) { return list.indexOf(x) === k; });
+  return list.slice(0, most || 30).join(' ') + (list.length > (most || 30) ? ' …' : '');
+}
 function isTaught(code, item) {
   var lim = S.limits[code];
   if (!lim) return true;
@@ -490,7 +498,7 @@ function isTaught(code, item) {
 function limitOptions(sel, value, blank) {
   sel.innerHTML = '';
   sel.appendChild(el('option', { value: '', text: blank }));
-  S.cat.blocks.forEach(function (b) { sel.appendChild(el('option', { value: b.key, text: b.title })); });
+  S.cat.blocks.forEach(function (b) { sel.appendChild(el('option', { value: b.key, text: b.title + ':  ' + setContents(b, 12) })); });
   sel.value = value || '';
 }
 function saveLimit(codes, upto) {
@@ -596,7 +604,8 @@ function drawClass() {
       var all = phaseItems(p), sec = all.filter(function (i) { return m[i] && m[i][0] === 'secure'; }).length;
       return el('td', {}, [el('div', { class: 'ph' }, [el('div', { class: 'lbl' }, [el('span', { text: sec + '/' + all.length })]),
         el('div', { class: 'track' }, [el('div', { class: 'fill', style: 'width:' + Math.round(100 * sec / all.length) + '%' })])])]);
-    })).concat([el('td', { text: last ? last.split('-').reverse().join('/') : '–' }), el('td', { class: 'lim', text: shortSet(S.limits[c.pupilCode]) || 'not set' }),
+    })).concat([el('td', { text: last ? last.split('-').reverse().join('/') : '–' }), el('td', { class: 'lim', title: S.limits[c.pupilCode] ? setContents(S.cat.blocks[blockIndex(S.limits[c.pupilCode])]) : '',
+                  text: S.limits[c.pupilCode] ? shortSet(S.limits[c.pupilCode]) + ' (' + setContents(S.cat.blocks[blockIndex(S.limits[c.pupilCode])], 5) + ')' : 'not set' }),
                 el('td', { text: ivCount(c.pupilCode) })]));
     tb.appendChild(row);
   });
@@ -864,7 +873,7 @@ function drawIvCard() {
   box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what' }, ['Blend and Find', sg.oral ? el('small', { text: '(suggested)' }) : null]), fsel,
     el('button', { class: 'btn' + (sg.oral ? '' : ' quiet'), text: '▶ Start', on: { click: function () { startFind(SCENES[+fsel.value]); } } })]));
   if (!sg.grid.length && !sg.mix.length) box.appendChild(el('div', { class: 'hint',
-    text: 'No Precision Grid or Mix It Up to suggest yet. They come from sounds, tricky words or words marked ✗ not yet. A blank box means not assessed, so it is never suggested.' }));
+    text: 'No Precision Grid or Mix It Up to suggest yet. They come from sounds, tricky words or words marked ✗ not yet, and, once "Taught up to" is set, from anything taught but left blank.' }));
   var past = ivSessions(c.pupilCode).slice(-4).reverse();
   if (past.length) {
     var lg = el('div', { class: 'ivlog' });
