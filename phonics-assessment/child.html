@@ -40,6 +40,15 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   #setup button { font: inherit; font-weight: 800; font-size: 1.1rem; margin-left: 8px; padding: 14px 20px; border: 0; border-radius: 12px; background: #1798d3; color: #fff; }
   #setup .err { color: #c62828; font-weight: 700; margin-top: 12px; min-height: 1.2em; }
   #ver { position: fixed; right: 10px; bottom: 8px; font-size: .7rem; color: #c9c2b0; }
+  /* ULS interventions (02.11.26): a Precision Grid, sound cards for Mix It Up, a word or a flashcard */
+  .grid { display: grid; gap: 1.4vmin; width: min(94vw, 150vh); }
+  .grid div { font-family: var(--cardfont); font-size: min(11vh, 8vw); line-height: 1.2; text-align: center; padding: 1vmin 0;
+              border: 2px solid #eadfc2; border-radius: 14px; background: #fffaf0; }
+  body.font-od .grid div { font-size: min(8.5vh, 6vw); }
+  .tiles { display: flex; gap: 2vw; justify-content: center; flex-wrap: wrap; }
+  .tiles div { font-family: var(--cardfont); font-size: min(26vh, 16vw); line-height: 1.15; min-width: 1.2em; text-align: center;
+               padding: 2vh 3vw; border: 3px solid #eadfc2; border-radius: 20px; background: #fffaf0; }
+  body.font-od .tiles div { font-size: min(19vh, 12vw); }
 </style>
 </head>
 <body>
@@ -55,7 +64,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div class="err" id="err"></div>
   </div>
 </div>
-<span id="ver">WFA-24.10.26d</span>
+<span id="ver">WFA-02.11.26a</span>
 
 <script>
 'use strict';
@@ -73,10 +82,11 @@ function getJSON(url) {
   }).then(function (d) { if (!d || d.ok !== true) throw new Error((d && d.error) || 'no answer'); return d; });
 }
 
-function show(item, font) {
+function show(item, font, view) {
   document.body.classList.toggle('font-od', font === 'od');
   var box = $('card');
   box.innerHTML = '';
+  if (view && view.cells && view.cells.length) { showView(box, view); return; }
   var it = item && C.items[item];
   if (!it) return;                                   // a blank card between children
   var d = document.createElement('div');
@@ -85,11 +95,23 @@ function show(item, font) {
   box.appendChild(d);
 }
 
+// what an intervention shows: letters and words only, chosen on the adult's iPad
+function showView(box, v) {
+  var d = document.createElement('div');
+  if (v.type === 'grid') {
+    d.className = 'grid';
+    d.style.gridTemplateColumns = 'repeat(' + (v.cols || 5) + ', 1fr)';
+  } else if (v.type === 'tiles') d.className = 'tiles';
+  else { d.className = 'big' + (v.cells[0].length > 3 ? ' word' : ''); d.textContent = v.cells[0].replace(/_/g, '-'); box.appendChild(d); return; }
+  v.cells.forEach(function (c) { var e = document.createElement('div'); e.textContent = c.replace(/_/g, '-'); d.appendChild(e); });
+  box.appendChild(d);
+}
+
 function poll() {
   clearTimeout(C.timer);
   getJSON(API + '&action=screen&role=child&code=' + C.code + '&seq=' + C.seq).then(function (d) {
     C.fails = 0; $('dot').className = ''; $('lost').hidden = true;
-    if (d.seq !== C.seq) { C.seq = d.seq; show(d.item, d.font); }
+    if (d.seq !== C.seq) { C.seq = d.seq; show(d.item, d.font, d.view); }
   }).catch(function () {
     C.fails++;
     $('dot').className = 'bad';

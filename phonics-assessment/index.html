@@ -154,6 +154,32 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .flash .done { text-align: center; }
   .flash .done b { font-size: 2rem; display: block; margin-bottom: 8px; }
 
+  /* ULS interventions (02.11.26) */
+  .low { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: #fff1dc; color: #9a5300;
+         font-size: .72rem; font-weight: 900; vertical-align: 2px; }
+  .ivcard { flex: 1; min-width: 280px; }
+  .ivcard h4 { margin: 0 0 6px; font-size: 1rem; }
+  .ivopt { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+  .ivopt .what { font-weight: 800; }
+  .ivopt .what small { color: var(--muted); font-weight: 700; margin-left: 4px; }
+  .ivopt select { font-size: 15px; padding: 6px 8px; max-width: 100%; }
+  .ivlog { font-size: .85rem; color: var(--muted); margin-top: 8px; }
+  .ivlog b { color: var(--ink); }
+  .iv .script { margin-top: 14px; padding: 14px 18px; border-radius: 12px; background: #eef4f9; font-weight: 800; font-size: 1.3rem;
+                max-width: 760px; text-align: center; line-height: 1.35; }
+  .iv .script small { display: block; font-size: .9rem; color: var(--muted); font-weight: 700; margin-top: 6px; }
+  .iv .step { font-size: .8rem; font-weight: 900; color: var(--wfa-blue); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+  .iv .preview { min-height: 0; padding: 14px; width: min(760px, 94%); }
+  .iv .pgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 100%; }
+  .iv .pgrid div, .iv .ptiles div { font-family: var(--cardfont); font-size: 2rem; text-align: center; background: #fffaf0;
+                                    border: 2px solid #eadfc2; border-radius: 10px; padding: 4px 0; }
+  .iv .ptiles { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .iv .ptiles div { font-size: 3rem; padding: 6px 18px; min-width: 1.2em; }
+  .iv .timer { font-weight: 900; font-variant-numeric: tabular-nums; }
+  .iv .timer.long { color: var(--warn); }
+  .iv .bottom { grid-template-columns: 1fr 1fr 1fr; }
+  .iv .note-in { font: inherit; font-size: 16px; width: min(560px, 92%); padding: 10px; border: 2px solid var(--line); border-radius: 10px; margin-top: 12px; }
+
   @media (max-width: 720px) {
     .tile { min-width: 70px; padding: 6px 12px; }
     .flash .bottom { grid-template-columns: 1fr 1fr; }
@@ -180,6 +206,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <select id="fClass" aria-label="Class"></select>
       <button class="btn quiet" id="btnAdd" hidden>+ Add a child</button>
       <label class="toggle" id="finWrap" hidden><input type="checkbox" id="showFin"> Show finished</label>
+      <label class="toggle" id="lowWrap" hidden title="Unlocking Letters and Sounds aims its interventions at the lowest 20%"><input type="checkbox" id="lowOnly"> Lowest 20% only</label>
       <span class="grow"></span>
       <span class="save-state" id="saveState"></span>
       <button class="btn quiet" id="btnImport">⬆ Import spreadsheet</button>
@@ -208,6 +235,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
         <div class="hint" id="flagHint" style="margin-bottom:8px"></div>
         <div class="flagbox" id="flagBox"></div>
       </div>
+      <div class="card ivcard" id="ivCard"></div>
     </div>
     <div class="bar">
       <div class="chips" id="phaseChips"></div>
@@ -219,7 +247,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-26.10.26a</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26a</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -267,6 +295,17 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   </div>
 </div>
 
+<!-- a ULS intervention: the adult's steps (the child sees child.html) -->
+<div class="flash iv" id="iv" hidden>
+  <div class="top"><span id="ivTitle"></span><span class="grow"></span><span class="timer" id="ivTimer">0:00</span><button class="scr" id="ivScreen"><span class="d"></span>Link child screen</button><label class="toggle fontpick"><select class="cardFont" aria-label="Card font"><option value="sassoon">Sassoon Infant</option><option value="od">OpenDyslexic</option></select></label><button class="btn quiet" id="ivClose">Stop</button></div>
+  <div class="card-area" id="ivArea"></div>
+  <div class="bottom" id="ivButtons">
+    <button class="fNav" id="ivPrev">‹ Back</button>
+    <button class="fNav" id="ivExtra" hidden></button>
+    <button class="fSec" id="ivNext">Next ›</button>
+  </div>
+</div>
+
 <script>
 'use strict';
 var API = 'https://api.wallscourt-farm-academy.co.uk/planning/phonics-db?token=__hub__';
@@ -275,7 +314,8 @@ var TERM_SHORT = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'];                        //
 var TERM_NAMES = ['Term 1', 'Term 2', 'Term 3', 'Term 4', 'Term 5', 'Term 6'];
 var DEFAULT_PHASES = { R: ['p1', 'p2', 'p3', 'p4'] };
 var S = { cat: null, year: 'R', cls: '', children: [], marks: {}, flags: {}, recSecure: {}, ontrack: {},
-          academicYear: '', term: 1, programme: new Set(), child: null, phases: null, gaps: false, queue: {}, saving: false, failed: false };
+          academicYear: '', term: 1, programme: new Set(), child: null, phases: null, gaps: false, queue: {}, saving: false, failed: false,
+          iv: null, lowOnly: false };
 
 function $(id) { return document.getElementById(id); }
 function el(tag, attrs, kids) {
@@ -326,6 +366,7 @@ function load() {
     if (!S.failed) clearBanner();
     drawClass();
     if (S.child) drawChild();
+    loadIv();
   }).catch(function (e) {
     banner('err', 'Could not load: ' + e.message + '. Nothing has been changed.', load);
     $('classList').innerHTML = '<div class="empty">Not loaded.</div>';
@@ -449,6 +490,7 @@ function onProgramme(code) { return (S.programme.has(code) || Object.keys(S.mark
 function visibleChildren() {
   return S.children.filter(function (c) {
     if (S.cls && c.class !== S.cls) return false;
+    if (S.lowOnly && !older() && !isLow(c.pupilCode)) return false;
     return !older() || onProgramme(c.pupilCode) || (S.showFin && finished(c.pupilCode));
   });
 }
@@ -463,6 +505,8 @@ function drawClass() {
   fc.value = S.cls;
   fc.hidden = classes.length < 2;
   $('btnAdd').hidden = $('finWrap').hidden = !older();
+  $('lowWrap').hidden = older();
+  $('lowOnly').checked = S.lowOnly;
   $('classHint').textContent = older()
     ? YEAR_NAMES[S.year] + ': only the children still on the phonics programme are listed. "+ Add a child" puts someone on it; a child secure in everything leaves the list. Tap a child to assess them.'
     : 'Tap a child to assess them. Every tap is saved straight away, and this term\'s "on track" answers go to the Pupil Tracker.';
@@ -482,6 +526,8 @@ function drawClass() {
   sum.appendChild(el('div', { class: 'stat' }, [el('b', { text: gYes + ' / ' + kids.length }), el('small', { text: 'on track in GPCs · ' + std })]));
   sum.appendChild(el('div', { class: 'stat' }, [el('b', { text: wVals.every(function (v) { return v === 'n/a'; }) && kids.length ? 'n/a' : wYes + ' / ' + kids.length }),
                                                 el('small', { text: 'on track in blended words · ' + std })]));
+  if (!older() && S.iv) sum.appendChild(el('div', { class: 'stat', title: 'The 20% of assessed children in ' + YEAR_NAMES[S.year] + ' with the fewest sounds and words secure so far. A guide for choosing intervention groups: any child can have an intervention.' },
+    [el('b', { text: String(Object.keys(S.iv.lowest || {}).length) }), el('small', { text: 'in the lowest 20% · ' + YEAR_NAMES[S.year] + ' (ULS intervention focus)' })]));
 
   var box = $('classList');
   box.innerHTML = '';
@@ -489,7 +535,7 @@ function drawClass() {
   var phases = phasesFor(S.year);
   var head = el('tr', {}, [el('th', { text: 'Child' }), el('th', { text: 'GPCs' }), el('th', { text: 'Words' })]
     .concat(phases.map(function (p) { return el('th', { text: S.cat.phases.find(function (x) { return x.key === p; }).name }); }))
-    .concat([el('th', { text: 'Last assessed' })]));
+    .concat([el('th', { text: 'Last assessed' }), el('th', { text: 'Interventions' })]));
   var table = el('table', { class: 'cls' }, [el('thead', {}, [head])]);
   var tb = el('tbody');
   kids.forEach(function (c) {
@@ -497,13 +543,14 @@ function drawClass() {
     var last = Object.keys(m).reduce(function (a, i) { return m[i][2] > a ? m[i][2] : a; }, '');
     var started = Object.keys(m).length > 0;          // not assessed yet: no answer rather than "No"
     var row = el('tr', { class: 'kid', on: { click: function () { openChild(c.pupilCode); } } }, [
-      el('td', { class: 'who' }, [el('b', {}, [kidLabel(c)]), el('small', { text: c.class })]),
+      el('td', { class: 'who' }, [el('b', {}, [kidLabel(c)]), el('small', { text: c.class }),
+                                  isLow(c.pupilCode) ? el('span', { class: 'low', text: 'Lowest 20%' }) : null]),
       el('td', {}, [yn(started ? on.gpc[t] : '')]), el('td', {}, [yn(started ? on.bw[t] : '')])
     ].concat(phases.map(function (p) {
       var all = phaseItems(p), sec = all.filter(function (i) { return m[i] && m[i][0] === 'secure'; }).length;
       return el('td', {}, [el('div', { class: 'ph' }, [el('div', { class: 'lbl' }, [el('span', { text: sec + '/' + all.length })]),
         el('div', { class: 'track' }, [el('div', { class: 'fill', style: 'width:' + Math.round(100 * sec / all.length) + '%' })])])]);
-    })).concat([el('td', { text: last ? last.split('-').reverse().join('/') : '–' })]));
+    })).concat([el('td', { text: last ? last.split('-').reverse().join('/') : '–' }), el('td', { text: ivCount(c.pupilCode) })]));
     tb.appendChild(row);
   });
   table.appendChild(tb);
@@ -523,6 +570,7 @@ function closeChild() {
   S.child = null;
   $('vChild').hidden = true; $('vClass').hidden = false;
   drawClass();
+  loadIv();
 }
 function drawChild() {
   var c = childObj();
@@ -576,6 +624,7 @@ function drawChildTop(keepBlocks) {
       fb.appendChild(el('button', { class: 'chip' + (flag === o[0] ? ' on' : ''), text: o[1], on: { click: function () { setFlag(c.pupilCode, o[0]); } } }));
     });
   }
+  drawIvCard();
   if (!keepBlocks) drawBlocks();
 }
 function setFlag(code, value) {
@@ -709,6 +758,207 @@ $('fSkip').onclick = function () { if (F) { F.pos++; drawFlash(); } };
 $('fPrev').onclick = function () { if (F && F.pos > 0) { F.pos--; drawFlash(); } };
 $('fClose').onclick = closeFlash;
 
+// ── ULS interventions (02.11.26), as ULS's own guide "Ambitious Expectations" describes them. The API works out
+//    the lowest 20% and what each child could have next (routers/phonics_db.py, uls_interventions.py); each session
+//    is recorded (ph_iv) but never changes the assessment marks. About 2 minutes, one-to-one, "my turn, your turn". ──
+var IV = null;
+function loadIv() {
+  getJSON(API + '&action=interventions&year=' + S.year).then(function (d) {
+    S.iv = d;
+    if (S.child) drawIvCard(); else drawClass();
+  }).catch(function () { S.iv = null; if (S.child) drawIvCard(); });
+}
+function isLow(code) { return !!(S.iv && S.iv.lowest && code in S.iv.lowest); }
+function ivSessions(code) { return (S.iv && S.iv.sessions && S.iv.sessions[code]) || []; }
+function ivCount(code) { var n = ivSessions(code).length; return n ? n + ' this year' : '–'; }
+var IV_NAMES = { grid: 'Precision Grid', mix: 'Mix It Up', oral: 'Oral Blending', find: 'Blend and Find', spot: 'Spot It', digraph: 'Digraph Spotter' };
+function card(t) { return String(t || '').replace(/_/g, '-'); }          // split digraphs show as a-e
+function itemShow(i) { var it = S.cat.items[i]; return it ? card(it.show) : i; }
+
+function drawIvCard() {
+  var box = $('ivCard'), c = childObj();
+  if (!box || !c) return;
+  box.innerHTML = '';
+  box.appendChild(el('h4', { text: 'ULS interventions' }));
+  if (!S.iv) { box.appendChild(el('div', { class: 'hint', text: 'Loading…' })); return; }
+  if (!older()) box.appendChild(el('div', { class: 'hint', style: 'margin-bottom:6px',
+    text: isLow(c.pupilCode) ? 'In the lowest 20% of ' + YEAR_NAMES[S.year] + ' so far: ULS aims its interventions at these children.'
+                             : 'Not in the lowest 20% of ' + YEAR_NAMES[S.year] + ', but any child can have an intervention.' }));
+  var sg = (S.iv.suggest || {})[c.pupilCode] || { grid: [], mix: [], oral: false };
+  // Precision Grid: one sound (or tricky word) not yet secure, three known
+  if (sg.grid.length) {
+    var gsel = el('select', { 'aria-label': 'Precision Grid focus' });
+    sg.grid.forEach(function (o, n) {
+      gsel.appendChild(el('option', { value: String(n), text: itemShow(o.focus) + (o.kind === 'cew' ? ' (tricky word)' : '') + '  with ' + o.known.map(itemShow).join(', ') }));
+    });
+    box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what', text: 'Precision Grid' }), gsel,
+      el('button', { class: 'btn', text: '▶ Start', on: { click: function () { startGrid(sg.grid[+gsel.value]); } } })]));
+  }
+  // Mix It Up: a sound the child knows well, two words with it
+  if (sg.mix.length) {
+    var msel = el('select', { 'aria-label': 'Mix It Up focus' });
+    sg.mix.forEach(function (o, n) {
+      msel.appendChild(el('option', { value: String(n), text: card(o.focus) + ':  ' + o.words.slice(0, 2).map(function (w) { return w.word; }).join(', ') }));
+    });
+    box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what', text: 'Mix It Up' }), msel,
+      el('button', { class: 'btn', text: '▶ Start', on: { click: function () { startMix(sg.mix[+msel.value]); } } })]));
+  }
+  if (sg.oral) box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what' }, ['Oral Blending', el('small', { text: 'or Blend and Find: on the tool soon. Phase 1 oral blending is not yet secure.' })])]));
+  if (!sg.grid.length && !sg.mix.length && !sg.oral) box.appendChild(el('div', { class: 'hint',
+    text: 'Nothing to suggest yet. Suggestions come from the record: Precision Grid for a sound or tricky word marked ✗ not yet (or skipped before ones they know), Mix It Up for words marked ✗ not yet.' }));
+  var past = ivSessions(c.pupilCode).slice(-4).reverse();
+  if (past.length) {
+    var lg = el('div', { class: 'ivlog' });
+    past.forEach(function (x) {
+      var focus = x.kind === 'grid' ? itemShow(x.focus) : card(x.focus);
+      lg.appendChild(el('div', {}, [el('b', { text: IV_NAMES[x.kind] + ' ' + focus }), ' · ' + String(x.at || '').slice(0, 10).split('-').reverse().join('/') +
+        (x.outcome ? ' · ' + (x.outcome === 'got' ? '✓ got it' : '✗ not yet') : '') + (x.detail && x.detail.note ? ' · ' + x.detail.note : '')]));
+    });
+    box.appendChild(lg);
+  }
+}
+
+function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+function jumble(parts) {                       // never the right order (unless there is only one way)
+  if (parts.length < 2 || new Set(parts).size < 2) return parts.slice();
+  var j; do { j = shuffle(parts); } while (j.join('|') === parts.join('|'));
+  return j;
+}
+// 5 by 5, the focus twice on every line and each known item once (ULS: "Ensure that the focus sound is written
+// twice on each line"); the focus never side by side with itself.
+function makeGrid(focus, known) {
+  var cells = [];
+  for (var r = 0; r < 5; r++) {
+    var row, tries = 0;
+    do { row = shuffle([focus, focus].concat(known)); tries++; }
+    while (tries < 50 && row.some(function (x, k) { return k && x === focus && row[k - 1] === focus; }));
+    cells = cells.concat(row);
+  }
+  return cells;
+}
+
+function startIv(kind, title, focus, detail, steps) {
+  IV = { kind: kind, focus: focus, detail: detail, steps: steps, pos: 0, t0: Date.now(), outcome: '', note: '' };
+  $('ivTitle').textContent = title;
+  $('iv').hidden = false;
+  document.body.style.overflow = 'hidden';
+  IV.tick = setInterval(drawTimer, 1000);
+  drawTimer();
+  drawIv();
+  checkScreen();
+}
+function drawTimer() {
+  if (!IV) return;
+  var sec = Math.floor((Date.now() - IV.t0) / 1000);
+  $('ivTimer').textContent = Math.floor(sec / 60) + ':' + ('0' + sec % 60).slice(-2);
+  $('ivTimer').className = 'timer' + (sec >= 120 ? ' long' : '');
+  $('ivTimer').title = sec >= 120 ? 'ULS: try to stick to about two minutes' : '';
+}
+function previewOf(v) {
+  if (!v) return el('div', { class: 'hint', text: '(blank)' });
+  if (v.type === 'grid') return el('div', { class: 'pgrid' }, v.cells.map(function (c) { return el('div', { text: card(c) }); }));
+  if (v.type === 'tiles') return el('div', { class: 'ptiles' }, v.cells.map(function (c) { return el('div', { text: card(c) }); }));
+  return el('div', { class: 'big' + (v.cells[0].length > 3 ? ' word' : ''), text: card(v.cells[0]) });
+}
+function drawIv() {
+  var box = $('ivArea'), last = IV.pos >= IV.steps.length;
+  box.innerHTML = '';
+  $('ivPrev').disabled = IV.pos === 0;
+  $('ivExtra').hidden = true;
+  if (last) {                                   // how it went: recorded, the assessment marks are not changed
+    sendScreen('', null);
+    $('ivNext').textContent = 'Save';
+    $('ivNext').disabled = !IV.outcome;
+    box.appendChild(el('div', { class: 'step', text: 'How did it go?' }));
+    var row = el('div', { class: 'chips', style: 'justify-content:center' });
+    [['got', '✓ Got it'], ['notyet', '✗ Not yet']].forEach(function (o) {
+      row.appendChild(el('button', { class: 'chip' + (IV.outcome === o[0] ? ' on' : ''), style: 'font-size:1.2rem;padding:12px 22px', text: o[1],
+        on: { click: function () { IV.outcome = o[0]; drawIv(); } } }));
+    });
+    box.appendChild(row);
+    var note = el('input', { class: 'note-in', placeholder: 'A note for next time (optional; no names)', maxlength: '300' });
+    note.value = IV.note;
+    note.addEventListener('input', function () { IV.note = note.value; });
+    box.appendChild(note);
+    box.appendChild(el('div', { class: 'note', text: 'This records the session. To change the assessment, mark the tile in the child\'s record.' }));
+    return;
+  }
+  var st = IV.steps[IV.pos];
+  $('ivNext').textContent = 'Next ›';
+  $('ivNext').disabled = false;
+  sendScreen('', st.view);
+  box.appendChild(el('div', { class: 'step', text: (IV.pos + 1) + ' of ' + IV.steps.length + (st.who ? ' · ' + st.who : '') }));
+  box.appendChild(el('div', { class: 'plabel', text: "On the child's screen" }));
+  box.appendChild(el('div', { class: 'preview' }, [previewOf(st.view)]));
+  box.appendChild(el('div', { class: 'script' }, [st.say, st.tip ? el('small', { text: st.tip }) : null]));
+  if (st.extra) {
+    $('ivExtra').hidden = false;
+    $('ivExtra').textContent = st.extra.label;
+    $('ivExtra').onclick = function () { st.extra.run(st); drawIv(); };
+  }
+}
+function closeIv() {
+  if (!IV) return;
+  clearInterval(IV.tick);
+  sendScreen('', null);
+  IV = null;
+  $('iv').hidden = true;
+  document.body.style.overflow = '';
+}
+function saveIv() {
+  var x = IV, seconds = Math.round((Date.now() - x.t0) / 1000), code = S.child;
+  var detail = Object.assign({}, x.detail);
+  if (x.note.trim()) detail.note = x.note.trim();
+  $('ivNext').disabled = true;
+  postJSON({ action: 'ivLog', pupilCode: code, kind: x.kind, focus: x.focus, detail: detail, outcome: x.outcome, seconds: seconds })
+    .then(function () {
+      closeIv();
+      banner('ok', IV_NAMES[x.kind] + ' saved.');
+      loadIv();
+    }).catch(function (e) { $('ivNext').disabled = false; banner('err', 'Not saved: ' + e.message, saveIv); });
+}
+$('ivNext').onclick = function () { if (!IV) return; if (IV.pos >= IV.steps.length) saveIv(); else { IV.pos++; drawIv(); } };
+$('ivPrev').onclick = function () { if (IV && IV.pos > 0) { IV.pos--; drawIv(); } };
+$('ivClose').onclick = closeIv;
+
+// Precision Grid (ULS intervention 5)
+function startGrid(o) {
+  var it = S.cat.items[o.focus], f = it.show, known = o.known.map(function (i) { return S.cat.items[i].show; });
+  var cew = o.kind === 'cew', thing = cew ? 'word' : 'sound';
+  var flash = { type: 'flash', cells: [f] };
+  var grid = { type: 'grid', cells: makeGrid(f, known), cols: 5 };
+  var steps = [
+    { who: 'My turn', view: flash, say: cew ? 'This word is "' + card(f) + '". What\'s the word?' : 'This is the grapheme ' + card(f) + '. What\'s the sound?',
+      tip: 'The child says the ' + thing + ' three times.' },
+    { who: 'Your turn', view: grid, say: 'Point to each ' + (cew ? 'word' : 'grapheme') + ' in turn and say the ' + thing + '.',
+      tip: 'The child goes along every line to the end. "' + card(f) + '" is twice on each line, with ' + known.map(card).join(', ') + '.',
+      extra: { label: 'New grid', run: function (st) { st.view = { type: 'grid', cells: makeGrid(f, known), cols: 5 }; } } },
+    { who: 'Check', view: flash, say: 'Show the flashcard again. Can the child remember the ' + thing + '?' }
+  ];
+  startIv('grid', 'Precision Grid · ' + card(f), o.focus, { known: o.known }, steps);
+}
+
+// Mix It Up (ULS intervention 3): the same word built, mixed up and rebuilt from its sound cards
+function startMix(o) {
+  var words = o.words.slice(0, 2), steps = [];
+  words.forEach(function (w, n) {
+    var tiles = { type: 'tiles', cells: w.parts, cols: w.parts.length }, mixed = function () { return { type: 'tiles', cells: jumble(w.parts), cols: w.parts.length }; };
+    var name = (n ? 'Second' : 'First') + ' word: ' + w.word;
+    steps.push({ who: 'My turn · ' + name, view: tiles, say: 'Point to each card and say the sound. Then sweep your finger under the cards and say the word.',
+                 tip: w.parts.map(card).join(' · ') + '  →  ' + w.word });
+    steps.push({ who: 'Your turn · ' + name, view: tiles, say: 'The child does the same: each sound, then sweep and say the word.' });
+    var mine = { who: 'My turn · ' + name, view: mixed(), say: 'Mix up the cards, then put them back in order, saying the sound for each one. Sweep and say the word.',
+                 extra: { label: 'Put in order', run: function (st) { st.view = st.view.cells.join() === w.parts.join() ? mixed() : tiles; } } };
+    steps.push(mine);
+    steps.push({ who: 'Your turn · ' + name, view: mixed(), say: 'The child puts the cards back in order, saying each sound, then sweeps and says the word.',
+                 extra: { label: 'Show in order', run: function (st) { st.view = st.view.cells.join() === w.parts.join() ? mixed() : tiles; } } });
+  });
+  words.forEach(function (w, n) {
+    steps.push({ who: 'Read fluently', view: { type: 'word', cells: [w.word] }, say: n ? 'And this word?' : '"Now we will read the words fluently." What does this say?' });
+  });
+  startIv('mix', 'Mix It Up · ' + card(o.focus), o.focus, { words: words.map(function (w) { return w.word; }) }, steps);
+}
+
 // child screen link
 var SKEY = 'wfa_ph_screen_v1', SCR = { code: recall(SKEY) || '', ago: null, last: null, timer: null, chain: Promise.resolve() };
 function newScreenCode() {
@@ -719,29 +969,31 @@ function newScreenCode() {
 }
 function childUrl() { return location.origin + location.pathname.replace(/[^/]*$/, '') + 'child.html#' + SCR.code; }
 function screenOn() { return SCR.ago != null && SCR.ago < 10; }
-function sendScreen(item) {
+function sendScreen(item, view) {
   // only once a child screen has been linked, so a single iPad on its own writes nothing
-  if (!SCR.code || SCR.ago == null || SCR.ago > 120) { SCR.last = item; return; }
-  SCR.last = item;
+  SCR.last = item; SCR.lastView = view || null;
+  if (!SCR.code || SCR.ago == null || SCR.ago > 120) return;
   var font = document.body.classList.contains('font-od') ? 'od' : 'sassoon';
   SCR.chain = SCR.chain.then(function () {               // one at a time, so the child screen never shows an older card
-    return postJSON({ action: 'screen', code: SCR.code, item: item, font: font })
+    return postJSON({ action: 'screen', code: SCR.code, item: item || '', font: font, view: view || null })
       .then(function (d) { SCR.ago = d.childAgo; drawScreenState(); });
   }).catch(function () {});
 }
 function checkScreen() {
   clearTimeout(SCR.timer);
-  if (!SCR.code || ($('flash').hidden && $('scrModal').hidden)) return;
+  if (!SCR.code || ($('flash').hidden && $('scrModal').hidden && $('iv').hidden)) return;
   getJSON(API + '&action=screen&code=' + SCR.code).then(function (d) {
     var was = screenOn();
     SCR.ago = d.childAgo;
     drawScreenState();
-    if (screenOn() && !was && F) sendScreen(SCR.last || '');     // a child screen has just joined: show it the card
+    if (screenOn() && !was && (F || IV)) sendScreen(SCR.last || '', SCR.lastView);   // a child screen has just joined: show it the card
   }).catch(function () {}).then(function () { SCR.timer = setTimeout(checkScreen, 3000); });
 }
 function drawScreenState() {
-  $('fScreen').className = 'scr' + (screenOn() ? ' on' : '');
-  $('fScreen').lastChild.textContent = screenOn() ? 'Child screen on' : 'Link child screen';
+  ['fScreen', 'ivScreen'].forEach(function (b) {
+    $(b).className = 'scr' + (screenOn() ? ' on' : '');
+    $(b).lastChild.textContent = screenOn() ? 'Child screen on' : 'Link child screen';
+  });
   $('scrStatus').textContent = screenOn() ? '✓ The child screen is showing the cards.' : 'Waiting for the child screen…';
   $('scrStatus').style.color = screenOn() ? '#1d7a45' : 'var(--muted)';
 }
@@ -756,9 +1008,14 @@ function openScreenPanel() {
   checkScreen();
 }
 $('fScreen').onclick = openScreenPanel;
-$('scrClose').onclick = function () { $('scrModal').hidden = true; if (F) { sendScreen(SCR.last || ''); checkScreen(); } };
+$('scrClose').onclick = function () { $('scrModal').hidden = true; if (F || IV) { sendScreen(SCR.last || '', SCR.lastView); checkScreen(); } };
+$('ivScreen').onclick = openScreenPanel;
 $('scrNew').onclick = function () { newScreenCode(); openScreenPanel(); };
 document.addEventListener('keydown', function (e) {
+  if (IV && e.target.tagName !== 'INPUT') {
+    if (e.key === 'ArrowRight') $('ivNext').click(); else if (e.key === 'ArrowLeft') $('ivPrev').click(); else if (e.key === 'Escape') closeIv();
+    return;
+  }
   if (!F) return;
   if (e.key === 'ArrowRight' || e.key === 'Enter') flashMark('secure');
   else if (e.key === 'ArrowLeft') flashMark('not');
@@ -826,11 +1083,13 @@ function setFont(f) {
   Array.prototype.forEach.call(document.querySelectorAll('.cardFont'), function (s) { s.value = f; });
   store(FKEY, f);
   if (typeof F !== 'undefined' && F && F.pos < F.list.length) sendScreen(F.list[F.pos]);
+  else if (typeof IV !== 'undefined' && IV) sendScreen('', SCR.lastView);
 }
 Array.prototype.forEach.call(document.querySelectorAll('.cardFont'), function (s) { s.onchange = function () { setFont(this.value); }; });
 setFont(recall(FKEY));
 $('btnExport').onclick = exportSheet;
 $('showFin').onchange = function () { S.showFin = this.checked; drawClass(); };
+$('lowOnly').onchange = function () { S.lowOnly = this.checked; drawClass(); };
 var ADD = new Set();
 function addButton() {
   $('addGo').disabled = !ADD.size;
