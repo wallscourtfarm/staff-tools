@@ -247,7 +247,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26a</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26b</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -301,7 +301,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="card-area" id="ivArea"></div>
   <div class="bottom" id="ivButtons">
     <button class="fNav" id="ivPrev">‹ Back</button>
-    <button class="fNav" id="ivExtra" hidden></button>
+    <button class="fNav" id="ivExtra" style="visibility:hidden"></button>
     <button class="fSec" id="ivNext">Next ›</button>
   </div>
 </div>
@@ -803,7 +803,7 @@ function drawIvCard() {
     box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what', text: 'Mix It Up' }), msel,
       el('button', { class: 'btn', text: '▶ Start', on: { click: function () { startMix(sg.mix[+msel.value]); } } })]));
   }
-  if (sg.oral) box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what' }, ['Oral Blending', el('small', { text: 'or Blend and Find: on the tool soon. Phase 1 oral blending is not yet secure.' })])]));
+  if (sg.oral) box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what' }, ['Oral Blending', el('small', { text: 'or Blend and Find: on the tool soon. Phase 1 oral blending is not all secure yet.' })])]));
   if (!sg.grid.length && !sg.mix.length && !sg.oral) box.appendChild(el('div', { class: 'hint',
     text: 'Nothing to suggest yet. Suggestions come from the record: Precision Grid for a sound or tricky word marked ✗ not yet (or skipped before ones they know), Mix It Up for words marked ✗ not yet.' }));
   var past = ivSessions(c.pupilCode).slice(-4).reverse();
@@ -864,7 +864,7 @@ function drawIv() {
   var box = $('ivArea'), last = IV.pos >= IV.steps.length;
   box.innerHTML = '';
   $('ivPrev').disabled = IV.pos === 0;
-  $('ivExtra').hidden = true;
+  $('ivExtra').style.visibility = 'hidden';
   if (last) {                                   // how it went: recorded, the assessment marks are not changed
     sendScreen('', null);
     $('ivNext').textContent = 'Save';
@@ -892,7 +892,7 @@ function drawIv() {
   box.appendChild(el('div', { class: 'preview' }, [previewOf(st.view)]));
   box.appendChild(el('div', { class: 'script' }, [st.say, st.tip ? el('small', { text: st.tip }) : null]));
   if (st.extra) {
-    $('ivExtra').hidden = false;
+    $('ivExtra').style.visibility = 'visible';
     $('ivExtra').textContent = st.extra.label;
     $('ivExtra').onclick = function () { st.extra.run(st); drawIv(); };
   }
