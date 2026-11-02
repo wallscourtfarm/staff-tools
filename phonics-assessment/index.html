@@ -219,7 +219,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <select id="fClass" aria-label="Class"></select>
       <button class="btn quiet" id="btnAdd" hidden>+ Add a child</button>
       <label class="toggle" id="finWrap" hidden><input type="checkbox" id="showFin"> Show finished</label>
-      <label class="toggle fontpick" title="How far this year group has been taught in the ULS programme (one setting for the whole year group)">📍 Taught up to <select id="yearLimit" aria-label="Taught up to"></select></label>
+      <label class="toggle fontpick" title="The last ULS set this year group has been taught, so is assessed up to (one setting for the whole year group)">📍 Assessment point <select id="yearLimit" aria-label="Assessment point"></select></label>
       <label class="toggle" id="lowWrap" hidden title="Unlocking Letters and Sounds aims its interventions at the lowest 20%"><input type="checkbox" id="lowOnly"> Lowest 20% only</label>
       <span class="grow"></span>
       <span class="save-state" id="saveState"></span>
@@ -254,7 +254,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div class="bar">
       <div class="chips" id="phaseChips"></div>
       <span class="grow"></span>
-      <label class="toggle fontpick" title="One setting for the whole year group">Taught up to (year group) <select id="childLimit" aria-label="Taught up to"></select></label>
+      <label class="toggle fontpick" title="One setting for the whole year group">Assessment point (year group) <select id="childLimit" aria-label="Assessment point"></select></label>
       <label class="toggle fontpick">Card font <select class="cardFont" aria-label="Card font"><option value="sassoon">Sassoon Infant</option><option value="od">OpenDyslexic</option></select></label>
       <label class="toggle"><input type="checkbox" id="gapsOnly"> Gaps only</label>
     </div>
@@ -262,7 +262,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26i</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26j</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -470,7 +470,7 @@ function items(blockKey) { var b = S.cat.blocks.find(function (x) { return x.key
 function phaseItems(ph) { return Object.keys(S.cat.items).filter(function (i) { return S.cat.items[i].phase === ph; }); }
 function sheetKey(c) { return c.yearGroup === 'R' ? 'R' : 'Y1'; }
 function phasesFor(year) { return DEFAULT_PHASES[year] || ['p2', 'p3', 'p4', 'p5a', 'y1nc', 'p5b', 'p5c']; }
-// "Taught up to": the teacher's last set taught for each child (a catalogue block key); after it = not taught yet
+// "Assessment point" (called "taught up to" in the API): the last set the year group has been taught (a catalogue block key); after it = not taught yet
 function blockIndex(key) { return S.cat.blocks.findIndex(function (b) { return b.key === key; }); }
 function shortSet(key) {
   var b = S.cat.blocks.find(function (x) { return x.key === key; });
@@ -651,7 +651,7 @@ function drawChild() {
   lg.appendChild(el('span', {}, [el('span', { class: 'yg', text: 'YR' }), ' ', el('span', { class: 'yg', text: 'Y1' }), ' in the corner: secured in that earlier year group']));
   lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--old)' }), 'imported, date not known']));
   lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:#fff3f3;border-color:#f0b4b4' }), 'not yet']));
-  if (S.limits[c.pupilCode]) lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'border-style:dashed;opacity:.5' }), 'faded: not taught yet (after ' + shortSet(S.limits[c.pupilCode]) + ')']));
+  if (S.limits[c.pupilCode]) lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'border-style:dashed;opacity:.5' }), 'faded: after the assessment point (' + shortSet(S.limits[c.pupilCode]) + '), not taught yet']));
   lg.appendChild(el('span', { text: '· Tap once for secure, again for not yet, again to clear.' }));
   drawChildTop();
 }
@@ -765,7 +765,7 @@ function startFlash(list, where) {
 function startFlashAll() {
   var list = [];
   S.cat.blocks.forEach(function (b) { if (S.phases.indexOf(b.phase) >= 0) list = list.concat(shownItems(b).filter(function (i) { return isTaught(S.child, i); })); });
-  if (!list.length) { banner('info', 'Nothing to show: choose a phase, untick "Gaps only", or check "Taught up to".'); return; }
+  if (!list.length) { banner('info', 'Nothing to show: choose a phase, untick "Gaps only", or check the assessment point.'); return; }
   startFlash(list, S.gaps ? 'Gaps' : 'Everything chosen');
 }
 function drawFlash() {
@@ -870,7 +870,7 @@ function drawIvCard() {
   box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what' }, ['Blend and Find', sg.find ? el('small', { text: '(suggested: beginning to blend)' }) : null]), fsel,
     el('button', { class: 'btn' + (sg.find ? '' : ' quiet'), text: '▶ Start', on: { click: function () { startFind(SCENES[+fsel.value]); } } })]));
   if (!sg.grid.length && !sg.mix.length && !sg.digraph.length) box.appendChild(el('div', { class: 'hint',
-    text: 'Nothing else to suggest yet. Suggestions come from sounds, tricky words or words marked ✗ not yet, and, once "Taught up to" is set, from anything taught but left blank.' }));
+    text: 'Nothing else to suggest yet. Suggestions come from sounds, tricky words or words marked ✗ not yet, and, once the assessment point is set, from anything up to it left blank.' }));
   var past = ivSessions(c.pupilCode).slice(-4).reverse();
   if (past.length) {
     var lg = el('div', { class: 'ivlog' });
@@ -1286,7 +1286,7 @@ $('lowOnly').onchange = function () { S.lowOnly = this.checked; drawClass(); };
 function changeTaught(sel) {
   var v = sel.value;
   saveTaught(v).then(function () {
-    banner('ok', v ? YEAR_NAMES[S.year] + ': taught up to ' + shortSet(v) + '.' : YEAR_NAMES[S.year] + ': "taught up to" cleared.');
+    banner('ok', v ? YEAR_NAMES[S.year] + ': assessment point ' + shortSet(v) + '.' : YEAR_NAMES[S.year] + ': assessment point cleared.');
     if (S.child) drawChild(); else drawClass();
   }).catch(function (e) { banner('err', 'Not saved: ' + e.message); if (S.child) drawChild(); else drawClass(); });
 }
