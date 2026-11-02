@@ -49,6 +49,15 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .tiles div { font-family: var(--cardfont); font-size: min(26vh, 16vw); line-height: 1.15; min-width: 1.2em; text-align: center;
                padding: 2vh 3vw; border: 3px solid #eadfc2; border-radius: 20px; background: #fffaf0; }
   body.font-od .tiles div { font-size: min(19vh, 12vw); }
+  /* Oral Blending picture cards and Blend and Find scenes: pictures only, nothing to read */
+  .pics { display: grid; gap: 3vmin; }
+  .pics div { font-size: min(34vh, 24vw); line-height: 1.15; text-align: center; padding: 2vmin 3vmin; border: 3px solid #eadfc2;
+              border-radius: 24px; background: #fffaf0; }
+  .pics.n4 div { font-size: min(22vh, 15vw); }
+  .scene { position: relative; width: min(92vw, 150vh); height: min(82vh, 60vw); border-radius: 28px; overflow: hidden;
+           background: linear-gradient(#dff1fb 0 55%, #e3f3d8 55% 100%); border: 3px solid #eadfc2; }
+  .scene .bg { position: absolute; right: 4%; top: 4%; font-size: min(30vh, 20vw); opacity: .35; }
+  .scene .obj { position: absolute; transform: translate(-50%, -50%); font-size: min(17vh, 12vw); line-height: 1; }
 </style>
 </head>
 <body>
@@ -64,7 +73,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div class="err" id="err"></div>
   </div>
 </div>
-<span id="ver">WFA-02.11.26a</span>
+<span id="ver">WFA-02.11.26b</span>
 
 <script>
 'use strict';
@@ -102,6 +111,22 @@ function showView(box, v) {
     d.className = 'grid';
     d.style.gridTemplateColumns = 'repeat(' + (v.cols || 5) + ', 1fr)';
   } else if (v.type === 'tiles') d.className = 'tiles';
+  else if (v.type === 'pics') {
+    d.className = 'pics' + (v.cells.length > 2 ? ' n4' : '');
+    d.style.gridTemplateColumns = 'repeat(' + (v.cells.length === 4 ? 2 : v.cells.length) + ', auto)';
+  } else if (v.type === 'scene') {                    // the scene picture, then its four objects
+    d.className = 'scene';
+    var at = [[22, 34], [62, 30], [30, 74], [74, 72]];
+    v.cells.forEach(function (c, k) {
+      var e = document.createElement('div');
+      e.className = k ? 'obj' : 'bg';
+      e.textContent = c;
+      if (k) { e.style.left = at[(k - 1) % 4][0] + '%'; e.style.top = at[(k - 1) % 4][1] + '%'; }
+      d.appendChild(e);
+    });
+    box.appendChild(d);
+    return;
+  }
   else { d.className = 'big' + (v.cells[0].length > 3 ? ' word' : ''); d.textContent = v.cells[0].replace(/_/g, '-'); box.appendChild(d); return; }
   v.cells.forEach(function (c) { var e = document.createElement('div'); e.textContent = c.replace(/_/g, '-'); d.appendChild(e); });
   box.appendChild(d);

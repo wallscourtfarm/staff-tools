@@ -175,6 +175,13 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
                                     border: 2px solid #eadfc2; border-radius: 10px; padding: 4px 0; }
   .iv .ptiles { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
   .iv .ptiles div { font-size: 3rem; padding: 6px 18px; min-width: 1.2em; }
+  .iv .ppics { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .iv .ppics div { font-size: 4.2rem; line-height: 1.2; padding: 4px 14px; background: #fffaf0; border: 2px solid #eadfc2; border-radius: 14px; }
+  .iv .pscene { position: relative; width: 100%; height: 260px; border-radius: 16px; overflow: hidden;
+                background: linear-gradient(#dff1fb 0 55%, #e3f3d8 55% 100%); }
+  .iv .pscene .bg { position: absolute; right: 4%; top: 4%; font-size: 5rem; opacity: .35; }
+  .iv .pscene .obj { position: absolute; transform: translate(-50%, -50%); font-size: 3.4rem; line-height: 1; }
+  .iv .say { font-size: 1.6rem; color: var(--wfa-blue); letter-spacing: .04em; }
   .iv .timer { font-weight: 900; font-variant-numeric: tabular-nums; }
   .iv .timer.long { color: var(--warn); }
   .iv .bottom { grid-template-columns: 1fr 1fr 1fr; }
@@ -247,7 +254,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26b</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26c</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -803,14 +810,20 @@ function drawIvCard() {
     box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what', text: 'Mix It Up' }), msel,
       el('button', { class: 'btn', text: '▶ Start', on: { click: function () { startMix(sg.mix[+msel.value]); } } })]));
   }
-  if (sg.oral) box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what' }, ['Oral Blending', el('small', { text: 'or Blend and Find: on the tool soon. Phase 1 oral blending is not all secure yet.' })])]));
-  if (!sg.grid.length && !sg.mix.length && !sg.oral) box.appendChild(el('div', { class: 'hint',
-    text: 'Nothing to suggest yet. Suggestions come from the record: Precision Grid for a sound or tricky word marked ✗ not yet (or skipped before ones they know), Mix It Up for words marked ✗ not yet.' }));
+  // Oral Blending and Blend and Find: pictures only, so any child can have them (suggested when Phase 1 has gaps)
+  var osel = el('select', { 'aria-label': 'Oral Blending words' }, [el('option', { value: '3', text: 'words with 3 sounds' }), el('option', { value: '4', text: 'words with 4 sounds' })]);
+  box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what' }, ['Oral Blending', sg.oral ? el('small', { text: '(suggested)' }) : null]), osel,
+    el('button', { class: 'btn' + (sg.oral ? '' : ' quiet'), text: '▶ Start', on: { click: function () { startOral(+osel.value); } } })]));
+  var fsel = el('select', { 'aria-label': 'Blend and Find scene' }, SCENES.map(function (x, n) { return el('option', { value: String(n), text: x.name }); }));
+  box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what' }, ['Blend and Find', sg.oral ? el('small', { text: '(suggested)' }) : null]), fsel,
+    el('button', { class: 'btn' + (sg.oral ? '' : ' quiet'), text: '▶ Start', on: { click: function () { startFind(SCENES[+fsel.value]); } } })]));
+  if (!sg.grid.length && !sg.mix.length) box.appendChild(el('div', { class: 'hint',
+    text: 'No Precision Grid or Mix It Up to suggest yet. They come from the record: a sound or tricky word marked ✗ not yet (or skipped before ones they know), or words marked ✗ not yet.' }));
   var past = ivSessions(c.pupilCode).slice(-4).reverse();
   if (past.length) {
     var lg = el('div', { class: 'ivlog' });
     past.forEach(function (x) {
-      var focus = x.kind === 'grid' ? itemShow(x.focus) : card(x.focus);
+      var focus = x.kind === 'grid' ? itemShow(x.focus) : x.kind === 'mix' ? card(x.focus) : x.focus;
       lg.appendChild(el('div', {}, [el('b', { text: IV_NAMES[x.kind] + ' ' + focus }), ' · ' + String(x.at || '').slice(0, 10).split('-').reverse().join('/') +
         (x.outcome ? ' · ' + (x.outcome === 'got' ? '✓ got it' : '✗ not yet') : '') + (x.detail && x.detail.note ? ' · ' + x.detail.note : '')]));
     });
@@ -858,6 +871,11 @@ function previewOf(v) {
   if (!v) return el('div', { class: 'hint', text: '(blank)' });
   if (v.type === 'grid') return el('div', { class: 'pgrid' }, v.cells.map(function (c) { return el('div', { text: card(c) }); }));
   if (v.type === 'tiles') return el('div', { class: 'ptiles' }, v.cells.map(function (c) { return el('div', { text: card(c) }); }));
+  if (v.type === 'pics') return el('div', { class: 'ppics' }, v.cells.map(function (c) { return el('div', { text: c }); }));
+  if (v.type === 'scene') return el('div', { class: 'pscene' }, v.cells.map(function (c, k) {
+    var at = [[22, 34], [62, 30], [30, 74], [74, 72]][(k - 1) % 4];
+    return el('div', { class: k ? 'obj' : 'bg', text: c, style: k ? 'left:' + at[0] + '%;top:' + at[1] + '%' : '' });
+  }));
   return el('div', { class: 'big' + (v.cells[0].length > 3 ? ' word' : ''), text: card(v.cells[0]) });
 }
 function drawIv() {
@@ -890,7 +908,8 @@ function drawIv() {
   box.appendChild(el('div', { class: 'step', text: (IV.pos + 1) + ' of ' + IV.steps.length + (st.who ? ' · ' + st.who : '') }));
   box.appendChild(el('div', { class: 'plabel', text: "On the child's screen" }));
   box.appendChild(el('div', { class: 'preview' }, [previewOf(st.view)]));
-  box.appendChild(el('div', { class: 'script' }, [st.say, st.tip ? el('small', { text: st.tip }) : null]));
+  box.appendChild(el('div', { class: 'script' }, [st.say, st.sounds ? el('div', { class: 'say', text: st.sounds }) : null,
+                                                    st.tip ? el('small', { text: st.tip }) : null]));
   if (st.extra) {
     $('ivExtra').style.visibility = 'visible';
     $('ivExtra').textContent = st.extra.label;
@@ -957,6 +976,66 @@ function startMix(o) {
     steps.push({ who: 'Read fluently', view: { type: 'word', cells: [w.word] }, say: n ? 'And this word?' : '"Now we will read the words fluently." What does this say?' });
   });
   startIv('mix', 'Mix It Up · ' + card(o.focus), o.focus, { words: words.map(function (w) { return w.word; }) }, steps);
+}
+
+// Oral Blending (ULS intervention 1) and Blend and Find (2): the child hears the sounds and blends them; the child's
+// screen shows pictures only. Pictures are emoji (drawn by the iPad itself, nothing to download). The Phase 1
+// assessment's own words (man, sock, cup, peg, fish, hand, tent, flag) are left out so they stay a fair check.
+var PICS = [
+  ['cat', '🐱', 'c a t'], ['dog', '🐶', 'd o g'], ['pig', '🐷', 'p i g'], ['hen', '🐔', 'h e n'], ['sun', '☀️', 's u n'],
+  ['bus', '🚌', 'b u s'], ['hat', '🎩', 'h a t'], ['bed', '🛏️', 'b e d'], ['map', '🗺️', 'm a p'], ['pen', '🖊️', 'p e n'],
+  ['bat', '🦇', 'b a t'], ['van', '🚐', 'v a n'], ['web', '🕸️', 'w e b'], ['ship', '🚢', 'sh i p'], ['duck', '🦆', 'd u ck'],
+  ['moon', '🌙', 'm oo n'], ['boat', '⛵', 'b oa t'], ['rain', '🌧️', 'r ai n'], ['goat', '🐐', 'g oa t'], ['coat', '🧥', 'c oa t'],
+  ['king', '🤴', 'k i ng'], ['ring', '💍', 'r i ng'], ['book', '📕', 'b oo k'], ['cake', '🎂', 'c ai k'], ['foot', '🦶', 'f oo t'],
+  ['nut', '🥜', 'n u t'], ['mug', '☕', 'm u g'], ['leaf', '🍃', 'l ee f'], ['shell', '🐚', 'sh e ll'], ['nose', '👃', 'n oa z'],
+  ['bike', '🚲', 'b igh k'], ['kite', '🪁', 'k igh t'], ['tap', '🚰', 't a p'], ['bag', '👜', 'b a g'], ['log', '🪵', 'l o g'],
+  ['sheep', '🐑', 'sh ee p'], ['bug', '🐛', 'b u g'], ['worm', '🪱', 'w ur m'], ['corn', '🌽', 'c or n'], ['peach', '🍑', 'p ee ch'],
+  ['pan', '🍳', 'p a n'], ['tree', '🌳', 't r ee'],
+  ['frog', '🐸', 'f r o g'], ['crab', '🦀', 'c r a b'], ['drum', '🥁', 'd r u m'], ['snail', '🐌', 's n ai l'], ['plug', '🔌', 'p l u g'],
+  ['milk', '🥛', 'm i l k'], ['nest', '🪺', 'n e s t'], ['spoon', '🥄', 's p oo n'], ['truck', '🚚', 't r u ck'], ['sled', '🛷', 's l e d'],
+  ['clock', '🕰️', 'c l o ck']
+].map(function (p) { return { word: p[0], pic: p[1], sounds: p[2].split(' ') }; });
+var SCENES = [
+  { name: 'Farmyard', bg: '🌾', words: ['pig', 'hen', 'goat', 'sheep'] },
+  { name: 'Garden', bg: '🌳', words: ['snail', 'frog', 'worm', 'bug'] },
+  { name: 'Seaside', bg: '🏖️', words: ['crab', 'boat', 'shell', 'sun'] },
+  { name: 'Kitchen', bg: '🏠', words: ['mug', 'pan', 'spoon', 'cake'] },
+  { name: 'Supermarket', bg: '🛒', words: ['milk', 'nut', 'corn', 'peach'] },
+  { name: 'Park', bg: '🏞️', words: ['dog', 'duck', 'kite', 'bike'] }
+];
+function pic(word) { return PICS.find(function (p) { return p.word === word; }); }
+function slow(p) { return p.sounds.join('  –  '); }
+function fast(p) { return p.sounds.join('-') + '  →  ' + p.word; }
+
+function startOral(n) {
+  var four = shuffle(PICS.filter(function (p) { return p.sounds.length === n; })).slice(0, 4), steps = [];
+  four.forEach(function (p, k) {
+    var one = { type: 'pics', cells: [p.pic] }, name = 'Picture ' + (k + 1) + ': ' + p.word;
+    steps.push({ who: 'My turn · ' + name, view: one, say: 'Show the picture. Sound-talk the word slowly. Do not say the word.', sounds: slow(p),
+                 extra: k ? null : { label: 'Other pictures', run: function () { closeIv(); startOral(n); } } });
+    steps.push({ who: 'Your turn · ' + name, view: one, say: 'The child sound-talks the same word.', sounds: slow(p) });
+    steps.push({ who: 'My turn · ' + name, view: one, say: 'Again, faster, then blend and say the word.', sounds: fast(p) });
+    steps.push({ who: 'Your turn · ' + name, view: one, say: 'Pass the picture to the child. The child sound-talks it and blends it to say the word.', sounds: fast(p) });
+  });
+  var all = { type: 'pics', cells: four.map(function (p) { return p.pic; }) };
+  shuffle(four).forEach(function (p, k) {
+    steps.push({ who: 'Point to it · ' + (k + 1) + ' of 4', view: all, say: 'Sound-talk one of the pictures. The child points to it, then sound-talks and blends to say the word.',
+                 sounds: slow(p), tip: 'It is the ' + p.word + '.' });
+  });
+  startIv('oral', 'Oral Blending', n + ' sounds', { words: four.map(function (p) { return p.word; }) }, steps);
+}
+
+function startFind(sc) {
+  var objs = shuffle(sc.words.map(pic)), steps = [];
+  var view = { type: 'scene', cells: [sc.bg].concat(objs.map(function (p) { return p.pic; })) };
+  shuffle(objs).forEach(function (p, k) {
+    var name = (k + 1) + ' of 4: ' + p.word;
+    steps.push({ who: 'My turn · ' + name, view: view, say: 'Sound-talk one of the things in the picture. Do not say the word.', sounds: slow(p) });
+    steps.push({ who: 'Your turn · ' + name, view: view, say: 'The child sound-talks the same word.', sounds: slow(p) });
+    steps.push({ who: 'My turn · ' + name, view: view, say: 'Again, faster, and ask the child to say the word.', sounds: slow(p) });
+    steps.push({ who: 'Your turn · ' + name, view: view, say: 'The child sound-talks the word and blends it, then points to the ' + p.word + ' in the picture.', sounds: fast(p) });
+  });
+  startIv('find', 'Blend and Find · ' + sc.name, sc.name, { words: sc.words.slice() }, steps);
 }
 
 // child screen link
