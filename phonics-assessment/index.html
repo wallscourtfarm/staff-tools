@@ -183,6 +183,10 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .iv .ppics img { display: block; width: 120px; height: 120px; object-fit: contain; }
   .iv .pscene { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; background-size: cover; background-position: center; }
   .iv .pscene .obj { position: absolute; transform: translate(-50%, -50%); width: 18%; height: auto; filter: drop-shadow(0 3px 3px rgba(0,0,0,.18)); }
+  .iv .pbtn { font-family: var(--cardfont); font-size: 4rem; display: flex; justify-content: center; gap: 2px; padding-bottom: 16px; }
+  .iv .pbtn span { position: relative; padding: 0 2px; }
+  .iv .pbtn .dot::after { content: ''; position: absolute; left: 50%; bottom: -12px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--wfa-blue); }
+  .iv .pbtn .line::after { content: ''; position: absolute; left: 4px; right: 4px; bottom: -8px; height: 5px; border-radius: 3px; background: var(--wfa-blue); }
   .iv .say { font-size: 1.6rem; color: var(--wfa-blue); letter-spacing: .04em; }
   .iv .timer { font-weight: 900; font-variant-numeric: tabular-nums; }
   .iv .timer.long { color: var(--warn); }
@@ -258,7 +262,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26h</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26i</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -830,6 +834,8 @@ function ivCount(code) { var n = ivSessions(code).length; return n ? n + ' this 
 var IV_NAMES = { grid: 'Precision Grid', mix: 'Mix It Up', oral: 'Oral Blending', find: 'Blend and Find', spot: 'Spot It', digraph: 'Digraph Spotter' };
 function card(t) { return String(t || '').replace(/_/g, '-'); }          // split digraphs show as a-e
 function itemShow(i) { var it = S.cat.items[i]; return it ? card(it.show) : i; }
+function optCard(o, i) { return card((o.cards && o.cards[i]) || (S.cat.items[i] || {}).show || i); }
+function kindName(o) { return o.kind === 'cew' ? ' (tricky word)' : o.kind === 'alt' ? (o.note ? ' (' + o.note + ')' : '') : ''; }
 
 function drawIvCard() {
   var box = $('ivCard'), c = childObj();
@@ -840,39 +846,36 @@ function drawIvCard() {
   if (!older()) box.appendChild(el('div', { class: 'hint', style: 'margin-bottom:6px',
     text: isLow(c.pupilCode) ? 'In the lowest 20% of ' + YEAR_NAMES[S.year] + ' so far: ULS aims its interventions at these children.'
                              : 'Not in the lowest 20% of ' + YEAR_NAMES[S.year] + ', but any child can have an intervention.' }));
-  var sg = (S.iv.suggest || {})[c.pupilCode] || { grid: [], mix: [], oral: false };
-  // Precision Grid: one sound (or tricky word) not yet secure, three known
-  if (sg.grid.length) {
-    var gsel = el('select', { 'aria-label': 'Precision Grid focus' });
-    sg.grid.forEach(function (o, n) {
-      gsel.appendChild(el('option', { value: String(n), text: itemShow(o.focus) + (o.kind === 'cew' ? ' (tricky word)' : '') + '  with ' + o.known.map(itemShow).join(', ') }));
-    });
-    box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what', text: 'Precision Grid' }), gsel,
-      el('button', { class: 'btn', text: '▶ Start', on: { click: function () { startGrid(sg.grid[+gsel.value]); } } })]));
+  var sg = (S.iv.suggest || {})[c.pupilCode] || {};
+  ['grid', 'spot', 'mix', 'digraph'].forEach(function (k) { sg[k] = sg[k] || []; });
+  // as ULS's progress sheet: sounds / tricky words on sight -> Precision Grid or Spot It; reading words with
+  // Phase 2-4 graphemes -> Mix It Up; digraphs and Phase 5 graphemes in words -> Digraph Spotter; oral blending
+  // -> Oral Blending (cannot blend yet) or Blend and Find (beginning to blend)
+  function option(name, list, label, start) {
+    if (!list.length) return;
+    var sel = el('select', { 'aria-label': name + ' focus' });
+    list.forEach(function (o, n) { sel.appendChild(el('option', { value: String(n), text: label(o) })); });
+    box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what', text: name }), sel,
+      el('button', { class: 'btn', text: '▶ Start', on: { click: function () { start(list[+sel.value]); } } })]));
   }
-  // Mix It Up: a sound the child knows well, two words with it
-  if (sg.mix.length) {
-    var msel = el('select', { 'aria-label': 'Mix It Up focus' });
-    sg.mix.forEach(function (o, n) {
-      msel.appendChild(el('option', { value: String(n), text: card(o.focus) + ':  ' + o.words.slice(0, 2).map(function (w) { return w.word; }).join(', ') }));
-    });
-    box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what', text: 'Mix It Up' }), msel,
-      el('button', { class: 'btn', text: '▶ Start', on: { click: function () { startMix(sg.mix[+msel.value]); } } })]));
-  }
-  // Oral Blending and Blend and Find: pictures only, so any child can have them (suggested when Phase 1 has gaps)
+  option('Precision Grid', sg.grid, function (o) { return optCard(o, o.focus) + kindName(o) + '  with ' + o.known.map(function (i) { return optCard(o, i); }).join(', '); }, startGrid);
+  option('Spot It', sg.spot, function (o) { return optCard(o, o.focus) + kindName(o) + '  among ' + o.known.map(function (i) { return optCard(o, i); }).join(', '); }, startSpot);
+  option('Mix It Up', sg.mix, function (o) { return card(o.focus) + ':  ' + o.words.slice(0, 2).map(function (w) { return w.word; }).join(', '); }, startMix);
+  option('Digraph Spotter', sg.digraph, function (o) { return card(o.focus) + ':  ' + o.words.slice(0, 4).map(function (w) { return w.word; }).join(', '); }, startDigraph);
+  // Oral Blending and Blend and Find: pictures only, so any child can have them
   var osel = el('select', { 'aria-label': 'Oral Blending words' }, [el('option', { value: '3', text: 'words with 3 sounds' }), el('option', { value: '4', text: 'words with 4 sounds' })]);
-  box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what' }, ['Oral Blending', sg.oral ? el('small', { text: '(suggested)' }) : null]), osel,
+  box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what' }, ['Oral Blending', sg.oral ? el('small', { text: '(suggested: not blending yet)' }) : null]), osel,
     el('button', { class: 'btn' + (sg.oral ? '' : ' quiet'), text: '▶ Start', on: { click: function () { startOral(+osel.value); } } })]));
   var fsel = el('select', { 'aria-label': 'Blend and Find scene' }, SCENES.map(function (x, n) { return el('option', { value: String(n), text: x.name }); }));
-  box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what' }, ['Blend and Find', sg.oral ? el('small', { text: '(suggested)' }) : null]), fsel,
-    el('button', { class: 'btn' + (sg.oral ? '' : ' quiet'), text: '▶ Start', on: { click: function () { startFind(SCENES[+fsel.value]); } } })]));
-  if (!sg.grid.length && !sg.mix.length) box.appendChild(el('div', { class: 'hint',
-    text: 'No Precision Grid or Mix It Up to suggest yet. They come from sounds, tricky words or words marked ✗ not yet, and, once "Taught up to" is set, from anything taught but left blank.' }));
+  box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what' }, ['Blend and Find', sg.find ? el('small', { text: '(suggested: beginning to blend)' }) : null]), fsel,
+    el('button', { class: 'btn' + (sg.find ? '' : ' quiet'), text: '▶ Start', on: { click: function () { startFind(SCENES[+fsel.value]); } } })]));
+  if (!sg.grid.length && !sg.mix.length && !sg.digraph.length) box.appendChild(el('div', { class: 'hint',
+    text: 'Nothing else to suggest yet. Suggestions come from sounds, tricky words or words marked ✗ not yet, and, once "Taught up to" is set, from anything taught but left blank.' }));
   var past = ivSessions(c.pupilCode).slice(-4).reverse();
   if (past.length) {
     var lg = el('div', { class: 'ivlog' });
     past.forEach(function (x) {
-      var focus = x.kind === 'grid' ? itemShow(x.focus) : x.kind === 'mix' ? card(x.focus) : x.focus;
+      var focus = (x.kind === 'grid' || x.kind === 'spot') ? itemShow(x.focus) : (x.kind === 'mix' || x.kind === 'digraph') ? card(x.focus) : x.focus;
       lg.appendChild(el('div', {}, [el('b', { text: IV_NAMES[x.kind] + ' ' + focus }), ' · ' + String(x.at || '').slice(0, 10).split('-').reverse().join('/') +
         (x.outcome ? ' · ' + (x.outcome === 'got' ? '✓ got it' : '✗ not yet') : '') + (x.detail && x.detail.note ? ' · ' + x.detail.note : '')]));
     });
@@ -920,6 +923,7 @@ function previewOf(v) {
   if (!v) return el('div', { class: 'hint', text: '(blank)' });
   if (v.type === 'grid') return el('div', { class: 'pgrid' }, v.cells.map(function (c) { return el('div', { text: card(c) }); }));
   if (v.type === 'tiles') return el('div', { class: 'ptiles' }, v.cells.map(function (c) { return el('div', { text: card(c) }); }));
+  if (v.type === 'buttons') return buttonsWord(v.cells, 'pbtn');
   if (v.type === 'pics') return el('div', { class: 'ppics' }, v.cells.map(function (c) { return el('div', {}, [el('img', { src: 'pics/' + c + '.webp', alt: c })]); }));
   if (v.type === 'scene') { var at = scenePlaces(v.cells.slice(1));
     return el('div', { class: 'pscene', style: 'background-image:url(pics/scene-' + v.cells[0] + '.webp)' }, v.cells.slice(1).map(function (c, k) {
@@ -933,6 +937,11 @@ var IN_SCENE = { sun: [80, 17], kite: [72, 22], boat: [30, 50] };
 function scenePlaces(objs) {
   var ground = [[16, 66], [40, 78], [62, 66], [84, 78]], g = 0;
   return objs.map(function (c) { return IN_SCENE[c] || ground[g++ % 4]; });
+}
+// a word with ULS sound buttons: a dot under each single-letter sound, a line under a digraph or trigraph
+// (the same drawing is in child.html)
+function buttonsWord(parts, cls) {
+  return el('div', { class: cls }, parts.map(function (p) { return el('span', { class: p.length > 1 ? 'line' : 'dot', text: p }); }));
 }
 function drawIv() {
   var box = $('ivArea'), last = IV.pos >= IV.steps.length;
@@ -998,19 +1007,68 @@ $('ivClose').onclick = closeIv;
 
 // Precision Grid (ULS intervention 5)
 function startGrid(o) {
-  var it = S.cat.items[o.focus], f = it.show, known = o.known.map(function (i) { return S.cat.items[i].show; });
-  var cew = o.kind === 'cew', thing = cew ? 'word' : 'sound';
+  var f = optCard(o, o.focus).replace(/-/g, '_'), known = o.known.map(function (i) { return optCard(o, i).replace(/-/g, '_'); });
+  var cew = o.kind === 'cew' || (o.kind === 'alt' && !/^as in /.test(o.note || '')), thing = cew ? 'word' : 'sound';
   var flash = { type: 'flash', cells: [f] };
   var grid = { type: 'grid', cells: makeGrid(f, known), cols: 5 };
   var steps = [
     { who: 'My turn', view: flash, say: cew ? 'This word is "' + card(f) + '". What\'s the word?' : 'This is the grapheme ' + card(f) + '. What\'s the sound?',
-      tip: 'The child says the ' + thing + ' three times.' },
+      tip: 'The child says the ' + thing + ' three times.' + (o.note && /^as in /.test(o.note) ? ' The sound is the one ' + o.note + '.' : '') },
     { who: 'Your turn', view: grid, say: 'Point to each ' + (cew ? 'word' : 'grapheme') + ' in turn and say the ' + thing + '.',
       tip: 'The child goes along every line to the end. "' + card(f) + '" is twice on each line, with ' + known.map(card).join(', ') + '.',
       extra: { label: 'New grid', run: function (st) { st.view = { type: 'grid', cells: makeGrid(f, known), cols: 5 }; } } },
     { who: 'Check', view: flash, say: 'Show the flashcard again. Can the child remember the ' + thing + '?' }
   ];
   startIv('grid', 'Precision Grid · ' + card(f), o.focus, { known: o.known }, steps);
+}
+
+// Spot It / Fastest Fingers (ULS intervention 4): one grapheme not yet secure, taught, then hidden in a small pack
+// of known flashcards for the child to spot; missed = told the sound and moved nearer the front
+function letterNames(g) { return g.replace(/_/g, '').split('').join(', '); }
+function packSteps(f, cards, o) {
+  return shuffle(cards).map(function (c) {
+    var isF = c === f;
+    return { who: 'Spot it', view: { type: 'flash', cards: null, cells: [c] }, say: 'What\'s the ' + (o.kind === 'cew' ? 'word' : 'sound') + '?',
+             tip: isF ? 'This is the new one. If the child does not know it, tell them; they say it back.' : 'One the child knows.',
+             extra: isF ? { label: 'Missed it: nearer the front', run: function () {
+               IV.steps.splice(Math.min(IV.pos + 3, IV.steps.length - 1), 0, packSteps(f, [f], o)[0]);
+             } } : null };
+  });
+}
+function startSpot(o) {
+  var f = optCard(o, o.focus).replace(/-/g, '_'), known = o.known.map(function (i) { return optCard(o, i).replace(/-/g, '_'); });
+  var cew = o.kind === 'cew' || (o.kind === 'alt' && !/^as in /.test(o.note || '')), multi = !cew && f.replace(/_/g, '').length > 1;
+  var flash = { type: 'flash', cells: [f] }, pack = [f].concat(known);
+  var steps = [
+    { who: 'My turn', view: flash, say: cew ? 'Read the word as your finger moves under it.' : 'Say the sound as your finger traces over the ' + (multi ? 'letters.' : 'letter.'),
+      tip: (multi ? 'Tell the child the letter names (' + letterNames(f) + '), then say the sound again. ' : '') + (o.note && /^as in /.test(o.note) ? 'The sound is the one ' + o.note + '.' : '') },
+    { who: 'Your turn', view: flash, say: 'The child says the ' + (cew ? 'word' : 'sound') + ' three times.' },
+    { who: 'My turn', view: { type: 'tiles', cells: shuffle(pack), cols: pack.length }, say: 'Put the new card in with the cards the child knows. Ask: "Can you spot the new ' + (cew ? 'word' : 'grapheme') + '?"' }
+  ].concat(packSteps(f, pack, o));
+  steps.push({ who: 'Again?', view: null, say: 'If the child spotted it, shuffle the cards and go again.',
+               extra: { label: 'Shuffle and go again', run: function () { [].splice.apply(IV.steps, [IV.pos, 0].concat(packSteps(f, pack, o))); } } });
+  startIv('spot', 'Spot It · ' + card(f), o.focus, { known: o.known }, steps);
+}
+
+// Digraph and Trigraph Spotter (ULS intervention 6): a digraph the child knows on a flashcard, found in four words
+// with sound buttons (a line under the digraph)
+function startDigraph(o) {
+  var f = o.focus, words = o.words.slice(0, 4), steps = [];
+  steps.push({ who: 'Flashcard', view: { type: 'flash', cells: [f] }, say: '"What\'s the sound?"', tip: 'Three times.' });
+  words.forEach(function (w, n) {
+    var plain = { type: 'word', cells: [w.word] }, btn = { type: 'buttons', cells: w.parts };
+    var name = 'Word ' + (n + 1) + ' of ' + words.length + ': ' + w.word;
+    steps.push({ who: 'My turn · ' + name, view: plain, say: 'Explain that you will put sound buttons on the word, then sound-talk it.',
+                 extra: { label: 'Show sound buttons', run: function (st) { st.view = st.view.type === 'word' ? btn : plain; } } });
+    steps.push({ who: 'My turn · ' + name, view: btn, say: 'A dot under each single-letter sound, a line under the ' + card(f) + '. Sound-talk the word.', sounds: w.parts.map(card).join('  –  ') });
+    steps.push({ who: 'Your turn · ' + name, view: btn, say: 'The child does the same with their own word card.' });
+    steps.push({ who: 'My turn · ' + name, view: btn, say: 'Sound-talk the word pointing at the sound buttons, then say the word.', sounds: w.parts.map(card).join('-') + '  →  ' + w.word });
+    steps.push({ who: 'Your turn · ' + name, view: btn, say: 'The child sound-talks the word and says it.' });
+  });
+  words.slice(1).forEach(function (w, n) {
+    steps.push({ who: 'Read fluently', view: { type: 'word', cells: [w.word] }, say: n ? 'And this one?' : 'Show the word cards. Ask the child to read the words fluently.' });
+  });
+  startIv('digraph', 'Digraph Spotter · ' + card(f), f, { words: words.map(function (w) { return w.word; }) }, steps);
 }
 
 // Mix It Up (ULS intervention 3): the same word built, mixed up and rebuilt from its sound cards
