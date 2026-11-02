@@ -220,6 +220,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <button class="btn quiet" id="btnAdd" hidden>+ Add a child</button>
       <label class="toggle" id="finWrap" hidden><input type="checkbox" id="showFin"> Show finished</label>
       <label class="toggle fontpick" title="The last ULS set this year group has been taught, so is assessed up to (one setting for the whole year group)">📍 Assessment point <select id="yearLimit" aria-label="Assessment point"></select></label>
+      <label class="toggle" id="p1Wrap" hidden title="Whether Phase 1 (oral blending) is part of this year group's assessment. The CLF on-track answers never use Phase 1."><input type="checkbox" id="p1On"> Include Phase 1</label>
       <label class="toggle" id="lowWrap" hidden title="Unlocking Letters and Sounds aims its interventions at the lowest 20%"><input type="checkbox" id="lowOnly"> Lowest 20% only</label>
       <span class="grow"></span>
       <span class="save-state" id="saveState"></span>
@@ -262,7 +263,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26j</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26k</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -330,7 +331,7 @@ var TERM_NAMES = ['Term 1', 'Term 2', 'Term 3', 'Term 4', 'Term 5', 'Term 6'];
 var DEFAULT_PHASES = { R: ['p1', 'p2', 'p3', 'p4'] };
 var S = { cat: null, year: 'R', cls: '', children: [], marks: {}, flags: {}, recSecure: {}, ontrack: {},
           academicYear: '', term: 1, programme: new Set(), child: null, phases: null, gaps: false, queue: {}, saving: false, failed: false,
-          iv: null, lowOnly: false, limits: {}, taught: '' };
+          iv: null, lowOnly: false, limits: {}, taught: '', phase1: true };
 
 function $(id) { return document.getElementById(id); }
 function el(tag, attrs, kids) {
@@ -377,7 +378,7 @@ function load() {
     S.children = d.children; S.marks = d.marks || {}; S.flags = d.flags || {}; S.recSecure = d.recSecure || {};
     S.ontrack = d.ontrack || {}; S.academicYear = d.academicYear; S.term = d.term || 1;
     S.programme = new Set(d.programme || []);
-    S.limits = d.limits || {}; S.taught = d.taughtUpTo || '';
+    S.limits = d.limits || {}; S.taught = d.taughtUpTo || ''; S.phase1 = d.phase1 !== false;
     applyQueueLocally();
     if (!S.failed) clearBanner();
     drawClass();
@@ -469,7 +470,9 @@ window.addEventListener('pagehide', function () { if (Object.keys(S.queue).lengt
 function items(blockKey) { var b = S.cat.blocks.find(function (x) { return x.key === blockKey; }); return b ? b.items : []; }
 function phaseItems(ph) { return Object.keys(S.cat.items).filter(function (i) { return S.cat.items[i].phase === ph; }); }
 function sheetKey(c) { return c.yearGroup === 'R' ? 'R' : 'Y1'; }
-function phasesFor(year) { return DEFAULT_PHASES[year] || ['p2', 'p3', 'p4', 'p5a', 'y1nc', 'p5b', 'p5c']; }
+// Phase 1 can be left out of a year group's assessment (one setting per year group): then it is not shown anywhere
+function withPhase1(list) { return S.phase1 ? list : list.filter(function (p) { return p !== 'p1'; }); }
+function phasesFor(year) { return withPhase1(DEFAULT_PHASES[year] || ['p2', 'p3', 'p4', 'p5a', 'y1nc', 'p5b', 'p5c']); }
 // "Assessment point" (called "taught up to" in the API): the last set the year group has been taught (a catalogue block key); after it = not taught yet
 function blockIndex(key) { return S.cat.blocks.findIndex(function (b) { return b.key === key; }); }
 function shortSet(key) {
@@ -509,7 +512,7 @@ function saveTaught(upto) {
 }
 function chosenPhases() {
   var saved = recall(PKEY) || {};
-  return saved[S.year] || phasesFor(S.year);
+  return withPhase1(saved[S.year] || phasesFor(S.year));
 }
 // When an item was first secured: "2026-27:1" = academic year 2026-27, term 1. The colour is the term; the year
 // group at the time is worked out from how many school years ago that was ("R", "Y1"...). 'earlier' = imported
@@ -559,6 +562,8 @@ function drawClass() {
   fc.hidden = classes.length < 2;
   $('btnAdd').hidden = $('finWrap').hidden = !older();
   $('lowWrap').hidden = older();
+  $('p1Wrap').hidden = older();
+  $('p1On').checked = S.phase1;
   limitOptions($('yearLimit'), S.taught, 'Not set');
   $('lowOnly').checked = S.lowOnly;
   $('classHint').textContent = older()
@@ -634,7 +639,9 @@ function drawChild() {
   $('cName').appendChild(el('small', { text: '  ' + c.class, style: 'color:var(--muted);font-size:1rem' }));
   var chips = $('phaseChips');
   chips.innerHTML = '';
+  S.phases = withPhase1(S.phases);
   S.cat.phases.forEach(function (p) {
+    if (p.key === 'p1' && !S.phase1) return;
     var on = S.phases.indexOf(p.key) >= 0;
     chips.appendChild(el('button', { class: 'chip' + (on ? ' on' : ''), text: p.name, on: { click: function () {
       S.phases = on ? S.phases.filter(function (x) { return x !== p.key; }) : S.phases.concat([p.key]);
@@ -1283,6 +1290,16 @@ setFont(recall(FKEY));
 $('btnExport').onclick = exportSheet;
 $('showFin').onchange = function () { S.showFin = this.checked; drawClass(); };
 $('lowOnly').onchange = function () { S.lowOnly = this.checked; drawClass(); };
+$('p1On').onchange = function () {
+  var on = this.checked, year = S.year;
+  postJSON({ action: 'setPhase1', year: year, on: on }).then(function (d) {
+    if (S.year !== year) return;
+    S.phase1 = d.phase1;
+    banner('ok', YEAR_NAMES[year] + ': Phase 1 ' + (on ? 'included in' : 'left out of') + ' the assessment.');
+    drawClass();
+    loadIv();
+  }).catch(function (e) { banner('err', 'Not saved: ' + e.message); $('p1On').checked = S.phase1; });
+};
 function changeTaught(sel) {
   var v = sel.value;
   saveTaught(v).then(function () {
