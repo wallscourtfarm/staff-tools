@@ -108,6 +108,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .tile.not .mk { color: var(--bad); }
   .tile.untaught { opacity: .4; border-style: dashed; }
   .lim { font-size: .85rem; font-weight: 800; color: var(--muted); }
+  #yearLimit, #childLimit { max-width: min(340px, 70vw); }
   .tile.pend::after { content: ''; position: absolute; left: 6px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
   .flagbox { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
@@ -214,7 +215,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <select id="fClass" aria-label="Class"></select>
       <button class="btn quiet" id="btnAdd" hidden>+ Add a child</button>
       <label class="toggle" id="finWrap" hidden><input type="checkbox" id="showFin"> Show finished</label>
-      <button class="btn quiet" id="btnLimit" title="How far the children have been taught in the ULS programme">📍 Taught up to…</button>
+      <label class="toggle fontpick" title="How far this year group has been taught in the ULS programme (one setting for the whole year group)">📍 Taught up to <select id="yearLimit" aria-label="Taught up to"></select></label>
       <label class="toggle" id="lowWrap" hidden title="Unlocking Letters and Sounds aims its interventions at the lowest 20%"><input type="checkbox" id="lowOnly"> Lowest 20% only</label>
       <span class="grow"></span>
       <span class="save-state" id="saveState"></span>
@@ -249,7 +250,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div class="bar">
       <div class="chips" id="phaseChips"></div>
       <span class="grow"></span>
-      <label class="toggle fontpick">Taught up to <select id="childLimit" aria-label="Taught up to"></select></label>
+      <label class="toggle fontpick" title="One setting for the whole year group">Taught up to (year group) <select id="childLimit" aria-label="Taught up to"></select></label>
       <label class="toggle fontpick">Card font <select class="cardFont" aria-label="Card font"><option value="sassoon">Sassoon Infant</option><option value="od">OpenDyslexic</option></select></label>
       <label class="toggle"><input type="checkbox" id="gapsOnly"> Gaps only</label>
     </div>
@@ -257,7 +258,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26f</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26g</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -266,17 +267,6 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <p class="hint">Years 3 to 6 list only the children still on the phonics programme. Tap the children to add, then press Add; they stay on the list until they are secure in everything.</p>
     <div id="addList" class="chips" style="overflow-y:auto;margin:10px 0"></div>
     <div class="impfoot"><span class="grow" id="addMsg"></span><button class="btn quiet" id="addCancel">Cancel</button> <button class="btn" id="addGo" disabled>Add</button></div>
-  </div>
-</div>
-
-<!-- how far children have been taught: anything after it is "not taught yet", not "not yet" -->
-<div class="modal" id="limModal" hidden>
-  <div class="box imp">
-    <h3>Taught up to</h3>
-    <p class="hint">Choose the last set these children have been taught (its GPCs are shown). Up to that set, a blank box counts as not yet secure. After it, sounds and words are "not taught yet": faded, left out of card mode and never suggested for an intervention. Tap a child to leave them out (for example a child in a different phonics group).</p>
-    <select id="limSet" aria-label="Last set taught"></select>
-    <div id="limList" class="chips" style="overflow-y:auto;margin:12px 0"></div>
-    <div class="impfoot"><span class="grow" id="limMsg"></span><button class="btn quiet" id="limCancel">Cancel</button> <button class="btn" id="limGo">Save</button></div>
   </div>
 </div>
 
@@ -336,7 +326,7 @@ var TERM_NAMES = ['Term 1', 'Term 2', 'Term 3', 'Term 4', 'Term 5', 'Term 6'];
 var DEFAULT_PHASES = { R: ['p1', 'p2', 'p3', 'p4'] };
 var S = { cat: null, year: 'R', cls: '', children: [], marks: {}, flags: {}, recSecure: {}, ontrack: {},
           academicYear: '', term: 1, programme: new Set(), child: null, phases: null, gaps: false, queue: {}, saving: false, failed: false,
-          iv: null, lowOnly: false, limits: {} };
+          iv: null, lowOnly: false, limits: {}, taught: '' };
 
 function $(id) { return document.getElementById(id); }
 function el(tag, attrs, kids) {
@@ -383,7 +373,7 @@ function load() {
     S.children = d.children; S.marks = d.marks || {}; S.flags = d.flags || {}; S.recSecure = d.recSecure || {};
     S.ontrack = d.ontrack || {}; S.academicYear = d.academicYear; S.term = d.term || 1;
     S.programme = new Set(d.programme || []);
-    S.limits = d.limits || {};
+    S.limits = d.limits || {}; S.taught = d.taughtUpTo || '';
     applyQueueLocally();
     if (!S.failed) clearBanner();
     drawClass();
@@ -501,9 +491,14 @@ function limitOptions(sel, value, blank) {
   S.cat.blocks.forEach(function (b) { sel.appendChild(el('option', { value: b.key, text: b.title + ':  ' + setContents(b, 12) })); });
   sel.value = value || '';
 }
-function saveLimit(codes, upto) {
-  return postJSON({ action: 'setLimit', pupilCodes: codes, upto: upto }).then(function (d) {
-    Object.keys(d.limits).forEach(function (c) { if (d.limits[c]) S.limits[c] = d.limits[c]; else delete S.limits[c]; });
+// one setting for the whole year group (daily lessons for every child: all taught up to the same point)
+function saveTaught(upto) {
+  var year = S.year;
+  return postJSON({ action: 'setLimit', year: year, upto: upto }).then(function (d) {
+    if (S.year !== year) return d;
+    S.taught = d.taughtUpTo || '';
+    S.limits = {};
+    if (S.taught) S.children.forEach(function (c) { S.limits[c.pupilCode] = S.taught; });
     loadIv();
     return d;
   });
@@ -560,6 +555,7 @@ function drawClass() {
   fc.hidden = classes.length < 2;
   $('btnAdd').hidden = $('finWrap').hidden = !older();
   $('lowWrap').hidden = older();
+  limitOptions($('yearLimit'), S.taught, 'Not set');
   $('lowOnly').checked = S.lowOnly;
   $('classHint').textContent = older()
     ? YEAR_NAMES[S.year] + ': only the children still on the phonics programme are listed. "+ Add a child" puts someone on it; a child secure in everything leaves the list. Tap a child to assess them.'
@@ -589,7 +585,7 @@ function drawClass() {
   var phases = phasesFor(S.year);
   var head = el('tr', {}, [el('th', { text: 'Child' }), el('th', { text: 'GPCs' }), el('th', { text: 'Words' })]
     .concat(phases.map(function (p) { return el('th', { text: S.cat.phases.find(function (x) { return x.key === p; }).name }); }))
-    .concat([el('th', { text: 'Last assessed' }), el('th', { text: 'Taught up to' }), el('th', { text: 'Interventions' })]));
+    .concat([el('th', { text: 'Last assessed' }), el('th', { text: 'Interventions' })]));
   var table = el('table', { class: 'cls' }, [el('thead', {}, [head])]);
   var tb = el('tbody');
   kids.forEach(function (c) {
@@ -604,9 +600,7 @@ function drawClass() {
       var all = phaseItems(p), sec = all.filter(function (i) { return m[i] && m[i][0] === 'secure'; }).length;
       return el('td', {}, [el('div', { class: 'ph' }, [el('div', { class: 'lbl' }, [el('span', { text: sec + '/' + all.length })]),
         el('div', { class: 'track' }, [el('div', { class: 'fill', style: 'width:' + Math.round(100 * sec / all.length) + '%' })])])]);
-    })).concat([el('td', { text: last ? last.split('-').reverse().join('/') : '–' }), el('td', { class: 'lim', title: S.limits[c.pupilCode] ? setContents(S.cat.blocks[blockIndex(S.limits[c.pupilCode])]) : '',
-                  text: S.limits[c.pupilCode] ? shortSet(S.limits[c.pupilCode]) + ' (' + setContents(S.cat.blocks[blockIndex(S.limits[c.pupilCode])], 5) + ')' : 'not set' }),
-                el('td', { text: ivCount(c.pupilCode) })]));
+    })).concat([el('td', { text: last ? last.split('-').reverse().join('/') : '–' }), el('td', { text: ivCount(c.pupilCode) })]));
     tb.appendChild(row);
   });
   table.appendChild(tb);
@@ -645,7 +639,7 @@ function drawChild() {
     } } }));
   });
   $('gapsOnly').checked = S.gaps;
-  limitOptions($('childLimit'), S.limits[c.pupilCode], 'Not set');
+  limitOptions($('childLimit'), S.taught, 'Not set');
   var lg = $('legend');
   lg.innerHTML = '';
   lg.appendChild(document.createTextNode('Secure since:'));
@@ -1224,46 +1218,15 @@ setFont(recall(FKEY));
 $('btnExport').onclick = exportSheet;
 $('showFin').onchange = function () { S.showFin = this.checked; drawClass(); };
 $('lowOnly').onchange = function () { S.lowOnly = this.checked; drawClass(); };
-$('childLimit').onchange = function () {
-  var v = this.value, code = S.child;
-  saveLimit([code], v).then(function () { if (S.child === code) drawChild(); })
-    .catch(function (e) { banner('err', 'Not saved: ' + e.message); drawChild(); });
-};
-var LIM = null;
-$('btnLimit').onclick = function () {
-  var kids = visibleChildren();
-  if (!kids.length) return;
-  LIM = new Set(kids.map(function (c) { return c.pupilCode; }));
-  var counts = {};
-  kids.forEach(function (c) { var k = S.limits[c.pupilCode] || ''; counts[k] = (counts[k] || 0) + 1; });
-  var common = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; })[0];
-  limitOptions($('limSet'), common, 'Not set (clear it)');
-  var box = $('limList');
-  box.innerHTML = '';
-  kids.forEach(function (c) {
-    var b = el('button', { class: 'chip on', title: shortSet(S.limits[c.pupilCode]) || 'not set' }, [kidLabel(c), el('small', { text: ' ' + c.class, style: 'opacity:.7' })]);
-    b.onclick = function () {
-      if (LIM.has(c.pupilCode)) LIM.delete(c.pupilCode); else LIM.add(c.pupilCode);
-      b.className = 'chip' + (LIM.has(c.pupilCode) ? ' on' : '');
-      $('limMsg').textContent = LIM.size + ' of ' + kids.length + ' children';
-    };
-    box.appendChild(b);
-  });
-  $('limMsg').textContent = kids.length + ' of ' + kids.length + ' children';
-  $('limModal').hidden = false;
-};
-$('limCancel').onclick = function () { $('limModal').hidden = true; };
-$('limGo').onclick = function () {
-  if (!LIM || !LIM.size) { $('limMsg').textContent = 'Choose at least one child.'; return; }
-  $('limGo').disabled = true;
-  var codes = Array.from(LIM), upto = $('limSet').value;
-  saveLimit(codes, upto).then(function () {
-    $('limModal').hidden = true;
-    banner('ok', upto ? codes.length + ' children: taught up to ' + shortSet(upto) + '.' : 'Cleared for ' + codes.length + ' children.');
-    drawClass();
-  }).catch(function (e) { $('limMsg').textContent = 'Not saved: ' + e.message; })
-    .then(function () { $('limGo').disabled = false; });
-};
+function changeTaught(sel) {
+  var v = sel.value;
+  saveTaught(v).then(function () {
+    banner('ok', v ? YEAR_NAMES[S.year] + ': taught up to ' + shortSet(v) + '.' : YEAR_NAMES[S.year] + ': "taught up to" cleared.');
+    if (S.child) drawChild(); else drawClass();
+  }).catch(function (e) { banner('err', 'Not saved: ' + e.message); if (S.child) drawChild(); else drawClass(); });
+}
+$('yearLimit').onchange = function () { changeTaught(this); };
+$('childLimit').onchange = function () { changeTaught(this); };
 var ADD = new Set();
 function addButton() {
   $('addGo').disabled = !ADD.size;
