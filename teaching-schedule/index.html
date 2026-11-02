@@ -503,7 +503,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <img src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="Wallscourt Farm Academy">
   <div>
     <div class="app-title" id="appTitle">Y4 Learning Schedule</div>
-    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-02.11.26a</div>
+    <div class="app-subtitle">Wallscourt Farm Academy &mdash; WFA-02.11.26b</div>
   </div>
   <div class="header-actions">
     <select id="yearGroupSelect" class="yg-select" onchange="changeYearGroup(this.value)">
@@ -1923,6 +1923,105 @@ function loadLocal() {
     const s = localStorage.getItem(scheduleKeyLS());
     if (s) state.schedule = JSON.parse(s);
   } catch {}
+  localAtLoad_ = clone_(state.schedule) || {};
+}
+// This device's copy of every week as it was when the page opened: the best
+// guess at "what the server had" for a week this page never managed to load.
+let localAtLoad_ = {};
+
+// ── Edits not yet saved, kept on this device (02.11.26) ─────────────────────
+// Reception's Drawing Club notes for T2W1 were typed but never reached the
+// server: none of the 40 kept versions of that week ever held them. The page
+// had several silent ways to lose an edit: if the week could not be loaded
+// (wifi drop, staff sign-in expired) saves were quietly switched off; if a save
+// failed, the next background refresh put the server copy back over the
+// unsaved text; and reloading always replaced this device's copy with the
+// server's. Now every edit is written here first, with the server copy it was
+// made against, and stays until a save of it succeeds. Whenever the page next
+// loads that week it merges these edits onto the server copy and saves them.
+function pendingKey_() { return `wfa_ts_pending_${YEAR_GROUP}`; }
+function readPending_() { try { return JSON.parse(localStorage.getItem(pendingKey_()) || '{}') || {}; } catch { return {}; } }
+function writePending_(p) {
+  try { if (Object.keys(p).length) localStorage.setItem(pendingKey_(), JSON.stringify(p)); else localStorage.removeItem(pendingKey_()); } catch {}
+}
+function markPending_(wk) {
+  const p = readPending_();
+  const base = p[wk] ? p[wk].base : clone_(weekBase[wk] || localAtLoad_[wk] || {});
+  p[wk] = { base, local: state.schedule[wk] || {}, ts: Date.now() };
+  writePending_(p);
+}
+function clearPending_(wk, savedData) {
+  const p = readPending_();
+  if (!p[wk]) return;
+  if (deepEq_(state.schedule[wk] || {}, savedData)) delete p[wk];
+  else p[wk] = { base: clone_(savedData), local: state.schedule[wk] || {}, ts: Date.now() };
+  writePending_(p);
+}
+
+// Pages from before 02.11.26 kept no record of unsaved edits, but they did keep
+// this device's copy of every week (and a copy at each refused save). Notes in
+// those copies that the server has never had are put back: only into a note
+// box that is empty on the server, on the same activity in the same place, so
+// nothing anyone saved is ever replaced. Runs once per week per device.
+function rescueLegacyNotes_(wk, server) {
+  const doneKey = `wfa_ts_rescued_${YEAR_GROUP}_${wk}`;
+  try { if (localStorage.getItem(doneKey)) return []; localStorage.setItem(doneKey, '1'); } catch { return []; }
+  const sources = [localAtLoad_[wk]];
+  try {
+    const prefix = `wfa_ts_conflict_${YEAR_GROUP}_${wk}_`;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix)) sources.push(JSON.parse(localStorage.getItem(k)));
+    }
+  } catch {}
+  const added = [];
+  const same = (a, b, k) => (a[k] || '') === (b[k] || '');
+  function walk(src, dst) {
+    if (!src || !dst || typeof src !== 'object' || typeof dst !== 'object') return;
+    if (Array.isArray(src) || Array.isArray(dst)) {
+      if (Array.isArray(src) && Array.isArray(dst)) src.forEach((v, i) => walk(v, dst[i]));
+      return;
+    }
+    if ('subject' in dst || 'subjectLeft' in dst) {
+      if (!same(src, dst, 'subject') || !same(src, dst, 'subjectLeft') || !same(src, dst, 'subjectRight') || !same(src, dst, 'customName')) return;
+      ['note', 'noteLeft', 'noteRight'].forEach(n => {
+        if (typeof src[n] === 'string' && src[n].trim() && !(dst[n] || '').trim()) { dst[n] = src[n]; added.push(src[n]); }
+      });
+      return;
+    }
+    Object.keys(dst).forEach(k => {
+      if (k === '_notes' && src._notes && typeof dst._notes === 'object') {
+        Object.keys(src._notes).forEach(r => {
+          const t = src._notes[r];
+          if (typeof t === 'string' && t.trim() && !(dst._notes[r] || '').trim()) { dst._notes[r] = t; added.push(t); }
+        });
+      } else walk(src[k], dst[k]);
+    });
+  }
+  sources.forEach(src => walk(src, server));
+  return added;
+}
+
+// Shown when the week cannot be loaded or a save fails, and cleared again as
+// soon as the page reaches the server.
+let connectionProblem_ = false;
+function reportConnectionProblem_(wk) {
+  connectionProblem_ = true;
+  updateSyncStatus('err');
+  showSyncBanner_('This page cannot reach the school system just now, so changes are NOT saved yet. They are kept on this device and will be saved as soon as it reconnects. If this stays, reload the page (you may need to sign in again) — your changes will be added back.');
+  if (!reportConnectionProblem_.retry) {
+    reportConnectionProblem_.retry = setTimeout(() => { reportConnectionProblem_.retry = null; retryWeek_(wk); }, 30000);
+  }
+}
+function retryWeek_(wk) {
+  if (wk !== schedKey()) return;
+  if (syncedWeeks.has(wk)) syncSave(wk); else syncLoad(wk);
+}
+function connectionOk_() {
+  if (!connectionProblem_) return;
+  connectionProblem_ = false;
+  const b = document.getElementById('syncBanner');
+  if (b) b.remove();
 }
 
 // Per-week readiness gate: init()/changeWeek() render instantly from local
@@ -1979,7 +2078,11 @@ let savesPending = 0;
 function syncSave(wk) {
   if (!SYNC_URL) return;
   wk = wk || schedKey();
-  if (!syncedWeeks.has(wk)) return; // haven't confirmed the real backend state for this week yet — don't risk overwriting it
+  markPending_(wk);
+  if (!syncedWeeks.has(wk)) { // haven't confirmed the real backend state for this week yet — don't risk overwriting it
+    if (loadFailed_[wk]) reportConnectionProblem_(wk); // kept on this device; saved once the week loads
+    return;
+  }
   // Saves run one at a time: a second save sent before the first returns would
   // carry the old version stamp and be refused as a conflict with our own edit.
   // The data is read when the save actually runs, so queued saves coalesce.
@@ -1997,10 +2100,13 @@ async function doSave_(wk, attempt = 0) {
   try {
     res = await fetch(SYNC_URL + '?token=' + OWN_BACKEND_TOKEN, { method:'POST', body, headers:{'Content-Type':'text/plain'}, keepalive: body.length < 60000 });
     try { json = await res.json(); } catch (parseErr) { /* fall through to the ok-check below */ }
-  } catch (err) { updateSyncStatus('err'); return; }
+  } catch (err) { reportConnectionProblem_(wk); return; }
   if (json && json.status === 'conflict') { await handleSaveConflict_(wk, json, attempt); return; }
-  if (!res.ok || !json || json.status === 'error') { updateSyncStatus('err'); return; }
-  if (json.updatedAt) { weekStamps[wk] = json.updatedAt; weekBase[wk] = JSON.parse(body).data; saveSeq++; }
+  if (!res.ok || !json || json.status === 'error') { reportConnectionProblem_(wk); return; }
+  const saved = JSON.parse(body).data;
+  if (json.updatedAt) { weekStamps[wk] = json.updatedAt; weekBase[wk] = saved; saveSeq++; }
+  clearPending_(wk, saved);
+  connectionOk_();
   updateSyncStatus('ok');
 }
 
@@ -2191,15 +2297,26 @@ async function syncLoad(weekKey, background) {
   const seqAtStart = saveSeq;
   try {
     const res = await fetch(`${TEACHING_SCHEDULE_READ_URL}?yearGroup=${encodeURIComponent(YEAR_GROUP)}&weekKey=${encodeURIComponent(weekKey)}&token=${OWN_BACKEND_TOKEN}`);
-    if (!res.ok) return;
+    if (!res.ok) throw new Error('load ' + res.status);
     const json = await res.json();
+    if (!json || json.status === 'error') throw new Error('load refused');
     if (isEditingField_() || (background && savesPending > 0)) { setTimeout(() => syncLoad(weekKey, background), 2000); return; }
     // A save landed while this was on its way, so this answer is older than what
     // the page now holds. Using it would put the old version back on screen
     // and wind the version stamp back (02.11.26). Ask again instead.
     if (saveSeq !== seqAtStart) { if (background) setTimeout(() => syncLoad(weekKey, background), 2000); else syncLoad(weekKey, background); return; }
-    if (background && json && json.updatedAt && json.updatedAt === weekStamps[weekKey]) return; // nothing newer
-    if (json && json.data && json.data.master) {
+    loadFailed_[weekKey] = false;
+    if (background && json.updatedAt && json.updatedAt === weekStamps[weekKey]) { connectionOk_(); return; } // nothing newer
+    const kept = readPending_()[weekKey];
+    let toSave = false, rescued = [];
+    if (kept && !(json.data && json.data.master)) {
+      // Nothing saved on the server yet: this device's edits are the week.
+      state.schedule[weekKey] = clone_(kept.local);
+      renderWhenIdle_();
+      persistLocal();
+      toSave = true;
+    }
+    if (json.data && json.data.master) {
       // Basic sanity check only (must look like real schedule data). The backend
       // now keys storage by yearGroup itself, so cross-year-group bleed can't
       // happen server-side. Do NOT reject on staff-view keys not matching current
@@ -2207,8 +2324,12 @@ async function syncLoad(weekKey, background) {
       // legitimate saved data, not corruption. Rejecting it caused active data
       // loss: a device would silently treat the week as blank, then overwrite
       // the real save with that blank state on its next load.
-      state.schedule[weekKey] = json.data;
-      renderGrid();
+      let next = json.data;
+      if (kept) next = merge3_(kept.base, kept.local, json.data);
+      else if (!background) { next = clone_(json.data); rescued = rescueLegacyNotes_(weekKey, next); }
+      toSave = !deepEq_(next, json.data);
+      state.schedule[weekKey] = next;
+      renderWhenIdle_();
       persistLocal();
     }
     // Reached only on a successful, parsed response — whether or not this week
@@ -2218,13 +2339,25 @@ async function syncLoad(weekKey, background) {
     // treating it as "confirmed empty" would let syncSave() overwrite real
     // saved data with nothing. See cover-plan's 15.09.26 data-loss incident,
     // same bug class. Must check for the error shape, not just "reached here".
-    if (!(json && json.status === 'error')) {
-      syncedWeeks.add(weekKey);
-      weekStamps[weekKey] = json.updatedAt || null;
-      weekBase[weekKey] = clone_(json.data || {});
-    }
-  } catch {}
+    syncedWeeks.add(weekKey);
+    weekStamps[weekKey] = json.updatedAt || null;
+    weekBase[weekKey] = clone_(json.data || {});
+    connectionOk_();
+    if (toSave) {
+      // The kept edits are now merged into this server copy; measure any later
+      // merge against it, not against the older copy they were first made on.
+      if (kept) { const p = readPending_(); if (p[weekKey]) { p[weekKey].base = clone_(json.data || {}); writePending_(p); } }
+      syncSave(weekKey);
+      if (rescued.length) showSyncBanner_(`${rescued.length} note${rescued.length === 1 ? '' : 's'} typed on this device earlier had never been saved — ${rescued.length === 1 ? 'it has' : 'they have'} now been added back and saved: ` + rescued.map(t => '“' + (t.length > 40 ? t.slice(0, 40) + '…' : t) + '”').join(', '));
+    } else if (kept) { const p = readPending_(); delete p[weekKey]; writePending_(p); }
+  } catch (e) {
+    // Not loaded (wifi, or the staff sign-in has expired). Until it loads, edits
+    // to this week are kept on this device only — say so, and keep trying.
+    if (!syncedWeeks.has(weekKey)) loadFailed_[weekKey] = true;
+    if (!background) reportConnectionProblem_(weekKey);
+  }
 }
+const loadFailed_ = {};
 
 async function syncPushAll() {
   if (!SYNC_URL) return;
