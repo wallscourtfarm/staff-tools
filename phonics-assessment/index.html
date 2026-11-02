@@ -258,7 +258,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26g</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26h</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -921,11 +921,18 @@ function previewOf(v) {
   if (v.type === 'grid') return el('div', { class: 'pgrid' }, v.cells.map(function (c) { return el('div', { text: card(c) }); }));
   if (v.type === 'tiles') return el('div', { class: 'ptiles' }, v.cells.map(function (c) { return el('div', { text: card(c) }); }));
   if (v.type === 'pics') return el('div', { class: 'ppics' }, v.cells.map(function (c) { return el('div', {}, [el('img', { src: 'pics/' + c + '.webp', alt: c })]); }));
-  if (v.type === 'scene') return el('div', { class: 'pscene', style: 'background-image:url(pics/scene-' + v.cells[0] + '.webp)' }, v.cells.slice(1).map(function (c, k) {
-    var at = [[16, 64], [38, 76], [62, 64], [84, 76]][k % 4];
-    return el('img', { class: 'obj', src: 'pics/' + c + '.webp', alt: c, style: 'left:' + at[0] + '%;top:' + at[1] + '%' });
-  }));
+  if (v.type === 'scene') { var at = scenePlaces(v.cells.slice(1));
+    return el('div', { class: 'pscene', style: 'background-image:url(pics/scene-' + v.cells[0] + '.webp)' }, v.cells.slice(1).map(function (c, k) {
+      return el('img', { class: 'obj', src: 'pics/' + c + '.webp', alt: c, style: 'left:' + at[k][0] + '%;top:' + at[k][1] + '%' });
+    })); }
   return el('div', { class: 'big' + (v.cells[0].length > 3 ? ' word' : ''), text: card(v.cells[0]) });
+}
+// where things stand in a scene: the sun and a kite in the sky, a boat on the sea, everything else on the ground
+// (the same table is in child.html)
+var IN_SCENE = { sun: [80, 17], kite: [72, 22], boat: [30, 50] };
+function scenePlaces(objs) {
+  var ground = [[16, 66], [40, 78], [62, 66], [84, 78]], g = 0;
+  return objs.map(function (c) { return IN_SCENE[c] || ground[g++ % 4]; });
 }
 function drawIv() {
   var box = $('ivArea'), last = IV.pos >= IV.steps.length;

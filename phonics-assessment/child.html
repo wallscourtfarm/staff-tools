@@ -77,7 +77,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div class="err" id="err"></div>
   </div>
 </div>
-<span id="ver">WFA-02.11.26c</span>
+<span id="ver">WFA-02.11.26d</span>
 
 <script>
 'use strict';
@@ -125,13 +125,15 @@ function showView(box, v) {
     var named = /^[a-z]+$/.test(v.cells[0]);
     d.className = 'scene' + (named ? ' photo' : '');
     if (named) d.style.backgroundImage = 'url(pics/scene-' + v.cells[0] + '.webp)';
-    var at = [[16, 64], [38, 76], [62, 64], [84, 76]];
+    // the sun and a kite in the sky, a boat on the sea, everything else on the ground (same table as index.html)
+    var IN_SCENE = { sun: [80, 17], kite: [72, 22], boat: [30, 50] }, ground = [[16, 66], [40, 78], [62, 66], [84, 78]], g = 0;
+    var at = v.cells.slice(1).map(function (c) { return IN_SCENE[c] || ground[g++ % 4]; });
     v.cells.forEach(function (c, k) {
       if (!k && named) return;
       var e = k ? picture(c) : document.createElement('div');
       e.className = k ? 'obj' : 'bg';
       if (!k) e.textContent = c;
-      if (k) { e.style.left = at[(k - 1) % 4][0] + '%'; e.style.top = at[(k - 1) % 4][1] + '%'; }
+      if (k) { e.style.left = at[k - 1][0] + '%'; e.style.top = at[k - 1][1] + '%'; }
       d.appendChild(e);
     });
     box.appendChild(d);
