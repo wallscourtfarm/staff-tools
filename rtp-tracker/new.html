@@ -117,7 +117,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   #chgbody .rb { padding:2px 8px; font-size:11px; }
   footer { text-align:center; font-size:11px; color:var(--muted); margin-top:16px; }
 
-  /* Maths additions: DfE reference, secure-by column and due/overdue marks. */
+  /* Maths additions: DfE reference, secure-by column and a filter by secure-by term. */
   th.th2 { font-size:11px; color:var(--muted); width:64px; min-width:64px; left:486px; z-index:6; }
   td.ttd { position:sticky; left:486px; z-index:2; text-align:center; background:var(--surface2); border-right:1px solid var(--line); width:64px; min-width:64px; }
   td.skilltd .ref { font-size:10px; font-weight:700; color:var(--muted); margin-right:5px; }
@@ -130,10 +130,6 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .wlock.wdraft { background:transparent; border:1px dashed var(--line); }
   .term.draft { background:transparent; border:1px dashed var(--line); }
   td.cell { position:relative; }
-  td.cell.due { box-shadow:inset 0 0 0 3px #f59e0b; }
-  td.cell.late::after { content:'!'; position:absolute; top:2px; right:4px; width:15px; height:15px; line-height:15px; border-radius:50%; background:#dc2626; color:#fff; font-size:10px; font-weight:900; }
-  .late-n { display:inline-block; background:var(--red-bg); color:var(--red-fg); border:1px solid var(--red-bd); border-radius:10px; padding:0 7px; font-size:10px; font-weight:800; margin-top:3px; }
-  .due-n { display:inline-block; background:var(--amb-bg); color:var(--amb-fg); border:1px solid var(--amb-bd); border-radius:10px; padding:0 7px; font-size:10px; font-weight:800; margin-top:3px; }
   .termpick { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
   .termpick .lt { padding:6px 12px; }
   .src { font-size:11px; color:var(--muted); }
@@ -164,7 +160,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <p><b>Non-Negotiables</b> are the previous year's 3 highest-weighted statements, carried up so they stay secure. Each counts at weight 1 and should be secure by Term 2. Year 1's are 4 key EYFS skills, chosen on the Year 1 tab of the review form.</p>
       <p><b>2. Percentages.</b> <b>Expected %</b> = weight earned ÷ weight available across the non-negotiables and expected standards that count. <b>Greater depth %</b> comes from the greater depth statements, which have not been written yet, so no child can show D yet.</p>
       <p><b>3. Grade</b> for a child working at their own year group: <b>D</b> = expected ≥ 90% and greater depth ≥ 60% · <b>O1</b> = expected ≥ 75% · <b>O2</b> = expected ≥ 65% · <b>Y</b> = expected ≥ 50%. Below 50% suggests an earlier year's statements: <b>A - Yn</b>. The teacher chooses which year a child is working at.</p>
-      <p><b>4. Secure by (new for maths).</b> Each statement has the term it should be secure by: Term 2, 4 or 6. From the term before, a child not yet Secure gets an <b>amber outline</b> (due soon). After that term, they get a <b>red !</b> (overdue), and the summary row counts them. The term is worked out from today's date; pick another term to see how the grid would look then.</p>
+      <p><b>4. Secure by (new for maths).</b> Each statement has the term it should be secure by: Term 2, 4 or 6. Use the <b>Secure by</b> buttons above the grid to show only the statements for one term. The filter only hides rows: every child's scores and grade still use all the statements.</p>
       <p><b>5. Where the numbers come from.</b> Weights and terms come from the review form first, then the tracker's own Weights &amp; targets tab, then a draft value (shown with a dashed box). Wording is the proposed wording unless the review form says "Use: Current". Change them in the <a href="review.html">review form</a>; this page picks them up when you refresh.</p>
     </div>
   </details>
@@ -172,7 +168,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="group-label">Year 5 class</div>
   <div class="classtabs" id="classtabs"></div>
 
-  <div class="group-label">Term (for the due-soon and overdue flags)</div>
+  <div class="group-label">Show statements secure by</div>
   <div class="termpick" id="termpick"></div>
 
   <div class="group-label">Status key (click a cell and type its letter; arrows or Enter move · or click a status, then click cells to paint it · "Whole row" sets a statement to Not taught for every unmarked child)</div>
@@ -192,7 +188,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 
   <div class="grid-scroll"><table id="grid"></table></div>
 
-  <footer>Maths tracker · Year 5 pilot WFA-04.11.26c · statement numbers (Y5_001…) are worked out from the current statements; marks are saved against each statement's code, so they stay put if the numbering shifts</footer>
+  <footer>Maths tracker · Year 5 pilot WFA-04.11.26d · statement numbers (Y5_001…) are worked out from the current statements; marks are saved against each statement's code, so they stay put if the numbering shifts</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -302,7 +298,7 @@ const NONE_ORDER  = ['x','taught','none'];
 const POINTS = { secure:1, developing:0.6, emerging:0.4, reteach:0, taught:0 };
 const YEARS = ['Y1','Y2','Y3','Y4','Y5','Y6'];
 const TIERNAME = { non_neg:'Non-Negotiables', expected:'Expected Standards', greater_depth:'Greater Depth' };
-const TERMS = [1,2,3,4,5,6];
+const TERMS = [2,4,6];
 
 // ---- Statements: built from the tracker + review form -----------------
 let SKILLS = {}, SKILL_BY_ID = {}, WEIGHT = {};
@@ -510,31 +506,21 @@ async function setMany(items){
 }
 
 // ---- Scoring (identical to the writing draft) + secure-by -------------
-function termFromDate(d){ const m = d.getMonth(); return m >= 8 && m <= 9 ? 1 : m >= 10 ? 2 : m <= 1 ? 3 : m <= 3 ? 4 : m <= 4 ? 5 : 6; }
-let classYear = PILOT_YEAR, level = PILOT_YEAR, paint = null, nowTerm = termFromDate(new Date());
+let classYear = PILOT_YEAR, level = PILOT_YEAR, paint = null, termFilter = 0;   // 0 = all terms
 const LEVEL_UP = 0.9;
 const lowerOf = L => yearNum(L) <= 1 ? 'EY' : 'Y' + (yearNum(L) - 1);
 const lbl = L => L === classYear ? L : 'A - ' + L;
 const levelsFor = y => YEARS.slice(0, yearNum(y));
-// Only for children on their own class year: the terms are when THIS year group should be secure.
-function timing(s, v, own){
-  if (!own || v === 'secure' || v === 'x') return '';
-  if (nowTerm > s.term) return 'late';
-  // Terms are 2, 4 and 6, so 'due' covers the term before as well as the term itself.
-  if (s.term - nowTerm <= 1) return 'due';
-  return '';
-}
 function summary(p){
   const L = p.work, d = (CLASS.data[p.id] || {}), own = L === classYear;
-  const c = { secure:0, developing:0, emerging:0, reteach:0, taught:0 }, t = { late:0, due:0 };
+  const c = { secure:0, developing:0, emerging:0, reteach:0, taught:0 };
   const exp = { points:0, max:0, counted:0, total:0, wAll:0, wSecure:0 }, gd = { points:0, max:0, counted:0, total:0 };
   SKILLS[L].forEach(s => {
     const v = d[s.skey] || 'none', w = WEIGHT[s.id], isGd = s.tier === 'greater_depth', g = isGd ? gd : exp;
     g.total++; if (!isGd) exp.wAll += w;
     if (v in POINTS){ g.points += w*POINTS[v]; g.max += w; g.counted++; if (!isGd){ c[v]++; if (v==='secure') exp.wSecure += w; } }
-    const tm = timing(s, v, own); if (tm) t[tm]++;
   });
-  return { L, c, t, exp, gd, expPct: exp.max ? 100*exp.points/exp.max : null, gdPct: gd.max ? 100*gd.points/gd.max : null };
+  return { L, c, exp, gd, expPct: exp.max ? 100*exp.points/exp.max : null, gdPct: gd.max ? 100*gd.points/gd.max : null };
 }
 function dooya(e, g){
   if (e === null) return '';
@@ -568,8 +554,8 @@ function renderClassTabs(){
     : '<span class="src">No Year 5 classes found in the tracker. Use "Sync roster" in the RTP Tracker.</span>';
 }
 function renderTermPick(){
-  document.getElementById('termpick').innerHTML = TERMS.map(t => '<button class="lt'+(t===nowTerm?' active':'')+'" data-term="'+t+'">Term '+t+'</button>').join('')
-    + '<span class="src">Amber outline = due by the end of this or next term · red ! = overdue (class-year children only)</span>';
+  document.getElementById('termpick').innerHTML = [0].concat(TERMS).map(t => '<button class="lt'+(t===termFilter?' active':'')+'" data-term="'+t+'">'+(t ? 'Term '+t : 'All terms')+'</button>').join('')
+    + (termFilter ? '<span class="src">Showing only statements to be secure by Term '+termFilter+'. Scores and grades still use every statement.</span>' : '');
 }
 function chip(key){
   const s = STATUS[key], el = document.createElement('div');
@@ -619,16 +605,14 @@ function renderGrid(){
       +(u.L === classYear ? '<div class="pct">Greater depth '+pc(u.gdPct)+'</div>' : '')
       +'<div class="nums">'+c.secure+' secure · '+c.developing+' dev.</div><div class="nums">'+c.emerging+' emerging · '+c.reteach+' reteach</div>'
       +'<div class="nums">'+c.taught+' taught, not used</div><div class="cov">'+e.counted+' of '+e.total+' counted</div>'
-      +(u.t.late ? '<div><span class="late-n">'+u.t.late+' OVERDUE</span></div>' : '')
-      +(u.t.due ? '<div><span class="due-n">'+u.t.due+' due soon</span></div>' : '')
       +(ready ? '<div><span class="ready">READY TO MOVE UP</span></div>' : '')+'</td>';
   });
   h += '</tr>';
-  const ncol = pupils.length + 3, own = level === classYear;
+  const ncol = pupils.length + 3;
   ['non_neg','expected','greater_depth'].forEach(tk => {
-    const list = SKILLS[level].filter(s => s.tier === tk);
+    const list = SKILLS[level].filter(s => s.tier === tk && (!termFilter || s.term === termFilter));
     if (!list.length){
-      if (tk === 'greater_depth') h += '<tr class="tierrow"><td colspan="'+ncol+'">'+TIERNAME[tk]+' (0) · not written yet</td></tr>';
+      if (tk === 'greater_depth' && !termFilter) h += '<tr class="tierrow"><td colspan="'+ncol+'">'+TIERNAME[tk]+' (0) · not written yet</td></tr>';
       return;
     }
     h += '<tr class="tierrow"><td colspan="'+ncol+'">'+TIERNAME[tk]+' ('+list.length+')</td></tr>';
@@ -641,9 +625,9 @@ function renderGrid(){
         +'<td class="wtd"><span class="wlock'+(w===0?' zero':'')+(s.wSrc==='draft'?' wdraft':'')+'" title="Weight '+SRC_TITLE[s.wSrc]+'">'+w+'</span></td>'
         +'<td class="ttd"><span class="term'+(s.tSrc==='draft'?' draft':'')+'" title="Secure by Term '+s.term+', '+SRC_TITLE[s.tSrc]+'">T'+s.term+'</span></td>';
       pupils.forEach(p => {
-        const v = (CLASS.data[p.id] || {})[s.skey] || 'none', m = STATUS[v], tm = timing(s, v, own);
-        h += '<td class="cell'+(paint?' paint':'')+(tm?' '+tm:'')+'" data-p="'+p.id+'" data-s="'+s.id+'" style="background:'+m.bg+';color:'+m.fg+'"'
-          +(tm==='late'?' title="Should have been secure by Term '+s.term+'"':tm==='due'?' title="Due to be secure by the end of Term '+s.term+'"':'')+'>'+(v==='none' ? '' : (v==='x' ? 'x' : m.label))+'</td>';
+        const v = (CLASS.data[p.id] || {})[s.skey] || 'none', m = STATUS[v];
+        h += '<td class="cell'+(paint?' paint':'')+'" data-p="'+p.id+'" data-s="'+s.id+'" style="background:'+m.bg+';color:'+m.fg+'"'
+          +'>'+(v==='none' ? '' : (v==='x' ? 'x' : m.label))+'</td>';
       });
       h += '</tr>';
     });
@@ -751,7 +735,7 @@ document.getElementById('classtabs').addEventListener('click', e => {
   level = classYear; document.getElementById('lvlnote').textContent = ''; closePicker(); selectCell(null); reloadClass();
 });
 document.getElementById('termpick').addEventListener('click', e => {
-  const b = e.target.closest('button[data-term]'); if (!b) return; nowTerm = Number(b.dataset.term); renderGrid();
+  const b = e.target.closest('button[data-term]'); if (!b) return; termFilter = Number(b.dataset.term); closePicker(); selectCell(null); renderGrid();
 });
 document.getElementById('lvltabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-lvl]'); if (!b) return; level = b.dataset.lvl; document.getElementById('lvlnote').textContent = ''; closePicker(); selectCell(null); renderGrid();
