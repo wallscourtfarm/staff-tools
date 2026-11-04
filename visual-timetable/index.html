@@ -473,6 +473,56 @@
     border-radius: 0;
     margin: 0;
   }
+
+  /* ── Your own cards ── */
+  .custom-help { font-size: 0.72rem; color: #888; line-height: 1.3; margin: 0 0 8px; }
+  .custom-form { background: #f5f8fa; border: 1px solid #dce3ea; border-radius: 8px; padding: 10px; }
+  .custom-field-label { display: block; font-size: 0.75rem; font-weight: 800; color: #445; margin: 0 0 4px; }
+  .custom-form input[type="text"], .custom-form select {
+    width: 100%; font-family: inherit; font-size: 16px; padding: 6px 8px;
+    border: 2px solid #c8d4de; border-radius: 6px; background: #fff; color: #223;
+  }
+  .custom-form input[type="text"] { margin-bottom: 10px; }
+  .custom-form select { font-size: 0.85rem; }
+  .custom-pic-row { display: flex; gap: 10px; align-items: flex-start; }
+  .custom-thumb {
+    width: 56px; height: 56px; border-radius: 50%; background: #fff; border: 2px solid #c8d4de;
+    flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem; color: #999;
+  }
+  .custom-thumb img { width: 100%; height: 100%; object-fit: contain; }
+  .custom-thumb.fill img { object-fit: cover; }
+  .custom-pic-btns { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .small-btn {
+    display: block; text-align: center; padding: 6px; border: 2px solid #1798d3; border-radius: 6px;
+    background: #fff; color: #1798d3; font-weight: 800; font-size: 0.8rem; cursor: pointer;
+  }
+  .small-btn:hover { background: #1798d3; color: #fff; }
+  .link-btn {
+    background: none; border: none; color: #1798d3; font-family: inherit; font-size: 0.75rem;
+    font-weight: 700; cursor: pointer; text-decoration: underline; padding: 2px 0; text-align: left;
+  }
+  .custom-fit { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #445; margin-top: 8px; cursor: pointer; }
+  .custom-fit[hidden], .link-btn[hidden] { display: none; }
+  .custom-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .custom-add-btn { margin-top: 0; padding: 8px; font-size: 0.9rem; }
+  .custom-msg { font-size: 0.72rem; color: #c05000; margin: 6px 0 0; min-height: 1em; line-height: 1.3; }
+  .custom-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+  .custom-item { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: #334; padding: 3px 4px; border-radius: 4px; }
+  .custom-item:hover { background: #f0f6fb; }
+  .custom-item input { width: 15px; height: 15px; accent-color: #1798d3; flex-shrink: 0; cursor: pointer; }
+  .custom-item .mini { width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 1px solid #c8d4de; overflow: hidden; flex-shrink: 0; }
+  .custom-item .mini img { width: 100%; height: 100%; object-fit: contain; }
+  .custom-item .mini.fill img { object-fit: cover; }
+  .custom-item .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .custom-item .ico-btn { background: none; border: none; cursor: pointer; font-size: 0.85rem; padding: 2px 4px; border-radius: 4px; }
+  .custom-item .ico-btn:hover { background: #dce3ea; }
+  .custom-item.editing { background: #e3f2fb; }
+
+  .card .card-label { overflow-wrap: break-word; }
+  .card.custom-no-pic { justify-content: center; }
+  .card.custom-no-pic .card-label { text-align: center; flex: 0 1 auto; }
+  .card-icon-wrap.photo-fill img { width: 100% !important; height: 100% !important; object-fit: cover; }
 </style>
 
 </head>
@@ -483,7 +533,7 @@
   <h1>Visual Timetable Cards
     <span>Wallscourt Farm Academy</span>
   </h1>
-  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-26.06.26b</span>
+  <span style="margin-left:auto;font-size:0.72rem;opacity:0.7;white-space:nowrap;">Y-04.11.26a</span>
 </div>
 
 <div class="app">
@@ -521,10 +571,45 @@
       <p style="font-size:0.72rem;color:#888;margin:4px 0 0;line-height:1.3;">Applies to subject cards<br>(Mathematician, Reader, Writer&hellip;)</p>
     </div>
 
+    <div class="panel-section custom-section">
+      <h2>Your Own Cards</h2>
+      <p class="custom-help">Make a card with any wording and picture &mdash; e.g. for one child&rsquo;s own timetable. Saved in this browser only.</p>
+      <div class="custom-form">
+        <label class="custom-field-label" for="custom-text">Wording</label>
+        <input type="text" id="custom-text" maxlength="80" placeholder="e.g. Sensory Break" autocomplete="off">
+
+        <span class="custom-field-label">Picture</span>
+        <div class="custom-pic-row">
+          <div class="custom-thumb" id="custom-thumb"><span>None</span></div>
+          <div class="custom-pic-btns">
+            <label class="small-btn upload-btn">📷 Upload picture
+              <input type="file" id="custom-file" accept="image/*" hidden>
+            </label>
+            <select id="custom-icon">
+              <option value="">or use a school picture&hellip;</option>
+            </select>
+            <button type="button" class="link-btn" id="custom-clear-pic" hidden>Remove picture</button>
+          </div>
+        </div>
+        <label class="custom-fit" id="custom-fit-row" hidden>
+          <input type="checkbox" id="custom-fit" checked> Fill the circle (best for photos)
+        </label>
+
+        <div class="custom-actions">
+          <button type="button" class="print-btn custom-add-btn" id="custom-add">+ Add card</button>
+          <button type="button" class="link-btn" id="custom-cancel" hidden>Cancel</button>
+        </div>
+        <p class="custom-msg" id="custom-msg"></p>
+      </div>
+      <div class="custom-list" id="custom-list"></div>
+    </div>
+
 
 
     <div class="panel-section">
-      <h2>Activities</h2>
+      <h2 style="display:flex;align-items:center;justify-content:space-between;">Activities
+        <button type="button" class="select-all-btn untick-btn" id="untick-all-std">Untick all</button>
+      </h2>
 
       <div class="cat-header">
         <strong>Daily Routine</strong>
@@ -622,7 +707,7 @@
   </div>
 </div>
 
-<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-26.06.26b</div>
+<div class="footer">Visual Timetable Cards &mdash; Wallscourt Farm Academy &mdash; v Y-04.11.26a</div>
 
 <script>
 const ICONS = {
@@ -763,6 +848,61 @@ function makeCardHTML(cb, colour, beingA) {
   </div>`;
 }
 
+// ── Your own cards ───────────────────────────────────────────────
+const CUSTOM_KEY = 'wfa_visual_timetable_custom_cards_v1';
+let customCards = [];
+try { customCards = JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]') || []; } catch (e) { customCards = []; }
+
+function escHTML(s) {
+  return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
+
+function customPicSrc(c) {
+  if (c.img) return c.img;
+  if (c.icon && ICONS[c.icon]) return ICONS[c.icon];
+  return '';
+}
+
+function makeCustomCardHTML(c, colour) {
+  const label = escHTML(c.label || '');
+  const src   = customPicSrc(c);
+  if (!src) {
+    return `<div class="card custom-card custom-no-pic" data-custom="1" style="background:${colour}">
+      <div class="card-label">${label}</div>
+    </div>`;
+  }
+  let wrapClass = 'card-icon-wrap';
+  let nudge = '';
+  if (c.img) {
+    if (c.fill !== false) wrapClass += ' photo-fill';
+  } else {
+    wrapClass += XSMALL_ICONS.has(c.icon) ? ' icon-xs' : SMALL_ICONS.has(c.icon) ? ' icon-sm' : '';
+    const baseNudge   = ICON_NUDGE[c.icon] || '';
+    const squareNudge = (currentSize === 'square') ? (SQUARE_ICON_NUDGE[c.icon] || '') : '';
+    const combined    = [baseNudge, squareNudge].filter(Boolean).join(' ');
+    if (combined) nudge = ` style="transform:${combined}"`;
+  }
+  return `<div class="card custom-card" data-custom="1" style="background:${colour}">
+    <div class="${wrapClass}"><img src="${src}" alt=""${nudge}></div>
+    <div class="card-label">${label}</div>
+  </div>`;
+}
+
+// Shrink long custom wording until it fits inside its card
+function fitCustomLabels() {
+  document.querySelectorAll('#preview-container .card[data-custom] .card-label').forEach(lbl => {
+    const card = lbl.closest('.card');
+    lbl.style.fontSize = '';
+    let size = parseFloat(getComputedStyle(lbl).fontSize);
+    let guard = 0;
+    while ((card.scrollHeight > card.clientHeight + 1 || lbl.scrollWidth > lbl.clientWidth + 1) && size > 10 && guard < 60) {
+      size -= 1;
+      lbl.style.fontSize = size + 'px';
+      guard++;
+    }
+  });
+}
+
 function renderCards() {
   const container = document.getElementById('preview-container');
   const checks = Array.from(document.querySelectorAll('.activity-list input[type="checkbox"]:checked'));
@@ -770,15 +910,21 @@ function renderCards() {
   const beingA  = document.getElementById('being-a-toggle').checked;
   const size    = currentSize;
 
-  if (checks.length === 0) {
+  // Your own cards come first, then the ticked standard cards
+  const items = [
+    ...customCards.filter(c => c.on !== false).map(c => ({ custom: c })),
+    ...checks.map(cb => ({ cb })),
+  ];
+
+  if (items.length === 0) {
     container.innerHTML = `<div class="page-preview ${size}"><div class="card-grid"><div class="empty-msg">No activities selected.</div></div></div>`;
     return;
   }
 
   const CARDS_PER_PAGE = currentSize === 'square' ? 6 : 14;
   const pages = [];
-  for (let i = 0; i < checks.length; i += CARDS_PER_PAGE) {
-    pages.push(checks.slice(i, i + CARDS_PER_PAGE));
+  for (let i = 0; i < items.length; i += CARDS_PER_PAGE) {
+    pages.push(items.slice(i, i + CARDS_PER_PAGE));
   }
 
   const cols = size === 'square' ? 3 : 2;
@@ -787,14 +933,15 @@ function renderCards() {
     let rows = '';
     for (let i = 0; i < page.length; i += cols) {
       const rowCells = page.slice(i, i + cols);
-      rows += `<tr>${rowCells.map(cb =>
-        `<td class="cut-cell">${makeCardHTML(cb, colour, beingA)}</td>`
+      rows += `<tr>${rowCells.map(it =>
+        `<td class="cut-cell">${it.custom ? makeCustomCardHTML(it.custom, colour) : makeCardHTML(it.cb, colour, beingA)}</td>`
       ).join('')}</tr>`;
     }
     return `<div class="page-preview ${size}">
       <table class="cut-table"><tbody>${rows}</tbody></table>
     </div>`;
   }).join('');
+  fitCustomLabels();
 }
 
 // Year group buttons
@@ -859,7 +1006,7 @@ document.querySelectorAll('.activity-list input[type="checkbox"]').forEach(cb =>
 document.getElementById('being-a-toggle').addEventListener('change', renderCards);
 
 // Select-all buttons
-document.querySelectorAll('.select-all-btn').forEach(btn => {
+document.querySelectorAll('.select-all-btn[data-cat]').forEach(btn => {
   btn.addEventListener('click', () => {
     const cat = btn.dataset.cat;
     const list = document.getElementById('cat-' + cat);
@@ -880,8 +1027,217 @@ renderCards = function() {
   _renderCards();
 };
 
+// Untick every standard card (handy when printing only your own cards)
+document.getElementById('untick-all-std').addEventListener('click', () => {
+  document.querySelectorAll('.activity-list input[type="checkbox"]').forEach(b => { b.checked = false; });
+  renderCards();
+});
+
+// ── Your own cards: editor ───────────────────────────────────────
+const cText    = document.getElementById('custom-text');
+const cFile    = document.getElementById('custom-file');
+const cIcon    = document.getElementById('custom-icon');
+const cThumb   = document.getElementById('custom-thumb');
+const cClear   = document.getElementById('custom-clear-pic');
+const cFitRow  = document.getElementById('custom-fit-row');
+const cFit     = document.getElementById('custom-fit');
+const cAdd     = document.getElementById('custom-add');
+const cCancel  = document.getElementById('custom-cancel');
+const cMsg     = document.getElementById('custom-msg');
+const cList    = document.getElementById('custom-list');
+
+let draftImg  = '';   // uploaded picture (data URL)
+let draftIcon = '';   // or a built-in school picture
+let editingId = null;
+
+// Fill the school-picture list from the existing activities
+(function buildIconOptions() {
+  const seen = new Map();
+  document.querySelectorAll('.activity-list input[data-icon]').forEach(cb => {
+    const key = cb.dataset.icon;
+    if (ICONS[key] && !seen.has(key)) seen.set(key, cb.dataset.label);
+  });
+  Array.from(seen.entries())
+    .sort((a, b) => a[1].localeCompare(b[1]))
+    .forEach(([key, label]) => {
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = label;
+      cIcon.appendChild(opt);
+    });
+})();
+
+function saveCustomCards() {
+  try {
+    localStorage.setItem(CUSTOM_KEY, JSON.stringify(customCards));
+    return true;
+  } catch (e) {
+    cMsg.textContent = 'This browser is full, so the card will disappear when the page is closed. Try a smaller picture or delete an old card.';
+    return false;
+  }
+}
+
+function updateDraftThumb() {
+  const src = draftImg || (draftIcon && ICONS[draftIcon]) || '';
+  cThumb.classList.toggle('fill', !!draftImg && cFit.checked);
+  cThumb.innerHTML = src ? `<img src="${src}" alt="">` : '<span>None</span>';
+  cClear.hidden = !src;
+  cFitRow.hidden = !draftImg;
+}
+
+// Shrink uploaded pictures so they print sharply but don't fill up the browser's storage
+function loadPicture(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('read'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('decode'));
+      img.onload = () => {
+        const MAX = 700;
+        const scale = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+        const w = Math.max(1, Math.round(img.naturalWidth * scale));
+        const h = Math.max(1, Math.round(img.naturalHeight * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        let url = canvas.toDataURL('image/webp', 0.88);
+        if (!url.startsWith('data:image/webp')) url = canvas.toDataURL('image/png');
+        // A big PNG photo: fall back to JPEG to keep it small
+        if (url.length > 900000) url = canvas.toDataURL('image/jpeg', 0.88);
+        resolve(url);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+cFile.addEventListener('change', async () => {
+  const file = cFile.files && cFile.files[0];
+  cFile.value = '';
+  if (!file) return;
+  cMsg.textContent = '';
+  try {
+    draftImg  = await loadPicture(file);
+    draftIcon = '';
+    cIcon.value = '';
+    cFit.checked = true;
+    updateDraftThumb();
+  } catch (e) {
+    cMsg.textContent = 'Sorry, that picture couldn’t be opened. Try a JPG or PNG.';
+  }
+});
+
+cIcon.addEventListener('change', () => {
+  draftIcon = cIcon.value;
+  if (draftIcon) draftImg = '';
+  updateDraftThumb();
+});
+
+cFit.addEventListener('change', updateDraftThumb);
+
+cClear.addEventListener('click', () => {
+  draftImg = ''; draftIcon = ''; cIcon.value = '';
+  updateDraftThumb();
+});
+
+function resetCustomForm() {
+  editingId = null;
+  cText.value = '';
+  draftImg = ''; draftIcon = ''; cIcon.value = '';
+  cFit.checked = true;
+  cAdd.textContent = '+ Add card';
+  cCancel.hidden = true;
+  updateDraftThumb();
+  renderCustomList();
+}
+
+cAdd.addEventListener('click', () => {
+  const label = cText.value.trim();
+  if (!label && !draftImg && !draftIcon) {
+    cMsg.textContent = 'Type some wording or choose a picture first.';
+    cText.focus();
+    return;
+  }
+  cMsg.textContent = '';
+  const data = { label, img: draftImg, icon: draftIcon, fill: cFit.checked };
+  if (editingId) {
+    const c = customCards.find(x => x.id === editingId);
+    if (c) Object.assign(c, data);
+  } else {
+    customCards.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), on: true, ...data });
+  }
+  saveCustomCards();
+  resetCustomForm();
+  renderCards();
+  cText.focus();
+});
+
+cText.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); cAdd.click(); } });
+cCancel.addEventListener('click', () => { cMsg.textContent = ''; resetCustomForm(); });
+
+function startEdit(id) {
+  const c = customCards.find(x => x.id === id);
+  if (!c) return;
+  editingId = id;
+  cText.value = c.label || '';
+  draftImg  = c.img || '';
+  draftIcon = c.icon || '';
+  cIcon.value = draftIcon;
+  cFit.checked = c.fill !== false;
+  cAdd.textContent = 'Save changes';
+  cCancel.hidden = false;
+  cMsg.textContent = '';
+  updateDraftThumb();
+  renderCustomList();
+  cText.focus();
+}
+
+function renderCustomList() {
+  cList.innerHTML = customCards.map(c => {
+    const src = customPicSrc(c);
+    const mini = src
+      ? `<span class="mini${c.img && c.fill !== false ? ' fill' : ''}"><img src="${src}" alt=""></span>`
+      : '<span class="mini"></span>';
+    return `<div class="custom-item${c.id === editingId ? ' editing' : ''}" data-id="${c.id}">
+      <input type="checkbox" ${c.on !== false ? 'checked' : ''} title="Include this card">
+      ${mini}
+      <span class="name" title="Edit">${escHTML(c.label || '(picture only)')}</span>
+      <button type="button" class="ico-btn" data-act="edit" title="Edit">✏️</button>
+      <button type="button" class="ico-btn" data-act="del" title="Delete">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+cList.addEventListener('click', e => {
+  const row = e.target.closest('.custom-item');
+  if (!row) return;
+  const id = row.dataset.id;
+  if (e.target.matches('input[type="checkbox"]')) {
+    const c = customCards.find(x => x.id === id);
+    if (c) { c.on = e.target.checked; saveCustomCards(); renderCards(); }
+    return;
+  }
+  const act = e.target.closest('[data-act]')?.dataset.act;
+  if (act === 'del') {
+    const c = customCards.find(x => x.id === id);
+    if (!confirm(`Delete the card “${c && c.label ? c.label : 'picture only'}”?`)) return;
+    customCards = customCards.filter(x => x.id !== id);
+    saveCustomCards();
+    if (editingId === id) resetCustomForm(); else renderCustomList();
+    renderCards();
+  } else if (act === 'edit' || e.target.classList.contains('name')) {
+    startEdit(id);
+  }
+});
+
+renderCustomList();
+updateDraftThumb();
+
 // Initial render
 renderCards();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitCustomLabels);
 
 function downloadPDF() {
   const pages = document.querySelectorAll('#preview-container .page-preview');
