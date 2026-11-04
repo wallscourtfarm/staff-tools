@@ -9,7 +9,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Maths Tracker New Design</title>
+<title>Maths Tracker Y5 Pilot</title>
 <style>
   /* Layout (copied from writing-tracker-new so the two trackers match): a sticky-header marking grid (statements down the side, children across) under a class-year switcher. Palette: school blue plus neutrals tinted toward it; status colours carry their own text colours so they read in both themes. */
   :root {
@@ -132,14 +132,15 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .termpick .lt { padding:6px 12px; }
   .src { font-size:11px; color:var(--muted); }
 </style>
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
 </head>
 <body>
 <header>
-  <h1>Maths Tracker – proposed new design (review draft)</h1>
-  <p>Ready to Progress statements and school targets (Y1 to Y6), scored the same way as the new writing tracker · fictitious children</p>
+  <h1>Maths Tracker – Year 5 pilot</h1>
+  <p>Ready to Progress statements and school targets, scored the same way as the new writing tracker</p>
 </header>
 <div class="wrap">
-  <div class="banner">REVIEW DRAFT. This is the proposed new maths tracker, shown with made-up children. It is not connected to the live RTP Tracker's pupil data, and nothing you do on this grid is saved: if you refresh, the marks disappear. Statements, weights and terms are read live from the review form and the tracker, so they change as you review.</div>
+  <div class="banner">YEAR 5 PILOT. Real Year 5 pupils: every mark you make is saved straight away for all staff, with your email and the time. The statements, weights and terms still come from the review form, so they may change while the review is finished; marks are kept against each statement.</div>
 
   <details class="how">
     <summary>How the new scoring works (click to open)</summary>
@@ -155,17 +156,17 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
         <tr><td>x Not taught · Unreviewed</td><td>No evidence yet</td><td>not counted at all</td></tr>
       </table>
       <p><b>Non-Negotiables</b> are the previous year's 3 highest-weighted statements, carried up so they stay secure. Each counts at weight 1 and should be secure by Term 2. Year 1's are 4 key EYFS skills, chosen on the Year 1 tab of the review form.</p>
-      <p><b>2. Percentages.</b> <b>Expected %</b> = weight earned ÷ weight available across the non-negotiables and expected standards that count. <b>Greater depth %</b> comes from the greater depth statements, which have not been written yet, so no child can show D in this draft.</p>
+      <p><b>2. Percentages.</b> <b>Expected %</b> = weight earned ÷ weight available across the non-negotiables and expected standards that count. <b>Greater depth %</b> comes from the greater depth statements, which have not been written yet, so no child can show D yet.</p>
       <p><b>3. Grade</b> for a child working at their own year group: <b>D</b> = expected ≥ 90% and greater depth ≥ 60% · <b>O1</b> = expected ≥ 75% · <b>O2</b> = expected ≥ 65% · <b>Y</b> = expected ≥ 50%. Below 50% suggests an earlier year's statements: <b>A - Yn</b>. The teacher chooses which year a child is working at.</p>
-      <p><b>4. Secure by (new for maths).</b> Each statement has the term it should be secure by: Term 2, 4 or 6. From the term before, a child not yet Secure gets an <b>amber outline</b> (due soon). After that term, they get a <b>red !</b> (overdue), and the summary row counts them. Use "Pretend it is" to see how the grid looks at different points in the year.</p>
+      <p><b>4. Secure by (new for maths).</b> Each statement has the term it should be secure by: Term 2, 4 or 6. From the term before, a child not yet Secure gets an <b>amber outline</b> (due soon). After that term, they get a <b>red !</b> (overdue), and the summary row counts them. The term is worked out from today's date; pick another term to see how the grid would look then.</p>
       <p><b>5. Where the numbers come from.</b> Weights and terms come from the review form first, then the tracker's own Weights &amp; targets tab, then a draft value (shown with a dashed box). Wording is the proposed wording unless the review form says "Use: Current". Change them in the <a href="review.html">review form</a>; this page picks them up when you refresh.</p>
     </div>
   </details>
 
-  <div class="group-label">Class year group</div>
+  <div class="group-label">Year 5 class</div>
   <div class="classtabs" id="classtabs"></div>
 
-  <div class="group-label">Pretend it is (to see the secure-by flags)</div>
+  <div class="group-label">Term (for the due-soon and overdue flags)</div>
   <div class="termpick" id="termpick"></div>
 
   <div class="group-label">Status key (click one, then click cells to paint it; or just click any cell)</div>
@@ -174,8 +175,8 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="hint">
     <span id="paintHint">Paint mode off.</span>
     <button class="btn" id="paintOff" style="display:none">Stop painting</button>
-    <button class="btn" id="clearBtn">Clear all marks (empty class)</button>
-    <button class="btn" id="resetBtn">Reload the example children</button>
+    <button class="btn" id="refreshBtn">Refresh</button>
+    <span id="savestate" class="wstatus"></span>
     <span id="src" class="src"></span>
   </div>
 
@@ -185,7 +186,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 
   <div class="grid-scroll"><table id="grid"></table></div>
 
-  <footer>Proposed new maths tracker · review draft WFA-22.10.26a · statement numbers (Y3_001…) are worked out on this page and would be fixed in the real tool</footer>
+  <footer>Maths tracker · Year 5 pilot WFA-04.11.26a · statement numbers (Y5_001…) are worked out from the current statements; marks are saved against each statement's code, so they stay put if the numbering shifts</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -193,8 +194,6 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 const API = 'https://api.wallscourt-farm-academy.co.uk/planning/rtptracker-db';
 const STRAND_ORDER = ['Number and Place Value','Number Facts','Addition and Subtraction','Multiplication and Division','Fractions','Geometry'];
 
-// Offline fallback only: the page normally reads the live statements from the tracker.
-const SEED = [["1NPV–1", "Number and Place Value", 1, 1, "Count within 100, forwards and backwards, starting with any number."], ["1NPV–2", "Number and Place Value", 1, 2, "Reason about the location of numbers to 20 within the linear number system, including comparing using < > and ="], ["2NPV–1", "Number and Place Value", 2, 3, "Recognise the place value of each digit in two-digit numbers, and compose and decompose two-digit numbers using standard and non-standard partitioning."], ["3NPV–1", "Number and Place Value", 3, 4, "Know that 10 tens are equivalent to 1 hundred, and that 100 is 10 times the size of 10; apply this to identify and work out how many 10s there are in other three-digit multiples of 10."], ["3NPV–2", "Number and Place Value", 3, 5, "Recognise the place value of each digit in three-digit numbers, and compose and decompose three-digit numbers using standard and non-standard partitioning."], ["3NPV–3", "Number and Place Value", 3, 6, "Reason about the location of any three-digit number in the linear number system, including identifying the previous and next multiple of 100 and 10."], ["3NPV–4", "Number and Place Value", 3, 7, "Divide 100 into 2, 4, 5 and 10 equal parts, and read scales/number lines marked in multiples of 100 with 2, 4, 5 and 10 equal parts."], ["4NPV–1", "Number and Place Value", 4, 8, "Know that 10 hundreds are equivalent to 1 thousand, and that 1,000 is 10 times the size of 100; apply this to identify and work out how many 100s there are in other four-digit multiples of 100."], ["4NPV–2", "Number and Place Value", 4, 9, "Recognise the place value of each digit in four-digit numbers, and compose and decompose four-digit numbers using standard and non-standard partitioning."], ["4NPV–3", "Number and Place Value", 4, 10, "Reason about the location of any four-digit number in the linear number system, including identifying the previous and next multiple of 1,000 and 100, and rounding to the nearest of each."], ["4NPV–4", "Number and Place Value", 4, 11, "Divide 1,000 into 2, 4, 5 and 10 equal parts, and read scales/number lines marked in multiples of 1,000 with 2, 4, 5 and 10 equal parts."], ["5NPV–1", "Number and Place Value", 5, 12, "Know that 10 tenths are equivalent to 1 one, and that 1 is 10 times the size of 0.1. Know that 100 hundredths are equivalent to 1 one, and that 1 is 100 times the size of 0.01. Know that 10 hundredths are equivalent to 1 tenth, and that 0.1 is 10 times the size of 0.01."], ["5NPV–2", "Number and Place Value", 5, 13, "Recognise the place value of each digit in numbers with up to 2 decimal places, and compose and decompose numbers with up to 2 decimal places using standard and non-standard partitioning."], ["5NPV–3", "Number and Place Value", 5, 14, "Reason about the location of any number with up to 2 decimals places in the linear number system, including identifying the previous and next multiple of 1 and 0.1 and rounding to the nearest of each."], ["5NPV–4", "Number and Place Value", 5, 15, "Divide 1 into 2, 4, 5 and 10 equal parts, and read scales/number lines marked in units of 1 with 2, 4, 5 and 10 equal parts."], ["5NPV–5", "Number and Place Value", 5, 16, "Convert between units of measure, including using common decimals and fractions."], ["6NPV–1", "Number and Place Value", 6, 17, "Understand the relationship between powers of 10 from 1 hundredth to 10 million, and use this to make a given number 10, 100, 1,000, 1 tenth, 1 hundredth or 1 thousandth times the size (multiply and divide by 10, 100 and 1,000)."], ["6NPV–2", "Number and Place Value", 6, 18, "Recognise the place value of each digit in numbers up to 10 million, including decimal fractions, and compose and decompose numbers up to 10 million using standard and non-standard partitioning."], ["6NPV–3", "Number and Place Value", 6, 19, "Reason about the location of any number up to 10 million, including decimal fractions, in the linear number system, and round numbers, as appropriate, including in contexts."], ["6NPV–4", "Number and Place Value", 6, 20, "Divide powers of 10, from 1 hundredth to 10 million, into 2, 4, 5 and 10 equal parts, and read scales/number lines with labelled intervals divided into 2, 4, 5 and 10 equal parts."], ["1NF–1", "Number Facts", 1, 21, "Develop fluency in addition and subtraction facts within 10."], ["1NF–2", "Number Facts", 1, 22, "Count forwards and backwards in multiples of 2, 5 and 10, up to 10 multiples, beginning with any multiple, and count forwards and backwards through the odd numbers."], ["2NF–1", "Number Facts", 2, 23, "Secure fluency in addition and subtraction facts within 10, through continued practice."], ["3NF–1", "Number Facts", 3, 24, "Secure fluency in addition and subtraction facts that bridge 10, through continued practice."], ["3NF–2", "Number Facts", 3, 25, "Recall multiplication facts, and corresponding division facts, in the 10, 5, 2, 4 and 8 multiplication tables, and recognise products in these multiplication tables as multiples of the corresponding number."], ["3NF–3", "Number Facts", 3, 26, "Apply place-value knowledge to known additive and multiplicative number facts (scaling facts by 10)."], ["4NF–1", "Number Facts", 4, 27, "Recall multiplication and division facts up to 12 × 12, and recognise products in multiplication tables as multiples of the corresponding number."], ["4NF–2", "Number Facts", 4, 28, "Solve division problems, with two-digit dividends and one-digit divisors, that involve remainders, and interpret remainders appropriately according to the context."], ["4NF–3", "Number Facts", 4, 29, "Apply place-value knowledge to known additive and multiplicative number facts (scaling facts by 100)"], ["5NF–1", "Number Facts", 5, 30, "Secure fluency in multiplication table facts, and corresponding division facts, through continued practice."], ["5NF–2", "Number Facts", 5, 31, "Apply place-value knowledge to known additive and multiplicative number facts (scaling facts by 1 tenth or 1 hundredth)."], ["1AS–1", "Addition and Subtraction", 1, 32, "Compose numbers to 10 from 2 parts, and partition numbers to 10 into parts, including recognising odd and even numbers."], ["1AS–2", "Addition and Subtraction", 1, 33, "Read, write and interpret equations containing addition ( ), subtraction ( ) and equals ( ) symbols, and relate additive expressions and equations to real-life contexts."], ["2AS–1", "Addition and Subtraction", 2, 34, "Add and subtract across 10."], ["2AS–2", "Addition and Subtraction", 2, 35, "Recognise the subtraction structure of ‘difference’ and answer questions of the form, “How many more…?”."], ["2AS–3", "Addition and Subtraction", 2, 36, "Add and subtract within 100 by applying related one-digit addition and subtraction facts: add and subtract only ones or only tens to/from a two-digit number."], ["2AS–4", "Addition and Subtraction", 2, 37, "Add and subtract within 100 by applying related one-digit addition and subtraction facts: add and subtract any 2 two-digit numbers."], ["3AS–1", "Addition and Subtraction", 3, 38, "Calculate complements to 100."], ["3AS–2", "Addition and Subtraction", 3, 39, "Add and subtract up to three-digit numbers using columnar methods."], ["3AS–3", "Addition and Subtraction", 3, 40, "Manipulate the additive relationship: Understand the inverse relationship between addition and subtraction, and how both relate to the part–part–whole structure. Understand and use the commutative property of addition, and understand the related property for subtraction."], ["6AS/MD–1", "Addition and Subtraction", 6, 41, "Understand that 2 numbers can be related additively or multiplicatively, and quantify additive and multiplicative relationships (multiplicative relationships restricted to multiplication by a whole number)."], ["6AS/MD–2", "Addition and Subtraction", 6, 42, "Use a given additive or multiplicative calculation to derive or complete a related calculation, using arithmetic properties, inverse relationships, and place-value understanding."], ["6AS/MD–3", "Addition and Subtraction", 6, 43, "Solve problems involving ratio relationships."], ["6AS/MD–4", "Addition and Subtraction", 6, 44, "Solve problems with 2 unknowns."], ["2MD–1", "Multiplication and Division", 2, 45, "Recognise repeated addition contexts, representing them with multiplication equations and calculating the product, within the 2, 5 and 10 multiplication tables."], ["2MD–2", "Multiplication and Division", 2, 46, "Relate grouping problems where the number of groups is unknown to multiplication equations with a missing factor, and to division equations (quotitive division)."], ["3MD–1", "Multiplication and Division", 3, 47, "Apply known multiplication and division facts to solve contextual problems with different structures, including quotitive and partitive division."], ["4MD–1", "Multiplication and Division", 4, 48, "Multiply and divide whole numbers by 10 and 100 (keeping to whole number quotients); understand this as equivalent to making a number 10 or 100 times the size."], ["4MD–2", "Multiplication and Division", 4, 49, "Manipulate multiplication and division equations, and understand and apply the commutative property of multiplication."], ["4MD–3", "Multiplication and Division", 4, 50, "Understand and apply the distributive property of multiplication."], ["5MD–1", "Multiplication and Division", 5, 51, "Multiply and divide numbers by 10 and 100; understand this as equivalent to making a number 10 or 100 times the size, or 1 tenth or 1 hundredth times the size."], ["5MD–2", "Multiplication and Division", 5, 52, "Find factors and multiples of positive whole numbers, including common factors and common multiples, and express a given number as a product of 2 or 3 factors."], ["5MD–3", "Multiplication and Division", 5, 53, "Multiply any whole number with up to 4 digits by any one-digit number using a formal written method."], ["5MD–4", "Multiplication and Division", 5, 54, "Divide a number with up to 4 digits by a one-digit number using a formal written method, and interpret remainders appropriately for the context."], ["3F–1", "Fractions", 3, 55, "Interpret and write proper fractions to represent 1 or several parts of a whole that is divided into equal parts."], ["3F–2", "Fractions", 3, 56, "Find unit fractions of quantities using known division facts (multiplication tables fluency)."], ["3F–3", "Fractions", 3, 57, "Reason about the location of any fraction within 1 in the linear number system."], ["3F–4", "Fractions", 3, 58, "Add and subtract fractions with the same denominator, within 1."], ["4F–1", "Fractions", 4, 59, "Reason about the location of mixed numbers in the linear number system."], ["4F–2", "Fractions", 4, 60, "Convert mixed numbers to improper fractions and vice versa."], ["4F–3", "Fractions", 4, 61, "Add and subtract improper and mixed fractions with the same denominator, including bridging whole numbers."], ["5F–1", "Fractions", 5, 62, "Find non-unit fractions of quantities."], ["5F–2", "Fractions", 5, 63, "Find equivalent fractions and understand that they have the same value and the same position in the linear number system."], ["5F–3", "Fractions", 5, 64, "Recall decimal fraction equivalents for 1/2, 1/4, 1/5, 1/10 and for multiples of these proper fractions."], ["6F–1", "Fractions", 6, 65, "Recognise when fractions can be simplified, and use common factors to simplify fractions."], ["6F–2", "Fractions", 6, 66, "Express fractions in a common denomination and use this to compare fractions that are similar in value."], ["6F–3", "Fractions", 6, 67, "Compare fractions with different denominators, including fractions greater than 1, using reasoning, and choose between reasoning and common denomination as a comparison strategy."], ["1G–1", "Geometry", 1, 68, "Recognise common 2D and 3D shapes presented in different orientations, and know that rectangles, triangles, cuboids and pyramids are not always similar to one another."], ["1G–2", "Geometry", 1, 69, "Compose 2D and 3D shapes from smaller shapes to match an example, including manipulating shapes to place them in particular orientations."], ["2G–1", "Geometry", 2, 70, "Use precise language to describe the properties of 2D and 3D shapes, and compare shapes by reasoning about similarities and differences in properties."], ["3G–1", "Geometry", 3, 71, "Recognise right angles as a property of shape or a description of a turn, and identify right angles in 2D shapes presented in different orientations."], ["3G–2", "Geometry", 3, 72, "Draw polygons by joining marked points, and identify parallel and perpendicular sides."], ["4G–1", "Geometry", 4, 73, "Draw polygons, specified by coordinates in the first quadrant, and translate within the first quadrant."], ["4G–2", "Geometry", 4, 74, "Identify regular polygons, including equilateral triangles and squares, as those in which the side-lengths are equal and the angles are equal. Find the perimeter of regular and irregular polygons."], ["4G–3", "Geometry", 4, 75, "Identify line symmetry in 2D shapes presented in different orientations. Reflect shapes in a line of symmetry and complete a symmetric figure or pattern with respect to a specified line of symmetry."], ["5G–1", "Geometry", 5, 76, "Compare angles, estimate and measure angles in degrees (°) and draw angles of a given size."], ["5G–2", "Geometry", 5, 77, "Compare areas and calculate the area of rectangles (including squares) using standard units."], ["6G–1", "Geometry", 6, 78, "Draw, compose, and decompose shapes according to given properties, including dimensions, angles and area, and solve related problems."]];
 const PROPOSED = {
   '1NPV–1': 'Count forwards and backwards within 100, starting from any number.',
   '1NPV–2': 'Place numbers to 20 on a number line and compare them using <, > and =.',
@@ -368,7 +367,8 @@ function buildSkills(criteria, reviews, y1NonNeg){
         weight: NON_NEG_WEIGHT, wSrc: 'nonneg', term: NON_NEG_TERM, tSrc: 'nonneg', key_essential: false }));
     let n = 0;
     SKILLS[Y] = top.concat(own[Y]).map(x => {
-      const s = Object.assign({}, x, { id: Y + '_' + String(++n).padStart(3, '0') });
+      // skey is what marks are saved against: stable while the Y5_001 numbering may shift.
+      const s = Object.assign({}, x, { id: Y + '_' + String(++n).padStart(3, '0'), skey: Y + (x.tier === 'non_neg' ? ':NN:' : ':') + x.code });
       SKILL_BY_ID[s.id] = s; WEIGHT[s.id] = s.weight;
       return s;
     });
@@ -388,49 +388,107 @@ async function loadStatements(){
     const reviews = {};
     Object.keys(cfg).forEach(k => { if (k.indexOf('review|') === 0) { try { reviews[k.slice(7)] = JSON.parse(cfg[k]); } catch (e) {} } });
     let y1 = []; try { y1 = JSON.parse(cfg['nonneg|Y1'] || '[]'); } catch (e) {}
+    ACAD_YEAR = cfg.academic_year || '';
     buildSkills(criteria, reviews, y1);
     const n = Object.keys(reviews).length, t = criteria.filter(c => c.custom).length;
     src.textContent = 'Statements read live: ' + criteria.length + ' (' + t + ' school target' + (t === 1 ? '' : 's') + '), ' + n + ' reviewed in the review form.';
   } catch (e) {
-    buildSkills(SEED.map(([code, strand, y, order, description]) => ({ code, strand, year_group:'Y' + y, order, description, weight:1 })), {});
-    src.textContent = 'Could not reach the tracker (' + e.message + '), so this shows the built-in Ready to Progress list with draft weights and terms.';
+    src.textContent = '';
+    throw new Error('Could not load the statements (' + e.message + '). Refresh the page; if it keeps happening, sign in again.');
   }
 }
 
-// ---- Fictitious children (same method as the writing draft) -----------
-function rng(seed){ let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-const PROFILE = { O1:{q:.82}, O2:{q:.72}, Y:{q:.62}, low:{q:.42}, gaps:{q:.80, gap:.22}, strong:{q:.92} };
-function fill(rand, p, framework, out){
-  const pr = PROFILE[p];
-  framework.forEach(s => {
-    // Later-term statements are less likely to be secure yet, so the due/overdue flags have something to show.
-    let v = pr.q + (rand()-.5)*.5 - (s.term >= 6 ? .12 : s.term >= 4 ? .05 : 0);
-    let st = v > .78 ? 'secure' : v > .55 ? 'developing' : v > .30 ? 'emerging' : 'reteach';
-    if (st === 'reteach' && rand() < .25) st = 'taught';
-    if (pr.gap && rand() < pr.gap) st = rand() < .5 ? 'none' : 'x';
-    out[s.id] = st;
-  });
+// ---- Real Year 5 pupils (pilot) --------------------------------------
+// Pupils come from the RTP tracker's own class lists (kept in step with the school roster by its "Sync roster").
+// Screens show initials only; WFANames.screen swaps in full names from a teacher-held names file.
+const PILOT_YEAR = 'Y5';
+let ACAD_YEAR = '', CLASSES = [], curClass = '', CLASS = { pupils: [], data: {} };
+function _iniPart(w, n) {
+  const s = String(w || '').replace(/[^A-Za-zÀ-ɏ]/g, '');
+  if (!s) return '';
+  const t = s.slice(0, n);
+  const rest = (s === s.toUpperCase() || s === s.toLowerCase()) ? t.slice(1).toLowerCase() : t.slice(1);
+  return t.charAt(0).toUpperCase() + rest;
 }
-const INITIALS = ['AB','CD','EF','GH','IJ','KL','MN','OP'];
-function buildClass(y){
-  const n = yearNum(y), rand = rng(2000+n*77), data = {}, pupils = [];
-  const plan = [['strong',y],['O1',y],['gaps',y],['O2',y],['Y',y],['low',y],
-                ['Y', n>=2 ? 'Y'+(n-1) : y], ['low', n>=3 ? 'Y'+(n-2) : (n===2 ? 'Y1' : y)]];
-  plan.forEach(([prof, work], i) => {
-    const id = INITIALS[i]; data[id] = {};
-    YEARS.forEach(L => SKILLS[L].forEach(s => data[id][s.id] = 'none'));
-    fill(rand, prof, SKILLS[work], data[id]);
-    pupils.push({ id, work });
-  });
-  return { pupils, data };
+function _iniSplit(first, last) {
+  const w = String(first == null ? '' : first).trim().split(/\s+/).filter(Boolean);
+  if (last === undefined || last === null || String(last).trim() === '') {
+    if (last === undefined && w.length > 1) return [w[0], w[w.length - 1]];
+    return [w[0] || '', ''];
+  }
+  const l = String(last).trim().split(/\s+/).filter(Boolean);
+  return [w[0] || '', l[l.length - 1]];
 }
-let CLASS = {};
-function loadExamples(){ CLASS = {}; YEARS.forEach(y => CLASS[y] = buildClass(y)); }
-function clearMarks(){ YEARS.forEach(y => { Object.keys(CLASS[y].data).forEach(p => Object.keys(CLASS[y].data[p]).forEach(id => CLASS[y].data[p][id] = 'none')); CLASS[y].pupils.forEach(p => p.work = y); }); }
+// pairs: array of [first, last] (last may be undefined to split a full name). Returns array of labels.
+function initialsLabels(pairs) {
+  const parts = pairs.map(p => _iniSplit(p[0], p[1]));
+  const L = parts.map(p => p.map(x => String(x).replace(/[^A-Za-zÀ-ɏ]/g, '').length));
+  const at = (i, n) => parts[i][1] ? _iniPart(parts[i][0], n) + _iniPart(parts[i][1], n) : _iniPart(parts[i][0], n + 1);
+  const fk = parts.map(p => (p[0] + '|' + p[1]).replace(/[^A-Za-z\u00C0-\u024F|]/g, '').toLowerCase());
+  const dupe = fk.map((k, i) => fk.some((o, j) => j !== i && o === k));
+  const out = new Array(parts.length);
+  let pending = parts.map((_, i) => i);
+  for (let n = 1; pending.length; n++) {
+    const cnt = {};
+    pending.forEach(i => { const k = at(i, n).toLowerCase(); cnt[k] = (cnt[k] || 0) + 1; });
+    const next = [];
+    pending.forEach(i => {
+      const k = at(i, n).toLowerCase();
+      const sat = n >= Math.max(L[i][0], L[i][1], 1) || n >= 12;
+      if (cnt[k] === 1) out[i] = at(i, n);
+      else if (sat) out[i] = dupe[i] ? at(i, 1) : at(i, n);
+      else next.push(i);
+    });
+    pending = next;
+  }
+  const seen = {};
+  for (let i = 0; i < out.length; i++) {
+    const k = out[i].toLowerCase();
+    seen[k] = (seen[k] || 0) + 1;
+    if (seen[k] > 1) out[i] = out[i] + ' ' + seen[k];
+  }
+  return out;
+}
+function pidAttr(p){ return p.code ? ' data-pupil-id="' + esc(p.code) + '"' : ''; }
+async function apiPost(body){
+  const r = await fetch(API + '?token=__hub__', { method:'POST', cache:'no-store', body: JSON.stringify(Object.assign({ academic_year: ACAD_YEAR }, body)) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json(); if (j && j.error) throw new Error(j.error);
+  return j;
+}
+async function loadClasses(){
+  const cls = await apiGet('getClasses');
+  CLASSES = cls.filter(c => 'Y' + yearNum(c.year_group) === PILOT_YEAR)
+    .sort((a, b) => String(a.class_name).localeCompare(String(b.class_name)));
+  let saved = ''; try { saved = localStorage.getItem('rtp_new_class') || ''; } catch (e) {}
+  curClass = (CLASSES.find(c => c.class_id === saved) || CLASSES[0] || {}).class_id || '';
+}
+async function loadClass(){
+  if (!curClass){ CLASS = { pupils: [], data: {} }; return; }
+  const j = await apiGet('getJudgements&class_id=' + encodeURIComponent(curClass));
+  const labels = initialsLabels((j.pupils || []).map(p => [p.name]));
+  CLASS = {
+    pupils: (j.pupils || []).map((p, i) => ({ id: p.pupil_id, label: labels[i], code: p.pupilCode || '', work: (j.workingAt || {})[p.pupil_id] || PILOT_YEAR })),
+    data: j.judgements || {}
+  };
+}
+function setSave(t, err){ const el = document.getElementById('savestate'); el.textContent = t; el.className = 'wstatus' + (err ? ' err' : ''); }
+// Optimistic: show the mark at once, then confirm with the database; put it back if the save fails.
+async function setStatus(pid, skey, status){
+  const d = CLASS.data[pid] || (CLASS.data[pid] = {}), prev = d[skey] || 'none';
+  if (prev === status) return;
+  if (status === 'none') delete d[skey]; else d[skey] = status;
+  renderGrid(); setSave('Saving…');
+  try { await apiPost({ action:'setJudgements', items:[{ pupil_id: pid, skey, status }] }); setSave('Saved ✓'); }
+  catch (e) {
+    if (prev === 'none') delete d[skey]; else d[skey] = prev;
+    renderGrid(); setSave('Not saved (' + e.message + '). That mark has been put back; try again or refresh.', true);
+  }
+}
 
 // ---- Scoring (identical to the writing draft) + secure-by -------------
 function termFromDate(d){ const m = d.getMonth(); return m >= 8 && m <= 9 ? 1 : m >= 10 ? 2 : m <= 1 ? 3 : m <= 3 ? 4 : m <= 4 ? 5 : 6; }
-let classYear = 'Y5', level = 'Y5', paint = null, nowTerm = termFromDate(new Date());
+let classYear = PILOT_YEAR, level = PILOT_YEAR, paint = null, nowTerm = termFromDate(new Date());
 const LEVEL_UP = 0.9;
 const lowerOf = L => yearNum(L) <= 1 ? 'EY' : 'Y' + (yearNum(L) - 1);
 const lbl = L => L === classYear ? L : 'A - ' + L;
@@ -444,11 +502,11 @@ function timing(s, v, own){
   return '';
 }
 function summary(p){
-  const L = p.work, d = CLASS[classYear].data[p.id], own = L === classYear;
+  const L = p.work, d = (CLASS.data[p.id] || {}), own = L === classYear;
   const c = { secure:0, developing:0, emerging:0, reteach:0, taught:0 }, t = { late:0, due:0 };
   const exp = { points:0, max:0, counted:0, total:0, wAll:0, wSecure:0 }, gd = { points:0, max:0, counted:0, total:0 };
   SKILLS[L].forEach(s => {
-    const v = d[s.id], w = WEIGHT[s.id], isGd = s.tier === 'greater_depth', g = isGd ? gd : exp;
+    const v = d[s.skey] || 'none', w = WEIGHT[s.id], isGd = s.tier === 'greater_depth', g = isGd ? gd : exp;
     g.total++; if (!isGd) exp.wAll += w;
     if (v in POINTS){ g.points += w*POINTS[v]; g.max += w; g.counted++; if (!isGd){ c[v]++; if (v==='secure') exp.wSecure += w; } }
     const tm = timing(s, v, own); if (tm) t[tm]++;
@@ -482,7 +540,9 @@ const fmt = n => (Math.round(n*10)/10).toString();
 const pc = n => n === null ? '–' : Math.round(n)+'%';
 
 function renderClassTabs(){
-  document.getElementById('classtabs').innerHTML = YEARS.map(y => '<button class="ct'+(y===classYear?' active':'')+'" data-cy="'+y+'">Year '+y.slice(1)+' class</button>').join('');
+  document.getElementById('classtabs').innerHTML = CLASSES.length
+    ? CLASSES.map(c => '<button class="ct'+(c.class_id===curClass?' active':'')+'" data-cls="'+esc(c.class_id)+'">'+esc(c.class_name)+'</button>').join('')
+    : '<span class="src">No Year 5 classes found in the tracker. Use "Sync roster" in the RTP Tracker.</span>';
 }
 function renderTermPick(){
   document.getElementById('termpick').innerHTML = TERMS.map(t => '<button class="lt'+(t===nowTerm?' active':'')+'" data-term="'+t+'">Term '+t+'</button>').join('')
@@ -504,7 +564,7 @@ function renderLegend(){
 function renderTabs(){
   const t = document.getElementById('lvltabs'); t.innerHTML = '';
   levelsFor(classYear).slice().reverse().forEach(L => {
-    const n = CLASS[classYear].pupils.filter(p => p.work === L).length;
+    const n = CLASS.pupils.filter(p => p.work === L).length;
     const b = document.createElement('button');
     b.className = 'lt'+(L===level?' active':'')+(L!==classYear?' below':''); b.dataset.lvl = L;
     b.innerHTML = (L===classYear ? L+' (class year)' : 'A - '+L)+' <small>· '+n+' pupil'+(n===1?'':'s')+'</small>';
@@ -514,13 +574,13 @@ function renderTabs(){
 const SRC_TITLE = { review:'from the review form', tracker:'from the tracker', draft:'draft value — not chosen yet', nonneg:'fixed for non-negotiables' };
 function renderGrid(){
   renderClassTabs(); renderTabs(); renderTermPick();
-  const t = document.getElementById('grid'), pupils = CLASS[classYear].pupils.filter(p => p.work === level);
+  const t = document.getElementById('grid'), pupils = CLASS.pupils.filter(p => p.work === level);
   if (!pupils.length){ t.innerHTML = '<tbody><tr><td class="empty">No children are working at '+lbl(level)+' right now. Use a child\'s "working at" box on another tab to move them here.</td></tr></tbody>'; return; }
   const sums = pupils.map(p => { const u = summary(p); return { p, u, g: grade(u) }; });
   let h = '<thead><tr><th class="skillh">'+level+' statements ('+SKILLS[level].length+')</th><th class="wh">Weight</th><th class="th2">Secure by</th>';
   sums.forEach(({p,u,g}) => {
     const [bg,fg] = GSTYLE[g.style];
-    h += '<th class="pupilh">'+p.id+'<select class="wsel" data-p="'+p.id+'">'+levelsFor(classYear).map(L => '<option value="'+L+'"'+(L===p.work?' selected':'')+'>'+(L===classYear?'Working at '+L:'A - '+L)+'</option>').join('')+'</select>'
+    h += '<th class="pupilh"><span'+pidAttr(p)+'>'+esc(p.label)+'</span><select class="wsel" data-p="'+p.id+'">'+levelsFor(classYear).map(L => '<option value="'+L+'"'+(L===p.work?' selected':'')+'>'+(L===classYear?'Working at '+L:'A - '+L)+'</option>').join('')+'</select>'
       +'<span class="hbadge" style="background:'+bg+';color:'+fg+'">'+g.label+'</span><div class="hexp">Expected '+pc(u.expPct)+'</div></th>';
   });
   h += '</tr></thead><tbody>';
@@ -558,7 +618,7 @@ function renderGrid(){
         +'<td class="wtd"><span class="wlock'+(w===0?' zero':'')+(s.wSrc==='draft'?' wdraft':'')+'" title="Weight '+SRC_TITLE[s.wSrc]+'">'+w+'</span></td>'
         +'<td class="ttd"><span class="term'+(s.tSrc==='draft'?' draft':'')+'" title="Secure by Term '+s.term+', '+SRC_TITLE[s.tSrc]+'">T'+s.term+'</span></td>';
       pupils.forEach(p => {
-        const v = CLASS[classYear].data[p.id][s.id], m = STATUS[v], tm = timing(s, v, own);
+        const v = (CLASS.data[p.id] || {})[s.skey] || 'none', m = STATUS[v], tm = timing(s, v, own);
         h += '<td class="cell'+(paint?' paint':'')+(tm?' '+tm:'')+'" data-p="'+p.id+'" data-s="'+s.id+'" style="background:'+m.bg+';color:'+m.fg+'"'
           +(tm==='late'?' title="Should have been secure by Term '+s.term+'"':tm==='due'?' title="Due to be secure by the end of Term '+s.term+'"':'')+'>'+(v==='none' ? '' : (v==='x' ? 'x' : m.label))+'</td>';
       });
@@ -568,10 +628,13 @@ function renderGrid(){
   t.innerHTML = h + '</tbody>';
 }
 function setWork(pid, L, viaButton){
-  const p = CLASS[classYear].pupils.find(x => x.id === pid); p.work = L;
+  const p = CLASS.pupils.find(x => x.id === pid), prev = p.work; p.work = L;
+  setSave('Saving…');
+  apiPost({ action:'setWorkingAt', pupil_id: pid, level: L }).then(() => setSave('Saved ✓'))
+    .catch(e => { p.work = prev; renderGrid(); setSave('Not saved (' + e.message + '). ' + p.label + ' is back on ' + lbl(prev) + '.', true); });
   const note = document.getElementById('lvlnote');
-  if (viaButton){ level = L; note.textContent = pid+' moved to '+lbl(L)+'. Now mark them against these statements.'; }
-  else note.textContent = pid+' is now working at '+lbl(L)+(L===level ? '.' : '. See the '+lbl(L)+' tab.');
+  if (viaButton){ level = L; note.textContent = p.label+' moved to '+lbl(L)+'. Now mark them against these statements.'; }
+  else note.textContent = p.label+' is now working at '+lbl(L)+(L===level ? '.' : '. See the '+lbl(L)+' tab.');
   renderGrid();
 }
 
@@ -581,8 +644,9 @@ const btn = k => { const s = STATUS[k]; return '<button data-k="'+k+'" style="ba
 function openPicker(cell){
   target = { p:cell.dataset.p, s:cell.dataset.s };
   const sk = SKILL_BY_ID[target.s];
-  picker.innerHTML = '<h4>'+target.p+' · '+esc(sk.skill).slice(0,90)+(sk.skill.length>90?'…':'')+'</h4>'+JUDGE_ORDER.slice().reverse().map(btn).join('')+'<div class="sep">No evidence yet</div>'+NONE_ORDER.map(btn).join('');
-  picker.querySelectorAll('button').forEach(b => b.onclick = () => { if (!target) return; CLASS[classYear].data[target.p][target.s] = b.dataset.k; closePicker(); renderGrid(); });
+  const who = (CLASS.pupils.find(x => x.id === target.p) || {}).label || '';
+  picker.innerHTML = '<h4>'+esc(who)+' · '+esc(sk.skill).slice(0,90)+(sk.skill.length>90?'…':'')+'</h4>'+JUDGE_ORDER.slice().reverse().map(btn).join('')+'<div class="sep">No evidence yet</div>'+NONE_ORDER.map(btn).join('');
+  picker.querySelectorAll('button').forEach(b => b.onclick = () => { if (!target) return; const t = target; closePicker(); setStatus(t.p, SKILL_BY_ID[t.s].skey, b.dataset.k); });
   const r = cell.getBoundingClientRect(); picker.classList.add('open');
   const ph = picker.offsetHeight; let top = r.bottom + 4; if (top + ph > innerHeight - 8) top = Math.max(8, innerHeight - ph - 8);
   picker.style.top = top+'px'; picker.style.left = Math.max(8, Math.min(r.left, innerWidth - 342))+'px';
@@ -595,15 +659,16 @@ grid.addEventListener('click', e => {
   const mv = e.target.closest('button[data-move]');
   if (mv){ e.stopPropagation(); setWork(mv.dataset.move, mv.dataset.to, true); return; }
   const c = e.target.closest('td.cell'); if (!c) return;
-  if (paint){ CLASS[classYear].data[c.dataset.p][c.dataset.s] = paint; renderGrid(); }
+  if (paint){ setStatus(c.dataset.p, SKILL_BY_ID[c.dataset.s].skey, paint); }
   else { e.stopPropagation(); openPicker(c); }
 });
 grid.addEventListener('change', e => {
   const sel = e.target.closest('select.wsel'); if (sel) setWork(sel.dataset.p, sel.value, false);
 });
 document.getElementById('classtabs').addEventListener('click', e => {
-  const b = e.target.closest('button[data-cy]'); if (!b) return;
-  classYear = b.dataset.cy; level = classYear; document.getElementById('lvlnote').textContent = ''; renderGrid();
+  const b = e.target.closest('button[data-cls]'); if (!b || b.dataset.cls === curClass) return;
+  curClass = b.dataset.cls; try { localStorage.setItem('rtp_new_class', curClass); } catch (err) {}
+  level = classYear; document.getElementById('lvlnote').textContent = ''; reloadClass();
 });
 document.getElementById('termpick').addEventListener('click', e => {
   const b = e.target.closest('button[data-term]'); if (!b) return; nowTerm = Number(b.dataset.term); renderGrid();
@@ -613,13 +678,25 @@ document.getElementById('lvltabs').addEventListener('click', e => {
 });
 document.addEventListener('click', e => { if (!picker.contains(e.target)) closePicker(); });
 document.getElementById('paintOff').onclick = () => { paint = null; renderLegend(); renderGrid(); };
-document.getElementById('clearBtn').onclick = () => { clearMarks(); level = classYear; document.getElementById('lvlnote').textContent = 'All marks cleared. Every child is back on the class year, ready to mark.'; renderGrid(); };
-document.getElementById('resetBtn').onclick = () => { loadExamples(); level = classYear; document.getElementById('lvlnote').textContent = ''; renderGrid(); };
+async function reloadClass(){
+  setSave('Loading…');
+  try { await loadClass(); setSave(''); } catch (e) { setSave('Could not load the class (' + e.message + '). Refresh the page.', true); }
+  renderGrid();
+}
+document.getElementById('refreshBtn').onclick = async () => {
+  try { await loadStatements(); } catch (e) { setSave(e.message, true); return; }
+  reloadClass();
+};
+// Pick up the other teacher's marks when coming back to the tab.
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !document.querySelector('.picker.open')) reloadClass(); });
 
 (async () => {
-  document.getElementById('grid').innerHTML = '<tbody><tr><td class="empty">Loading the statements…</td></tr></tbody>';
-  await loadStatements();
-  loadExamples(); renderLegend(); renderGrid();
+  const grid0 = document.getElementById('grid');
+  grid0.innerHTML = '<tbody><tr><td class="empty">Loading…</td></tr></tbody>';
+  try { await loadStatements(); await loadClasses(); await loadClass(); }
+  catch (e) { grid0.innerHTML = '<tbody><tr><td class="empty">' + esc(e.message) + '</td></tr></tbody>'; return; }
+  renderLegend(); renderGrid();
+  try { if (window.WFANames && WFANames.screen) WFANames.screen.init(); } catch (e) { /* names-on-screen is optional */ }
 })();
 </script>
 </body>
