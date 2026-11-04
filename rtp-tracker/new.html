@@ -109,6 +109,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .picker h4 { margin:2px 4px 6px; font-size:12px; color:var(--fg2); font-weight:600; }
   .picker button { display:flex; width:100%; align-items:center; gap:8px; text-align:left; border:2px solid transparent; border-radius:8px; padding:7px 10px; margin-bottom:4px; font-size:13px; font-weight:600; cursor:pointer; }
   .picker button small { display:block; font-weight:400; font-size:11px; opacity:.85; }
+  .picker button[disabled] { opacity:.45; cursor:default; }
   .picker .sep { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; margin:6px 4px 4px; }
   .wstatus { font-size:12px; color:var(--muted); } .wstatus.err { color:var(--red-fg); }
   .wbox.changed { border-color:var(--accent); background:var(--surface2); box-shadow:0 0 0 1px var(--accent); }
@@ -120,6 +121,9 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   th.th2 { font-size:11px; color:var(--muted); width:64px; min-width:64px; left:486px; z-index:6; }
   td.ttd { position:sticky; left:486px; z-index:2; text-align:center; background:var(--surface2); border-right:1px solid var(--line); width:64px; min-width:64px; }
   td.skilltd .ref { font-size:10px; font-weight:700; color:var(--muted); margin-right:5px; }
+  td.skilltd .rowbtn { float:right; margin:0 0 2px 6px; font-size:10px; font-weight:700; padding:2px 6px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--fg2); cursor:pointer; }
+  td.skilltd .rowbtn:hover { border-color:var(--accent); color:var(--accent); }
+  .picker p.note { margin:2px 4px 8px; font-size:11px; color:var(--muted); }
   .school { display:inline-block; background:#ede9fe; color:#5b21b6; border:1px solid #c4b5fd; font-size:9px; font-weight:800; padding:0 5px; border-radius:8px; margin-left:6px; vertical-align:middle; }
   .term { display:inline-block; min-width:30px; padding:3px 6px; font-size:12px; font-weight:800; border-radius:6px; background:var(--line); color:var(--fg2); }
   .term.none { background:transparent; color:var(--muted); font-weight:600; }
@@ -171,7 +175,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="group-label">Term (for the due-soon and overdue flags)</div>
   <div class="termpick" id="termpick"></div>
 
-  <div class="group-label">Status key (click a cell and type its letter; arrows or Enter move · or click a status, then click cells to paint it)</div>
+  <div class="group-label">Status key (click a cell and type its letter; arrows or Enter move · or click a status, then click cells to paint it · "Whole row" sets a statement to Not taught for every unmarked child)</div>
   <div class="legend" id="legendJudge"></div>
   <div class="legend" id="legendNone" style="margin-top:6px"></div>
   <div class="hint">
@@ -188,7 +192,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 
   <div class="grid-scroll"><table id="grid"></table></div>
 
-  <footer>Maths tracker · Year 5 pilot WFA-04.11.26b · statement numbers (Y5_001…) are worked out from the current statements; marks are saved against each statement's code, so they stay put if the numbering shifts</footer>
+  <footer>Maths tracker · Year 5 pilot WFA-04.11.26c · statement numbers (Y5_001…) are worked out from the current statements; marks are saved against each statement's code, so they stay put if the numbering shifts</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -491,6 +495,20 @@ async function setStatus(pid, skey, status){
   }
 }
 
+// Several marks in one save (the whole-row button). Puts them all back if the save fails.
+async function setMany(items){
+  if (!items.length) return;
+  const prev = items.map(it => (CLASS.data[it.pupil_id] || {})[it.skey] || 'none');
+  const put = (it, v) => { const d = CLASS.data[it.pupil_id] || (CLASS.data[it.pupil_id] = {}); if (v === 'none') delete d[it.skey]; else d[it.skey] = v; };
+  items.forEach(it => put(it, it.status));
+  renderGrid(); setSave('Saving…');
+  try { await apiPost({ action:'setJudgements', items }); setSave('Saved ✓ (' + items.length + ' mark' + (items.length === 1 ? '' : 's') + ')'); }
+  catch (e) {
+    items.forEach((it, i) => put(it, prev[i]));
+    renderGrid(); setSave('Not saved (' + e.message + '). Those marks have been put back; try again or refresh.', true);
+  }
+}
+
 // ---- Scoring (identical to the writing draft) + secure-by -------------
 function termFromDate(d){ const m = d.getMonth(); return m >= 8 && m <= 9 ? 1 : m >= 10 ? 2 : m <= 1 ? 3 : m <= 3 ? 4 : m <= 4 ? 5 : 6; }
 let classYear = PILOT_YEAR, level = PILOT_YEAR, paint = null, nowTerm = termFromDate(new Date());
@@ -618,7 +636,7 @@ function renderGrid(){
     list.forEach(s => {
       if (tk !== 'non_neg' && s.category !== lastCat){ h += '<tr class="catrow"><td colspan="'+ncol+'">'+esc(s.category)+'</td></tr>'; lastCat = s.category; }
       const w = WEIGHT[s.id];
-      h += '<tr><td class="skilltd"><span class="ref" title="Statement number · DfE code">'+s.id+(s.custom ? '' : ' · '+esc(s.ref))+(s.from ? (s.from === 'EYFS' ? ' · EYFS skill' : ' · from '+s.from+' (weight '+s.fromWeight+' there)') : '')+'</span>'+esc(s.skill)
+      h += '<tr><td class="skilltd"><button class="rowbtn" data-row="'+s.id+'" title="Set this whole row to Not taught, or clear it">Whole row</button><span class="ref" title="Statement number · DfE code">'+s.id+(s.custom ? '' : ' · '+esc(s.ref))+(s.from ? (s.from === 'EYFS' ? ' · EYFS skill' : ' · from '+s.from+' (weight '+s.fromWeight+' there)') : '')+'</span>'+esc(s.skill)
         +(s.key_essential?'<span class="key">KEY</span>':'')+(s.custom && !s.from?'<span class="school">SCHOOL</span>':'')+(s.example?'<span class="ex">'+esc(s.example)+'</span>':'')+'</td>'
         +'<td class="wtd"><span class="wlock'+(w===0?' zero':'')+(s.wSrc==='draft'?' wdraft':'')+'" title="Weight '+SRC_TITLE[s.wSrc]+'">'+w+'</span></td>'
         +'<td class="ttd"><span class="term'+(s.tSrc==='draft'?' draft':'')+'" title="Secure by Term '+s.term+', '+SRC_TITLE[s.tSrc]+'">T'+s.term+'</span></td>';
@@ -692,12 +710,33 @@ function openPicker(cell){
   picker.style.top = top+'px'; picker.style.left = Math.max(8, Math.min(r.left, innerWidth - 342))+'px';
 }
 function closePicker(){ picker.classList.remove('open'); target = null; }
+// Whole row: only touches children on this tab. Never overwrites a real judgement.
+function openRowMenu(b){
+  const s = SKILL_BY_ID[b.dataset.row], pupils = CLASS.pupils.filter(p => p.work === level);
+  const val = p => (CLASS.data[p.id] || {})[s.skey] || 'none';
+  const blank = pupils.filter(p => val(p) === 'none'), xs = pupils.filter(p => val(p) === 'x');
+  const marked = pupils.length - blank.length - xs.length, x = STATUS.x, n = STATUS.none;
+  picker.innerHTML = '<h4>'+s.id+' · '+esc(s.skill).slice(0,90)+(s.skill.length>90?'…':'')+'</h4>'
+    + '<button data-act="x" style="background:'+x.bg+';color:'+x.fg+'"'+(blank.length?'':' disabled')+'><span>Not taught for the whole row<small>'
+      + (blank.length ? 'Sets the '+blank.length+' unreviewed '+(blank.length===1?'child':'children')+' to Not taught' : 'No unreviewed children on this row') + '</small></span></button>'
+    + '<button data-act="clear" style="background:'+n.bg+';color:'+n.fg+'"'+(xs.length?'':' disabled')+'><span>Clear Not taught from the row<small>'
+      + (xs.length ? 'Sets the '+xs.length+' Not taught '+(xs.length===1?'child':'children')+' back to Unreviewed' : 'Nobody on this row is Not taught') + '</small></span></button>'
+    + (marked ? '<p class="note">'+marked+' '+(marked===1?'child has':'children have')+' a real mark on this row; '+(marked===1?'it is':'those are')+' left alone.</p>' : '')
+    + '<p class="note">Only the children on this tab ('+lbl(level)+').</p>';
+  picker.querySelector('[data-act="x"]').onclick = () => { closePicker(); setMany(blank.map(p => ({ pupil_id:p.id, skey:s.skey, status:'x' }))); };
+  picker.querySelector('[data-act="clear"]').onclick = () => { closePicker(); setMany(xs.map(p => ({ pupil_id:p.id, skey:s.skey, status:'none' }))); };
+  const r = b.getBoundingClientRect(); picker.classList.add('open');
+  const ph = picker.offsetHeight; let top = r.bottom + 4; if (top + ph > innerHeight - 8) top = Math.max(8, innerHeight - ph - 8);
+  picker.style.top = top+'px'; picker.style.left = Math.max(8, Math.min(r.left, innerWidth - 342))+'px';
+}
 
 // ---- Events -----------------------------------------------------------
 const grid = document.getElementById('grid');
 grid.addEventListener('click', e => {
   const mv = e.target.closest('button[data-move]');
   if (mv){ e.stopPropagation(); setWork(mv.dataset.move, mv.dataset.to, true); return; }
+  const rb = e.target.closest('button[data-row]');
+  if (rb){ e.stopPropagation(); selectCell(null); openRowMenu(rb); return; }
   const c = e.target.closest('td.cell'); if (!c) return;
   selectCell(c);
   if (paint){ setStatus(c.dataset.p, SKILL_BY_ID[c.dataset.s].skey, paint); }
