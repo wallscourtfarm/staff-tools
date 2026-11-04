@@ -90,6 +90,8 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   tr.grprow td { background:var(--grp); font-size:11px; font-weight:700; padding:3px 10px 3px 22px; color:var(--fg2); font-style:italic; }
   td.cell { width:118px; min-width:118px; height:32px; text-align:center; font-size:11px; font-weight:700; cursor:pointer; user-select:none; border-right:1px solid var(--surface); }
   td.cell:hover { filter:brightness(.93); }
+  td.cell.cur { outline:3px solid var(--accent); outline-offset:-3px; }
+  .chip kbd { font:inherit; font-size:10px; font-weight:800; padding:0 4px; border-radius:4px; border:1px solid var(--line); background:var(--surface2); }
   td.cell.paint { cursor:copy; }
   tr.sumrow td { vertical-align:top; background:var(--surface); border-bottom:3px solid var(--line); }
   td.sum { padding:8px; font-size:11px; color:var(--fg); }
@@ -169,7 +171,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="group-label">Term (for the due-soon and overdue flags)</div>
   <div class="termpick" id="termpick"></div>
 
-  <div class="group-label">Status key (click one, then click cells to paint it; or just click any cell)</div>
+  <div class="group-label">Status key (click a cell and type its letter; arrows or Enter move · or click a status, then click cells to paint it)</div>
   <div class="legend" id="legendJudge"></div>
   <div class="legend" id="legendNone" style="margin-top:6px"></div>
   <div class="hint">
@@ -186,7 +188,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 
   <div class="grid-scroll"><table id="grid"></table></div>
 
-  <footer>Maths tracker · Year 5 pilot WFA-04.11.26a · statement numbers (Y5_001…) are worked out from the current statements; marks are saved against each statement's code, so they stay put if the numbering shifts</footer>
+  <footer>Maths tracker · Year 5 pilot WFA-04.11.26b · statement numbers (Y5_001…) are worked out from the current statements; marks are saved against each statement's code, so they stay put if the numbering shifts</footer>
 </div>
 <div class="picker" id="picker"></div>
 
@@ -288,6 +290,9 @@ const STATUS = {
   x:          { label:'x Not taught',     bg:'#dbeafe', fg:'#1e40af', desc:'Not taught yet · not counted' },
   none:       { label:'Unreviewed',       bg:'#f0f0f0', fg:'#9ca3af', desc:'Not looked at yet · not counted' }
 };
+// Keyboard marking, as in the writing tracker: type the letter into the selected cell. U or Delete/Backspace = Unreviewed.
+const KEYS = { r:'reteach', e:'emerging', d:'developing', s:'secure', x:'x', t:'taught', u:'none' };
+const KEY_OF = Object.fromEntries(Object.entries(KEYS).map(([k, v]) => [v, k.toUpperCase()]));
 const JUDGE_ORDER = ['reteach','emerging','developing','secure'];
 const NONE_ORDER  = ['x','taught','none'];
 const POINTS = { secure:1, developing:0.6, emerging:0.4, reteach:0, taught:0 };
@@ -550,7 +555,7 @@ function renderTermPick(){
 }
 function chip(key){
   const s = STATUS[key], el = document.createElement('div');
-  el.className = 'chip'+(paint===key?' active':''); el.innerHTML = '<span class="sw" style="background:'+s.bg+'"></span>'+s.label; el.title = s.desc;
+  el.className = 'chip'+(paint===key?' active':''); el.innerHTML = '<span class="sw" style="background:'+s.bg+'"></span>'+s.label+' <kbd>'+KEY_OF[key]+'</kbd>'; el.title = s.desc;
   el.onclick = () => { paint = (paint===key ? null : key); renderLegend(); renderGrid(); };
   return el;
 }
@@ -626,6 +631,7 @@ function renderGrid(){
     });
   });
   t.innerHTML = h + '</tbody>';
+  markCur();
 }
 function setWork(pid, L, viaButton){
   const p = CLASS.pupils.find(x => x.id === pid), prev = p.work; p.work = L;
@@ -639,6 +645,40 @@ function setWork(pid, L, viaButton){
 }
 
 // ---- Picker -----------------------------------------------------------
+// ---- Selected cell + keyboard (copied from the writing tracker) ---------
+let cur = null;   // the cell the keyboard acts on
+function curCell(){ return cur && document.querySelector('#grid td.cell[data-p="'+cur.p+'"][data-s="'+cur.s+'"]'); }
+function markCur(){ const c = curCell(); if (c) c.classList.add('cur'); }
+function selectCell(c){
+  document.querySelectorAll('#grid td.cell.cur').forEach(x => x.classList.remove('cur'));
+  cur = c ? { p:c.dataset.p, s:c.dataset.s } : null;
+  if (c){
+    c.classList.add('cur'); c.scrollIntoView({ block:'nearest', inline:'nearest' });
+    const sc = c.closest('.grid-scroll'), w = c.parentElement.querySelector('td.ttd');   // keep it clear of the sticky statement columns
+    if (sc && w){ const over = w.getBoundingClientRect().right - c.getBoundingClientRect().left; if (over > 0) sc.scrollLeft -= over; }
+    const th = sc && sc.querySelector('thead');                                            // and clear of the sticky children's header
+    if (th){ const over = th.getBoundingClientRect().bottom - c.getBoundingClientRect().top; if (over > 0) sc.scrollTop -= over; }
+  }
+}
+function moveCur(dr, dc){
+  const rows = [...document.querySelectorAll('#grid tr')].filter(r => r.querySelector('td.cell'));
+  const c = curCell(); if (!c) return;
+  const r = rows.indexOf(c.parentElement), cells = [...c.parentElement.querySelectorAll('td.cell')], i = cells.indexOf(c);
+  const nr = Math.min(rows.length - 1, Math.max(0, r + dr)), row = [...rows[nr].querySelectorAll('td.cell')];
+  selectCell(row[Math.min(row.length - 1, Math.max(0, i + dc))]);
+}
+document.addEventListener('keydown', e => {
+  if (!cur || !curCell() || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.closest && e.target.closest('input, select, textarea')) return;
+  const k = e.key.toLowerCase(), arrows = { arrowdown:[1,0], arrowup:[-1,0], arrowright:[0,1], arrowleft:[0,-1] };
+  if (arrows[k]){ e.preventDefault(); closePicker(); moveCur(...arrows[k]); return; }
+  if (k === 'enter'){ e.preventDefault(); closePicker(); moveCur(e.shiftKey ? -1 : 1, 0); return; }   // like a spreadsheet: Enter down, Shift+Enter up
+  if (k === 'escape'){ closePicker(); selectCell(null); return; }
+  const v = KEYS[k] || ((k === 'delete' || k === 'backspace') ? 'none' : null); if (!v) return;
+  e.preventDefault(); closePicker();
+  setStatus(cur.p, SKILL_BY_ID[cur.s].skey, v);   // mark and stay on the cell; Enter or the arrow keys move
+});
+
 const picker = document.getElementById('picker'); let target = null;
 const btn = k => { const s = STATUS[k]; return '<button data-k="'+k+'" style="background:'+s.bg+';color:'+s.fg+'"><span>'+s.label+'<small>'+s.desc+'</small></span></button>'; };
 function openPicker(cell){
@@ -659,6 +699,7 @@ grid.addEventListener('click', e => {
   const mv = e.target.closest('button[data-move]');
   if (mv){ e.stopPropagation(); setWork(mv.dataset.move, mv.dataset.to, true); return; }
   const c = e.target.closest('td.cell'); if (!c) return;
+  selectCell(c);
   if (paint){ setStatus(c.dataset.p, SKILL_BY_ID[c.dataset.s].skey, paint); }
   else { e.stopPropagation(); openPicker(c); }
 });
@@ -668,13 +709,13 @@ grid.addEventListener('change', e => {
 document.getElementById('classtabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-cls]'); if (!b || b.dataset.cls === curClass) return;
   curClass = b.dataset.cls; try { localStorage.setItem('rtp_new_class', curClass); } catch (err) {}
-  level = classYear; document.getElementById('lvlnote').textContent = ''; reloadClass();
+  level = classYear; document.getElementById('lvlnote').textContent = ''; closePicker(); selectCell(null); reloadClass();
 });
 document.getElementById('termpick').addEventListener('click', e => {
   const b = e.target.closest('button[data-term]'); if (!b) return; nowTerm = Number(b.dataset.term); renderGrid();
 });
 document.getElementById('lvltabs').addEventListener('click', e => {
-  const b = e.target.closest('button[data-lvl]'); if (!b) return; level = b.dataset.lvl; document.getElementById('lvlnote').textContent = ''; renderGrid();
+  const b = e.target.closest('button[data-lvl]'); if (!b) return; level = b.dataset.lvl; document.getElementById('lvlnote').textContent = ''; closePicker(); selectCell(null); renderGrid();
 });
 document.addEventListener('click', e => { if (!picker.contains(e.target)) closePicker(); });
 document.getElementById('paintOff').onclick = () => { paint = null; renderLegend(); renderGrid(); };
