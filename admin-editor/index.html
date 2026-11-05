@@ -94,7 +94,7 @@
 
 <div class="toast" id="toast"></div>
 
-<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-05.11.26a</footer>
+<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-05.11.26b</footer>
 
 <script>
 // Calls go through the site's own /_api proxy, which checks the staff login and adds the
@@ -135,6 +135,16 @@ function defaultAccessFor(role) {
   return [ACCESS_STAFF];
 }
 function accessOn() { return !!(state.access && state.access.groups); }
+// What to tick for an email. An email already saved on this person shows exactly what
+// they have now, so editing anything else never changes their logins. A newly typed
+// email shows the role's defaults, unless it already has tool access beyond the hub
+// (a new starter already let in to the hub still gets their role's tools ticked).
+function ticksFor(email, role) {
+  email = (email || '').trim().toLowerCase();
+  if (email && email === state.formSavedEmail) return groupsOf(email);
+  const g = groupsOf(email);
+  return g.filter(id => id !== ACCESS_STAFF).length ? g : defaultAccessFor(role || '');
+}
 function groupsOf(email) {
   email = (email || '').trim().toLowerCase();
   if (!email || !accessOn()) return [];
@@ -314,8 +324,8 @@ function accessFieldHtml(row, isAdd) {
   if (!a || a.error === 'not_allowed') return null; // only people who manage logins see this at all
   if (a.error === 'not_configured') return '<div class="access-note">Logins can\'t be changed from here yet (the server isn\'t connected to Cloudflare). Ask Innes.</div>';
   if (a.error) return '<div class="access-note">Couldn\'t load the login lists: ' + escapeHtml(a.error) + '. Other changes still save.</div>';
-  const current = groupsOf(row.Email);
-  const ticked = new Set(row.Email && current.length ? current : (isAdd || !row.Email ? defaultAccessFor(row.Role || '') : []));
+  state.formSavedEmail = (row.Email || '').trim().toLowerCase();
+  const ticked = new Set(ticksFor(row.Email, row.Role));
   let html = '<div style="font-size:12px;color:#64748b;margin:-2px 0 6px">Ticked = they can open it. Saved for their email above; they get a login code by email the first time they open a tool.</div><div class="access-checks">';
   a.groups.forEach(g => {
     html += '<label title="' + escapeHtml(g.tools.join(', ')) + '"><input type="checkbox" name="acc_' + g.id + '" ' + (ticked.has(g.id) ? 'checked' : '') +
@@ -332,7 +342,7 @@ function setTicks(form, ids) {
 function useSuggestedEmail(email) {
   const form = document.getElementById('entryForm');
   form.elements.Email.value = email;
-  if (!state.accessTouched && groupsOf(email).length) setTicks(form, groupsOf(email));
+  if (!state.accessTouched) setTicks(form, ticksFor(email, form.elements.Role ? form.elements.Role.value : ''));
   const s = document.getElementById('emailSuggest');
   if (s) s.remove();
 }
@@ -426,12 +436,10 @@ function openForm(editIndex, prefill) {
   if (state.tab === 'Staff' && form.querySelector('input[name^="acc_"]')) {
     // A new role or a typed email that's already on the lists re-ticks the boxes, until they're ticked by hand.
     if (form.elements.Role) form.elements.Role.addEventListener('change', () => {
-      const email = (form.elements.Email.value || '').trim().toLowerCase();
-      if (!state.accessTouched && !groupsOf(email).length) setTicks(form, defaultAccessFor(form.elements.Role.value === '(not set)' ? '' : form.elements.Role.value));
+      if (!state.accessTouched) setTicks(form, ticksFor(form.elements.Email.value, form.elements.Role.value));
     });
     form.elements.Email.addEventListener('change', () => {
-      const g = groupsOf(form.elements.Email.value);
-      if (!state.accessTouched && g.length) setTicks(form, g);
+      if (!state.accessTouched) setTicks(form, ticksFor(form.elements.Email.value, form.elements.Role.value));
     });
   }
 }
