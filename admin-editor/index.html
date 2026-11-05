@@ -46,7 +46,7 @@
   .modal h3 { font-family: 'Nunito', sans-serif; font-weight: 900; color: #1798d3; font-size: 18px; margin-bottom: 18px; }
   .field { margin-bottom: 16px; }
   .field label { display: block; font-size: 13px; font-weight: bold; color: #475569; margin-bottom: 6px; }
-  .field input[type=text], .field input[type=date], .field input[type=number], .field select {
+  .field input[type=text], .field input[type=email], .field input[type=date], .field input[type=number], .field select {
     width: 100%; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; font-size: 16px; font-family: inherit;
   }
   .field input[type=color] { width: 60px; height: 40px; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 2px; cursor: pointer; }
@@ -65,6 +65,12 @@
   .toast.error { background: #dc2626; }
 
   .loading { text-align: center; padding: 40px; color: #94a3b8; }
+  .access-checks { display: flex; flex-direction: column; gap: 6px; }
+  .access-checks label { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; font-weight: normal; color: #1e293b; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+  .access-checks input { margin-top: 3px; flex-shrink: 0; }
+  .access-note { font-size: 13px; color: #64748b; background: #f8fafc; border-radius: 8px; padding: 10px 12px; }
+  .suggest-btn { background: #e0f2fe; color: #0369a1; border: none; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; margin-top: 6px; }
+  .no-login { color: #b45309; }
 </style>
 </head>
 <body>
@@ -72,7 +78,7 @@
 <div class="app-header">
   <div>
     <div class="app-title">School Info</div>
-    <div class="app-subtitle">Term dates, calendar events, meetings, staff list, day timings, and bookable resources</div>
+    <div class="app-subtitle">Term dates, calendar events, meetings, staff list and logins, day timings, and bookable resources</div>
   </div>
 </div>
 
@@ -88,7 +94,7 @@
 
 <div class="toast" id="toast"></div>
 
-<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-27.10.26b</footer>
+<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-05.11.26a</footer>
 
 <script>
 // Calls go through the site's own /_api proxy, which checks the staff login and adds the
@@ -105,6 +111,45 @@ const VALUE_TO_NEEDS_COVER = Object.fromEntries(Object.entries(NEEDS_COVER_TO_VA
 // Same "R,4,5" form as SubjectGroups/DayTimings year groups; the teaching schedule reads it as-is.
 const YG_CHECKS = [['R', 'Reception'], ['1', 'Y1'], ['2', 'Y2'], ['3', 'Y3'], ['4', 'Y4'], ['5', 'Y5'], ['6', 'Y6']];
 const CODE_TO_YG = Object.fromEntries(Object.entries(YG_TO_CODE).map(([k, v]) => [v, k]));
+
+// Logins (05.11.26). Each staff tool is gated by a Cloudflare login list; the API
+// (/planning/admin/access) reads and changes those lists one email at a time, and only
+// for people who can open this page. These are the lists ticked by default for a new
+// person, by role — the 09.09.26 Access Register decision. Anything can be changed
+// by hand before saving.
+const ACCESS_STAFF = 'eaebdb89-1861-4380-9c0d-905e7872a0a5';
+const ACCESS_TEACHING = [ACCESS_STAFF,
+  '031d448f-2488-4d09-94d8-3659b587164f', // Curriculum Planner
+  '2e6dd3af-f55d-4fda-bd77-3616a403642b', // Reading Challenge Log + Certificates
+  'fb790b8f-1899-49bc-8ac3-3f73c35d01ac', // Writing Tracker + RTP Tracker
+  '3c98bd88-eab4-458e-a51a-c87392315303', // WFA Pupil Tracker
+  '4f0c59a3-7e07-4d35-9b83-51c476d0d4c0', // Cohort Trajectories
+  '6639c900-26d7-498f-90c0-34beab0de05e', // WFA App Dashboard
+];
+const ACCESS_SUPPORT = [ACCESS_STAFF, '031d448f-2488-4d09-94d8-3659b587164f', '4f0c59a3-7e07-4d35-9b83-51c476d0d4c0'];
+const TEACHING_ROLES = ['Class', 'Cover Teacher', 'Teaching Partner', 'Phase', 'Phase Lead', 'SENCO', 'Assistant Principal', 'Vice Principal', 'Principal'];
+const SUPPORT_ROLES = ['Learning Partner', 'Learning Support'];
+function defaultAccessFor(role) {
+  if (TEACHING_ROLES.includes(role)) return ACCESS_TEACHING;
+  if (SUPPORT_ROLES.includes(role)) return ACCESS_SUPPORT;
+  return [ACCESS_STAFF];
+}
+function accessOn() { return !!(state.access && state.access.groups); }
+function groupsOf(email) {
+  email = (email || '').trim().toLowerCase();
+  if (!email || !accessOn()) return [];
+  return state.access.groups.filter(g => g.emails.includes(email)).map(g => g.id);
+}
+// A known login email whose name part has both their first and last name in it, if exactly one does.
+function suggestEmail(name) {
+  if (!accessOn()) return '';
+  const words = (name || '').toLowerCase().replace(/[^a-z\s-]/g, '').split(/[\s-]+/).filter(w => w.length > 1);
+  if (words.length < 2) return '';
+  const all = new Set(state.access.groups.flatMap(g => g.emails));
+  const hits = [...all].filter(e => { const local = e.split('@')[0]; return local.includes(words[0]) && local.includes(words[words.length - 1]); });
+  return hits.length === 1 ? hits[0] : '';
+}
+function escapeHtml(t) { return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 const SECTIONS = {
   TermDates: {
@@ -141,13 +186,16 @@ const SECTIONS = {
   },
   Staff: {
     icon: '🧑‍🏫', name: 'Staff List', desc: 'Add, remove, or update staff',
-    primary: r => r.Name, secondary: r => [CODE_TO_YG[r.YearGroup] || r.YearGroup, r.Role, r.DayOffCover === 'No' ? 'Available for cover' : '', r.CoverRole ? 'Cover: ' + r.CoverRole : '', workingDaysLabel(r.WorkingDays)].filter(Boolean).join(' · '),
+    primary: r => r.Name, secondary: r => [accessOn() && !r.Email ? '<span class="no-login">No login email</span>' : '', CODE_TO_YG[r.YearGroup] || r.YearGroup, r.Role, r.DayOffCover === 'No' ? 'Available for cover' : '', r.CoverRole ? 'Cover: ' + r.CoverRole : '', workingDaysLabel(r.WorkingDays)].filter(Boolean).join(' · '),
     fields: [
       { key: 'Name', label: 'Name', type: 'text' },
+      { key: 'Email', label: 'Email (the address they log in with)', type: 'email', optional: true,
+        hint: 'Their school address, e.g. jo.bloggs@clf.uk. Without it they can\'t log in to any staff tool.' },
       { key: 'YearGroup', label: 'Year group', type: 'select', options: YEAR_GROUPS.map(yg => yg || '(none / support staff)'), valueMap: { ...YG_TO_CODE, '(none / support staff)': '' }, displayMap: CODE_TO_YG },
       { key: 'WorkingDays', label: 'Working days', type: 'days' },
       { key: 'Role', label: 'Role', type: 'select', options: ROLES.map(r => r || '(not set)'), valueMap: { '(not set)': '' },
         hint: 'Cover Teacher = a teacher with no class of their own: available for cover, lunch cover and FAB, not tied to a year group. Otherwise, to take a teacher out of their class change this from Class to what they do now.' },
+      { key: 'Access', label: 'Staff tools they can open', type: 'access' },
       { key: 'DayOffCover', label: 'Needs cover when absent?', type: 'select', options: Object.keys(NEEDS_COVER_TO_VALUE), valueMap: NEEDS_COVER_TO_VALUE, displayMap: VALUE_TO_NEEDS_COVER,
         hint: 'Leave on Automatic unless the cover planner is getting it wrong for this person.' },
       { key: 'Phone', label: 'Mobile number for text notifications', type: 'text', optional: true,
@@ -219,7 +267,7 @@ function workingDaysLabel(wd) {
   return nums.map(n => DAY_NAMES[parseInt(n, 10) - 1]).filter(Boolean).join(', ');
 }
 
-let state = { view: 'home', tab: null, rows: [], editingIndex: null };
+let state = { view: 'home', tab: null, rows: [], editingIndex: null, access: null, accessTouched: false };
 
 async function api(path, opts = {}) {
   const url = API_BASE + path + (path.includes('?') ? '&' : '?') + 'token=' + TOKEN;
@@ -240,7 +288,9 @@ async function loadTab(tab) {
   state.tab = tab;
   state.rows = [];
   render();
+  const accessLoad = tab === 'Staff' ? loadAccess() : null;
   const res = await api('/tab?tab=' + tab);
+  if (accessLoad) await accessLoad;
   if (res.error) {
     showToast('Could not load this list: ' + res.error, true);
     state.rows = [];
@@ -248,6 +298,43 @@ async function loadTab(tab) {
     state.rows = res.rows || [];
   }
   render();
+}
+
+async function loadAccess() {
+  try {
+    const r = await fetch('/_api/planning/admin/access?token=' + TOKEN, { headers: { 'X-WFA-Proxy': '1' } });
+    state.access = await r.json();
+  } catch (e) {
+    state.access = { error: 'could not reach the login lists' };
+  }
+}
+
+function accessFieldHtml(row, isAdd) {
+  const a = state.access;
+  if (!a || a.error === 'not_allowed') return null; // only people who manage logins see this at all
+  if (a.error === 'not_configured') return '<div class="access-note">Logins can\'t be changed from here yet (the server isn\'t connected to Cloudflare). Ask Innes.</div>';
+  if (a.error) return '<div class="access-note">Couldn\'t load the login lists: ' + escapeHtml(a.error) + '. Other changes still save.</div>';
+  const current = groupsOf(row.Email);
+  const ticked = new Set(row.Email && current.length ? current : (isAdd || !row.Email ? defaultAccessFor(row.Role || '') : []));
+  let html = '<div style="font-size:12px;color:#64748b;margin:-2px 0 6px">Ticked = they can open it. Saved for their email above; they get a login code by email the first time they open a tool.</div><div class="access-checks">';
+  a.groups.forEach(g => {
+    html += '<label title="' + escapeHtml(g.tools.join(', ')) + '"><input type="checkbox" name="acc_' + g.id + '" ' + (ticked.has(g.id) ? 'checked' : '') +
+      (g.id === ACCESS_STAFF ? ' data-staff="1"' : '') + ' onchange="state.accessTouched = true"> <span>' + escapeHtml(g.label) + '</span></label>';
+  });
+  return html + '</div>';
+}
+
+function setTicks(form, ids) {
+  const want = new Set(ids);
+  form.querySelectorAll('input[name^="acc_"]').forEach(cb => { cb.checked = want.has(cb.name.slice(4)); });
+}
+
+function useSuggestedEmail(email) {
+  const form = document.getElementById('entryForm');
+  form.elements.Email.value = email;
+  if (!state.accessTouched && groupsOf(email).length) setTicks(form, groupsOf(email));
+  const s = document.getElementById('emailSuggest');
+  if (s) s.remove();
 }
 
 function goHome() {
@@ -275,8 +362,14 @@ function openForm(editIndex, prefill) {
 
   let html = '<h3>' + (editIndex !== null ? 'Edit' : (prefill ? 'Copy of row' : 'Add')) + ' — ' + section.name + '</h3>' +
     (prefill && section.duplicateHint ? '<p style="font-size:13px;color:#64748b;margin:-8px 0 16px">' + section.duplicateHint + '</p>' : '') + '<form id="entryForm">';
+  state.accessTouched = false;
   section.fields.forEach(f => {
     if (f.addOnly && editIndex !== null) return;
+    if (f.type === 'access') {
+      const inner = accessFieldHtml(row, editIndex === null);
+      if (inner) html += '<div class="field"><label>' + f.label + '</label>' + inner + '</div>';
+      return;
+    }
     const rawVal = row[f.key] || '';
     html += '<div class="field"><label>' + f.label + '</label>' + (f.hint ? '<div style="font-size:12px;color:#64748b;margin:-2px 0 6px">' + f.hint + '</div>' : '');
     if (f.type === 'check') {
@@ -315,7 +408,11 @@ function openForm(editIndex, prefill) {
       html += '<input type="' + f.type + '" name="' + f.key + '" value="' + rawVal.replace(/"/g, '&quot;') + '" list="dl_' + f.key + '">';
       html += '<datalist id="dl_' + f.key + '">' + f.list.map(o => '<option value="' + o + '">').join('') + '</datalist>';
     } else {
-      html += '<input type="' + f.type + '" name="' + f.key + '" value="' + rawVal.replace(/"/g, '&quot;') + '"' + (f.min ? ' min="' + f.min + '"' : '') + (f.max ? ' max="' + f.max + '"' : '') + '>';
+      html += '<input type="' + f.type + '" name="' + f.key + '" value="' + rawVal.replace(/"/g, '&quot;') + '"' + (f.min ? ' min="' + f.min + '"' : '') + (f.max ? ' max="' + f.max + '"' : '') + (f.type === 'email' ? ' autocomplete="off" autocapitalize="off" spellcheck="false"' : '') + '>';
+      if (f.key === 'Email' && !rawVal && editIndex !== null) {
+        const sug = suggestEmail(row.Name);
+        if (sug) html += '<div id="emailSuggest"><button type="button" class="suggest-btn" onclick="useSuggestedEmail(\'' + sug + '\')">Use ' + escapeHtml(sug) + ' (already on the login lists)</button></div>';
+      }
     }
     html += '</div>';
   });
@@ -324,7 +421,19 @@ function openForm(editIndex, prefill) {
 
   document.getElementById('formModal').innerHTML = html;
   document.getElementById('formModalBg').classList.add('open');
-  document.getElementById('entryForm').addEventListener('submit', handleFormSubmit);
+  const form = document.getElementById('entryForm');
+  form.addEventListener('submit', handleFormSubmit);
+  if (state.tab === 'Staff' && form.querySelector('input[name^="acc_"]')) {
+    // A new role or a typed email that's already on the lists re-ticks the boxes, until they're ticked by hand.
+    if (form.elements.Role) form.elements.Role.addEventListener('change', () => {
+      const email = (form.elements.Email.value || '').trim().toLowerCase();
+      if (!state.accessTouched && !groupsOf(email).length) setTicks(form, defaultAccessFor(form.elements.Role.value === '(not set)' ? '' : form.elements.Role.value));
+    });
+    form.elements.Email.addEventListener('change', () => {
+      const g = groupsOf(form.elements.Email.value);
+      if (!state.accessTouched && g.length) setTicks(form, g);
+    });
+  }
 }
 
 function closeForm() {
@@ -339,6 +448,7 @@ async function handleFormSubmit(e) {
 
   section.fields.forEach(f => {
     if (f.addOnly && state.editingIndex !== null) return;
+    if (f.type === 'access') return;
     if (f.type === 'check') {
       values[f.key] = formData.get(f.key) ? 'true' : '';
     } else if (f.type === 'days') {
@@ -377,8 +487,14 @@ async function handleFormSubmit(e) {
   }
 
   if (res.status === 'ok') {
+    let msg = 'Saved';
+    let failed = false;
+    if (state.tab === 'Staff' && e.target.querySelector('input[name^="acc_"]')) {
+      const out = await saveAccess(e.target, values, state.editingIndex !== null ? state.rows[state.editingIndex] : {});
+      msg = out.msg; failed = out.failed;
+    }
     closeForm();
-    showToast('Saved');
+    showToast(msg, failed);
     loadTab(state.tab);
   } else {
     showToast(res.message || 'Something went wrong — nothing was changed', true);
@@ -387,11 +503,38 @@ async function handleFormSubmit(e) {
   }
 }
 
+// After the Staff row has saved: make their logins match the ticks (only if something differs).
+async function saveAccess(form, values, before) {
+  const email = (values.Email || '').trim().toLowerCase();
+  const oldEmail = (before.Email || '').trim().toLowerCase();
+  const wanted = [...form.querySelectorAll('input[name^="acc_"]')].filter(cb => cb.checked).map(cb => cb.name.slice(4));
+  if (!email) return { msg: wanted.length ? 'Saved — but with no email they can\'t log in to any tool yet' : 'Saved', failed: false };
+  const have = groupsOf(email);
+  const same = have.length === wanted.length && wanted.every(id => have.includes(id));
+  const moving = oldEmail && oldEmail !== email && groupsOf(oldEmail).length;
+  if (same && !moving) return { msg: 'Saved', failed: false };
+  const res = await accessSet({ email, groups: wanted, old_email: moving ? oldEmail : '' });
+  if (res.status === 'ok') return { msg: 'Saved — logins updated' + (wanted.length && !have.length ? '. They can now log in with ' + email : ''), failed: false };
+  return { msg: 'Saved, but logins were not changed: ' + (res.message || 'something went wrong'), failed: true };
+}
+
+async function accessSet(body) {
+  try {
+    const r = await fetch('/_api/planning/admin/access/set?token=' + TOKEN, { method: 'POST', headers: { 'X-WFA-Proxy': '1', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json();
+    await loadAccess();
+    return j;
+  } catch (err) {
+    return { status: 'error', message: 'could not reach the server' };
+  }
+}
+
 function openDeleteConfirm(index) {
   const section = SECTIONS[state.tab];
   const row = state.rows[index];
   const html = '<p>Remove <strong>' + section.primary(row) + '</strong>?</p>' +
     '<p class="warn">This can\'t be undone.' + (section.deleteWarn ? ' ' + section.deleteWarn : '') + '</p>' +
+    (state.tab === 'Staff' && groupsOf(row.Email).length ? '<label style="display:flex;gap:8px;align-items:center;font-size:14px;margin-top:12px"><input type="checkbox" id="removeLogins" checked> Also remove their logins to staff tools (' + escapeHtml(row.Email) + ')</label>' : '') +
     '<div class="modal-actions">' +
     '<button type="button" class="btn-cancel" onclick="closeConfirm()">Cancel</button>' +
     '<button type="button" class="btn-primary" style="background:#dc2626" onclick="doDelete(' + index + ')">Remove</button>' +
@@ -405,12 +548,20 @@ function closeConfirm() {
 }
 
 async function doDelete(index) {
+  const removeLogins = !!(document.getElementById('removeLogins') || {}).checked;
+  const email = (state.rows[index] || {}).Email || '';
   closeConfirm();
   const res = await api('/tab/delete', {
     method: 'POST',
-    body: JSON.stringify({ tab: state.tab, row_index: index }),
+    body: JSON.stringify({ tab: state.tab, row_index: index, expect: { Name: state.rows[index].Name || '' } }),
   });
   if (res.status === 'ok') {
+    if (removeLogins && email) {
+      const r = await accessSet({ email, groups: [] });
+      showToast(r.status === 'ok' ? 'Removed, and their logins taken away' : 'Removed, but their logins were NOT taken away: ' + (r.message || 'error'), r.status !== 'ok');
+      loadTab(state.tab);
+      return;
+    }
     showToast('Removed');
     loadTab(state.tab);
   } else {
