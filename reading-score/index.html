@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+/* WFA: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Reading Assessment Tracker</title>
+<link rel="icon" href="../favicon.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa.css">
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
+<style>
+  :root { --ink:#0a0101; --muted:#5b6b7b; --line:#d9e3ec; --bad:#c62828; }
+  body { color: var(--ink); }
+  [hidden] { display: none !important; }
+  main { max-width: 1200px; padding: 20px 16px 90px; }
+  select, button { font: inherit; font-size: 16px; }
+  select { padding: 9px 12px; border: 2px solid var(--line); border-radius: 10px; background: #fff; }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .hint { color: var(--muted); font-size: .92rem; margin: 0 0 12px; }
+  .card { background: #fff; border-radius: 14px; box-shadow: 0 2px 10px rgba(23,152,211,.10); overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 10px; border-top: 1px solid var(--line); text-align: left; white-space: nowrap; }
+  th { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; border-top: 0; }
+  tr.kid { cursor: pointer; }
+  tr.kid:hover { background: #f4f9fd; }
+  .band { display: inline-block; min-width: 2.2em; text-align: center; font-weight: 800; border-radius: 8px; padding: 3px 8px; }
+  .b-D { background: #7b3fbf; color: #fff; } .b-O1 { background: #2bae62; color: #fff; }
+  .b-O2 { background: #ffd84d; } .b-Y { background: #ff9e3d; } .b-A { background: #e55353; color: #fff; }
+  .part { opacity: .55; }
+  .gap { color: var(--bad); font-weight: 700; font-size: .85rem; }
+  .none { color: var(--muted); }
+  .diff { font-weight: 800; }
+  .work { background: #f4f9fd; padding: 12px 18px; white-space: normal; }
+  .work ul { margin: 6px 0 0 18px; padding: 0; }
+  .work li { margin: 3px 0; }
+  .note { color: #1f5f86; }
+  .empty { padding: 40px 20px; text-align: center; color: var(--muted); }
+  .err { background: #fdecec; color: var(--bad); padding: 12px 16px; border-radius: 10px; margin-bottom: 14px; font-weight: 700; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-content">
+    <img class="logo" src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA">
+    <div><h1>Reading Assessment Tracker</h1><p>The suggested reading score for each child, beside your own judgement</p></div>
+  </div>
+</header>
+<main>
+  <div class="bar">
+    <select id="year" aria-label="Year group"></select>
+    <select id="term" aria-label="Term"></select>
+    <select id="cls" aria-label="Class"></select>
+  </div>
+  <p class="hint">The suggested band is a strong indicator, not a judgement: your own reading DOOYA is the one that counts. Tap a child to see how their score was worked out. Faded scores are what the child has so far, with something still to assess.</p>
+  <div id="err" class="err" hidden></div>
+  <div class="card"><div id="out" class="empty">Loading…</div></div>
+</main>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-05.11.26a</span></footer>
+<script>
+var AY = '2026-27', API = 'https://api.wallscourt-farm-academy.co.uk/reading-score/';
+var YEARS = ['R','Y1','Y2','Y3','Y4','Y5','Y6'];
+var COLS = [['phonics','Phonics'],['comprehension','Comprehension'],['rubric','Fluency rubric'],['speed','Speed']];
+var LABEL = { phonics:'phonics', comprehension:'comprehension', rubric:'fluency rubric', speed:'reading speed' };
+var S = { data: null, open: null };
+function $(i){ return document.getElementById(i); }
+function el(t, a, kids){ var e=document.createElement(t); Object.keys(a||{}).forEach(function(k){ if(k==='text') e.textContent=a[k]; else e.setAttribute(k,a[k]); }); (kids||[]).forEach(function(c){ if(c) e.appendChild(typeof c==='string'?document.createTextNode(c):c); }); return e; }
+function recall(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function store(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function yname(y){ return y==='R' ? 'Reception' : 'Year ' + y.slice(1); }
+
+(function init(){
+  YEARS.forEach(function(y){ $('year').appendChild(el('option',{value:y,text:yname(y)})); });
+  $('term').appendChild(el('option',{value:'0',text:'Current term'}));
+  for (var t=1;t<=6;t++) $('term').appendChild(el('option',{value:String(t),text:'Term '+t}));
+  $('year').value = recall('rs_year') || 'Y5';
+  $('term').value = recall('rs_term') || '0';
+  $('year').onchange = function(){ store('rs_year',$('year').value); store('rs_cls',''); load(); };
+  $('term').onchange = function(){ store('rs_term',$('term').value); load(); };
+  $('cls').onchange = function(){ store('rs_cls',$('cls').value); draw(); };
+  load();
+})();
+
+function load(){
+  $('out').className = 'empty'; $('out').textContent = 'Loading…'; $('err').hidden = true;
+  fetch(API + AY + '/' + $('year').value + '?term=' + $('term').value, { cache:'no-store' })
+    .then(function(r){ if(!r.ok) throw new Error('the server said ' + r.status); return r.json(); })
+    .then(function(d){ S.data = d; S.open = null; classes(); draw(); })
+    .catch(function(e){ $('out').textContent = 'Not loaded.'; $('err').hidden = false; $('err').textContent = 'Could not load: ' + e.message + '. Nothing has been changed.'; });
+}
+function classes(){
+  var cs = Array.from(new Set(S.data.children.map(function(c){ return c.class; }))).sort(), sel = $('cls');
+  sel.innerHTML = '';
+  sel.appendChild(el('option',{value:'',text:'All classes (' + S.data.children.length + ')'}));
+  cs.forEach(function(c){ sel.appendChild(el('option',{value:c,text:c})); });
+  var want = recall('rs_cls') || '';
+  sel.value = cs.indexOf(want) >= 0 ? want : '';
+  sel.hidden = cs.length < 2;
+}
+function bandEl(b, part){ return b ? el('span',{class:'band b-' + b + (part?' part':''),text:b}) : el('span',{class:'none',text:'–'}); }
+function pc(v){ return v == null ? el('span',{class:'none',text:'–'}) : document.createTextNode(Math.round(v) + '%'); }
+
+function draw(){
+  var d = S.data, cls = $('cls').value;
+  var kids = d.children.filter(function(c){ return !cls || c.class === cls; });
+  if (!kids.length) { $('out').className = 'empty'; $('out').textContent = 'No children found.'; return; }
+  $('out').className = '';
+  var tb = el('table'), hr = el('tr');
+  ['Child'].concat(COLS.map(function(c){ return c[1]; })).concat(['Suggested','Your DOOYA','']).forEach(function(h){ hr.appendChild(el('th',{text:h})); });
+  tb.appendChild(el('thead',{},[hr]));
+  var body = el('tbody');
+  kids.forEach(function(k){
+    var s = k.suggested, tr = el('tr',{class:'kid'}), part = !!s.incomplete.length;
+    tr.appendChild(el('td',{},[el('span',{'data-pupil-id':k.pupilCode,text:k.label||'?'})]));
+    COLS.forEach(function(c){
+      var td = el('td'), inW = s.weights[c[0]] != null;
+      if (!inW) td.appendChild(el('span',{class:'none',text:'n/a'})); else td.appendChild(pc(s.components[c[0]]));
+      tr.appendChild(td);
+    });
+    var sc = el('td');
+    var pct = part ? s.partialPct : s.pct, bd = part ? s.partialBand : s.band;
+    if (pct == null) sc.appendChild(el('span',{class:'none',text:'nothing yet'}));
+    else { sc.appendChild(bandEl(bd, part)); sc.appendChild(document.createTextNode(' ' + Math.round(pct) + '%')); if (part) sc.className = 'part'; }
+    tr.appendChild(sc);
+    var td = el('td');
+    if (k.teacherDooya) {
+      td.appendChild(el('span',{class:'band',text:k.teacherDooya}));
+      if (!part && bd && bd !== k.teacherDooya) td.appendChild(el('span',{class:'diff',text:'  ≠'}));
+    } else td.appendChild(el('span',{class:'none',text:'not entered'}));
+    tr.appendChild(td);
+    tr.appendChild(el('td',{},[part ? el('span',{class:'gap',text:'incomplete: ' + s.incomplete.join(', ')}) : null]));
+    tr.addEventListener('click', function(){ S.open = S.open === k.pupilCode ? null : k.pupilCode; draw(); });
+    body.appendChild(tr);
+    if (S.open === k.pupilCode) {
+      var w = el('td',{class:'work',colspan:'8'}), ul = el('ul');
+      var wts = Object.keys(s.weights).map(function(x){ return LABEL[x] + ' ' + s.weights[x] + '%'; }).join(', ');
+      w.appendChild(el('b',{text:'Weights this term: ' + wts}));
+      (s.working || []).forEach(function(x){ ul.appendChild(el('li',{text:x})); });
+      (s.notes || []).forEach(function(x){ ul.appendChild(el('li',{class:'note',text:x})); });
+      if (!ul.childNodes.length) ul.appendChild(el('li',{text:'Nothing assessed yet this term.'}));
+      w.appendChild(ul);
+      body.appendChild(el('tr',{},[w]));
+    }
+  });
+  tb.appendChild(body);
+  $('out').innerHTML = ''; $('out').appendChild(tb);
+  if (window.WFANames && WFANames.apply) { try { WFANames.apply(); } catch(e){} }
+}
+</script>
+</body>
+</html>
