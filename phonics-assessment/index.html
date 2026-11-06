@@ -263,7 +263,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-02.11.26k</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-06.11.26a</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -702,13 +702,32 @@ function shownItems(block) {
 }
 // "Gaps only" decides which tiles show when the record is drawn; a tile tapped secure stays on screen until the
 // record is drawn again, so the list does not jump about mid-assessment.
+// The order on screen and in card mode (Innes, 06.11.26): within each phase, every set's GPCs first, then the common
+// exception words, then every set's blending. A set's sounds and its words are shown as two parts of the same set; the
+// catalogue's own order (one block per set) is unchanged, so the assessment point and the CLF spreadsheet are too.
+function shownBlocks() {
+  var out = [];
+  S.cat.phases.forEach(function (ph) {
+    if (S.phases.indexOf(ph.key) < 0) return;
+    var bs = S.cat.blocks.filter(function (b) { return b.phase === ph.key; });
+    var part = function (b, kinds, label) {
+      var its = b.items.filter(function (i) { return kinds.indexOf(S.cat.items[i].section) >= 0; });
+      if (!its.length) return;
+      out.push({ key: b.key, phase: b.phase, items: its,
+                 title: its.length < b.items.length ? b.title + ' · ' + label : b.title });
+    };
+    bs.forEach(function (b) { part(b, ['gpc', 'alt'], 'GPCs'); });
+    bs.forEach(function (b) { part(b, ['cew'], ''); });
+    bs.forEach(function (b) { part(b, ['bw', 'ob'], 'Blending'); });
+  });
+  return out;
+}
 function drawBlocks() {
   var box = $('blocks');
   var keepY = window.scrollY;
   box.innerHTML = '';
   var any = false;
-  S.cat.blocks.forEach(function (b) {
-    if (S.phases.indexOf(b.phase) < 0) return;
+  shownBlocks().forEach(function (b) {
     var list = shownItems(b);
     if (!list.length) return;
     any = true;
@@ -771,7 +790,7 @@ function startFlash(list, where) {
 }
 function startFlashAll() {
   var list = [];
-  S.cat.blocks.forEach(function (b) { if (S.phases.indexOf(b.phase) >= 0) list = list.concat(shownItems(b).filter(function (i) { return isTaught(S.child, i); })); });
+  shownBlocks().forEach(function (b) { list = list.concat(shownItems(b).filter(function (i) { return isTaught(S.child, i); })); });
   if (!list.length) { banner('info', 'Nothing to show: choose a phase, untick "Gaps only", or check the assessment point.'); return; }
   startFlash(list, S.gaps ? 'Gaps' : 'Everything chosen');
 }
