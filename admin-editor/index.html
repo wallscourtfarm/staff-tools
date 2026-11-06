@@ -69,6 +69,7 @@
   .access-checks label { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; font-weight: normal; color: #1e293b; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
   .access-checks input { margin-top: 3px; flex-shrink: 0; }
   .access-note { font-size: 13px; color: #64748b; background: #f8fafc; border-radius: 8px; padding: 10px 12px; }
+  .access-incl { display: block; font-size: 12px; color: #64748b; margin-top: 3px; line-height: 1.4; }
   .suggest-btn { background: #e0f2fe; color: #0369a1; border: none; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; margin-top: 6px; }
   .no-login { color: #b45309; }
 </style>
@@ -94,7 +95,7 @@
 
 <div class="toast" id="toast"></div>
 
-<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-05.11.26b</footer>
+<footer style="text-align:center;padding:16px;font-size:12px;color:#94a3b8">Wallscourt Farm Academy · School Info · WFA-06.11.26a</footer>
 
 <script>
 // Calls go through the site's own /_api proxy, which checks the staff login and adds the
@@ -317,6 +318,34 @@ async function loadAccess() {
   } catch (e) {
     state.access = { error: 'could not reach the login lists' };
   }
+  state.hubTools = await hubToolNames((state.access && state.access.own_paths) || null);
+}
+
+// The tools on the staff hub that need nothing more than the hub tick (no list of their own),
+// read live from the hub page so the names stay current as tools are added.
+async function hubToolNames(ownPaths) {
+  if (!ownPaths) return [];
+  try {
+    const html = await (await fetch('/index.html', { cache: 'no-store' })).text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const base = location.origin + '/';
+    const names = new Set();
+    doc.querySelectorAll('a.card').forEach(a => {
+      const h = a.querySelector('h3');
+      if (!h) return;
+      let u;
+      try { u = new URL(a.getAttribute('href'), base); } catch (e) { return; }
+      if (u.host !== location.host) return;
+      const path = u.pathname.replace(/index\.html$/, '').replace(/\/$/, '');
+      if (!path) return;
+      if (ownPaths.some(p => path === p || path.startsWith(p + '/'))) return;
+      const name = h.textContent.trim();
+      if (!/guide/i.test(name)) names.add(name);
+    });
+    return [...names].sort((x, y) => x.localeCompare(y));
+  } catch (e) {
+    return [];
+  }
 }
 
 function accessFieldHtml(row, isAdd) {
@@ -329,7 +358,9 @@ function accessFieldHtml(row, isAdd) {
   let html = '<div style="font-size:12px;color:#64748b;margin:-2px 0 6px">Ticked = they can open it. Saved for their email above; they get a login code by email the first time they open a tool.</div><div class="access-checks">';
   a.groups.forEach(g => {
     html += '<label title="' + escapeHtml(g.tools.join(', ')) + '"><input type="checkbox" name="acc_' + g.id + '" ' + (ticked.has(g.id) ? 'checked' : '') +
-      (g.id === ACCESS_STAFF ? ' data-staff="1"' : '') + ' onchange="state.accessTouched = true"> <span>' + escapeHtml(g.label) + '</span></label>';
+      (g.id === ACCESS_STAFF ? ' data-staff="1"' : '') + ' onchange="state.accessTouched = true"> <span>' + escapeHtml(g.label) +
+      (g.id === ACCESS_STAFF && (state.hubTools || []).length ? '<span class="access-incl">Also gives ' + escapeHtml(state.hubTools.join(' · ')) + '</span>' : '') +
+      '</span></label>';
   });
   return html + '</div>';
 }
