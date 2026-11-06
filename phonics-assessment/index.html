@@ -263,7 +263,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-06.11.26c</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-06.11.26d</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -279,7 +279,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
 <div class="modal" id="impModal" hidden>
   <div class="box imp">
     <h3 id="impTitle">Import a ULS spreadsheet</h3>
-    <p class="hint">Choose the filled-in ULS tracker for this year group (any version of the CLF spreadsheet). Nothing is saved until you press Import, and anything already recorded here is kept: the spreadsheet only fills in what is missing. Names are matched to the class lists on this screen and are not stored.</p>
+    <p class="hint">Choose the filled-in ULS tracker for this year group (any version of the CLF spreadsheet). Nothing is saved until you press Import, and anything already recorded here is kept: the spreadsheet only fills in what is missing, and only brings in what is secure (a 0 stays blank). Names are matched to the class lists on this screen and are not stored.</p>
     <input type="file" id="impFile" accept=".xlsm,.xlsx">
     <div id="impBody"></div>
     <div class="impfoot"><span class="grow" id="impMsg"></span><button class="btn quiet" id="impCancel">Cancel</button> <button class="btn" id="impGo" disabled>Import</button></div>
@@ -304,7 +304,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div class="top"><span id="fWhere"></span><span class="grow"></span><button class="scr" id="fScreen"><span class="d"></span>Link child screen</button><label class="toggle fontpick"><select class="cardFont" aria-label="Card font"><option value="sassoon">Sassoon Infant</option><option value="od">OpenDyslexic</option></select></label><span id="fCount"></span><button class="btn quiet" id="fClose">Finish</button></div>
   <div class="card-area" id="fCard"></div>
   <div class="bottom" id="fButtons">
-    <button class="fNot" id="fNot">✗ Not yet</button>
+    <button class="fNot" id="fNot" title="Not secure now. Left blank, unless it was secure before: then ✗ (knew it, now doesn't)">✗ Not met</button>
     <button class="fNav" id="fPrev">‹ Back</button>
     <button class="fNav" id="fSkip">Skip ›</button>
     <button class="fSec" id="fSec">✓ Secure</button>
@@ -660,9 +660,10 @@ function drawChild() {
   TERM_NAMES.forEach(function (t, i) { lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--t' + (i + 1) + ')' }), t])); });
   lg.appendChild(el('span', {}, [el('span', { class: 'yg', text: 'YR' }), ' ', el('span', { class: 'yg', text: 'Y1' }), ' in the corner: secured in that earlier year group']));
   lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:var(--old)' }), 'imported, date not known']));
-  lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:#fff3f3;border-color:#f0b4b4' }), 'not yet']));
+  lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'background:#fff3f3;border-color:#f0b4b4' }), '✗ knew it before, doesn\'t now']));
+  lg.appendChild(el('span', {}, [el('span', { class: 'sw' }), 'blank: not assessed yet, or not met (up to the assessment point it counts as a gap)']));
   if (S.limits[c.pupilCode]) lg.appendChild(el('span', {}, [el('span', { class: 'sw', style: 'border-style:dashed;opacity:.5' }), 'faded: after the assessment point (' + shortSet(S.limits[c.pupilCode]) + '), not taught yet']));
-  lg.appendChild(el('span', { text: '· Tap once for secure, again for not yet, again to clear.' }));
+  lg.appendChild(el('span', { text: '· Tap once for ✓ secure, again for ✗ knew it, now doesn\'t, again to clear.' }));
   drawChildTop();
 }
 function drawChildTop(keepBlocks) {
@@ -766,7 +767,7 @@ function tile(i, redraw) {
   var info = st === 'secure' ? securedInfo(mk[1], childObj()) : null;
   var untaught = !isTaught(S.child, i);
   var t = el('button', { class: 'tile' + (it.say ? ' say' : '') + (st ? ' ' + st : '') + ((S.child + '|' + i) in S.queue ? ' pend' : '') + (untaught && !st ? ' untaught' : ''),
-                         title: it.label + (info ? ': ' + info.text : st === 'not' ? ': not yet' : untaught ? ': not taught yet' : ''), 'data-item': i });
+                         title: it.label + (info ? ': ' + info.text : st === 'not' ? ': knew it before, doesn\'t now' : untaught ? ': not taught yet' : ''), 'data-item': i });
   if (info) t.style.background = info.colour;
   t.appendChild(document.createTextNode(it.say || it.show));
   if (it.hint) t.appendChild(el('small', { text: it.hint }));
@@ -784,7 +785,7 @@ function tile(i, redraw) {
 var F = null;
 function startFlash(list, where) {
   if (!list.length) return;
-  F = { list: list.slice(), pos: 0, where: where, before: {} };
+  F = { list: list.slice(), pos: 0, where: where, before: {}, missed: {} };
   list.forEach(function (i) { F.before[i] = markState(S.child, i); });
   $('flash').hidden = false;
   document.body.style.overflow = 'hidden';
@@ -805,9 +806,10 @@ function drawFlash() {
   if (done) {
     sendScreen('');
     var nowSec = F.list.filter(function (i) { return markState(S.child, i) === 'secure' && F.before[i] !== 'secure'; }).length;
-    var notYet = F.list.filter(function (i) { return markState(S.child, i) === 'not'; }).length;
+    var lost = F.list.filter(function (i) { return markState(S.child, i) === 'not'; }).length;
+    var notMet = Object.keys(F.missed).filter(function (i) { return !markState(S.child, i); }).length;
     box.appendChild(el('div', { class: 'done' }, [el('b', { text: 'All done' }),
-      el('div', { text: nowSec + ' newly secure · ' + notYet + ' not yet' }),
+      el('div', { text: nowSec + ' newly secure · ' + notMet + ' not met (left blank)' + (lost ? ' · ' + lost + ' ✗ knew it, now doesn\'t' : '') }),
       el('div', { style: 'margin-top:18px' }, [el('button', { class: 'btn', text: 'Back to the record', on: { click: closeFlash } })])]));
     $('fCount').textContent = '';
     $('fWhere').textContent = F.where;
@@ -825,11 +827,15 @@ function drawFlash() {
   // Oral blending: the child reads nothing; the adult says the sounds and the child blends them
   if (it.say) box.appendChild(el('div', { class: 'teacher' }, ['Say: ' + it.say, el('small', { text: 'The child blends the sounds into the word.' })]));
   else if (it.hint) box.appendChild(el('div', { class: 'note', text: 'For you: ' + it.hint }));
-  box.appendChild(el('div', { class: 'note state', text: st === 'secure' ? '✓ secure' : st === 'not' ? '✗ not yet' : '' }));
+  box.appendChild(el('div', { class: 'note state', text: st === 'secure' ? '✓ secure' : st === 'not' ? '✗ knew it before, doesn\'t now' : (F.missed[i] ? 'not met (left blank)' : '') }));
 }
+// ✓ = secure. ✗ "Not met": the box stays blank (blank = not met), unless the child had it before this
+// session (secure, or already ✗): then ✗, "knew it, now doesn't" (Innes 06.11.26).
 function flashMark(state) {
   if (!F || F.pos >= F.list.length) return;
   var i = F.list[F.pos];
+  if (state === 'not') { F.missed[i] = 1; if (F.before[i] !== 'secure' && F.before[i] !== 'not') state = ''; }
+  else delete F.missed[i];
   if (markState(S.child, i) !== state) setMark(S.child, i, state);
   F.pos++;
   drawFlash();
@@ -899,7 +905,7 @@ function drawIvCard() {
   box.appendChild(el('div', { class: 'ivopt' }, [el('span', { class: 'what' }, ['Blend and Find', sg.find ? el('small', { text: '(suggested: beginning to blend)' }) : null]), fsel,
     el('button', { class: 'btn' + (sg.find ? '' : ' quiet'), text: '▶ Start', on: { click: function () { startFind(SCENES[+fsel.value]); } } })]));
   if (!sg.grid.length && !sg.mix.length && !sg.digraph.length) box.appendChild(el('div', { class: 'hint',
-    text: 'Nothing else to suggest yet. Suggestions come from sounds, tricky words or words marked ✗ not yet, and, once the assessment point is set, from anything up to it left blank.' }));
+    text: 'Nothing else to suggest yet. Suggestions come from sounds, tricky words or words marked ✗, and, once the assessment point is set, from anything up to it left blank.' }));
   var past = ivSessions(c.pupilCode).slice(-4).reverse();
   if (past.length) {
     var lg = el('div', { class: 'ivlog' });
@@ -1485,7 +1491,7 @@ function drawImport() {
            : ['no', 'not found: choose, or leave out'];
     t.appendChild(el('tr', {}, [el('td', { text: r.name }),
       el('td', {}, [sel, el('div', { class: 'st ' + st[0], text: st[1] })]),
-      el('td', { text: r.secure + ' secure · ' + r.notYet + ' not yet' })]));
+      el('td', { text: r.secure + ' secure' })]));
   });
   box.appendChild(t);
   var chosenCodes = {};
