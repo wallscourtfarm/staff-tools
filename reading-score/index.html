@@ -59,7 +59,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   <div id="err" class="err" hidden></div>
   <div class="card"><div id="out" class="empty">Loading…</div></div>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-05.11.26a</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-06.11.26a</span></footer>
 <script>
 var AY = '2026-27', API = 'https://api.wallscourt-farm-academy.co.uk/reading-score/';
 var YEARS = ['R','Y1','Y2','Y3','Y4','Y5','Y6'];
@@ -88,7 +88,7 @@ function load(){
   $('out').className = 'empty'; $('out').textContent = 'Loading…'; $('err').hidden = true;
   fetch(API + AY + '/' + $('year').value + '?term=' + $('term').value, { cache:'no-store' })
     .then(function(r){ if(!r.ok) throw new Error('the server said ' + r.status); return r.json(); })
-    .then(function(d){ S.data = d; S.open = null; classes(); draw(); })
+    .then(function(d){ S.data = d; S.open = null; $('term').options[0].textContent = 'Current term (Term ' + d.term + ')'; classes(); draw(); })
     .catch(function(e){ $('out').textContent = 'Not loaded.'; $('err').hidden = false; $('err').textContent = 'Could not load: ' + e.message + '. Nothing has been changed.'; });
 }
 function classes(){
