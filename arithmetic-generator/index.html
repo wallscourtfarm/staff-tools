@@ -291,7 +291,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     </div>
   </div>
 
-  <div class="version">11.10.26a</div>
+  <div class="version">06.11.26a</div>
 </div>
 
 <script>
@@ -341,33 +341,44 @@ function shuffleArr(arr) {
   return arr;
 }
 // pools: { topicKey: [fn, fn, ...] } — each fn() returns a fresh question object.
+//   A pool may instead be a list of strands ([[fn,fn],[fn,fn,fn]]): picks from it are then
+//   spread across the strands in proportion, so even a few questions cover every strand.
 // topics: { topicKey: boolean } — which topics are ticked (unticked = excluded entirely).
 // targetCount: desired question total; blank/0 = natural total of one pull per pool entry.
 // fillerFn: only used if literally no topic is ticked, so a paper is never empty.
+// Each ticked topic gets a share of the paper in proportion to its size (largest remainder),
+// so a short paper keeps the same mix as the full one instead of leaving whole topics out by chance.
+function spreadOrder(pool) {
+  if (!pool.some(Array.isArray)) return shuffleArr(pool.slice());
+  const tagged = [];
+  pool.forEach(strand => {
+    const st = Array.isArray(strand) ? shuffleArr(strand.slice()) : [strand];
+    st.forEach((fn, i) => tagged.push({fn, pos:(i + Math.random()) / st.length}));
+  });
+  return tagged.sort((a,b) => a.pos - b.pos).map(x => x.fn);
+}
 function buildFromPools(pools, topics, targetCount, fillerFn) {
   const activeKeys = Object.keys(pools).filter(k => topics[k]);
   if (activeKeys.length === 0) {
     const n = targetCount && targetCount > 0 ? targetCount : 20;
     return Array.from({length: n}, () => ({...fillerFn(), _topic:'_core'}));
   }
-  let natural = [];
-  activeKeys.forEach(k => pools[k].forEach(fn => natural.push({key:k, fn})));
-  shuffleArr(natural);
-  const n = targetCount && targetCount > 0 ? targetCount : natural.length;
-  let chosen;
-  if (n <= natural.length) {
-    chosen = natural.slice(0, n);
-  } else {
-    chosen = natural.slice();
-    let i = 0;
-    while (chosen.length < n) {
-      const k = activeKeys[i % activeKeys.length];
-      const pool = pools[k];
-      chosen.push({key:k, fn: pool[Math.floor(Math.random() * pool.length)]});
-      i++;
+  const sizes = activeKeys.map(k => pools[k].flat().length);
+  const natural = sizes.reduce((a,b) => a+b, 0);
+  const n = targetCount && targetCount > 0 ? targetCount : natural;
+  const exact = sizes.map(sz => sz * n / natural);
+  const quota = exact.map(Math.floor);
+  let left = n - quota.reduce((a,b) => a+b, 0);
+  exact.map((e,i) => ({i, r: e - quota[i] + Math.random()*1e-6}))
+       .sort((a,b) => b.r - a.r).slice(0, left).forEach(({i}) => quota[i]++);
+  const qs = [];
+  activeKeys.forEach((k, i) => {
+    let order = spreadOrder(pools[k]);
+    for (let j = 0; j < quota[i]; j++) {
+      if (j > 0 && j % order.length === 0) order = spreadOrder(pools[k]);
+      qs.push({...order[j % order.length](), _topic:k});
     }
-  }
-  const qs = chosen.map(({key, fn}) => ({...fn(), _topic:key}));
+  });
   shuffleArr(qs);
   return qs;
 }
@@ -824,17 +835,40 @@ function genY5Arith(t, targetCount, sortMode) {
       () => { const az=rand(10,999); return {text:`${az} × 0 =`,answer:0,marks:1,yg:'Y3'}; },
       () => { const d2=pick([2,4,5,8,10]),q2=rand(2,10); return {text:`${d2*q2} ÷ ${d2} =`,answer:q2,marks:1,yg:'Y3'}; },
     ],
+    // Y4 revision, modelled on last year's Y4 arithmetic paper (T4W6): four strands, taken in
+    // proportion, so every paper's Y4 questions include fractions and a spread of addition and
+    // subtraction sizes (3d+2d, 4d±3d, 4d±4d, multiples of 100, missing numbers).
     y5Y4content: [
-      () => { const a=rand(1000,9999),b=rand(1000,9999); return {text:`${a.toLocaleString()} + ${b.toLocaleString()} =`,answer:a+b,marks:1,yg:'Y4'}; },
-      () => { let aa,bb; do{aa=rand(1000,9999);bb=rand(1000,aa-100);}while(!hasRegroup(aa,bb,'sub')); return {text:`${aa} - ${bb} =`,answer:aa-bb,marks:1,yg:'Y4'}; },
-      () => { const m=rand(12,99),n=pick([10,100,1000]); return {text:`${m} × ${n} =`,answer:m*n,marks:1,yg:'Y4'}; },
-      () => { let fa,fb,fc; do{fa=rand(2,5);fb=rand(2,5);fc=rand(2,5);}while(fa*fb*fc>=100); return {text:`${fa} × ${fb} × ${fc} =`,answer:fa*fb*fc,marks:1,yg:'Y4'}; },
-      () => { const sa=rand(100,499),sb=rand(3,9); return {text:`${sa} × ${sb} =`,answer:sa*sb,marks:1,yg:'Y4'}; },
-      () => { const db=rand(3,12),dq=rand(10,99); return {text:`${db*dq} ÷ ${db} =`,answer:dq,marks:1,yg:'Y4'}; },
-      () => { const p=rand(50,500),qv=rand(p+10,p+500); return {text:`[BOX] + ${p} = ${qv}`,answer:qv-p,box:true,marks:1,yg:'Y4'}; },
-      () => { const ta=rand(2,12),tb=rand(8,12); return {text:`${ta} × ${tb} =`,answer:ta*tb,marks:1,yg:'Y4'}; },
-      () => { const th=rand(1,9),h=rand(1,9),t_=rand(10,99),ptot=th*1000+h*100+t_; return {text:`${ptot.toLocaleString()} = ${th},000 + [BOX] + ${t_}`,answer:h*100,box:true,marks:1,yg:'Y4'}; },
-      () => { const dd=rand(3,9),dqq=rand(11,50); return {text:`${dd*dqq} ÷ ${dd} =`,answer:dqq,marks:1,yg:'Y4'}; },
+      [ // addition & subtraction
+        () => { let a,b; do{a=rand(200,899);b=rand(15,99);}while(!hasRegroup(a,b,'add')); return {text:`${a} + ${b} =`,answer:a+b,marks:1,yg:'Y4'}; },
+        () => { let a,b; do{a=rand(200,899);b=rand(15,99);}while(!hasRegroup(a,b,'sub')); return {text:`${a} - ${b} =`,answer:a-b,marks:1,yg:'Y4'}; },
+        () => { let a,b; do{a=rand(1000,8999);b=rand(100,999);}while(!hasRegroup(a,b,'add')||a+b>9999); return {text:`${a} + ${b} =`,answer:a+b,col:true,marks:1,yg:'Y4'}; },
+        () => { let a,b; do{a=rand(1000,9999);b=rand(100,999);}while(!hasRegroup(a,b,'sub')); return {text:`${a} - ${b} =`,answer:a-b,col:true,marks:1,yg:'Y4'}; },
+        () => { let a,b; do{a=rand(1000,5999);b=rand(1000,9999-a);}while(!hasRegroup(a,b,'add')); return {text:`${a} + ${b} =`,answer:a+b,col:true,marks:1,yg:'Y4'}; },
+        () => { let a,b; do{a=rand(3000,9999);b=rand(1000,a-500);}while(!hasRegroup(a,b,'sub')); return {text:`${a} - ${b} =`,answer:a-b,col:true,marks:1,yg:'Y4'}; },
+        () => { const b=rand(2,9)*100,a=rand(b/100+2,80)*100; return {text:`${a} - ${b} =`,answer:a-b,marks:1,yg:'Y4'}; },
+        () => { const b=rand(1,4)*100,c=rand(500,900); return {text:`[BOX] + ${b} = ${c}`,answer:c-b,box:true,marks:1,yg:'Y4'}; },
+        () => { const a=rand(5,9)*100,c=rand(20,49)*10; return {text:`${a} - [BOX] = ${c}`,answer:a-c,box:true,marks:1,yg:'Y4'}; },
+      ],
+      [ // fractions
+        () => { const d=pick([5,6,7,8,9,10,12]),n1=rand(1,d-2),n2=rand(1,d-1-n1),sn=n1+n2,sim=fracStr(sn,d); return {frac:[[n1,d],[n2,d]],answer:sim===`${sn}/${d}`?sim:`${sn}/${d} (or ${sim})`,marks:1,yg:'Y4'}; },
+        () => { const d=pick([5,6,7,8,9,10,12]),n1=rand(2,d-1),n2=rand(1,n1-1),dn=n1-n2,sim=fracStr(dn,d); return {frac:[[n1,d],[n2,d]],fracOp:'-',answer:sim===`${dn}/${d}`?sim:`${dn}/${d} (or ${sim})`,marks:1,yg:'Y4'}; },
+        () => { const d=pick([2,3,4,5,6,8,10]),a=d*rand(3,12); return {text:`1/${d} of ${a} =`,answer:a/d,marks:1,yg:'Y4'}; },
+        () => { const d=pick([3,4,5,6,8,10]),n=rand(2,d-1),a=d*rand(3,12); return {text:`${n}/${d} of ${a} =`,answer:n*a/d,marks:1,yg:'Y4'}; },
+      ],
+      [ // multiplication & division
+        () => { const a=rand(3,12),b=pick([6,7,8,9,11,12]); return {text:`${a} × ${b} =`,answer:a*b,marks:1,yg:'Y4'}; },
+        () => { let a,b,c; do{a=rand(2,5);b=rand(2,5);c=pick([2,3,4,5,10]);}while(a*b*c>120); return {text:`${a} × ${b} × ${c} =`,answer:a*b*c,marks:1,yg:'Y4'}; },
+        () => { const a=rand(12,99),b=rand(3,9); return {text:`${a} × ${b} =`,answer:a*b,work:true,marks:1,yg:'Y4'}; },
+        () => { const a=rand(101,399),b=rand(3,8); return {text:`${a} × ${b} =`,answer:a*b,work:true,marks:1,yg:'Y4'}; },
+        () => { const d=pick([6,7,8,9,12]),q=rand(3,12); return {text:`${d*q} ÷ ${d} =`,answer:q,marks:1,yg:'Y4'}; },
+        () => { const d=rand(3,9),q=rand(13,39); return {text:`${d*q} ÷ ${d} =`,answer:q,work:true,marks:1,yg:'Y4'}; },
+      ],
+      [ // place value
+        () => { const m=rand(11,80),f=pick([10,100,1000]); return {text:`${m} × ${f} =`,answer:m*f,marks:1,yg:'Y4'}; },
+        () => { const a=rand(5,80)*100,f=pick([10,100]); return {text:`${a} ÷ ${f} =`,answer:a/f,marks:1,yg:'Y4'}; },
+        () => { const f=pick([10,100,1000]); let a; do{a=rand(1000,8000);}while(Math.floor(a/f)%10!==9&&Math.random()<0.6); return {text:`${a} + ${f} =`,answer:a+f,marks:1,yg:'Y4'}; },
+      ],
     ],
     _core: [
       () => tt(),
