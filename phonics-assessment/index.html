@@ -263,7 +263,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div id="blocks"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-06.11.26b</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-06.11.26c</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -490,7 +490,10 @@ function setContents(b, most) {
 function isTaught(code, item) {
   var lim = S.limits[code];
   if (!lim) return true;
-  return blockIndex(S.cat.items[item].block) <= blockIndex(lim);
+  var it = S.cat.items[item], b = S.cat.blocks[blockIndex(lim)];
+  // a phase's common exception words are taught alongside its sets, so they count once the point reaches that phase
+  if (it.section === 'cew' && b && it.phase === b.phase) return true;
+  return blockIndex(it.block) <= blockIndex(lim);
 }
 function limitOptions(sel, value, blank) {
   sel.innerHTML = '';
