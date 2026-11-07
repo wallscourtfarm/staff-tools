@@ -195,10 +195,19 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
                                     border: 2px solid #eadfc2; border-radius: 10px; padding: 4px 0; }
   .iv .ptiles { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
   .iv .ptiles div { font-size: 3rem; padding: 6px 18px; min-width: 1.2em; }
-  /* Mix It Up: the cards can be dragged into order (07.11.26) */
-  .iv .ptiles.move div { touch-action: none; cursor: grab; -webkit-user-select: none; user-select: none; }
-  .iv .ptiles div.drag { position: relative; z-index: 2; cursor: grabbing; box-shadow: 0 8px 18px rgba(0,0,0,.2); border-color: var(--wfa-blue); }
-  .iv .ptiles.ok div { border-color: #2e9e4f; background: #eefaf0; }
+  /* Mix It Up: the mixed-up cards on top, a place for each underneath (07.11.26) */
+  .iv .board { --w: min(84px, calc(78vw / var(--n) - 10px)); display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .iv .board .pool, .iv .board .places { display: flex; gap: 10px; }
+  .iv .board .spot, .iv .board .place { position: relative; width: var(--w); height: calc(var(--w) * 1.25); border-radius: calc(var(--w) * .18); box-sizing: border-box; }
+  .iv .board .place { border: 2px dashed #1f2a36; background: #f1f1f1; }
+  .iv .board .bcard { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+                     font-family: var(--cardfont); font-size: calc(var(--w) * .5); line-height: 1; color: #111; background: #f6e3d8;
+                     border: 2px solid #1f2a36; border-radius: calc(var(--w) * .18); touch-action: none; cursor: grab;
+                     -webkit-user-select: none; user-select: none; }
+  .iv .board .place .bcard { inset: -2px; }
+  body.font-od .iv .board .bcard { font-size: calc(var(--w) * .36); }
+  .iv .board .bcard.drag { z-index: 5; cursor: grabbing; box-shadow: 0 10px 24px rgba(0,0,0,.25); }
+  .iv .board.ok .bcard { background: #e3f6e7; border-color: #2e9e4f; }
   .iv .dragnote { font-size: .85rem; font-weight: 700; color: var(--muted); margin-top: 6px; text-align: center; }
   .iv .ppics { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
   .iv .ppics div { padding: 6px; background: #fffaf0; border: 2px solid #eadfc2; border-radius: 14px; }
@@ -299,7 +308,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div class="card scroll-x" id="logBox"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-07.11.26b</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-07.11.26c</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -1004,16 +1013,8 @@ function drawTimer() {
 function previewOf(v) {
   if (!v) return el('div', { class: 'hint', text: '(blank)' });
   if (v.type === 'grid') return el('div', { class: 'pgrid' }, v.cells.map(function (c) { return el('div', { text: card(c) }); }));
-  if (v.type === 'tiles') {
-    var ok = v.want && v.cells.join('|') === v.want.join('|');
-    var row = el('div', { class: 'ptiles' + (v.move ? ' move' : '') + (ok ? ' ok' : '') },
-                 v.cells.map(function (c, i) { var d = el('div', { text: card(c) }); d.dataset.i = i; return d; }));
-    if (v.move) dragTiles(row, function (order) {      // the new order goes to a linked child screen too
-      v.cells = order.map(function (i) { return v.cells[i]; });
-      drawIv();
-    });
-    return row;
-  }
+  if (isBoard(v)) return buildBoard(v.cells, function (cells) { v.cells = cells; drawIv(); }, v.want);   // drawIv sends it to a child screen
+  if (v.type === 'tiles') return el('div', { class: 'ptiles' }, v.cells.map(function (c) { return el('div', { text: card(c) }); }));
   if (v.type === 'buttons') return buttonsWord(v.cells, 'pbtn');
   if (v.type === 'pics') return el('div', { class: 'ppics' }, v.cells.map(function (c) { return el('div', {}, [el('img', { src: 'pics/' + c + '.webp', alt: c })]); }));
   if (v.type === 'scene') { var at = scenePlaces(v.cells.slice(1));
@@ -1031,45 +1032,79 @@ function scenePlaces(objs) {
 }
 // a word with ULS sound buttons: a dot under each single-letter sound, a line under a digraph or trigraph
 // (the same drawing is in child.html)
-// drag a card along the row with a finger or the mouse; done(order) gets the cards' new order as indexes
-// into the cells it was drawn from (the same function is in index.html and child.html)
-function dragTiles(box, done) {
+// Mix It Up board (07.11.26): the mixed-up sound cards along the top, an empty place for each one underneath to build
+// the word in. A board is a 'tiles' view with blank (' ') cells: the first half is the top row, the second half the
+// places, and a blank is an empty spot. Drag a card to a spot (a card already there swaps with it), or tap it: a card
+// on top goes to the next empty place, a card in a place goes back up. The same function is in index.html and child.html.
+function isBoard(v) { return !!v && v.type === 'tiles' && v.cells.length % 2 === 0 && v.cells.indexOf(' ') >= 0; }
+function buildBoard(cells, changed, want) {
+  cells = cells.slice();
+  var n = cells.length / 2, box = document.createElement('div');
+  box.className = 'board';
+  box.style.setProperty('--n', n);
+  function draw() {
+    box.innerHTML = '';
+    [0, 1].forEach(function (row) {
+      var line = document.createElement('div');
+      line.className = row ? 'places' : 'pool';
+      for (var i = 0; i < n; i++) {
+        var at = row * n + i, spot = document.createElement('div');
+        spot.className = row ? 'place' : 'spot';
+        spot.dataset.at = at;
+        if (cells[at] !== ' ') {
+          var c = document.createElement('div');
+          c.className = 'bcard';
+          c.textContent = cells[at].replace(/_/g, '-');
+          c.dataset.at = at;
+          spot.appendChild(c);
+        }
+        line.appendChild(spot);
+      }
+      box.appendChild(line);
+    });
+    box.classList.toggle('ok', !!want && cells.slice(n).join('|') === want.join('|'));
+  }
+  function emptyIn(row) { for (var i = row * n; i < row * n + n; i++) if (cells[i] === ' ') return i; return null; }
+  function put(from, to) {
+    if (to == null || to === from) return;
+    var t = cells[to]; cells[to] = cells[from]; cells[from] = t;
+    draw();
+    if (changed) changed(cells.slice());
+  }
   box.addEventListener('pointerdown', function (e) {
-    var t = e.target.closest ? e.target.closest('div') : null;
-    if (!t || t.parentNode !== box || e.button > 0) return;
+    var c = e.target.closest ? e.target.closest('.bcard') : null;
+    if (!c || e.button > 0) return;
     e.preventDefault();
-    var r0 = t.getBoundingClientRect(), gx = e.clientX - r0.left, gy = e.clientY - r0.top, moved = false;
-    t.classList.add('drag');
+    var from = +c.dataset.at, sx = e.clientX, sy = e.clientY, far = false;
+    c.classList.add('drag');
     function follow(ev) {
       if (ev.pointerId !== e.pointerId) return;
       ev.preventDefault();
-      var x = ev.clientX, y = ev.clientY, kids = [].slice.call(box.children), at = kids.indexOf(t);
-      kids.forEach(function (k, n) {
-        if (k === t) return;
-        var r = k.getBoundingClientRect();
-        if (x > r.left && x < r.right && y > r.top - 20 && y < r.bottom + 20) {
-          var mid = r.left + r.width / 2;
-          if (n > at && x > mid) { box.insertBefore(t, k.nextSibling); moved = true; }
-          else if (n < at && x < mid) { box.insertBefore(t, k); moved = true; }
-        }
-      });
-      t.style.transform = '';
-      var r = t.getBoundingClientRect();
-      t.style.transform = 'translate(' + (x - gx - r.left) + 'px,' + (y - gy - r.top) + 'px)';
+      if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 10) far = true;
+      c.style.transform = 'translate(' + (ev.clientX - sx) + 'px,' + (ev.clientY - sy) + 'px)';
     }
-    function drop(ev) {                         // followed on the whole page: moving the card in the row loses a pointer capture
+    function drop(ev) {
       if (ev.pointerId !== e.pointerId) return;
       document.removeEventListener('pointermove', follow);
       document.removeEventListener('pointerup', drop);
       document.removeEventListener('pointercancel', drop);
-      t.style.transform = '';
-      t.classList.remove('drag');
-      if (moved) done([].map.call(box.children, function (k) { return +k.dataset.i; }));
+      c.style.transform = '';
+      c.classList.remove('drag');
+      if (ev.type === 'pointercancel') return;
+      if (!far) { put(from, emptyIn(from < n ? 1 : 0)); return; }        // a tap
+      var best = null, bd = Infinity;                                     // the spot nearest where it was let go
+      [].forEach.call(box.querySelectorAll('.spot, .place'), function (s) {
+        var r = s.getBoundingClientRect(), dx = ev.clientX - (r.left + r.width / 2), dy = ev.clientY - (r.top + r.height / 2);
+        if (Math.abs(dx) < r.width && Math.abs(dy) < r.height && dx * dx + dy * dy < bd) { bd = dx * dx + dy * dy; best = +s.dataset.at; }
+      });
+      put(from, best);
     }
     document.addEventListener('pointermove', follow, { passive: false });
     document.addEventListener('pointerup', drop);
     document.addEventListener('pointercancel', drop);
   });
+  draw();
+  return box;
 }
 function buttonsWord(parts, cls) {
   return el('div', { class: cls }, parts.map(function (p) { return el('span', { class: p.length > 1 ? 'line' : 'dot', text: p }); }));
@@ -1104,7 +1139,7 @@ function drawIv() {
   box.appendChild(el('div', { class: 'step', text: (IV.pos + 1) + ' of ' + IV.steps.length + (st.who ? ' · ' + st.who : '') }));
   box.appendChild(el('div', { class: 'plabel', text: "On the child's screen" }));
   box.appendChild(el('div', { class: 'preview' }, [previewOf(st.view)]));
-  if (st.view && st.view.move) box.appendChild(el('div', { class: 'dragnote', text: 'Drag the cards to move them. On the child screen, the child can drag them too.' }));
+  if (isBoard(st.view)) box.appendChild(el('div', { class: 'dragnote', text: 'Drag or tap a card to move it into a place. On the child screen, the child can move them too.' }));
   box.appendChild(el('div', { class: 'script' }, [st.say, st.sounds ? el('div', { class: 'say', text: st.sounds }) : null,
                                                     st.tip ? el('small', { text: st.tip }) : null]));
   if (st.extra) {
@@ -1207,18 +1242,21 @@ function startDigraph(o) {
 function startMix(o) {
   var words = o.words.slice(0, 2), steps = [];
   words.forEach(function (w, n) {
-    var tiles = { type: 'tiles', cells: w.parts, cols: w.parts.length }, mixed = function () { return { type: 'tiles', cells: jumble(w.parts), cols: w.parts.length, move: true, want: w.parts }; };
+    var tiles = { type: 'tiles', cells: w.parts, cols: w.parts.length }, blanks = w.parts.map(function () { return ' '; }),
+        mixed = function () { return { type: 'tiles', cells: jumble(w.parts).concat(blanks), cols: w.parts.length, want: w.parts }; },
+        built = function () { return { type: 'tiles', cells: blanks.concat(w.parts), cols: w.parts.length, want: w.parts }; },
+        done = function (st) { return st.view.cells.slice(w.parts.length).join('|') === w.parts.join('|'); };
     var name = (n ? 'Second' : 'First') + ' word: ' + w.word;
     steps.push({ who: 'My turn · ' + name, view: tiles, say: 'Point to each card and say the sound. Then sweep your finger under the cards and say the word.',
                  tip: w.parts.map(card).join(' · ') + '  →  ' + w.word });
     steps.push({ who: 'Your turn · ' + name, view: tiles, say: 'The child does the same: each sound, then sweep and say the word.' });
     var mine = { who: 'My turn · ' + name, view: mixed(), say: 'Mix up the cards, then put them back in order, saying the sound for each one. Sweep and say the word.',
-                 extra: { label: function (st) { return st.view.cells.join() === w.parts.join() ? 'Mix up again' : 'Put in order'; },
-                          run: function (st) { st.view = st.view.cells.join() === w.parts.join() ? mixed() : tiles; } } };
+                 extra: { label: function (st) { return done(st) ? 'Mix up again' : 'Put in order'; },
+                          run: function (st) { st.view = done(st) ? mixed() : built(); } } };
     steps.push(mine);
     steps.push({ who: 'Your turn · ' + name, view: mixed(), say: 'The child puts the cards back in order, saying each sound, then sweeps and says the word.',
-                 extra: { label: function (st) { return st.view.cells.join() === w.parts.join() ? 'Mix up again' : 'Show in order'; },
-                          run: function (st) { st.view = st.view.cells.join() === w.parts.join() ? mixed() : tiles; } } });
+                 extra: { label: function (st) { return done(st) ? 'Mix up again' : 'Show in order'; },
+                          run: function (st) { st.view = done(st) ? mixed() : built(); } } });
   });
   words.forEach(function (w, n) {
     steps.push({ who: 'Read fluently', view: { type: 'word', cells: [w.word] }, say: n ? 'And this word?' : '"Now we will read the words fluently." What does this say?' });

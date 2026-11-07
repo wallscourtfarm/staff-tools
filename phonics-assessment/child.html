@@ -49,9 +49,19 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .tiles div { font-family: var(--cardfont); font-size: min(26vh, 16vw); line-height: 1.15; min-width: 1.2em; text-align: center;
                padding: 2vh 3vw; border: 3px solid #eadfc2; border-radius: 20px; background: #fffaf0; }
   body.font-od .tiles div { font-size: min(19vh, 12vw); }
-  /* the child can drag the sound cards into order (Mix It Up, 07.11.26) */
-  .tiles div { touch-action: none; cursor: grab; }
-  .tiles div.drag { position: relative; z-index: 2; cursor: grabbing; box-shadow: 0 10px 24px rgba(0,0,0,.22); border-color: #1798d3; }
+  /* Mix It Up (07.11.26): the mixed-up cards on top, a place for each underneath; the child drags or taps them down */
+  .board { --w: min(calc((92vw - (var(--n) - 1) * 3vw) / var(--n)), 28vh, 26vw); display: flex; flex-direction: column; align-items: center; gap: 7vh; }
+  .board .pool, .board .places { display: flex; gap: 3vw; }
+  .board .spot, .board .place { position: relative; width: var(--w); height: calc(var(--w) * 1.25); border-radius: calc(var(--w) * .18); box-sizing: border-box; }
+  .board .place { border: 4px dashed #1f2a36; background: #f1f1f1; }
+  .board .bcard { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+                     font-family: var(--cardfont); font-size: calc(var(--w) * .5); line-height: 1; color: #111; background: #f6e3d8;
+                     border: 4px solid #1f2a36; border-radius: calc(var(--w) * .18); touch-action: none; cursor: grab;
+                     -webkit-user-select: none; user-select: none; }
+  .board .place .bcard { inset: -4px; }
+  body.font-od .board .bcard { font-size: calc(var(--w) * .36); }
+  .board .bcard.drag { z-index: 5; cursor: grabbing; box-shadow: 0 10px 24px rgba(0,0,0,.25); }
+  .board.ok .bcard { background: #e3f6e7; border-color: #2e9e4f; }
   /* Oral Blending picture cards and Blend and Find scenes: pictures only, nothing to read */
   .pics { display: grid; gap: 3vmin; }
   .pics div { font-size: min(34vh, 24vw); line-height: 1.15; text-align: center; padding: 2vmin 3vmin; border: 3px solid #eadfc2;
@@ -86,7 +96,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div class="err" id="err"></div>
   </div>
 </div>
-<span id="ver">WFA-07.11.26a</span>
+<span id="ver">WFA-07.11.26b</span>
 
 <script>
 'use strict';
@@ -119,6 +129,7 @@ function show(item, font, view) {
 
 // what an intervention shows: letters and words only, chosen on the adult's iPad
 function showView(box, v) {
+  if (isBoard(v)) { box.appendChild(buildBoard(v.cells)); return; }
   var d = document.createElement('div');
   if (v.type === 'grid') {
     d.className = 'grid';
@@ -155,50 +166,83 @@ function showView(box, v) {
     return;
   }
   else { d.className = 'big' + (v.cells[0].length > 3 ? ' word' : ''); d.textContent = v.cells[0].replace(/_/g, '-'); box.appendChild(d); return; }
-  v.cells.forEach(function (c, i) { var e = document.createElement('div'); e.textContent = c.replace(/_/g, '-'); e.dataset.i = i; d.appendChild(e); });
-  if (v.type === 'tiles') dragTiles(d, function () {});   // the cards stay where the child puts them until the adult's iPad moves on
+  v.cells.forEach(function (c) { var e = document.createElement('div'); e.textContent = c.replace(/_/g, '-'); d.appendChild(e); });
   box.appendChild(d);
 }
 
-// drag a card along the row with a finger or the mouse; done(order) gets the cards' new order as indexes
-// into the cells it was drawn from (the same function is in index.html and child.html)
-function dragTiles(box, done) {
+// Mix It Up board (07.11.26): the mixed-up sound cards along the top, an empty place for each one underneath to build
+// the word in. A board is a 'tiles' view with blank (' ') cells: the first half is the top row, the second half the
+// places, and a blank is an empty spot. Drag a card to a spot (a card already there swaps with it), or tap it: a card
+// on top goes to the next empty place, a card in a place goes back up. The same function is in index.html and child.html.
+function isBoard(v) { return !!v && v.type === 'tiles' && v.cells.length % 2 === 0 && v.cells.indexOf(' ') >= 0; }
+function buildBoard(cells, changed, want) {
+  cells = cells.slice();
+  var n = cells.length / 2, box = document.createElement('div');
+  box.className = 'board';
+  box.style.setProperty('--n', n);
+  function draw() {
+    box.innerHTML = '';
+    [0, 1].forEach(function (row) {
+      var line = document.createElement('div');
+      line.className = row ? 'places' : 'pool';
+      for (var i = 0; i < n; i++) {
+        var at = row * n + i, spot = document.createElement('div');
+        spot.className = row ? 'place' : 'spot';
+        spot.dataset.at = at;
+        if (cells[at] !== ' ') {
+          var c = document.createElement('div');
+          c.className = 'bcard';
+          c.textContent = cells[at].replace(/_/g, '-');
+          c.dataset.at = at;
+          spot.appendChild(c);
+        }
+        line.appendChild(spot);
+      }
+      box.appendChild(line);
+    });
+    box.classList.toggle('ok', !!want && cells.slice(n).join('|') === want.join('|'));
+  }
+  function emptyIn(row) { for (var i = row * n; i < row * n + n; i++) if (cells[i] === ' ') return i; return null; }
+  function put(from, to) {
+    if (to == null || to === from) return;
+    var t = cells[to]; cells[to] = cells[from]; cells[from] = t;
+    draw();
+    if (changed) changed(cells.slice());
+  }
   box.addEventListener('pointerdown', function (e) {
-    var t = e.target.closest ? e.target.closest('div') : null;
-    if (!t || t.parentNode !== box || e.button > 0) return;
+    var c = e.target.closest ? e.target.closest('.bcard') : null;
+    if (!c || e.button > 0) return;
     e.preventDefault();
-    var r0 = t.getBoundingClientRect(), gx = e.clientX - r0.left, gy = e.clientY - r0.top, moved = false;
-    t.classList.add('drag');
+    var from = +c.dataset.at, sx = e.clientX, sy = e.clientY, far = false;
+    c.classList.add('drag');
     function follow(ev) {
       if (ev.pointerId !== e.pointerId) return;
       ev.preventDefault();
-      var x = ev.clientX, y = ev.clientY, kids = [].slice.call(box.children), at = kids.indexOf(t);
-      kids.forEach(function (k, n) {
-        if (k === t) return;
-        var r = k.getBoundingClientRect();
-        if (x > r.left && x < r.right && y > r.top - 20 && y < r.bottom + 20) {
-          var mid = r.left + r.width / 2;
-          if (n > at && x > mid) { box.insertBefore(t, k.nextSibling); moved = true; }
-          else if (n < at && x < mid) { box.insertBefore(t, k); moved = true; }
-        }
-      });
-      t.style.transform = '';
-      var r = t.getBoundingClientRect();
-      t.style.transform = 'translate(' + (x - gx - r.left) + 'px,' + (y - gy - r.top) + 'px)';
+      if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 10) far = true;
+      c.style.transform = 'translate(' + (ev.clientX - sx) + 'px,' + (ev.clientY - sy) + 'px)';
     }
-    function drop(ev) {                         // followed on the whole page: moving the card in the row loses a pointer capture
+    function drop(ev) {
       if (ev.pointerId !== e.pointerId) return;
       document.removeEventListener('pointermove', follow);
       document.removeEventListener('pointerup', drop);
       document.removeEventListener('pointercancel', drop);
-      t.style.transform = '';
-      t.classList.remove('drag');
-      if (moved) done([].map.call(box.children, function (k) { return +k.dataset.i; }));
+      c.style.transform = '';
+      c.classList.remove('drag');
+      if (ev.type === 'pointercancel') return;
+      if (!far) { put(from, emptyIn(from < n ? 1 : 0)); return; }        // a tap
+      var best = null, bd = Infinity;                                     // the spot nearest where it was let go
+      [].forEach.call(box.querySelectorAll('.spot, .place'), function (s) {
+        var r = s.getBoundingClientRect(), dx = ev.clientX - (r.left + r.width / 2), dy = ev.clientY - (r.top + r.height / 2);
+        if (Math.abs(dx) < r.width && Math.abs(dy) < r.height && dx * dx + dy * dy < bd) { bd = dx * dx + dy * dy; best = +s.dataset.at; }
+      });
+      put(from, best);
     }
     document.addEventListener('pointermove', follow, { passive: false });
     document.addEventListener('pointerup', drop);
     document.addEventListener('pointercancel', drop);
   });
+  draw();
+  return box;
 }
 
 function picture(c) {
