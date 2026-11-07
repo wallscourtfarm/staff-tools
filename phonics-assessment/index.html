@@ -168,6 +168,23 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .ivopt select { font-size: 15px; padding: 6px 8px; max-width: 100%; }
   .ivlog { font-size: .85rem; color: var(--muted); margin-top: 8px; }
   .ivlog b { color: var(--ink); }
+  /* intervention log (like the paper record: one row per child, one column per day) */
+  table.log { border-collapse: collapse; width: 100%; }
+  table.log th, table.log td { border: 1px solid var(--line); padding: 8px; vertical-align: middle; }
+  table.log th { font-size: .8rem; color: var(--muted); background: #fff; white-space: nowrap; }
+  table.log th.today, table.log td.today { background: #fff8e8; }
+  table.log td.who { white-space: nowrap; }
+  table.log td.day { text-align: center; white-space: nowrap; font-weight: 800; }
+  .lf { display: inline-flex; align-items: center; gap: 4px; background: var(--soft); border-radius: 999px; padding: 3px 4px 3px 10px; margin: 2px; font-weight: 800; }
+  .lf button { border: 0; background: none; color: var(--muted); font-size: 1rem; padding: 0 6px; }
+  .lf.add { padding: 3px 10px; color: var(--wfa-blue); border: 1px dashed var(--wfa-blue); background: #fff; cursor: pointer; }
+  .mark { display: inline-block; margin: 2px 3px; }
+  .mark small { color: var(--muted); font-weight: 800; margin-right: 2px; }
+  .mark .ok { color: var(--ok); } .mark .star { color: #e3a008; }
+  .tap { min-width: 64px; min-height: 44px; border: 2px solid var(--line); border-radius: 10px; background: #fff; font-weight: 800; font-size: 1rem; margin: 2px; padding: 4px 8px; }
+  .tap.did { border-color: var(--ok); background: #e8f7ee; }
+  .tap.got { border-color: #e3a008; background: #fff3d0; }
+  .tap small { display: block; font-size: .7rem; color: var(--muted); }
   .iv .script { margin-top: 14px; padding: 14px 18px; border-radius: 12px; background: #eef4f9; font-weight: 800; font-size: 1.3rem;
                 max-width: 760px; text-align: center; line-height: 1.35; }
   .iv .script small { display: block; font-size: .9rem; color: var(--muted); font-weight: 700; margin-top: 6px; }
@@ -224,6 +241,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
       <label class="toggle" id="lowWrap" hidden title="Unlocking Letters and Sounds aims its interventions at the lowest 20%"><input type="checkbox" id="lowOnly"> Lowest 20% only</label>
       <span class="grow"></span>
       <span class="save-state" id="saveState"></span>
+      <button class="btn quiet" id="btnLog">📋 Intervention log</button>
       <button class="btn quiet" id="btnImport">⬆ Import spreadsheet</button>
       <button class="btn ghost" id="btnExport">⬇ CLF spreadsheet</button>
       <span id="namesSlot"></span>
@@ -262,8 +280,21 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div class="legend" id="legend" style="margin-bottom:12px"></div>
     <div id="blocks"></div>
   </section>
+
+  <!-- intervention log: the paper record teams keep, one row per child, one column per day -->
+  <section id="vLog" hidden>
+    <div class="childhead">
+      <button class="btn quiet" id="logBack">‹ Class</button>
+      <b style="font-size:1.4rem">Intervention log</b>
+      <select id="logKind" aria-label="Intervention"></select>
+      <label class="toggle fontpick">Recording for <input type="date" id="logDay" style="font-size:16px;min-width:150px;padding:6px 8px"></label>
+      <button class="btn quiet" id="logAdd">+ Add a child</button>
+    </div>
+    <p class="hint" id="logHint"></p>
+    <div class="card scroll-x" id="logBox"></div>
+  </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-06.11.26d</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-07.11.26a</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -272,6 +303,17 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <p class="hint">Years 3 to 6 list only the children still on the phonics programme. Tap the children to add, then press Add; they stay on the list until they are secure in everything.</p>
     <div id="addList" class="chips" style="overflow-y:auto;margin:10px 0"></div>
     <div class="impfoot"><span class="grow" id="addMsg"></span><button class="btn quiet" id="addCancel">Cancel</button> <button class="btn" id="addGo" disabled>Add</button></div>
+  </div>
+</div>
+
+<!-- intervention log: put a child on it, with what they are working on -->
+<div class="modal" id="logModal" hidden>
+  <div class="box">
+    <h3 id="logModalTitle">Add to the log</h3>
+    <p class="hint">Choose the child and what they are working on. Add more than one if they are working on several.</p>
+    <p><select id="logChild" aria-label="Child" style="max-width:100%"></select></p>
+    <p><select id="logFocus" aria-label="Working on" style="max-width:100%"></select></p>
+    <div class="impfoot"><span class="grow" id="logMsg"></span><button class="btn quiet" id="logCancel">Cancel</button> <button class="btn" id="logGo">Add</button></div>
   </div>
 </div>
 
@@ -1521,6 +1563,153 @@ $('impGo').onclick = function () {
     if (d.trackerError) banner('err', d.trackerError);
     load();
   }).catch(function (e) { $('impMsg').textContent = 'Not imported: ' + e.message; $('impGo').disabled = false; });
+};
+
+// ── Intervention log (07.11.26): the paper record teams keep (Reception's Spot It sheet), in the tool. One row per
+//    child on the log for that intervention, with what they are working on; one column per day a session was
+//    recorded. ✓ = did the intervention, ✓★ = did it and got it (for Spot It: spotted it). Sessions run in the
+//    tool show here too. Tap a box in the "Recording for" day: blank → ✓ → ✓★ → blank. Nothing about the child
+//    is stored beyond the pupil code (ph_iv, ph_iv_focus). ──
+var LOG = { kind: 'spot', day: '', busy: false };
+function ivFocusLabel(kind, f) { return (kind === 'grid' || kind === 'spot') ? itemShow(f) : (kind === 'mix' || kind === 'digraph') ? card(f) : f; }
+function dayOf(at) { var d = new Date(at); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function shortDay(d) { var p = d.split('-'); return +p[2] + '/' + +p[1]; }
+function logFocus(code) { return (((S.iv || {}).focus || {})[code] || {})[LOG.kind] || []; }
+function logSessions(code) { return ivSessions(code).filter(function (x) { return x.kind === LOG.kind; }); }
+function openLog() {
+  if (!LOG.day) LOG.day = today();
+  $('vClass').hidden = true; $('vLog').hidden = false;
+  window.scrollTo(0, 0);
+  var k = $('logKind'); k.innerHTML = '';
+  ['spot', 'grid', 'mix', 'digraph', 'oral', 'find'].forEach(function (x) { k.appendChild(el('option', { value: x, text: IV_NAMES[x] })); });
+  k.value = LOG.kind;
+  $('logDay').value = LOG.day; $('logDay').max = today();
+  drawLog();
+}
+function closeLog() { $('vLog').hidden = true; $('vClass').hidden = false; drawClass(); }
+function logRows() {
+  return S.children.filter(function (c) {
+    if (S.cls && c.class !== S.cls) return false;
+    return logFocus(c.pupilCode).length || logSessions(c.pupilCode).length;
+  });
+}
+function drawLog() {
+  var box = $('logBox');
+  box.innerHTML = '';
+  $('logHint').textContent = '✓ did the intervention · ✓★ did it and ' + (LOG.kind === 'spot' ? 'spotted it' : 'got it') +
+    '. Tap a box in the ' + (LOG.day === today() ? 'Today' : shortDay(LOG.day)) + ' column: once for ✓, again for ✓★, again to clear. To fill in an earlier day, change "Recording for".';
+  if (!S.iv) { box.appendChild(el('div', { class: 'empty', text: 'Loading…' })); return; }
+  var kids = logRows();
+  if (!kids.length) {
+    box.appendChild(el('div', { class: 'empty' }, [el('b', { text: 'No one on the ' + IV_NAMES[LOG.kind] + ' log yet' }),
+      'Press + Add a child, or run ' + IV_NAMES[LOG.kind] + ' from a child\'s record.'])); return;
+  }
+  var days = {};
+  kids.forEach(function (c) { logSessions(c.pupilCode).forEach(function (x) { days[dayOf(x.at)] = 1; }); });
+  days[LOG.day] = 1;
+  days = Object.keys(days).sort();
+  var head = el('tr', {}, [el('th', { text: 'Child' }), el('th', { text: 'Working on' })].concat(days.map(function (d) {
+    return el('th', { class: d === LOG.day ? 'today' : '', text: d === today() ? 'Today' : shortDay(d) });
+  })));
+  var tb = el('tbody');
+  kids.forEach(function (c) {
+    var code = c.pupilCode, foci = logFocus(code), ses = logSessions(code);
+    var all = foci.slice(); ses.forEach(function (x) { if (all.indexOf(x.focus) < 0) all.push(x.focus); });
+    var many = all.length > 1;
+    var work = el('td', {}, foci.map(function (f) {
+      return el('span', { class: 'lf' }, [ivFocusLabel(LOG.kind, f), el('button', { 'aria-label': 'Take off the log', title: 'Take off the log (sessions stay)', text: '×',
+        on: { click: function () { setLogFocus(code, f, false); } } })]);
+    }).concat([el('span', { class: 'lf add', text: '+', title: 'Add something to work on', on: { click: function () { addToLog(code); } } })]));
+    var row = el('tr', {}, [el('td', { class: 'who' }, [el('b', {}, [kidLabel(c)]), isLow(code) ? el('span', { class: 'low', text: 'Lowest 20%' }) : null]), work]);
+    days.forEach(function (d) {
+      var those = ses.filter(function (x) { return dayOf(x.at) === d; });
+      if (d !== LOG.day) {
+        row.appendChild(el('td', { class: 'day' }, those.map(function (x) {
+          return el('span', { class: 'mark' }, [many ? el('small', { text: ivFocusLabel(LOG.kind, x.focus) }) : null,
+            el('span', { class: 'ok', text: '✓' }), x.outcome === 'got' ? el('span', { class: 'star', text: '★' }) : null]);
+        })));
+        return;
+      }
+      var cell = el('td', { class: 'day today' });
+      all.forEach(function (f) {
+        var mine = those.filter(function (x) { return x.focus === f; }), last = mine[mine.length - 1];
+        var st = !last ? '' : last.outcome === 'got' ? 'got' : 'did';
+        cell.appendChild(el('button', { class: 'tap ' + st, title: ivFocusLabel(LOG.kind, f), on: { click: function () { tapLog(code, f, last); } } },
+          [st === 'got' ? '✓★' : st === 'did' ? '✓' : '·', many || foci.length > 1 ? el('small', { text: ivFocusLabel(LOG.kind, f) }) : null]));
+      });
+      row.appendChild(cell);
+    });
+    tb.appendChild(row);
+  });
+  box.appendChild(el('table', { class: 'log' }, [el('thead', {}, [head]), tb]));
+}
+function logWrite(body) {
+  if (LOG.busy) return;
+  LOG.busy = true;
+  postJSON(body).then(function () {
+    return getJSON(API + '&action=interventions&year=' + S.year).then(function (d) { S.iv = d; });
+  }).catch(function (e) { banner('err', 'Not saved: ' + e.message); })
+    .then(function () { LOG.busy = false; drawLog(); });
+}
+function tapLog(code, focus, last) {
+  if (!last) logWrite({ action: 'ivLog', pupilCode: code, kind: LOG.kind, focus: focus, outcome: 'notyet', detail: { quick: true },
+                        on: LOG.day === today() ? '' : LOG.day });
+  else if (last.outcome !== 'got') logWrite({ action: 'ivChange', id: last.id, outcome: 'got' });
+  else logWrite({ action: 'ivChange', id: last.id, delete: true });
+}
+function setLogFocus(code, focus, on) { logWrite({ action: 'ivFocus', pupilCode: code, kind: LOG.kind, focus: focus, on: on }); }
+// what a child can work on in each intervention: their own suggestions first, then everything that fits
+function focusOptions(code) {
+  var sg = ((S.iv || {}).suggest || {})[code] || {}, out = [], seen = {};
+  function add(v, label, group) { if (v && !seen[v]) { seen[v] = 1; out.push({ v: v, label: label, group: group }); } }
+  var k = LOG.kind;
+  if (k === 'grid' || k === 'spot') {
+    (sg[k] || []).forEach(function (o) { add(o.focus, optCard(o, o.focus) + kindName(o), 'Suggested for this child'); });
+    S.cat.blocks.forEach(function (b) {
+      b.items.forEach(function (i) { var it = S.cat.items[i]; if (it.section === 'gpc' || it.section === 'cew' || it.section === 'alt')
+        add(i, card(it.show) + (it.section === 'cew' ? ' (tricky word)' : it.hint ? ' (' + it.hint + ')' : ''), b.title.replace(/ · .*/, '')); });
+    });
+  } else if (k === 'mix' || k === 'digraph') {
+    (sg[k] || []).forEach(function (o) { add(o.focus, card(o.focus), 'Suggested for this child'); });
+    S.cat.blocks.forEach(function (b) { b.items.forEach(function (i) { var it = S.cat.items[i];
+      if (it.section === 'gpc' && (k === 'mix' || it.show.length > 1)) add(it.show, card(it.show), b.title.replace(/ · .*/, '')); }); });
+  } else if (k === 'oral') { add('3 sounds', 'words with 3 sounds', 'Oral Blending'); add('4 sounds', 'words with 4 sounds', 'Oral Blending'); }
+  else SCENES.forEach(function (x) { add(x.name, x.name, 'Scenes'); });
+  return out;
+}
+function fillFocus(code) {
+  var sel = $('logFocus'), groups = {};
+  sel.innerHTML = '';
+  focusOptions(code).forEach(function (o) {
+    if (!groups[o.group]) { groups[o.group] = el('optgroup', { label: o.group }); sel.appendChild(groups[o.group]); }
+    groups[o.group].appendChild(el('option', { value: o.v, text: o.label }));
+  });
+}
+function addToLog(code) {
+  var cs = $('logChild');
+  cs.innerHTML = '';
+  S.children.filter(function (c) { return !S.cls || c.class === S.cls; }).forEach(function (c) {
+    cs.appendChild(el('option', { value: c.pupilCode, 'data-pupil-id': c.pupilCode, text: c.label || '?' }));
+  });
+  if (code) cs.value = code;
+  cs.disabled = !!code;
+  fillFocus(cs.value);
+  cs.onchange = function () { fillFocus(cs.value); };
+  $('logModalTitle').textContent = 'Add to the ' + IV_NAMES[LOG.kind] + ' log';
+  $('logMsg').textContent = '';
+  $('logModal').hidden = false;
+}
+$('btnLog').onclick = openLog;
+$('logBack').onclick = closeLog;
+$('logKind').onchange = function () { LOG.kind = this.value; drawLog(); };
+$('logDay').onchange = function () { var v = this.value; if (v && v <= today()) LOG.day = v; else this.value = LOG.day; drawLog(); };
+$('logAdd').onclick = function () { addToLog(''); };
+$('logCancel').onclick = function () { $('logModal').hidden = true; };
+$('logGo').onclick = function () {
+  var code = $('logChild').value, f = $('logFocus').value;
+  if (!code || !f) { $('logMsg').textContent = 'Choose a child and what they are working on.'; return; }
+  $('logModal').hidden = true;
+  setLogFocus(code, f, true);
 };
 
 // The shared names helper puts its button in the bottom corner, where it covers this page's buttons; keep it in the toolbar.
