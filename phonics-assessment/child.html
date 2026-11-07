@@ -49,6 +49,9 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
   .tiles div { font-family: var(--cardfont); font-size: min(26vh, 16vw); line-height: 1.15; min-width: 1.2em; text-align: center;
                padding: 2vh 3vw; border: 3px solid #eadfc2; border-radius: 20px; background: #fffaf0; }
   body.font-od .tiles div { font-size: min(19vh, 12vw); }
+  /* the child can drag the sound cards into order (Mix It Up, 07.11.26) */
+  .tiles div { touch-action: none; cursor: grab; }
+  .tiles div.drag { position: relative; z-index: 2; cursor: grabbing; box-shadow: 0 10px 24px rgba(0,0,0,.22); border-color: #1798d3; }
   /* Oral Blending picture cards and Blend and Find scenes: pictures only, nothing to read */
   .pics { display: grid; gap: 3vmin; }
   .pics div { font-size: min(34vh, 24vw); line-height: 1.15; text-align: center; padding: 2vmin 3vmin; border: 3px solid #eadfc2;
@@ -83,7 +86,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div class="err" id="err"></div>
   </div>
 </div>
-<span id="ver">WFA-02.11.26e</span>
+<span id="ver">WFA-07.11.26a</span>
 
 <script>
 'use strict';
@@ -152,8 +155,50 @@ function showView(box, v) {
     return;
   }
   else { d.className = 'big' + (v.cells[0].length > 3 ? ' word' : ''); d.textContent = v.cells[0].replace(/_/g, '-'); box.appendChild(d); return; }
-  v.cells.forEach(function (c) { var e = document.createElement('div'); e.textContent = c.replace(/_/g, '-'); d.appendChild(e); });
+  v.cells.forEach(function (c, i) { var e = document.createElement('div'); e.textContent = c.replace(/_/g, '-'); e.dataset.i = i; d.appendChild(e); });
+  if (v.type === 'tiles') dragTiles(d, function () {});   // the cards stay where the child puts them until the adult's iPad moves on
   box.appendChild(d);
+}
+
+// drag a card along the row with a finger or the mouse; done(order) gets the cards' new order as indexes
+// into the cells it was drawn from (the same function is in index.html and child.html)
+function dragTiles(box, done) {
+  box.addEventListener('pointerdown', function (e) {
+    var t = e.target.closest ? e.target.closest('div') : null;
+    if (!t || t.parentNode !== box || e.button > 0) return;
+    e.preventDefault();
+    var r0 = t.getBoundingClientRect(), gx = e.clientX - r0.left, gy = e.clientY - r0.top, moved = false;
+    t.classList.add('drag');
+    function follow(ev) {
+      if (ev.pointerId !== e.pointerId) return;
+      ev.preventDefault();
+      var x = ev.clientX, y = ev.clientY, kids = [].slice.call(box.children), at = kids.indexOf(t);
+      kids.forEach(function (k, n) {
+        if (k === t) return;
+        var r = k.getBoundingClientRect();
+        if (x > r.left && x < r.right && y > r.top - 20 && y < r.bottom + 20) {
+          var mid = r.left + r.width / 2;
+          if (n > at && x > mid) { box.insertBefore(t, k.nextSibling); moved = true; }
+          else if (n < at && x < mid) { box.insertBefore(t, k); moved = true; }
+        }
+      });
+      t.style.transform = '';
+      var r = t.getBoundingClientRect();
+      t.style.transform = 'translate(' + (x - gx - r.left) + 'px,' + (y - gy - r.top) + 'px)';
+    }
+    function drop(ev) {                         // followed on the whole page: moving the card in the row loses a pointer capture
+      if (ev.pointerId !== e.pointerId) return;
+      document.removeEventListener('pointermove', follow);
+      document.removeEventListener('pointerup', drop);
+      document.removeEventListener('pointercancel', drop);
+      t.style.transform = '';
+      t.classList.remove('drag');
+      if (moved) done([].map.call(box.children, function (k) { return +k.dataset.i; }));
+    }
+    document.addEventListener('pointermove', follow, { passive: false });
+    document.addEventListener('pointerup', drop);
+    document.addEventListener('pointercancel', drop);
+  });
 }
 
 function picture(c) {

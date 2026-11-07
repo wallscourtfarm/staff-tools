@@ -195,6 +195,11 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
                                     border: 2px solid #eadfc2; border-radius: 10px; padding: 4px 0; }
   .iv .ptiles { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
   .iv .ptiles div { font-size: 3rem; padding: 6px 18px; min-width: 1.2em; }
+  /* Mix It Up: the cards can be dragged into order (07.11.26) */
+  .iv .ptiles.move div { touch-action: none; cursor: grab; -webkit-user-select: none; user-select: none; }
+  .iv .ptiles div.drag { position: relative; z-index: 2; cursor: grabbing; box-shadow: 0 8px 18px rgba(0,0,0,.2); border-color: var(--wfa-blue); }
+  .iv .ptiles.ok div { border-color: #2e9e4f; background: #eefaf0; }
+  .iv .dragnote { font-size: .85rem; font-weight: 700; color: var(--muted); margin-top: 6px; text-align: center; }
   .iv .ppics { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
   .iv .ppics div { padding: 6px; background: #fffaf0; border: 2px solid #eadfc2; border-radius: 14px; }
   .iv .ppics img { display: block; width: 120px; height: 120px; object-fit: contain; }
@@ -294,7 +299,7 @@ window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_ap
     <div class="card scroll-x" id="logBox"></div>
   </section>
 </main>
-<footer>Wallscourt Farm Academy · <span id="ver">WFA-07.11.26a</span></footer>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-07.11.26b</span></footer>
 
 <!-- Years 3-6: put a child on the phonics list -->
 <div class="modal" id="addModal" hidden>
@@ -999,7 +1004,16 @@ function drawTimer() {
 function previewOf(v) {
   if (!v) return el('div', { class: 'hint', text: '(blank)' });
   if (v.type === 'grid') return el('div', { class: 'pgrid' }, v.cells.map(function (c) { return el('div', { text: card(c) }); }));
-  if (v.type === 'tiles') return el('div', { class: 'ptiles' }, v.cells.map(function (c) { return el('div', { text: card(c) }); }));
+  if (v.type === 'tiles') {
+    var ok = v.want && v.cells.join('|') === v.want.join('|');
+    var row = el('div', { class: 'ptiles' + (v.move ? ' move' : '') + (ok ? ' ok' : '') },
+                 v.cells.map(function (c, i) { var d = el('div', { text: card(c) }); d.dataset.i = i; return d; }));
+    if (v.move) dragTiles(row, function (order) {      // the new order goes to a linked child screen too
+      v.cells = order.map(function (i) { return v.cells[i]; });
+      drawIv();
+    });
+    return row;
+  }
   if (v.type === 'buttons') return buttonsWord(v.cells, 'pbtn');
   if (v.type === 'pics') return el('div', { class: 'ppics' }, v.cells.map(function (c) { return el('div', {}, [el('img', { src: 'pics/' + c + '.webp', alt: c })]); }));
   if (v.type === 'scene') { var at = scenePlaces(v.cells.slice(1));
@@ -1017,6 +1031,46 @@ function scenePlaces(objs) {
 }
 // a word with ULS sound buttons: a dot under each single-letter sound, a line under a digraph or trigraph
 // (the same drawing is in child.html)
+// drag a card along the row with a finger or the mouse; done(order) gets the cards' new order as indexes
+// into the cells it was drawn from (the same function is in index.html and child.html)
+function dragTiles(box, done) {
+  box.addEventListener('pointerdown', function (e) {
+    var t = e.target.closest ? e.target.closest('div') : null;
+    if (!t || t.parentNode !== box || e.button > 0) return;
+    e.preventDefault();
+    var r0 = t.getBoundingClientRect(), gx = e.clientX - r0.left, gy = e.clientY - r0.top, moved = false;
+    t.classList.add('drag');
+    function follow(ev) {
+      if (ev.pointerId !== e.pointerId) return;
+      ev.preventDefault();
+      var x = ev.clientX, y = ev.clientY, kids = [].slice.call(box.children), at = kids.indexOf(t);
+      kids.forEach(function (k, n) {
+        if (k === t) return;
+        var r = k.getBoundingClientRect();
+        if (x > r.left && x < r.right && y > r.top - 20 && y < r.bottom + 20) {
+          var mid = r.left + r.width / 2;
+          if (n > at && x > mid) { box.insertBefore(t, k.nextSibling); moved = true; }
+          else if (n < at && x < mid) { box.insertBefore(t, k); moved = true; }
+        }
+      });
+      t.style.transform = '';
+      var r = t.getBoundingClientRect();
+      t.style.transform = 'translate(' + (x - gx - r.left) + 'px,' + (y - gy - r.top) + 'px)';
+    }
+    function drop(ev) {                         // followed on the whole page: moving the card in the row loses a pointer capture
+      if (ev.pointerId !== e.pointerId) return;
+      document.removeEventListener('pointermove', follow);
+      document.removeEventListener('pointerup', drop);
+      document.removeEventListener('pointercancel', drop);
+      t.style.transform = '';
+      t.classList.remove('drag');
+      if (moved) done([].map.call(box.children, function (k) { return +k.dataset.i; }));
+    }
+    document.addEventListener('pointermove', follow, { passive: false });
+    document.addEventListener('pointerup', drop);
+    document.addEventListener('pointercancel', drop);
+  });
+}
 function buttonsWord(parts, cls) {
   return el('div', { class: cls }, parts.map(function (p) { return el('span', { class: p.length > 1 ? 'line' : 'dot', text: p }); }));
 }
@@ -1050,11 +1104,12 @@ function drawIv() {
   box.appendChild(el('div', { class: 'step', text: (IV.pos + 1) + ' of ' + IV.steps.length + (st.who ? ' · ' + st.who : '') }));
   box.appendChild(el('div', { class: 'plabel', text: "On the child's screen" }));
   box.appendChild(el('div', { class: 'preview' }, [previewOf(st.view)]));
+  if (st.view && st.view.move) box.appendChild(el('div', { class: 'dragnote', text: 'Drag the cards to move them. On the child screen, the child can drag them too.' }));
   box.appendChild(el('div', { class: 'script' }, [st.say, st.sounds ? el('div', { class: 'say', text: st.sounds }) : null,
                                                     st.tip ? el('small', { text: st.tip }) : null]));
   if (st.extra) {
     $('ivExtra').style.visibility = 'visible';
-    $('ivExtra').textContent = st.extra.label;
+    $('ivExtra').textContent = typeof st.extra.label === 'function' ? st.extra.label(st) : st.extra.label;
     $('ivExtra').onclick = function () { st.extra.run(st); drawIv(); };
   }
 }
@@ -1152,16 +1207,18 @@ function startDigraph(o) {
 function startMix(o) {
   var words = o.words.slice(0, 2), steps = [];
   words.forEach(function (w, n) {
-    var tiles = { type: 'tiles', cells: w.parts, cols: w.parts.length }, mixed = function () { return { type: 'tiles', cells: jumble(w.parts), cols: w.parts.length }; };
+    var tiles = { type: 'tiles', cells: w.parts, cols: w.parts.length }, mixed = function () { return { type: 'tiles', cells: jumble(w.parts), cols: w.parts.length, move: true, want: w.parts }; };
     var name = (n ? 'Second' : 'First') + ' word: ' + w.word;
     steps.push({ who: 'My turn · ' + name, view: tiles, say: 'Point to each card and say the sound. Then sweep your finger under the cards and say the word.',
                  tip: w.parts.map(card).join(' · ') + '  →  ' + w.word });
     steps.push({ who: 'Your turn · ' + name, view: tiles, say: 'The child does the same: each sound, then sweep and say the word.' });
     var mine = { who: 'My turn · ' + name, view: mixed(), say: 'Mix up the cards, then put them back in order, saying the sound for each one. Sweep and say the word.',
-                 extra: { label: 'Put in order', run: function (st) { st.view = st.view.cells.join() === w.parts.join() ? mixed() : tiles; } } };
+                 extra: { label: function (st) { return st.view.cells.join() === w.parts.join() ? 'Mix up again' : 'Put in order'; },
+                          run: function (st) { st.view = st.view.cells.join() === w.parts.join() ? mixed() : tiles; } } };
     steps.push(mine);
     steps.push({ who: 'Your turn · ' + name, view: mixed(), say: 'The child puts the cards back in order, saying each sound, then sweeps and says the word.',
-                 extra: { label: 'Show in order', run: function (st) { st.view = st.view.cells.join() === w.parts.join() ? mixed() : tiles; } } });
+                 extra: { label: function (st) { return st.view.cells.join() === w.parts.join() ? 'Mix up again' : 'Show in order'; },
+                          run: function (st) { st.view = st.view.cells.join() === w.parts.join() ? mixed() : tiles; } } });
   });
   words.forEach(function (w, n) {
     steps.push({ who: 'Read fluently', view: { type: 'word', cells: [w.word] }, say: n ? 'And this word?' : '"Now we will read the words fluently." What does this say?' });
