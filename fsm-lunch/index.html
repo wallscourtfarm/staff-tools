@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+/* WFA: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FSM Lunch Choices</title>
+<link rel="icon" href="../favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
+<style>
+:root{--blue:#1798d3;--blue-d:#0f6e9c;--soft:#eef6fb;--dark:#0a0101;--bg:#f4f7f9;--card:#fff;--line:#dde3e8;--muted:#5d6b75;
+  --red:#d6453d;--redbg:#fde9e7;--halal:#0f7c86;--halalbg:#dff2f3;--green:#2e8b3d;--greenbg:#e5f4e7;
+  --pasta:#c98a00;--pastabg:#fff3d1;--roll:#7a4bb5;--rollbg:#f0e8fa}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Nunito',-apple-system,sans-serif;font-weight:600;background:var(--bg);color:var(--dark)}
+#top{background:var(--blue);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+#top a.home{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none}
+#top img{height:34px;background:#fff;border-radius:8px;padding:3px}
+#top h1{margin:0;font-size:1.25rem;font-weight:900}
+.seg{display:flex;gap:4px;background:rgba(255,255,255,.18);border-radius:22px;padding:3px;margin-left:auto}
+.seg button{background:none;color:#fff;border:0;border-radius:18px;padding:7px 14px;font:800 .92rem 'Nunito',sans-serif;cursor:pointer}
+.seg button.on{background:#fff;color:var(--blue)}
+main{max-width:1150px;margin:0 auto;padding:14px 16px 60px}
+.pickrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
+.pickrow .lbl{font-weight:800;color:var(--muted);margin-right:4px;min-width:52px}
+.chip{border:2px solid var(--line);background:#fff;border-radius:20px;padding:6px 13px;font:800 .92rem 'Nunito',sans-serif;cursor:pointer;color:var(--dark)}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.kids{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.kid{border:2px solid var(--line);background:var(--card);border-radius:24px;padding:8px 14px;font:800 1rem 'Nunito',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--dark)}
+.kid.on{border-color:var(--blue);background:var(--blue);color:#fff}
+.kid .n{font-size:.75rem;background:var(--bg);color:var(--muted);border-radius:10px;padding:1px 7px}
+.kid.on .n{background:rgba(255,255,255,.25);color:#fff}
+.kid.done .n{background:var(--greenbg);color:var(--green)}
+.kid.done.on .n{background:#fff;color:var(--green)}
+.kid .x{font-size:.8rem;opacity:.7}
+.addkid{display:flex;gap:6px;align-items:center}
+select{font:700 .92rem 'Nunito',sans-serif;padding:7px 10px;border:2px solid var(--line);border-radius:10px;background:#fff;max-width:240px}
+.who{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 12px}
+.who h2{margin:0;font-size:1.5rem;font-weight:900}
+.who .hint{color:var(--muted)}
+.weeks{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr));gap:14px}
+.week{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+.week h3{margin:0 0 8px;font-size:1.1rem;color:var(--blue);font-weight:900}
+.dates{color:var(--muted);font-weight:700;font-size:.85rem}
+.day{margin-bottom:10px}
+.day .dn{font-weight:900;font-size:.9rem;margin-bottom:4px}
+.opts{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.opt{border:2px solid var(--line);background:#fff;border-radius:10px;padding:7px 5px;font:600 .74rem/1.2 'Nunito',sans-serif;cursor:pointer;text-align:left;min-height:62px;color:var(--dark);position:relative}
+.opt b{display:block;font-size:.68rem;font-weight:900;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px}
+.opt.r b{color:var(--red)} .opt.h b{color:var(--halal)} .opt.g b{color:var(--green)} .opt.p b{color:var(--pasta)} .opt.f b{color:var(--roll)}
+.opt.r.on{background:var(--redbg);border-color:var(--red)}
+.opt.h.on{background:var(--halalbg);border-color:var(--halal)}
+.opt.g.on{background:var(--greenbg);border-color:var(--green)}
+.opt.p.on{background:var(--pastabg);border-color:var(--pasta)}
+.opt.f.on{background:var(--rollbg);border-color:var(--roll)}
+.opt.on::after{content:"✓";position:absolute;top:4px;right:7px;font-weight:900;font-size:1rem}
+.fills{display:flex;gap:6px;margin-top:6px;align-items:center;font-weight:800;font-size:.8rem;color:var(--roll)}
+.fill{border:2px solid var(--roll);background:#fff;color:var(--roll);border-radius:16px;padding:5px 12px;font:800 .85rem 'Nunito',sans-serif;cursor:pointer}
+.fill.on{background:var(--roll);color:#fff}
+.fills.need{animation:pulse 1.2s ease-in-out 2}
+@keyframes pulse{50%{opacity:.4}}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+.btn{border:0;border-radius:10px;padding:10px 16px;font:800 .95rem 'Nunito',sans-serif;cursor:pointer;background:var(--blue);color:#fff}
+.btn.ghost{background:#fff;color:var(--blue);border:2px solid var(--blue)}
+.btn.warn{background:#fff;color:var(--red);border:2px solid var(--red)}
+.note{background:#fff;border-left:4px solid var(--blue);padding:10px 12px;border-radius:8px;color:var(--muted);margin:10px 0 14px;line-height:1.4}
+.note.bad{border-color:var(--red);color:var(--red)}
+table{border-collapse:collapse;width:100%;background:#fff;font-size:.85rem;table-layout:fixed}
+th,td{border:1px solid var(--line);padding:6px;vertical-align:top;text-align:left}
+th{background:var(--soft);font-weight:900}
+td.c-r{background:var(--redbg)} td.c-h{background:var(--halalbg)} td.c-g{background:var(--greenbg)} td.c-p{background:var(--pastabg)} td.c-f{background:var(--rollbg)} td.c-x{color:#a00;font-weight:800}
+td .t{font-weight:900;font-size:.7rem;text-transform:uppercase}
+.child{break-inside:avoid;page-break-inside:avoid;margin-bottom:14px}
+.childhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.childhead h3{margin:0;color:var(--blue);font-size:1.25rem;font-weight:900}
+.childhead .box{display:inline-block;width:16px;height:16px;border:2px solid var(--blue);border-radius:3px;margin-right:8px;vertical-align:-1px}
+.empty{background:#fff;border-radius:14px;padding:24px;text-align:center;color:var(--muted)}
+#ver{position:fixed;left:10px;bottom:8px;font-size:.72rem;color:var(--muted);background:rgba(255,255,255,.85);padding:2px 8px;border-radius:8px}
+#printArea{display:none}
+/* paper tick sheets */
+.ps{break-after:page;page-break-after:always;font-size:9pt}
+.ps h2{margin:0 0 4px;font-size:15pt}
+.ps .sub{margin:0 0 6px;color:#444}
+.ps .wk{display:grid;grid-template-columns:repeat(3,1fr);gap:5mm}
+.ps table{font-size:7.5pt}
+.ps td{padding:2px 3px}
+.ps .box{display:inline-block;width:10px;height:10px;border:1.5px solid #000;margin-right:3px;vertical-align:-1px}
+.printver{font-size:8pt;color:#666;text-align:right;margin-bottom:4px}
+@media print{
+  @page{size:A4 landscape;margin:9mm}
+  body{background:#fff}
+  #top,main,#ver{display:none!important}
+  #printArea{display:block}
+  table{font-size:8.5pt}
+  td,th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<div id="top">
+  <a class="home" href="../index.html" title="Staff tools"><img src="../logo.png" alt=""><h1>FSM Lunch Choices</h1></a>
+  <div class="seg">
+    <button data-tab="choose" class="on">Choose</button>
+    <button data-tab="list">List</button>
+  </div>
+</div>
+<main id="view"><div class="empty">Loading the class lists and the menu…</div></main>
+<div id="printArea"></div>
+<div id="ver">WFA-10.11.26a · choices saved on this device</div>
+<script>
+const VERSION='WFA-10.11.26a';
+const API='https://api.wallscourt-farm-academy.co.uk/planning/pupils?token=__hub__';
+const DAYS=['Mon','Tue','Wed','Thu','Fri'];
+const DAYNAME={Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday'};
+const OPT=[{k:'r',label:'Red'},{k:'h',label:'Halal'},{k:'g',label:'Green'},{k:'p',label:'Pasta'},{k:'f',label:'Filled roll'}];
+const FILLS=['Ham','Cheese','Tuna'];
+// Innovate menu: no ham rolls on Fridays
+const fillsFor=d=>d==='Fri'?['Cheese','Tuna']:FILLS;
+// menu.json (Menu Publisher) has no halal dish, so each red dish is matched to its halal version from the
+// Innovate primary menu PDF. Fish days are the same as red. A red dish not listed here shows "Halal version of ...".
+const HALAL={
+ "Beef and Lentil Bolognaise with Penne Pasta":"Halal Beef and Lentil Bolognaise with Penne Pasta",
+ "Pork Sausages, Mashed Potatoes and Gravy":"Halal Chicken Sausages, Mashed Potatoes and Gravy",
+ "Roast Chicken Breast, Roast Potatoes and Gravy":"Halal Roast Chicken Breast, Roast Potatoes and Gravy",
+ "Chicken and Chickpea Korma with Mixed Rice":"Halal Chicken and Chickpea Korma with Mixed Rice",
+ "Cajun Chicken Pizza with Wedges":"Halal Cajun Chicken Pizza with Wedges",
+ "Mild Chilli Beef and Bean Macaroni Cheese":"Halal Mild Chilli Beef and Bean Macaroni Cheese",
+ "Roast Gammon, Roast Potatoes and Gravy":"Halal Roast Chicken Breast, Roast Potatoes and Gravy",
+ "Chicken Fajita with Mexican Rice":"Halal Chicken Fajita with Mexican Rice",
+ "Sweet Chilli Salmon Melt with Wedges":"Halal Sweet Chilli Salmon Melt with Wedges",
+ "BBQ Chicken Loaded Mac 'n' Cheese":"Halal BBQ Chicken Loaded Mac 'n' Cheese",
+ "Pork Sausages, Stuffed Yorkie, Mash and Gravy":"Halal Chicken Sausage, Stuffed Yorkie, Mash and Gravy",
+ "Mild Beef Chilli Topped Jacket Potato with Nacho Crunch":"Halal Mild Beef Chilli Topped Jacket Potato with Nacho Crunch"
+};
+function halalFor(red){if(HALAL[red])return HALAL[red];if(/\bfish\b/i.test(red))return red;return 'Halal version of: '+red;}
+const KEY='wfa_fsm_lunch_v1';
+
+let store={sel:{year:'',cls:''},extra:{},choices:{}};
+try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&s.choices)store=Object.assign(store,s);}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){}}
+
+let PUPILS=[],CYCLE=[],SIG='',tab='choose',current=null;
+
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const codeOf=p=>p.pupilId||p.id;
+const nameSpan=p=>`<span data-pupil-id="${esc(p.pupilId||'')}">${esc(p.label||'?')}</span>`;
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+function mondayOf(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-((x.getDay()+6)%7));return x;}
+function fmt(k){const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
+function hash(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36);}
+
+// ── menu: the repeating weeks still to come, numbered as the menu numbers them from its first week ──
+function buildCycle(menu){
+  const weeks=(menu&&menu.weeks)||{};
+  const keys=Object.keys(weeks).sort();
+  const num={};let n=0;
+  keys.forEach(k=>{const s=JSON.stringify(weeks[k]);if(!(s in num))num[s]=++n;});
+  const thisMon=iso(mondayOf(new Date()));
+  let future=keys.filter(k=>k>=thisMon);if(!future.length)future=keys;
+  const bySig={};
+  future.forEach(k=>{const s=JSON.stringify(weeks[k]);(bySig[s]=bySig[s]||{n:num[s],menu:weeks[k],dates:[]}).dates.push(k);});
+  CYCLE=Object.values(bySig).sort((a,b)=>a.n-b.n).map(w=>({w:String(w.n),menu:w.menu,dates:w.dates}));
+  SIG=hash(CYCLE.map(w=>JSON.stringify(w.menu)).join('|'));
+}
+const TOTAL=()=>CYCLE.length*5;
+function menuText(wk,d,k){const m=wk.menu[d]||[];if(k==='h')return halalFor(m[0]||'');return m[{r:0,g:1,p:2}[k]]||'';}
+const complete=k=>!!k&&k!=='f';
+function picks(code){const c=store.choices[SIG]=store.choices[SIG]||{};return c[code]=c[code]||{};}
+const count=code=>Object.entries((store.choices[SIG]||{})[code]||{}).filter(([k,v])=>complete(v)&&CYCLE.some(w=>k.startsWith(w.w+'-'))).length;
+
+// ── pupils ──
+const yearSort=y=>{const m=/(\d+)/.exec(y||'');return m?+m[1]:(/^r|rec/i.test(y||'')?0:99);};
+function years(){return [...new Set(PUPILS.map(p=>p.yearGroup).filter(Boolean))].sort((a,b)=>yearSort(a)-yearSort(b)||a.localeCompare(b));}
+function classes(y){return [...new Set(PUPILS.filter(p=>p.yearGroup===y).map(p=>p.class).filter(Boolean))].sort();}
+function inSel(p){return p.yearGroup===store.sel.year&&(!store.sel.cls||p.class===store.sel.cls);}
+function kids(){
+  return PUPILS.filter(p=>inSel(p)&&(p.fsm||store.extra[codeOf(p)]))
+    .sort((a,b)=>(a.class||'').localeCompare(b.class||'')||(a.label||'').localeCompare(b.label||''));
+}
+
+function render(){
+  document.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  const v=document.getElementById('view');
+  let h=pickerHTML();
+  if(!store.sel.year){v.innerHTML=h+'<div class="empty">Choose a year group to see its children who get free school meals.</div>';return;}
+  const list=kids();
+  if(!list.find(p=>codeOf(p)===current))current=list[0]?codeOf(list[0]):null;
+  h+=tab==='choose'?chooseHTML(list):listHTML(list);
+  v.innerHTML=h;
+}
+
+function pickerHTML(){
+  let h='<div class="pickrow"><span class="lbl">Year</span>'+years().map(y=>`<button class="chip${y===store.sel.year?' on':''}" data-year="${esc(y)}">${esc(y)}</button>`).join('')+'</div>';
+  if(store.sel.year){
+    h+='<div class="pickrow"><span class="lbl">Class</span>'+`<button class="chip${!store.sel.cls?' on':''}" data-cls="">Whole year</button>`+classes(store.sel.year).map(c=>`<button class="chip${c===store.sel.cls?' on':''}" data-cls="${esc(c)}">${esc(c)}</button>`).join('')+'</div>';
+  }
+  return h;
+}
+
+function kidChips(list){
+  const others=PUPILS.filter(p=>inSel(p)&&!p.fsm&&!store.extra[codeOf(p)]).sort((a,b)=>(a.label||'').localeCompare(b.label||''));
+  let h='<div class="kids">'+list.map(p=>{const c=count(codeOf(p));return `<button class="kid${codeOf(p)===current?' on':''}${c===TOTAL()?' done':''}" data-kid="${esc(codeOf(p))}">${nameSpan(p)} <span class="n">${c}/${TOTAL()}</span>${p.fsm?'':`<span class="x" data-unextra="${esc(codeOf(p))}" title="Take off this list">✕</span>`}</button>`}).join('');
+  if(others.length)h+=`<span class="addkid"><select id="addSel"><option value="">+ Add another child…</option>${others.map(p=>`<option value="${esc(codeOf(p))}">${esc(p.label)}${store.sel.cls?'':' ('+esc(p.class)+')'}</option>`).join('')}</select></span>`;
+  return h+'</div>';
+}
+
+function chooseHTML(list){
+  if(!list.length)return kidChips(list)+'<div class="empty">No children here are marked as free school meals in the school roster. Use “+ Add another child” to add one.</div>';
+  const p=list.find(x=>codeOf(x)===current),ch=picks(current);
+  let h=kidChips(list);
+  h+=`<div class="who"><h2>${nameSpan(p)}</h2><span class="hint">Tap one meal for each day${store.sel.cls?'':' · '+esc(p.class)}</span></div><div class="weeks">`;
+  for(const wk of CYCLE){
+    h+=`<div class="week"><h3>Week ${wk.w} <span class="dates">· next: w/c ${wk.dates.slice(0,2).map(fmt).join(', ')}</span></h3>`;
+    for(const d of DAYS){
+      if(!wk.menu[d])continue;
+      const cur=ch[wk.w+'-'+d]||'';
+      h+=`<div class="day"><div class="dn">${DAYNAME[d]}</div><div class="opts">`;
+      OPT.forEach(o=>{const txt=o.k==='f'?fillsFor(d).join(', ').replace(/, (\w+)$/,' or $1'):menuText(wk,d,o.k);h+=`<button class="opt ${o.k}${cur[0]===o.k?' on':''}" data-w="${wk.w}" data-d="${d}" data-o="${o.k}"><b>${o.label}</b>${esc(txt)}</button>`;});
+      h+='</div>';
+      if(cur[0]==='f')h+=`<div class="fills${cur==='f'?' need':''}">${cur==='f'?'Which filling?':'Filling:'} `+fillsFor(d).map(f=>`<button class="fill${cur==='f:'+f?' on':''}" data-w="${wk.w}" data-d="${d}" data-fill="${f}">${f}</button>`).join('')+'</div>';
+      h+='</div>';
+    }
+    h+='</div>';
+  }
+  h+='</div>';
+  const i=list.indexOf(p),next=list[i+1];
+  h+=`<div class="bar">${next?`<button class="btn" data-go="${esc(codeOf(next))}">Next child →</button>`:'<button class="btn" data-tab="list">See the list →</button>'}<button class="btn warn" data-clear="${esc(current)}">Clear this child's choices</button></div>`;
+  return h;
+}
+
+function cell(wk,d,k){
+  if(!k)return '<td class="c-x">Not chosen</td>';
+  if(k==='f')return '<td class="c-x">Roll – filling not chosen</td>';
+  if(k[0]==='f')return `<td class="c-f"><span class="t">Filled roll</span><br>${esc(k.slice(2))}</td>`;
+  const o=OPT.find(x=>x.k===k);return `<td class="c-${k}"><span class="t">${o.label}</span><br>${esc(menuText(wk,d,k))}</td>`;
+}
+function childBlock(p,name){
+  const ch=((store.choices[SIG]||{})[codeOf(p)])||{};
+  let h=`<div class="child"><div class="childhead"><h3><span class="box"></span>${name}</h3><span class="dates">${esc(p.class)} · ${count(codeOf(p))}/${TOTAL()} chosen</span></div><table><tr><th style="width:13%">Week</th>`+DAYS.map(d=>`<th>${DAYNAME[d]}</th>`).join('')+'</tr>';
+  for(const wk of CYCLE){
+    h+=`<tr><td><b>Week ${wk.w}</b><br><span class="dates">w/c ${wk.dates.slice(0,2).map(fmt).join(', ')}</span></td>`+DAYS.map(d=>cell(wk,d,ch[wk.w+'-'+d])).join('')+'</tr>';
+  }
+  return h+'</table></div>';
+}
+function listHTML(list){
+  const missing=list.filter(p=>count(codeOf(p))<TOTAL());
+  let h=kidChips(list);
+  h+='<div class="note">One block per child, ready to enter into each child\'s lunch account in turn. Each week repeats every '+CYCLE.length+' weeks.'+(missing.length?` <b style="color:var(--red)">${missing.length} still to finish.</b>`:list.length?' Everyone has chosen every meal.':'')+'</div>';
+  h+='<div class="bar"><button class="btn" id="printList">Print list</button><button class="btn ghost" id="printPaper">Print paper tick sheets</button></div>';
+  return h+list.map(p=>childBlock(p,nameSpan(p))).join('');
+}
+
+function paperSheet(p,name){
+  let h=`<div class="ps"><h2>${name} — my lunch choices</h2><p class="sub">Tick <b>one</b> meal for each day. You will have these every time this week comes round. <span style="float:right">${VERSION}</span></p><div class="wk">`;
+  for(const wk of CYCLE){
+    h+=`<table><tr><th colspan="2">Week ${wk.w} <span style="font-weight:600">(w/c ${wk.dates.slice(0,2).map(fmt).join(', ')})</span></th></tr>`;
+    for(const d of DAYS){
+      if(!wk.menu[d])continue;
+      h+=`<tr><td style="width:14%"><b>${d}</b></td><td>`+OPT.filter(o=>o.k!=='f').map(o=>`<div><span class="box"></span><b>${o.label}:</b> ${esc(menuText(wk,d,o.k))}</div>`).join('')+'<div><b>Filled roll:</b> '+fillsFor(d).map(f=>`<span class="box"></span>${f}`).join(' &nbsp;')+'</div></td></tr>';
+    }
+    h+='</table>';
+  }
+  return h+'</div></div>';
+}
+
+// Names come from the teacher's own names file, read in this browser only; without it the print uses initials.
+function namesThen(fn){
+  const shown=window.WFANames&&WFANames.screen.active&&WFANames.screen.file;
+  if(shown||!window.WFANames)return fn(shown||null);
+  WFANames.pick({purpose:'Your names file puts the children\'s names on the printout. It is read on this device only and never uploaded.',skipLabel:'Print with initials'}).then(fn);
+}
+function doPrint(kind){
+  const list=kids();
+  namesThen(file=>{
+    const nm=p=>{const r=file&&p.pupilId&&file.get(p.pupilId);return esc((r&&r.name)||p.label||'?');};
+    const area=document.getElementById('printArea');
+    area.innerHTML=kind==='paper'?list.map(p=>paperSheet(p,nm(p))).join(''):`<div class="printver">FSM lunch choices · ${esc(store.sel.year)} ${esc(store.sel.cls||'')} · ${VERSION}</div>`+list.map(p=>childBlock(p,nm(p))).join('');
+    setTimeout(()=>{window.print();setTimeout(()=>{area.innerHTML='';if(file&&!(WFANames.screen.active&&WFANames.screen.file===file))file.clear();},500);},50);
+  });
+}
+
+document.addEventListener('change',e=>{
+  if(e.target.id==='addSel'&&e.target.value){store.extra[e.target.value]=true;current=e.target.value;save();render();}
+});
+document.addEventListener('click',e=>{
+  const un=e.target.closest('[data-unextra]');
+  if(un){e.stopPropagation();const c=un.dataset.unextra;if(confirm('Take this child off the list? Their choices are kept if you add them back.')){delete store.extra[c];save();render();}return;}
+  const t=e.target.closest('button');if(!t)return;
+  if(t.dataset.tab){tab=t.dataset.tab;render();window.scrollTo(0,0);return;}
+  if(t.dataset.year!==undefined){store.sel={year:t.dataset.year,cls:''};save();render();return;}
+  if(t.dataset.cls!==undefined){store.sel.cls=t.dataset.cls;save();render();return;}
+  if(t.dataset.kid){current=t.dataset.kid;tab='choose';render();return;}
+  if(t.dataset.go){current=t.dataset.go;render();window.scrollTo(0,0);return;}
+  const keep=()=>{save();const y=window.scrollY;render();window.scrollTo(0,y);};
+  if(t.dataset.o){const c=picks(current),key=t.dataset.w+'-'+t.dataset.d;if((c[key]||'')[0]===t.dataset.o)delete c[key];else c[key]=t.dataset.o;keep();return;}
+  if(t.dataset.fill){picks(current)[t.dataset.w+'-'+t.dataset.d]='f:'+t.dataset.fill;keep();return;}
+  if(t.dataset.clear){if(confirm("Clear all of this child's choices?")){delete (store.choices[SIG]||{})[t.dataset.clear];save();render();}return;}
+  if(t.id==='printList'){doPrint('list');return;}
+  if(t.id==='printPaper'){doPrint('paper');return;}
+});
+
+Promise.all([
+  fetch(API,{cache:'no-store'}).then(r=>r.json()),
+  fetch('../menu.json',{cache:'no-store'}).then(r=>r.json())
+]).then(([pd,menu])=>{
+  if(!pd||!Array.isArray(pd.pupils))throw new Error('class list');
+  PUPILS=pd.pupils;
+  buildCycle(menu);
+  if(!CYCLE.length)throw new Error('menu');
+  if(store.sel.year&&!years().includes(store.sel.year))store.sel={year:'',cls:''};
+  if(store.sel.cls&&!classes(store.sel.year).includes(store.sel.cls))store.sel.cls='';
+  render();
+}).catch(err=>{
+  document.getElementById('view').innerHTML='<div class="note bad">Could not load the '+(String(err&&err.message)==='menu'?'lunch menu':'class lists')+'. Check you are signed in and online, then reload the page.</div>';
+});
+try{WFANames.screen.init();}catch(e){}
+</script>
+</body>
+</html>
