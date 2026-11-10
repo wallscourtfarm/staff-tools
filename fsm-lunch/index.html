@@ -112,9 +112,9 @@ td .t{font-weight:900;font-size:.7rem;text-transform:uppercase}
 </div>
 <main id="view"><div class="empty">Loading the class lists and the menu…</div></main>
 <div id="printArea"></div>
-<div id="ver">WFA-10.11.26a · choices saved on this device</div>
+<div id="ver">WFA-10.11.26b · choices saved on this device</div>
 <script>
-const VERSION='WFA-10.11.26a';
+const VERSION='WFA-10.11.26b';
 const API='https://api.wallscourt-farm-academy.co.uk/planning/pupils?token=__hub__';
 const DAYS=['Mon','Tue','Wed','Thu','Fri'];
 const DAYNAME={Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday'};
@@ -141,8 +141,10 @@ const HALAL={
 function halalFor(red){if(HALAL[red])return HALAL[red];if(/\bfish\b/i.test(red))return red;return 'Halal version of: '+red;}
 const KEY='wfa_fsm_lunch_v1';
 
-let store={sel:{year:'',cls:''},extra:{},choices:{}};
+// extra: children added by the teacher; skip: FSM children the teacher has left off (e.g. they always choose their own lunches)
+let store={sel:{year:'',cls:''},extra:{},skip:{},choices:{}};
 try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&s.choices)store=Object.assign(store,s);}catch(e){}
+store.extra=store.extra||{};store.skip=store.skip||{};
 function save(){try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){}}
 
 let PUPILS=[],CYCLE=[],SIG='',tab='choose',current=null;
@@ -181,7 +183,7 @@ function years(){return [...new Set(PUPILS.map(p=>p.yearGroup).filter(Boolean))]
 function classes(y){return [...new Set(PUPILS.filter(p=>p.yearGroup===y).map(p=>p.class).filter(Boolean))].sort();}
 function inSel(p){return p.yearGroup===store.sel.year&&(!store.sel.cls||p.class===store.sel.cls);}
 function kids(){
-  return PUPILS.filter(p=>inSel(p)&&(p.fsm||store.extra[codeOf(p)]))
+  return PUPILS.filter(p=>inSel(p)&&((p.fsm&&!store.skip[codeOf(p)])||store.extra[codeOf(p)]))
     .sort((a,b)=>(a.class||'').localeCompare(b.class||'')||(a.label||'').localeCompare(b.label||''));
 }
 
@@ -205,14 +207,15 @@ function pickerHTML(){
 }
 
 function kidChips(list){
-  const others=PUPILS.filter(p=>inSel(p)&&!p.fsm&&!store.extra[codeOf(p)]).sort((a,b)=>(a.label||'').localeCompare(b.label||''));
-  let h='<div class="kids">'+list.map(p=>{const c=count(codeOf(p));return `<button class="kid${codeOf(p)===current?' on':''}${c===TOTAL()?' done':''}" data-kid="${esc(codeOf(p))}">${nameSpan(p)} <span class="n">${c}/${TOTAL()}</span>${p.fsm?'':`<span class="x" data-unextra="${esc(codeOf(p))}" title="Take off this list">✕</span>`}</button>`}).join('');
-  if(others.length)h+=`<span class="addkid"><select id="addSel"><option value="">+ Add another child…</option>${others.map(p=>`<option value="${esc(codeOf(p))}">${esc(p.label)}${store.sel.cls?'':' ('+esc(p.class)+')'}</option>`).join('')}</select></span>`;
+  const on=new Set(list.map(codeOf));
+  const others=PUPILS.filter(p=>inSel(p)&&!on.has(codeOf(p))).sort((a,b)=>(b.fsm?1:0)-(a.fsm?1:0)||(a.label||'').localeCompare(b.label||''));
+  let h='<div class="kids">'+list.map(p=>{const c=count(codeOf(p));return `<button class="kid${codeOf(p)===current?' on':''}${c===TOTAL()?' done':''}" data-kid="${esc(codeOf(p))}">${nameSpan(p)} <span class="n">${c}/${TOTAL()}</span><span class="x" data-off="${esc(codeOf(p))}" title="Leave off the list">✕</span></button>`}).join('');
+  if(others.length)h+=`<span class="addkid"><select id="addSel"><option value="">+ Add another child…</option>${others.map(p=>`<option value="${esc(codeOf(p))}">${esc(p.label)}${store.sel.cls?'':' ('+esc(p.class)+')'}${p.fsm?' · FSM, left off':''}</option>`).join('')}</select></span>`;
   return h+'</div>';
 }
 
 function chooseHTML(list){
-  if(!list.length)return kidChips(list)+'<div class="empty">No children here are marked as free school meals in the school roster. Use “+ Add another child” to add one.</div>';
+  if(!list.length)return kidChips(list)+'<div class="empty">No children on the list. Children marked as free school meals in the school roster appear here by themselves; use “+ Add another child” to add one.</div>';
   const p=list.find(x=>codeOf(x)===current),ch=picks(current);
   let h=kidChips(list);
   h+=`<div class="who"><h2>${nameSpan(p)}</h2><span class="hint">Tap one meal for each day${store.sel.cls?'':' · '+esc(p.class)}</span></div><div class="weeks">`;
@@ -287,11 +290,11 @@ function doPrint(kind){
 }
 
 document.addEventListener('change',e=>{
-  if(e.target.id==='addSel'&&e.target.value){store.extra[e.target.value]=true;current=e.target.value;save();render();}
+  if(e.target.id==='addSel'&&e.target.value){const c=e.target.value,p=PUPILS.find(x=>codeOf(x)===c);delete store.skip[c];if(!(p&&p.fsm))store.extra[c]=true;current=c;save();render();}
 });
 document.addEventListener('click',e=>{
-  const un=e.target.closest('[data-unextra]');
-  if(un){e.stopPropagation();const c=un.dataset.unextra;if(confirm('Take this child off the list? Their choices are kept if you add them back.')){delete store.extra[c];save();render();}return;}
+  const off=e.target.closest('[data-off]');
+  if(off){e.stopPropagation();const c=off.dataset.off,p=PUPILS.find(x=>codeOf(x)===c);if(confirm('Leave this child off the list (for example, they always choose their own lunches)? Any choices are kept, and you can add them back from “+ Add another child”.')){delete store.extra[c];if(p&&p.fsm)store.skip[c]=true;save();render();}return;}
   const t=e.target.closest('button');if(!t)return;
   if(t.dataset.tab){tab=t.dataset.tab;render();window.scrollTo(0,0);return;}
   if(t.dataset.year!==undefined){store.sel={year:t.dataset.year,cls:''};save();render();return;}
