@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+/* WFA: calls to the WFA API go through this site's login-checked /_api proxy, so no token lives in this page. */
+(function(){var H='https://api.wallscourt-farm-academy.co.uk/',f=window.fetch;
+window.fetch=function(u,o){try{if(typeof u==='string'&&u.indexOf(H)===0){u='/_api/'+u.slice(H.length);var h=new Headers((o&&o.headers)||{});h.set('X-WFA-Proxy','1');o=Object.assign({},o,{headers:h});}}catch(e){}return f.call(this,u,o);};})();
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Oak Clips</title>
+<link rel="icon" href="../favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{--blue:#1798d3;--blue-d:#0f6e9c;--soft:#eef6fb;--dark:#0a0101;--bg:#f4f7f9;--card:#fff;--line:#dde3e8;--muted:#5d6b75;
+  --red:#d6453d;--green:#2e8b3d;--greenbg:#e5f4e7;--purple:#7a4bb5;--purplebg:#f0e8fa}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Nunito',-apple-system,sans-serif;font-weight:600;background:var(--bg);color:var(--dark)}
+#top{background:var(--blue);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+#top a.home{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none}
+#top img{height:34px;background:#fff;border-radius:8px;padding:3px}
+#top h1{margin:0;font-size:1.25rem;font-weight:900}
+#top .sub{opacity:.9;font-weight:700}
+main{max-width:980px;margin:0 auto;padding:16px 16px 70px}
+.ask{background:var(--card);border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+.ask label{display:block;font-weight:900;margin-bottom:8px;font-size:1.05rem}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+#link{flex:1 1 320px;min-width:0;font:700 16px 'Nunito',sans-serif;padding:11px 12px;border:2px solid var(--line);border-radius:10px}
+#link:focus{outline:none;border-color:var(--blue)}
+.btn{border:0;border-radius:10px;padding:10px 16px;font:800 .95rem 'Nunito',sans-serif;cursor:pointer;background:var(--blue);color:#fff;white-space:nowrap}
+.btn:disabled{opacity:.55;cursor:default}
+.btn.ghost{background:#fff;color:var(--blue);border:2px solid var(--blue)}
+.btn.small{padding:6px 11px;font-size:.85rem;border-radius:8px}
+.hint{color:var(--muted);font-size:.9rem;margin-top:8px;line-height:1.4}
+.recent{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.recent .lbl{font-weight:800;color:var(--muted);font-size:.85rem;margin-right:2px}
+.chip{border:2px solid var(--line);background:#fff;border-radius:18px;padding:5px 12px;font:800 .85rem 'Nunito',sans-serif;cursor:pointer;color:var(--dark);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip:hover{border-color:var(--blue)}
+.note{background:#fff;border-left:4px solid var(--blue);padding:10px 12px;border-radius:8px;color:var(--muted);margin:14px 0;line-height:1.45}
+.note.bad{border-color:var(--red);color:var(--red);font-weight:800}
+.note b{color:var(--dark)}
+.unit{margin:18px 0 6px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.unit h2{margin:0;font-size:1.4rem;font-weight:900}
+.unit .count{color:var(--muted);font-weight:800}
+.lesson{background:var(--card);border-radius:14px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin:12px 0}
+.lhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lhead h3{margin:0;font-size:1.15rem;font-weight:900;color:var(--blue);flex:1 1 260px}
+.lhead h3 .num{display:inline-block;background:var(--soft);color:var(--blue-d);border-radius:8px;padding:0 8px;margin-right:6px}
+.lhead a.oak{font-weight:800;font-size:.85rem;color:var(--muted)}
+.part{margin-top:10px}
+.part h4{margin:0 0 4px;font-size:.92rem;font-weight:900;color:var(--muted)}
+.clip{display:flex;align-items:center;gap:10px;padding:7px 4px;border-top:1px solid var(--line);flex-wrap:wrap}
+.clip:first-of-type{border-top:0}
+.play{width:38px;height:38px;flex:0 0 38px;border-radius:50%;border:0;background:var(--blue);color:#fff;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.play.on{background:var(--dark)}
+.ct{flex:1 1 200px;min-width:0}
+.ct .t{font-weight:800}
+.ct .m{font-size:.8rem;color:var(--muted);font-weight:700}
+.kind{display:inline-block;border-radius:8px;padding:0 7px;font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.03em;margin-right:6px}
+.kind.audio{background:var(--greenbg);color:var(--green)}
+.kind.video{background:var(--purplebg);color:var(--purple)}
+.player{flex:1 1 100%;padding:4px 0 6px 48px}
+.player audio{width:100%;max-width:520px}
+.player video{width:100%;max-width:640px;border-radius:10px;background:#000}
+.none{color:var(--muted);font-style:italic;margin-top:8px}
+.spin{display:inline-block;width:16px;height:16px;border:3px solid var(--soft);border-top-color:var(--blue);border-radius:50%;animation:s 1s linear infinite;vertical-align:-3px;margin-right:8px}
+@keyframes s{to{transform:rotate(360deg)}}
+.how{margin-top:22px}
+.how h3{margin:0 0 6px;font-size:1rem;font-weight:900}
+.how ol{margin:0;padding-left:20px;line-height:1.6;color:var(--muted)}
+#ver{position:fixed;left:10px;bottom:8px;font-size:.72rem;color:var(--muted);background:rgba(255,255,255,.85);padding:2px 8px;border-radius:8px}
+@media (max-width:560px){.player{padding-left:0}.lhead .btn{width:100%}}
+</style>
+</head>
+<body>
+<div id="top">
+  <a class="home" href="../index.html" title="Staff tools"><img src="../logo.png" alt=""><h1>Oak Clips</h1></a>
+  <span class="sub">Songs and videos from Oak lessons, ready for PowerPoint</span>
+</div>
+<main>
+  <div class="ask">
+    <label for="link">Paste the link to an Oak lesson, or to a unit's list of lessons</label>
+    <div class="row">
+      <input id="link" type="url" inputmode="url" autocomplete="off" placeholder="https://www.thenational.academy/teachers/programmes/…">
+      <button class="btn" id="go">Show clips</button>
+    </div>
+    <div class="hint">Copy the address from the top of the Oak page in your browser. A unit link shows every lesson in the unit.</div>
+    <div class="recent" id="recent"></div>
+  </div>
+  <div id="out"></div>
+  <div class="how">
+    <h3>Putting a clip into PowerPoint</h3>
+    <ol>
+      <li>Press <b>⬇ Save</b> next to a clip, or <b>⬇ Save all</b> for a whole lesson (a zip file: open it to get the clips out).</li>
+      <li>In PowerPoint: <b>Insert → Video</b> (or <b>Audio</b>) <b>→ This Device</b>, and choose the clip from your Downloads folder.</li>
+      <li>The song plays on the same slide as its words, so there's no need to switch to the website.</li>
+    </ol>
+    <div class="note">Oak's lessons are free to use, and the songs in them are cleared for teaching in UK schools. Keep the files in school: don't post them online or share them outside school.</div>
+  </div>
+</main>
+<div id="ver">WFA-10.11.26a</div>
+<script>
+const VERSION='WFA-10.11.26a';
+const API='https://api.wallscourt-farm-academy.co.uk/planning/oakclips?token=__hub__&link=';
+const RECENT_KEY='wfa_oak_recent_v1';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safe=s=>String(s||'').replace(/[\/:\\*?"<>|]/g,'-').replace(/\s+/g,' ').trim().replace(/\.+$/,'');
+const mmss=s=>s==null?'':Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+let DATA=null, busy=false;
+
+function getRecent(){try{return JSON.parse(localStorage.getItem(RECENT_KEY)||'[]')}catch(e){return[]}}
+function addRecent(link,label){
+  try{const r=getRecent().filter(x=>x.link!==link);r.unshift({link,label});localStorage.setItem(RECENT_KEY,JSON.stringify(r.slice(0,6)))}catch(e){}
+  drawRecent();
+}
+function drawRecent(){
+  const r=getRecent();
+  $('#recent').innerHTML=r.length?'<span class="lbl">Recent:</span>'+r.map((x,i)=>`<button class="chip" data-i="${i}" title="${esc(x.link)}">${esc(x.label)}</button>`).join(''):'';
+  $('#recent').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{$('#link').value=r[+b.dataset.i].link;show();});
+}
+
+function fileName(lesson,part,clip,ci){return `${part.n}-${String(ci+1).padStart(2,'0')} ${safe(clip.title)}.${clip.ext}`}
+
+async function show(){
+  const link=$('#link').value.trim();
+  if(!link||busy)return;
+  if(!/thenational\.academy/.test(link)){$('#out').innerHTML='<div class="note bad">That doesn\'t look like an Oak National Academy link. Copy the address from the Oak lesson page.</div>';return;}
+  busy=true;$('#go').disabled=true;
+  $('#out').innerHTML='<div class="note"><span class="spin"></span>Reading the lesson from Oak…</div>';
+  let d;
+  try{
+    const r=await fetch(API+encodeURIComponent(link));
+    d=await r.json();
+  }catch(e){d={ok:false,error:'Couldn\'t get the clips. Your sign-in may have run out: reload the page and try again.'};}
+  busy=false;$('#go').disabled=false;
+  if(d.error==='unauthorised')d={ok:false,error:'Your sign-in has run out. Reload the page and try again.'};
+  if(!d.ok){$('#out').innerHTML=`<div class="note bad">${esc(d.error||'Something went wrong. Try again.')}</div>`;return;}
+  DATA=d;
+  const u=new URL(location.href);u.searchParams.set('link',link);history.replaceState(null,'',u);
+  const one=d.lessons.length===1;
+  addRecent(link,one?d.lessons[0].title:(d.unit||'Unit')+' (whole unit)');
+  draw();
+}
+
+function draw(){
+  const d=DATA, total=d.lessons.reduce((n,l)=>n+l.parts.reduce((m,p)=>m+p.clips.length,0),0);
+  let h=`<div class="unit"><h2>${esc(d.unit||'Oak lesson')}</h2><span class="count">${d.lessons.length>1?d.lessons.length+' lessons · ':''}${total} clip${total===1?'':'s'}</span></div>`;
+  if(!total){$('#out').innerHTML=h+'<div class="note">This has no songs or video clips to save. Oak only has separate clips for some lessons, such as music.</div>';return;}
+  d.lessons.forEach((l,li)=>{
+    const n=l.parts.reduce((m,p)=>m+p.clips.length,0);
+    h+=`<div class="lesson"><div class="lhead"><h3>${l.order!=null&&d.lessons.length>1?`<span class="num">${l.order}</span>`:''}${esc(l.title)}</h3>
+      <a class="oak" href="${esc(l.url)}" target="_blank" rel="noopener">Open on Oak ↗</a>
+      ${n?`<button class="btn small" data-zip="${li}">⬇ Save all ${n}</button>`:''}</div>`;
+    if(!n)h+='<div class="none">No separate clips in this lesson.</div>';
+    l.parts.forEach((p,pi)=>{
+      h+=`<div class="part"><h4>${p.n===0?'Warm-up':'Part '+p.n}${p.title?': '+esc(p.title):''}</h4>`;
+      p.clips.forEach((c,ci)=>{
+        const id=`${li}-${pi}-${ci}`;
+        h+=`<div class="clip" id="c${id}"><button class="play" data-play="${id}" aria-label="Play ${esc(c.title)}">▶</button>
+          <div class="ct"><div class="t">${esc(c.title)}</div><div class="m"><span class="kind ${c.kind}">${c.kind==='video'?'Video':'Audio'}</span>${mmss(c.duration)}</div></div>
+          <button class="btn small ghost" data-save="${id}">⬇ Save</button></div>`;
+      });
+      h+='</div>';
+    });
+    h+='</div>';
+  });
+  $('#out').innerHTML=h;
+  $('#out').querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>play(b));
+  $('#out').querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>saveOne(b));
+  $('#out').querySelectorAll('[data-zip]').forEach(b=>b.onclick=()=>saveLesson(b));
+}
+
+function clipAt(id){const [li,pi,ci]=id.split('-').map(Number);const l=DATA.lessons[li],p=l.parts[pi];return{l,p,c:p.clips[ci],ci};}
+
+function play(b){
+  const id=b.dataset.play, row=$('#c'+id), open=row.querySelector('.player');
+  document.querySelectorAll('.player').forEach(x=>{x.querySelector('audio,video')?.pause();x.remove();});
+  document.querySelectorAll('.play.on').forEach(x=>{x.classList.remove('on');x.textContent='▶';});
+  if(open)return;
+  const {c}=clipAt(id);
+  const div=document.createElement('div');div.className='player';
+  div.innerHTML=c.kind==='video'?`<video controls playsinline autoplay src="${esc(c.url)}"></video>`:`<audio controls autoplay src="${esc(c.url)}"></audio>`;
+  row.appendChild(div);b.classList.add('on');b.textContent='■';
+}
+
+async function getBlob(url){
+  const r=await fetch(url);
+  if(!r.ok)throw new Error('download failed '+r.status);
+  return r.blob();
+}
+function hand(blob,name){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),60000);
+}
+
+async function saveOne(b){
+  const {l,p,c,ci}=clipAt(b.dataset.save), old=b.textContent;
+  b.disabled=true;b.innerHTML='<span class="spin"></span>Saving';
+  try{hand(await getBlob(c.url),fileName(l,p,c,ci));b.textContent='✓ Saved';}
+  catch(e){b.textContent='Try again';alert('That clip didn\'t download. Check the internet connection and try again.');}
+  b.disabled=false;setTimeout(()=>{if(b.textContent!=='Try again')b.textContent=old},4000);
+}
+
+async function saveLesson(b){
+  if(typeof JSZip==='undefined'){alert('The zip maker didn\'t load. Reload the page and try again.');return;}
+  const l=DATA.lessons[+b.dataset.zip], items=[];
+  l.parts.forEach(p=>p.clips.forEach((c,ci)=>items.push({p,c,ci})));
+  const old=b.textContent;b.disabled=true;
+  const zip=new JSZip(), folder=safe(l.title);
+  let done=0, failed=[];
+  const list=[l.title,l.url,''];
+  l.parts.forEach(p=>{list.push((p.n===0?'Warm-up':'Part '+p.n)+(p.title?' - '+p.title:''));p.clips.forEach((c,ci)=>list.push('  '+fileName(l,p,c,ci)));list.push('');});
+  zip.file(folder+'/Clip list.txt',list.join('\r\n'));
+  const work=items.slice();
+  async function worker(){
+    while(work.length){
+      const it=work.shift();
+      try{zip.file(folder+'/'+fileName(l,it.p,it.c,it.ci),await getBlob(it.c.url),{binary:true});}
+      catch(e){failed.push(it.c.title);}
+      done++;b.innerHTML=`<span class="spin"></span>${done} of ${items.length}`;
+    }
+  }
+  b.innerHTML=`<span class="spin"></span>0 of ${items.length}`;
+  await Promise.all([worker(),worker(),worker()]);
+  b.innerHTML='<span class="spin"></span>Making the zip';
+  try{
+    const blob=await zip.generateAsync({type:'blob',compression:'STORE'});
+    hand(blob,folder+'.zip');
+    b.textContent=failed.length?'⚠ Saved, '+failed.length+' missing':'✓ Saved';
+    if(failed.length)alert('These clips didn\'t download, so they aren\'t in the zip:\n\n'+failed.join('\n')+'\n\nTry them one at a time with ⬇ Save.');
+  }catch(e){b.textContent='Try again';alert('The zip couldn\'t be made (the lesson may be too big for this device). Save the clips one at a time instead.');}
+  b.disabled=false;setTimeout(()=>{if(b.textContent==='✓ Saved')b.textContent=old},5000);
+}
+
+$('#go').onclick=show;
+$('#link').addEventListener('keydown',e=>{if(e.key==='Enter')show();});
+drawRecent();
+const start=new URLSearchParams(location.search).get('link');
+if(start){$('#link').value=start;show();}
+</script>
+</body>
+</html>
