@@ -61,6 +61,14 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
 @keyframes spin{to{transform:rotate(360deg)}}
 .hint{font-size:.8rem;color:#888;font-weight:600;margin-top:6px}
 .version{text-align:center;color:#bbb;font-size:.75rem;padding:16px 0}
+.mode-tabs{display:flex;gap:6px;background:white;border-radius:12px;padding:5px;box-shadow:0 1px 8px rgba(0,0,0,.07);margin-bottom:16px}
+.mode-tab{flex:1;border:none;background:none;padding:10px 8px;border-radius:8px;font-weight:800;font-size:.92rem;font-family:'Nunito',sans-serif;cursor:pointer;color:#555}
+.mode-tab:hover{background:#f0f7fc}
+.mode-tab.active{background:#1798d3;color:white}
+.ps-list{list-style:none;margin:12px 0 4px;padding:0;display:grid;gap:6px}
+.ps-list li{display:flex;gap:10px;align-items:baseline;padding:8px 12px;border:1.5px solid #e8e8e8;border-radius:8px;font-size:.95rem;font-weight:700}
+.ps-list .n{color:#1798d3;font-weight:900;min-width:18px}
+.ps-list .a{margin-left:auto;color:#2e7d32;font-weight:800;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -73,8 +81,13 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
 
 <div class="container">
 
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="tabPaper" onclick="setMode('paper')">📄 Full paper</button>
+    <button class="mode-tab" id="tabPractice" onclick="setMode('practice')">📝 Practice sheet (one skill)</button>
+  </div>
+
   <!-- Session Setup -->
-  <div class="card">
+  <div class="card" id="setupCard">
     <h2>📅 Session Setup</h2>
     <div class="row">
       <div>
@@ -100,6 +113,53 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
     </div>
   </div>
 
+  <!-- Practice sheet: one skill, one double-sided sheet -->
+  <div id="practiceMode" style="display:none">
+  <div class="card">
+    <h2>📝 Practice Sheet — one skill</h2>
+    <p class="hint" style="margin:-6px 0 14px">One sheet of paper printed double-sided: half the questions on each side, with plenty of room for working. Questions start easier and get harder.</p>
+    <div class="row">
+      <div>
+        <label class="lbl">Level</label>
+        <select id="psLevel">
+          <option value="Y3">Year 3</option>
+          <option value="Y4">Year 4</option>
+          <option value="Y5">Year 5</option>
+          <option value="Y6">Year 6</option>
+        </select>
+      </div>
+      <div>
+        <label class="lbl">Number of questions</label>
+        <select id="psCount">
+          <option>4</option><option>5</option><option selected>6</option><option>7</option><option>8</option>
+        </select>
+      </div>
+    </div>
+    <label class="lbl">Skill</label>
+    <select id="psSkill" style="margin-bottom:4px"></select>
+    <p class="hint" id="psSkillHint" style="margin:0 0 14px"></p>
+    <div class="toggle-row" id="psNoMixedRow" style="display:none">
+      <input type="checkbox" id="psNoMixed">
+      <label for="psNoMixed">No mixed numbers</label>
+      <small>— no mixed numbers in the questions; answers bigger than 1 stay as improper fractions (e.g. 11/8)</small>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" id="btnPractice" onclick="makePracticeSheet()">Make practice sheet</button>
+    </div>
+    <div id="psResult" style="display:none;margin-top:14px;border-top:1px solid #eee;padding-top:14px">
+      <ol class="ps-list" id="psList"></ol>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+        <button class="btn btn-primary" onclick="downloadPracticeSheet(this)">💾 Download sheet (PDF)</button>
+        <button class="btn btn-amber" onclick="downloadPracticeAnswers(this)">🗒 Download answers (PDF)</button>
+        <button class="btn btn-navy" onclick="previewPracticeSheet()">👁 Preview sheet</button>
+        <button class="btn btn-green" onclick="makePracticeSheet()">🔄 New questions</button>
+      </div>
+      <p class="hint">Print the sheet double-sided (flip on long edge). Every pupil gets the same questions.</p>
+    </div>
+  </div>
+  </div>
+
+  <div id="paperMode">
   <!-- Standard paper -->
   <div class="card">
     <h2>📄 Standard Paper</h2>
@@ -290,8 +350,9 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
       <div id="paperBtns"></div>
     </div>
   </div>
+  </div><!-- /paperMode -->
 
-  <div class="version">06.11.26b</div>
+  <div class="version">11.11.26a</div>
 </div>
 
 <script>
@@ -399,6 +460,439 @@ function orderQuestions(qs, mode, topicOrder, ownYg) {
   return qs;
 }
 
+// ─── PRACTICE SHEETS (one skill, one double-sided sheet) ─────────────────────
+// Each skill lists its question makers from easiest to hardest. A sheet of n questions
+// walks that list evenly from first to last, so it always starts easy and ends on the hardest kind.
+function lcm(a, b) { return a * b / gcd(a, b); }
+const nf = n => Math.abs(n) >= 10000 ? n.toLocaleString('en-GB') : String(n);
+const numStr = x => String(parseFloat(Number(x).toFixed(6)));
+const decStr = (m, dp) => (m / 10 ** dp).toFixed(dp);
+function decM(lo, hi) { let m; do { m = rand(lo, hi); } while (m % 10 === 0); return m; }
+let psNoMixed = false; // set while making a sheet with "No mixed numbers" ticked
+function fracImproper(n, d) { const g = gcd(n, d); return d / g === 1 ? `${n / g}` : `${n / g}/${d / g}`; }
+function fracAns(n, d) { const s = psNoMixed ? fracImproper(n, d) : fracStr(n, d), raw = `${n}/${d}`; return s === raw ? s : `${raw} = ${s}`; }
+// Marks a question maker that puts mixed numbers in the question (left out when "No mixed numbers" is ticked).
+const MIXQ = fn => Object.assign(fn, {mixed: true});
+function coprimeNum(d, lo = 1) { let n; do { n = rand(lo, d - 1); } while (gcd(n, d) !== 1); return n; }
+function carries(a, b) { let c = 0, k = 0; while (a > 0 || b > 0) { c = (a % 10 + b % 10 + c) >= 10 ? 1 : 0; k += c; a = Math.floor(a / 10); b = Math.floor(b / 10); } return k; }
+function borrows(a, b) { let br = 0, k = 0; while (a > 0 || b > 0) { br = (a % 10 - br - b % 10) < 0 ? 1 : 0; k += br; a = Math.floor(a / 10); b = Math.floor(b / 10); } return k; }
+function findPair(gen, ok) { let p = gen(); for (let i = 0; i < 5000 && !ok(...p); i++) p = gen(); return p; }
+const PT = (text, answer, x) => Object.assign({text, answer: String(answer), marks: 1}, x || {});
+const PF = (n1, d1, op, n2, d2, answer) => ({frac: [[n1, d1], [n2, d2]], fracOp: op, answer: String(answer), marks: 1});
+const MIX = (w, n, d) => `${w} ${n}/${d}`;
+// Two denominators where one is a multiple of the other (Y5), e.g. 3 and 12.
+function relatedDenoms() { let d1, k; do { d1 = pick([2, 3, 4, 5, 6]); k = pick([2, 3, 4]); } while (d1 * k > 20); return [d1, d1 * k]; }
+// Two denominators where neither divides the other (Y6), e.g. 4 and 6.
+function unrelatedDenoms() { let a, b; do { a = rand(2, 12); b = rand(2, 12); } while (a === b || a % b === 0 || b % a === 0 || lcm(a, b) > 40); return [a, b]; }
+
+// Column add/subtract helpers
+const colAdd = (lo1, hi1, lo2, hi2, ok) => () => { const [a, b] = findPair(() => [rand(lo1, hi1), rand(lo2, hi2)], ok); return PT(`${nf(a)} + ${nf(b)} =`, nf(a + b), {col: true}); };
+const colSub = (gen, ok) => () => { const [a, b] = findPair(gen, (a, b) => a > b && ok(a, b)); return PT(`${nf(a)} − ${nf(b)} =`, nf(a - b), {col: true}); };
+const LM = (alo, ahi, blo, bhi) => () => { const a = rand(alo, ahi), b = rand(blo, bhi); return {longMult: {a, b}, answer: nf(a * b), marks: 2}; };
+const LD = (dlo, dhi, qlo, qhi, nlo, nhi) => () => { const [d, q] = findPair(() => [rand(dlo, dhi), rand(qlo, qhi)], (d, q) => d * q >= nlo && d * q <= nhi && q % 10 !== 0); return {longDiv: {divisor: d, dividend: d * q}, answer: String(q), marks: 2}; };
+const divQ = (dlo, dhi, qlo, qhi, nlo, nhi, ok = () => true) => () => { const [d, q] = findPair(() => [rand(dlo, dhi), rand(qlo, qhi)], (d, q) => d * q >= nlo && d * q <= nhi && ok(d, q)); return PT(`${nf(d * q)} ÷ ${d} =`, q, {work: true}); };
+const mulQ = (alo, ahi, ms, ok = () => true) => () => { const [a, m] = findPair(() => [rand(alo, ahi), pick(ms)], ok); return PT(`${nf(a)} × ${m} =`, nf(a * m), {work: true}); };
+const fracOf = (ds, nonUnit, klo, khi) => () => { const d = pick(ds), n = nonUnit ? coprimeNum(d, 2) : 1, a = d * rand(klo, khi); return PT(`${n}/${d} of ${nf(a)} =`, nf(n * a / d)); };
+const pctOf = (pcts, step, klo, khi) => () => { const p = pick(pcts), a = step * rand(klo, khi); return PT(`${p}% of ${nf(a)} =`, numStr(a * p / 100)); };
+
+const PRACTICE_SKILLS = {
+  Y3: [
+    {id: 'y3add', label: 'Column addition (3-digit)', hint: 'No exchanging → one exchange → two exchanges.', gens: [
+      colAdd(100, 499, 100, 499, (a, b) => carries(a, b) === 0),
+      colAdd(100, 599, 100, 399, (a, b) => carries(a, b) === 1 && a + b < 1000),
+      colAdd(100, 599, 100, 399, (a, b) => carries(a, b) === 2 && a + b < 1000),
+    ]},
+    {id: 'y3sub', label: 'Column subtraction (3-digit)', hint: 'No exchanging → one exchange → two exchanges.', gens: [
+      colSub(() => [rand(300, 999), rand(100, 899)], (a, b) => borrows(a, b) === 0),
+      colSub(() => [rand(300, 999), rand(100, 899)], (a, b) => borrows(a, b) === 1),
+      colSub(() => [rand(300, 999), rand(100, 899)], (a, b) => borrows(a, b) === 2),
+    ]},
+    {id: 'y3tables', label: 'Times tables ×3, ×4, ×8', hint: 'Multiplication facts → division facts → missing numbers.', gens: [
+      () => { const f = pick([3, 4, 8]), a = rand(2, 12); return PT(`${a} × ${f} =`, a * f); },
+      () => { const f = pick([3, 4, 8]), a = rand(2, 12); return PT(`${f} × ${a} =`, a * f); },
+      () => { const f = pick([3, 4, 8]), a = rand(2, 12); return PT(`${a * f} ÷ ${f} =`, a); },
+      () => { const f = pick([3, 4, 8]), a = rand(2, 12); return PT(`[BOX] × ${f} = ${a * f}`, a, {box: true}); },
+    ]},
+    {id: 'y3mult', label: 'Short multiplication (2-digit × 1-digit)', hint: 'No exchanging → exchanging → larger numbers.', gens: [
+      mulQ(11, 44, [2, 3, 4], (a, m) => (a % 10) * m < 10 && Math.floor(a / 10) * m < 10),
+      mulQ(13, 49, [3, 4, 5, 8], (a, m) => (a % 10) * m >= 10),
+      mulQ(51, 99, [3, 4, 8], (a, m) => (a % 10) * m >= 10),
+    ]},
+    {id: 'y3div', label: 'Division (2-digit ÷ 1-digit)', hint: 'No exchanging → exchanging → dividing by 8.', gens: [
+      divQ(2, 4, 11, 49, 20, 99, (d, q) => Math.floor(q / 10) * d < 10 && (q % 10) * d < 10 && q % 10 !== 0),
+      divQ(3, 5, 12, 30, 30, 99, (d, q) => Math.floor(d * q / 10) % d !== 0),
+      divQ(4, 8, 13, 24, 100, 192, (d, q) => d === 4 || d === 8),
+    ]},
+    {id: 'y3frac', label: 'Adding and subtracting fractions (same denominator)', hint: 'Adding → subtracting → three fractions.', gens: [
+      () => { const d = rand(3, 10), n1 = rand(1, d - 2), n2 = rand(1, d - 1 - n1); return PF(n1, d, '+', n2, d, fracAns(n1 + n2, d)); },
+      () => { const d = rand(3, 10), n1 = rand(2, d - 1), n2 = rand(1, n1 - 1); return PF(n1, d, '−', n2, d, fracAns(n1 - n2, d)); },
+      () => { const d = rand(7, 12), a = rand(1, 3), b = rand(1, 3), c = rand(1, d - a - b); return PT(`${a}/${d} + ${b}/${d} + ${c}/${d} =`, fracAns(a + b + c, d)); },
+    ]},
+    {id: 'y3fracof', label: 'Fractions of amounts', hint: '½ and ¼ → ⅓, ⅕, 1/10 → ⅛ → non-unit fractions like ⅔.', gens: [
+      fracOf([2, 4], false, 2, 12),
+      fracOf([3, 5, 10], false, 2, 10),
+      fracOf([8], false, 2, 10),
+      fracOf([3, 4, 5], true, 2, 10),
+    ]},
+  ],
+  Y4: [
+    {id: 'y4add', label: 'Column addition (4-digit)', hint: 'One exchange → two exchanges → three exchanges.', gens: [
+      colAdd(1000, 8999, 100, 999, (a, b) => carries(a, b) === 1 && a + b < 10000),
+      colAdd(1000, 6999, 1000, 4999, (a, b) => carries(a, b) === 2 && a + b < 10000),
+      colAdd(1000, 6999, 1000, 4999, (a, b) => carries(a, b) === 3 && a + b < 10000),
+    ]},
+    {id: 'y4sub', label: 'Column subtraction (4-digit)', hint: 'One exchange → several exchanges → exchanging across a zero.', gens: [
+      colSub(() => [rand(2000, 9999), rand(100, 999)], (a, b) => borrows(a, b) === 1),
+      colSub(() => [rand(3000, 9999), rand(1000, 8999)], (a, b) => borrows(a, b) >= 2),
+      colSub(() => [rand(2, 9) * 1000 + pick([0, rand(1, 9) * 100]) + rand(1, 9), rand(1000, 8999)], (a, b) => a - b >= 100 && borrows(a, b) >= 2),
+    ]},
+    {id: 'y4tables', label: 'Times tables to 12 × 12', hint: '×6, ×7, ×9, ×11, ×12 facts → division facts → missing numbers → three numbers.', gens: [
+      () => { const f = pick([6, 7, 9, 11, 12]), a = rand(2, 12); return PT(`${a} × ${f} =`, a * f); },
+      () => { const f = pick([6, 7, 9, 11, 12]), a = rand(2, 12); return PT(`${a * f} ÷ ${f} =`, a); },
+      () => { const f = pick([6, 7, 8, 9, 12]), a = rand(3, 12); return PT(`[BOX] × ${f} = ${a * f}`, a, {box: true}); },
+      () => { const [a, b, c] = findPair(() => [rand(2, 5), rand(2, 5), pick([2, 3, 4, 5, 10])], (a, b, c) => a * b * c <= 120); return PT(`${a} × ${b} × ${c} =`, a * b * c); },
+    ]},
+    {id: 'y4mult', label: 'Short multiplication (2- and 3-digit × 1-digit)', hint: '2-digit → 3-digit → 3-digit × 6, 7, 8 or 9.', gens: [
+      mulQ(23, 99, [6, 7, 8, 9]),
+      mulQ(101, 499, [3, 4, 5]),
+      mulQ(201, 999, [6, 7, 8, 9]),
+    ]},
+    {id: 'y4div', label: 'Short division (2- and 3-digit ÷ 1-digit)', hint: '2-digit with exchanging → 3-digit → 3-digit ÷ 6, 7, 8 or 9.', gens: [
+      divQ(3, 9, 11, 30, 30, 99, (d, q) => Math.floor(d * q / 10) % d !== 0),
+      divQ(2, 5, 25, 450, 100, 999),
+      divQ(6, 9, 13, 150, 100, 999),
+    ]},
+    {id: 'y4pv', label: 'Multiplying and dividing by 10 and 100', hint: '× 10 → × 100 → ÷ 10 → ÷ 100 → answers with tenths.', gens: [
+      () => { const a = rand(12, 999); return PT(`${a} × 10 =`, nf(a * 10)); },
+      () => { const a = rand(12, 99); return PT(`${a} × 100 =`, nf(a * 100)); },
+      () => { const a = rand(12, 999) * 10; return PT(`${nf(a)} ÷ 10 =`, a / 10); },
+      () => { const a = rand(12, 99) * 100; return PT(`${nf(a)} ÷ 100 =`, a / 100); },
+      () => { const a = decM(3, 99); return PT(`${a} ÷ 10 =`, numStr(a / 10)); },
+    ]},
+    {id: 'y4frac', mix: true, label: 'Adding and subtracting fractions (same denominator)', hint: 'Adding → subtracting → answers bigger than 1 → 1 take away a fraction → three fractions.', gens: [
+      () => { const d = rand(5, 12), n1 = rand(1, d - 2), n2 = rand(1, d - 1 - n1); return PF(n1, d, '+', n2, d, fracAns(n1 + n2, d)); },
+      () => { const d = rand(5, 12), n1 = rand(2, d - 1), n2 = rand(1, n1 - 1); return PF(n1, d, '−', n2, d, fracAns(n1 - n2, d)); },
+      () => { const d = rand(4, 10), n1 = rand(2, d - 1), n2 = rand(d - n1 + 1, d - 1); return PF(n1, d, '+', n2, d, fracAns(n1 + n2, d)); },
+      () => { const d = rand(3, 12), n = rand(1, d - 1); return PT(`1 − ${n}/${d} =`, fracAns(d - n, d)); },
+      () => { const d = rand(7, 12), n1 = rand(2, d - 3), n2 = rand(1, d - 1 - n1), n3 = rand(1, n1 + n2 - 1); return PT(`${n1}/${d} + ${n2}/${d} − ${n3}/${d} =`, fracAns(n1 + n2 - n3, d)); },
+    ]},
+    {id: 'y4fracof', label: 'Fractions of amounts', hint: 'Unit fractions → non-unit fractions → bigger amounts.', gens: [
+      fracOf([2, 3, 4, 5, 6, 8, 10], false, 2, 12),
+      fracOf([3, 4, 5], true, 2, 12),
+      fracOf([6, 7, 8, 9, 10, 12], true, 2, 12),
+      fracOf([3, 4, 5, 6, 8], true, 21, 99),
+    ]},
+  ],
+  Y5: [
+    {id: 'y5frac', mix: true, label: 'Adding and subtracting fractions', hint: 'Same denominator → related denominators (e.g. 1/3 + 5/12) → mixed numbers.', gens: [
+      () => { const d = rand(5, 12), n1 = rand(2, d - 1), n2 = rand(d - n1 + 1, d - 1); return PF(n1, d, '+', n2, d, fracAns(n1 + n2, d)); },
+      () => { const d = rand(5, 12), n1 = rand(3, d - 1), n2 = rand(1, n1 - 1); return PF(n1, d, '−', n2, d, fracAns(n1 - n2, d)); },
+      () => { const [ds, db] = relatedDenoms(), a = coprimeNum(ds), b = coprimeNum(db); const N = a * (db / ds) + b; return Math.random() < 0.5 ? PF(a, ds, '+', b, db, fracAns(N, db)) : PF(b, db, '+', a, ds, fracAns(N, db)); },
+      () => { let ds, db, a, b; do { [ds, db] = relatedDenoms(); a = coprimeNum(ds); b = coprimeNum(db); } while (a * (db / ds) === b); const A = a * (db / ds); return A > b ? PF(a, ds, '−', b, db, fracAns(A - b, db)) : PF(b, db, '−', a, ds, fracAns(b - A, db)); },
+      MIXQ(() => { const [ds, db] = relatedDenoms(), w = rand(1, 4); let a = coprimeNum(ds), b = coprimeNum(db); const smallFirst = Math.random() < 0.5; const [n1, d1, n2, d2] = smallFirst ? [a, ds, b, db] : [b, db, a, ds]; const N = w * db + n1 * (db / d1) + n2 * (db / d2); return PT(`${MIX(w, n1, d1)} + ${n2}/${d2} =`, fracStr(N, db)); }),
+      MIXQ(() => { const [ds, db] = relatedDenoms(), w1 = rand(3, 7), w2 = rand(1, w1 - 1); const a = coprimeNum(ds), b = coprimeNum(db); const smallFirst = Math.random() < 0.5; const [n1, d1, n2, d2] = smallFirst ? [a, ds, b, db] : [b, db, a, ds]; const N = (w1 * db + n1 * (db / d1)) - (w2 * db + n2 * (db / d2)); return PT(`${MIX(w1, n1, d1)} − ${MIX(w2, n2, d2)} =`, fracStr(N, db)); }),
+    ]},
+    {id: 'y5fracmult', mix: true, label: 'Multiplying fractions by whole numbers', hint: 'Unit fractions → answers bigger than 1 → whole number first → mixed numbers.', gens: [
+      () => { const d = rand(3, 12), m = rand(2, d - 1); return PT(`1/${d} × ${m} =`, fracAns(m, d)); },
+      () => { const d = rand(3, 9), n = coprimeNum(d, 2), m = rand(2, 5); return PT(`${n}/${d} × ${m} =`, fracAns(n * m, d)); },
+      () => { const d = rand(4, 10), n = coprimeNum(d, 2), m = rand(3, 8); return PT(`${m} × ${n}/${d} =`, fracAns(n * m, d)); },
+      MIXQ(() => { const d = rand(3, 8), n = coprimeNum(d), w = rand(1, 3), m = rand(2, 5); return PT(`${MIX(w, n, d)} × ${m} =`, fracStr((w * d + n) * m, d)); }),
+    ]},
+    {id: 'y5fracof', label: 'Fractions of amounts', hint: 'Non-unit fractions → sevenths, ninths, twelfths → 4-digit amounts.', gens: [
+      fracOf([3, 4, 5, 6, 8, 10], true, 5, 25),
+      fracOf([7, 9, 11, 12], true, 10, 40),
+      fracOf([4, 5, 8], true, 150, 1200),
+    ]},
+    {id: 'y5dec', label: 'Adding and subtracting decimals', hint: 'Tenths → mixed decimal places → whole number take away a decimal → thousandths.', gens: [
+      () => { const a = decM(11, 99), b = decM(11, 99); return PT(`${decStr(a, 1)} + ${decStr(b, 1)} =`, numStr((a + b) / 10)); },
+      () => { const a = decM(101, 999), b = decM(11, 99); return PT(`${decStr(a, 2)} + ${decStr(b, 1)} =`, numStr((a + b * 10) / 100)); },
+      () => { const w = rand(3, 20), b = decM(101, w * 100 - 1); return PT(`${w} − ${decStr(b, 2)} =`, numStr((w * 100 - b) / 100)); },
+      () => { const a = decM(1001, 9999), b = decM(11, 999); return PT(`${decStr(a, 3)} + ${decStr(b, 2)} =`, numStr((a + b * 10) / 1000)); },
+      () => { const a = decM(31, 150), b = decM(1001, a * 100 - 1); return PT(`${decStr(a, 1)} − ${decStr(b, 3)} =`, numStr((a * 100 - b) / 1000)); },
+    ]},
+    {id: 'y5pv', label: 'Multiplying and dividing by 10, 100 and 1,000', hint: 'Whole numbers → decimals × 10/100/1,000 → answers with decimals.', gens: [
+      () => { const a = rand(12, 999), f = pick([10, 100, 1000]); return PT(`${a} × ${nf(f)} =`, nf(a * f)); },
+      () => { const f = pick([10, 100, 1000]), a = rand(12, 99) * f; return PT(`${nf(a)} ÷ ${nf(f)} =`, a / f); },
+      () => { const m = decM(101, 999), dp = pick([1, 2]), f = pick([10, 100, 1000]); return PT(`${decStr(m, dp)} × ${nf(f)} =`, nf(+numStr(m * f / 10 ** dp))); },
+      () => { const f = pick([100, 1000]), a = decM(11, 999); return PT(`${a} ÷ ${nf(f)} =`, numStr(a / f)); },
+      () => { const m = decM(11, 99), f = pick([10, 100]); return PT(`${decStr(m, 1)} ÷ ${f} =`, numStr(m / 10 / f)); },
+    ]},
+    {id: 'y5pct', label: 'Percentages of amounts', hint: '50% and 10% → 25% → 75% and 20% → 1% and 5%.', gens: [
+      pctOf([50, 10], 10, 2, 50),
+      pctOf([25], 4, 3, 30),
+      () => pick([pctOf([75], 4, 3, 30), pctOf([20], 5, 3, 30)])(),
+      () => pick([pctOf([1], 100, 2, 9), pctOf([5], 20, 2, 30)])(),
+    ]},
+    {id: 'y5add', label: 'Column addition (5- and 6-digit)', hint: 'Different lengths → several exchanges → 6-digit → three numbers.', gens: [
+      colAdd(10000, 89999, 1000, 9999, (a, b) => carries(a, b) >= 1 && carries(a, b) <= 2),
+      colAdd(10000, 59999, 10000, 39999, (a, b) => carries(a, b) >= 2 && a + b < 100000),
+      colAdd(100000, 599999, 10000, 99999, (a, b) => carries(a, b) >= 3),
+      () => { const a = rand(10000, 59999), b = rand(1000, 9999), c = rand(100, 999); return PT(`${nf(a)} + ${nf(b)} + ${nf(c)} =`, nf(a + b + c), {col: true}); },
+    ]},
+    {id: 'y5sub', label: 'Column subtraction (5- and 6-digit)', hint: 'Different lengths → several exchanges → exchanging across zeros → 6-digit.', gens: [
+      colSub(() => [rand(20000, 99999), rand(1000, 9999)], (a, b) => borrows(a, b) >= 1 && borrows(a, b) <= 2),
+      colSub(() => [rand(30000, 99999), rand(10000, 89999)], (a, b) => borrows(a, b) >= 2 && a - b >= 1000),
+      colSub(() => [rand(2, 9) * 10000 + pick([0, rand(1, 9) * 100]) + rand(1, 99), rand(10000, 39999)], (a, b) => a - b > 1000 && borrows(a, b) >= 3),
+      colSub(() => [rand(200000, 999999), rand(10000, 199999)], (a, b) => borrows(a, b) >= 3),
+    ]},
+    {id: 'y5mult', label: 'Short multiplication (4-digit × 1-digit)', hint: '3-digit → 4-digit → 4-digit with a zero → 4-digit × 7, 8 or 9.', gens: [
+      mulQ(201, 999, [6, 7, 8, 9]),
+      mulQ(1002, 2999, [3, 4, 5]),
+      mulQ(1000, 9999, [4, 5, 6, 7], (a, m) => String(a).slice(1).includes('0') && a % 10 !== 0 && a * m < 100000),
+      mulQ(1201, 9999, [7, 8, 9]),
+    ]},
+    {id: 'y5long', label: 'Long multiplication', hint: '2-digit × 2-digit → 3-digit × 2-digit → 4-digit × 2-digit. Each is worth 2 marks.', gens: [
+      LM(23, 99, 12, 99),
+      LM(102, 999, 12, 99),
+      LM(1002, 9999, 12, 79),
+    ]},
+    {id: 'y5div', label: 'Short division (4-digit ÷ 1-digit)', hint: '3-digit → 4-digit → a zero in the answer → remainders.', gens: [
+      divQ(6, 9, 15, 160, 100, 999),
+      divQ(3, 9, 112, 3333, 1000, 9999),
+      () => { const [d, q] = findPair(() => [rand(3, 9), rand(1, 9) * 100 + rand(1, 9)], (d, q) => d * q >= 1000 && d * q <= 9999); return PT(`${nf(d * q)} ÷ ${d} =`, q, {work: true}); },
+      () => { const [d, q] = findPair(() => [rand(3, 9), rand(112, 3333)], (d, q) => d * q + d - 1 <= 9999 && d * q >= 1000); const r = rand(1, d - 1); return PT(`${nf(d * q + r)} ÷ ${d} =`, `${q} r ${r}`, {work: true}); },
+    ]},
+  ],
+  Y6: [
+    {id: 'y6frac', mix: true, label: 'Adding and subtracting fractions', hint: 'Different denominators → subtracting → mixed numbers → subtracting mixed numbers.', gens: [
+      () => { const [d1, d2] = unrelatedDenoms(), n1 = coprimeNum(d1), n2 = coprimeNum(d2), L = lcm(d1, d2); return PF(n1, d1, '+', n2, d2, fracAns(n1 * (L / d1) + n2 * (L / d2), L)); },
+      () => { let d1, d2, n1, n2, L; do { [d1, d2] = unrelatedDenoms(); n1 = coprimeNum(d1); n2 = coprimeNum(d2); L = lcm(d1, d2); } while (n1 * (L / d1) <= n2 * (L / d2)); return PF(n1, d1, '−', n2, d2, fracAns(n1 * (L / d1) - n2 * (L / d2), L)); },
+      MIXQ(() => { const [d1, d2] = unrelatedDenoms(), n1 = coprimeNum(d1), n2 = coprimeNum(d2), L = lcm(d1, d2), w1 = rand(1, 5), w2 = rand(1, 4); return PT(`${MIX(w1, n1, d1)} + ${MIX(w2, n2, d2)} =`, fracStr((w1 + w2) * L + n1 * (L / d1) + n2 * (L / d2), L)); }),
+      MIXQ(() => { const [d1, d2] = unrelatedDenoms(), n1 = coprimeNum(d1), n2 = coprimeNum(d2), L = lcm(d1, d2), w1 = rand(3, 8), w2 = rand(1, w1 - 1); return PT(`${MIX(w1, n1, d1)} − ${MIX(w2, n2, d2)} =`, fracStr((w1 - w2) * L + n1 * (L / d1) - n2 * (L / d2), L)); }),
+    ]},
+    {id: 'y6fracmult', label: 'Multiplying fractions', hint: 'Unit fractions → proper fractions → answers that simplify.', gens: [
+      () => { const a = rand(2, 9), b = rand(2, 9); return PT(`1/${a} × 1/${b} =`, `1/${a * b}`); },
+      () => { const [n1, d1, n2, d2] = findPair(() => { const d1 = rand(3, 9), d2 = rand(3, 9); return [coprimeNum(d1), d1, coprimeNum(d2), d2]; }, (n1, d1, n2, d2) => gcd(n1 * n2, d1 * d2) === 1 && n1 * n2 > 1); return PT(`${n1}/${d1} × ${n2}/${d2} =`, fracAns(n1 * n2, d1 * d2)); },
+      () => { const [n1, d1, n2, d2] = findPair(() => { const d1 = rand(3, 10), d2 = rand(3, 10); return [coprimeNum(d1), d1, coprimeNum(d2), d2]; }, (n1, d1, n2, d2) => gcd(n1 * n2, d1 * d2) > 1); return PT(`${n1}/${d1} × ${n2}/${d2} =`, fracAns(n1 * n2, d1 * d2)); },
+    ]},
+    {id: 'y6fracdiv', label: 'Dividing fractions by whole numbers', hint: 'Unit fractions → other fractions → answers that simplify.', gens: [
+      () => { const d = rand(2, 9), m = rand(2, 6); return PT(`1/${d} ÷ ${m} =`, `1/${d * m}`); },
+      () => { const [n, d, m] = findPair(() => { const d = rand(3, 9); return [coprimeNum(d, 2), d, rand(2, 5)]; }, (n, d, m) => n > 1 && gcd(n, m) === 1); return PT(`${n}/${d} ÷ ${m} =`, fracAns(n, d * m)); },
+      () => { const [k, m, d] = findPair(() => [rand(1, 4), rand(2, 4), rand(5, 13)], (k, m, d) => k * m < d && gcd(k * m, d) === 1); return PT(`${k * m}/${d} ÷ ${m} =`, fracAns(k * m, d * m)); },
+    ]},
+    {id: 'y6pct', label: 'Percentages of amounts', hint: 'Multiples of 10% → 5% and 15% → 35%, 45%, 65% → harder percentages.', gens: [
+      pctOf([20, 30, 40, 60, 70], 10, 3, 30),
+      pctOf([5, 15], 20, 3, 30),
+      pctOf([35, 45, 65], 20, 3, 30),
+      pctOf([12, 4, 8, 2], 100, 2, 9),
+    ]},
+    {id: 'y6dec', label: 'Multiplying and dividing decimals', hint: '0.7 × 8 → decimals × whole numbers → dividing decimals by whole numbers.', gens: [
+      () => { const d = rand(2, 9), n = rand(3, 9); return PT(`0.${d} × ${n} =`, numStr(d * n / 10)); },
+      () => { const m = decM(11, 99), n = rand(3, 9); return PT(`${decStr(m, 1)} × ${n} =`, numStr(m * n / 10)); },
+      () => { const m = decM(101, 999), n = rand(3, 9); return PT(`${decStr(m, 2)} × ${n} =`, numStr(m * n / 100)); },
+      () => { const n = rand(3, 9), q = rand(2, 9); return PT(`${numStr(n * q / 10)} ÷ ${n} =`, numStr(q / 10)); },
+      () => { const n = rand(3, 9), q = decM(11, 99); return PT(`${numStr(n * q / 10)} ÷ ${n} =`, numStr(q / 10)); },
+    ]},
+    {id: 'y6bodmas', label: 'Order of operations', hint: '× before + → brackets → ÷ and × together → squares and cubes.', gens: [
+      () => { const a = rand(2, 20), b = rand(2, 9), c = rand(2, 9); return PT(`${a} + ${b} × ${c} =`, a + b * c); },
+      () => { const a = rand(2, 12), b = rand(2, 9), c = rand(2, 9); return Math.random() < 0.5 ? PT(`(${a} + ${b}) × ${c} =`, (a + b) * c) : PT(`${c} × (${a + b} − ${b}) =`, c * a); },
+      () => { const b = rand(2, 9), q = rand(2, 12), c = rand(2, 9), d = rand(2, 9); return PT(`${b * q} ÷ ${b} + ${c} × ${d} =`, q + c * d); },
+      () => pick([
+        () => { const a = rand(2, 9), b = rand(2, 7), c = rand(2, 8); return PT(`${a} + ${b}<sup>2</sup> × ${c} =`, a + b * b * c); },
+        () => { const [a, b, c] = findPair(() => [pick([2, 3, 4]), rand(2, 9), rand(2, 9)], (a, b, c) => a ** 3 > b * c); return PT(`${a}<sup>3</sup> − ${b} × ${c} =`, a ** 3 - b * c); },
+        () => { const b = pick([2, 3, 4, 5]), div = pick([3, 4, 5, 7]); const q = rand(Math.ceil((b * b + 1) / div), Math.ceil((b * b + 1) / div) + 5); return PT(`(${b}<sup>2</sup> + ${div * q - b * b}) ÷ ${div} =`, q); },
+      ])(),
+    ]},
+    {id: 'y6long', label: 'Long multiplication', hint: '3-digit × 2-digit → 4-digit × 2-digit → bigger multipliers. Each is worth 2 marks.', gens: [
+      LM(102, 999, 23, 99),
+      LM(1002, 9999, 12, 59),
+      LM(1002, 9999, 60, 99),
+    ]},
+    {id: 'y6longdiv', label: 'Long division', hint: '3-digit ÷ 2-digit → 4-digit ÷ 2-digit → 3-digit answers. Each is worth 2 marks.', gens: [
+      LD(11, 25, 12, 40, 100, 999),
+      LD(12, 49, 21, 99, 1000, 9999),
+      LD(11, 35, 101, 600, 1000, 9999),
+    ]},
+  ],
+};
+// ─── END PRACTICE CATALOGUE ───
+
+const LEVEL_NAME = {Y3: 'Year 3', Y4: 'Year 4', Y5: 'Year 5', Y6: 'Year 6'};
+let currentMode = 'paper';
+let practiceSheet = null;
+
+function setMode(mode) {
+  currentMode = mode === 'practice' ? 'practice' : 'paper';
+  const prac = currentMode === 'practice';
+  document.getElementById('practiceMode').style.display = prac ? '' : 'none';
+  document.getElementById('paperMode').style.display = prac ? 'none' : '';
+  document.getElementById('setupCard').style.display = prac ? 'none' : '';
+  document.getElementById('tabPractice').classList.toggle('active', prac);
+  document.getElementById('tabPaper').classList.toggle('active', !prac);
+  if (typeof saveSetup === 'function') try { saveSetup(); } catch (e) {}
+}
+
+function psFillSkills(keepId) {
+  const level = document.getElementById('psLevel').value;
+  const sel = document.getElementById('psSkill');
+  const want = keepId || sel.value;
+  const skills = PRACTICE_SKILLS[level] || [];
+  sel.innerHTML = skills.map(s => `<option value="${s.id}">${s.label}</option>`).join('');
+  if (skills.some(s => s.id === want)) sel.value = want;
+  psShowHint();
+}
+function psCurrentSkill() {
+  const level = document.getElementById('psLevel').value;
+  return (PRACTICE_SKILLS[level] || []).find(s => s.id === document.getElementById('psSkill').value);
+}
+function psShowHint() {
+  const s = psCurrentSkill();
+  document.getElementById('psSkillHint').textContent = s ? `Questions go: ${s.hint}` : '';
+  document.getElementById('psNoMixedRow').style.display = s && s.mix ? '' : 'none';
+}
+function psClearResult() { practiceSheet = null; document.getElementById('psResult').style.display = 'none'; }
+document.getElementById('psLevel').addEventListener('change', () => { psFillSkills(); psClearResult(); });
+document.getElementById('psSkill').addEventListener('change', () => { psShowHint(); psClearResult(); });
+document.getElementById('psCount').addEventListener('change', psClearResult);
+document.getElementById('psNoMixed').addEventListener('change', psClearResult);
+
+// The question as one line of text (for the on-screen list and the answer sheet).
+function qPlain(q) {
+  if (q.longMult) return `${q.longMult.a} × ${q.longMult.b} =`;
+  if (q.longDiv) return `${q.longDiv.dividend} ÷ ${q.longDiv.divisor} =`;
+  if (q.frac) { const [[a, b], [c, d]] = q.frac; return `${a}/${b} ${q.fracOp || '+'} ${c}/${d} =`; }
+  return (q.text || '').replace('[BOX]', '☐');
+}
+
+function genPractice(level, skillId, n, noMixed) {
+  const skill = (PRACTICE_SKILLS[level] || []).find(s => s.id === skillId);
+  psNoMixed = !!(noMixed && skill.mix);
+  const gens = psNoMixed ? skill.gens.filter(f => !f.mixed) : skill.gens;
+  const g = gens.length, qs = [], seen = new Set();
+  for (let j = 0; j < n; j++) {
+    const idx = n === 1 ? 0 : Math.round(j * (g - 1) / (n - 1));
+    let q;
+    for (let t = 0; t < 40; t++) { q = gens[idx](); if (!seen.has(qPlain(q))) break; }
+    seen.add(qPlain(q));
+    qs.push(q);
+  }
+  psNoMixed = false;
+  return {level, skill, qs};
+}
+
+function makePracticeSheet() {
+  const level = document.getElementById('psLevel').value;
+  const skill = psCurrentSkill();
+  if (!skill) return;
+  const n = parseInt(document.getElementById('psCount').value, 10) || 6;
+  practiceSheet = genPractice(level, skill.id, n, document.getElementById('psNoMixed').checked);
+  const esc = s => String(s).replace(/<sup>(\d)<\/sup>/g, (_, p) => p === '2' ? '²' : p === '3' ? '³' : p);
+  document.getElementById('psList').innerHTML = practiceSheet.qs.map((q, i) =>
+    `<li><span class="n">${i + 1}</span><span>${esc(qPlain(q))}</span><span class="a">${q.answer}</span></li>`).join('');
+  document.getElementById('psResult').style.display = '';
+}
+
+function buildPracticeSheetHTML(ps) {
+  const {level, skill, qs} = ps;
+  const per = Math.ceil(qs.length / 2);
+  // Page 1 has a 24mm header and an 8mm footer inside a 267mm-high page; every box is the same height.
+  const boxH = `${Math.floor((267 - 24 - 8 - per * 3) / per)}mm`;
+  const boxes = (list, start) => list.map((q, i) => qToHTML(q, start + i + 1, null, boxH)).join('');
+  const CSS = `
+    @page{size:A4;margin:14mm 18mm}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Helvetica,Arial,sans-serif;background:white}
+    @media screen{body{background:#e8e8e8;padding:10mm 0}.ps-page{background:white;width:174mm;margin:0 auto 10mm;box-shadow:0 0 0 14mm white}}
+    ${Q_CSS}
+    .ps-page{height:267mm;display:flex;flex-direction:column;overflow:hidden}
+    .ps-page.first{page-break-after:always;break-after:page}
+    .ps-head1{height:24mm;flex-shrink:0}
+    .ps-head2{height:10mm;flex-shrink:0}
+    .ps-bar{background:#1a3a5c;color:white;padding:2.5mm 4mm;display:flex;justify-content:space-between;align-items:center;gap:4mm}
+    .ps-bar b{font-size:12.5pt}
+    .ps-bar span{font-size:9pt;opacity:.85;white-space:nowrap}
+    .ps-head2 .ps-bar{padding:1.5mm 4mm}
+    .ps-head2 .ps-bar b{font-size:10pt}
+    .ps-name{display:flex;gap:10mm;font-size:11pt;margin-top:4mm;align-items:baseline}
+    .ps-line{display:inline-block;border-bottom:1px solid #333;width:70mm;height:5mm;margin-left:2mm}
+    .ps-line.short{width:35mm}
+    .ps-qs{flex:1}
+    .ps-foot1{height:8mm;flex-shrink:0;text-align:right;font-size:10pt;font-weight:bold;color:#1a3a5c;padding-top:2mm}
+    .ps-check{flex-shrink:0;border:0.8px solid #444;padding:3mm 4mm;font-size:9.5pt;display:flex;gap:5mm;white-space:nowrap;align-items:center;flex-wrap:wrap}
+    .ps-check b{margin-right:2mm}
+    .ps-tick{display:inline-block;width:5mm;height:5mm;border:1px solid #333;vertical-align:middle;margin-right:2mm}
+    .q-header .fh{font-size:14pt}
+    .q-header .fh-n,.q-header .fh-d{padding-left:4px;padding-right:4px}
+    .mark-lbl{display:none}
+    .q-strip{width:15mm}`;
+  const p2 = qs.slice(per);
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<title>${LEVEL_NAME[level]} practice — ${skill.label}</title><style>${CSS}</style></head><body>
+<div class="ps-page first">
+  <div class="ps-head1">
+    <div class="ps-bar"><b>${skill.label}</b><span>${LEVEL_NAME[level]} · Practice</span></div>
+    <div class="ps-name">Name<span class="ps-line"></span>Date<span class="ps-line short"></span></div>
+  </div>
+  <div class="ps-qs">${boxes(qs.slice(0, per), 0)}</div>
+  <div class="ps-foot1">Turn over ➜</div>
+</div>
+<div class="ps-page">
+  <div class="ps-head2"><div class="ps-bar"><b>${skill.label}</b><span>${LEVEL_NAME[level]} · Practice</span></div></div>
+  <div class="ps-qs">${boxes(p2, per)}</div>
+  <div class="ps-check"><b>How did you get on?</b>
+    <span><span class="ps-tick"></span>I can do this on my own</span>
+    <span><span class="ps-tick"></span>I'm nearly there</span>
+    <span><span class="ps-tick"></span>I need more help</span>
+  </div>
+</div>
+</body></html>`;
+}
+
+function buildPracticeAnswersHTML(ps) {
+  const {level, skill, qs} = ps;
+  const CSS = `
+    @page{size:A4;margin:14mm 18mm}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Helvetica,Arial,sans-serif;font-size:11pt}
+    .hdr{background:#1a3a5c;color:white;padding:4mm 6mm;margin-bottom:6mm}
+    .hdr h1{font-size:14pt;font-weight:bold}
+    .hdr p{font-size:9pt;opacity:.8;margin-top:1mm}
+    table{border-collapse:collapse;width:100%}
+    td{border:0.8px solid #bbb;padding:3mm 4mm;vertical-align:middle;font-weight:bold}
+    td.qn{width:12mm;color:#2e6fad;text-align:center;font-size:12pt}
+    td.qa{width:65mm;color:#1b5e20;background:#f1f8e9}
+    sup{font-size:0.6em;vertical-align:0.45em;line-height:0}
+    .pf{display:inline-flex;flex-direction:column;align-items:center;line-height:1;vertical-align:middle;margin:0 2px}
+    .pf-n{border-bottom:1.5px solid currentColor;padding:0 3px 1px;text-align:center;font-size:10pt}
+    .pf-d{padding:1px 3px 0;text-align:center;font-size:10pt}
+    .pf-whole{margin-right:2px;vertical-align:middle}`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Answers — ${skill.label}</title><style>${CSS}</style></head><body>
+<div class="hdr"><h1>Answers — ${skill.label}</h1><p>${LEVEL_NAME[level]} practice sheet · ${qs.length} questions</p></div>
+<table>${qs.map((q, i) => `<tr><td class="qn">${i + 1}</td><td>${renderFracs(qPlain(q))}</td><td class="qa">${renderFracs(q.answer)}</td></tr>`).join('')}</table>
+</body></html>`;
+}
+
+function previewPracticeSheet() {
+  if (!practiceSheet) return;
+  const win = window.open('', '_blank');
+  if (!win) { alert('The preview window was blocked. Allow pop-ups for this site, or use Download sheet.'); return; }
+  win.document.write(buildPracticeSheetHTML(practiceSheet));
+  win.document.close();
+}
+async function _pdfButton(btn, html, filename) {
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Making PDF…';
+  try {
+    const blob = await _postPDF('/generate', {html, filename});
+    _downloadBlob(URL.createObjectURL(blob), filename);
+    btn.textContent = '✅ Downloaded';
+  } catch (e) {
+    btn.textContent = '❌ Failed'; console.error(e);
+  }
+  setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 3000);
+}
+function downloadPracticeSheet(btn) {
+  if (!practiceSheet) return;
+  const {level, skill} = practiceSheet;
+  _pdfButton(btn, buildPracticeSheetHTML(practiceSheet), `${LEVEL_NAME[level]} practice - ${skill.label}.pdf`);
+}
+function downloadPracticeAnswers(btn) {
+  if (!practiceSheet) return;
+  const {level, skill} = practiceSheet;
+  _pdfButton(btn, buildPracticeAnswersHTML(practiceSheet), `${LEVEL_NAME[level]} practice - ${skill.label} - Answers.pdf`);
+}
+
 // ─── STATE ───────────────────────────────────────────────────────────────────
 let generatedPapers = null;
 
@@ -466,6 +960,7 @@ function syncStandardLevelToClassYear() {
   const classYear = document.getElementById('classYear').value;
   const level = CLASS_YEAR_TO_LEVEL[classYear];
   if (level) document.getElementById('standardLevel').value = level;
+  if (level) { document.getElementById('psLevel').value = level; psFillSkills(); }
   updateTopicCards();
 }
 
@@ -499,6 +994,11 @@ function saveSetup() {
     questionCount: document.getElementById('questionCount').value,
     questionOrder: document.getElementById('questionOrder').value,
     includeReasoning: document.getElementById('includeReasoning').checked,
+    mode: currentMode,
+    psLevel: document.getElementById('psLevel').value,
+    psSkill: document.getElementById('psSkill').value,
+    psCount: document.getElementById('psCount').value,
+    psNoMixed: document.getElementById('psNoMixed').checked,
     topics,
     groups
   }));
@@ -515,6 +1015,11 @@ function loadSetup() {
   if (saved.standardCount) document.getElementById('standardCount').value = saved.standardCount;
   if (saved.questionCount) document.getElementById('questionCount').value = saved.questionCount;
   if (saved.questionOrder) document.getElementById('questionOrder').value = saved.questionOrder;
+  if (saved.psLevel) document.getElementById('psLevel').value = saved.psLevel;
+  if (saved.psCount) document.getElementById('psCount').value = saved.psCount;
+  document.getElementById('psNoMixed').checked = !!saved.psNoMixed;
+  psFillSkills(saved.psSkill);
+  if (saved.mode) setMode(saved.mode);
   // Always default includeReasoning to checked — don't restore from saved state
   if (saved.topics) {
     document.querySelectorAll('#topicsY2 input,#topicsY3 input,#topicsY4 input,#topicsY4R input,#topicsY5R input,#topicsY6R input,#topicsY5 input,#topicsY6 input').forEach(cb => {
@@ -538,6 +1043,8 @@ function loadSetup() {
 document.querySelector('.container').addEventListener('change', saveSetup);
 document.querySelector('.container').addEventListener('input', saveSetup);
 
+document.getElementById('psLevel').value = CLASS_YEAR_TO_LEVEL[document.getElementById('classYear').value] || 'Y5';
+psFillSkills();
 loadSetup();
 updateTopicCards();
 
@@ -965,7 +1472,7 @@ function genY6Arith(t, targetCount, sortMode) {
         const pat=pick(['sq_add','cube_sub','sq_mult']);
         let bt,ba;
         if(pat==='sq_add'){const a=rand(2,9),b=rand(2,7),c=rand(2,8);bt=`${a} + ${b}<sup>2</sup> × ${c} =`;ba=a+b*b*c;}
-        else if(pat==='cube_sub'){const a=pick([2,3,4]),b=rand(2,9),c=rand(2,9);bt=`${a}<sup>3</sup> − ${b} × ${c} =`;ba=a*a*a-b*c;}
+        else if(pat==='cube_sub'){let a,b,c;do{a=pick([2,3,4]);b=rand(2,9);c=rand(2,9);}while(a*a*a<=b*c);bt=`${a}<sup>3</sup> − ${b} × ${c} =`;ba=a*a*a-b*c;}
         else{const a=rand(2,6),b=pick([2,3,4,5]),c=rand(1,9);bt=`${a} × ${b}<sup>2</sup> − ${c} =`;ba=a*b*b-c;}
         return {text:bt,answer:ba,marks:1,yg:'Y6'};
       },
@@ -1220,10 +1727,10 @@ function renderFracsInText(str) {
   );
 }
 
-function qToHTML(q, qNum, defaultYg) {
+function qToHTML(q, qNum, defaultYg, heightOverride) {
   const isLongCalc = !!(q.longMult || q.longDiv);
   const isWork = q.work || q.col;
-  const boxH = isLongCalc ? 'calc(12*6.5mm)' : isWork ? 'calc(12*6.5mm)' : 'calc(10*6.5mm)';
+  const boxH = heightOverride || (isLongCalc ? 'calc(12*6.5mm)' : isWork ? 'calc(12*6.5mm)' : 'calc(10*6.5mm)');
   const marks = q.marks || 1;
 
   let mainContent = '';
@@ -1396,6 +1903,45 @@ function buildCoverHTML(classYear, label, hasPaper2, pupilName, coverMarks) {
   </div>`;
 }
 
+// Question-box styles, shared by the full paper and the practice sheet.
+const Q_CSS = `
+    /* ── Arithmetic header ── */
+    .arith-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3mm;font-size:10pt}
+    .arith-hdr-l{font-weight:bold;color:#1a3a5c}
+    .arith-y6-scores{display:flex;gap:12mm;margin-bottom:3mm;font-size:10pt;font-weight:bold}
+    .y6-score-box{background:#f0f4f8;border:0.8px solid #aaa;padding:2mm 4mm}
+    /* ── Question boxes ── */
+    .q-box{display:flex;border:0.8px solid #444;margin-bottom:3mm;page-break-inside:avoid;break-inside:avoid}
+    .q-left{width:14mm;border-right:0.8px solid #444;display:flex;flex-direction:column;align-items:center;padding:2.5mm 2mm;flex-shrink:0}
+    .q-num{color:#2e6fad;font-weight:900;font-size:14pt;line-height:1}
+    .q-show-method{font-size:7.5pt;font-weight:900;text-align:center;flex:1;display:flex;align-items:center;justify-content:center;line-height:1.5}
+    .q-main{flex:1;position:relative;background-image:linear-gradient(#c0cfe0 1px,transparent 1px),linear-gradient(90deg,#c0cfe0 1px,transparent 1px);background-size:6.5mm 6.5mm;background-position:0 calc(2*6.5mm)}
+    .q-header{background:white;border-bottom:0.8px solid #ccc;padding:1.5mm 4mm;display:flex;align-items:center;gap:3mm;font-size:15pt;font-weight:bold;height:calc(2*6.5mm);position:relative;z-index:2;flex-wrap:wrap}
+    sup{font-size:0.6em;vertical-align:0.45em;line-height:0;font-weight:bold}
+    .q-ans{position:absolute;bottom:3mm;right:3mm;width:36mm;height:13mm;border:2.5px solid #2e6fad;background:white;z-index:3}
+    .ibox{display:inline-block;width:26mm;height:11mm;border:2.5px solid #2e6fad;background:white;vertical-align:middle}
+    .fh{display:inline-flex;flex-direction:column;align-items:center;font-size:11pt;font-weight:bold;line-height:1;vertical-align:middle;margin:0 1px}
+    .fh-n{padding:0 3px 2px;border-bottom:1.5px solid black}
+    .fh-d{padding:2px 3px 0}
+    .eq-op{font-weight:bold;font-size:14pt}
+    .q-strip{width:19mm;border-left:0.8px solid #444;background:#c8dcf0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:4mm;flex-shrink:0}
+    .mark-box{width:11mm;height:11mm;border:0.8px solid #555;background:white}
+    .mark-lbl{font-size:7pt;text-align:center;margin-top:1.5mm;font-weight:bold}
+    .q-yg{font-size:6.5pt;font-weight:900;text-align:center;margin-top:auto;padding:1px 2px;border-radius:2px;color:white}
+    .q-yg-Y3{background:#d63384}.q-yg-Y4{background:#1798d3}.q-yg-Y5{background:#e67e22}.q-yg-Y6{background:#27ae60}
+    /* ── Long multiplication ── */
+    .lm{position:absolute;top:calc(2*6.5mm);left:calc(2*6.5mm);display:inline-flex;flex-direction:column;font-size:13pt;font-weight:bold}
+    .lm-row{display:flex}
+    .lm-row.rule{border-bottom:2.5px solid black}
+    .lm-cell{width:6.5mm;height:6.5mm;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    /* ── Long division ── */
+    .ld{position:absolute;top:calc(2*6.5mm);left:calc(1*6.5mm);display:flex;align-items:flex-start;font-size:13pt;font-weight:bold}
+    .ld-divisor{display:flex}
+    .ld-bracket{border-left:2.5px solid black;display:flex}
+    .ld-cell{width:6.5mm;height:6.5mm;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .ld-dvd{width:6.5mm;height:6.5mm;display:flex;align-items:center;justify-content:center;border-top:2.5px solid black;flex-shrink:0}
+`;
+
 // ─── BUILD PAPER HTML ─────────────────────────────────────────────────────────
 function buildPaperHTML(classYear, label, arithQs, reasoningQs, pupilNames) {
   const hasPaper2 = !!reasoningQs;
@@ -1452,41 +1998,7 @@ function buildPaperHTML(classYear, label, arithQs, reasoningQs, pupilNames) {
     .cover-name-row{display:flex;align-items:baseline;gap:4mm;font-size:13pt}
     .cover-name-line{width:70mm;border-bottom:1px solid #333;height:6mm}
     .cover-prefilled{font-size:15pt;font-weight:bold;color:#1a3a5c;border-bottom:1.5px solid #333;width:70mm;display:inline-block}
-    /* ── Arithmetic header ── */
-    .arith-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3mm;font-size:10pt}
-    .arith-hdr-l{font-weight:bold;color:#1a3a5c}
-    .arith-y6-scores{display:flex;gap:12mm;margin-bottom:3mm;font-size:10pt;font-weight:bold}
-    .y6-score-box{background:#f0f4f8;border:0.8px solid #aaa;padding:2mm 4mm}
-    /* ── Question boxes ── */
-    .q-box{display:flex;border:0.8px solid #444;margin-bottom:3mm;page-break-inside:avoid;break-inside:avoid}
-    .q-left{width:14mm;border-right:0.8px solid #444;display:flex;flex-direction:column;align-items:center;padding:2.5mm 2mm;flex-shrink:0}
-    .q-num{color:#2e6fad;font-weight:900;font-size:14pt;line-height:1}
-    .q-show-method{font-size:7.5pt;font-weight:900;text-align:center;flex:1;display:flex;align-items:center;justify-content:center;line-height:1.5}
-    .q-main{flex:1;position:relative;background-image:linear-gradient(#c0cfe0 1px,transparent 1px),linear-gradient(90deg,#c0cfe0 1px,transparent 1px);background-size:6.5mm 6.5mm;background-position:0 calc(2*6.5mm)}
-    .q-header{background:white;border-bottom:0.8px solid #ccc;padding:1.5mm 4mm;display:flex;align-items:center;gap:3mm;font-size:15pt;font-weight:bold;height:calc(2*6.5mm);position:relative;z-index:2;flex-wrap:wrap}
-    sup{font-size:0.6em;vertical-align:0.45em;line-height:0;font-weight:bold}
-    .q-ans{position:absolute;bottom:3mm;right:3mm;width:36mm;height:13mm;border:2.5px solid #2e6fad;background:white;z-index:3}
-    .ibox{display:inline-block;width:26mm;height:11mm;border:2.5px solid #2e6fad;background:white;vertical-align:middle}
-    .fh{display:inline-flex;flex-direction:column;align-items:center;font-size:11pt;font-weight:bold;line-height:1;vertical-align:middle;margin:0 1px}
-    .fh-n{padding:0 3px 2px;border-bottom:1.5px solid black}
-    .fh-d{padding:2px 3px 0}
-    .eq-op{font-weight:bold;font-size:14pt}
-    .q-strip{width:19mm;border-left:0.8px solid #444;background:#c8dcf0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:4mm;flex-shrink:0}
-    .mark-box{width:11mm;height:11mm;border:0.8px solid #555;background:white}
-    .mark-lbl{font-size:7pt;text-align:center;margin-top:1.5mm;font-weight:bold}
-    .q-yg{font-size:6.5pt;font-weight:900;text-align:center;margin-top:auto;padding:1px 2px;border-radius:2px;color:white}
-    .q-yg-Y3{background:#d63384}.q-yg-Y4{background:#1798d3}.q-yg-Y5{background:#e67e22}.q-yg-Y6{background:#27ae60}
-    /* ── Long multiplication ── */
-    .lm{position:absolute;top:calc(2*6.5mm);left:calc(2*6.5mm);display:inline-flex;flex-direction:column;font-size:13pt;font-weight:bold}
-    .lm-row{display:flex}
-    .lm-row.rule{border-bottom:2.5px solid black}
-    .lm-cell{width:6.5mm;height:6.5mm;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    /* ── Long division ── */
-    .ld{position:absolute;top:calc(2*6.5mm);left:calc(1*6.5mm);display:flex;align-items:flex-start;font-size:13pt;font-weight:bold}
-    .ld-divisor{display:flex}
-    .ld-bracket{border-left:2.5px solid black;display:flex}
-    .ld-cell{width:6.5mm;height:6.5mm;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .ld-dvd{width:6.5mm;height:6.5mm;display:flex;align-items:center;justify-content:center;border-top:2.5px solid black;flex-shrink:0}
+    ${Q_CSS}
     /* ── Reasoning ── */
     .r-header{background:#1a3a5c;color:white;padding:3mm 4mm;display:flex;justify-content:space-between;align-items:center;margin-bottom:3mm}
     .r-year{font-weight:bold;font-size:11pt}
