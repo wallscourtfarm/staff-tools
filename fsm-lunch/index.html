@@ -85,12 +85,15 @@ td .t{font-weight:900;font-size:.7rem;text-transform:uppercase}
 #printArea{display:none}
 /* paper tick sheets */
 .ps{break-after:page;page-break-after:always;font-size:9pt}
-.ps h2{margin:0 0 4px;font-size:15pt}
-.ps .sub{margin:0 0 6px;color:#444}
-.ps .wk{display:grid;grid-template-columns:repeat(3,1fr);gap:5mm}
-.ps table{font-size:7.5pt}
-.ps td{padding:2px 3px}
-.ps .box{display:inline-block;width:10px;height:10px;border:1.5px solid #000;margin-right:3px;vertical-align:-1px}
+.ps h2{margin:0 0 3px;font-size:14pt}
+.ps .sub{margin:0 0 5px;color:#444}
+.ps table.pt{width:100%;table-layout:fixed;font-size:8.8pt;line-height:1.2}
+.ps .pt th,.ps .pt td{padding:4px 5px}
+.ps .pt th.dn{width:10mm;text-align:center;vertical-align:middle;font-size:8.5pt}
+.ps .pt .o{display:grid;grid-template-columns:16px 11.5mm 1fr;align-items:start;margin:2px 0}
+.ps .pt .o b{font-weight:900}
+.ps .pt .o.roll{display:flex;gap:7px;align-items:center}
+.ps .box{display:inline-block;width:11px;height:11px;border:1.5px solid #000;margin-right:3px;vertical-align:-1px;margin-top:1px}
 .printver{font-size:8pt;color:#666;text-align:right;margin-bottom:4px}
 @media print{
   @page{size:A4 landscape;margin:9mm}
@@ -112,9 +115,9 @@ td .t{font-weight:900;font-size:.7rem;text-transform:uppercase}
 </div>
 <main id="view"><div class="empty">Loading the class lists and the menu…</div></main>
 <div id="printArea"></div>
-<div id="ver">WFA-10.11.26b · choices saved on this device</div>
+<div id="ver">WFA-11.11.26a · choices saved on this device</div>
 <script>
-const VERSION='WFA-10.11.26b';
+const VERSION='WFA-11.11.26a';
 const API='https://api.wallscourt-farm-academy.co.uk/planning/pupils?token=__hub__';
 const DAYS=['Mon','Tue','Wed','Thu','Fri'];
 const DAYNAME={Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday'};
@@ -261,16 +264,20 @@ function listHTML(list){
 }
 
 function paperSheet(p,name){
-  let h=`<div class="ps"><h2>${name} — my lunch choices</h2><p class="sub">Tick <b>one</b> meal for each day. You will have these every time this week comes round. <span style="float:right">${VERSION}</span></p><div class="wk">`;
-  for(const wk of CYCLE){
-    h+=`<table><tr><th colspan="2">Week ${wk.w} <span style="font-weight:600">(w/c ${wk.dates.slice(0,2).map(fmt).join(', ')})</span></th></tr>`;
-    for(const d of DAYS){
-      if(!wk.menu[d])continue;
-      h+=`<tr><td style="width:14%"><b>${d}</b></td><td>`+OPT.filter(o=>o.k!=='f').map(o=>`<div><span class="box"></span><b>${o.label}:</b> ${esc(menuText(wk,d,o.k))}</div>`).join('')+'<div><b>Filled roll:</b> '+fillsFor(d).map(f=>`<span class="box"></span>${f}`).join(' &nbsp;')+'</div></td></tr>';
+  // One table: days down the side, the menu weeks across, so each week gets a third of the page width.
+  let h=`<div class="ps"><h2>${name} — my lunch choices</h2><p class="sub">Tick <b>one</b> meal for each day. You will have these every time this week comes round. <span style="float:right">${VERSION}</span></p>`;
+  h+='<table class="pt"><tr><th class="dn"></th>'+CYCLE.map(wk=>`<th>Week ${wk.w} <span style="font-weight:600">(w/c ${wk.dates.slice(0,2).map(fmt).join(', ')})</span></th>`).join('')+'</tr>';
+  for(const d of DAYS){
+    if(!CYCLE.some(wk=>wk.menu[d]))continue;
+    h+=`<tr><th class="dn">${d}</th>`;
+    for(const wk of CYCLE){
+      if(!wk.menu[d]){h+='<td></td>';continue;}
+      h+='<td>'+OPT.filter(o=>o.k!=='f').map(o=>`<div class="o"><span class="box"></span><b>${o.label}</b><span>${esc(menuText(wk,d,o.k))}</span></div>`).join('')
+        +'<div class="o roll"><b>Filled roll</b>'+fillsFor(d).map(f=>`<span><span class="box"></span>${f}</span>`).join('')+'</div></td>';
     }
-    h+='</table>';
+    h+='</tr>';
   }
-  return h+'</div></div>';
+  return h+'</table></div>';
 }
 
 // Names come from the teacher's own names file, read in this browser only; without it the print uses initials.
