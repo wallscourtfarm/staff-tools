@@ -352,7 +352,7 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
   </div>
   </div><!-- /paperMode -->
 
-  <div class="version">11.11.26a</div>
+  <div class="version">11.11.26b</div>
 </div>
 
 <script>
@@ -654,7 +654,12 @@ const PRACTICE_SKILLS = {
     ]},
   ],
   Y6: [
-    {id: 'y6frac', mix: true, label: 'Adding and subtracting fractions', hint: 'Different denominators → subtracting → mixed numbers → subtracting mixed numbers.', gens: [
+    {id: 'y6frac', mix: true, label: 'Adding and subtracting fractions', hint: 'Same denominator → related denominators (e.g. 1/3 + 5/12) → different denominators (e.g. 3/4 + 1/6) → mixed numbers.', gens: [
+      () => { const d = rand(5, 12), n1 = rand(2, d - 1), n2 = rand(d - n1 + 1, d - 1); return PF(n1, d, '+', n2, d, fracAns(n1 + n2, d)); },
+      () => pick([
+        () => { const [ds, db] = relatedDenoms(), a = coprimeNum(ds), b = coprimeNum(db); const N = a * (db / ds) + b; return Math.random() < 0.5 ? PF(a, ds, '+', b, db, fracAns(N, db)) : PF(b, db, '+', a, ds, fracAns(N, db)); },
+        () => { let ds, db, a, b; do { [ds, db] = relatedDenoms(); a = coprimeNum(ds); b = coprimeNum(db); } while (a * (db / ds) === b); const A = a * (db / ds); return A > b ? PF(a, ds, '−', b, db, fracAns(A - b, db)) : PF(b, db, '−', a, ds, fracAns(b - A, db)); },
+      ])(),
       () => { const [d1, d2] = unrelatedDenoms(), n1 = coprimeNum(d1), n2 = coprimeNum(d2), L = lcm(d1, d2); return PF(n1, d1, '+', n2, d2, fracAns(n1 * (L / d1) + n2 * (L / d2), L)); },
       () => { let d1, d2, n1, n2, L; do { [d1, d2] = unrelatedDenoms(); n1 = coprimeNum(d1); n2 = coprimeNum(d2); L = lcm(d1, d2); } while (n1 * (L / d1) <= n2 * (L / d2)); return PF(n1, d1, '−', n2, d2, fracAns(n1 * (L / d1) - n2 * (L / d2), L)); },
       MIXQ(() => { const [d1, d2] = unrelatedDenoms(), n1 = coprimeNum(d1), n2 = coprimeNum(d2), L = lcm(d1, d2), w1 = rand(1, 5), w2 = rand(1, 4); return PT(`${MIX(w1, n1, d1)} + ${MIX(w2, n2, d2)} =`, fracStr((w1 + w2) * L + n1 * (L / d1) + n2 * (L / d2), L)); }),
