@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Writing Cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Lexend:wght@400;600;700&family=Playpen+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* Prints the writing target / checklist strips from the Writing Targets workbook (read in this browser only, never uploaded).
+     The printed strip CSS and print code are copied from writing-targets/index.html (WFA-11.11.26b) so the cards look the same. */
+  :root {
+    --bg:#f1f5f9; --surface:#ffffff; --surface2:#f8fafc; --fg:#0f172a; --fg2:#334155; --muted:#64748b;
+    --line:#e2e8f0; --accent:#1798d3; --accent-fg:#ffffff; --sel:#e0f2fe;
+    --red-bg:#fef2f2; --red-bd:#f87171; --red-fg:#991b1b;
+    --grn-bg:#dcfce7; --grn-bd:#86efac; --grn-fg:#166534;
+    --shadow:0 1px 4px rgba(0,0,0,.1);
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#0b1220; --surface:#111a2b; --surface2:#16213a; --fg:#e6edf7; --fg2:#c3cfe0; --muted:#8a9bb5;
+    --line:#26344d; --accent:#38bdf8; --accent-fg:#06202e; --sel:#12324a;
+    --red-bg:#3b1414; --red-bd:#b91c1c; --red-fg:#fecaca;
+    --grn-bg:#0b2e1a; --grn-bd:#166534; --grn-fg:#bbf7d0;
+    --shadow:0 1px 4px rgba(0,0,0,.5); color-scheme:dark; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.45 Nunito, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { background:#0a0101; color:#fff; padding:12px 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:19px; font-weight:800; }
+  header img { height:34px; }
+  .years { display:flex; gap:4px; flex-wrap:wrap; }
+  .years button { border:1px solid #475569; background:transparent; color:#fff; border-radius:8px; padding:5px 11px; font:inherit; font-weight:700; cursor:pointer; }
+  .years button.on { background:#1798d3; border-color:#1798d3; color:#fff; }
+  .spacer { flex:1; }
+  main { max-width:1100px; margin:0 auto; padding:14px 16px 40px; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  button.b { border:1px solid var(--line); background:var(--surface); color:var(--fg); border-radius:8px; padding:7px 12px; cursor:pointer; font:inherit; font-size:14px; }
+  button.b:hover { border-color:var(--accent); }
+  button.p { background:var(--accent); border-color:var(--accent); color:var(--accent-fg); font-weight:700; }
+  button.b:disabled { opacity:.5; cursor:default; }
+  select { font:inherit; font-size:16px; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--fg); }
+  .note { color:var(--muted); font-size:13px; }
+  .banner { padding:9px 12px; border-radius:8px; margin-bottom:10px; display:none; }
+  .banner.err { display:block; background:var(--red-bg); border:1px solid var(--red-bd); color:var(--red-fg); }
+  .banner.ok { display:block; background:var(--grn-bg); border:1px solid var(--grn-bd); color:var(--grn-fg); }
+  #drop { border:2px dashed var(--accent); border-radius:12px; background:var(--surface); padding:22px 16px; text-align:center; margin-bottom:14px; }
+  #drop.over { background:var(--sel); }
+  #drop .big { font-size:17px; font-weight:700; margin-bottom:6px; }
+  #drop label.pick { display:inline-block; background:var(--accent); color:var(--accent-fg); border-radius:8px; padding:9px 16px; font-weight:700; cursor:pointer; margin:6px 0; }
+  #drop input[type=file] { position:absolute; width:1px; height:1px; opacity:0; }
+  #drop.small { padding:10px 14px; text-align:left; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  #drop.small .big { font-size:15px; margin:0; }
+  #drop.small label.pick { padding:6px 12px; margin:0; font-size:14px; }
+  section.group { background:var(--surface); border:1px solid var(--line); border-radius:12px; margin-bottom:16px; box-shadow:var(--shadow); overflow:hidden; }
+  section.group h2 { margin:0; font-size:16px; padding:10px 14px; border-bottom:1px solid var(--line); display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  section.group h2 .note { font-weight:400; }
+  .row { display:grid; grid-template-columns:28px 60px 56px 1fr; gap:8px; align-items:start; padding:8px 14px; border-bottom:1px solid var(--line); }
+  .row:last-child { border-bottom:0; }
+  .row.sel { background:var(--sel); }
+  .row.off { opacity:.55; }
+  .row .who { font-weight:800; }
+  .row .cls { color:var(--muted); font-size:13px; }
+  .row .items { font-size:13px; color:var(--fg2); }
+  .row .items div { margin:1px 0; }
+  .row .items .none { color:var(--muted); font-style:italic; }
+  .row .items .met { color:var(--grn-fg); }
+  .row input { width:20px; height:20px; margin:2px 0 0; }
+  .empty { padding:12px; color:var(--muted); font-style:italic; }
+  footer { text-align:center; font-size:11px; color:var(--muted); margin-top:16px; }
+  @media (max-width:560px) { .row { grid-template-columns:28px 52px 1fr; } .row .cls { display:none; } }
+  /* ---- Printed strips: copied from writing-targets/index.html ---- */
+  /* Printed strips: three to an A4 landscape page (or, with the small size, five at 54 x 166 mm to fit plastic wallets), the same size front and back (front: the child's checklist or targets; back: the school's spelling strip artwork, 81 x 195 mm, its own shape, redrawn for the small size).
+     Strips are centred and touch, so a double-sided print lines up whichever way the printer flips. Nothing on a strip says a year or a level. */
+  #print { position:fixed; left:-10000px; top:0; }
+  #print .sheet { width:297mm; height:210mm; display:flex; justify-content:center; background:#fff; }
+  /* Strips touch, with a dotted cutting line down the full page at each edge: three (or five) equal strips from straight cuts. */
+  #print .col { position:relative; height:210mm; display:flex; align-items:center; }
+  #print .col::before, #print .col:last-child::after { content:''; position:absolute; top:0; bottom:0; border-left:0.35mm dashed #666; }
+  #print .col::before { left:0; }
+  #print .col:last-child::after { right:0; }
+  #print .slot { width:81mm; height:195mm; }
+  #print .wc { width:81mm; height:195mm; border:0.6mm solid #0a0101; display:flex; flex-direction:column; color:#000; font-family:Lexend, Arial, sans-serif; overflow:hidden; }
+  #print .wc .hd { border-bottom:0.3mm solid #999; padding:3mm 3mm 2.5mm; text-align:center; }
+  #print .wc .hd .nm { font-size:17pt; font-weight:700; line-height:1.15; }
+  #print .wc .hd .ti { font-family:"Playpen Sans", Lexend, Arial, sans-serif; font-size:14pt; margin-top:1mm; }
+  #print .wc .list { flex:1; overflow:hidden; padding:4mm 4mm 2mm; font-size:14pt; }
+  #print .wc ul { list-style:none; margin:0; padding:0; }
+  #print .wc li { line-height:1.25; margin:0 0 0.75em; display:flex; gap:0.45em; }
+  #print .wc li .bx { flex:0 0 0.95em; height:0.95em; border:0.5mm solid #000; margin-top:0.12em; }
+  #print .wc li .n { flex:0 0 1.2em; font-weight:700; }
+  #print .wc li .eg { display:block; font-size:0.78em; color:#333; font-style:italic; margin-top:0.15em; }
+  #print .wc .ft { border-top:0.3mm solid #999; padding:2mm 3mm; text-align:center; font-family:"Playpen Sans", Lexend, Arial, sans-serif; font-size:10.5pt; }
+  #print img.sp { display:block; width:81mm; height:195mm; object-fit:fill; }   /* the school's own strip artwork, same shape as the strip */
+  #print.small .slot, #print.small .wc, #print.small img.sp { width:54mm; height:166mm; }
+  #print.small .wc .hd { padding:2.5mm 2mm 2mm; }
+  #print.small .wc .hd .nm { font-size:14pt; }
+  #print.small .wc .hd .ti { font-size:11pt; line-height:1.2; }
+  #print.small .wc .list { padding:3mm 2.5mm 1mm; }
+  #print.small .wc li { line-height:1.22; margin-bottom:0.6em; gap:0.4em; }
+  #print.small .wc li .bx { flex-basis:0.9em; height:0.9em; border-width:0.45mm; }
+  #print.small .wc li .n { flex-basis:1.1em; }
+  #print.small .wc .ft { padding:1.5mm 2mm; font-size:8.5pt; }
+  @media print {
+    @page { size:A4 landscape; margin:0; }
+    body { background:#fff; }
+    body > *:not(#print) { display:none !important; }
+    #print { position:static; }
+    #print .sheet { page-break-after:always; break-after:page; }
+    #print .sheet:last-child { page-break-after:auto; break-after:auto; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <img src="../../logo.png" alt="">
+  <h1>Writing Cards</h1>
+  <div class="years" id="years"></div>
+  <span class="spacer"></span>
+  <select id="cls" aria-label="Class" style="display:none"></select>
+</header>
+<main>
+  <div class="banner" id="banner"></div>
+  <div id="drop">
+    <div class="big">Choose the Writing Targets workbook</div>
+    <div class="note" id="dropnote">Writing Targets.xlsx, from the Staff-Tools / Writing folder. On an iPad tap the button and pick it from OneDrive in Files; on a laptop you can also drag it here. It is read on this device only and never uploaded.</div>
+    <label class="pick" for="file">Choose workbook…</label>
+    <input type="file" id="file" accept=".xlsx,.xlsm,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+  </div>
+  <div id="work" style="display:none">
+    <div class="bar">
+      <label><input type="checkbox" id="selAll"> All children</label>
+      <button class="b p" id="printSel">Print cards</button>
+      <label class="note"><input type="checkbox" id="backs"> Spelling strip on the back (print double-sided)</label>
+      <label class="note">Size <select id="ssize"><option value="">8.1 × 19.5 cm, 3 to a page</option><option value="54x166">5.4 × 16.6 cm, 5 to a page</option></select></label>
+      <button class="b" id="printBacks">Print spelling strips</button>
+    </div>
+    <div class="note" id="srcnote"></div>
+    <div id="lists"></div>
+  </div>
+  <input type="file" id="stripfile" accept="image/*" style="display:none">
+  <footer>Writing Cards · WFA-12.11.26a · prints the strips from the Writing Targets workbook, as the Writing Targets tool did</footer>
+</main>
+<div id="print"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
+<script>
+const VERSION = 'WFA-12.11.26a';
+const S = { years:{}, bank:{}, year:'', cls:'all', selected:new Set(), file:'' };
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+const key = s => norm(s).toLowerCase().replace(/[’‘]/g, "'");
+function banner(text, err){ const b = $('banner'); b.textContent = text || ''; b.className = 'banner' + (text ? (err ? ' err' : ' ok') : ''); }
+
+// ---- Reading the workbook (by header names) ---------------------------------
+function sheetRows(wb, name){ const ws = wb.Sheets[name]; return ws ? XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:false, blankrows:false }) : null; }
+function headerIndex(rows, must){   // find the header row (within the first 5) that has every column in `must`
+  for (let r = 0; r < Math.min(5, rows.length); r++) {
+    const h = rows[r].map(key);
+    if (must.every(m => h.includes(key(m)))) return { r, h };
+  }
+  return null;
+}
+function readWorkbook(wb){
+  const years = {}, bank = {};
+  wb.SheetNames.forEach(name => {
+    const rows = sheetRows(wb, name);
+    if (!rows || !rows.length) return;
+    // Statement bank: the statement text as printed, and its example
+    const bh = headerIndex(rows, ['Type']);
+    if (bh) {
+      const iT = bh.h.findIndex(x => x.startsWith('statement')), iE = bh.h.findIndex(x => x.startsWith('example')), iK = bh.h.indexOf('type');
+      if (iT >= 0 && iE >= 0) {
+        rows.slice(bh.r + 1).forEach(r => { const t = norm(r[iT]); if (t) bank[key(t)] = { eg:norm(r[iE]), type:norm(r[iK]) }; });
+        return;
+      }
+    }
+    // A year sheet: Pupil code, Initials, Class, Card, Statement 1..12
+    const yh = headerIndex(rows, ['Pupil code', 'Initials', 'Class', 'Card']);
+    if (!yh) return;
+    const h = yh.h, ix = n => h.indexOf(key(n));
+    const st = h.map((x, i) => [x, i]).filter(([x]) => /^statement \d+$/.test(x)).sort((a, b) => parseInt(a[0].slice(10)) - parseInt(b[0].slice(10)));
+    if (!st.length) return;
+    const iCode = ix('Pupil code'), iIni = ix('Initials'), iCls = ix('Class'), iCard = ix('Card'), iAs = ix('Print as'), iMet = h.findIndex(x => x.startsWith('met'));
+    const pupils = rows.slice(yh.r + 1).filter(r => norm(r[iCode]) || norm(r[iIni])).map((r, n) => {
+      const card = key(r[iCard]), fmt = card.startsWith('target') ? 'targets' : card.startsWith('check') ? 'checklist' : '';
+      const met = new Set(String(iMet >= 0 ? r[iMet] : '').split(/[^0-9]+/).filter(Boolean).map(Number));
+      const items = st.map(([x, i]) => ({ num:parseInt(x.slice(10)), text:norm(r[i]) })).filter(i => i.text).map(i => Object.assign(i, { met: fmt === 'targets' && met.has(i.num) }));
+      return { key:name + ':' + n, code:norm(r[iCode]), label:norm(r[iIni]) || '?', cls:norm(r[iCls]), format:fmt, ticks: fmt === 'targets' && iAs >= 0 && key(r[iAs]).startsWith('tick'), items };
+    });
+    years[name] = pupils;
+  });
+  return { years, bank };
+}
+function loadFile(f){
+  if (!f) return;
+  banner('');
+  const rd = new FileReader();
+  rd.onload = () => {
+    let wb;
+    try { wb = XLSX.read(new Uint8Array(rd.result), { type:'array' }); }
+    catch (e) { banner('That file could not be opened as a spreadsheet. Choose Writing Targets.xlsx.', true); return; }
+    const d = readWorkbook(wb), names = Object.keys(d.years);
+    if (!names.length) { banner('"' + f.name + '" is not the Writing Targets workbook: it has no year sheets with Pupil code, Initials, Class, Card and Statement columns. Choose Writing Targets.xlsx from the Writing folder.', true); return; }
+    S.years = d.years; S.bank = d.bank; S.file = f.name; S.selected.clear();
+    if (!names.includes(S.year)) S.year = names.includes('Y5') ? 'Y5' : names[0];
+    S.cls = 'all';
+    $('drop').classList.add('small');
+    $('drop').querySelector('.big').textContent = f.name;
+    $('dropnote').textContent = Object.keys(S.bank).length ? '' : 'No Statement bank sheet found, so examples will not print under targets.';
+    $('drop').querySelector('label.pick').textContent = 'Choose a different workbook…';
+    $('work').style.display = '';
+    openYear(S.year);
+  };
+  rd.onerror = () => banner('That file could not be read. If it is in OneDrive, make sure it has downloaded, then try again.', true);
+  rd.readAsArrayBuffer(f);
+}
+
+// ---- Lists -----------------------------------------------------------------
+function shown(){ return (S.years[S.year] || []).filter(p => S.cls === 'all' || p.cls === S.cls); }
+function printable(p){ return p.format && p.items.length; }
+function openYear(y){
+  S.year = y; S.selected.clear();
+  const classes = [...new Set((S.years[y] || []).map(p => p.cls).filter(Boolean))];
+  if (S.cls !== 'all' && !classes.includes(S.cls)) S.cls = 'all';
+  $('cls').style.display = '';
+  $('cls').innerHTML = '<option value="all">All classes</option>' + classes.map(c => '<option' + (c === S.cls ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+  shown().filter(printable).forEach(p => S.selected.add(p.key));   // everyone with a card starts ticked
+  render();
+}
+function itemLine(i){ return i.text.replace('{words}', '…'); }
+function cardLines(p){
+  if (!printable(p)) return '<div class="none">No card yet</div>';
+  return (p.format === 'targets' && p.ticks ? '<div class="note">☐ Printed with tick boxes</div>' : '')
+    + p.items.map(i => '<div class="' + (i.met ? 'met' : '') + '">' + (i.met ? '✓ ' : '• ') + esc(itemLine(i)) + (i.met ? ' (met, not printed)' : '') + '</div>').join('');
+}
+function render(){
+  $('years').innerHTML = Object.keys(S.years).map(y => '<button data-y="' + esc(y) + '" class="' + (y === S.year ? 'on' : '') + '">' + esc(y) + '</button>').join('');
+  const P = shown();
+  const groups = [
+    { f:'targets', title:'Development targets', sub:'' },
+    { f:'checklist', title:'Checklists', sub:'' },
+    { f:'', title:'No card yet', sub:'nothing to print' },
+  ];
+  $('lists').innerHTML = groups.map(g => {
+    const rows = P.filter(p => (printable(p) ? p.format : '') === g.f);
+    if (!rows.length && g.f === '') return '';
+    return '<section class="group"><h2>' + g.title + ' <span class="note">' + (g.sub ? g.sub + ' · ' : '') + rows.length + '</span></h2>'
+      + (rows.length ? rows.map(p => '<div class="row' + (S.selected.has(p.key) ? ' sel' : '') + (printable(p) ? '' : ' off') + '" data-k="' + esc(p.key) + '">'
+        + '<input type="checkbox" class="pick" aria-label="Print this card" ' + (S.selected.has(p.key) ? 'checked' : '') + (printable(p) ? '' : ' disabled') + '>'
+        + '<span class="who"><span' + (p.code ? ' data-pupil-id="' + esc(p.code) + '"' : '') + '>' + esc(p.label) + '</span></span>'
+        + '<span class="cls">' + esc(p.cls) + '</span>'
+        + '<div class="items">' + cardLines(p) + '</div></div>').join('') : '<div class="empty">Nobody here.</div>')
+      + '</section>';
+  }).join('');
+  const can = P.filter(printable), n = can.filter(p => S.selected.has(p.key)).length;
+  $('selAll').checked = can.length > 0 && n === can.length;
+  $('printSel').textContent = n ? 'Print ' + n + (n === 1 ? ' card' : ' cards') : 'Print cards';
+  $('printSel').disabled = !n;
+  $('srcnote').textContent = S.year + (S.cls === 'all' ? '' : ' ' + S.cls) + ': ' + P.length + ' children, ' + can.length + ' with a card, ' + n + ' ticked to print.';
+  try { WFANames.screen.apply && WFANames.screen.apply(); } catch (e) {}
+}
+
+// ---- Printing (copied from writing-targets/index.html; the cards now come from the workbook) -----------
+const STRIP_URL = {};   // the school's spelling strip artwork for each size (not kept in this public repo)
+const small = () => $('ssize').value === '54x166';   // 5.4 x 16.6 cm strips, five to a page, for plastic wallets
+const perPage = () => small() ? 5 : 3;
+async function stripUrl(){
+  const size = $('ssize').value;
+  if (STRIP_URL[size]) return STRIP_URL[size];
+  if (STRIP_URL.own) return STRIP_URL.own;
+  // The artwork (a picture, no pupil data) comes from the school's server behind the staff sign-in, as the old tool did.
+  const r = await fetch('/_api/planning/writingtargets-db?action=strip&token=__hub__' + (size ? '&size=' + size : ''), { headers:{ 'X-WFA-Proxy':'1' } }).catch(() => null);
+  const type = r ? r.headers.get('Content-Type') || '' : '';
+  if (!r || !r.ok || !type.startsWith('image/')) return askStripPicture();
+  return STRIP_URL[size] = URL.createObjectURL(await r.blob());
+}
+function askStripPicture(){   // if the server is unavailable: the teacher picks the spelling strip picture from their own files
+  return new Promise((ok, no) => {
+    if (!confirm('The spelling strip picture could not be loaded from the school server. Choose the spelling strip picture from your own files instead?')) { no(new Error('the spelling strip picture could not be loaded')); return; }
+    const inp = $('stripfile');
+    inp.value = '';
+    inp.onchange = () => { const f = inp.files[0]; if (!f) { no(new Error('no picture chosen')); return; } ok(STRIP_URL.own = URL.createObjectURL(f)); };
+    inp.click();
+  });
+}
+function spellingStrip(){ return '<img class="sp" src="' + (STRIP_URL[$('ssize').value] || STRIP_URL.own) + '" alt="Spelling Strip">'; }
+function backsOn(){ try { return localStorage.getItem('wfa_wtg_backs') !== '0'; } catch (e) { return true; } }
+function sizeSaved(){ try { return ['54x166', '54x174', '58x178'].includes(localStorage.getItem('wfa_wtg_size')) ? '54x166' : ''; } catch (e) { return ''; } }
+function lineText(text){   // the "words I often misspell" line: a blank line to write on when no words were typed
+  let t = esc(text);
+  if (t.includes('{words}')) return t.replace('{words}', '______________');
+  if (/:\s*$/.test(t)) return t.replace(/\s*$/, ' ______________');
+  return t;
+}
+function exampleOf(text){ const b = S.bank[key(text)]; return b && b.eg ? b.eg : ''; }
+function namesThen(fn){   // as fsm-lunch: the teacher's names file, read in this browser only; without it the strips show initials
+  const on = window.WFANames && WFANames.screen && WFANames.screen.active && WFANames.screen.file;
+  if (on || !window.WFANames) return fn(on || null);
+  WFANames.pick({ purpose:'For the names on the writing strips. Your names file is read on this device only and never uploaded.', skipLabel:'Print with initials' }).then(fn, () => fn(null));
+}
+function printCards(){
+  const P = shown().filter(p => S.selected.has(p.key) && printable(p));
+  if (!P.length) { banner('Tick the children whose cards you want to print.', true); return; }
+  namesThen(async names => {
+    const name = p => { const n = names && p.code ? names.get(p.code) : null; return n && n.first ? n.first.trim() : p.label; };   // first name only on anything a child holds
+    const fronts = P.map(p => {
+      const t = p.format === 'targets', num = t && !p.ticks;
+      const lis = p.items.filter(i => !(t && i.met)).map((i, n) => {
+        const eg = t ? exampleOf(i.text) : '';
+        return '<li>' + (num ? '<span class="n">' + (n + 1) + '.</span>' : '<span class="bx"></span>') + '<span>' + lineText(i.text)
+          + (eg ? '<span class="eg">' + esc(eg) + '</span>' : '') + '</span></li>';
+      }).join('');
+      return '<div class="wc"><div class="hd"><div class="nm">' + esc(name(p)) + '</div><div class="ti">' + (t ? 'My Writing Targets' : 'My Writing Checklist') + '</div></div>'
+        + '<div class="list"><ul>' + lis + '</ul></div>'
+        + '<div class="ft">' + (num ? 'Show these in every piece of writing.' : t ? 'Tick each one as you write and when you check.' : 'Check every piece of writing.') + '</div></div>';
+    });
+    const keep = names && WFANames.screen && WFANames.screen.active && WFANames.screen.file === names;
+    if (names && !keep) try { names.clear(); } catch (e) {}
+    const withBacks = $('backs').checked, pages = [];
+    if (withBacks) try { await stripUrl(); } catch (e) { banner('Not printed: ' + e.message + '. Untick "Spelling strip on the back" to print the cards without it.', true); return; }
+    const per = perPage();
+    for (let i = 0; i < fronts.length; i += per) {
+      pages.push(fronts.slice(i, i + per));
+      if (withBacks) pages.push(Array.from({ length:per }, spellingStrip));   // every back page is full, so it lines up however the sheet flips
+    }
+    printPages(pages);
+  });
+}
+async function printBacks(){
+  const want = shown().filter(p => S.selected.has(p.key)).length;
+  const n = parseInt(prompt('How many spelling strips? (' + (small() ? 'five' : 'three') + ' to a page)', String(Math.max(perPage(), want))), 10);
+  if (!n || n < 1) return;
+  try { await stripUrl(); } catch (e) { banner('Not printed: ' + e.message + '.', true); return; }
+  const strips = Array.from({ length:Math.min(n, 300) }, spellingStrip), pages = [];
+  const per = perPage();
+  for (let i = 0; i < strips.length; i += per) pages.push(strips.slice(i, i + per));
+  printPages(pages);
+}
+function buildPages(pages){
+  const cols = [...Array(perPage()).keys()];
+  $('print').className = small() ? 'small' : '';
+  $('print').innerHTML = pages.map(pg => '<div class="sheet">' + cols.map(k => '<div class="col">' + (pg[k] || '<div class="slot"></div>') + '</div>').join('') + '</div>').join('');
+}
+async function printPages(pages){
+  buildPages(pages);
+  try { await document.fonts.ready; } catch (e) {}
+  await Promise.all([...$('print').querySelectorAll('img')].map(im => im.decode().catch(() => {})));
+  fitLists();
+  setTimeout(() => { window.print(); setTimeout(() => { $('print').innerHTML = ''; }, 500); }, 50);
+}
+function fitLists(){   // shrink a strip's text until every statement fits
+  document.querySelectorAll('#print .list').forEach(el => {
+    let pt = 14;
+    el.style.fontSize = pt + 'pt';
+    while (el.scrollHeight > el.clientHeight + 1 && pt > 8) { pt -= 0.5; el.style.fontSize = pt + 'pt'; }
+  });
+}
+
+// ---- Events ------------------------------------------------------------------
+$('file').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => { const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) loadFile(f); });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+$('years').addEventListener('click', e => { const b = e.target.closest('button[data-y]'); if (b && b.dataset.y !== S.year) openYear(b.dataset.y); });
+$('cls').addEventListener('change', e => { S.cls = e.target.value; S.selected.clear(); shown().filter(printable).forEach(p => S.selected.add(p.key)); render(); });
+$('selAll').addEventListener('change', e => { shown().filter(printable).forEach(p => e.target.checked ? S.selected.add(p.key) : S.selected.delete(p.key)); render(); });
+$('lists').addEventListener('click', e => {
+  const row = e.target.closest('.row'); if (!row || row.classList.contains('off')) return;
+  const k = row.dataset.k;
+  if (!e.target.classList.contains('pick')) { S.selected.has(k) ? S.selected.delete(k) : S.selected.add(k); }
+  else { e.target.checked ? S.selected.add(k) : S.selected.delete(k); }
+  render();
+});
+$('printSel').addEventListener('click', printCards);
+$('printBacks').addEventListener('click', printBacks);
+$('backs').checked = backsOn();
+$('backs').addEventListener('change', e => { try { localStorage.setItem('wfa_wtg_backs', e.target.checked ? '1' : '0'); } catch (err) {} });
+$('ssize').value = sizeSaved();
+$('ssize').addEventListener('change', e => { try { localStorage.setItem('wfa_wtg_size', e.target.value); } catch (err) {} });
+try { WFANames.screen.init(); } catch (e) {}
+if (!window.XLSX) banner('The spreadsheet reader did not load. Check the internet connection and refresh the page.', true);
+</script>
+</body>
+</html>
