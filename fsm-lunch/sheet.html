@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FSM Lunch Choice Sheets</title>
+<link rel="icon" href="../favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--blue:#1798d3;--dark:#0a0101;--bg:#f4f7f9;--line:#dde3e8;--muted:#5d6b75;--red:#d6453d}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Nunito',-apple-system,sans-serif;font-weight:600;background:var(--bg);color:var(--dark)}
+#top{background:var(--blue);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#top a.home{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none}
+#top img{height:34px;background:#fff;border-radius:8px;padding:3px}
+#top h1{margin:0;font-size:1.25rem;font-weight:900}
+main{max-width:1150px;margin:0 auto;padding:14px 16px 60px}
+.note{background:#fff;border-left:4px solid var(--blue);padding:10px 12px;border-radius:8px;color:var(--muted);margin:10px 0 14px;line-height:1.4}
+.note.bad{border-color:var(--red);color:var(--red)}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 0}
+.bar label{font-weight:800}
+.bar input{font:700 1rem 'Nunito',sans-serif;width:80px;padding:7px 10px;border:2px solid var(--line);border-radius:10px;font-size:16px}
+.btn{border:0;border-radius:10px;padding:10px 16px;font:800 .95rem 'Nunito',sans-serif;cursor:pointer;background:var(--blue);color:#fff}
+.preview{background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow-x:auto}
+#ver{position:fixed;left:10px;bottom:8px;font-size:.72rem;color:var(--muted);background:rgba(255,255,255,.85);padding:2px 8px;border-radius:8px}
+#printArea{display:none}
+table{border-collapse:collapse;width:100%;background:#fff;table-layout:fixed}
+th,td{border:1px solid #bbb;padding:4px 5px;vertical-align:top;text-align:left}
+th{background:#eef6fb;font-weight:900}
+.ps{font-size:9pt;min-width:900px}
+.ps + .ps{break-before:page;page-break-before:always}
+.ps .head{display:flex;gap:24px;align-items:flex-end;margin:0 0 4px}
+.ps h2{margin:0;font-size:14pt;white-space:nowrap}
+.ps .line{flex:1;display:flex;gap:6px;align-items:flex-end;font-weight:800;font-size:11pt}
+.ps .line span{flex:1;border-bottom:1.5px solid #000;height:18px}
+.ps .line.cls{flex:0 0 150px}
+.ps .sub{margin:0 0 5px;color:#444}
+.ps table.pt{font-size:8.8pt;line-height:1.2}
+.ps .pt th.dn{width:10mm;text-align:center;vertical-align:middle;font-size:8.5pt}
+.ps .pt .o{display:grid;grid-template-columns:16px 11.5mm 1fr;align-items:start;margin:2px 0}
+.ps .pt .o b{font-weight:900}
+.ps .pt .o.roll{display:flex;gap:7px;align-items:center}
+.ps .box{display:inline-block;width:11px;height:11px;border:1.5px solid #000;margin-right:3px;vertical-align:-1px;margin-top:1px}
+@media print{
+  @page{size:A4 landscape;margin:9mm}
+  body{background:#fff}
+  #top,main,#ver{display:none!important}
+  #printArea{display:block}
+  .ps{min-width:0}
+  td,th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<div id="top">
+  <a class="home" href="../index.html" title="Staff tools"><img src="../logo.png" alt=""><h1>FSM Lunch Choice Sheets</h1></a>
+</div>
+<main>
+  <div class="note">Prints blank lunch choice sheets for the current menu. Go through a sheet with each child and write their name on it by hand. Nothing about any child is entered, saved or sent.</div>
+  <div class="bar">
+    <label for="copies">How many sheets?</label>
+    <input id="copies" type="number" min="1" max="60" value="1" inputmode="numeric">
+    <button class="btn" id="print">Print sheets</button>
+  </div>
+  <div id="view" class="preview">Loading the lunch menu…</div>
+</main>
+<div id="printArea"></div>
+<div id="ver">WFA-12.11.26a · no pupil data</div>
+<script>
+const VERSION='WFA-12.11.26a';
+const DAYS=['Mon','Tue','Wed','Thu','Fri'];
+const OPT=[{k:'r',label:'Red'},{k:'h',label:'Halal'},{k:'g',label:'Green'},{k:'p',label:'Pasta'}];
+const FILLS=['Ham','Cheese','Tuna'];
+// Innovate menu: no ham rolls on Fridays
+const fillsFor=d=>d==='Fri'?['Cheese','Tuna']:FILLS;
+// menu.json (Menu Publisher) has no halal dish, so each red dish is matched to its halal version from the
+// Innovate primary menu PDF (same table as fsm-lunch/index.html). Fish days are the same as red.
+const HALAL={
+ "Beef and Lentil Bolognaise with Penne Pasta":"Halal Beef and Lentil Bolognaise with Penne Pasta",
+ "Pork Sausages, Mashed Potatoes and Gravy":"Halal Chicken Sausages, Mashed Potatoes and Gravy",
+ "Roast Chicken Breast, Roast Potatoes and Gravy":"Halal Roast Chicken Breast, Roast Potatoes and Gravy",
+ "Chicken and Chickpea Korma with Mixed Rice":"Halal Chicken and Chickpea Korma with Mixed Rice",
+ "Cajun Chicken Pizza with Wedges":"Halal Cajun Chicken Pizza with Wedges",
+ "Mild Chilli Beef and Bean Macaroni Cheese":"Halal Mild Chilli Beef and Bean Macaroni Cheese",
+ "Roast Gammon, Roast Potatoes and Gravy":"Halal Roast Chicken Breast, Roast Potatoes and Gravy",
+ "Chicken Fajita with Mexican Rice":"Halal Chicken Fajita with Mexican Rice",
+ "Sweet Chilli Salmon Melt with Wedges":"Halal Sweet Chilli Salmon Melt with Wedges",
+ "BBQ Chicken Loaded Mac 'n' Cheese":"Halal BBQ Chicken Loaded Mac 'n' Cheese",
+ "Pork Sausages, Stuffed Yorkie, Mash and Gravy":"Halal Chicken Sausage, Stuffed Yorkie, Mash and Gravy",
+ "Mild Beef Chilli Topped Jacket Potato with Nacho Crunch":"Halal Mild Beef Chilli Topped Jacket Potato with Nacho Crunch"
+};
+function halalFor(red){if(HALAL[red])return HALAL[red];if(/\bfish\b/i.test(red))return red;return 'Halal version of: '+red;}
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+function mondayOf(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-((x.getDay()+6)%7));return x;}
+function fmt(k){const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
+
+let CYCLE=[];
+// The repeating menu weeks still to come, numbered as the menu numbers them from its first week.
+function buildCycle(menu){
+  const weeks=(menu&&menu.weeks)||{};
+  const keys=Object.keys(weeks).sort();
+  const num={};let n=0;
+  keys.forEach(k=>{const s=JSON.stringify(weeks[k]);if(!(s in num))num[s]=++n;});
+  const thisMon=iso(mondayOf(new Date()));
+  let future=keys.filter(k=>k>=thisMon);if(!future.length)future=keys;
+  const bySig={};
+  future.forEach(k=>{const s=JSON.stringify(weeks[k]);(bySig[s]=bySig[s]||{n:num[s],menu:weeks[k],dates:[]}).dates.push(k);});
+  CYCLE=Object.values(bySig).sort((a,b)=>a.n-b.n).map(w=>({w:String(w.n),menu:w.menu,dates:w.dates}));
+}
+function menuText(wk,d,k){const m=wk.menu[d]||[];if(k==='h')return halalFor(m[0]||'');return m[{r:0,g:1,p:2}[k]]||'';}
+
+function sheet(){
+  let h=`<div class="ps"><div class="head"><h2>My lunch choices</h2><div class="line">Name <span></span></div><div class="line cls">Class <span></span></div></div>`;
+  h+=`<p class="sub">Tick <b>one</b> meal for each day. You will have these every time this week comes round. <span style="float:right">${VERSION}</span></p>`;
+  h+='<table class="pt"><tr><th class="dn"></th>'+CYCLE.map(wk=>`<th>Week ${wk.w} <span style="font-weight:600">(w/c ${wk.dates.slice(0,2).map(fmt).join(', ')})</span></th>`).join('')+'</tr>';
+  for(const d of DAYS){
+    if(!CYCLE.some(wk=>wk.menu[d]))continue;
+    h+=`<tr><th class="dn">${d}</th>`;
+    for(const wk of CYCLE){
+      if(!wk.menu[d]){h+='<td></td>';continue;}
+      h+='<td>'+OPT.map(o=>`<div class="o"><span class="box"></span><b>${o.label}</b><span>${esc(menuText(wk,d,o.k))}</span></div>`).join('')
+        +'<div class="o roll"><b>Filled roll</b>'+fillsFor(d).map(f=>`<span><span class="box"></span>${f}</span>`).join('')+'</div></td>';
+    }
+    h+='</tr>';
+  }
+  return h+'</table></div>';
+}
+
+document.getElementById('print').addEventListener('click',()=>{
+  if(!CYCLE.length)return;
+  const n=Math.max(1,Math.min(60,parseInt(document.getElementById('copies').value,10)||1));
+  const area=document.getElementById('printArea');
+  area.innerHTML=Array.from({length:n},sheet).join('');
+  setTimeout(()=>{window.print();setTimeout(()=>{area.innerHTML='';},500);},50);
+});
+
+fetch('../menu.json',{cache:'no-store'}).then(r=>r.json()).then(menu=>{
+  buildCycle(menu);
+  if(!CYCLE.length)throw new Error('menu');
+  document.getElementById('view').innerHTML=sheet();
+}).catch(()=>{
+  document.getElementById('view').innerHTML='<div class="note bad">Could not load the lunch menu. Check you are online, then reload the page.</div>';
+});
+</script>
+</body>
+</html>
