@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precision Teaching: print the week</title>
+<link rel="icon" href="../../favicon.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa.css">
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!--
+  Precision Teaching week pack, printed from the workbook "Spelling and Precision/Precision Teaching.xlsx".
+  The workbook is read in this browser only (SheetJS). The sheets are made by the SAME Python code the old tool used
+  (precision-teaching/app.py build_week_pdf + data.py generate_sheet, copied unchanged into ./py by py/make_copies.py),
+  run in the browser with Pyodide + ReportLab. Nothing about a child is uploaded or saved.
+-->
+<style>
+  :root { --ink:#0a0101; --muted:#5b6b7b; --line:#d9e3ec; --soft:#f4f9fd; --bad:#c62828; }
+  body { color: var(--ink); }
+  [hidden] { display: none !important; }
+  header { padding: 18px 24px; }
+  header h1 { font-size: 1.6rem; }
+  main { max-width: 1000px; padding: 20px 16px 80px; }
+  button, input, select { font: inherit; }
+  button { cursor: pointer; }
+  .hint { color: var(--muted); font-size: .95rem; margin: 2px 0 14px; }
+  .card { background: #fff; border-radius: 14px; box-shadow: 0 2px 10px rgba(23,152,211,.10); padding: 16px 18px; margin-bottom: 16px; }
+  .stepname { font-size: .85rem; text-transform: uppercase; letter-spacing: .8px; color: var(--wfa-blue); font-weight: 900; margin-bottom: 10px; }
+  .sub { font-size: .85rem; font-weight: 800; color: var(--muted); margin: 12px 0 6px; }
+  .drop { border: 2px dashed #b9cbdb; border-radius: 12px; padding: 18px; text-align: center; background: var(--soft); }
+  .drop.over { border-color: var(--wfa-blue); background: #e7f4fb; }
+  .drop b { display: block; margin-bottom: 8px; }
+  .filebtn { display: inline-block; background: var(--wfa-blue); color: #fff; border-radius: 10px; padding: 10px 18px; font-weight: 800; cursor: pointer; }
+  .filebtn input { display: none; }
+  .msg { margin-top: 10px; font-weight: 700; }
+  .msg.err { color: var(--bad); }
+  .msg.ok { color: #1d7a45; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border: 2px solid var(--line); background: #fff; border-radius: 999px; padding: 7px 15px; font-weight: 800; min-width: 48px; color: var(--ink); }
+  .chip.on { background: var(--wfa-blue); border-color: var(--wfa-blue); color: #fff; }
+  .chiprow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .link { border: 0; background: none; color: var(--wfa-blue); font-weight: 800; padding: 4px 6px; }
+  label.ck { display: flex; gap: 10px; align-items: flex-start; font-weight: 700; margin: 8px 0; cursor: pointer; }
+  label.ck input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
+  .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 16px; }
+  select { font-size: 16px; padding: 9px 12px; border: 2px solid var(--line); border-radius: 10px; background: #fff; max-width: 100%; }
+  .caption { color: var(--muted); font-size: .88rem; margin: 4px 0 0; }
+  .btn { border: 0; border-radius: 10px; padding: 11px 18px; font-weight: 800; background: var(--wfa-blue); color: #fff; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.ghost { background: #fff; color: var(--wfa-blue); border: 2px solid var(--wfa-blue); }
+  .files { margin-top: 14px; display: grid; gap: 10px; }
+  .file { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: var(--soft); }
+  .file b { flex: 1; min-width: 200px; }
+  .lock { background: #eef7fd; border-radius: 12px; padding: 12px 14px; color: #24506b; font-size: .92rem; }
+  .skipped { color: var(--muted); font-size: .88rem; margin-top: 8px; }
+  footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 20px 10px; }
+  @media (max-width: 560px) { header { padding: 14px 16px; } header h1 { font-size: 1.3rem; } .logo { height: 44px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-content">
+    <img class="logo" src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/wfa_logo.webp" alt="WFA">
+    <div><h1>Precision Teaching</h1><p>Print: this week's sheets for your group, from the workbook</p></div>
+  </div>
+</header>
+
+<main>
+  <p class="hint">Choose the Precision Teaching workbook, then whose sheets and how to print, then make the PDF.
+    The sheets are the same as the Precision Teaching tool made: a timetable page for each child, then each day's practice sheets.</p>
+
+  <section class="card">
+    <div class="stepname">1. Your workbook</div>
+    <div class="drop" id="drop">
+      <b>Precision Teaching.xlsx</b>
+      <label class="filebtn">Choose the workbook<input type="file" id="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+      <p class="caption">or drag it here. It is in the Staff-Tools folder, "Spelling and Precision". It is read on this device only.</p>
+    </div>
+    <div id="msg" class="msg"></div>
+  </section>
+
+  <section class="card" id="cardWho" hidden>
+    <div class="stepname">2. Whose sheets</div>
+    <div id="yearBox"><div class="sub">Year group</div><div class="chips" id="years"></div></div>
+    <div id="classBox"><div class="sub">Classes (tap to choose one or more)</div><div class="chips" id="classes"></div></div>
+    <div id="kidBox">
+      <div class="sub">Children</div>
+      <div class="chips" id="kids"></div>
+      <div class="chiprow"><button class="link" id="kidsAll" type="button">Choose all</button><button class="link" id="kidsNone" type="button">Clear</button></div>
+    </div>
+    <label class="ck" id="eachBox" hidden><input type="checkbox" id="each"> A separate file for each class</label>
+    <div class="sub">Week</div>
+    <select id="week" aria-label="Week"></select>
+    <div id="skipped" class="skipped"></div>
+  </section>
+
+  <section class="card" id="cardHow" hidden>
+    <div class="stepname">3. How to print</div>
+    <label class="ck"><input type="checkbox" id="duplex" checked> <span>One piece of paper per day (print double-sided)<br><span class="caption">Each day starts on the front of a new piece of paper, with a big coloured day heading, so children can keep the week in their drawer and take out the right day's sheet.</span></span></label>
+    <div class="opts">
+      <label class="ck"><input type="checkbox" id="answers" checked> Include answer key</label>
+      <label class="ck"><input type="checkbox" id="cover" checked> Timetable page for each child</label>
+    </div>
+    <div id="shareBox">
+      <label class="ck"><input type="checkbox" id="share" checked> <span>Save paper: short days can share a piece of paper<br><span class="caption">A day is never split across two pieces of paper. If a whole day fits in the space left on the paper, it goes there, with its own day heading.</span></span></label>
+      <p class="caption">Print double-sided (flip on the long edge). Blank sides are added where needed.</p>
+    </div>
+    <div class="sub">Handwriting font</div>
+    <div id="hwNone" class="caption">Handwriting sheets use Sassoon print letters. To use the school's joined (XCCW), Sassoon dotted or Linkpen fonts,
+      <label class="link" style="display:inline;cursor:pointer">add the six font files<input type="file" id="fonts" accept=".ttf,font/ttf" multiple hidden></label>
+      (XCCW_Joined_4a, 4b, Dotted_4a, Dotted_4b, SassoInfDotB, LinkpenDot). They are used on this device only.</div>
+    <div id="hwPick" hidden><select id="hwFont"></select></div>
+  </section>
+
+  <section class="card" id="cardGo" hidden>
+    <div class="stepname">4. Make the sheets</div>
+    <button class="btn" id="go" type="button">Create this week's sheets (PDF)</button>
+    <div id="goMsg" class="msg"></div>
+    <div class="files" id="files"></div>
+  </section>
+
+  <div class="lock">🔒 The workbook and your names file are read on this device only. Nothing is uploaded or saved.
+    Without a names file the sheets show each child's initials. The first time you make sheets the page fetches the sheet maker (about 20 seconds).</div>
+</main>
+<footer>Wallscourt Farm Academy · <span id="ver">WFA-12.11.26a</span></footer>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const HW_FONTS = ['Cursive, dotted (XCCW)', 'Cursive, solid (XCCW)', 'Print, dotted (Sassoon)', 'Pre-cursive, dotted (Linkpen)'];
+const FONT_FILES = ['XCCW_Joined_4a.ttf', 'XCCW_Joined_4b.ttf', 'XCCW_Joined_Dotted_4a.ttf', 'XCCW_Joined_Dotted_4b.ttf', 'SassoInfDotB.ttf', 'LinkpenDot.ttf'];
+// Areas and their ids, in case the workbook's Parts sheet is missing (same as precision-teaching/scripts/build_catalogue.py).
+const AREA_IDS = {'Times tables': 'times_tables', 'Number bonds': 'number_bonds', 'Doubles and halves': 'doubles_halves',
+  'Addition facts': 'addition_facts', 'Written calculation': 'calc', 'Phonics sounds': 'phonics',
+  'Common exception words: spelling': 'cew_spell', 'Common exception words: sentences': 'cew', 'Homophones': 'homophones',
+  'Spelling rules (Unlocking Letters and Sounds)': 'spelling', 'Handwriting: letters': 'hw_letters', 'Handwriting: joins': 'hw_joins'};
+
+let WB = null;              // parsed workbook: {children, targets, areas}
+let sel = {year: null, classes: [], kids: new Set()};
+let fontFiles = {};          // name -> Uint8Array (teacher's own font files, memory only)
+let made = [];               // object URLs of made PDFs
+
+// ── Reading the workbook (by header names) ───────────────────────────────────────────────────────────────
+const norm = v => String(v == null ? '' : v).trim();
+const yes = v => /^(y|yes|x|✓|✔|1|true)$/i.test(norm(v));
+
+function sheetRows(wb, name, need) {
+  // The sheet called `name`, else the first sheet whose header row has every column in `need`.
+  const tryOne = ws => {
+    if (!ws) return null;
+    const rows = XLSX.utils.sheet_to_json(ws, {header: 1, defval: null, raw: true});
+    for (let i = 0; i < Math.min(rows.length, 5); i++) {
+      const h = (rows[i] || []).map(norm);
+      if (need.every(n => h.includes(n))) return {head: h, rows: rows.slice(i + 1), col: n => h.indexOf(n)};
+    }
+    return null;
+  };
+  return tryOne(wb.Sheets[name]) || wb.SheetNames.map(n => tryOne(wb.Sheets[n])).find(Boolean) || null;
+}
+
+function toDate(v) {
+  if (v instanceof Date) return new Date(v.getFullYear(), v.getMonth(), v.getDate());
+  if (typeof v === 'number') { const d = XLSX.SSF.parse_date_code(v); return d ? new Date(d.y, d.m - 1, d.d) : null; }
+  const m = norm(v).match(/^(\d{4})-(\d{2})-(\d{2})/) || null;
+  if (m) return new Date(+m[1], m[2] - 1, +m[3]);
+  const u = norm(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (u) return new Date(u[3].length === 2 ? 2000 + +u[3] : +u[3], u[2] - 1, +u[1]);
+  return null;
+}
+
+function readWorkbook(wb) {
+  const T = sheetRows(wb, 'Targets', ['Target no', 'Code', 'Area', 'Part', 'Status']);
+  if (!T) throw new Error("This is not the Precision Teaching workbook: it has no 'Targets' sheet. Choose 'Precision Teaching.xlsx' in the Spelling and Precision folder.");
+  const Pu = sheetRows(wb, 'Pupils', ['Code', 'Initials', 'Class']);
+  if (!Pu) throw new Error("This workbook has no 'Pupils' sheet (Code, Initials, Class), so the children cannot be named. Choose 'Precision Teaching.xlsx'.");
+  const G = sheetRows(wb, 'My group', ['Code', 'In group']);
+  const Pa = sheetRows(wb, 'Parts', ['Area', 'Area id']);
+  const Ca = sheetRows(wb, 'Catalogue', ['Area', 'Area id', 'Part', 'Item']);
+
+  const areaIds = Object.assign({}, AREA_IDS);
+  for (const S of [Ca, Pa]) if (S) for (const r of S.rows) {
+    const a = norm(r[S.col('Area')]), id = norm(r[S.col('Area id')]);
+    if (a && id) areaIds[a] = id;
+  }
+  const pupils = {};
+  const yc = Pu.col('Year group') >= 0 ? Pu.col('Year group') : Pu.col('Year');
+  for (const r of Pu.rows) {
+    const code = norm(r[Pu.col('Code')]);
+    if (!code) continue;
+    let yg = yc >= 0 ? norm(r[yc]) : '';
+    const cls = norm(r[Pu.col('Class')]);
+    if (/^\d$/.test(yg)) yg = 'Y' + yg;
+    if (!yg && /^\d/.test(cls)) yg = 'Y' + cls[0];
+    pupils[code] = {pupilCode: code, label: norm(r[Pu.col('Initials')]) || '?', class: cls, yearGroup: yg};
+  }
+  let inGroup = null;
+  if (G && G.rows.some(r => norm(r[G.col('Code')]))) {
+    inGroup = new Set(G.rows.filter(r => norm(r[G.col('Code')]) && yes(r[G.col('In group')])).map(r => norm(r[G.col('Code')])));
+  }
+  const itemCols = T.head.map((h, i) => [h, i]).filter(([h]) => /^Item \d+$/.test(h))
+    .sort((a, b) => +a[0].slice(5) - +b[0].slice(5)).map(([, i]) => i);
+  const dayCols = DAYS.map(d => T.col(d));
+  const targets = [], skipped = {notInGroup: 0, unknownChild: 0, unknownArea: 0, noItems: 0};
+  for (const r of T.rows) {
+    if (norm(r[T.col('Status')]).toLowerCase() !== 'active') continue;
+    const code = norm(r[T.col('Code')]);
+    if (!code) continue;
+    const area = norm(r[T.col('Area')]);
+    const t = {
+      id: norm(r[T.col('Target no')]), pupilCode: code, area: areaIds[area] || '', areaName: area,
+      partName: norm(r[T.col('Part')]),
+      items: itemCols.map(i => norm(r[i])).filter(Boolean),
+      days: DAYS.filter((d, j) => dayCols[j] >= 0 && yes(r[dayCols[j]])),
+      started: T.col('Started') >= 0 ? toDate(r[T.col('Started')]) : null,
+    };
+    if (!pupils[code]) { skipped.unknownChild++; continue; }
+    if (inGroup && !inGroup.has(code)) { skipped.notInGroup++; continue; }
+    if (!t.area) { skipped.unknownArea++; continue; }
+    if (!t.items.length) { skipped.noItems++; continue; }
+    targets.push(t);
+  }
+  // One name per area id (the old catalogue's area name; the timetable rows start with it). The workbook's wins.
+  const areaName = {};
+  for (const [name, id] of Object.entries(areaIds)) areaName[id] = name;
+  const areas = Object.entries(areaName).map(([id, name]) => ({id, name}));
+  return {pupils, targets, areas, skipped};
+}
+
+// ── Weeks ────────────────────────────────────────────────────────────────────────────────────────────────
+const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+function mondayOf(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+function fillWeeks() {
+  const today = new Date(), mon = mondayOf(today);
+  const dflt = (today.getDay() === 6 || today.getDay() === 0) ? 1 : 0;   // at the weekend, next week
+  const fmt = d => d.toLocaleDateString('en-GB', {day: 'numeric', month: 'short'});
+  $('week').innerHTML = '';
+  for (let k = -3; k <= 3; k++) {
+    const m = new Date(mon); m.setDate(m.getDate() + 7 * k);
+    const f = new Date(m); f.setDate(f.getDate() + 4);
+    const tag = k === 0 ? 'This week' : k === 1 ? 'Next week' : k === -1 ? 'Last week' : '';
+    const o = new Option(`${tag ? tag + ': ' : ''}Mon ${fmt(m)} to Fri ${fmt(f)}`, iso(m));
+    if (k === dflt) o.selected = true;
+    $('week').add(o);
+  }
+}
+function weekTargets() {
+  const mon = new Date($('week').value + 'T00:00:00'), fri = new Date(mon); fri.setDate(fri.getDate() + 4);
+  return WB.targets.filter(t => !t.started || t.started <= fri);
+}
+function printDate() {
+  // The sheets carry a date (the old tool printed today's). Today if it is in the chosen week, else that Monday.
+  const mon = new Date($('week').value + 'T00:00:00'), today = new Date();
+  const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+  return (today >= mon && today <= new Date(sun.getFullYear(), sun.getMonth(), sun.getDate(), 23, 59)) ? iso(today) : iso(mon);
+}
+
+// ── Choosing whose sheets (year -> classes -> children, like the old print screen) ────────────────────────
+function kidsWithTargets() {
+  const codes = new Set(weekTargets().filter(t => t.days.length).map(t => t.pupilCode));
+  return Object.values(WB.pupils).filter(p => codes.has(p.pupilCode))
+    .sort((a, b) => a.class.localeCompare(b.class) || a.label.localeCompare(b.label));
+}
+const yearName = y => /^Y\d+$/.test(y) ? `Year ${y.slice(1)}` : (y || 'No year');
+function chip(text, on, fn, title) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'chip' + (on ? ' on' : ''); b.textContent = text; b.onclick = fn;
+  if (title) b.title = title;
+  return b;
+}
+function render() {
+  const kids = kidsWithTargets();
+  const years = [...new Set(kids.map(p => p.yearGroup))].sort((a, b) => a.length - b.length || a.localeCompare(b));
+  if (!years.includes(sel.year)) sel.year = years.length === 1 ? years[0] : null;
+  $('yearBox').hidden = years.length < 2;
+  $('years').replaceChildren(...years.map(y => chip(yearName(y), y === sel.year, () => { sel.year = y; sel.classes = []; sel.kids = null; render(); })));
+  const inYear = sel.year == null ? [] : kids.filter(p => p.yearGroup === sel.year);
+  const classes = [...new Set(inYear.map(p => p.class))].sort();
+  sel.classes = sel.classes.filter(c => classes.includes(c));
+  if (!sel.classes.length) sel.classes = classes.slice();
+  $('classBox').hidden = classes.length < 2;
+  $('classes').replaceChildren(...classes.map(c => chip(c, sel.classes.includes(c), () => {
+    sel.classes = sel.classes.includes(c) ? sel.classes.filter(x => x !== c) : [...sel.classes, c];
+    if (!sel.classes.length) sel.classes = classes.slice();      // tapping the last one off goes back to them all
+    sel.kids = null; render();
+  })));
+  const pool = inYear.filter(p => sel.classes.includes(p.class));
+  if (!(sel.kids instanceof Set)) sel.kids = new Set(pool.map(p => p.pupilCode));
+  for (const c of [...sel.kids]) if (!pool.some(p => p.pupilCode === c)) sel.kids.delete(c);
+  $('kidBox').hidden = !pool.length;
+  $('kids').replaceChildren(...pool.map(p => chip(p.label, sel.kids.has(p.pupilCode), () => {
+    sel.kids.has(p.pupilCode) ? sel.kids.delete(p.pupilCode) : sel.kids.add(p.pupilCode); render();
+  }, p.class)));
+  const selClasses = [...new Set(pool.filter(p => sel.kids.has(p.pupilCode)).map(p => p.class))];
+  $('eachBox').hidden = sel.classes.length < 2;
+  $('go').disabled = !sel.kids.size;
+  $('go').textContent = sel.year == null && years.length > 1 ? 'Choose your year group first' : `Create this week's sheets (PDF)`;
+  $('shareBox').hidden = !$('duplex').checked;
+  const s = WB.skipped, notes = [];
+  if (!kids.length) notes.push('No child has an active target with days ticked for this week.');
+  if (s.notInGroup) notes.push(`${s.notInGroup} active target${s.notInGroup > 1 ? 's are' : ' is'} for children not in My group (In group = Yes), so not printed.`);
+  if (s.unknownChild) notes.push(`${s.unknownChild} active target${s.unknownChild > 1 ? 's have' : ' has'} a code that is not on the Pupils sheet.`);
+  if (s.noItems) notes.push(`${s.noItems} active target${s.noItems > 1 ? 's have' : ' has'} no items.`);
+  if (s.unknownArea) notes.push(`${s.unknownArea} active target${s.unknownArea > 1 ? 's have' : ' has'} an Area this page does not know.`);
+  const later = WB.targets.length - weekTargets().length;
+  if (later) notes.push(`${later} active target${later > 1 ? 's start' : ' starts'} after this week, so ${later > 1 ? 'are' : 'is'} not included.`);
+  $('skipped').textContent = notes.join(' ');
+  clearFiles();
+}
+$('kidsAll').onclick = () => { sel.kids = null; render(); };
+$('kidsNone').onclick = () => { sel.kids = new Set(); render(); };
+$('week').onchange = () => { sel.kids = null; render(); };
+['duplex', 'answers', 'cover', 'share', 'each', 'hwFont'].forEach(id => $(id).addEventListener('change', render));
+
+// ── Loading the workbook ─────────────────────────────────────────────────────────────────────────────────
+function say(el, text, kind) { $(el).textContent = text; $(el).className = 'msg' + (kind ? ' ' + kind : ''); }
+async function loadFile(f) {
+  if (!f) return;
+  say('msg', 'Reading ' + f.name + '…');
+  try {
+    if (!/\.xls[xm]$/i.test(f.name)) throw new Error('That is not an Excel workbook. Choose "Precision Teaching.xlsx".');
+    const wb = XLSX.read(new Uint8Array(await f.arrayBuffer()), {type: 'array', cellDates: true});
+    WB = readWorkbook(wb);
+    const n = new Set(WB.targets.map(t => t.pupilCode)).size;
+    say('msg', `${f.name}: ${WB.targets.length} active target${WB.targets.length === 1 ? '' : 's'} for ${n} child${n === 1 ? '' : 'ren'}.`, 'ok');
+    sel = {year: null, classes: [], kids: null};
+    ['cardWho', 'cardHow', 'cardGo'].forEach(id => $(id).hidden = false);
+    fillWeeks();
+    render();
+    sheetMaker();               // start fetching the sheet maker now, so it is ready sooner
+  } catch (e) {
+    WB = null;
+    ['cardWho', 'cardHow', 'cardGo'].forEach(id => $(id).hidden = true);
+    say('msg', e.message || 'That workbook could not be read.', 'err');
+  }
+}
+$('file').onchange = e => loadFile(e.target.files[0]);
+const drop = $('drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+
+// ── Optional handwriting fonts (the school's licensed fonts never go on this public site) ────────────────
+$('fonts').onchange = async e => {
+  const want = Object.fromEntries(FONT_FILES.map(f => [f.toLowerCase(), f]));
+  for (const f of e.target.files) { const k = want[f.name.toLowerCase()]; if (k) fontFiles[k] = new Uint8Array(await f.arrayBuffer()); }
+  const missing = FONT_FILES.filter(f => !fontFiles[f]);
+  if (missing.length) { alert('Still needed: ' + missing.join(', ')); return; }
+  $('hwNone').hidden = true; $('hwPick').hidden = false;
+  $('hwFont').innerHTML = HW_FONTS.map(n => `<option>${n}</option>`).join('');
+  fontsSent = false;
+};
+
+// ── The sheet maker: the old Python sheet code, run in this browser ──────────────────────────────────────
+const PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.27.7/full/';
+const PY_FILES = ['data.py', 'cloze_bank.py', 'cloze_more.json', 'pt_render.py', 'name_stamps.py', 'pack.py'];
+let makerP = null, fontsSent = false;
+function loadScript(src) {
+  return new Promise((ok, bad) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => bad(new Error('Could not fetch ' + src)); document.head.appendChild(s); });
+}
+function sheetMaker() {
+  if (!makerP) makerP = (async () => {
+    await loadScript(PYODIDE + 'pyodide.js');
+    const py = await loadPyodide({indexURL: PYODIDE});
+    await py.loadPackage(['micropip', 'pillow']);
+    await py.runPythonAsync(`import micropip\nawait micropip.install(['reportlab==4.4.4'])`);
+    py.FS.mkdirTree('/pt/fonts');
+    const v = '?v=' + encodeURIComponent($('ver').textContent);
+    for (const f of PY_FILES) {
+      const r = await fetch('py/' + f + v); if (!r.ok) throw new Error('Could not fetch ' + f);
+      py.FS.writeFile('/pt/' + f, new Uint8Array(await r.arrayBuffer()));
+    }
+    const fr = await fetch('../../precision-teaching/fonts/SassoonInfant.ttf');
+    if (fr.ok) py.FS.writeFile('/pt/fonts/SassoonInfant.ttf', new Uint8Array(await fr.arrayBuffer()));
+    py.runPython(`import sys\nsys.path.insert(0, '/pt')\ntry:\n    import requests\nexcept Exception:\n    import types; sys.modules['requests'] = types.ModuleType('requests')\nimport pack`);
+    return py;
+  })();
+  makerP.catch(() => { makerP = null; });
+  return makerP;
+}
+
+// ── Names (the names file, exactly as the other staff tools) ─────────────────────────────────────────────
+function namesThen(fn) {
+  const shown = window.WFANames && WFANames.screen.active && WFANames.screen.file;
+  if (shown || !window.WFANames) return fn(shown || null);
+  WFANames.pick({purpose: 'Your names file puts the children\'s names on the sheets. It is read on this device only and never uploaded.', skipLabel: 'Print with initials'}).then(fn);
+}
+
+function clearFiles() { made.forEach(u => URL.revokeObjectURL(u)); made = []; $('files').innerHTML = ''; say('goMsg', ''); }
+
+$('go').onclick = () => {
+  if (!WB || !sel.kids.size) return;
+  namesThen(async file => {
+    clearFiles();
+    $('go').disabled = true;
+    try {
+      say('goMsg', makerP ? 'Making the sheets…' : 'Getting the sheet maker ready (about 20 seconds the first time)…');
+      const py = await sheetMaker();
+      say('goMsg', 'Making the sheets…');
+      await new Promise(r => setTimeout(r, 30));
+      if (!fontsSent && Object.keys(fontFiles).length === FONT_FILES.length) {
+        for (const [n, b] of Object.entries(fontFiles)) py.FS.writeFile('/pt/fonts/' + n, b);
+        py.runPython('import pt_render\npt_render._hw_fonts_ok = None');
+        fontsSent = true;
+      }
+      const codes = [...sel.kids];
+      const kids = codes.map(c => WB.pupils[c]);
+      const selClasses = [...new Set(kids.map(p => p.class))].sort();
+      const allClasses = [...new Set(kidsWithTargets().filter(p => p.yearGroup === sel.year).map(p => p.class))];
+      let groups;
+      if ($('each').checked && !$('eachBox').hidden && selClasses.length > 1) {
+        groups = selClasses.map(c => [c, kids.filter(p => p.class === c).map(p => p.pupilCode)]);
+      } else {
+        const tag = selClasses.length < allClasses.length || allClasses.length === 1 ? selClasses.join('-') : (sel.year || '');
+        groups = [[tag, codes]];
+      }
+      const names = {};
+      if (file) for (const c of codes) { const rec = file.get(c); const nm = rec && (rec.name || [rec.first, rec.last].filter(Boolean).join(' ')); if (nm) names[c] = nm; }
+      const want = new Set(codes);
+      const payload = {
+        areas: WB.areas,
+        children: Object.values(WB.pupils).filter(p => want.has(p.pupilCode)),
+        targets: weekTargets().filter(t => want.has(t.pupilCode)).map(t => ({id: t.id, pupilCode: t.pupilCode, area: t.area, partName: t.partName, items: t.items, days: t.days})),
+        groups, names, answers: $('answers').checked, cover: $('cover').checked, duplex: $('duplex').checked,
+        share: $('share').checked, hw_font: $('hwPick').hidden ? null : $('hwFont').value, print_date: printDate(),
+      };
+      py.globals.set('payload_json', JSON.stringify(payload));
+      const out = py.runPython('import pack\npack.build(payload_json)');
+      py.globals.delete('payload_json');
+      const list = out.toJs({dict_converter: Object.fromEntries});
+      out.destroy();
+      if (file && !(WFANames.screen.active && WFANames.screen.file === file)) file.clear();
+      if (!list.length) { say('goMsg', 'Nothing to print: no days are ticked for these children.', 'err'); return; }
+      const wk = $('week').value;
+      for (const f of list) {
+        const blob = new Blob([f.pdf], {type: 'application/pdf'}), url = URL.createObjectURL(blob);
+        made.push(url);
+        const nk = f.children, fname = `precision-teaching-week${f.label ? '-' + f.label : ''}-${wk}.pdf`;
+        const row = document.createElement('div'); row.className = 'file';
+        const b = document.createElement('b');
+        b.textContent = `${f.label || 'The sheets'} (${nk} child${nk !== 1 ? 'ren' : ''}, ${f.sheets} sheets)`;
+        const open = document.createElement('a'); open.className = 'btn'; open.href = url; open.target = '_blank'; open.rel = 'noopener'; open.textContent = 'Open to print';
+        const dl = document.createElement('a'); dl.className = 'btn ghost'; dl.href = url; dl.download = fname; dl.textContent = 'Download';
+        open.style.textDecoration = dl.style.textDecoration = 'none';
+        row.append(b, open, dl);
+        $('files').appendChild(row);
+      }
+      say('goMsg', Object.keys(names).length ? `Done, with names for ${Object.keys(names).length} of ${codes.length} children.` : 'Done. The sheets show initials.', 'ok');
+    } catch (e) {
+      console.error(e);
+      say('goMsg', 'The sheets could not be made (' + (e && e.message ? String(e.message).split('\n').filter(Boolean).pop() : 'error') + '). Check your internet connection and try again.', 'err');
+    } finally {
+      $('go').disabled = !sel.kids.size;
+    }
+  });
+};
+
+try { WFANames.screen.init(); } catch (e) {}
+</script>
+</body>
+</html>

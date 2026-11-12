@@ -1,0 +1,1785 @@
+"""Data model for Precision Teaching Grids — pupils, ladders, probes, git sync."""
+
+import json
+import os
+import random
+import string
+import re
+import subprocess
+from datetime import date, datetime
+from pathlib import Path
+
+import requests
+
+# Pupil data lives in its own private repo (moved out of the public
+# staff-tools repo 13.09.26 — see wallscourtfarm/precision-teaching-data),
+# nested here as a plain git checkout with its own .git and remote.
+# App/probe-tab code stays in staff-tools; only the data + its git history
+# live in the private repo.
+REPO_DIR = Path(__file__).parent / "private-data"
+DATA_DIR = REPO_DIR / "data"
+PROBES_DIR = DATA_DIR / "probes"
+
+# ── Hub roster (Bromcom-sourced, via the WFA API) ────────────────────────────
+# Pupils only ever enter this tool by being picked from the live roster here
+# — never by typing a name. See add_pupil / sync_pupils_from_roster below.
+
+# Postgres roster on the WFA API since 25.09.26 — this used to read the
+# shared-sync Google Apps Script. Same pupil shape (compared field by field
+# across all 383 pupils). A fixed URL rather than an environment override, so a
+# stale setting can't quietly point it back at Google.
+HUB_URL = "https://api.wallscourt-farm-academy.co.uk/planning/pupilroster-db/pupils"
+HUB_TOKEN = os.environ.get("HUB_TOKEN", "")
+
+
+def fetch_hub_pupils_checked():
+    """Live pupil list from the hub as (pupils, problem). `problem` is "" on success, otherwise a short plain
+    reason (no token, token refused, unreachable) so the screen can say why the list is empty."""
+    if not HUB_TOKEN:
+        return [], "This tool has no hub token set (HUB_TOKEN on Railway)."
+    try:
+        r = requests.get(HUB_URL, params={"action": "getPupils", "token": HUB_TOKEN}, timeout=20)
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        return [], f"The roster could not be reached ({type(e).__name__})."
+    if data.get("error"):
+        return [], f"The roster refused the request ({data.get('error')}). The hub token on Railway may be out of date."
+    return data.get("pupils", []), ""
+
+
+def fetch_hub_pupils():
+    """Live pupil list from the hub. Returns [] on any failure — callers
+    should treat that as 'roster unavailable right now', not 'no pupils'."""
+    return fetch_hub_pupils_checked()[0]
+
+# ── Skill Ladders ──────────────────────────────────────────────────────────
+
+DEFAULT_LADDERS = [
+    {
+        "id": "number_bonds",
+        "name": "Number Bonds",
+        "subject": "maths",
+        "description": "Number bonds progression from 5 to 20",
+        "steps": [
+            {
+                "id": "bonds_5",
+                "name": "Number bonds to 5",
+                "aim": {"correctPerMin": 40, "maxErrors": 1, "timedSec": 60},
+                "items": ["0+5", "1+4", "2+3", "3+2", "4+1", "5+0"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "bonds_10",
+                "name": "Number bonds to 10",
+                "aim": {"correctPerMin": 40, "maxErrors": 1, "timedSec": 60},
+                "items": [
+                    "0+10", "1+9", "2+8", "3+7", "4+6", "5+5",
+                    "6+4", "7+3", "8+2", "9+1", "10+0",
+                ],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "bonds_20",
+                "name": "Number bonds to 20",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [
+                    "0+20", "1+19", "2+18", "3+17", "4+16", "5+15",
+                    "6+14", "7+13", "8+12", "9+11", "10+10",
+                    "11+9", "12+8", "13+7", "14+6", "15+5",
+                    "16+4", "17+3", "18+2", "19+1", "20+0",
+                ],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+        ],
+    },
+    {
+        "id": "times_tables",
+        "name": "Times Tables",
+        "subject": "maths",
+        "description": "Times tables progression from 2x to 12x",
+        "steps": [
+            {
+                "id": "tt_10",
+                "name": "10x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"10×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "tt_2",
+                "name": "2x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"2×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "tt_5",
+                "name": "5x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"5×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "tt_4",
+                "name": "4x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"4×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "tt_8",
+                "name": "8x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"8×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "tt_3",
+                "name": "3x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"3×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "tt_6",
+                "name": "6x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"6×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "tt_9",
+                "name": "9x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"9×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "tt_7",
+                "name": "7x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"7×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "tt_11",
+                "name": "11x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"11×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "tt_12",
+                "name": "12x table",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"12×{i}" for i in range(1, 13)],
+                "windowSize": 5,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+        ],
+    },
+    {
+        "id": "doubles_halves",
+        "name": "Doubles & Halves",
+        "subject": "maths",
+        "description": "Doubling and halving facts",
+        "steps": [
+            {
+                "id": "doubles_10",
+                "name": "Doubles to 10",
+                "aim": {"correctPerMin": 40, "maxErrors": 1, "timedSec": 60},
+                "items": ["double 1", "double 2", "double 3", "double 4", "double 5"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "doubles_20",
+                "name": "Doubles to 20",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"double {i}" for i in range(1, 11)],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "halves_20",
+                "name": "Halves of numbers to 20",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": ["half of 2", "half of 4", "half of 6", "half of 8", "half of 10",
+                           "half of 12", "half of 14", "half of 16", "half of 18", "half of 20"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+        ],
+    },
+    {
+        "id": "addition_facts",
+        "name": "Addition Facts",
+        "subject": "maths",
+        "description": "Quick recall of addition facts to 20",
+        "steps": [
+            {
+                "id": "add_1d",
+                "name": "Single-digit addition",
+                "aim": {"correctPerMin": 40, "maxErrors": 2, "timedSec": 60},
+                "items": [f"{a}+{b}" for a in range(1, 10) for b in range(1, 10) if a + b <= 10][:20],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+        ],
+    },
+    {
+        "id": "phonics_gpcs",
+        "name": "Phonics GPCs",
+        "subject": "phonics",
+        "description": "Grapheme-phoneme correspondences, in Unlocking Letters and Sounds teaching order",
+        "steps": [
+            {
+                "id": "phase2_gpcs",
+                "name": "Phase 2 GPCs",
+                "aim": {"correctPerMin": 20, "maxErrors": 2, "timedSec": 60},
+                "items": [
+                    "s", "a", "t", "p", "i", "n", "m", "d",
+                    "g", "o", "c", "k", "ck", "e", "u", "r",
+                    "h", "b", "f", "ff", "l", "ll", "ss",
+                ],
+                "windowSize": 6,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "phase3_gpcs",
+                "name": "Phase 3 GPCs",
+                "aim": {"correctPerMin": 20, "maxErrors": 2, "timedSec": 60},
+                "items": [
+                    "j", "v", "w", "x", "y", "z", "zz", "qu",
+                    "ch", "sh", "th", "ng", "ai", "ee", "igh", "oa",
+                    "oo", "ar", "or", "ur", "ow", "oi", "ear", "air",
+                    "ure", "er",
+                ],
+                "windowSize": 6,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "phase5a_gpcs",
+                "name": "Phase 5a GPCs",
+                "aim": {"correctPerMin": 15, "maxErrors": 3, "timedSec": 60},
+                "items": [
+                    "ay", "ou", "ie", "ea", "oy", "ir", "ue", "aw",
+                    "wh", "ph", "ew", "oe", "au", "ey",
+                    "a_e", "e_e", "i_e", "o_e", "u_e",
+                ],
+                "windowSize": 6,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+        ],
+    },
+    {
+        "id": "common_exception_words_y1",
+        "name": "Common Exception Words (Y1)",
+        "subject": "spellings",
+        "description": "Common exception words, in Unlocking Letters and Sounds teaching order",
+        "steps": [
+            {
+                "id": "cew_reception",
+                "name": "Reception CEW",
+                "aim": {"correctPerMin": 10, "maxErrors": 1, "timedSec": 60},
+                "items": [
+                    "the", "to", "into", "no", "I", "go",
+                    "me", "we", "be", "he", "she", "was",
+                    "you", "they", "all", "are", "my", "her",
+                ],
+                "windowSize": 8,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "cew_y1",
+                "name": "Year 1 CEW",
+                "aim": {"correctPerMin": 10, "maxErrors": 1, "timedSec": 60},
+                "items": [
+                    "said", "have", "like", "so", "do", "some",
+                    "come", "were", "there", "little", "one", "when",
+                    "out", "what", "oh", "their", "people", "Mr",
+                    "Mrs", "looked", "called", "asked", "water", "where",
+                    "who", "again", "thought", "through", "mouse", "work",
+                    "many", "laughed", "because", "different", "any", "eyes",
+                    "friends", "once", "please",
+                ],
+                "windowSize": 8,
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+        ],
+    },
+    {
+        "id": "common_exception_words_y2",
+        "name": "Common Exception Words (Y2)",
+        "subject": "spellings",
+        "description": "Year 2 common exception words — read/spell fluency",
+        "steps": [
+            {
+                "id": "cew_y2_door_floor",
+                "name": "CEW Y2: door, floor, poor, because, find, kind",
+                "aim": {"correctPerMin": 8, "maxErrors": 1, "timedSec": 60},
+                "items": ["door", "floor", "poor", "because", "find", "kind"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "cew_y2_behind_child",
+                "name": "CEW Y2: behind, child, children, wild, climb, most",
+                "aim": {"correctPerMin": 8, "maxErrors": 1, "timedSec": 60},
+                "items": ["behind", "child", "children", "wild", "climb", "most"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "cew_y2_both_old",
+                "name": "CEW Y2: both, old, cold, gold, told, every",
+                "aim": {"correctPerMin": 8, "maxErrors": 1, "timedSec": 60},
+                "items": ["both", "old", "cold", "gold", "told", "every"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+        ],
+    },
+    {
+        "id": "spelling_rules_y1",
+        "name": "Spelling Rules (Y1)",
+        "subject": "spellings",
+        "description": "Year 1 spelling patterns — grouped by rule, 5 words per step",
+        "steps": [
+            {
+                "id": "spell_y1s1",
+                "name": "Y1: Words ending in ff, ll, ss, zz, ck",
+                "aim": {"correctPerMin": 8, "maxErrors": 1, "timedSec": 60},
+                "items": ["bell", "kiss", "clock", "puff", "buzz"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "spell_y1s2",
+                "name": "Y1: Words with k and nk",
+                "aim": {"correctPerMin": 8, "maxErrors": 1, "timedSec": 60},
+                "items": ["kit", "mask", "bank", "pink", "skin"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "spell_y1s3",
+                "name": "Y1: Words with tch",
+                "aim": {"correctPerMin": 8, "maxErrors": 1, "timedSec": 60},
+                "items": ["catch", "fetch", "hutch", "match", "patch"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+        ],
+    },
+    {
+        "id": "spelling_rules_y2",
+        "name": "Spelling Rules (Y2)",
+        "subject": "spellings",
+        "description": "Year 2 spelling patterns — grouped by rule, 5 words per step",
+        "steps": [
+            {
+                "id": "spell_y2s1",
+                "name": "Y2: Words with dge",
+                "aim": {"correctPerMin": 8, "maxErrors": 1, "timedSec": 60},
+                "items": ["badge", "edge", "bridge", "dodge", "fudge"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "spell_y2s2",
+                "name": "Y2: Words with ge (j sound)",
+                "aim": {"correctPerMin": 8, "maxErrors": 1, "timedSec": 60},
+                "items": ["change", "strange", "range", "hinge", "fringe"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "spell_y2s5",
+                "name": "Y2: Words with kn and gn",
+                "aim": {"correctPerMin": 8, "maxErrors": 1, "timedSec": 60},
+                "items": ["knock", "know", "knee", "gnome", "gnat"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+        ],
+    },
+    {
+        "id": "spelling_rules_y4",
+        "name": "Spelling Rules (Y4)",
+        "subject": "spellings",
+        "description": "Year 4 spelling patterns — grouped by rule, 10 words per step",
+        "steps": [
+            {
+                "id": "spell_y4s1",
+                "name": "Y4: Homophones (accept/except, knot/not, peace/piece)",
+                "aim": {"correctPerMin": 8, "maxErrors": 1, "timedSec": 60},
+                "items": ["accept", "except", "knot", "not", "peace", "piece", "plain", "plane", "weather", "whether"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "spell_y4s2",
+                "name": "Y4: Prefix in- (inability, inactive, incorrect...)",
+                "aim": {"correctPerMin": 8, "maxErrors": 1, "timedSec": 60},
+                "items": ["inability", "inactive", "inadequate", "incorrect", "incurable", "indefinite", "inelegant", "inflexible", "insecure", "invisible"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+            {
+                "id": "spell_y4s6",
+                "name": "Y4: Key Spellings (strength, grammar, calendar...)",
+                "aim": {"correctPerMin": 8, "maxErrors": 1, "timedSec": 60},
+                "items": ["strength", "grammar", "calendar", "women", "appear", "straight", "interest", "opposite", "increase", "believe"],
+                "untimedAim": {"accuracyPct": 100, "minTrials": 3},
+            },
+        ],
+    },
+]
+
+
+def _generate_token():
+    """Generate a random 4-letter token for iPad self-assessment."""
+    consonants = "bcdfghjklmnpqrstvwxyz"
+    vowels = "aeiou"
+    return random.choice(consonants) + random.choice(vowels) + random.choice(consonants) + random.choice(vowels)
+
+
+def default_pupils():
+    return {"pupils": []}
+
+
+def default_skill_ladders():
+    return {"ladders": DEFAULT_LADDERS}
+
+
+# ── JSON I/O ────────────────────────────────────────────────────────────────
+
+def read_json(path):
+    p = Path(path)
+    if not p.exists():
+        return None
+    with open(p, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def write_json(path, data):
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+# ── Git Sync ────────────────────────────────────────────────────────────────
+
+def _github_token():
+    """Token from the environment or Streamlit secrets, if either is present."""
+    tok = os.environ.get("GITHUB_TOKEN", "")
+    if tok:
+        return tok
+    try:
+        import streamlit as st
+        return st.secrets.get("GITHUB_TOKEN", "")
+    except Exception:
+        return ""
+
+
+def ensure_remote_auth():
+    """Keep the origin remote clean of baked-in tokens; auth via env/secrets.
+
+    A PAT in .git/config would ship the credential wherever the repo is
+    copied, so the remote is kept as plain https:// and the token is applied
+    per-operation from Streamlit secrets / GITHUB_TOKEN instead.
+    """
+    gitcfg = REPO_DIR / ".git" / "config"
+    try:
+        if gitcfg.exists():
+            cfg = gitcfg.read_text(encoding="utf-8", errors="ignore")
+            if re.search(r"https://[^@\s]+@", cfg):
+                cfg = re.sub(r"(https://)[^@\s]+@", r"\1", cfg)
+                gitcfg.write_text(cfg, encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _git_auth_url():
+    tok = _github_token()
+    # Pupil data's own private repo (moved 13.09.26) — distinct from the
+    # public staff-tools repo the app's own code lives in.
+    base = "https://github.com/wallscourtfarm/precision-teaching-data.git"
+    if tok:
+        return f"https://{tok}@{base[len('https://'):]}"
+    return base
+
+
+# The server has no git identity of its own, so every commit carries one explicitly. (Without it `git commit`
+# fails with "Author identity unknown", which used to be swallowed: nothing was saved to the data repo.)
+_GIT_ID = ["-c", "user.name=WFA Precision Teaching", "-c", "user.email=noreply@wallscourt-farm-academy.co.uk"]
+SAVE_STATUS = {"ok": True, "message": "", "at": None}
+
+
+def _redact(text):
+    tok = _github_token()
+    text = text or ""
+    return text.replace(tok, "***") if tok else text
+
+
+def _git(args, timeout=30):
+    return subprocess.run(["git", *_GIT_ID, *args], cwd=REPO_DIR, capture_output=True, text=True, timeout=timeout)
+
+
+def _record_save(ok, message=""):
+    if not ok:
+        print(f"[precision-teaching save] FAILED: {_redact(message).strip()[:300]}", flush=True)
+    SAVE_STATUS.update({"ok": ok, "message": _redact(message).strip()[:400], "at": datetime.now().strftime("%H:%M:%S")})
+
+
+def _clone_data_repo():
+    """Fetch the private data repo into REPO_DIR. REPO_DIR may already hold files that were never under git
+    (written while git was missing): they are kept in a backup folder, and a local pupil list is carried over
+    if GitHub has none."""
+    import shutil
+    tmp = REPO_DIR.parent / "private-data-clone"
+    shutil.rmtree(tmp, ignore_errors=True)
+    r = subprocess.run(["git", "clone", _git_auth_url(), str(tmp)], capture_output=True, text=True, timeout=90)
+    if r.returncode != 0:
+        _record_save(False, "Could not fetch the saved data from GitHub: " + _redact(r.stderr or r.stdout))
+        shutil.rmtree(tmp, ignore_errors=True)
+        return False
+    local_pupils = read_json(REPO_DIR / "data" / "pupils.json") if REPO_DIR.exists() else None
+    if REPO_DIR.exists():
+        backup = REPO_DIR.parent / "private-data-local-backup"
+        shutil.rmtree(backup, ignore_errors=True)
+        shutil.move(str(REPO_DIR), str(backup))
+    shutil.move(str(tmp), str(REPO_DIR))
+    remote_pupils = read_json(REPO_DIR / "data" / "pupils.json") or {"pupils": []}
+    if local_pupils and local_pupils.get("pupils") and not remote_pupils.get("pupils"):
+        write_json(REPO_DIR / "data" / "pupils.json", local_pupils)
+    return True
+
+
+def git_pull():
+    if not (REPO_DIR / ".git").exists():
+        try:
+            REPO_DIR.parent.mkdir(parents=True, exist_ok=True)
+            if not _clone_data_repo():
+                return False
+        except FileNotFoundError:
+            _record_save(False, "git is not installed on this server, so nothing can be saved to GitHub.")
+            return False
+        except Exception as e:
+            _record_save(False, f"Could not fetch the saved data from GitHub: {type(e).__name__}")
+            return False
+        return (REPO_DIR / ".git").exists()
+    ensure_remote_auth()
+    try:
+        f = _git(["fetch", _git_auth_url(), "+main:refs/remotes/origin/main"], timeout=30)
+        if f.returncode != 0:
+            _record_save(False, "Could not fetch the saved data from GitHub: " + (f.stderr or f.stdout))
+            return False
+        r = _git(["rebase", "--autostash", "origin/main"], timeout=30)
+        if r.returncode != 0:
+            _git(["rebase", "--abort"], timeout=10)
+            _record_save(False, "Could not combine the saved data with this server's changes: " + (r.stderr or r.stdout))
+            return False
+        return True
+    except Exception:
+        return False
+
+
+def git_add_commit_push(filepath, message):
+    """Commit a data file and push it to the private data repo. Records the outcome in SAVE_STATUS so the app
+    can say plainly when a change is NOT backed up."""
+    try:
+        ensure_remote_auth()
+        a = _git(["add", filepath], timeout=15)
+        if a.returncode != 0:
+            _record_save(False, "git add failed: " + (a.stderr or a.stdout))
+            return False
+        c = _git(["commit", "-m", message], timeout=15)
+        out = (c.stdout or "") + (c.stderr or "")
+        if c.returncode != 0 and "nothing to commit" not in out and "nothing added" not in out:
+            _record_save(False, "git commit failed: " + out)
+            return False
+        url = _git_auth_url()
+        p = _git(["push", url, "HEAD:main"], timeout=45)
+        if p.returncode != 0:
+            f = _git(["fetch", url, "+main:refs/remotes/origin/main"], timeout=30)
+            if f.returncode == 0:
+                if _git(["rebase", "--autostash", "origin/main"], timeout=30).returncode != 0:
+                    _git(["rebase", "--abort"], timeout=10)
+            p = _git(["push", url, "HEAD:main"], timeout=45)
+        if p.returncode != 0:
+            _record_save(False, "git push failed: " + (p.stderr or p.stdout))
+            return False
+        _git(["update-ref", "refs/remotes/origin/main", "HEAD"], timeout=10)   # so 'unpushed commits' counts correctly
+        _record_save(True, "")
+        return True
+    except FileNotFoundError:
+        _record_save(False, "git is not installed on this server, so nothing can be saved to GitHub.")
+        return False
+    except Exception as e:
+        _record_save(False, f"{type(e).__name__}: {e}")
+        return False
+
+
+def git_unsaved_count():
+    """Changes not yet safely on GitHub: uncommitted files in the data repo plus commits not yet pushed."""
+    if not (REPO_DIR / ".git").exists():
+        return 1      # no link to the data repo at all: nothing here is backed up
+    try:
+        st_ = _git(["status", "--porcelain", "--", "data"], timeout=10)
+        files = [l for l in st_.stdout.splitlines() if l.strip()]
+        return len(files) + git_pending_commits()
+    except Exception:
+        return 0
+
+
+def git_selftest():
+    """Plain-English check that this server can read from AND write to the private data repo."""
+    lines = []
+    if not _github_token():
+        return ["No GITHUB_TOKEN is set on this server, so nothing can be saved to GitHub."]
+    try:
+        subprocess.run(["git", "--version"], capture_output=True, timeout=5)
+    except FileNotFoundError:
+        return ["git is not installed on this server, so nothing can be saved to GitHub."]
+    if not (REPO_DIR / ".git").exists():
+        return ["This server has no copy of the data repository yet (the first fetch from GitHub failed)."]
+    url = _git_auth_url()
+    try:
+        r = _git(["ls-remote", url, "HEAD"], timeout=30)
+        lines.append("Read from GitHub: OK" if r.returncode == 0 else "Read from GitHub: FAILED. " + _redact(r.stderr or r.stdout).strip()[:250])
+        w = _git(["push", "--dry-run", url, "HEAD:main"], timeout=30)
+        lines.append("Write to GitHub: OK" if w.returncode == 0 else "Write to GitHub: FAILED. " + _redact(w.stderr or w.stdout).strip()[:250])
+    except Exception as e:
+        lines.append(f"Check could not run: {type(e).__name__}")
+    return lines
+
+
+def git_pending_commits():
+    try:
+        result = subprocess.run(
+            ["git", "log", "--oneline", "origin/main..HEAD"],
+            cwd=REPO_DIR, capture_output=True, text=True, timeout=5
+        )
+        lines = [l for l in result.stdout.strip().split("\n") if l]
+        return len(lines)
+    except Exception:
+        return 0
+
+
+# ── Data Access ─────────────────────────────────────────────────────────────
+
+def load_pupils():
+    data = read_json(DATA_DIR / "pupils.json")
+    return data if data else default_pupils()
+
+
+def save_pupils(pupils_data):
+    write_json(DATA_DIR / "pupils.json", pupils_data)
+
+
+def load_ladders():
+    data = read_json(DATA_DIR / "skill-ladders.json")
+    data = data if data else default_skill_ladders()
+    try:
+        used = set()
+        for p in (read_json(DATA_DIR / "pupils.json") or {}).get("pupils", []):
+            used.update((p.get("currentSkills") or {}).keys())
+    except Exception:
+        used = set()
+    return merge_builtin_ladders(data, used)
+
+
+# ── Built-in ladders added on every load (handwriting, homophones, custom sets, ULS spelling) ──────────────
+
+_HW_AIM = {"correctPerMin": 20, "maxErrors": 0, "timedSec": 60}
+
+
+def _hw_step(step_id, name, items):
+    # windowSize 2: a child practises just two letters (or joins) at a time; the teacher can choose which two.
+    return {"id": step_id, "name": name, "aim": dict(_HW_AIM), "items": list(items), "windowSize": 2,
+            "untimedAim": {"accuracyPct": 100, "minTrials": 3}}
+
+
+def builtin_ladders():
+    from cloze_bank import HOMOPHONE_STEPS
+    return [
+        {"id": "homophones", "name": "Homophones", "subject": "spellings", "kind": "cloze",
+         "description": "Choose the right homophone for each sentence from a word bank",
+         "steps": [{"id": sid, "name": nm, "aim": {"correctPerMin": 10, "maxErrors": 1, "timedSec": 60},
+                    "items": words, "untimedAim": {"accuracyPct": 100, "minTrials": 3}}
+                   for sid, nm, words in HOMOPHONE_STEPS]},
+        {"id": "handwriting_letters", "name": "Handwriting: letter families", "subject": "handwriting",
+         "kind": "hw_letters", "independent": True,
+         "description": "Letter formation by family",
+         "steps": [
+             _hw_step("hw_curly", "Curly caterpillar letters (c a d g o q s e f)", list("cadgoqsef")),
+             _hw_step("hw_ladder", "Long ladder letters (l i t u j y)", list("ltiujy")),
+             _hw_step("hw_robot", "One-armed robot letters (b h k m n p r)", list("bhkmnpr")),
+             _hw_step("hw_zigzag", "Zig-zag monster letters (v w x z)", list("vwxz")),
+         ]},
+        {"id": "handwriting_joins", "name": "Handwriting: joins", "subject": "handwriting",
+         "kind": "hw_joins", "independent": True,
+         "description": "Joining letters in pairs and common endings",
+         "steps": [
+             _hw_step("hj_r", "Joins with r (ra re ri ro ru...)", ["ra", "re", "ri", "ro", "ru", "rt", "rn", "rm", "rl", "ry"]),
+             _hw_step("hj_o", "Joins with o (oa oe oi ol...)", ["oa", "oe", "oi", "ol", "on", "or", "os", "ot", "ou", "ow"]),
+             _hw_step("hj_e", "Joins with e (ea ed ee el...)", ["ea", "ed", "ee", "el", "en", "er", "es", "et", "eo", "ew"]),
+             _hw_step("hj_tl", "Joins to t and l (at et it ot ut al el il...)", ["at", "et", "it", "ot", "ut", "al", "el", "il", "ol", "ul"]),
+             _hw_step("hj_vowel", "Vowel pairs (ai ea ee ie oa ou...)", ["ai", "ea", "ee", "ie", "oa", "oo", "ou", "ow", "ue", "ay"]),
+             _hw_step("hj_end", "Common endings (ing ed er est ly...)", ["ing", "ed", "er", "est", "ly", "ful", "ment", "tion"]),
+         ]},
+        {"id": "custom_sets", "name": "Custom sets", "subject": "custom", "independent": True,
+         "description": "Sets you make yourself: chosen graphemes, letters, joins or words", "steps": []},
+    ]
+
+
+_OLD_SPELLING_SHED_LADDERS = {"spelling_rules_y1", "spelling_rules_y2", "spelling_rules_y4"}
+_CLOZE_LADDER_PREFIXES = ("common_exception_words",)
+
+
+def merge_builtin_ladders(ladders_data, used_step_ids=()):
+    """Add any missing built-in ladders/steps; switch the common exception word ladders to sentence (cloze)
+    practice; drop the old Spelling Shed ladders unless a child is still using one of their steps."""
+    used = set(used_step_ids)
+    ladders = ladders_data.setdefault("ladders", [])
+    keep = []
+    for l in ladders:
+        if l["id"] in _OLD_SPELLING_SHED_LADDERS and not any(s["id"] in used for s in l["steps"]):
+            continue
+        keep.append(l)
+    ladders[:] = keep
+    by_id = {l["id"]: l for l in ladders}
+    extra = list(builtin_ladders())
+    uls = read_json(DATA_DIR / "uls-spelling-ladders.json")
+    if uls:
+        extra += uls.get("ladders", [])
+    for b in extra:
+        have = by_id.get(b["id"])
+        if not have:
+            ladders.append(b)
+            by_id[b["id"]] = b
+            continue
+        for k in ("kind", "independent", "subject"):
+            if k in b and k not in have:
+                have[k] = b[k]
+        known = {s["id"] for s in have["steps"]}
+        have["steps"].extend(s for s in b["steps"] if s["id"] not in known)
+        want = {s["id"]: s["windowSize"] for s in b["steps"] if s.get("windowSize")}
+        for s in have["steps"]:
+            if s["id"] in want and not s.get("windowSize") and s["id"].startswith(("hw_", "hj_")):
+                s["windowSize"] = want[s["id"]]
+    for l in ladders:
+        if l["id"].startswith(_CLOZE_LADDER_PREFIXES) and not l.get("kind"):
+            l["kind"] = "cloze"
+    return ladders_data
+
+
+def step_subject(step, ladders_data=None, ladder=None):
+    """A step's subject: its own if set (custom sets), else its ladder's."""
+    if step.get("subject"):
+        return step["subject"]
+    if ladder is None and ladders_data is not None:
+        ladder = next((l for l in ladders_data["ladders"] if l["id"] == step.get("ladder_id")), None)
+    return ladder["subject"] if ladder else "maths"
+
+
+def step_kind(step, ladder=None):
+    """How a step is practised: 'cloze', 'hw_letters', 'hw_joins' or None (the standard sheet for its subject)."""
+    return step.get("kind") or (ladder.get("kind") if ladder else None)
+
+
+def save_ladders(ladders_data):
+    write_json(DATA_DIR / "skill-ladders.json", ladders_data)
+
+
+def load_probes(pupil_id, skill_id):
+    path = PROBES_DIR / pupil_id / f"{skill_id}.json"
+    data = read_json(path)
+    return data if data else {"pupilId": pupil_id, "skillId": skill_id, "probes": []}
+
+
+def save_probes(pupil_id, skill_id, probes_data):
+    path = PROBES_DIR / pupil_id / f"{skill_id}.json"
+    write_json(path, probes_data)
+
+
+def add_probe(pupil_id, skill_id, mode, correct, errors, items_shown, duration_sec, notes="", item_results=None):
+    """Add a probe record. item_results is a dict of {item: True/False} for per-item tracking."""
+    probes_data = load_probes(pupil_id, skill_id)
+    probe = {
+        "date": date.today().isoformat(),
+        "mode": mode,
+        "durationSec": duration_sec,
+        "correct": correct,
+        "errors": errors,
+        "itemsShown": items_shown,
+        "notes": notes,
+    }
+    if item_results:
+        probe["itemResults"] = item_results
+    probes_data["probes"].append(probe)
+    save_probes(pupil_id, skill_id, probes_data)
+    return probes_data
+
+
+def load_all_probes_for_pupil(pupil_id):
+    results = {}
+    pupil_dir = PROBES_DIR / pupil_id
+    if pupil_dir.exists():
+        for f in pupil_dir.glob("*.json"):
+            data = read_json(f)
+            if data:
+                results[data["skillId"]] = data
+    return results
+
+
+# ── Ladder Helpers ──────────────────────────────────────────────────────────
+
+def get_all_steps(ladders_data):
+    steps = []
+    for ladder in ladders_data["ladders"]:
+        for i, step in enumerate(ladder["steps"]):
+            steps.append({**step, "ladder_id": ladder["id"], "ladder_name": ladder["name"], "step_index": i})
+    return steps
+
+
+def get_step(ladders_data, step_id):
+    for step in get_all_steps(ladders_data):
+        if step["id"] == step_id:
+            return step
+    return None
+
+
+def get_next_step(ladders_data, step_id):
+    steps = get_all_steps(ladders_data)
+    for i, s in enumerate(steps):
+        if s["id"] == step_id and i + 1 < len(steps) and steps[i + 1]["ladder_id"] == s["ladder_id"]:
+            return steps[i + 1]
+    return None
+
+
+def check_aim_met(step, probes_data):
+    if not probes_data["probes"]:
+        return False
+    aim = step["aim"]
+    recent_timed = [p for p in probes_data["probes"] if p["mode"] == "timed"]
+    if not recent_timed:
+        return False
+    last = recent_timed[-1]
+    duration_min = last["durationSec"] / 60
+    cpm = last["correct"] / duration_min if duration_min > 0 else 0
+    return cpm >= aim["correctPerMin"] and last["errors"] <= aim["maxErrors"]
+
+
+# ── Pupil Helpers ───────────────────────────────────────────────────────────
+#
+# PRIVACY (10.10.26): this tool no longer stores a child's name or UPN. A tracked pupil is identified by the
+# roster's random pupil code (`pupilCode`, "p_" + 10 chars) and shown by the roster's initials `label`.
+# `firstName` / `lastName` hold only 3-letter stubs (kept so older code paths still work). Real names appear
+# nowhere in this app (18.10.26: the names-file option was removed; printed sheets get names in the browser).
+
+def _letters(token):
+    return re.sub(r"[^A-Za-z]", "", token or "")
+
+
+def stub_first(value):
+    toks = str(value or "").split()
+    return _letters(toks[0])[:3] if toks else ""
+
+
+def stub_last(value):
+    toks = str(value or "").split()
+    return _letters(toks[-1])[:3] if toks else ""
+
+
+def pupil_label(pupil):
+    """Initials for a tracked pupil: the roster's label, else first letters of the stubs."""
+    lab = (pupil.get("label") or "").strip()
+    if lab:
+        return lab
+    return ((pupil.get("firstName", "")[:1] + pupil.get("lastName", "")[:1]).upper()) or "?"
+
+
+def display_name(pupil):
+    """What to show for a pupil: always their initials. Real names never reach this app: printed sheets get them
+    in the teacher's own browser (Name Stamper), and nothing on screen shows them."""
+    return pupil_label(pupil)
+
+
+def add_pupil(pupils_data, hub_pupil):
+    """Create a locally-tracked pupil record from a roster pupil (as returned by fetch_hub_pupils). Stores the
+    pupil code, initials label, class and year group only. The p### id stays the internal key (probe history
+    is filed under it)."""
+    pupil_id = f"p{len(pupils_data['pupils']) + 1:03d}"
+    while any(p["id"] == pupil_id for p in pupils_data["pupils"]):
+        num = int(pupil_id[1:]) + 1
+        pupil_id = f"p{num:03d}"
+    pupil = {
+        "id": pupil_id,
+        "pupilCode": hub_pupil.get("pupilId") or "",
+        "label": hub_pupil.get("label") or "",
+        "firstName": stub_first(hub_pupil.get("first")),
+        "lastName": stub_last(hub_pupil.get("last")),
+        "class": hub_pupil.get("class", ""),
+        "yearGroup": hub_pupil.get("yearGroup", ""),
+        "token": _generate_token(),
+        "currentSkills": {},
+        "notes": "",
+    }
+    pupils_data["pupils"].append(pupil)
+    return pupil
+
+
+def get_pupil(pupils_data, pupil_id):
+    for p in pupils_data["pupils"]:
+        if p["id"] == pupil_id:
+            return p
+    return None
+
+
+def anonymise_pupils(pupils_data):
+    """One-time, idempotent: bring every tracked pupil to the privacy shape. Links each to the roster by UPN
+    (then by an unambiguous stub match within the year group), stores the pupil code + label, drops the UPN,
+    and cuts the name fields to 3-letter stubs. Names are cut even if the roster cannot be reached; the UPN
+    and code link are only touched when it can. Returns counts only: {changed, linked, unlinked}."""
+    hub = fetch_hub_pupils()
+    by_upn = {p.get("upn"): p for p in hub if p.get("upn")}
+    by_code = {p.get("pupilId"): p for p in hub if p.get("pupilId")}
+    by_stub = {}
+    for h in hub:
+        by_stub.setdefault((h.get("yearGroup"), (h.get("first") or "").lower(), (h.get("last") or "").lower()), []).append(h)
+    changed = linked = unlinked = 0
+    for pupil in pupils_data["pupils"]:
+        before = (pupil.get("firstName"), pupil.get("lastName"), pupil.get("upn"), pupil.get("pupilCode"), pupil.get("label"))
+        hub_p = None
+        if hub:
+            if pupil.get("pupilCode"):
+                hub_p = by_code.get(pupil["pupilCode"])
+            if not hub_p and pupil.get("upn"):
+                hub_p = by_upn.get(pupil["upn"])
+            if not hub_p:
+                cands = by_stub.get((pupil.get("yearGroup"), stub_first(pupil.get("firstName")).lower(),
+                                     stub_last(pupil.get("lastName")).lower()), [])
+                hub_p = cands[0] if len(cands) == 1 else None
+        if hub_p:
+            pupil["pupilCode"] = hub_p.get("pupilId") or pupil.get("pupilCode", "")
+            pupil["label"] = hub_p.get("label") or pupil.get("label", "")
+            pupil.pop("upn", None)
+            linked += 1
+        elif hub:
+            unlinked += 1
+        pupil["firstName"], pupil["lastName"] = stub_first(pupil.get("firstName")), stub_last(pupil.get("lastName"))
+        if before != (pupil.get("firstName"), pupil.get("lastName"), pupil.get("upn"), pupil.get("pupilCode"), pupil.get("label")):
+            changed += 1
+    return {"changed": changed, "linked": linked, "unlinked": unlinked}
+
+
+def sync_pupils_from_roster(pupils_data):
+    """Refresh every tracked pupil's label / class / year group from the live roster, matched by pupil code.
+    Unlinked pupils are reported by label, never by name. Returns {updated, unmatched}."""
+    hub_pupils = fetch_hub_pupils()
+    if not hub_pupils:
+        return {"updated": 0, "unmatched": [], "error": "roster unavailable"}
+    by_code = {p.get("pupilId"): p for p in hub_pupils if p.get("pupilId")}
+    updated, unmatched = 0, []
+    for pupil in pupils_data["pupils"]:
+        hub_p = by_code.get(pupil.get("pupilCode"))
+        if not hub_p:
+            unmatched.append(pupil_label(pupil))
+            continue
+        new = {"label": hub_p.get("label") or pupil.get("label", ""),
+               "class": hub_p.get("class", pupil.get("class", "")),
+               "yearGroup": hub_p.get("yearGroup", pupil.get("yearGroup", "")),
+               "firstName": stub_first(hub_p.get("first")), "lastName": stub_last(hub_p.get("last"))}
+        if any(pupil.get(k) != v for k, v in new.items()):
+            pupil.update(new)
+            updated += 1
+    return {"updated": updated, "unmatched": unmatched}
+
+
+# ── Skill Status Helpers ─────────────────────────────────────────────────────
+
+# currentSkills maps skill_id → {"status": "mastered"|"active"|"upcoming",
+#   "masteredDate": "2026-05-22"|None, "nextReview": "2026-05-29"|None,
+#   "reviewStage": 0|1|2|None}
+#
+# Review stages:
+#   0 = review 1 week after mastery
+#   1 = review 2 weeks after stage 0 passes
+#   2 = review 1 month after stage 1 passes
+#   After stage 2 passes → status becomes "secure" (no more reviews)
+
+REVIEW_DELTAS = {
+    0: 7,   # 1 week
+    1: 14,  # 2 weeks
+    2: 28,  # 4 weeks (1 month)
+}
+
+def migrate_skills_format(pupil):
+    """Convert old string-format currentSkills to new object format."""
+    skills = pupil.get("currentSkills", {})
+    if not skills:
+        return False
+    changed = False
+    for skill_id, value in list(skills.items()):
+        if isinstance(value, str):
+            # Old format: "mastered", "active", "upcoming"
+            skills[skill_id] = {
+                "status": value,
+                "masteredDate": date.today().isoformat() if value == "mastered" else None,
+                "nextReview": None,
+                "reviewStage": None,
+            }
+            # Schedule review for newly migrated mastered skills
+            if value == "mastered":
+                skills[skill_id]["nextReview"] = (date.today()).isoformat()
+                skills[skill_id]["reviewStage"] = 0
+            changed = True
+    return changed
+
+
+def get_skill_status(pupil, skill_id):
+    """Get the status string for a skill, handling both old and new formats."""
+    skills = pupil.get("currentSkills", {})
+    entry = skills.get(skill_id)
+    if entry is None:
+        return None
+    if isinstance(entry, str):
+        return entry
+    return entry.get("status")
+
+
+def set_skill_status(pupil, skill_id, status, mastered_date=None):
+    """Set a skill status with review scheduling.
+
+    When marking as mastered, automatically schedules the first review (1 week).
+    When marking as active, clears review data.
+    """
+    skills = pupil.setdefault("currentSkills", {})
+    if status == "mastered":
+        m_date = mastered_date or date.today().isoformat()
+        skills[skill_id] = {
+            "status": "mastered",
+            "masteredDate": m_date,
+            "nextReview": (date.today() + __import__("datetime").timedelta(days=7)).isoformat(),
+            "reviewStage": 0,
+        }
+    elif status == "active":
+        skills[skill_id] = {
+            "status": "active",
+            "masteredDate": None,
+            "nextReview": None,
+            "reviewStage": None,
+        }
+    elif status == "secure":
+        skills[skill_id] = {
+            "status": "secure",
+            "masteredDate": skills.get(skill_id, {}).get("masteredDate") if isinstance(skills.get(skill_id), dict) else None,
+            "nextReview": None,
+            "reviewStage": None,
+        }
+    else:  # upcoming or other
+        skills[skill_id] = {
+            "status": status,
+            "masteredDate": None,
+            "nextReview": None,
+            "reviewStage": None,
+        }
+
+
+def pass_review(pupil, skill_id):
+    """Mark a review as passed. Schedules the next review or marks as secure."""
+    entry = pupil["currentSkills"].get(skill_id)
+    if not entry or not isinstance(entry, dict):
+        return
+
+    stage = entry.get("reviewStage", 0)
+    if stage is None:
+        stage = 0
+
+    next_stage = stage + 1
+    if next_stage >= len(REVIEW_DELTAS):
+        # Completed all review stages — mark as secure
+        entry["status"] = "secure"
+        entry["nextReview"] = None
+        entry["reviewStage"] = None
+    else:
+        # Schedule next review
+        delta_days = REVIEW_DELTAS[next_stage]
+        entry["status"] = "mastered"
+        entry["nextReview"] = (date.today() + __import__("datetime").timedelta(days=delta_days)).isoformat()
+        entry["reviewStage"] = next_stage
+
+
+def fail_review(pupil, skill_id):
+    """Mark a review as failed. Resets to active for re-practice."""
+    entry = pupil["currentSkills"].get(skill_id)
+    if not entry or not isinstance(entry, dict):
+        return
+    entry["status"] = "active"
+    entry["nextReview"] = None
+    entry["reviewStage"] = None
+
+
+def get_reviews_due(pupils_data, ladders_data, as_of_date=None):
+    """Get a list of reviews due today or overdue for all pupils.
+
+    Returns: [{pupil, skill_id, step, reviewStage, nextReview, overdue}]
+    """
+    as_of = as_of_date or date.today()
+    reviews = []
+    for p in pupils_data["pupils"]:
+        skills = p.get("currentSkills", {})
+        for skill_id, entry in skills.items():
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("nextReview"):
+                next_review = date.fromisoformat(entry["nextReview"])
+                if next_review <= as_of:
+                    step = get_step(ladders_data, skill_id)
+                    if step:
+                        reviews.append({
+                            "pupil": p,
+                            "skill_id": skill_id,
+                            "step": step,
+                            "reviewStage": entry.get("reviewStage", 0),
+                            "nextReview": entry["nextReview"],
+                            "overdue": (as_of - next_review).days,
+                        })
+    return reviews
+
+
+def skill_status(entry):
+    """Get the status string from a currentSkills entry, handling both old (str) and new (dict) formats."""
+    if isinstance(entry, str):
+        return entry
+    if isinstance(entry, dict):
+        return entry.get("status", "")
+    return ""
+
+
+def active_skills_for(pupil):
+    """Get dict of skill_id → entry for all active skills of a pupil."""
+    return {k: v for k, v in pupil.get("currentSkills", {}).items()
+            if skill_status(v) == "active"}
+
+
+def count_by_status(pupils_data, status):
+    """Count total skills with a given status across all pupils."""
+    count = 0
+    for p in pupils_data["pupils"]:
+        for entry in p.get("currentSkills", {}).values():
+            if skill_status(entry) == status:
+                count += 1
+    return count
+
+
+def ensure_data_files():
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    PROBES_DIR.mkdir(parents=True, exist_ok=True)
+    if not (DATA_DIR / "pupils.json").exists():
+        save_pupils(default_pupils())
+    if not (DATA_DIR / "skill-ladders.json").exists():
+        save_ladders(default_skill_ladders())
+
+
+# ── Progress Calculation ────────────────────────────────────────────────────
+
+def get_baseline(probes_data):
+    """Return the first baseline probe, or None."""
+    baselines = [p for p in probes_data.get("probes", []) if p.get("mode") == "baseline"]
+    return baselines[0] if baselines else None
+
+
+def get_item_mastery(probes_data, step_items):
+    """Calculate per-item mastery from all probes.
+
+    Returns dict: {item: {"known": True/False, "firstKnown": "date"|None, "baselineKnown": bool}}
+    An item is 'known' if it was correct in the most recent probe it appeared in.
+    """
+    mastery = {}
+    for item in step_items:
+        mastery[item] = {"known": False, "firstKnown": None, "baselineKnown": False}
+
+    baseline = get_baseline(probes_data)
+    if baseline and "itemResults" in baseline:
+        for item, correct in baseline["itemResults"].items():
+            if item in mastery:
+                mastery[item]["baselineKnown"] = correct
+                mastery[item]["known"] = correct
+                if correct:
+                    mastery[item]["firstKnown"] = baseline["date"]
+
+    # Process all probes in order — most recent result wins
+    for probe in probes_data.get("probes", []):
+        if "itemResults" not in probe:
+            continue
+        for item, correct in probe["itemResults"].items():
+            if item in mastery:
+                mastery[item]["known"] = correct
+                if correct and mastery[item]["firstKnown"] is None:
+                    mastery[item]["firstKnown"] = probe["date"]
+
+    return mastery
+
+
+def get_progress_summary(probes_data, step):
+    """Get a progress summary for a pupil on a skill.
+
+    Returns: {
+        "baselineDate": str|None,
+        "baselineCorrect": int,
+        "baselineTotal": int,
+        "baselineCpm": float|None,
+        "latestDate": str|None,
+        "latestCorrect": int,
+        "latestTotal": int,
+        "latestCpm": float|None,
+        "newFactsLearned": int,   # items known now but not at baseline
+        "totalFactsKnown": int,   # items known now
+        "totalFacts": int,        # total items in skill
+        "improvementPct": float,  # % improvement from baseline to latest
+        "probesCount": int,
+        "timedProbesCount": int,
+    }
+    """
+    items = step["items"]
+    total_items = len(items)
+    probes = probes_data.get("probes", [])
+
+    baseline = get_baseline(probes_data)
+    timed_probes = [p for p in probes if p.get("mode") == "timed"]
+
+    # Baseline stats
+    baseline_date = baseline["date"] if baseline else None
+    baseline_correct = baseline["correct"] if baseline else 0
+    baseline_total = baseline["correct"] + baseline["errors"] if baseline else 0
+    baseline_cpm = None
+    if baseline and baseline.get("durationSec", 0) > 0:
+        baseline_cpm = round(baseline["correct"] / (baseline["durationSec"] / 60), 1)
+
+    # Baseline item-level
+    baseline_known_items = set()
+    if baseline and "itemResults" in baseline:
+        baseline_known_items = {item for item, correct in baseline["itemResults"].items() if correct}
+
+    # Latest probe stats
+    latest = probes[-1] if probes else None
+    latest_date = latest["date"] if latest else None
+    latest_correct = latest["correct"] if latest else 0
+    latest_total = (latest["correct"] + latest["errors"]) if latest else 0
+    latest_cpm = None
+    if latest and latest.get("durationSec", 0) > 0 and latest["mode"] == "timed":
+        latest_cpm = round(latest["correct"] / (latest["durationSec"] / 60), 1)
+
+    # Current item-level mastery
+    mastery = get_item_mastery(probes_data, items)
+    current_known = sum(1 for m in mastery.values() if m["known"])
+
+    # New facts = known now but not at baseline
+    new_facts = 0
+    for item in items:
+        if mastery[item]["known"] and item not in baseline_known_items:
+            new_facts += 1
+
+    # Improvement percentage
+    if baseline_cpm is not None and latest_cpm is not None and baseline_cpm > 0:
+        improvement_pct = round((latest_cpm - baseline_cpm) / baseline_cpm * 100, 1)
+    elif baseline_total > 0 and latest_total > 0:
+        baseline_acc = baseline_correct / baseline_total * 100 if baseline_total else 0
+        latest_acc = latest_correct / latest_total * 100 if latest_total else 0
+        improvement_pct = round(latest_acc - baseline_acc, 1)
+    else:
+        improvement_pct = 0
+
+    # Progress vs. baseline, as Innes defines it: learning as many new items
+    # as you started out knowing = 100% progress. Falls back to new items
+    # as a % of the whole set when baseline knew nothing (avoids /0).
+    baseline_known_count = len(baseline_known_items)
+    progress_pct_is_fallback = baseline_known_count == 0
+    if not progress_pct_is_fallback:
+        progress_pct = round(new_facts / baseline_known_count * 100, 1)
+    else:
+        progress_pct = round(new_facts / total_items * 100, 1) if total_items > 0 else 0
+
+    return {
+        "baselineDate": baseline_date,
+        "baselineCorrect": baseline_correct,
+        "baselineTotal": baseline_total,
+        "baselineCpm": baseline_cpm,
+        "latestDate": latest_date,
+        "latestCorrect": latest_correct,
+        "latestTotal": latest_total,
+        "latestCpm": latest_cpm,
+        "newFactsLearned": new_facts,
+        "totalFactsKnown": current_known,
+        "totalFacts": total_items,
+        "improvementPct": improvement_pct,
+        "progressPct": progress_pct,
+        "progressPctIsFallback": progress_pct_is_fallback,
+        "probesCount": len(probes),
+        "timedProbesCount": len(timed_probes),
+    }
+
+
+# ── Rolling Window Helpers ──────────────────────────────────────────────────
+#
+# A step opts into rolling-window practice by setting "windowSize" (e.g. 5).
+# Instead of drilling every item in the step at once, the pupil only ever
+# sees a sliding window of that many items from step["items"] (which must be
+# in a meaningful order — e.g. 2×1..2×12). As items in the window become
+# known, they're dropped and replaced with the next items in the sequence,
+# via suggest_next_window — reviewed and confirmed by the teacher, never
+# applied automatically.
+#
+# Stored on the pupil's currentSkills[skill_id] entry, alongside status/
+# masteredDate/nextReview/reviewStage:
+#   "window": [item, ...]      — the items currently active
+#   "windowFrontier": int      — index into step["items"] of the last item
+#                                 ever introduced into a window for this
+#                                 skill (backfill always moves forward from
+#                                 here, never re-introduces a retired item)
+
+def is_windowed(step):
+    return bool(step.get("windowSize"))
+
+
+def get_active_window(pupil, skill_id, step):
+    """The pupil's current window for a windowed step. Not yet persisted if
+    this is the first time — caller should persist via set_active_window
+    once a probe/assignment actually happens."""
+    entry = pupil.get("currentSkills", {}).get(skill_id)
+    if isinstance(entry, dict) and entry.get("window"):
+        return entry["window"]
+    return step["items"][: step.get("windowSize") or len(step["items"])]
+
+
+def get_window_frontier(pupil, skill_id, step):
+    entry = pupil.get("currentSkills", {}).get(skill_id)
+    if isinstance(entry, dict) and entry.get("windowFrontier") is not None:
+        return entry["windowFrontier"]
+    return (step.get("windowSize") or len(step["items"])) - 1
+
+
+def set_active_window(pupil, skill_id, window, frontier):
+    """Persist a (possibly edited) window as the pupil's active list for
+    this skill. Preserves status/masteredDate/nextReview/reviewStage."""
+    skills = pupil.setdefault("currentSkills", {})
+    entry = skills.get(skill_id)
+    if not isinstance(entry, dict):
+        entry = {"status": "active", "masteredDate": None, "nextReview": None, "reviewStage": None}
+    entry["window"] = window
+    entry["windowFrontier"] = frontier
+    skills[skill_id] = entry
+
+
+def suggest_next_window(pupil, skill_id, step, probes_data):
+    """Suggest the next rolling window based on per-item mastery within the
+    pupil's *current* window: known items are dropped, not-yet-known items
+    are kept, and the window is topped back up to windowSize with the next
+    unseen items in step["items"] order.
+
+    Returns (suggested_window, new_frontier, step_complete) — step_complete
+    is True once every item in the whole step is known and there's nothing
+    left to introduce.
+    """
+    window_size = step.get("windowSize") or len(step["items"])
+    current_window = get_active_window(pupil, skill_id, step)
+    frontier = get_window_frontier(pupil, skill_id, step)
+
+    mastery = get_item_mastery(probes_data, step["items"])
+    keep = [item for item in current_window if not mastery.get(item, {}).get("known")]
+    dropped_count = len(current_window) - len(keep)
+
+    remaining_items = step["items"][frontier + 1:]
+    backfill = remaining_items[:dropped_count]
+    suggested = keep + backfill
+    new_frontier = frontier + len(backfill)
+
+    step_complete = (
+        new_frontier >= len(step["items"]) - 1
+        and all(mastery.get(item, {}).get("known") for item in step["items"])
+    )
+
+    return suggested, new_frontier, step_complete
+
+
+# ── Answer Parsing ──────────────────────────────────────────────────────────
+
+def get_answer(item: str, step_id: str = "") -> str:
+    """Convert an item string to its expected answer for auto-marking.
+
+    Handles maths items like '7×3', '7 × 3', '0+5', 'double 5', 'half of 10'.
+    For spelling and phonics items, returns the item itself (for comparison).
+    """
+    item = item.strip()
+
+    # Doubles: "double 5" → "10"
+    if item.lower().startswith("double "):
+        try:
+            n = int(item.split()[-1])
+            return str(n * 2)
+        except (ValueError, IndexError):
+            return item
+
+    # Halves: "half of 10" → "5"
+    if item.lower().startswith("half of "):
+        try:
+            n = int(item.split()[-1])
+            return str(n // 2)
+        except (ValueError, IndexError):
+            return item
+
+    # Multiplication: "7×3" or "7 × 3"
+    if "×" in item:
+        try:
+            parts = item.replace(" ", "").split("×")
+            a, b = int(parts[0]), int(parts[1])
+            return str(a * b)
+        except (ValueError, IndexError):
+            return item
+
+    # Addition: "0+5" or "3 + 7"
+    if "+" in item:
+        try:
+            parts = item.replace(" ", "").split("+")
+            a, b = int(parts[0]), int(parts[1])
+            return str(a + b)
+        except (ValueError, IndexError):
+            return item
+
+    # Subtraction: "10-3"
+    if "-" in item and not item.startswith("-"):
+        try:
+            parts = item.replace(" ", "").split("-")
+            a, b = int(parts[0]), int(parts[1])
+            return str(a - b)
+        except (ValueError, IndexError):
+            return item
+
+    # Default: the item itself (spelling words, phonics GPCs)
+    return item.lower()
+
+
+def format_bond_item(item):
+    """Number-bonds items ('3+2', meaning 3 and 2 make the bond total) become
+    a missing-addend cloze — e.g. '3 + ? = 5' (answer '2') — instead of
+    asking for the total, which is identical for every item in a 'bonds to
+    N' step and so doesn't actually test which numbers make the bond.
+    Which side gets blanked is randomised per call, so repeats of the same
+    item test recall from both directions."""
+    try:
+        a_s, b_s = item.replace(" ", "").split("+")
+        a, b = int(a_s), int(b_s)
+    except (ValueError, IndexError):
+        return item, get_answer(item)
+    total = a + b
+    if random.random() < 0.5:
+        return f"{a} + ? = {total}", str(b)
+    return f"? + {b} = {total}", str(a)
+
+
+# ── Distributed Review Items ─────────────────────────────────────────────────
+
+def get_review_items(pupil, current_skill_id, ladders_data, max_items=2):
+    """Select 1-2 items from previously mastered skills in the same ladder for distributed practice.
+
+    Prioritises skills closest to their review due date.
+    Returns a list of dicts: {"item": "...", "question": "...", "answer": "...", "from_skill": "...", "from_skill_name": "..."}
+    """
+    # Find which ladder the current skill is in
+    current_step = get_step(ladders_data, current_skill_id)
+    if not current_step:
+        return []
+
+    ladder_id = current_step["ladder_id"]
+    ladder = None
+    for l in ladders_data["ladders"]:
+        if l["id"] == ladder_id:
+            ladder = l
+            break
+    if not ladder:
+        return []
+
+    # Find mastered skills in this ladder that have review dates
+    skills = pupil.get("currentSkills", {})
+    candidates = []
+    for step in ladder["steps"]:
+        if step["id"] == current_skill_id:
+            continue
+        entry = skills.get(step["id"])
+        if not entry or not isinstance(entry, dict):
+            continue
+        if entry.get("status") not in ("mastered", "secure"):
+            continue
+        # Pick items from this step
+        for item in step["items"]:
+            candidates.append({
+                "item": item,
+                "question": item,
+                "answer": get_answer(item, step["id"]),
+                "from_skill": step["id"],
+                "from_skill_name": step["name"],
+                "review_due": entry.get("nextReview", ""),
+            })
+
+    if not candidates:
+        return []
+
+    # Sort by review due date (closest first)
+    candidates.sort(key=lambda c: c.get("review_due") or "9999-99-99")
+
+    # Pick random items, preferring those closest to review
+    random.shuffle(candidates[:4])  # shuffle among the most due
+    return candidates[:max_items]
+
+
+# ── Sheet Generator ───────────────────────────────────────────────────────────
+
+def _sheet_question(item, skill_id, step_name, is_bonds):
+    question, answer = format_bond_item(item) if is_bonds else (item, get_answer(item, skill_id))
+    return {
+        "item": item,
+        "question": question,
+        "answer": answer,
+        "is_review": False,
+        "from_skill": skill_id,
+        "from_skill_name": step_name,
+    }
+
+
+def _cloze_sheet(pupil, skill_id, step, ladder, subject, pool, target_count, variant=None):
+    """'Choose the word that fits' sheet: a word bank plus gap sentences, in a shuffled order.
+
+    Each word gets two sentences a day. variant is the day of the week (0 = Monday): each day takes the NEXT two
+    sentences for every word, so with 10 sentences per word no sentence repeats within a week. With no variant
+    (a one-off sheet) the starting point is random."""
+    from cloze_bank import sentences_for
+    per_word = 2
+    words = [w for w in pool if sentences_for(w)]
+    random.shuffle(words)
+    questions = []
+    for w in words:
+        sents = sentences_for(w)
+        k = min(per_word, len(sents))
+        start = (variant * k) if variant is not None else random.randrange(len(sents))
+        for j in range(k):
+            questions.append({"item": w, "question": sents[(start + j) % len(sents)], "answer": w, "is_review": False,
+                              "from_skill": skill_id, "from_skill_name": step["name"]})
+    questions = questions[:16]
+    random.shuffle(questions)
+    from cloze_bank import bank_groups
+    groups = bank_groups({q["answer"] for q in questions})
+    if all(len(g) == 1 for g in groups):      # no homophones (e.g. common exception words): order carries no hint
+        random.shuffle(groups)
+    bank = [w for g in groups for w in g]
+    return {
+        "pupil_name": display_name(pupil), "skill_name": step["name"],
+        "ladder_name": step["ladder_name"] if "ladder_name" in step else (ladder["name"] if ladder else ""),
+        "subject": subject, "display_mode": "cloze", "aim": step["aim"], "untimedAim": step.get("untimedAim"),
+        "items": questions, "review_items": [], "questions": questions, "bank": bank, "bank_groups": groups,
+        "total_questions": len(questions),
+    }
+
+
+# How many letters are hidden on each day of the week (Monday = 0). The first letter always stays.
+FADE_MISSING = [1, 2, 2, 3, 99]
+
+
+def fade_pattern(word, missing, rng):
+    """Which letters to hide: never the first one; at most all but the first."""
+    letters = [i for i, ch in enumerate(word) if i > 0 and ch.isalpha()]
+    k = min(missing, len(letters))
+    return sorted(rng.sample(letters, k)) if k else []
+
+
+def _fade_sheet(pupil, skill_id, step, ladder, pool, variant=None):
+    """Look, trace, fill the gaps, fold and write from memory: one row per word. Fewer letters are shown as the
+    week goes on (FADE_MISSING), so the child copies less and remembers more. Needs no adult."""
+    missing = FADE_MISSING[variant] if variant is not None and 0 <= variant < len(FADE_MISSING) else 1
+    rng = random.Random()
+    words = list(dict.fromkeys(pool))[:10]
+    rng.shuffle(words)
+    qs = [{"item": w, "question": w, "answer": w, "gaps": fade_pattern(w, missing, rng), "is_review": False,
+           "from_skill": skill_id, "from_skill_name": step["name"]} for w in words]
+    return {
+        "pupil_name": display_name(pupil), "skill_name": step["name"],
+        "ladder_name": step["ladder_name"] if "ladder_name" in step else (ladder["name"] if ladder else ""),
+        "subject": "spellings", "display_mode": "fade", "aim": step["aim"], "untimedAim": step.get("untimedAim"),
+        "items": qs, "review_items": [], "questions": qs, "total_questions": len(qs),
+    }
+
+
+_CALC_FMT = re.compile(r"^(\d)-digit\s*([+−×÷])\s*(\d)-digit(\s*\(remainders\))?$")
+
+
+def _n_digit(n, rng):
+    return rng.randint(10 ** (n - 1), 10 ** n - 1) if n > 1 else rng.randint(2, 9)
+
+
+def calc_question(fmt, rng):
+    """One written-method question for a format such as '4-digit + 3-digit' or '3-digit ÷ 1-digit (remainders)'.
+    Returns {a, b, op, answer} with whole-number answers (subtraction never negative; division exact unless the
+    format says remainders)."""
+    m = _CALC_FMT.match(fmt.strip())
+    if not m:
+        return None
+    da, op, db, rem = int(m.group(1)), m.group(2), int(m.group(3)), bool(m.group(4))
+    if op == "+":
+        a, b = _n_digit(da, rng), _n_digit(db, rng)
+        return {"a": a, "b": b, "op": op, "answer": str(a + b)}
+    if op == "−":
+        while True:
+            a, b = _n_digit(da, rng), _n_digit(db, rng)
+            if a > b:
+                return {"a": a, "b": b, "op": op, "answer": str(a - b)}
+    if op == "×":
+        a, b = _n_digit(da, rng), rng.randint(2, 9)
+        return {"a": a, "b": b, "op": op, "answer": str(a * b)}
+    # division: up-to-4-digit dividend by a single-digit divisor
+    b = rng.randint(2, 9)
+    if rem:
+        while True:
+            a = _n_digit(da, rng)
+            if a % b:
+                return {"a": a, "b": b, "op": op, "answer": f"{a // b} r {a % b}"}
+    lo, hi = -(-10 ** (da - 1) // b), (10 ** da - 1) // b
+    q = rng.randint(max(lo, 1), hi)
+    return {"a": q * b, "b": b, "op": op, "answer": str(q)}
+
+
+def _calc_sheet(pupil, skill_id, step, ladder, pool):
+    """Written calculation: 2-4 questions a day, each set out on squared paper for the written method."""
+    rng = random.Random()
+    fmts = [i for i in pool if _CALC_FMT.match(i.strip())]
+    count = next((int(i.split()[0]) for i in pool if re.match(r"^[2-4] a day$", i.strip())), 3)
+    order = []
+    while len(order) < count and fmts:
+        batch = fmts[:]
+        rng.shuffle(batch)
+        order += batch
+    qs = []
+    for f in order[:count]:
+        q = calc_question(f, rng)
+        if q:
+            q.update({"item": f, "question": f"{q['a']} {q['op']} {q['b']}", "is_review": False,
+                      "from_skill": skill_id, "from_skill_name": step["name"]})
+            qs.append(q)
+    return {
+        "pupil_name": display_name(pupil), "skill_name": step["name"],
+        "ladder_name": step["ladder_name"] if "ladder_name" in step else (ladder["name"] if ladder else ""),
+        "subject": "maths", "display_mode": "calc", "aim": step["aim"], "untimedAim": step.get("untimedAim"),
+        "calc_layout": "self" if any(i.strip() == "They set it out" for i in pool) else "set",
+        "items": qs, "review_items": [], "questions": qs, "total_questions": len(qs),
+    }
+
+
+def _handwriting_sheet(pupil, skill_id, step, ladder, kind, pool):
+    qs = [{"item": it, "question": it, "answer": it, "is_review": False, "from_skill": skill_id,
+           "from_skill_name": step["name"]} for it in pool]
+    return {
+        "pupil_name": display_name(pupil), "skill_name": step["name"],
+        "ladder_name": step["ladder_name"] if "ladder_name" in step else (ladder["name"] if ladder else ""),
+        "subject": "handwriting", "display_mode": "handwriting", "hw_kind": kind,
+        "aim": step["aim"], "untimedAim": step.get("untimedAim"),
+        "items": qs, "review_items": [], "questions": qs, "total_questions": len(qs),
+    }
+
+
+def generate_sheet(pupil, skill_id, ladders_data, probes_data=None, include_review=True,
+                    item_pool=None, target_count=None, variant=None):
+    """Generate a practice sheet for a pupil on a given skill.
+
+    item_pool: the items to draw from — pass the pupil's current rolling
+    window for a windowed step, otherwise defaults to the whole step's
+    items. target_count: how many questions to fill the sheet to — defaults
+    to the pupil's saved itemsPerSheet for this skill (or 25).
+
+    Every subject fills to target_count the same way: repeated shuffled
+    passes over item_pool, then distributed review items dropped in at
+    random positions. (Small pools — e.g. an 8-word CEW window — repeat
+    several times per sheet; that's the point, it's a fluency check.)
+
+    Returns a dict with:
+      - "pupil_name": str
+      - "skill_name": str
+      - "ladder_name": str
+      - "subject": str ("maths", "phonics", "spellings")
+      - "aim": dict (correctPerMin, maxErrors, timedSec)
+      - "items": list of question dicts for the current skill
+      - "review_items": list of review item dicts from mastered skills
+      - "questions": list of all question dicts (skill items + review, shuffled appropriately)
+      - "total_questions": int
+    """
+    step = get_step(ladders_data, skill_id)
+    if not step:
+        return None
+
+    ladder = None
+    for l in ladders_data["ladders"]:
+        if step["ladder_id"] == l["id"]:
+            ladder = l
+            break
+
+    subject = step_subject(step, ladders_data, ladder)
+    kind = step_kind(step, ladder)
+    is_bonds = ladder is not None and ladder["id"] == "number_bonds"
+    # Common Exception Words are a *reading* recognition task (see the word,
+    # say it) like maths/phonics, not a dictation-spelling task — only the
+    # actual Spelling Rules ladders are "write the word you hear".
+    is_cew = ladder is not None and ladder["id"].startswith("common_exception_words")
+    display_mode = "dictation" if subject == "spellings" and not is_cew else "recognition"
+    pool = item_pool if item_pool is not None else step["items"]
+
+    if kind == "cloze":
+        return _cloze_sheet(pupil, skill_id, step, ladder, subject, pool, target_count, variant)
+    if kind in ("hw_letters", "hw_joins"):
+        return _handwriting_sheet(pupil, skill_id, step, ladder, kind, pool)
+    if kind == "fade":
+        return _fade_sheet(pupil, skill_id, step, ladder, pool, variant)
+    if kind == "calc":
+        return _calc_sheet(pupil, skill_id, step, ladder, pool)
+
+    if target_count is None:
+        entry = pupil.get("currentSkills", {}).get(skill_id)
+        target_count = entry.get("itemsPerSheet", 25) if isinstance(entry, dict) else 25
+
+    skill_items = [_sheet_question(item, skill_id, step["name"], is_bonds) for item in pool]
+
+    # Get distributed review items
+    review_items = []
+    if include_review:
+        review_items = get_review_items(pupil, skill_id, ladders_data, max_items=2)
+        if is_bonds:
+            review_items = [{**ri, **dict(zip(("question", "answer"), format_bond_item(ri["item"])))}
+                             for ri in review_items]
+
+    # Fill to target_count with repeated shuffled passes — re-formatting
+    # bonds items fresh each occurrence so which side is blanked varies.
+    questions = []
+    if pool:
+        while len(questions) < target_count:
+            shuffled_pool = pool[:]
+            random.shuffle(shuffled_pool)
+            questions.extend(_sheet_question(item, skill_id, step["name"], is_bonds) for item in shuffled_pool)
+
+    for ri in review_items:
+        ri_copy = {**ri, "is_review": True}
+        pos = random.randint(0, min(len(questions), max(target_count - 1, 0))) if questions else 0
+        questions.insert(pos, ri_copy)
+
+    questions = questions[:target_count]
+    random.shuffle(questions)
+
+    return {
+        "pupil_name": display_name(pupil),
+        "skill_name": step["name"],
+        "ladder_name": step["ladder_name"] if "ladder_name" in step else ladder["name"],
+        "subject": subject,
+        "display_mode": display_mode,
+        "aim": step["aim"],
+        "untimedAim": step.get("untimedAim"),
+        "items": skill_items,
+        "review_items": review_items,
+        "questions": questions,
+        "total_questions": len(questions),
+    }
