@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spelling Sheets</title>
+<link rel="icon" href="../../favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/wallscourtfarm/wfa-shared@main/web/names-file.js?v=2"></script>
+<style>
+@font-face{font-family:'WFASassoon';src:url('../../precision-teaching/fonts/SassoonInfant.ttf') format('truetype');font-display:block}
+:root{--blue:#1798d3;--blue-d:#0f6e9c;--soft:#eef6fb;--dark:#0a0101;--bg:#f4f7f9;--card:#fff;--line:#dde3e8;--muted:#5d6b75;--navy:#1A3C6E;--red:#c62828;--redbg:#fde9e7;--green:#2e7d32;--greenbg:#e5f4e7}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Nunito',-apple-system,sans-serif;font-weight:600;background:var(--bg);color:var(--dark)}
+#top{background:var(--blue);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+#top a.home{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none}
+#top img{height:34px;background:#fff;border-radius:8px;padding:3px}
+#top h1{margin:0;font-size:1.25rem;font-weight:900}
+#top .back{margin-left:auto;color:rgba(255,255,255,.9);text-decoration:none;font-weight:800;font-size:.85rem;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.45)}
+main{max-width:1000px;margin:0 auto;padding:14px 16px 70px}
+.box{background:var(--card);border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:14px}
+.box h2{margin:0 0 8px;font-size:1.1rem;font-weight:900;color:var(--blue)}
+.hint{color:var(--muted);font-size:.9rem;margin:4px 0}
+#drop{border:3px dashed var(--line);border-radius:14px;padding:22px 14px;text-align:center;cursor:pointer;background:#fafcfd}
+#drop.over{border-color:var(--blue);background:var(--soft)}
+#drop b{font-size:1.05rem}
+.btn{border:0;border-radius:10px;padding:10px 16px;font:800 .95rem 'Nunito',sans-serif;cursor:pointer;background:var(--blue);color:#fff}
+.btn.sec{background:#fff;color:var(--blue);border:2px solid var(--blue)}
+.btn:disabled{opacity:.45;cursor:default}
+.pickrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+.pickrow .lbl{font-weight:800;color:var(--muted);min-width:70px}
+.chip{border:2px solid var(--line);background:#fff;border-radius:20px;padding:6px 13px;font:800 .92rem 'Nunito',sans-serif;cursor:pointer;color:var(--dark)}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+select{font:700 .92rem 'Nunito',sans-serif;padding:7px 10px;border:2px solid var(--line);border-radius:10px;background:#fff;max-width:100%}
+.sheet{border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
+.sheet.on{border-color:var(--blue);background:var(--soft)}
+.sheet>label{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.sheet>label input{width:20px;height:20px;accent-color:var(--blue);margin-top:2px;flex:none}
+.sheet .t{font-weight:900}
+.sheet .d{color:var(--muted);font-size:.86rem}
+.opts{display:flex;flex-wrap:wrap;gap:8px 16px;margin:8px 0 0 30px;align-items:center;font-size:.9rem}
+.opts label{display:flex;gap:5px;align-items:center;cursor:pointer}
+.opts input[type=radio]{accent-color:var(--blue)}
+.note{border-radius:10px;padding:10px 12px;margin:8px 0;font-size:.92rem}
+.note.bad{background:var(--redbg);color:#7a1c14}
+.note.ok{background:var(--greenbg);color:#1d4d22}
+.note.info{background:var(--soft);color:#164a66}
+.kids{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0 30px}
+.kid{border:2px solid var(--line);background:#fff;border-radius:18px;padding:5px 11px;font:800 .88rem 'Nunito',sans-serif;cursor:pointer;color:var(--dark)}
+.kid.on{border-color:var(--blue);background:var(--blue);color:#fff}
+.kid small{font-weight:700;opacity:.75}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+table.list{border-collapse:collapse;width:100%;font-size:.85rem}
+table.list th,table.list td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+table.list th{color:var(--muted);font-weight:800}
+.tag{display:inline-block;font-size:.72rem;font-weight:800;border-radius:8px;padding:1px 6px;background:var(--bg);color:var(--muted)}
+.scroll{overflow-x:auto}
+footer{position:fixed;bottom:4px;right:8px;font-size:11px;color:#9aa;font-family:Arial,sans-serif}
+.hidden{display:none!important}
+
+/* ── Print pages (A4 portrait), same geometry as the old Spelling Bee PDFs ── */
+#printArea{display:none}
+#printArea.preview{display:block;background:#8a96a0;padding:12px;border-radius:12px;overflow-x:auto}
+#printArea.preview .pg{margin:0 auto 12px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.pg{width:210mm;height:297mm;position:relative;overflow:hidden;background:#fff;font-family:Helvetica,Arial,sans-serif;font-weight:normal;color:#000;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.cut{position:absolute;border:0 dashed #595959}
+.cut.v{top:0;bottom:0;width:0;border-left-width:.75pt}
+.cut.h{left:0;right:0;height:0;border-top-width:.75pt}
+.cut.rec{border-color:#808080}
+.cut.rec.v{border-left-width:.6pt}.cut.rec.h{border-top-width:.6pt}
+/* paired list card: 4 x 3 */
+.pl{position:absolute;border:2pt solid var(--c);overflow:hidden}
+.pl .hd{position:absolute;left:0;right:0;top:0;height:10mm;background:var(--c)}
+.pill{position:absolute;top:1.5mm;height:7mm;line-height:7mm;padding:0 2.5mm;border-radius:3pt;background:#fff;color:#1A3C6E;font-weight:bold;font-size:10pt;white-space:nowrap;max-width:calc(100% - 4mm);overflow:hidden}
+.pill.badge{font-size:8pt;right:2mm}
+.pill.nm{left:2mm}
+.pl .ws{position:absolute;left:0;right:0;top:calc(10mm + 4pt)}
+.pl .w{height:20pt;line-height:20pt;padding-left:2mm;font-family:'WFASassoon',Helvetica,sans-serif;font-size:14pt;color:#1A3C6E;white-space:pre;position:relative}
+.pl .w.r{color:#404080}
+.pl .w.r1::before{content:'';position:absolute;left:1mm;right:1mm;top:-3pt;height:.3pt;background:repeating-linear-gradient(90deg,#b3b3b3 0 3pt,transparent 3pt 5pt)}
+.pl .cn{position:absolute;left:0;right:0;bottom:0;height:5mm;background:var(--c);font-weight:bold;font-size:7pt;text-align:right;padding-right:2mm;line-height:5mm}
+/* double-sided bee card: 2 x 4 */
+.ds{position:absolute;border:2pt solid var(--c)}
+.ds .hd{position:absolute;left:0;right:0;top:0;height:9mm;background:var(--c)}
+.ds .pill{top:1.25mm;height:6.5mm;line-height:6.5mm;font-size:11pt}
+.ds .pill.badge{font-size:9pt}
+.ds .wa{position:absolute;left:0;right:0;top:12mm;bottom:9mm}
+.ds .rl{position:absolute;left:2mm;right:2mm;height:0;border-top:.4pt solid #d1d1d1}
+.ds .vs{position:absolute;left:50%;top:1mm;bottom:1mm;border-left:.5pt solid #bfbfbf}
+.ds .col{position:absolute;top:0;bottom:0;width:50%;display:flex;flex-direction:column}
+.ds .cell{flex:1;position:relative}
+.ds .cell>span{position:absolute;bottom:30%;left:3mm;white-space:nowrap}
+.ds .num{font-size:9pt;color:#808080}
+.ds .wd{font-family:'WFASassoon',Helvetica,sans-serif;font-size:16pt;color:#1A3C6E;margin-left:2pt}
+.ds .ft{position:absolute;left:0;right:0;bottom:1.2mm;text-align:center;font-style:italic;font-size:6.5pt;color:#808080}
+/* recording sheet: 2 x 3 */
+.rc{position:absolute;border:.8pt solid #4d4d4d;display:grid;grid-template-columns:22pt 1fr 44pt}
+.rc div{border-right:.8pt solid #4d4d4d;border-bottom:.8pt solid #4d4d4d;font-size:9pt;color:#4d4d4d}
+.rc .m,.rc .k{border-right:0}
+.rc .h{background:#f2f2f2;font-size:8pt;padding:3pt 0 0 4pt}
+.rc .h.k{font-size:7pt;text-align:center;padding:5pt 0 0}
+.rc .n{text-align:center;display:flex;align-items:flex-end;justify-content:center;padding-bottom:1.5pt}
+/* key spellings practice */
+.ps-h{position:absolute;left:12mm;right:12mm;height:9mm;border-bottom:1.3pt solid #1798d3}
+.ps-h .l{position:absolute;left:0;bottom:2.4mm;font-weight:bold;font-size:11pt;color:#0e2841;white-space:nowrap}
+.ps-h .r{position:absolute;right:0;bottom:2.4mm;font-size:9pt;color:#737373}
+.ps-i{position:absolute;left:12mm;font-weight:bold;font-size:8.5pt;color:#156082;white-space:nowrap}
+.ps-row{position:absolute;left:12mm;width:186mm;height:11.33mm;overflow:visible}
+.ps-cut{position:absolute;left:12mm;right:12mm;border-top:.8pt dashed #8c8c8c}
+@media print{
+  @page{size:A4 portrait;margin:0}
+  html,body{background:#fff}
+  body>*:not(#printArea){display:none!important}
+  #printArea{display:block!important;padding:0!important;background:none!important}
+  #printArea .pg{margin:0!important;box-shadow:none!important;break-after:page;page-break-after:always}
+}
+@media (max-width:620px){.opts,.kids{margin-left:0}}
+</style>
+</head>
+<body>
+<div id="top">
+  <a class="home" href="../../"><img src="../../logo.png" alt=""><h1>Spelling Sheets</h1></a>
+  <a class="back" href="../../">&larr; Staff Tools</a>
+</div>
+<main>
+  <div class="box">
+    <h2>1. Choose your Spelling Tracker workbook</h2>
+    <div id="drop" tabindex="0" role="button">
+      <b>Tap to choose, or drop the file here</b>
+      <div class="hint">The file called <i>Spelling Tracker - Y5.xlsx</i> (or your year group) in the Staff-Tools / Spelling and Precision folder.</div>
+      <div class="hint">It is read on this device only. Nothing is uploaded or saved.</div>
+    </div>
+    <input type="file" id="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden">
+    <div id="fileMsg"></div>
+  </div>
+
+  <div id="setup" class="hidden">
+    <div class="box">
+      <h2>2. Class and week</h2>
+      <div class="pickrow" id="clsRow"><span class="lbl">Class</span></div>
+      <div class="pickrow"><span class="lbl">Week</span><select id="week"></select> <span class="hint" id="ruleInfo"></span></div>
+      <div class="pickrow hidden" id="srcRow"><span class="lbl">Key words</span>
+        <label class="chip on" style="display:flex;gap:6px;align-items:center"><input type="radio" name="src" value="next" checked style="accent-color:var(--blue)"> Next five words (as in the Children sheet)</label>
+        <label class="chip" style="display:flex;gap:6px;align-items:center"><input type="radio" name="src" value="log" style="accent-color:var(--blue)"> The words already in the log for this week (reprint)</label>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>3. What to print</h2>
+      <div class="sheet" data-sheet="lists">
+        <label><input type="checkbox" id="sLists"><span><span class="t">Paired spelling lists</span><br><span class="d">12 cards on a sheet. Words 1 to 5: each child's key spellings. Words 6 to 10: this week's rule words. Partners share a colour.</span></span></label>
+        <div class="opts"><span>Order:</span>
+          <label><input type="radio" name="order" value="partner_pairs" checked> Partner pairs</label>
+          <label><input type="radio" name="order" value="by_class"> By class</label>
+          <label><input type="radio" name="order" value="all"> All</label>
+        </div>
+      </div>
+      <div class="sheet" data-sheet="cards">
+        <label><input type="checkbox" id="sCards" checked><span><span class="t">Spelling Bee cards (double sided)</span><br><span class="d">8 cards on a sheet: key spellings on the left, rule words on the right. Partner's card is printed on the back, so print on both sides (flip on long edge).</span></span></label>
+      </div>
+      <div class="sheet" data-sheet="rec">
+        <label><input type="checkbox" id="sRec" checked><span><span class="t">Recording sheet</span><br><span class="d">6 blank cards on a sheet (Name, 1 to 10, Check) for the children to write their words on. One card per child.</span></span></label>
+      </div>
+      <div class="sheet" data-sheet="stuck">
+        <label><input type="checkbox" id="sStuck"><span><span class="t">Key spellings practice (stuck words)</span><br><span class="d">A handwriting sheet for each child who has had the same key spelling in several weeks and still hasn't got it right. Trace it, keep writing it, then write it from memory.</span></span></label>
+        <div class="opts">
+          <label>Stuck for <select id="stuckMin"><option value="2">2+ weeks</option><option value="3">3+ weeks</option><option value="4">4+ weeks</option><option value="5">5+ weeks</option></select></label>
+          <label>Writing <select id="stuckFont"><option value="dotted">Sassoon, dotted to trace</option><option value="grey">Sassoon, light grey to trace</option><option value="solid">Sassoon, solid</option></select></label>
+          <label>Empty lines <select id="stuckLines"><option value="0">0</option><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option></select></label>
+        </div>
+        <div class="opts" id="stuckPickHead"><span id="stuckCount"></span> <button type="button" class="chip" id="stuckAll">All</button><button type="button" class="chip" id="stuckNone">None</button></div>
+        <div class="kids" id="stuckKids"></div>
+      </div>
+      <div class="note info">Seating-plan order is not available: the workbook does not hold the seating plan, so cards print in class order, partners together.</div>
+      <div class="actions">
+        <button class="btn" id="printBtn">🖨 Print</button>
+        <button class="btn sec" id="previewBtn">Preview on screen</button>
+        <span class="hint" id="printMsg"></span>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>Check the words</h2>
+      <p class="hint">Key spellings are the first five words each child has not got right yet, counting from their start word (the same as 'Next key spelling 1-5' in the Children sheet). If the Key spellings log already has this week's words, you can choose to print those instead (a reprint of what was handed out). Use <b>Show names</b> to see names on this screen.</p>
+      <div class="scroll"><table class="list" id="checkTable"></table></div>
+    </div>
+  </div>
+</main>
+<div id="printArea"></div>
+<footer>WFA-12.11.26a</footer>
+
+<script id="reader">
+/* ── Workbook reader: pure functions (also run by the node check script) ── */
+var SpellReader = (function(){
+  function norm(s){return String(s==null?'':s).trim().toLowerCase().replace(/\s+/g,' ');}
+  function str(v){return v==null?'':String(v).trim();}
+  function rows(wb,XLSX,name){
+    var key=wb.SheetNames.find(function(n){return norm(n)===norm(name);});
+    if(!key)return null;
+    return XLSX.utils.sheet_to_json(wb.Sheets[key],{header:1,defval:null,raw:true,blankrows:true});
+  }
+  function headerIndex(head){var m={};(head||[]).forEach(function(h,i){var k=norm(h);if(k&&!(k in m))m[k]=i;});return m;}
+  function col(m,name){var k=norm(name);return (k in m)?m[k]:-1;}
+  var CODE=/^p_[a-z0-9]+$/i, WEEK=/^T\d+W\d+$/i;
+
+  function parse(wb,XLSX){
+    var need=['Children','Pupils','Key spellings log','Mastered','Weeks'];
+    var missing=need.filter(function(n){return !rows(wb,XLSX,n);});
+    if(missing.length){
+      return {error:"This doesn't look like a Spelling Tracker workbook (it has no "+missing.map(function(m){return "'"+m+"'";}).join(', ')+" sheet"+(missing.length>1?"s":"")+"). Choose the file called 'Spelling Tracker - Y5.xlsx' (or your year group) from the Spelling and Precision folder."};
+    }
+    var title='';
+    var rm=rows(wb,XLSX,'Read me'); if(rm&&rm[0])title=str(rm[0][0]);
+
+    // Pupils: code, initials, class (plain values)
+    var P=rows(wb,XLSX,'Pupils'), ph=headerIndex(P[0]);
+    var pc=col(ph,'Code'), pi=col(ph,'Initials'), pk=col(ph,'Class');
+    if(pc<0||pi<0)return {error:"The 'Pupils' sheet needs 'Code' and 'Initials' columns."};
+    var pupils={};
+    P.slice(1).forEach(function(r){var c=str(r[pc]);if(CODE.test(c))pupils[c]={initials:str(r[pi]),cls:pk>=0?str(r[pk]):''};});
+
+    // Children: code, group, partner, start word (typed values)
+    var C=rows(wb,XLSX,'Children'), ch=headerIndex(C[0]);
+    var cc=col(ch,'Code'), cg=col(ch,'Group'), cp=col(ch,'Partner (code)'), cs=col(ch,'Start word');
+    if(cc<0||cs<0)return {error:"The 'Children' sheet needs 'Code' and 'Start word' columns."};
+    var cached=[1,2,3,4,5].map(function(n){return col(ch,'Next key spelling '+n);});
+    var kids=[];
+    C.slice(1).forEach(function(r,i){
+      var code=str(r[cc]); if(!CODE.test(code))return;
+      var pu=pupils[code]||{};
+      var start=Number(r[cs]); if(!isFinite(start))start=0;
+      kids.push({code:code,initials:pu.initials||'?',cls:pu.cls||'',group:cg>=0?norm(r[cg]):'main',partner:cp>=0?str(r[cp]):'',start:start,row:i,
+        cachedNext:cached.map(function(ci){return ci>=0?r[ci]:null;})});
+    });
+    if(!kids.length)return {error:"The 'Children' sheet has no children in it."};
+
+    // Mastered: word list (rows with a Position), and the 12 Nov learnt string per child
+    var M=rows(wb,XLSX,'Mastered'), mh=headerIndex(M[0]);
+    var mPos=col(mh,'Position'), mWord=col(mh,'Word');
+    if(mPos<0||mWord<0)return {error:"The 'Mastered' sheet needs 'Position' and 'Word' columns."};
+    var codeCol={}; (M[0]||[]).forEach(function(h,i){var c=str(h);if(CODE.test(c))codeCol[c]=i;});
+    var list=[], learntRow=null;
+    M.slice(1).forEach(function(r){
+      var lbl=norm(r[mWord]);
+      if((r[mPos]==null||r[mPos]==='')&&lbl.indexOf('learnt on')===0)learntRow=r;
+      var pos=r[mPos];
+      if(pos!==null&&pos!==''&&isFinite(Number(pos))&&str(r[mWord]))list.push({pos:Number(pos),word:str(r[mWord])});
+    });
+    list.sort(function(a,b){return a.pos-b.pos;});
+
+    // Key spellings log
+    var K=rows(wb,XLSX,'Key spellings log'), kh=headerIndex(K[0]);
+    var kw=col(kh,'Week'), kc=col(kh,'Code');
+    var kW=[1,2,3,4,5].map(function(n){return col(kh,'Word '+n);}), kR=[1,2,3,4,5].map(function(n){return col(kh,'Right '+n);});
+    if(kw<0||kc<0||kW.indexOf(-1)>=0)return {error:"The 'Key spellings log' sheet needs Week, Code and Word 1-5 columns."};
+    var log=[];
+    K.slice(1).forEach(function(r){
+      var code=str(r[kc]); if(!CODE.test(code))return;
+      log.push({week:str(r[kw]),code:code,words:kW.map(function(i){return str(r[i]);}),right:kR.map(function(i){return i>=0&&norm(r[i])==='y';})});
+    });
+
+    // Learnt now = 12 Nov data + every word marked Y in the log (same as Mastered row 5)
+    kids.forEach(function(k){
+      var set={};
+      if(learntRow&&codeCol[k.code]!=null){str(learntRow[codeCol[k.code]]).split('|').forEach(function(w){if(w)set[w]=1;});}
+      log.forEach(function(e){if(e.code!==k.code)return;e.words.forEach(function(w,i){if(w&&e.right[i])set[w]=1;});});
+      k.learnt=set;
+      var next=[];
+      for(var i=0;i<list.length&&next.length<5;i++){if(list[i].pos>=k.start&&!set[list[i].word])next.push(list[i].word);}
+      k.next=next;
+      // stuck: given in 2+ different real weeks (T?W?, not TxWy) and still not learnt
+      var weeksBy={};
+      log.forEach(function(e){if(e.code!==k.code||!WEEK.test(e.week))return;e.words.forEach(function(w){if(!w)return;(weeksBy[w]=weeksBy[w]||{})[e.week.toUpperCase()]=1;});});
+      k.stuck=Object.keys(weeksBy).filter(function(w){return !set[w];}).map(function(w){var wk=Object.keys(weeksBy[w]).sort(weekSort);return {word:w,weeks:wk,n:wk.length};})
+        .filter(function(s){return s.n>=2;})
+        .sort(function(a,b){return (b.n-a.n)||weekSort(a.weeks[0],b.weeks[0])||a.word.toLowerCase().localeCompare(b.word.toLowerCase());});
+      k.logged={};
+      log.forEach(function(e){if(e.code===k.code&&e.words.some(Boolean))k.logged[e.week.toUpperCase()]=e.words.filter(Boolean);});
+    });
+
+    // Weeks
+    var W=rows(wb,XLSX,'Weeks'), wh=headerIndex(W[0]);
+    var ww=col(wh,'Week'), wn=col(wh,'Now'), wt=col(wh,'Rule title');
+    var wR=[1,2,3,4,5].map(function(n){return col(wh,'Rule word '+n);});
+    var weeks=[], now='';
+    W.slice(1).forEach(function(r){
+      var wk=str(r[ww]); if(!wk)return;
+      var words=wR.map(function(i){return i>=0?str(r[i]):'';}).filter(Boolean);
+      weeks.push({week:wk,title:wt>=0?str(r[wt]):'',words:words});
+      if(wn>=0&&str(r[wn])&&str(r[wn])!=='0')now=wk;
+    });
+    if(!now&&weeks.length)now=weeks[weeks.length-1].week;
+
+    var classes=[];kids.forEach(function(k){if(k.cls&&classes.indexOf(k.cls)<0)classes.push(k.cls);});classes.sort();
+    return {title:title,kids:kids,weeks:weeks,now:now,classes:classes,listSize:list.length,logRows:log.length,hasLearntRow:!!learntRow};
+  }
+  function weekSort(a,b){
+    var pa=/^T(\d+)W(\d+)$/i.exec(a||''),pb=/^T(\d+)W(\d+)$/i.exec(b||'');
+    if(!pa||!pb)return String(a).localeCompare(String(b));
+    return (pa[1]-pb[1])||(pa[2]-pb[2]);
+  }
+  return {parse:parse,weekSort:weekSort};
+})();
+if(typeof module!=='undefined')module.exports=SpellReader;
+</script>
+
+<script>
+var VERSION='WFA-12.11.26a';
+// Pair colours: the same palette the Class Manager used (routes/class_manager.py PAIR_COLOURS)
+var PAIR_COLOURS=[['#C62828','Red'],['#E65100','Orange'],['#F9A825','Gold'],['#827717','Olive'],['#2E7D32','Green'],['#558B2F','Lime'],['#00695C','Teal'],['#0277BD','Blue'],['#1A237E','Navy'],['#6A1B9A','Purple'],['#AD1457','Pink'],['#B71C1C','Crimson'],['#5D4037','Brown'],['#37474F','Slate'],['#BF360C','Rust'],['#4A148C','Indigo'],['#004D40','Forest'],['#E91E63','Cerise'],['#EF6C00','Amber'],['#795548','Mocha']];
+var DATA=null, sel={cls:'all',week:''}, stuckOff={};
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+/* ── File picking ── */
+var drop=$('drop'), inp=$('file');
+drop.addEventListener('click',function(){inp.click();});
+drop.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();inp.click();}});
+['dragenter','dragover'].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault();drop.classList.add('over');});});
+['dragleave','drop'].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault();drop.classList.remove('over');});});
+drop.addEventListener('drop',function(e){var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)loadFile(f);});
+inp.addEventListener('change',function(){if(inp.files[0])loadFile(inp.files[0]);inp.value='';});
+
+function loadFile(f){
+  var msg=$('fileMsg'); msg.innerHTML='<div class="note info">Reading '+esc(f.name)+'…</div>';
+  var rd=new FileReader();
+  rd.onload=function(){
+    try{ loadBuffer(rd.result,f.name); }
+    catch(e){ msg.innerHTML='<div class="note bad">That file could not be read as an Excel workbook. Choose the Spelling Tracker .xlsx file.</div>'; $('setup').classList.add('hidden'); }
+  };
+  rd.onerror=function(){msg.innerHTML='<div class="note bad">The file could not be opened. If it is in OneDrive, make sure it has downloaded, then try again.</div>';};
+  rd.readAsArrayBuffer(f);
+}
+function loadBuffer(buf,name){
+  var wb=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true});
+  var d=SpellReader.parse(wb,XLSX), msg=$('fileMsg');
+  if(d.error){DATA=null;msg.innerHTML='<div class="note bad">'+esc(d.error)+'</div>';$('setup').classList.add('hidden');return;}
+  DATA=d; sel={cls:'all',week:d.now}; stuckOff={};
+  assignColours();
+  msg.innerHTML='<div class="note ok"><b>'+esc(d.title||name)+'</b>: '+d.kids.length+' children, '+d.weeks.length+' weeks, '+d.listSize+' words in the word list.'+(d.hasLearntRow?'':' (No 12 November data row found in Mastered, so only words marked Y in the Key spellings log count as learnt.)')+'</div>';
+  $('setup').classList.remove('hidden');
+  render();
+}
+
+/* Partners share a colour; colours run through the palette within each class (the workbook holds no colours) */
+function assignColours(){
+  var byCode={}; DATA.kids.forEach(function(k){byCode[k.code]=k;k.colour=null;});
+  var idx={};
+  DATA.kids.forEach(function(k){
+    if(k.colour)return;
+    var p=byCode[k.partner];
+    if(!p||p===k){k.colour=['#1798d3',''];return;}
+    var n=idx[k.cls]||0; idx[k.cls]=n+1;
+    k.colour=p.colour=PAIR_COLOURS[n%PAIR_COLOURS.length];
+  });
+}
+
+/* ── Choices ── */
+function chosenKids(){return DATA.kids.filter(function(k){return sel.cls==='all'||k.cls===sel.cls;});}
+function weekObj(){return DATA.weeks.find(function(w){return w.week===sel.week;})||{week:sel.week||'TxWy',title:'',words:[]};}
+function useLog(){var r=document.querySelector('input[name=src]:checked');return r&&r.value==='log';}
+function keyWords(k){var lg=useLog()&&k.logged[String(sel.week).toUpperCase()];return lg&&lg.length?{words:lg.slice(0,5),from:'log'}:{words:k.next,from:'next'};}
+function ruleWords(k){return k.group==='revision'?[]:weekObj().words.slice(0,5);}  // as the old tool: revision group had no main-rule words
+function stuckFor(k){var min=+$('stuckMin').value;return k.stuck.filter(function(s){return s.n>=min;});}
+
+function render(){
+  var cr=$('clsRow');
+  cr.innerHTML='<span class="lbl">Class</span>'+[['all','Whole year']].concat(DATA.classes.map(function(c){return [c,c];}))
+    .map(function(c){return '<button type="button" class="chip'+(sel.cls===c[0]?' on':'')+'" data-cls="'+esc(c[0])+'">'+esc(c[1])+'</button>';}).join('');
+  $('week').innerHTML=DATA.weeks.map(function(w){return '<option value="'+esc(w.week)+'"'+(w.week===sel.week?' selected':'')+'>'+esc(w.week)+(w.week===DATA.now?' (this week)':'')+'</option>';}).join('');
+  var w=weekObj();
+  var anyLog=chosenKids().some(function(k){return k.logged[String(sel.week).toUpperCase()];});
+  $('srcRow').classList.toggle('hidden',!anyLog);
+  if(!anyLog){var nr=document.querySelector('input[name=src][value=next]');if(nr)nr.checked=true;}
+  document.querySelectorAll('#srcRow label').forEach(function(l){l.classList.toggle('on',l.querySelector('input').checked);});
+  $('ruleInfo').textContent=(w.title?w.title+': ':'')+(w.words.length?w.words.join(', '):'no rule words set for this week');
+  document.querySelectorAll('.sheet').forEach(function(s){s.classList.toggle('on',s.querySelector('input[type=checkbox]').checked);});
+  // stuck pick list
+  var withStuck=chosenKids().filter(function(k){return stuckFor(k).length;});
+  $('stuckKids').innerHTML=withStuck.length?withStuck.map(function(k){var n=stuckFor(k).length;return '<button type="button" class="kid'+(stuckOff[k.code]?'':' on')+'" data-stuck="'+esc(k.code)+'"><span data-pupil-id="'+esc(k.code)+'">'+esc(k.initials)+'</span> <small>'+n+' word'+(n===1?'':'s')+'</small></button>';}).join('')
+    :'<span class="hint">No children in this class have a key spelling stuck for that many weeks.</span>';
+  var picked=withStuck.filter(function(k){return !stuckOff[k.code];}).length;
+  $('stuckCount').textContent=picked+' of '+withStuck.length+' children picked';
+  $('stuckPickHead').classList.toggle('hidden',!withStuck.length);
+  // check table
+  var rows=chosenKids().map(function(k){
+    var kw=keyWords(k), st=stuckFor(k), p=DATA.kids.find(function(x){return x.code===k.partner;});
+    return '<tr><td><span data-pupil-id="'+esc(k.code)+'">'+esc(k.initials)+'</span></td><td>'+esc(k.cls)+'</td><td>'+(p?'<span data-pupil-id="'+esc(p.code)+'">'+esc(p.initials)+'</span>':'<span class="tag">none</span>')+'</td><td>'+esc(kw.words.join(', '))+(kw.from==='log'?' <span class="tag">from log</span>':'')+(k.group!=='main'?' <span class="tag">'+esc(k.group)+'</span>':'')+'</td><td>'+esc(st.map(function(s){return s.word+' ('+s.n+')';}).join(', '))+'</td></tr>';
+  }).join('');
+  $('checkTable').innerHTML='<tr><th>Child</th><th>Class</th><th>Partner</th><th>Key spellings for '+esc(sel.week)+'</th><th>Stuck words (weeks)</th></tr>'+rows;
+}
+document.addEventListener('click',function(e){
+  var t=e.target.closest('button');if(!t||!DATA)return;
+  if(t.dataset.cls){sel.cls=t.dataset.cls;render();return;}
+  if(t.dataset.stuck){var c=t.dataset.stuck;if(stuckOff[c])delete stuckOff[c];else stuckOff[c]=1;render();return;}
+  if(t.id==='stuckAll'){stuckOff={};render();return;}
+  if(t.id==='stuckNone'){chosenKids().forEach(function(k){stuckOff[k.code]=1;});render();return;}
+  if(t.id==='printBtn'){doPrint(false);return;}
+  if(t.id==='previewBtn'){doPrint(true);return;}
+});
+document.addEventListener('change',function(e){
+  if(!DATA)return;
+  if(e.target.id==='week'){sel.week=e.target.value;render();}
+  else if(e.target.name==='src')render();
+  else if(e.target.closest('.sheet')||e.target.id==='stuckMin')render();
+});
+
+/* ── Builders (geometry copied from wfa-app pdf_builder.py / spelling_practice_pdf.py) ── */
+var A4W=210,A4H=297;
+function cutLines(xs,ys,cls){return xs.map(function(x){return '<div class="cut v '+(cls||'')+'" style="left:'+x+'mm"></div>';}).join('')+ys.map(function(y){return '<div class="cut h '+(cls||'')+'" style="top:'+y+'mm"></div>';}).join('');}
+function labelColour(hex){var r=parseInt(hex.substr(1,2),16)/255,g=parseInt(hex.substr(3,2),16)/255,b=parseInt(hex.substr(5,2),16)/255;return (0.299*r+0.587*g+0.114*b)<0.55?'#fff':'#262626';}
+function splitPairs(list,map){
+  var seen={},a=[],b=[],un=[];
+  list.forEach(function(p){
+    if(seen[p.code])return;
+    var m=map[p.partner];
+    if(p.partner&&m&&m!==p&&!seen[m.code]){a.push(p);b.push(m);seen[p.code]=seen[m.code]=1;}
+    else{un.push(p);seen[p.code]=1;}
+  });
+  return {a:a,b:b,un:un};
+}
+function chunk(arr,n){var o=[];for(var i=0;i<arr.length;i+=n)o.push(arr.slice(i,i+n));return o;}
+var GAPMM=6*25.4/72;
+
+// Paired spelling lists: A4, 4 x 3 cards
+function pairedLists(kids,order,nm){
+  var M=6,COLS=4,ROWS=3,cw=(A4W-2*M)/COLS,rh=(A4H-2*M)/ROWS,PER=12,pages=[];
+  var map={};kids.forEach(function(k){map[k.code]=k;});
+  function card(p,pos){
+    var ci=pos%COLS,ri=Math.floor(pos/COLS),col=p.colour||['#1798d3',''];
+    var words=keyWords(p).words.slice(0,5).concat(ruleWords(p));
+    var h='<div class="pl" style="--c:'+col[0]+';left:'+(M+ci*cw+GAPMM)+'mm;top:'+(M+ri*rh+GAPMM)+'mm;width:'+(cw-2*GAPMM)+'mm;height:'+(rh-2*GAPMM)+'mm"><div class="hd"></div>'
+      +'<div class="pill nm">'+esc(nm(p))+'</div>'+(p.cls?'<div class="pill badge">'+esc(p.cls)+'</div>':'')+'<div class="ws">';
+    words.slice(0,10).forEach(function(w,i){h+='<div class="w'+(i>=5?' r':'')+(i===5?' r1':'')+'">'+(i+1)+'.  '+esc(w)+'</div>';});
+    h+='</div>'+(col[1]?'<div class="cn" style="color:'+labelColour(col[0])+'">'+esc(col[1])+'</div>':'')+'</div>';
+    return h;
+  }
+  function batch(list){chunk(list,PER).forEach(function(pg){
+    var xs=[],ys=[];for(var i=0;i<=COLS;i++)xs.push(M+i*cw);for(var j=0;j<=ROWS;j++)ys.push(M+j*rh);
+    pages.push('<div class="pg">'+pg.map(card).join('')+cutLines(xs,ys)+'</div>');
+  });}
+  if(order==='by_class'||order==='all'){
+    var sorted=kids.slice().sort(function(x,y){
+      if(order==='by_class'&&x.cls!==y.cls)return x.cls<y.cls?-1:1;
+      return nm(x).toLowerCase().localeCompare(nm(y).toLowerCase());});
+    var s=splitPairs(sorted,map); batch(s.a);batch(s.b);batch(s.un);
+  }else{
+    var s2=splitPairs(kids,map),ac=chunk(s2.a,PER),bc=chunk(s2.b,PER);
+    for(var i=0;i<Math.max(ac.length,bc.length);i++){if(ac[i])batch(ac[i]);if(bc[i])batch(bc[i]);}
+    batch(s2.un);
+  }
+  return pages;
+}
+
+// Double-sided Bee cards: A4, 2 x 4; backs mirrored left/right so partners land back to back (flip on long edge)
+function beeCards(kids,nm){
+  var M=6,COLS=2,ROWS=4,PER=8,cw=(A4W-2*M)/COLS,rh=(A4H-2*M)/ROWS,G=5,pages=[];
+  var map={};kids.forEach(function(k){map[k.code]=k;});
+  function card(p,pos,solo){
+    var ci=pos%COLS,ri=Math.floor(pos/COLS),col=p.colour||['#1798d3',''];
+    var kw=keyWords(p).words.slice(0,5),rw=ruleWords(p);
+    var h='<div class="ds" style="--c:'+col[0]+';left:'+(M+ci*cw+G)+'mm;top:'+(M+ri*rh+G)+'mm;width:'+(cw-2*G)+'mm;height:'+(rh-2*G)+'mm"><div class="hd"></div>'
+      +'<div class="pill nm">'+esc(nm(p))+'</div>'+(p.cls?'<div class="pill badge">'+esc(p.cls)+'</div>':'')+'<div class="wa">';
+    for(var r=1;r<5;r++)h+='<div class="rl" style="top:'+(r*20)+'%"></div>';
+    h+='<div class="vs"></div>';
+    [[kw,0,'0'],[rw,5,'50%']].forEach(function(c){
+      h+='<div class="col" style="left:'+c[2]+'">';
+      for(var i=0;i<5;i++)h+='<div class="cell">'+(c[0][i]?'<span><span class="num">'+(i+1+c[1])+'.</span><span class="wd">'+esc(c[0][i])+'</span></span>':'')+'</div>';
+      h+='</div>';
+    });
+    h+='</div>'+(solo?'':'<div class="ft">Your partner\'s words are on the other side</div>')+'</div>';
+    return h;
+  }
+  function page(list,mirror,cuts,solo){
+    var h='<div class="pg">';
+    list.forEach(function(p,pos){if(!p)return;var ci=pos%COLS,ri=Math.floor(pos/COLS);if(mirror)ci=COLS-1-ci;h+=card(p,ri*COLS+ci,solo);});
+    if(cuts){var xs=[],ys=[];for(var i=0;i<=COLS;i++)xs.push(M+i*cw);for(var j=0;j<=ROWS;j++)ys.push(M+j*rh);h+=cutLines(xs,ys);}
+    pages.push(h+'</div>');
+  }
+  var classes=[];kids.forEach(function(k){if(classes.indexOf(k.cls)<0)classes.push(k.cls);});
+  classes.forEach(function(c){
+    var s=splitPairs(kids.filter(function(k){return k.cls===c;}),map);
+    chunk(s.a,PER).forEach(function(ch,i){page(ch,false,true,false);page(s.b.slice(i*PER,i*PER+PER),true,false,false);});
+    chunk(s.un,PER).forEach(function(ch){page(ch,false,true,true);});
+  });
+  return pages;
+}
+
+// Recording sheet: A4, 2 x 3 blank cards, one card per child
+function recordingSheet(n){
+  var pt=25.4/72,PAD=5*pt,HW=A4W/2,TH=A4H/3,HDR=22*pt,ROW=(TH-HDR-2*PAD)/10,pages=[];
+  function cardHtml(x,y){
+    var h='<div class="rc" style="left:'+(x+PAD)+'mm;top:'+(y+PAD)+'mm;width:'+(HW-2*PAD)+'mm;height:'+(TH-2*PAD)+'mm;grid-template-rows:'+HDR+'mm repeat(10,'+ROW+'mm)">'
+      +'<div class="h" style="grid-column:1/3">Name</div><div class="h k">Check</div>';
+    for(var i=1;i<=10;i++)h+='<div class="n">'+i+'</div><div></div><div class="m"></div>';
+    return h+'</div>';
+  }
+  for(var s=0;s<Math.max(n,1);s+=6){
+    var h='<div class="pg">';
+    for(var r=0;r<3;r++)for(var c=0;c<2;c++)h+=cardHtml(c*HW,r*TH);
+    h+='<div class="cut rec v" style="left:'+HW+'mm"></div><div class="cut rec h" style="top:'+TH+'mm"></div><div class="cut rec h" style="top:'+(2*TH)+'mm"></div>';
+    pages.push(h+'</div>');
+  }
+  return pages;
+}
+
+// Key spellings practice sheets (stuck words): two children to a page when they fit in half a page
+function practiceSheets(children,style,practice){
+  var MG=12,HEADER=9,INSTR=5.5,ASC=8,DESC=3.33,XH=5,ROWGAP=2.5,WORDGAP=2,CUTGAP=6,pt=25.4/72;
+  var rowH=ASC+DESC+ROWGAP,FS=31.8*pt,usable=A4H-2*MG,half=(usable-CUTGAP)/2;
+  var d=new Date(),date=('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+String(d.getFullYear()).slice(-2);
+  var title='Key spellings practice'+(sel.week?'  |  '+sel.week:'');
+  var txt={dotted:'fill="none" stroke="#333" stroke-width=".2" stroke-dasharray=".3 .45" stroke-linecap="round"',grey:'fill="#c4c4c4"',solid:'fill="#000"'}[style]||'';
+  function rowSvg(top,word){
+    return '<svg class="ps-row" style="top:'+(top)+'mm" viewBox="0 0 186 '+(ASC+DESC)+'" width="186mm" height="'+(ASC+DESC)+'mm">'
+      +'<line x1="0" x2="186" y1="0" y2="0" stroke="#a6d1ed" stroke-width="'+(0.5*pt)+'"/>'
+      +'<line x1="0" x2="186" y1="'+(ASC-XH)+'" y2="'+(ASC-XH)+'" stroke="#ccc" stroke-width="'+(0.4*pt)+'" stroke-dasharray="'+(3*pt)+' '+(3*pt)+'"/>'
+      +'<line x1="0" x2="186" y1="'+ASC+'" y2="'+ASC+'" stroke="#a6d1ed" stroke-width="'+(1.4*pt)+'"/>'
+      +'<line x1="0" x2="186" y1="'+(ASC+DESC)+'" y2="'+(ASC+DESC)+'" stroke="#ccc" stroke-width="'+(0.4*pt)+'" stroke-dasharray="'+(8*pt)+' '+(4*pt)+'"/>'
+      +(word?'<text x="'+(2*pt)+'" y="'+ASC+'" font-family="WFASassoon" font-size="'+FS+'" '+txt+'>'+esc(word)+'</text>':'')+'</svg>';
+  }
+  function header(top,label,cont){
+    return '<div class="ps-h" style="top:'+top+'mm"><span class="l">'+esc(label)+'  |  '+esc(title)+(cont?'  (continued)':'')+'</span><span class="r">Date: '+date+'</span></div>';
+  }
+  var pages=[],cur='';
+  function flush(){if(cur){pages.push('<div class="pg">'+cur+'</div>');cur='';}}
+  function drawChild(slotTop,slotBottom,ch){
+    var yTop=slotTop+HEADER;
+    cur+=header(slotTop,ch.label,false)+'<div class="ps-i" style="top:'+(yTop+11*pt-3)+'mm">Trace each word, then keep writing it to the end of the line. Write it from memory on the empty line.</div>';
+    var y=yTop+INSTR+2*pt+ASC,bottom=slotBottom;
+    ch.words.forEach(function(w){
+      var need=(1+practice)*rowH+WORDGAP;
+      if((y-ASC)+need>bottom+WORDGAP){flush();cur+=header(MG,ch.label,true);y=MG+HEADER+4*pt+ASC;bottom=A4H-MG;}
+      cur+=rowSvg(y-ASC,w);y+=rowH;
+      for(var i=0;i<practice;i++){cur+=rowSvg(y-ASC,'');y+=rowH;}
+      y+=WORDGAP;
+    });
+  }
+  function blockH(n){return HEADER+INSTR+n*((1+practice)*rowH+WORDGAP);}
+  var halves=children.filter(function(c){return blockH(c.words.length)<=half;}),fulls=children.filter(function(c){return halves.indexOf(c)<0;});
+  var state='empty';
+  halves.concat(fulls).forEach(function(ch){
+    if(halves.indexOf(ch)<0){if(state==='half'){flush();}drawChild(MG,A4H-MG,ch);flush();state='empty';return;}
+    if(state==='empty'){drawChild(MG,MG+half,ch);state='half';}
+    else{cur+='<div class="ps-cut" style="top:'+(MG+half+CUTGAP/2)+'mm"></div>';drawChild(MG+half+CUTGAP,A4H-MG,ch);flush();state='empty';}
+  });
+  flush();
+  return pages;
+}
+
+/* ── Print ── */
+// Names come from the teacher's own names file, read in this browser only; without it the print uses initials.
+function namesThen(fn){
+  var shown=window.WFANames&&WFANames.screen.active&&WFANames.screen.file;
+  if(shown||!window.WFANames)return fn(shown||null);
+  WFANames.pick({purpose:'Your names file puts the children\'s first names on the printout. It is read on this device only and never uploaded.',skipLabel:'Print with initials'}).then(fn);
+}
+function doPrint(preview){
+  if(!DATA)return;
+  var kids=chosenKids(),want={lists:$('sLists').checked,cards:$('sCards').checked,rec:$('sRec').checked,stuck:$('sStuck').checked};
+  var msg=$('printMsg');
+  if(!want.lists&&!want.cards&&!want.rec&&!want.stuck){msg.textContent='Tick at least one sheet to print.';return;}
+  var stuckKids=kids.filter(function(k){return stuckFor(k).length&&!stuckOff[k.code];});
+  if(want.stuck&&!stuckKids.length&&!want.lists&&!want.cards&&!want.rec){msg.textContent='No children picked for the practice sheets.';return;}
+  msg.textContent='';
+  namesThen(function(file){
+    var nm=function(p){var r=file&&file.get(p.code);return (r&&(r.first||r.name))||p.initials||'?';};
+    var pages=[];
+    if(want.lists)pages=pages.concat(pairedLists(kids,(document.querySelector('input[name=order]:checked')||{}).value||'partner_pairs',nm));
+    if(want.cards)pages=pages.concat(beeCards(kids,nm));
+    if(want.rec)pages=pages.concat(recordingSheet(kids.length));
+    if(want.stuck&&stuckKids.length)pages=pages.concat(practiceSheets(stuckKids.map(function(k){return {label:nm(k),words:stuckFor(k).map(function(s){return s.word;})};}),$('stuckFont').value,+$('stuckLines').value));
+    var area=$('printArea');
+    area.innerHTML=pages.join('');
+    msg.textContent=pages.length+' page'+(pages.length===1?'':'s')+(want.cards?'. Bee cards: print on both sides, flip on long edge.':'');
+    var done=function(){if(file&&!(WFANames.screen.active&&WFANames.screen.file===file))file.clear();};
+    if(preview){area.classList.add('preview');area.scrollIntoView({behavior:'smooth'});return;}
+    area.classList.remove('preview');
+    var go=function(){setTimeout(function(){window.print();setTimeout(function(){area.innerHTML='';done();},500);},50);};
+    (document.fonts&&document.fonts.load?document.fonts.load('16px WFASassoon').catch(function(){}):Promise.resolve()).then(go,go);
+  });
+}
+try{WFANames.screen.init();}catch(e){}
+</script>
+</body>
+</html>
