@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Open version (12.11.26): no pupil list, no saving or sending of results, nothing stored on the device. Results show on screen only. Live version with saving: index.html -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Times Tables Practice (open) - Wallscourt Farm Academy</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #1a1a1a;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            border-top: 5px solid #1798d3;
+        }
+        .school-header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .school-logo {
+            max-width: 120px;
+            height: auto;
+        }
+        h1 {
+            text-align: center;
+            color: #0a0101;
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 1.1em;
+        }
+
+        /* Setup screen */
+        .table-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .table-btn {
+            padding: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border: 3px solid #ddd;
+            border-radius: 8px;
+            background: #f8f8f8;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #333;
+        }
+        .table-btn:hover { border-color: #1798d3; background: #e8f4fa; }
+        .table-btn.selected {
+            background: #1798d3;
+            color: white;
+            border-color: #1798d3;
+        }
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .action-btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-select-all {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .btn-select-all:hover { background: #d0d0d0; }
+        .btn-start {
+            background: #1798d3;
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.3em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            transition: all 0.2s;
+        }
+        .btn-start:hover { background: #1280b3; }
+        .btn-start:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #999;
+        }
+
+        /* Settings selectors */
+        .settings-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 10px 0;
+            font-size: 1.1em;
+            color: #333;
+        }
+        .settings-row select {
+            padding: 8px 15px;
+            font-size: 1.1em;
+            border-radius: 6px;
+            border: 2px solid #ddd;
+            background: white;
+        }
+        .settings-row select:focus { border-color: #1798d3; outline: none; }
+
+        /* Quiz screen */
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        .progress-bar {
+            background: #eee;
+            border-radius: 8px;
+            height: 16px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #1798d3;
+            border-radius: 8px;
+            transition: width 0.4s ease;
+        }
+        .progress-text {
+            text-align: center;
+            color: #666;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        /* Countdown timer bar */
+        .countdown-bar {
+            background: #eee;
+            border-radius: 8px;
+            height: 12px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .countdown-fill {
+            height: 100%;
+            border-radius: 8px;
+            width: 100%;
+            background: #1798d3;
+            transition: none;
+        }
+        .countdown-fill.warning { background: #FF9800; }
+        .countdown-fill.danger { background: #d32f2f; }
+
+        .question-display {
+            text-align: center;
+            font-size: 3em;
+            font-weight: bold;
+            color: #0a0101;
+            margin: 20px 0;
+        }
+        .answer-section {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+        .answer-input {
+            width: 150px;
+            padding: 15px;
+            font-size: 2em;
+            text-align: center;
+            border: 3px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s;
+            -moz-appearance: textfield;
+        }
+        .answer-input::-webkit-outer-spin-button,
+        .answer-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .answer-input:focus { border-color: #1798d3; }
+        .answer-input.correct { border-color: #1798d3; background: #e8f4fa; }
+        .answer-input.wrong { border-color: #d32f2f; background: #ffebee; }
+        .answer-input.timeout { border-color: #FF9800; background: #fff3e0; }
+
+        .btn-submit {
+            padding: 15px 30px;
+            font-size: 1.3em;
+            font-weight: bold;
+            background: #1798d3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-submit:hover { background: #1280b3; }
+
+        .feedback {
+            text-align: center;
+            font-size: 1.4em;
+            font-weight: bold;
+            margin: 10px 0;
+            min-height: 40px;
+        }
+        .feedback.correct-feedback { color: #1798d3; }
+        .feedback.wrong-feedback { color: #d32f2f; }
+        .feedback.timeout-feedback { color: #FF9800; }
+
+        .score-display {
+            text-align: center;
+            font-size: 1.1em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        /* Next question button */
+        .btn-next {
+            display: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            background: #0a0101;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+            transition: all 0.2s;
+        }
+        .btn-next:hover { background: #292929; }
+        .btn-next.visible { display: block; }
+
+        /* Keypad */
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            max-width: 280px;
+            margin: 15px auto 0;
+        }
+        .key-btn {
+            padding: 18px;
+            font-size: 1.5em;
+            font-weight: bold;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: #f8f8f8;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: #333;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .key-btn:hover { background: #e8f4fa; border-color: #1798d3; }
+        .key-btn:active { background: #1798d3; color: white; transform: scale(0.95); }
+        .key-btn.key-clear {
+            background: #ffebee;
+            border-color: #d32f2f;
+            color: #d32f2f;
+            font-size: 1.1em;
+        }
+        .key-btn.key-clear:active { background: #d32f2f; color: white; }
+        .key-btn.key-go {
+            background: #1798d3;
+            color: white;
+            border-color: #1798d3;
+        }
+        .key-btn.key-go:hover { background: #1280b3; }
+        .key-btn.key-go:active { transform: scale(0.95); }
+
+        /* Results screen */
+        .results-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .results-header .emoji {
+            font-size: 4em;
+            display: block;
+            margin-bottom: 10px;
+        }
+        .results-header .score-big {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #0a0101;
+        }
+        .results-header .score-label {
+            font-size: 1.2em;
+            color: #666;
+        }
+        .results-message {
+            text-align: center;
+            font-size: 1.3em;
+            color: #555;
+            margin: 15px 0;
+        }
+        .all-answers {
+            margin: 20px 0;
+        }
+        .all-answers h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        .summary-item {
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin: 4px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.05em;
+        }
+        .summary-item.correct-item {
+            background: #e8f4fa;
+            border-left: 4px solid #1798d3;
+        }
+        .summary-item.wrong-item {
+            background: #ffebee;
+            border-left: 4px solid #d32f2f;
+        }
+        .summary-item .question-text { color: #333; }
+        .summary-item .answer-detail { font-weight: bold; }
+        .summary-item.correct-item .answer-detail { color: #1798d3; }
+        .summary-item.wrong-item .answer-detail { color: #d32f2f; }
+        .summary-item .correct-answer-small {
+            color: #1798d3;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .btn-again {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            background: #1798d3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 15px;
+            transition: all 0.2s;
+        }
+        .btn-again:hover { background: #1280b3; }
+        .btn-home {
+            padding: 12px 30px;
+            font-size: 1em;
+            background: #0a0101;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            transition: all 0.2s;
+        }
+        .btn-home:hover { background: #292929; }
+
+        /* Responsive - tablets (iPad) */
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .container { padding: 20px; }
+            h1 { font-size: 1.7em; }
+            .question-display { font-size: 2.5em; margin: 15px 0; }
+            .answer-input { width: 130px; padding: 12px; font-size: 1.8em; }
+            .btn-submit { padding: 12px 20px; font-size: 1.1em; }
+            .table-grid { gap: 8px; }
+            .table-btn { padding: 12px; font-size: 1.1em; }
+            .keypad { max-width: 260px; }
+            .key-btn { padding: 15px; font-size: 1.4em; }
+            .settings-row { flex-direction: column; gap: 5px; }
+        }
+
+        /* Responsive - phones (iPhone) */
+        @media (max-width: 480px) {
+            body { padding: 5px; align-items: flex-start; }
+            .container { padding: 15px; border-radius: 8px; }
+            h1 { font-size: 1.4em; }
+            .subtitle { font-size: 0.95em; margin-bottom: 15px; }
+            .school-logo { max-width: 80px; }
+            .question-display { font-size: 2em; margin: 10px 0; }
+            .answer-input { width: 110px; padding: 10px; font-size: 1.5em; }
+            .btn-submit { padding: 10px 15px; font-size: 1em; }
+            .table-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+            .table-btn { padding: 10px; font-size: 1em; }
+            .keypad { max-width: 240px; gap: 6px; }
+            .key-btn { padding: 14px; font-size: 1.3em; }
+            .feedback { font-size: 1.1em; }
+            .btn-start { font-size: 1.1em; padding: 12px 20px; }
+            .btn-next { font-size: 1em; padding: 12px 20px; }
+            .btn-again { font-size: 1em; padding: 12px 20px; }
+            .summary-item { font-size: 0.95em; padding: 6px 10px; }
+            .results-header .score-big { font-size: 2em; }
+            .results-header .emoji { font-size: 3em; }
+        }
+
+        /* Prevent zoom on input focus on iOS */
+        @media (max-width: 768px) {
+            .answer-input { font-size: 16px; }
+            .settings-row select { font-size: 16px; }
+        }
+
+        .timer {
+            text-align: center;
+            color: #999;
+            font-size: 1em;
+            margin-top: 5px;
+        }
+        .version-footer {
+            text-align: center;
+            font-size: 11px;
+            color: #aaa;
+            padding: 8px 0 0;
+            font-family: sans-serif;
+        }
+
+        /* ========== MTC MODE ========== */
+        .mode-selector {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+            font-size: 0.9em;
+        }
+        .mode-selector label { margin-right: 8px; font-weight: 600; color: #333; }
+        .mode-selector select { padding: 6px 10px; border-radius: 4px; border: 2px solid #ddd; }
+        .mode-selector select:focus { border-color: #1798d3; outline: none; }
+
+        body.mtc-mode { background: #f0f0f0; align-items: flex-start; padding: 0; }
+        body.mtc-mode .container {
+            max-width: 100%;
+            width: 100%;
+            border-radius: 0;
+            box-shadow: none;
+            border-top: none;
+            padding: 0;
+            min-height: 100vh;
+        }
+        body.mtc-mode .school-header,
+        body.mtc-mode h1,
+        body.mtc-mode .subtitle,
+        body.mtc-mode .feedback,
+        body.mtc-mode .score-display,
+        body.mtc-mode .timer,
+        body.mtc-mode .btn-next,
+        body.mtc-mode .btn-submit,
+        body.mtc-mode .progress-bar,
+        body.mtc-mode .progress-text,
+        body.mtc-mode .countdown-bar,
+        body.mtc-mode .question-display,
+        body.mtc-mode .answer-section,
+        body.mtc-mode .keypad { display: none; }
+
+        .mtc-header {
+            background: #0a0101;
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .mtc-header .gov-logo { font-size: 1.5em; font-weight: 700; letter-spacing: 0.5px; }
+        .mtc-header .header-right { display: flex; align-items: center; gap: 20px; }
+        .mtc-header .school-name { font-size: 0.9em; opacity: 0.8; }
+        .mtc-content { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; }
+
+        .mtc-transition-msg { font-size: 2em; color: #0a0101; font-weight: 500; text-align: center; display: none; }
+        .mtc-transition-msg.visible { display: block; }
+        .mtc-btn-next {
+            display: none;
+            background: #1798d3;
+            color: white;
+            font-size: 1.2em;
+            font-weight: 600;
+            padding: 14px 40px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .mtc-btn-next:hover { background: #1280b3; }
+        .mtc-btn-next.visible { display: inline-block; }
+        .mtc-option-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+            font-size: 1em;
+            color: #0a0101;
+        }
+        .mtc-option-row select {
+            padding: 8px 14px;
+            font-size: 1em;
+            border-radius: 4px;
+            border: 2px solid #0b0c0c;
+            background: white;
+        }
+        .mtc-option-row select:focus { border-color: #1798d3; outline: none; }
+        .mtc-quiz-area.hidden { display: none; }
+        .mtc-question-container { display: flex; align-items: center; justify-content: center; margin: 40px 0 20px; position: relative; }
+        .mtc-timer-text {
+            font-size: 1em;
+            font-weight: 600;
+            color: #0a0101;
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+        }
+        .mtc-question {
+            font-size: 3em;
+            font-weight: 700;
+            color: #0a0101;
+            letter-spacing: 1px;
+            position: absolute;
+            right: calc(50% + calc(3 * 2.6cm + 2 * 8px) / 2 + 12px);
+            white-space: nowrap;
+        }
+        .mtc-answer-box {
+            width: calc(3 * 2.6cm + 2 * 8px);
+            height: 50px;
+            font-size: 2em;
+            text-align: center;
+            border: 2px solid #0a0101;
+            background: white;
+            outline: none;
+            -moz-appearance: textfield;
+        }
+        .mtc-answer-box::-webkit-outer-spin-button,
+        .mtc-answer-box::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .mtc-answer-box:focus { border-color: #1798d3; box-shadow: 0 0 0 3px rgba(23, 152, 211, 0.3); }
+        .mtc-numpad-wrapper { display: flex; justify-content: center; }
+        .mtc-numpad { display: grid; grid-template-columns: repeat(3, 2.6cm); gap: 8px; justify-content: center; }
+        .mtc-key {
+            height: 1.8cm;
+            width: 2.6cm;
+            font-size: 1.6em;
+            font-weight: 500;
+            background: #70777c;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            touch-action: manipulation;
+        }
+        .mtc-key:hover { background: #5c6266; }
+        .mtc-key:active { background: #4a4e51; }
+        .mtc-key.mtc-zero { grid-column: 2; }
+        .mtc-key.mtc-back { font-size: 1.3em; }
+
+        body.mtc-mode .results-header .emoji { font-size: 4em; margin-bottom: 20px; }
+        body.mtc-mode .results-header .score-big { font-size: 3em; font-weight: 700; color: #0a0101; }
+        body.mtc-mode .results-header .score-label { font-size: 1.5em; color: #505a5f; margin-top: 10px; }
+        body.mtc-mode .results-message { font-size: 1.3em; color: #0a0101; margin: 20px 0; }
+        body.mtc-mode .all-answers { max-width: 500px; margin: 30px auto; padding: 0 20px 30px; }
+        body.mtc-mode .summary-item { background: #f3f2f1; border-left: 4px solid #0a0101; }
+        body.mtc-mode .summary-item.correct-item { background: #e7f4e4; border-left-color: #1798d3; }
+        body.mtc-mode .summary-item.wrong-item { background: #f9d6d6; border-left-color: #d4351c; }
+        body.mtc-mode .btn-again { background: #1798d3; border-radius: 0; max-width: 500px; margin-left: auto; margin-right: auto; }
+        body.mtc-mode .btn-again:hover { background: #1280b3; }
+        body.mtc-mode .btn-home { background: #0a0101; border-radius: 0; max-width: 500px; margin-left: auto; margin-right: auto; }
+
+        .mtc-welcome { text-align: center; padding: 60px 20px; max-width: 500px; margin: 0 auto; }
+        .mtc-welcome h2 { font-size: 2em; color: #0a0101; margin-bottom: 20px; }
+        .mtc-welcome p { color: #505a5f; margin: 15px 0; font-size: 1.1em; }
+        .mtc-welcome .start-btn {
+            background: #1798d3;
+            color: white;
+            font-size: 1.2em;
+            font-weight: 600;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 30px;
+        }
+        .mtc-welcome .start-btn:hover { background: #1280b3; }
+
+        .mtc-practice-notice {
+            background: #fff9c4;
+            border-left: 4px solid #f9a825;
+            padding: 12px 16px;
+            margin-bottom: 30px;
+            font-size: 0.95em;
+            color: #0a0101;
+            max-width: 320px;
+            text-align: left;
+        }
+
+        .mtc-teacher-row { margin-top: 20px; text-align: left; max-width: 320px; margin-left: auto; margin-right: auto; }
+        .mtc-checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 1em; color: #0a0101; cursor: pointer; }
+        .mtc-checkbox-label input { width: 18px; height: 18px; }
+        .mtc-name-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+        .mtc-name-row label { font-size: 0.95em; color: #505a5f; white-space: nowrap; }
+        .mtc-name-row input, .mtc-name-row select {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 1em;
+            border-radius: 4px;
+            border: 2px solid #0b0c0c;
+            background: white;
+        }
+        .mtc-name-row input:focus, .mtc-name-row select:focus { border-color: #1798d3; outline: none; }
+        .mtc-name-error { color: #d4351c; font-size: 0.9em; margin-top: 8px; }
+        .mtc-header { cursor: default; }
+
+        .mtc-pin-content { text-align: center; padding: 60px 20px; max-width: 400px; margin: 0 auto; }
+        .mtc-pin-content h2 { font-size: 1.6em; color: #0a0101; margin-bottom: 24px; }
+        .mtc-pin-dots { display: flex; justify-content: center; gap: 14px; margin-bottom: 16px; }
+        .mtc-pin-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #0b0c0c; }
+        .mtc-pin-dot.filled { background: #0b0c0c; }
+        .mtc-pin-error { color: #d4351c; font-size: 0.95em; margin-bottom: 20px; min-height: 1.2em; }
+
+        .mtc-save-status { text-align: center; font-size: 1em; margin: 10px 0; font-weight: 600; }
+        .mtc-save-status.saved { color: #1798d3; }
+        .mtc-save-status.saving { color: #505a5f; }
+        .mtc-save-status.failed { color: #d4351c; }
+
+        .mtc-class-results { max-width: 700px; margin: 0 auto; padding: 30px 20px; text-align: left; }
+        .mtc-class-results h2 { font-size: 1.8em; color: #0a0101; margin-bottom: 16px; }
+        .mtc-year-filter-row { justify-content: flex-start; margin: 0 0 16px; }
+        .mtc-summary-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+        .mtc-summary-table th, .mtc-summary-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #ddd; }
+        .mtc-summary-table th { color: #505a5f; font-size: 0.9em; font-weight: 600; }
+        .mtc-summary-table td { font-size: 1em; }
+        .mtc-summary-table td.name { font-weight: 700; color: #0a0101; }
+        .mtc-class-results-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .mtc-btn-print {
+            background: #1798d3; color: white; font-size: 1.1em; font-weight: 600;
+            padding: 14px 30px; border: none; border-radius: 8px; cursor: pointer;
+        }
+        .mtc-btn-print:hover { background: #1280b3; }
+        .mtc-btn-back {
+            background: #f3f2f1; color: #0a0101; font-size: 1.1em; font-weight: 600;
+            padding: 14px 30px; border: none; border-radius: 8px; cursor: pointer;
+        }
+        .mtc-btn-back:hover { background: #dbdad9; }
+        .mtc-result-row {
+            border: 1px solid #ddd; border-radius: 6px; margin-bottom: 10px; padding: 12px 16px;
+            cursor: pointer;
+        }
+        .mtc-result-row-head { display: flex; justify-content: space-between; align-items: center; font-size: 1.05em; }
+        .mtc-result-row-head .name { font-weight: 700; color: #0a0101; }
+        .mtc-result-row-head .score { color: #505a5f; }
+        .mtc-result-row-detail { display: none; margin-top: 10px; font-size: 0.95em; }
+        .mtc-result-row-detail.open { display: block; }
+        .mtc-result-row-detail .wrong-fact { color: #d4351c; margin: 3px 0; }
+        .mtc-result-row-detail .no-gaps { color: #1798d3; }
+        .mtc-all-q-label { margin-top: 14px; font-weight: 600; color: #0a0101; }
+        .mtc-all-questions {
+            display: flex;
+            gap: 4px 24px;
+            margin-top: 8px;
+        }
+        .mtc-q-col { display: flex; flex-direction: column; flex: 1; min-width: 140px; }
+        .mtc-q-item { font-size: 0.9em; padding: 2px 0; }
+        .mtc-q-item.correct { color: #1798d3; }
+        .mtc-q-item.correct span { color: #1798d3; }
+        .mtc-q-item.wrong { color: #0a0101; }
+        .mtc-q-item.wrong span { color: #d4351c; font-weight: 600; }
+
+        @media print {
+            .mode-selector, .mtc-header, .mtc-class-results-actions, .version-footer { display: none !important; }
+            .mtc-result-row-detail { display: block !important; }
+        }
+
+        @media (max-width: 768px) {
+            .mtc-question { font-size: 2.5em; right: calc(50% + calc(3 * 2.2cm + 2 * 6px) / 2 + 10px); }
+            .mtc-answer-box { width: calc(3 * 2.2cm + 2 * 6px); height: 44px; font-size: 1.6em; }
+            .mtc-numpad { grid-template-columns: repeat(3, 2.2cm); gap: 6px; }
+            .mtc-key { height: 1.5cm; width: 2.2cm; font-size: 1.4em; }
+            .mtc-header .gov-logo { font-size: 1.2em; }
+            .mtc-header .school-name { display: none; }
+            .mtc-transition-msg { font-size: 1.5em; }
+        }
+        @media (max-width: 480px) {
+            .mtc-question { font-size: 2em; right: calc(50% + calc(3 * 2cm + 2 * 5px) / 2 + 8px); }
+            .mtc-answer-box { width: calc(3 * 2cm + 2 * 5px); height: 40px; font-size: 1.4em; }
+            .mtc-numpad { grid-template-columns: repeat(3, 2cm); gap: 5px; }
+            .mtc-key { height: 1.4cm; width: 2cm; font-size: 1.2em; }
+            .mtc-header .gov-logo { font-size: 1em; }
+            .mtc-timer-text { font-size: 0.85em; }
+            .mtc-transition-msg { font-size: 1.2em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="mode-selector">
+        <label for="mode-select">Mode:</label>
+        <select id="mode-select" onchange="switchMode(this.value)">
+            <option value="practice">Practice Mode</option>
+            <option value="mtc">MTC Mode</option>
+        </select>
+    </div>
+    <div class="container">
+        <!-- Setup Screen -->
+        <div id="setup-screen" class="screen active">
+            <div class="school-header">
+                <img src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy" class="school-logo">
+            </div>
+            <h1>Times Tables</h1>
+            <p class="subtitle">Select which times tables to practise</p>
+
+            <div class="btn-row">
+                <button class="action-btn btn-select-all" onclick="selectAll()">Select All</button>
+                <button class="action-btn btn-select-all" onclick="selectNone()">Clear All</button>
+            </div>
+
+            <div class="table-grid" id="table-grid"></div>
+
+            <div class="settings-row">
+                <label for="num-questions">Questions:</label>
+                <select id="num-questions">
+                    <option value="10">10</option>
+                    <option value="15">15</option>
+                    <option value="20" selected>20</option>
+                    <option value="30">30</option>
+                    <option value="50">50</option>
+                </select>
+            </div>
+
+            <div class="settings-row">
+                <label for="time-limit">Time per question:</label>
+                <select id="time-limit">
+                    <option value="0">No limit</option>
+                    <option value="3">3 seconds</option>
+                    <option value="4.5" selected>4.5 seconds</option>
+                    <option value="6">6 seconds</option>
+                    <option value="8">8 seconds</option>
+                    <option value="10">10 seconds</option>
+                </select>
+            </div>
+
+            <div class="settings-row">
+                <label for="wait-between">Between questions:</label>
+                <select id="wait-between">
+                    <option value="auto" selected>Auto (2 second delay)</option>
+                    <option value="wait">Wait for "Next Question"</option>
+                </select>
+            </div>
+
+            <button class="btn-start" id="btn-start" onclick="startQuiz()" disabled>
+                Choose at least one table
+            </button>
+        </div>
+
+        <!-- Quiz Screen -->
+        <div id="quiz-screen" class="screen">
+            <div class="school-header">
+                <img src="https://wallscourtfarmacademy.clf.uk/wp-content/uploads/Wallscourt%20Farm%20logo%20cmyk%20big.jpg" alt="Wallscourt Farm Academy" class="school-logo">
+            </div>
+            <h1>Times Tables</h1>
+            <div class="progress-text" id="progress-text"></div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="countdown-bar" id="countdown-bar">
+                <div class="countdown-fill" id="countdown-fill"></div>
+            </div>
+            <div class="question-display" id="question-display"></div>
+            <div class="answer-section">
+                <input type="number" class="answer-input" id="answer-input"
+                       autocomplete="off" inputmode="none">
+                <button class="btn-submit" id="btn-submit" onclick="submitAnswer()">Go!</button>
+            </div>
+            <div class="feedback" id="feedback"></div>
+            <div class="score-display" id="score-display"></div>
+            <div class="timer" id="timer"></div>
+
+            <button class="btn-next" id="btn-next" onclick="nextQuestion()">Next Question</button>
+
+            <div class="keypad" id="keypad">
+                <button class="key-btn" onclick="keyPress('1')">1</button>
+                <button class="key-btn" onclick="keyPress('2')">2</button>
+                <button class="key-btn" onclick="keyPress('3')">3</button>
+                <button class="key-btn" onclick="keyPress('4')">4</button>
+                <button class="key-btn" onclick="keyPress('5')">5</button>
+                <button class="key-btn" onclick="keyPress('6')">6</button>
+                <button class="key-btn" onclick="keyPress('7')">7</button>
+                <button class="key-btn" onclick="keyPress('8')">8</button>
+                <button class="key-btn" onclick="keyPress('9')">9</button>
+                <button class="key-btn key-clear" onclick="keyClear()">Clear</button>
+                <button class="key-btn" onclick="keyPress('0')">0</button>
+                <button class="key-btn key-go" onclick="submitAnswer()">Go!</button>
+            </div>
+        </div>
+
+        <!-- MTC Welcome Screen -->
+        <div id="mtc-welcome-screen" class="screen">
+            <div class="mtc-header">
+                <span class="gov-logo">GOV.UK</span>
+                <span class="school-name">Wallscourt Farm Academy</span>
+            </div>
+            <div class="mtc-welcome">
+                <h2>Multiplication Tables Check</h2>
+                <p>This is a practice version of the official Year 4 Multiplication Tables Check (MTC).</p>
+                <p>You will have 3 practice questions, then 25 test questions.</p>
+                <p>Each question has a 6-second time limit.</p>
+                <div class="mtc-option-row">
+                    <label for="mtc-wait-between">Between questions:</label>
+                    <select id="mtc-wait-between">
+                        <option value="auto">Auto-advance (2 second pause)</option>
+                        <option value="wait" selected>Wait for "Next question" button</option>
+                    </select>
+                </div>
+                <button class="start-btn" onclick="startMTC()">Start now</button>
+            </div>
+        </div>
+
+        <!-- MTC Quiz Screen -->
+        <div id="mtc-quiz-screen" class="screen">
+            <div class="mtc-header">
+                <span class="gov-logo">GOV.UK</span>
+                <div class="header-right">
+                    <span class="school-name" id="mtc-progress-label"></span>
+                </div>
+            </div>
+            <div class="mtc-content">
+                <div id="mtc-practice-notice" class="mtc-practice-notice" style="display:none;">
+                    <strong>Practice question</strong> — Try this one before the real check begins.
+                </div>
+                <div class="mtc-transition-msg" id="mtc-transition-msg"></div>
+                <button class="mtc-btn-next" id="mtc-btn-next" onclick="mtcNextQuestion()">Next question</button>
+                <div class="mtc-quiz-area" id="mtc-quiz-area">
+                    <div class="mtc-question-container">
+                        <span class="mtc-timer-text" id="mtc-timer-text">Time left: 6</span>
+                        <span class="mtc-question" id="mtc-question"></span>
+                        <input type="number" class="mtc-answer-box" id="mtc-answer" autocomplete="off" inputmode="none">
+                    </div>
+                    <div class="mtc-numpad-wrapper">
+                        <div class="mtc-numpad">
+                            <button class="mtc-key" onclick="mtcKeyPress('1')">1</button>
+                            <button class="mtc-key" onclick="mtcKeyPress('2')">2</button>
+                            <button class="mtc-key" onclick="mtcKeyPress('3')">3</button>
+                            <button class="mtc-key" onclick="mtcKeyPress('4')">4</button>
+                            <button class="mtc-key" onclick="mtcKeyPress('5')">5</button>
+                            <button class="mtc-key" onclick="mtcKeyPress('6')">6</button>
+                            <button class="mtc-key" onclick="mtcKeyPress('7')">7</button>
+                            <button class="mtc-key" onclick="mtcKeyPress('8')">8</button>
+                            <button class="mtc-key" onclick="mtcKeyPress('9')">9</button>
+                            <button class="mtc-key mtc-back" onclick="mtcBack()">⌫</button>
+                            <button class="mtc-key mtc-zero" onclick="mtcKeyPress('0')">0</button>
+                            <button class="mtc-key mtc-enter" onclick="mtcSubmit()">Enter</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="results-screen" class="screen">
+            <div class="results-header">
+                <span class="emoji" id="results-emoji"></span>
+                <span class="score-big" id="results-score"></span>
+                <div class="score-label" id="results-label"></div>
+            </div>
+            <div class="results-message" id="results-message"></div>
+            <div class="timer" id="results-time"></div>
+            <div class="mtc-save-status open-note" id="open-note">Results are not saved. You can note the score in the class results spreadsheet.</div>
+            <div class="all-answers" id="all-answers"></div>
+            <button class="btn-again" id="btn-again" onclick="restartQuiz()">Try Again</button>
+            <button class="btn-home" id="btn-home" onclick="goHome()">Change Tables</button>
+        </div>
+
+        <div class="version-footer">WFA-12.11.26a</div>
+    </div>
+
+    <script>
+        let selectedTables = new Set();
+        let questions = [];
+        let currentQuestion = 0;
+        let score = 0;
+        let allAnswers = [];
+        let startTime = null;
+        let questionTimeLimit = 4.5;
+        let questionStartTime = null;
+        let countdownInterval = null;
+        let questionTimeout = null;
+        let answering = false;
+        let waitBetween = false;
+        let isMTCMode = false;
+        let mtcPhase = 'setup'; // setup, practice, test
+        let mtcPracticeCount = 0;
+        let mtcWaitBetween = false;
+
+        // Build table selection grid
+        const grid = document.getElementById('table-grid');
+        for (let i = 1; i <= 12; i++) {
+            const btn = document.createElement('button');
+            btn.className = 'table-btn';
+            btn.textContent = i + '\u00d7';
+            btn.dataset.table = i;
+            btn.onclick = () => toggleTable(i, btn);
+            grid.appendChild(btn);
+        }
+
+        function toggleTable(n, btn) {
+            if (selectedTables.has(n)) {
+                selectedTables.delete(n);
+                btn.classList.remove('selected');
+            } else {
+                selectedTables.add(n);
+                btn.classList.add('selected');
+            }
+            updateStartButton();
+        }
+
+        function selectAll() {
+            document.querySelectorAll('.table-btn').forEach(btn => {
+                const n = parseInt(btn.dataset.table);
+                selectedTables.add(n);
+                btn.classList.add('selected');
+            });
+            updateStartButton();
+        }
+
+        function selectNone() {
+            document.querySelectorAll('.table-btn').forEach(btn => {
+                selectedTables.delete(parseInt(btn.dataset.table));
+                btn.classList.remove('selected');
+            });
+            updateStartButton();
+        }
+
+        function updateStartButton() {
+            const btn = document.getElementById('btn-start');
+            if (selectedTables.size > 0) {
+                btn.disabled = false;
+                btn.textContent = 'Start! (' + selectedTables.size + ' table' +
+                    (selectedTables.size > 1 ? 's' : '') + ')';
+            } else {
+                btn.disabled = true;
+                btn.textContent = 'Choose at least one table';
+            }
+        }
+
+        function generateQuestions() {
+            const numQuestions = parseInt(document.getElementById('num-questions').value);
+            const pool = [];
+            selectedTables.forEach(table => {
+                for (let i = 1; i <= 12; i++) {
+                    pool.push({ a: table, b: i });
+                }
+            });
+
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+
+            questions = pool.slice(0, numQuestions);
+
+            while (questions.length < numQuestions) {
+                for (let i = pool.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pool[i], pool[j]] = [pool[j], pool[i]];
+                }
+                questions = questions.concat(pool.slice(0, numQuestions - questions.length));
+            }
+
+            questions = questions.map(q => {
+                if (Math.random() > 0.5) return { a: q.b, b: q.a };
+                return q;
+            });
+        }
+
+        function startQuiz() {
+            isMTCMode = false;
+            generateQuestions();
+            currentQuestion = 0;
+            score = 0;
+            allAnswers = [];
+            startTime = Date.now();
+            questionTimeLimit = parseFloat(document.getElementById('time-limit').value);
+            waitBetween = document.getElementById('wait-between').value === 'wait';
+
+            const countdownBar = document.getElementById('countdown-bar');
+            countdownBar.style.display = questionTimeLimit > 0 ? 'block' : 'none';
+
+            document.getElementById('btn-next').classList.remove('visible');
+            showScreen('quiz-screen');
+            showQuestion();
+        }
+
+        function showQuestion() {
+            answering = true;
+            document.getElementById('btn-next').classList.remove('visible');
+            const q = questions[currentQuestion];
+            document.getElementById('question-display').textContent = q.a + ' \u00d7 ' + q.b + ' = ?';
+            document.getElementById('progress-text').textContent =
+                'Question ' + (currentQuestion + 1) + ' of ' + questions.length;
+            document.getElementById('progress-fill').style.width =
+                ((currentQuestion) / questions.length * 100) + '%';
+            document.getElementById('score-display').textContent =
+                'Score: ' + score + ' / ' + currentQuestion;
+            document.getElementById('feedback').textContent = '';
+            document.getElementById('feedback').className = 'feedback';
+
+            const input = document.getElementById('answer-input');
+            input.value = '';
+            input.className = 'answer-input';
+            input.focus();
+
+            updateTimer();
+            startCountdown();
+        }
+
+        function startCountdown() {
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (questionTimeout) clearTimeout(questionTimeout);
+
+            if (questionTimeLimit <= 0) return;
+
+            questionStartTime = Date.now();
+            const fill = document.getElementById('countdown-fill');
+            fill.style.width = '100%';
+            fill.className = 'countdown-fill';
+
+            countdownInterval = setInterval(() => {
+                const elapsed = (Date.now() - questionStartTime) / 1000;
+                const remaining = Math.max(0, questionTimeLimit - elapsed);
+                const pct = (remaining / questionTimeLimit) * 100;
+                fill.style.width = pct + '%';
+
+                if (pct <= 20) fill.className = 'countdown-fill danger';
+                else if (pct <= 50) fill.className = 'countdown-fill warning';
+                else fill.className = 'countdown-fill';
+            }, 50);
+
+            questionTimeout = setTimeout(() => {
+                if (answering) handleTimeout();
+            }, questionTimeLimit * 1000);
+        }
+
+        function handleTimeout() {
+            answering = false;
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (questionTimeout) clearTimeout(questionTimeout);
+
+            const fill = document.getElementById('countdown-fill');
+            fill.style.width = '0%';
+            fill.className = 'countdown-fill danger';
+
+            const input = document.getElementById('answer-input');
+            const q = questions[currentQuestion];
+            const correct = q.a * q.b;
+            const feedback = document.getElementById('feedback');
+
+            input.className = 'answer-input timeout';
+            feedback.textContent = 'Time\u2019s up! ' + q.a + ' \u00d7 ' + q.b + ' = ' + correct;
+            feedback.className = 'feedback timeout-feedback';
+
+            const given = parseInt(input.value);
+            allAnswers.push({
+                a: q.a, b: q.b, correct: correct,
+                given: isNaN(given) ? '\u2014' : given,
+                timedOut: true, isCorrect: false
+            });
+
+            document.getElementById('score-display').textContent =
+                'Score: ' + score + ' / ' + (currentQuestion + 1);
+
+            currentQuestion++;
+            advanceQuestion();
+        }
+
+        function advanceQuestion() {
+            if (waitBetween) {
+                if (currentQuestion >= questions.length) {
+                    document.getElementById('btn-next').classList.remove('visible');
+                    setTimeout(showResults, 1000);
+                } else {
+                    document.getElementById('btn-next').classList.add('visible');
+                }
+            } else {
+                const delay = 2000;
+                if (currentQuestion >= questions.length) {
+                    setTimeout(showResults, delay);
+                } else {
+                    setTimeout(showQuestion, delay);
+                }
+            }
+        }
+
+        function nextQuestion() {
+            if (currentQuestion >= questions.length) {
+                showResults();
+            } else {
+                showQuestion();
+            }
+        }
+
+        function updateTimer() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = Math.floor(elapsed / 60);
+            const secs = elapsed % 60;
+            document.getElementById('timer').textContent =
+                mins + ':' + (secs < 10 ? '0' : '') + secs;
+        }
+
+        let timerInterval = null;
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+
+            if (timerInterval) clearInterval(timerInterval);
+            if (id === 'quiz-screen') {
+                timerInterval = setInterval(updateTimer, 1000);
+            }
+        }
+
+        function submitAnswer() {
+            if (!answering) return;
+
+            const input = document.getElementById('answer-input');
+            const answer = parseInt(input.value);
+            const q = questions[currentQuestion];
+            const correct = q.a * q.b;
+            const feedback = document.getElementById('feedback');
+
+            if (isNaN(answer)) {
+                input.focus();
+                return;
+            }
+
+            answering = false;
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (questionTimeout) clearTimeout(questionTimeout);
+
+            if (answer === correct) {
+                score++;
+                input.className = 'answer-input correct';
+                feedback.textContent = 'Correct!';
+                feedback.className = 'feedback correct-feedback';
+                allAnswers.push({ a: q.a, b: q.b, correct: correct, given: answer, isCorrect: true });
+            } else {
+                input.className = 'answer-input wrong';
+                feedback.textContent = q.a + ' \u00d7 ' + q.b + ' = ' + correct;
+                feedback.className = 'feedback wrong-feedback';
+                allAnswers.push({ a: q.a, b: q.b, correct: correct, given: answer, isCorrect: false });
+            }
+
+            document.getElementById('score-display').textContent =
+                'Score: ' + score + ' / ' + (currentQuestion + 1);
+
+            currentQuestion++;
+            advanceQuestion();
+        }
+
+        // Keyboard support
+        document.getElementById('answer-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') submitAnswer();
+        });
+        document.getElementById('mtc-answer').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') mtcSubmit();
+        });
+
+        // Mode switching
+        function switchMode(mode) {
+            document.body.classList.toggle('mtc-mode', mode === 'mtc');
+            if (mode === 'mtc') {
+                showScreen('mtc-welcome-screen');
+            } else {
+                isMTCMode = false;
+                showScreen('setup-screen');
+            }
+        }
+
+        function restartQuiz() {
+            if (isMTCMode) {
+                startMTC();
+            } else {
+                startQuiz();
+            }
+        }
+
+        function goHome() {
+            if (isMTCMode) {
+                document.getElementById('mode-select').value = 'practice';
+                switchMode('practice');
+            } else {
+                showScreen('setup-screen');
+            }
+        }
+
+        // MTC mode - follows the official test format: tables 2-12, 3 practice
+        // questions then 25 timed test questions
+        // Mirrors the real MTC's question-selection rules: no 0x/1x tables,
+        // no division, the 6/7/8/9/12 tables (the hardest) appear more
+        // often, the easier 2/5/10 tables are capped at 7 questions, and
+        // the 25 chosen facts are then presented in a random order.
+        function generateMTCQuestions() {
+            const HARD_TABLES = [6, 7, 8, 9, 12];
+            const EASY_TABLES = [2, 5, 10];
+            const MAX_EASY = 7;
+            const TOTAL = 25;
+
+            let pool = [];
+            for (let a = 2; a <= 12; a++) {
+                for (let b = 2; b <= 12; b++) {
+                    const weight = HARD_TABLES.includes(a) ? 2 : 1;
+                    for (let w = 0; w < weight; w++) pool.push({ a, b });
+                }
+            }
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+
+            const selected = [];
+            const seen = new Set();
+            let easyCount = 0;
+            for (const fact of pool) {
+                if (selected.length >= TOTAL) break;
+                const key = fact.a + 'x' + fact.b;
+                if (seen.has(key)) continue;
+                const isEasy = EASY_TABLES.includes(fact.a);
+                if (isEasy && easyCount >= MAX_EASY) continue;
+                seen.add(key);
+                if (isEasy) easyCount++;
+                selected.push(fact);
+            }
+            // The easy-table cap only ever excludes 3 of the 11 tables, so
+            // there are always enough remaining facts — this is just a
+            // safety net in case that ever changes.
+            if (selected.length < TOTAL) {
+                for (let a = 2; a <= 12 && selected.length < TOTAL; a++) {
+                    for (let b = 2; b <= 12 && selected.length < TOTAL; b++) {
+                        const key = a + 'x' + b;
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        selected.push({ a, b });
+                    }
+                }
+            }
+
+            for (let i = selected.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [selected[i], selected[j]] = [selected[j], selected[i]];
+            }
+            questions = selected;
+        }
+
+        function startMTC() {
+            isMTCMode = true;
+            mtcPhase = 'practice';
+            mtcPracticeCount = 0;
+            mtcWaitBetween = document.getElementById('mtc-wait-between').value === 'wait';
+            generateMTCQuestions();
+            currentQuestion = 0;
+            score = 0;
+            allAnswers = [];
+            startTime = Date.now();
+            questionTimeLimit = 6;
+
+            showScreen('mtc-quiz-screen');
+            showMTCQuestion();
+        }
+
+        function showMTCQuestion() {
+            answering = true;
+            document.getElementById('mtc-transition-msg').classList.remove('visible');
+            document.getElementById('mtc-btn-next').classList.remove('visible');
+            document.getElementById('mtc-quiz-area').classList.remove('hidden');
+
+            const input = document.getElementById('mtc-answer');
+            input.value = '';
+            input.focus();
+
+            const practiceNotice = document.getElementById('mtc-practice-notice');
+            const progressLabel = document.getElementById('mtc-progress-label');
+
+            if (mtcPhase === 'practice') {
+                practiceNotice.style.display = 'block';
+                progressLabel.textContent = 'Practice ' + (mtcPracticeCount + 1) + ' of 3';
+            } else {
+                practiceNotice.style.display = 'none';
+                progressLabel.textContent = 'Question ' + (currentQuestion + 1) + ' of 25';
+            }
+
+            const q = questions[currentQuestion];
+            document.getElementById('mtc-question').textContent = q.a + ' × ' + q.b + ' = ';
+
+            startMTCTimer();
+        }
+
+        function startMTCTimer() {
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (questionTimeout) clearTimeout(questionTimeout);
+
+            questionStartTime = Date.now();
+            const timerText = document.getElementById('mtc-timer-text');
+            timerText.textContent = 'Time left: 6';
+
+            countdownInterval = setInterval(() => {
+                const elapsed = (Date.now() - questionStartTime) / 1000;
+                const remaining = Math.max(0, questionTimeLimit - elapsed);
+                timerText.textContent = 'Time left: ' + Math.ceil(remaining);
+            }, 100);
+
+            questionTimeout = setTimeout(() => {
+                if (answering) handleMTCTimeout();
+            }, questionTimeLimit * 1000);
+        }
+
+        function handleMTCTimeout() {
+            answering = false;
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (questionTimeout) clearTimeout(questionTimeout);
+
+            document.getElementById('mtc-timer-text').textContent = 'Time left: 0';
+
+            const input = document.getElementById('mtc-answer');
+            const q = questions[currentQuestion];
+            const correct = q.a * q.b;
+            const given = parseInt(input.value);
+
+            allAnswers.push({
+                a: q.a, b: q.b, correct: correct,
+                given: isNaN(given) ? '—' : given,
+                timedOut: true, isCorrect: false
+            });
+
+            advanceMTC();
+        }
+
+        function mtcKeyPress(digit) {
+            if (!answering) return;
+            const input = document.getElementById('mtc-answer');
+            if (input.value.length < 3) input.value += digit;
+        }
+
+        function mtcBack() {
+            const input = document.getElementById('mtc-answer');
+            input.value = input.value.slice(0, -1);
+        }
+
+        function mtcSubmit() {
+            if (!answering) return;
+            const input = document.getElementById('mtc-answer');
+            const answer = parseInt(input.value);
+            if (isNaN(answer)) return;
+
+            answering = false;
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (questionTimeout) clearTimeout(questionTimeout);
+
+            const q = questions[currentQuestion];
+            const correct = q.a * q.b;
+            const isCorrect = answer === correct;
+            if (isCorrect) score++;
+
+            allAnswers.push({ a: q.a, b: q.b, correct: correct, given: answer, isCorrect: isCorrect });
+
+            advanceMTC();
+        }
+
+        function advanceMTC() {
+            currentQuestion++;
+            mtcPracticeCount++;
+            document.getElementById('mtc-quiz-area').classList.add('hidden');
+
+            if (mtcPhase === 'practice' && mtcPracticeCount >= 3) {
+                mtcPhase = 'test';
+                currentQuestion = 0;
+                score = 0;
+                allAnswers = [];
+                generateMTCQuestions();
+                showMTCTransition('Question 1...');
+                return;
+            }
+
+            if (mtcPhase === 'test' && currentQuestion >= 25) {
+                setTimeout(showResults, 2000);
+                return;
+            }
+
+            showMTCTransition('Question ' + (currentQuestion + 1) + '...');
+        }
+
+        // Shows the "Question N..." message, then either advances after a
+        // pause or waits for the child to press "Next question", per the
+        // Between questions setting chosen on the MTC welcome screen.
+        function showMTCTransition(msg) {
+            const transitionMsg = document.getElementById('mtc-transition-msg');
+            const quizArea = document.getElementById('mtc-quiz-area');
+            const timerText = document.getElementById('mtc-timer-text');
+
+            quizArea.classList.add('hidden');
+            transitionMsg.textContent = msg;
+            transitionMsg.classList.add('visible');
+            timerText.textContent = 'Time left: 6';
+            // The practice notice must reflect the phase we're transitioning
+            // INTO, not the one just finished, or "Question 1..." (the very
+            // first test question) still shows the "Practice question" banner.
+            document.getElementById('mtc-practice-notice').style.display = mtcPhase === 'practice' ? 'block' : 'none';
+
+            if (mtcWaitBetween) {
+                document.getElementById('mtc-btn-next').classList.add('visible');
+            } else {
+                setTimeout(showMTCQuestion, 2000);
+            }
+        }
+
+        function mtcNextQuestion() {
+            document.getElementById('mtc-btn-next').classList.remove('visible');
+            showMTCQuestion();
+        }
+
+        // Keypad functions
+        function keyPress(digit) {
+            if (!answering) return;
+            const input = document.getElementById('answer-input');
+            if (input.value.length < 3) {
+                input.value += digit;
+            }
+        }
+
+        function keyClear() {
+            const input = document.getElementById('answer-input');
+            input.value = '';
+            input.focus();
+        }
+
+        function showResults() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = Math.floor(elapsed / 60);
+            const secs = elapsed % 60;
+            const pct = Math.round((score / questions.length) * 100);
+
+            let emoji, message;
+            if (pct === 100) { emoji = '\ud83c\udf1f'; message = 'Perfect score! Amazing work!'; }
+            else if (pct >= 90) { emoji = '\ud83c\udf89'; message = 'Brilliant! Nearly perfect!'; }
+            else if (pct >= 70) { emoji = '\ud83d\udc4f'; message = 'Great effort! Keep practising!'; }
+            else if (pct >= 50) { emoji = '\ud83d\udcaa'; message = 'Good try! You\'re getting there!'; }
+            else { emoji = '\ud83d\udcda'; message = 'Keep practising, you\'ll get better!'; }
+
+            document.getElementById('results-emoji').textContent = emoji;
+            document.getElementById('results-score').textContent = score + ' / ' + questions.length;
+            document.getElementById('results-label').textContent = pct + '% correct';
+            document.getElementById('results-message').textContent = message;
+            document.getElementById('results-time').textContent =
+                'Time: ' + mins + ':' + (secs < 10 ? '0' : '') + secs;
+
+            const summaryDiv = document.getElementById('all-answers');
+            let html = '<h3>Question Summary</h3>';
+            allAnswers.forEach((a, i) => {
+                const cls = a.isCorrect ? 'correct-item' : 'wrong-item';
+                const num = i + 1;
+                const question = a.a + ' \u00d7 ' + a.b + ' = ' + a.correct;
+                if (a.isCorrect) {
+                    html += '<div class="summary-item ' + cls + '">' +
+                        '<span class="question-text">' + num + '. ' + question + '</span>' +
+                        '<span class="answer-detail">\u2713</span>' +
+                        '</div>';
+                } else {
+                    const label = a.timedOut ? 'Timed out' : 'Answered ' + a.given;
+                    html += '<div class="summary-item ' + cls + '">' +
+                        '<span class="question-text">' + num + '. ' + a.a + ' \u00d7 ' + a.b + '</span>' +
+                        '<span>' +
+                        '<span class="answer-detail">' + label + '</span>' +
+                        '<span class="correct-answer-small">\u2192 ' + a.correct + '</span>' +
+                        '</span>' +
+                        '</div>';
+                }
+            });
+            summaryDiv.innerHTML = html;
+
+            document.getElementById('btn-again').textContent = 'Try Again';
+
+            showScreen('results-screen');
+        }
+
+        // Some browsers restore a <select>'s value on reload/back-forward
+        // navigation without firing its onchange event, so the Mode
+        // dropdown can show "MTC Mode" while the screen underneath is
+        // still stuck on the practice setup. Force them back in sync once
+        // at load.
+        switchMode(document.getElementById('mode-select').value);
+    </script>
+</body>
+</html>
