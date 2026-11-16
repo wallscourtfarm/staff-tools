@@ -1,7 +1,7 @@
 // wfa-paused — shown instead of WFA tools while they are paused.
 // Switched on by adding Cloudflare Worker routes that point at this script;
 // switched off by deleting those routes. Holds no data and no secrets.
-const VERSION = "12.11.26a";
+const VERSION = "16.11.26a";
 
 const PAGE = `<!doctype html>
 <html lang="en-GB"><head><meta charset="utf-8">
@@ -21,8 +21,9 @@ p{font-size:1.05rem;line-height:1.5;margin:0 0 10px}
 </style></head><body>
 <main class="card">
 <h1>This tool is paused</h1>
-<p>Wallscourt Farm Academy's online tools are paused for now.</p>
-<p>No information has been lost. Everything will be back when the tools return.</p>
+<p>Wallscourt Farm Academy's online tools that hold children's information are paused for now.</p>
+<p><b>Staff:</b> use the WFA Tools folder in the Staff-Tools OneDrive library. Open <b>Start here</b> on a school laptop.</p>
+<p><b>Children:</b> please ask your teacher.</p>
 <p class="v">${VERSION}</p>
 </main></body></html>`;
 
