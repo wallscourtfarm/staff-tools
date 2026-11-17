@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<link rel="icon" type="image/png" href="../../favicon.png">
+<style>html{color-scheme:light}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>River Journey</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Layout: full-screen 3D landscape model; WFA-blue header; info card top-left;
+     journey stops + buttons floating at the bottom; HTML labels pinned to 3D points. */
+  :root {
+    --brand: #1798d3;
+    --on-brand: #ffffff;
+    --sky1: #bfe0f3;
+    --sky2: #eef7fc;
+    --fog: #d9ecf7;
+    --panel: rgba(255, 255, 255, 0.95);
+    --edge: #c8dae7;
+    --fg: #0a1a24;
+    --muted: #4b6475;
+    --ink: #0f6c99;
+    --lbl-bg: rgba(255, 255, 255, 0.94);
+    --lbl-fg: #0a1a24;
+    --shadow: rgba(10, 40, 60, 0.16);
+    --erosion: #b04a26;
+    --transport: #a86f00;
+    --deposit: #2c7d47;
+    --chip-fg: #ffffff;
+    --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+    --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+    --hdr: 64px;
+    --ctl: 120px;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --sky1: #0b1824; --sky2: #1b3247; --fog: #172b3c;
+    --panel: rgba(15, 27, 39, 0.95); --edge: #2b4459; --fg: #e8f1f6; --muted: #9fb6c7; --ink: #6cc6ef;
+    --lbl-bg: rgba(15, 27, 39, 0.92); --lbl-fg: #e8f1f6; --shadow: rgba(0, 0, 0, 0.45);
+    --erosion: #e88460; --transport: #e9b443; --deposit: #5cc884; --chip-fg: #0b1218; color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --sky1: #0b1824; --sky2: #1b3247; --fog: #172b3c;
+    --panel: rgba(15, 27, 39, 0.95); --edge: #2b4459; --fg: #e8f1f6; --muted: #9fb6c7; --ink: #6cc6ef;
+    --lbl-bg: rgba(15, 27, 39, 0.92); --lbl-fg: #e8f1f6; --shadow: rgba(0, 0, 0, 0.45);
+    --erosion: #e88460; --transport: #e9b443; --deposit: #5cc884; --chip-fg: #0b1218; color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--sky2); background-image: linear-gradient(180deg, var(--sky1), var(--sky2) 70%);
+         color: var(--fg); font-family: var(--font); font-size: 15px; overflow: hidden; }
+  #scene { position: fixed; inset: 0; touch-action: none; }
+  #scene canvas { display: block; }
+
+  header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 4;
+    background: var(--brand); color: var(--on-brand);
+    padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-bottom: 10px;
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    display: flex; align-items: center; gap: 8px 20px;
+  }
+  .brand { display: flex; flex-direction: column; min-width: 0; }
+  h1 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.15; text-wrap: balance; }
+  .brand span { font-size: 13px; font-weight: 700; opacity: .88; letter-spacing: .02em; }
+  .where { margin-left: auto; font-weight: 800; font-size: 14px; background: rgba(255,255,255,.18); border-radius: 999px; padding: 4px 12px; white-space: nowrap; }
+
+  #labels { position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+  .lbl { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); white-space: nowrap;
+         background: var(--lbl-bg); color: var(--lbl-fg); font-weight: 800; font-size: 13px; line-height: 1.2;
+         padding: 4px 10px; border-radius: 999px; box-shadow: 0 2px 8px var(--shadow); border: 1px solid var(--edge);
+         margin-top: -8px; transition: opacity .3s; }
+  .lbl::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 2px; height: 7px; background: var(--lbl-fg); opacity: .6; transform: translateX(-50%); }
+  .lbl small { display: block; font-weight: 700; font-size: 11px; color: var(--muted); }
+
+  .info {
+    position: fixed; z-index: 3; left: var(--gutter-l); top: calc(var(--hdr) + 12px);
+    width: min(350px, calc(100% - 32px)); max-height: calc(100% - var(--hdr) - var(--ctl) - 48px); overflow: auto;
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 12px 16px;
+    box-shadow: 0 4px 16px var(--shadow);
+  }
+  .info summary { font-weight: 800; font-size: 17px; cursor: pointer; line-height: 1.3; text-wrap: balance; color: var(--ink); }
+  .info p { margin: 8px 0 0; line-height: 1.45; }
+  .info p.note { color: var(--muted); font-size: 13px; }
+  dl { margin: 12px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: baseline; }
+  dt { color: var(--muted); font-size: 13px; font-weight: 700; }
+  dd { margin: 0; font-weight: 800; min-width: 0; }
+  .chip { display: inline-block; padding: 1px 10px; border-radius: 999px; font-size: 13px; color: var(--chip-fg); margin: 0 4px 3px 0; }
+  .chip.erosion { background: var(--erosion); }
+  .chip.transport { background: var(--transport); }
+  .chip.deposit { background: var(--deposit); }
+
+  .controls {
+    position: fixed; z-index: 4; left: 50%; transform: translateX(-50%);
+    bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+    width: min(820px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 16px; padding: 10px 12px;
+    box-shadow: 0 4px 18px var(--shadow);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .stops { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .stops::-webkit-scrollbar { display: none; }
+  .stops button { flex: 1 0 auto; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .stops button b { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 12px;
+                    background: var(--edge); color: var(--fg); }
+  .stops button[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+  .stops button[aria-pressed="true"] b { background: var(--on-brand); color: var(--brand); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  button {
+    font: inherit; font-weight: 800; font-size: 15px; min-height: 44px; padding: 8px 14px; border-radius: 12px; cursor: pointer;
+    border: 2px solid var(--edge); background: transparent; color: var(--fg);
+  }
+  button.primary { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+  button[disabled] { opacity: .4; cursor: default; }
+  button.ghost[aria-pressed="true"] { border-color: var(--brand); color: var(--ink); }
+  button:focus-visible, summary:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+  footer {
+    position: fixed; z-index: 3; left: 0; right: 0; bottom: calc(5px + env(safe-area-inset-bottom, 0px));
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    text-align: center; font-size: 11px; font-weight: 700; color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 18px; }
+    .where { display: none; }
+    .info { padding: 10px 12px; font-size: 14px; }
+    .info summary { font-size: 16px; }
+    .stops button { font-size: 14px; padding: 6px 10px; }
+    .stops button span { display: none; }
+    .stops button[aria-pressed="true"] span { display: inline; }
+    .row button { flex: 1 1 auto; font-size: 14px; padding: 6px 10px; }
+    .lbl { font-size: 12px; padding: 3px 8px; }
+    footer { font-size: 10px; }
+    footer .nts { display: none; }
+    .info { max-height: min(42vh, calc(100% - var(--hdr) - var(--ctl) - 48px)); }
+  }
+</style>
+
+<div id="scene"></div>
+<div id="labels"></div>
+
+<header id="hdr">
+  <div class="brand">
+    <h1>River Journey</h1>
+    <span>Year 5 Geography · Rivers</span>
+  </div>
+  <div class="where" id="where">From source to sea</div>
+</header>
+
+<details class="info" id="info" open>
+  <summary id="infoTitle">What is a river basin?</summary>
+  <div id="infoBody"></div>
+  <dl id="readouts"></dl>
+</details>
+
+<div class="controls" id="controls">
+  <div class="stops" id="stops" role="group" aria-label="Stops along the river"></div>
+  <div class="row">
+    <button id="prev" type="button" aria-label="Previous stop">◀ Previous</button>
+    <button id="next" type="button" class="primary" aria-label="Next stop">Next ▶</button>
+    <button id="fly" type="button" class="ghost" aria-pressed="false">Fly the whole river</button>
+    <button id="lblBtn" type="button" class="ghost" aria-pressed="true">Labels</button>
+  </div>
+</div>
+
+<footer><span class="nts">Model not to scale: hills are made steeper so you can see them. · </span>Wallscourt Farm Academy · Y5-17.11.26a</footer>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ================= Helpers =================
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const lerp = (a, b, t) => a + (b - a) * t;
+function table(tab, x) {            // straight-line interpolation through [x, value] pairs
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i = 1; i < tab.length; i++) if (x <= tab[i][0]) {
+    const [x0, y0] = tab[i - 1], [x1, y1] = tab[i]; return lerp(y0, y1, (x - x0) / (x1 - x0));
+  }
+  return tab[tab.length - 1][1];
+}
+function hash(i, j) {
+  let h = Math.imul(i, 374761393) + Math.imul(j, 668265263) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967295;
+}
+function vnoise(x, z) {
+  const i = Math.floor(x), j = Math.floor(z), fx = x - i, fz = z - j;
+  const u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
+  return lerp(lerp(hash(i, j), hash(i + 1, j), u), lerp(hash(i, j + 1), hash(i + 1, j + 1), u), v);
+}
+function fbm(x, z) { let s = 0, a = .5, f = 1; for (let o = 0; o < 4; o++) { s += a * vnoise(x * f, z * f); a *= .5; f *= 2.03; } return s / .9375; }
+function seeded(seed) { let s = seed >>> 0; return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296); }
+const rand = seeded(7);
+
+// ================= The landscape plan =================
+// x runs from the mountains (west, negative) to the sea (east, positive). 1 unit is roughly 30 m of height.
+const X0 = -62, X1 = 62, Z0 = -32, Z1 = 32, STEP = 0.5;
+const NX = Math.round((X1 - X0) / STEP) + 1, NZ = Math.round((Z1 - Z0) / STEP) + 1;
+const SEA = 0.05;
+const XS = -57, XE = 61, XW = -31, DROP = 2.6;     // source, end, waterfall position, waterfall height
+
+const MAIN_PTS = [[-57,-13],[-52,-10.5],[-46,-7],[-40,-5],[-35,-6.5],[-31,-5],[-26,-3],[-21,0],
+  [-16,-3.5],[-11,2.5],[-6,-3.5],[-1,2.5],[4,-3.5],[9,2],[14.5,-3.5],[18.5,0.6],[21.5,1],[24.5,1],[27.5,0.4],[33.5,4],[40,-1],[45,0],[51,0],[61,0]];
+const toCurve = pts => new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal');
+const mainCurve = toCurve(MAIN_PTS);
+
+// River level along the river, by how far east the river has reached (cx). The waterfall is a sudden step.
+function riverLevel(cx, xw = XW) {
+  const u = clamp((cx - XS) / (XE - XS), 0, 1);
+  return 0.06 + 15.5 * Math.pow(1 - u, 2.4) + DROP * (1 - sstep(xw - 0.12, xw + 0.12, cx));
+}
+const CW = [[-57,.16],[-46,.3],[-44,.38],[-21,.55],[-19,.68],[12,1.0],[44,1.6],[49,3.4],[54,6],[61,7]];        // half-width of channel
+const DEPTH = [[-57,.25],[-21,.45],[12,.7],[44,.9],[52,.6]];
+const FLOOD = [[-57,0],[-21,.3],[-10,2.4],[12,4],[20,9],[44,12],[61,12]];                                  // flat valley floor width
+const RISE = [[-57,5],[-30,6],[-21,9],[12,12],[44,14]];                                                     // how far valley sides spread
+const VSHAPE = [[-57,1],[-22,1],[-12,0],[61,0]];                                                             // 1 = straight V sides
+const MINDEEP = [[-57,4],[-21,3],[12,1.2],[44,.5],[52,0]];
+const LIFT = [[-57,0],[-21,.15],[12,.3],[44,.3],[50,.1]];
+const LOWER = x => sstep(10, 16, x) * (1 - sstep(43, 47, x));            // 1 in the lower course
+const BENDY = x => sstep(-22, -16, x) * (1 - sstep(42, 46, x));          // meander bank shapes
+const ESTUARY = x => sstep(44, 49, x);
+
+function hill(x, z) {
+  const mf = sstep(-5, -50, x);
+  let h = 1.5 + 22.5 * Math.pow(sstep(44, -62, x), 1.3);
+  h += 4 * Math.pow(Math.abs(z) / 32, 2);
+  h += (1 + 4.5 * mf) * (fbm(x * .06 + 3.1, z * .06 - 7.3) - .5) * 2;
+  h += mf * Math.pow(Math.max(0, fbm(x * .11 + 11, z * .11 + 4) - .45), 2) * 22;
+  return h;
+}
+const coast = (x, z) => 3.2 * sstep(46.5, 54, x + 3 * (fbm(z * .12, 5.5) - .5) * 2);   // land drops into the sea
+
+// ---- polylines for distance lookups ----
+function makePoly(curve, n) {
+  const p = curve.getSpacedPoints(n), N = p.length;
+  const px = new Float32Array(N), pz = new Float32Array(N), kx = new Float32Array(N), kz = new Float32Array(N);
+  for (let i = 0; i < N; i++) { px[i] = p[i].x; pz[i] = p[i].z; }
+  const tx = [], tz = [];
+  for (let i = 0; i < N; i++) {
+    const a = Math.max(0, i - 1), b = Math.min(N - 1, i + 1);
+    let dx = px[b] - px[a], dz = pz[b] - pz[a]; const l = Math.hypot(dx, dz) || 1; tx.push(dx / l); tz.push(dz / l);
+  }
+  const ds = curve.getLength() / (N - 1);
+  for (let i = 0; i < N; i++) {
+    const a = Math.max(0, i - 2), b = Math.min(N - 1, i + 2);
+    kx[i] = (tx[b] - tx[a]) / ((b - a) * ds); kz[i] = (tz[b] - tz[a]) / ((b - a) * ds);
+  }
+  return { px, pz, kx, kz, tx, tz, N };
+}
+const Q = { d: 0, cx: 0, i: 0, f: 0, inside: false, k: 0 };
+function nearest(P, x, z) {
+  let best = 1e9, bi = 0, bf = 0;
+  const { px, pz, N } = P;
+  for (let i = 0; i < N - 1; i++) {
+    const ax = px[i], az = pz[i], bx = px[i + 1] - ax, bz = pz[i + 1] - az;
+    let t = ((x - ax) * bx + (z - az) * bz) / (bx * bx + bz * bz); t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const dx = x - ax - bx * t, dz = z - az - bz * t, d2 = dx * dx + dz * dz;
+    if (d2 < best) { best = d2; bi = i; bf = t; }
+  }
+  Q.d = Math.sqrt(best); Q.i = bi; Q.f = bf;
+  const qx = px[bi] + (px[bi + 1] - px[bi]) * bf, qz = pz[bi] + (pz[bi + 1] - pz[bi]) * bf;
+  Q.cx = qx;
+  const kx = P.kx[bi], kz = P.kz[bi];
+  Q.k = Math.hypot(kx, kz); Q.inside = ((x - qx) * kx + (z - qz) * kz) > 0;
+  return Q;
+}
+const mainPoly = makePoly(mainCurve, 420);
+
+// Tributaries end exactly on the main river, so they meet at a confluence.
+function nearestMainPoint(x, z) { nearest(mainPoly, x, z); const i = Q.i; return [mainPoly.px[i], mainPoly.pz[i]]; }
+const joinA = nearestMainPoint(-47.5, -7.5), joinB = nearestMainPoint(-43, -6);
+const tribs = [
+  { pts: [[-59.5, 4], [-55.5, 0.5], [-51.5, -4.3], joinA] },
+  { pts: [[-50, -26], [-47, -18.5], [-44.6, -11.5], joinB] },
+].map(t => {
+  const curve = toCurve(t.pts), poly = makePoly(curve, 70);
+  const wj = riverLevel(t.pts[3][0]);
+  const start = Math.min(hill(t.pts[0][0], t.pts[0][1]) - 3, wj + 6.5);
+  return { curve, poly, wj, start, W: s => wj + (start - wj) * Math.pow(1 - s, 1.15) };
+});
+
+// Oxbow lake: the old meander loop, cut off where the river now runs straight across its neck.
+// Its two ends sit just off the bank, sealed by a strip of silt.
+const OX = { x: 23, z: 6.35, r: 3.2 };
+const oxPts = [];
+for (let i = 0; i <= 48; i++) { const a = (-62 + (i / 48) * 304) * Math.PI / 180; oxPts.push(new THREE.Vector3(OX.x + Math.cos(a) * OX.r, 0, OX.z + Math.sin(a) * OX.r * 0.85)); }
+const oxCurve = new THREE.CatmullRomCurve3(oxPts, false);
+const oxPoly = makePoly(oxCurve, 60);
+const OX_LEVEL = riverLevel(OX.x) - 0.08;   // still water, a little below the flat ground round it
+const OX_ENDS = [oxPts[0], oxPts[oxPts.length - 1]];   // where silt has sealed the old loop off
+
+// ================= Build the height map =================
+const H = new Float32Array(NX * NZ), KIND = new Uint8Array(NX * NZ), CXA = new Float32Array(NX * NZ), DA = new Float32Array(NX * NZ);
+// KIND: 0 land, 1 river bed, 2 inside-bend sand, 3 river cliff, 4 floodplain, 5 mud, 6 lake bed, 7 levée, 8 soft rock
+for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
+  const x = X0 + i * STEP, z = Z0 + j * STEP, id = j * NX + i;
+  const hl = hill(x, z);
+  // --- main river ---
+  nearest(mainPoly, x, z);
+  const d = Q.d, cx = Q.cx;
+  const cw = table(CW, cx) * (1 + 0.5 * Math.exp(-(((cx - XW - 0.9) / 0.7) ** 2)));
+  const cwc = cw * 1.12 + 0.18;
+  // Away from the channel, use the point's own x so the valley sides change smoothly between bends.
+  const xe = lerp(cx, x, sstep(cwc, cwc + 5, d)), W = riverLevel(xe);
+  let depth = table(DEPTH, cx) + 0.7 * Math.exp(-(((cx - XW - 0.9) / 0.6) ** 2));  // plunge pool
+  const lift = table(LIFT, xe), bend = BENDY(cx) * clamp(Q.k / 0.22, 0, 1);
+  let h, kind = 0;
+  if (d < cwc) {
+    const r = d / cwc;
+    if (bend > .25 && Q.inside) h = W - depth * (1 - r) * 0.75;                // gentle slip-off slope
+    else if (bend > .25) h = W - depth * (1.15 - 1.05 * Math.pow(r, 4));        // deep outside bend
+    else h = W - depth * (1 - r * r);
+    kind = (bend > .25 && Q.inside && r > .35) ? 2 : 1;
+    const est = ESTUARY(cx);
+    if (est > 0) {
+      const mud = Math.max(0, fbm(x * .45 + 2, z * .45 - 9) - .44) * 5.5 * est * sstep(.2, .45, r) * (1 - sstep(.85, 1, r));
+      if (mud > 0.02) { h = Math.max(h, W - 0.25 + mud); if (h > W + 0.06) kind = 5; }
+    }
+  } else {
+    const e = d - cwc, fw = table(FLOOD, xe), rw = table(RISE, xe), lin = table(VSHAPE, xe);
+    const hillE = Math.max(hl, W + lift + table(MINDEEP, xe));
+    let shape = 0;
+    if (e > fw) { const s = clamp((e - fw) / rw, 0, 1); shape = lerp(s * s * (3 - 2 * s), Math.pow(s, .9), lin); }
+    h = W + lift + (hillE - W - lift) * shape;
+    if (shape < .02 && fw > 1) kind = 4;
+    const lev = LOWER(xe) * 0.34 * Math.exp(-(((e - 0.45) / 0.5) ** 2));
+    if (lev > 0.08) kind = 7;
+    h += lev;
+    if (bend > .25) {
+      if (!Q.inside) { const c = 0.9 * bend * (1 - sstep(0, 1.3, e)); h += c; if (c > .25) kind = 3; }
+      else if (e < 0.9) kind = 2;
+    }
+    if (Math.abs(cx - XW) < 0.75 && h < riverLevel(XW - 1) - 0.65 && h > riverLevel(XW + 1) - 0.1 && e < 2.2) kind = 8;
+  }
+  CXA[id] = xe; DA[id] = d - cwc;
+  // --- tributaries (take whichever valley is lowest) ---
+  for (const t of tribs) {
+    nearest(t.poly, x, z);
+    if (Q.d > 9) continue;
+    const s = (Q.i + Q.f) / (t.poly.N - 1), Wt = t.W(s), c2 = 0.16 + 0.12 * s + 0.15, hl2 = Math.max(hl, Wt + 2);
+    const ht = Q.d < c2 ? Wt - 0.22 * (1 - (Q.d / c2) ** 2) : Wt + (hl2 - Wt) * clamp((Q.d - c2) / 4.5, 0, 1);
+    if (ht < h) { h = ht; kind = Q.d < c2 ? 1 : 0; DA[id] = Math.min(DA[id], Q.d - c2); }
+  }
+  // --- oxbow lake ---
+  nearest(oxPoly, x, z);
+  // Flatten the floodplain round the old loop, then dig a smooth hollow for the lake. Never touch the river channel.
+  const dOx = Q.d, wOx = 1 - sstep(2.2, 3.2, dOx);
+  if (wOx > 0 && d > cwc + 0.05) { h = lerp(h, OX_LEVEL + 0.28, wOx); if (kind !== 5 && kind !== 1) kind = 4; }
+  if (dOx < 1.7 && d > cwc + 0.3) {   // gentle banks keep the shoreline smooth on the 0.5-unit grid
+    const ho = lerp(OX_LEVEL - 0.25, OX_LEVEL + 0.28, clamp((dOx - 0.3) / 1.35, 0, 1));
+    if (ho < h) { h = ho; if (ho < OX_LEVEL + 0.03) kind = 6; }
+  }
+  // silt plug: the strip of mud between each end of the lake and the river
+  if (kind !== 6 && kind !== 1 && d > cwc && OX_ENDS.some(e => z < e.z + 0.2 && Math.hypot(x - e.x, z - e.z) < 1.6)) kind = 5;
+  h -= coast(x, z);
+  if (kind === 5 && h < riverLevel(cx) + 0.06) kind = 1;
+  H[id] = h; KIND[id] = kind;
+}
+
+function heightAt(x, z) {
+  const fx = clamp((x - X0) / STEP, 0, NX - 1.001), fz = clamp((z - Z0) / STEP, 0, NZ - 1.001);
+  const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, id = j * NX + i;
+  return lerp(lerp(H[id], H[id + 1], u), lerp(H[id + NX], H[id + NX + 1], u), v);
+}
+
+// ================= Three.js scene =================
+const wrap = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+wrap.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xd9ecf7, 120, 330);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.3, 800);
+camera.position.set(0, 62, 58);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.enablePan = false;
+controls.minDistance = 6; controls.maxDistance = 190; controls.maxPolarAngle = 1.36;
+controls.target.set(0, 3, 0);
+
+scene.add(new THREE.HemisphereLight(0xf4f9ff, 0x6f6a55, 1.25));
+const sun = new THREE.DirectionalLight(0xfff4e0, 1.7); sun.position.set(30, 60, 25); scene.add(sun);
+
+// ---- terrain mesh with vertex colours ----
+const COL = {
+  snow: '#f2f5f8', rock: '#8c867b', rockDark: '#6f685f', heath: '#8f9a5c', grass: '#67a64c', grassDark: '#4d8939',
+  plain: '#93c35f', f1: '#a8ca6c', f2: '#86b955', f3: '#b9c97a', sand: '#e2cf98', bed: '#7c6a50', cliff: '#a5693f',
+  mud: '#8c7757', seabed: '#cbb98b', soft: '#c9a46f', levee: '#a3cf6f'
+};
+const C = Object.fromEntries(Object.entries(COL).map(([k, v]) => [k, new THREE.Color(v)]));
+{
+  const pos = new Float32Array(NX * NZ * 3), col = new Float32Array(NX * NZ * 3), tmp = new THREE.Color();
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
+    const id = j * NX + i, x = X0 + i * STEP, z = Z0 + j * STEP, h = H[id];
+    pos.set([x, h, z], id * 3);
+    const hx = H[j * NX + Math.min(NX - 1, i + 1)] - H[j * NX + Math.max(0, i - 1)];
+    const hz = H[Math.min(NZ - 1, j + 1) * NX + i] - H[Math.max(0, j - 1) * NX + i];
+    const slope = Math.hypot(hx, hz) / (2 * STEP), n = fbm(x * .3, z * .3), k = KIND[id];
+    if (k === 1) tmp.copy(C.bed);
+    else if (k === 2) tmp.copy(C.sand);
+    else if (k === 3) tmp.copy(C.cliff);
+    else if (k === 5) tmp.copy(C.mud);
+    else if (k === 6) tmp.copy(C.bed);
+    else if (k === 8) tmp.copy(C.soft);
+    else if (h < SEA + 0.02) tmp.copy(C.seabed);
+    else if (h < SEA + 0.45 && x > 42) tmp.copy(C.sand);
+    else if (h > 22.5 + n * 3) tmp.copy(C.snow);
+    else if (slope > 1.25) tmp.copy(C.rockDark);
+    else if (h > 16.5 + n * 3 || slope > .85) tmp.copy(C.rock).lerp(C.heath, clamp(1.2 - slope, 0, .6));
+    else if (k === 7) tmp.copy(C.levee);
+    else if (k === 4 && LOWER(CXA[id]) > .5) {
+      const f = hash(Math.floor((x + 200) / 2.7), Math.floor((z + 200) / 2.2));
+      tmp.copy(f < .33 ? C.f1 : f < .66 ? C.f2 : C.f3);
+    }
+    else if (k === 4) tmp.copy(C.plain);
+    else tmp.copy(C.grass).lerp(C.grassDark, clamp(n * 1.2 - .2 + h / 30, 0, 1));
+    col.set([tmp.r, tmp.g, tmp.b], id * 3);
+  }
+  const idx = [];
+  for (let j = 0; j < NZ - 1; j++) for (let i = 0; i < NX - 1; i++) {
+    const a = j * NX + i, b = a + 1, c = a + NX, d = c + 1; idx.push(a, c, b, b, c, d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true })));
+}
+
+// ---- side walls, so it looks like a model on a table ----
+{
+  const soil = new THREE.MeshLambertMaterial({ color: 0x8a6747 }), seaSide = new THREE.MeshLambertMaterial({ color: 0x2f7fb8 });
+  const BOT = -4;
+  function wall(list) {     // list of [x, z, h]
+    const sp = [], wp = [];
+    for (let k = 0; k < list.length - 1; k++) {
+      const [x0, z0, h0] = list[k], [x1, z1, h1] = list[k + 1];
+      sp.push(x0, BOT, z0, x1, BOT, z1, x1, h1, z1, x0, BOT, z0, x1, h1, z1, x0, h0, z0);
+      if (h0 < SEA || h1 < SEA) {
+        const a = Math.min(h0, SEA), b = Math.min(h1, SEA);
+        wp.push(x0, a, z0, x1, b, z1, x1, SEA, z1, x0, a, z0, x1, SEA, z1, x0, SEA, z0);
+      }
+    }
+    for (const [arr, m] of [[sp, soil], [wp, seaSide]]) {
+      if (!arr.length) continue;
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); g.computeVertexNormals();
+      m.side = THREE.DoubleSide; scene.add(new THREE.Mesh(g, m));
+    }
+  }
+  const s = [], n = [], w = [], e = [];
+  for (let i = 0; i < NX; i++) { s.push([X0 + i * STEP, Z0, H[i]]); n.push([X0 + i * STEP, Z1, H[(NZ - 1) * NX + i]]); }
+  for (let j = 0; j < NZ; j++) { w.push([X0, Z0 + j * STEP, H[j * NX]]); e.push([X1, Z0 + j * STEP, H[j * NX + NX - 1]]); }
+  [s, n, w, e].forEach(wall);
+}
+
+// ---- water textures (drawn, not downloaded) ----
+function streakTexture(vertical = false) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+  const g = c.getContext('2d'); g.fillStyle = '#d6d6d6'; g.fillRect(0, 0, 256, 128);
+  const r = seeded(vertical ? 3 : 11);
+  for (let k = 0; k < 90; k++) {
+    const x = r() * 256, y = r() * 128, len = 18 + r() * 60;
+    g.strokeStyle = `rgba(255,255,255,${.35 + r() * .55})`; g.lineWidth = 1 + r() * 2.5; g.lineCap = 'round';
+    for (const ox of [0, -256, 256]) { g.beginPath(); g.moveTo(x + ox, y); g.lineTo(x + ox + len, y + (r() - .5) * 3); g.stroke(); }
+  }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+  if (vertical) { t.center.set(.5, .5); t.rotation = Math.PI / 2; }
+  return t;
+}
+const flowTex = streakTexture(), fallTex = streakTexture(true), lakeTex = streakTexture(), seaTex = streakTexture();
+seaTex.repeat.set(5, 9); lakeTex.repeat.set(.4, .4);
+
+// ---- the river ribbon ----
+const RIB = mainCurve.getSpacedPoints(1500);
+const ribInfo = [];       // for flying: centre, level, tangent
+const WCOL = [[-57,'#a9dbec'],[-30,'#9fd3e6'],[-29,'#e9f6fb'],[-27.5,'#8ccbe3'],[-12,'#5aa7cf'],[15,'#5f9fb5'],[38,'#6f9688'],[46,'#6f8f86'],[52,'#3f8fc4']];
+function waterColour(cx) {
+  for (let i = 1; i < WCOL.length; i++) if (cx <= WCOL[i][0]) return new THREE.Color(WCOL[i - 1][1]).lerp(new THREE.Color(WCOL[i][1]), clamp((cx - WCOL[i - 1][0]) / (WCOL[i][0] - WCOL[i - 1][0]), 0, 1));
+  return new THREE.Color(WCOL[WCOL.length - 1][1]);
+}
+{
+  const pos = [], uv = [], col = [], idx = [];
+  let u = 0;
+  for (let k = 0; k < RIB.length; k++) {
+    if (RIB[k].x > 54) break;
+    const p = RIB[k], a = RIB[Math.max(0, k - 1)], b = RIB[Math.min(RIB.length - 1, k + 1)];
+    const tx = b.x - a.x, tz = b.z - a.z, l = Math.hypot(tx, tz) || 1, nx = -tz / l, nz = tx / l;
+    const y = Math.max(riverLevel(p.x, XW + 0.5), SEA + 0.02) + 0.07;
+    const hw = Math.max(table(CW, p.x), 0.22);
+    ribInfo.push({ x: p.x, z: p.z, y, tx: tx / l, tz: tz / l });
+    if (k > 0) u += Math.hypot(p.x - RIB[k - 1].x, p.z - RIB[k - 1].z) * 0.25 / table([[-57, 1.1], [-21, 1.6], [12, 2.1], [44, 2.4], [55, 1]], p.x);
+    pos.push(p.x + nx * hw, y, p.z + nz * hw, p.x - nx * hw, y, p.z - nz * hw);
+    uv.push(u, 0, u, 1);
+    const c = waterColour(p.x); col.push(c.r, c.g, c.b, c.r, c.g, c.b);
+    if (k > 0) { const q = (k - 1) * 2; idx.push(q, q + 1, q + 2, q + 1, q + 3, q + 2); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  const m = new THREE.MeshStandardMaterial({ map: flowTex, vertexColors: true, roughness: .25, metalness: .05, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  scene.add(new THREE.Mesh(g, m));
+}
+// tributary ribbons
+for (const t of tribs) {
+  const pts = t.curve.getSpacedPoints(120), pos = [], uv = [], idx = [];
+  let u = 0;
+  pts.forEach((p, k) => {
+    const a = pts[Math.max(0, k - 1)], b = pts[Math.min(pts.length - 1, k + 1)];
+    const tx = b.x - a.x, tz = b.z - a.z, l = Math.hypot(tx, tz) || 1, nx = -tz / l, nz = tx / l;
+    const s = k / (pts.length - 1), y = t.W(s) + 0.06, hw = 0.13 + 0.08 * s;
+    if (k > 0) u += Math.hypot(p.x - pts[k - 1].x, p.z - pts[k - 1].z) * 0.22;
+    pos.push(p.x + nx * hw, y, p.z + nz * hw, p.x - nx * hw, y, p.z - nz * hw); uv.push(u, 0, u, 1);
+    if (k > 0) { const q = (k - 1) * 2; idx.push(q, q + 1, q + 2, q + 1, q + 3, q + 2); }
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx); g.computeVertexNormals();
+  scene.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: flowTex, color: 0xa9dbec, roughness: .25, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+}
+// oxbow lake (still water): one flat surface; the banks round the hollow hide everything outside the lake
+{
+  const x0 = OX.x - OX.r - 1.5, x1 = OX.x + OX.r + 1.5, z0 = OX_ENDS[0].z - 1.25, z1 = OX.z + OX.r * .85 + 1.5;
+  const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0, 1, 1); g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, OX_LEVEL, (z0 + z1) / 2);
+  const p = g.attributes.position, uv = g.attributes.uv; for (let k = 0; k < p.count; k++) uv.setXY(k, p.getX(k), p.getZ(k));
+  scene.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: lakeTex, color: 0x5e9a95, roughness: .2 })));
+}
+// the sea
+{
+  const g = new THREE.PlaneGeometry(X1 - 30, Z1 - Z0); g.rotateX(-Math.PI / 2);
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: seaTex, color: 0x3f8fc4, roughness: .3, metalness: .05 }));
+  m.position.set((X1 + 30) / 2, SEA, 0); scene.add(m);
+}
+
+// ---- waterfall: hard rock cap, falling water, spray ----
+const WF = (() => {
+  let best = 0, bd = 1e9; ribInfo.forEach((r, k) => { const d = Math.abs(r.x - XW); if (d < bd) { bd = d; best = k; } });
+  return ribInfo[best];
+})();
+const UP_LEVEL = riverLevel(XW - 1), LOW_LEVEL = riverLevel(XW + 1.5);
+const yaw = -Math.atan2(WF.tz, WF.tx);
+{
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.7, 5.2), new THREE.MeshLambertMaterial({ color: 0x5c5853 }));
+  cap.position.set(WF.x - WF.tx * 0.2, UP_LEVEL - 0.06 - 0.35, WF.z - WF.tz * 0.2); cap.rotation.y = yaw; scene.add(cap);
+}
+const FALL_AT = new THREE.Vector3(WF.x + WF.tx * 0.55, 0, WF.z + WF.tz * 0.55);
+{
+  const hw = Math.max(table(CW, XW), .22) + .05, hgt = UP_LEVEL - LOW_LEVEL + 0.1;
+  const g = new THREE.PlaneGeometry(hw * 2, hgt);
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: fallTex, color: 0xeaf7fc, roughness: .3, transparent: true, opacity: .93, side: THREE.DoubleSide }));
+  m.position.set(FALL_AT.x + WF.tx * 0.02, LOW_LEVEL + hgt / 2 + 0.02, FALL_AT.z + WF.tz * 0.02);
+  m.rotation.y = yaw + Math.PI / 2; scene.add(m);
+}
+const spray = (() => {
+  const n = 90, pos = new Float32Array(n * 3), vel = [];
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: .14, transparent: true, opacity: .85 }));
+  for (let k = 0; k < n; k++) vel.push({ life: rand() });
+  scene.add(pts); return { pts, pos, vel, n };
+})();
+function tickSpray(dt) {
+  const { pos, vel, n } = spray, base = LOW_LEVEL + 0.1;
+  for (let k = 0; k < n; k++) {
+    const v = vel[k]; v.life += dt * 0.9;
+    if (v.life >= 1) {
+      v.life = 0; const a = rand() * Math.PI * 2, s = .3 + rand() * .9;
+      v.vx = Math.cos(a) * s + WF.tx * .6; v.vz = Math.sin(a) * s + WF.tz * .6; v.vy = 1 + rand() * 1.6;
+      pos[k * 3] = FALL_AT.x + WF.tx * .2; pos[k * 3 + 1] = base; pos[k * 3 + 2] = FALL_AT.z + WF.tz * .2;
+    }
+    if (v.vx === undefined) continue;
+    v.vy -= 4 * dt;
+    pos[k * 3] += v.vx * dt; pos[k * 3 + 1] = Math.max(base, pos[k * 3 + 1] + v.vy * dt); pos[k * 3 + 2] += v.vz * dt;
+  }
+  spray.pts.geometry.attributes.position.needsUpdate = true;
+}
+
+// ---- boulders in the upper course ----
+{
+  const g = new THREE.DodecahedronGeometry(0.22, 0), m = new THREE.MeshLambertMaterial({ color: 0x8a847a });
+  const inst = new THREE.InstancedMesh(g, m, 46), o = new THREE.Object3D();
+  let c = 0;
+  for (let k = 0; c < 46 && k < 2000; k++) {
+    const r = ribInfo[Math.floor(rand() * ribInfo.length)];
+    if (r.x < -44 || r.x > -22 || Math.abs(r.x - XW) < 1.2) continue;
+    const side = rand() < .5 ? -1 : 1, off = table(CW, r.x) * (0.4 + rand() * 1.6) * side;
+    const x = r.x - r.tz * off, z = r.z + r.tx * off;
+    o.position.set(x, Math.max(heightAt(x, z), r.y - .12), z); o.rotation.set(rand() * 3, rand() * 3, rand() * 3);
+    o.scale.setScalar(.6 + rand() * .9); o.updateMatrix(); inst.setMatrixAt(c++, o.matrix);
+  }
+  inst.count = c; scene.add(inst);
+}
+
+// ---- trees and a town near the mouth ----
+const TOWN = { x: 41.5, z: 8 };
+{
+  const cone = new THREE.ConeGeometry(.38, 1.1, 6); cone.translate(0, .55, 0);
+  const inst = new THREE.InstancedMesh(cone, new THREE.MeshLambertMaterial({ color: 0x2f6b34 }), 320), o = new THREE.Object3D();
+  let c = 0;
+  for (let k = 0; c < 320 && k < 20000; k++) {
+    const i = 1 + Math.floor(rand() * (NX - 2)), j = 1 + Math.floor(rand() * (NZ - 2)), id = j * NX + i, h = H[id];
+    if (h < .6 || h > 15.5 || KIND[id] !== 0 || DA[id] < 1.2) continue;
+    const x = X0 + i * STEP, z = Z0 + j * STEP;
+    if (Math.hypot(x - TOWN.x, z - TOWN.z) < 6 || Math.hypot(x - OX.x, z - OX.z) < OX.r + 2.6) continue;
+    if (Math.abs(H[id + 1] - H[id - 1]) > .9 || Math.abs(H[id + NX] - H[id - NX]) > .9) continue;
+    if (fbm(x * .12, z * .12) < .5) continue;      // trees grow in woods, not everywhere
+    o.position.set(x + (rand() - .5) * .4, h - .05, z + (rand() - .5) * .4); o.scale.setScalar(.7 + rand() * .7); o.rotation.set(0, rand() * 6, 0);
+    o.updateMatrix(); inst.setMatrixAt(c++, o.matrix);
+  }
+  inst.count = c; scene.add(inst);
+
+  const box = new THREE.BoxGeometry(.7, .5, .55); box.translate(0, .25, 0);
+  const roof = new THREE.ConeGeometry(.55, .4, 4); roof.rotateY(Math.PI / 4); roof.scale(1, 1, .8); roof.translate(0, .7, 0);
+  const houses = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: 0xf1e7d6 }), 34);
+  const roofs = new THREE.InstancedMesh(roof, new THREE.MeshLambertMaterial({ color: 0xb4513a }), 34);
+  let hc = 0;
+  for (let k = 0; hc < 34 && k < 3000; k++) {
+    const x = TOWN.x + (rand() - .5) * 9, z = TOWN.z + (rand() - .5) * 7;
+    nearest(mainPoly, x, z); if (Q.d < table(CW, Q.cx) * 1.12 + 1.6) continue;
+    const h = heightAt(x, z); if (h < .25) continue;
+    o.position.set(x, h - .03, z); o.rotation.set(0, Math.round(rand() * 4) * Math.PI / 2 + .3, 0); o.scale.setScalar(.9 + rand() * .3);
+    o.updateMatrix(); houses.setMatrixAt(hc, o.matrix); roofs.setMatrixAt(hc, o.matrix); hc++;
+  }
+  houses.count = roofs.count = hc; scene.add(houses, roofs);
+}
+
+// ---- rain clouds over the mountains ----
+const CLOUDS = [[-52, 29, -9], [-45, 30.5, 6], [-57, 28.5, 14], [-40, 31, -18]];
+const rain = (() => {
+  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: .93 }), ball = new THREE.SphereGeometry(1, 12, 10);
+  for (const [cx, cy, cz] of CLOUDS) {
+    const grp = new THREE.Group();
+    for (let k = 0; k < 6; k++) { const s = new THREE.Mesh(ball, mat); s.position.set((k - 2.5) * 1.4, Math.sin(k * 1.7) * .5, (rand() - .5) * 1.6); s.scale.set(1.7, 1.1, 1.4).multiplyScalar(.8 + rand() * .5); grp.add(s); }
+    grp.position.set(cx, cy, cz); scene.add(grp);
+  }
+  const n = 420, pos = new Float32Array(n * 6), drops = [];
+  for (let k = 0; k < n; k++) {
+    const c = CLOUDS[k % CLOUDS.length], x = c[0] + (rand() - .5) * 8, z = c[2] + (rand() - .5) * 3.5;
+    drops.push({ x, z, top: c[1] - 1, bottom: heightAt(x, z), y: c[1] - 1 - rand() * (c[1] - heightAt(x, z)) });
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x6d9fc4, transparent: true, opacity: .6 }));
+  scene.add(lines); return { pos, drops, lines };
+})();
+function tickRain(dt) {
+  const { pos, drops } = rain;
+  drops.forEach((d, k) => {
+    d.y -= dt * 16; if (d.y < d.bottom) d.y = d.top;
+    pos.set([d.x, d.y, d.z, d.x, d.y + .7, d.z], k * 6);
+  });
+  rain.lines.geometry.attributes.position.needsUpdate = true;
+}
+
+// ================= Useful places for labels and views =================
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+function ribAt(xTarget) { let best = ribInfo[0], bd = 1e9; for (const r of ribInfo) { const d = Math.abs(r.x - xTarget); if (d < bd) { bd = d; best = r; } } return best; }
+function onRiver(x, up = .2) { const r = ribAt(x); return V(r.x, r.y + up, r.z); }
+function beside(x, off, up = .2) { const r = ribAt(x); const px = r.x - r.tz * off, pz = r.z + r.tx * off; return V(px, heightAt(px, pz) + up, pz); }
+function bendApex(x0, x1, sign) {  // the most extreme point of a bend between x0 and x1
+  let best = null; for (const r of ribInfo) if (r.x > x0 && r.x < x1 && (!best || sign * r.z > sign * best.z)) best = r; return best;
+}
+let peak = { h: -1 };
+for (let id = 0; id < H.length; id++) if (H[id] > peak.h) peak = { h: H[id], x: X0 + (id % NX) * STEP, z: Z0 + Math.floor(id / NX) * STEP };
+const midTA = tribs[0].curve.getPointAt(.45), midTB = tribs[1].curve.getPointAt(.5);
+const apexM = bendApex(-9, -3, -1), apexM2 = bendApex(-4, 2, 1);
+function bankPoint(r, outside, off) {   // point on the outside (or inside) bank of a bend
+  const k = ribInfo.indexOf(r), a = ribInfo[Math.max(0, k - 6)], b = ribInfo[Math.min(ribInfo.length - 1, k + 6)];
+  const cx = (a.x + b.x) / 2 - r.x, cz = (a.z + b.z) / 2 - r.z, l = Math.hypot(cx, cz) || 1;   // towards the inside
+  const s = outside ? -1 : 1, px = r.x + s * cx / l * off, pz = r.z + s * cz / l * off;
+  return V(px, heightAt(px, pz) + .25, pz);
+}
+const mudSpot = (() => {
+  let best = null;
+  for (let id = 0; id < H.length; id++) if (KIND[id] === 5) { const x = X0 + (id % NX) * STEP; if (!best || Math.abs(x - 48) < Math.abs(best.x - 48)) best = { x, z: Z0 + Math.floor(id / NX) * STEP, h: H[id] }; }
+  return best ? V(best.x, best.h + .2, best.z) : onRiver(48);
+})();
+
+// ================= Stops =================
+const chip = (k, t) => `<span class="chip ${k}">${t}</span>`;
+const E = chip('erosion', 'Erosion'), T = chip('transport', 'Transportation'), D = chip('deposit', 'Deposition');
+const STOPS = [
+  { id: 'whole', name: 'Whole river', q: 'What is a river basin?',
+    p: ['A river begins high up at its source and flows downhill all the way to its mouth, where it meets the sea. Rivers never start at the coast.',
+        'Smaller streams called tributaries join it on the way. All the land that drains water into the river and its tributaries is called the river basin.',
+        'Geographers split the journey into the upper, middle and lower course. Tap a stop below to visit each part, or fly the whole river.'],
+    dl: [['Starts', 'Source, on high ground'], ['Ends', 'Mouth, at the sea'], ['Flows', 'Always downhill'], ['Parts', 'Upper, middle and lower course']],
+    view: () => ({ f: V(0, 2, 0), off: V(0, 62, 58), fit: 2.1, hw: 64 }),
+    labels: () => [['Source', onRiver(XS + .5, .4)], ['Mouth', onRiver(50, .4)], ['Tributary', V(midTB.x, heightAt(midTB.x, midTB.z) + .3, midTB.z)],
+      ['Upper course', onRiver(-33, .6)], ['Middle course', onRiver(-5, .6)], ['Lower course', onRiver(28, .6)], ['Sea', V(57, SEA, -16)],
+      ['River basin', V(-8, heightAt(-8, 14) + .5, 14), 'land drained by the river']] },
+  { id: 'source', name: 'Source', q: 'Where does a river begin?',
+    p: ['Rain and snow fall on the mountains. This is called precipitation. Some water runs over the ground as run-off. Some soaks in as groundwater, then bubbles out of the ground at a spring.',
+        'Tiny mountain streams trickle downhill. A stream that joins a bigger river is called a tributary. The place where they meet is a confluence.',
+        'Up here the river is narrow and shallow, with a rocky bed and banks.'],
+    dl: [['Height', 'About 600 m above sea level'], ['Gradient', 'Very steep'], ['Width', 'Less than 1 m'], ['Depth', 'Very shallow'], ['Main job', E]],
+    view: () => ({ f: onRiver(-49, 0), off: V(13, 22, 17), fit: 1.6, hw: 15 }),
+    labels: () => [['Spring', onRiver(XS + .3, .3), 'the source'], ['Snow', V(peak.x, peak.h + .4, peak.z)], ['Rain clouds', V(CLOUDS[0][0], CLOUDS[0][1] + 1.8, CLOUDS[0][2]), 'precipitation'],
+      ['Tributary', V(midTB.x, heightAt(midTB.x, midTB.z) + .3, midTB.z)], ['Mountain stream', V(midTA.x, heightAt(midTA.x, midTA.z) + .3, midTA.z)],
+      ['Confluence', V(joinA[0], riverLevel(joinA[0]) + .3, joinA[1]), 'streams meet']] },
+  { id: 'upper', name: 'Upper course', q: 'Why are mountain valleys V-shaped?',
+    p: ['The river wears away its bed and banks and carries the bits downstream. This is erosion. Over thousands of years the river cuts down into the land and carves a steep V-shaped valley.',
+        'At the waterfall, a layer of hard rock sits on top of soft rock. The soft rock is eroded faster, leaving an overhang. The falling water digs out a deep plunge pool. When the overhang collapses, the waterfall moves back up the valley.',
+        { note: 'Mountain streams look fast as they splash, but bumping over boulders slows the water down. Erosion is not the same as weathering: weathering breaks rock where it is; erosion carries it away.' }],
+    dl: [['Height', 'About 300 to 500 m'], ['Gradient', 'Steep'], ['Width', '1 to 5 m'], ['Velocity', 'Slower than it looks'], ['Main job', E]],
+    view: () => { const f = V(FALL_AT.x - WF.tx * .5, LOW_LEVEL + 1.3, FALL_AT.z - WF.tz * .5); return { f, off: V(WF.tx * 8 - WF.tz * 4, 4.2, WF.tz * 8 + WF.tx * 4), fit: 1.5, hw: 6 }; },
+    labels: () => [['Waterfall', V(FALL_AT.x, UP_LEVEL + .45, FALL_AT.z)], ['Hard rock', beside(XW - .2, 1.35, -.15)], ['Overhang', V(FALL_AT.x - WF.tz * .9, UP_LEVEL - .5, FALL_AT.z + WF.tx * .9)],
+      ['Soft rock', beside(XW + .05, -1.25, -.6)], ['Plunge pool', V(FALL_AT.x + WF.tx * .9, LOW_LEVEL + .2, FALL_AT.z + WF.tz * .9)],
+      ['V-shaped valley', beside(-38, 4.2, .3)], ['Boulders', onRiver(-25, .25)]] },
+  { id: 'middle', name: 'Middle course', q: 'Why does a river bend?',
+    p: ['The land is gentler and the valley is wider. Tributaries have added more water, so the river is wider and deeper. It transports the rocks and soil it has eroded, rolling and bouncing them along.',
+        'The river swings from side to side in bends called meanders. On the outside of each bend the water flows fastest. It erodes the bank and makes a steep river cliff.',
+        'On the inside of the bend the water is slow. It loses energy and drops sand and gravel. This is deposition, and it builds a gentle slip-off slope.',
+        { note: 'Fieldwork idea: time a floating stick over 10 m. Velocity = distance ÷ time.' }],
+    dl: [['Height', 'About 50 to 200 m'], ['Gradient', 'Gentle'], ['Width', '10 to 30 m'], ['Velocity', 'Faster'], ['Main jobs', T + E + D]],
+    view: () => ({ f: V(apexM.x, apexM.y, apexM.z + 1), off: V(2, 15, 15), fit: 1.5 }),
+    labels: () => [['Meander', onRiver(-11, .4)], ['River cliff', bankPoint(apexM, true, 1.6), 'outside bend: erosion'], ['Slip-off slope', bankPoint(apexM2, false, 1.3), 'inside bend: deposition'],
+      ['Wide valley', beside(-12, 9, .3)]] },
+  { id: 'lower', name: 'Lower course', q: 'What happens when a river floods?',
+    p: ['The land is almost flat now. The river is at its widest and deepest. Its smooth, deep channel lets it flow even faster than the mountain stream, carrying lots of fine mud called silt.',
+        'When the river floods, water spreads across the flat floodplain and slows down. It drops its silt, which makes rich farmland. The heaviest mud drops first, by the river, building raised banks called levées.',
+        'A meander can loop so far that the river cuts straight across its neck. The old loop is cut off, and silt seals its ends. It is left beside the river as a curved oxbow lake.'],
+    dl: [['Height', 'Below 50 m'], ['Gradient', 'Almost flat'], ['Width', '30 to 100 m'], ['Velocity', 'Faster still'], ['Main jobs', D + T]],
+    view: () => ({ f: V(24, 1.4, 3), off: V(-3, 15, 17), fit: 1.5 }),
+    labels: () => [['Oxbow lake', V(OX.x, OX_LEVEL + .2, OX.z + OX.r * .85)], ['Floodplain', V(30, heightAt(30, -10) + .2, -10), 'farmland'],
+      ['Levée', beside(25.5, -(table(CW, 25.5) * 1.12 + .65)), 'raised bank'], ['Cut-off', onRiver(21.5, .4), 'the river\'s new, straighter course'], ['Meander', onRiver(32, .4)]] },
+  { id: 'mouth', name: 'Mouth', q: 'Where does the river end?',
+    p: ['The mouth is where the river meets the sea. This river ends in a wide estuary. Fresh river water mixes with salty seawater, and the tide flows in and out twice a day.',
+        'The river slows right down and drops the last of its mud. At low tide, mudflats appear, and birds come to feed.',
+        'The River Avon flows from Bristol into the Severn Estuary. Some rivers, like the Nile, drop so much mud that they build a delta. Water evaporates from the sea, and the water cycle begins again.'],
+    dl: [['Height', '0 m (sea level)'], ['Gradient', 'Flat'], ['Width', 'Up to several kilometres'], ['Water', 'Fresh and salty mixed'], ['Main job', D]],
+    view: () => ({ f: V(48, .5, 1), off: V(-13, 13, 17), fit: 1.5 }),
+    labels: () => [['Estuary', onRiver(51, .3)], ['Mudflats', mudSpot], ['Sea', V(58.5, SEA, -12)], ['Town', V(TOWN.x, heightAt(TOWN.x, TOWN.z) + 1, TOWN.z), 'ports grow at river mouths'],
+      ['Mouth', onRiver(54.5, .3), 'where the river meets the sea']] },
+];
+const STOP_X = [-1e9, -1e9, -42.5, -21, 12, 44];       // where each part starts along the river
+
+// ================= UI =================
+const $ = id => document.getElementById(id);
+const stopsEl = $('stops'), lblLayer = $('labels');
+STOPS.forEach((s, i) => {
+  const b = document.createElement('button'); b.type = 'button'; b.dataset.i = i;
+  b.innerHTML = `<b>${i === 0 ? '★' : i}</b><span>${s.name}</span>`; b.setAttribute('aria-label', s.name);
+  b.addEventListener('click', () => { stopFly(); setStop(i, true); });
+  stopsEl.appendChild(b);
+});
+let cur = -1, labelEls = [], showLabels = true;
+function setStop(i, move) {
+  if (i === cur && !move) return;
+  cur = i; const s = STOPS[i];
+  [...stopsEl.children].forEach((b, k) => b.setAttribute('aria-pressed', k === i ? 'true' : 'false'));
+  stopsEl.children[i].scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  $('infoTitle').textContent = s.q;
+  $('infoBody').innerHTML = s.p.map(p => typeof p === 'string' ? `<p>${p}</p>` : `<p class="note">${p.note}</p>`).join('');
+  $('readouts').innerHTML = s.dl.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  $('where').textContent = i === 0 ? 'From source to sea' : `Stop ${i} of 5 · ${s.name}`;
+  $('prev').disabled = i === 0; $('next').disabled = i === STOPS.length - 1;
+  lblLayer.innerHTML = '';
+  labelEls = s.labels().map(([text, pos, sub]) => {
+    const el = document.createElement('div'); el.className = 'lbl';
+    el.innerHTML = sub ? `${text}<small>${sub}</small>` : text; lblLayer.appendChild(el); return { el, pos };
+  });
+  if (move) goTo(s.view());
+}
+$('prev').addEventListener('click', () => { stopFly(); if (cur > 0) setStop(cur - 1, true); });
+$('next').addEventListener('click', () => { stopFly(); if (cur < STOPS.length - 1) setStop(cur + 1, true); });
+$('lblBtn').addEventListener('click', () => {
+  showLabels = !showLabels; $('lblBtn').setAttribute('aria-pressed', String(showLabels)); lblLayer.hidden = !showLabels;
+});
+addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('input,textarea')) return;
+  if (e.key === 'ArrowRight') $('next').click(); else if (e.key === 'ArrowLeft') $('prev').click();
+});
+
+// ---- camera moves ----
+let tween = null;
+function viewPose(v) {
+  const need = (v.hw || 18) / (Math.tan(camera.fov * Math.PI / 360) * camera.aspect) / v.off.length();
+  const k = clamp(need, 1, v.fit || 1.5);
+  return { pos: v.f.clone().add(v.off.clone().multiplyScalar(k)), target: v.f.clone() };
+}
+function goTo(v, dur = 2) {
+  const p = viewPose(v);
+  tween = { p0: camera.position.clone(), t0: controls.target.clone(), p1: p.pos, t1: p.target, s: 0,
+            dur, arc: Math.min(25, camera.position.distanceTo(p.pos) * .25) };
+  controls.enabled = false;
+}
+const smoother = t => t * t * t * (t * (t * 6 - 15) + 10);
+function tickTween(dt) {
+  if (!tween) return;
+  tween.s = Math.min(1, tween.s + dt / tween.dur);
+  const e = smoother(tween.s);
+  camera.position.lerpVectors(tween.p0, tween.p1, e); camera.position.y += Math.sin(Math.PI * e) * tween.arc;
+  controls.target.lerpVectors(tween.t0, tween.t1, e);
+  camera.lookAt(controls.target);
+  if (tween.s >= 1) { tween = null; controls.enabled = true; }
+}
+
+// ---- fly the whole river ----
+let fly = null;
+const flyBtn = $('fly');
+flyBtn.addEventListener('click', () => { if (fly) { stopFly(); setStop(cur, true); } else startFly(); });
+function startFly() {
+  tween = null; controls.enabled = false;
+  fly = { t: 0, look: onRiver(XS + 3, 0) };
+  flyBtn.setAttribute('aria-pressed', 'true'); flyBtn.textContent = 'Stop flying';
+}
+function stopFly() {
+  if (!fly) return; fly = null; controls.enabled = true;
+  flyBtn.setAttribute('aria-pressed', 'false'); flyBtn.textContent = 'Fly the whole river';
+}
+function sampleRib(t) { const f = clamp(t, 0, 1) * (ribInfo.length - 1), k = Math.floor(f); return ribInfo[Math.min(k, ribInfo.length - 1)]; }
+function tickFly(dt) {
+  if (!fly) return;
+  fly.t += dt / 55;
+  const r = sampleRib(fly.t), ahead = sampleRib(fly.t + .045);
+  let s = 1; for (let k = 1; k < STOP_X.length; k++) if (r.x >= STOP_X[k]) s = k;
+  if (s !== cur) setStop(s, false);
+  const back = 7, cx = r.x - r.tx * back, cz = r.z - r.tz * back;
+  const cy = Math.max(r.y + 5.5, heightAt(cx, cz) + 3, heightAt(r.x, r.z) + 4);
+  const want = V(cx, cy, cz), look = V(ahead.x, ahead.y, ahead.z);
+  const a = 1 - Math.exp(-dt * 2.2);
+  camera.position.lerp(want, a); fly.look.lerp(look, a);
+  controls.target.copy(fly.look); camera.lookAt(fly.look);
+  if (fly.t >= 1) { stopFly(); setStop(5, true); }
+}
+
+// ---- labels follow their 3D points ----
+const pv = new THREE.Vector3();
+function tickLabels() {
+  if (!showLabels) return;
+  const w = innerWidth, h = innerHeight;
+  for (const { el, pos } of labelEls) {
+    pv.copy(pos).project(camera);
+    const vis = pv.z < 1 && pv.x > -1.1 && pv.x < 1.1 && pv.y > -1.1 && pv.y < 1.1;
+    el.style.opacity = vis ? '1' : '0';
+    if (vis) el.style.transform = `translate(${((pv.x + 1) / 2 * w).toFixed(1)}px, ${((1 - pv.y) / 2 * h).toFixed(1)}px) translate(-50%, -100%)`;
+  }
+}
+
+// ---- theme: fog follows the page colours ----
+function syncTheme() {
+  const fog = getComputedStyle(document.documentElement).getPropertyValue('--fog').trim() || '#d9ecf7';
+  scene.fog.color.set(fog);
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncTheme);
+new MutationObserver(syncTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+syncTheme();
+
+// ---- sizes ----
+function measure() {
+  const r = document.documentElement.style;
+  r.setProperty('--hdr', $('hdr').offsetHeight + 'px');
+  r.setProperty('--ctl', $('controls').offsetHeight + 'px');
+}
+function resize() {
+  renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); measure();
+}
+addEventListener('resize', resize);
+new ResizeObserver(measure).observe($('controls'));
+resize();
+if (innerWidth < 640) $('info').open = false;
+
+// start on the whole-river view
+setStop(0, false);
+{ const p = viewPose(STOPS[0].view()); camera.position.copy(p.pos); controls.target.copy(p.target); }
+
+// test hook: lets a checker step the animation when the tab is in the background
+window.__river = { step: (n = 60) => { for (let k = 0; k < n; k++) { const dt = 1 / 30; tickTween(dt); tickFly(dt); } controls.update(); renderer.render(scene, camera); tickLabels(); } };
+
+// ================= Animation loop =================
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), .05);
+  flowTex.offset.x -= dt * .17;
+  fallTex.offset.x -= dt * 1.1;
+  lakeTex.offset.x += dt * .004;
+  seaTex.offset.x += dt * .01; seaTex.offset.y += dt * .006;
+  tickSpray(dt); tickRain(dt);
+  tickTween(dt); tickFly(dt);
+  if (!tween && !fly) controls.update();
+  renderer.render(scene, camera);
+  tickLabels();
+});
+</script>
+
+</html>

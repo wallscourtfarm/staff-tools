@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<link rel="icon" type="image/png" href="../../favicon.png">
+<style>html{color-scheme:light}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ancient Egypt</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Layout: full-screen 3D scene; WFA-blue header with an Old/New Kingdom switch and three tabs per kingdom;
+     a timeline strip under the header; info card top-left; hint line and controls floating at the bottom. */
+  :root {
+    --bg: #f1ebe0;
+    --panel: rgba(255, 255, 255, 0.95);
+    --edge: #d9cdb8;
+    --fg: #1f1a12;
+    --muted: #6a5d48;
+    --blue: #1798d3;
+    --on-blue: #ffffff;
+    --btn: #1798d3;
+    --on-btn: #ffffff;
+    --press: #dff0fa;
+    --gold: #b7791f;
+    --old: #d08a2e;
+    --new: #2f7fb5;
+    --rome: #8a8f98;
+    --lbl-bg: rgba(255, 255, 255, 0.93);
+    --lbl-fg: #1f1a12;
+    --shadow: rgba(60, 40, 10, 0.18);
+    --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+    --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+    --hdr: 64px;
+    --tl: 0px;
+    --ctl: 70px;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #1b1610; --panel: rgba(34, 28, 20, 0.95); --edge: #4a3f2e; --fg: #f3ece0; --muted: #bfae92;
+    --btn: #3aaee3; --on-btn: #04121a; --press: #17384a; --gold: #e0a84a; --old: #e8a04a; --new: #5aa8de; --rome: #a4a9b2;
+    --lbl-bg: rgba(27, 22, 16, 0.92); --lbl-fg: #f3ece0; --shadow: rgba(0, 0, 0, 0.5); color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg: #1b1610; --panel: rgba(34, 28, 20, 0.95); --edge: #4a3f2e; --fg: #f3ece0; --muted: #bfae92;
+    --btn: #3aaee3; --on-btn: #04121a; --press: #17384a; --gold: #e0a84a; --old: #e8a04a; --new: #5aa8de; --rome: #a4a9b2;
+    --lbl-bg: rgba(27, 22, 16, 0.92); --lbl-fg: #f3ece0; --shadow: rgba(0, 0, 0, 0.5); color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; overflow: hidden; }
+  #scene { position: fixed; inset: 0; touch-action: none; }
+  #scene canvas { display: block; }
+  .labels { position: absolute; inset: 0; pointer-events: none; }
+
+  header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 3;
+    background: var(--blue); color: var(--on-blue);
+    padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-bottom: 10px;
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  }
+  .brand { display: flex; flex-direction: column; min-width: 0; }
+  h1 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.15; text-wrap: balance; }
+  .brand span { font-size: 13px; font-weight: 700; opacity: .9; letter-spacing: .02em; }
+  .nav { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-left: auto; }
+  .king { display: flex; background: rgba(0, 0, 0, .16); border-radius: 999px; padding: 3px; }
+  .king button {
+    font: inherit; font-weight: 800; font-size: 13px; min-height: 38px; padding: 4px 12px; border: 0; border-radius: 999px;
+    background: transparent; color: var(--on-blue); cursor: pointer; letter-spacing: .02em;
+  }
+  .king button[aria-pressed="true"] { background: #0d5f86; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tabs button {
+    font: inherit; font-weight: 800; font-size: 15px; min-height: 44px; padding: 6px 14px;
+    border-radius: 999px; border: 2px solid rgba(255,255,255,.6); background: transparent; color: var(--on-blue); cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: #ffffff; color: #0f6d99; border-color: #ffffff; }
+
+  /* Timeline strip */
+  .timeline {
+    position: fixed; z-index: 2; top: calc(var(--hdr) + 10px); right: var(--gutter-r);
+    width: min(470px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 8px 14px 6px;
+    box-shadow: 0 4px 14px var(--shadow); font-size: 11px; font-weight: 800; color: var(--muted);
+  }
+  .tl-bar { position: relative; height: 12px; margin-top: 18px; border-radius: 6px; background: var(--edge); }
+  .tl-band { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+  .tl-band.ok { background: var(--old); } .tl-band.nk { background: var(--new); } .tl-band.rb { background: var(--rome); }
+  .tl-mark { position: absolute; top: -18px; transform: translateX(-50%); color: var(--fg); white-space: nowrap; font-size: 11px; transition: left .5s; }
+  .tl-mark::after { content: ""; position: absolute; left: var(--a, 50%); top: 14px; margin-left: -5px; border: 5px solid transparent; border-top-color: var(--fg); }
+  .tl-ticks { position: relative; height: 14px; margin-top: 3px; }
+  .tl-ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .tl-ticks span:first-child { transform: none; } .tl-ticks span:last-child { transform: translateX(-100%); }
+  .tl-key { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 2px; }
+  .tl-key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+
+  .info {
+    position: fixed; z-index: 2; left: var(--gutter-l); top: calc(var(--hdr) + 12px);
+    width: min(340px, calc(100% - 32px)); max-height: calc(100% - var(--hdr) - var(--ctl) - 110px); overflow: auto;
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 12px 16px;
+    box-shadow: 0 4px 14px var(--shadow);
+  }
+  .info summary { font-weight: 800; font-size: 17px; cursor: pointer; line-height: 1.3; text-wrap: balance; min-height: 28px; }
+  .info p { margin: 8px 0 0; line-height: 1.45; }
+  .info p.note { color: var(--muted); font-size: 13px; }
+  .info p.think { border-left: 4px solid var(--gold); padding-left: 10px; }
+  .info b { color: var(--blue); }
+  .kchip { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; color: #fff; margin-bottom: 2px; }
+  .kchip.old { background: var(--old); color: #1f1a12; } .kchip.new { background: var(--new); }
+  dl { margin: 12px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: baseline; }
+  dt { color: var(--muted); font-size: 13px; font-weight: 700; }
+  dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 0; }
+
+  .say {
+    position: fixed; z-index: 2; left: 50%; transform: translateX(-50%); margin: 0;
+    bottom: calc(var(--ctl) + 32px + env(safe-area-inset-bottom, 0px));
+    width: max-content; max-width: min(600px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 8px 16px;
+    font-weight: 800; font-size: 15px; line-height: 1.35; text-align: center; text-wrap: balance;
+    box-shadow: 0 4px 14px var(--shadow);
+  }
+  .say:empty { display: none; }
+
+  .controls {
+    position: fixed; z-index: 3; left: 50%; transform: translateX(-50%);
+    bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    width: min(860px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 16px; padding: 10px 12px;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 4px 18px var(--shadow);
+  }
+  .controls button {
+    font: inherit; font-weight: 800; font-size: 15px; min-height: 44px; padding: 8px 16px; border-radius: 12px; cursor: pointer;
+    border: 2px solid var(--btn); background: var(--btn); color: var(--on-btn);
+  }
+  .controls button.ghost { background: transparent; color: var(--fg); border-color: var(--edge); }
+  .controls button.ghost[aria-pressed="true"] { background: var(--press); border-color: var(--btn); }
+  .controls button:disabled { opacity: .4; cursor: default; }
+  button:focus-visible, summary:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+  .lbl {
+    font: 800 13px var(--font); background: var(--lbl-bg); color: var(--lbl-fg); border: 1px solid var(--edge);
+    padding: 3px 10px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 6px var(--shadow);
+  }
+  .lbl small { display: block; font-weight: 700; font-size: 11px; color: var(--muted); text-align: center; }
+  .lbl.hot { background: var(--gold); color: #fff; border-color: transparent; }
+
+  footer {
+    position: fixed; z-index: 2; left: 0; right: 0; bottom: calc(3px + env(safe-area-inset-bottom, 0px));
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    text-align: center; font-size: 11px; color: var(--muted);
+  }
+  .oops { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; font-weight: 800; }
+
+  @media (max-width: 899px) {
+    .timeline { left: var(--gutter-l); right: var(--gutter-r); width: auto; }
+    .info { top: calc(var(--hdr) + var(--tl) + 18px); max-height: calc(100% - var(--hdr) - var(--tl) - var(--ctl) - 116px); }
+  }
+  @media (max-width: 640px) {
+    h1 { font-size: 18px; }
+    .nav { margin-left: 0; gap: 6px 8px; }
+    .king button { font-size: 12px; min-height: 36px; padding: 3px 10px; }
+    .tabs button { font-size: 14px; padding: 4px 11px; min-height: 40px; }
+    .controls button { font-size: 14px; padding: 6px 12px; }
+    .controls { bottom: calc(20px + env(safe-area-inset-bottom, 0px)); padding: 8px; gap: 6px; }
+    .say { font-size: 14px; }
+    .lbl { font-size: 12px; padding: 2px 8px; }
+    .lbl small { display: none; }
+    .timeline { padding: 6px 10px 4px; }
+    .tl-key { display: none; }
+    .tl-ticks .opt { display: none; }
+    footer .tip { display: none; }
+  }
+</style>
+
+<div id="scene"></div>
+
+<header id="hdr">
+  <div class="brand">
+    <h1>Ancient Egypt</h1>
+    <span>Year 5 History · Old Kingdom and New Kingdom</span>
+  </div>
+  <div class="nav">
+    <div class="king" role="group" aria-label="Choose a kingdom">
+      <button type="button" data-k="old" aria-pressed="true">Old Kingdom</button>
+      <button type="button" data-k="new" aria-pressed="false">New Kingdom</button>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Choose a model">
+      <button role="tab" data-tab="pyramids" data-k="old" aria-selected="true">Pyramids</button>
+      <button role="tab" data-tab="build" data-k="old" aria-selected="false">Building</button>
+      <button role="tab" data-tab="nile" data-k="old" aria-selected="false">The Nile</button>
+      <button role="tab" data-tab="tomb" data-k="new" aria-selected="false">Royal tomb</button>
+      <button role="tab" data-tab="heart" data-k="new" aria-selected="false">The heart</button>
+      <button role="tab" data-tab="temple" data-k="new" aria-selected="false">Temple</button>
+    </nav>
+  </div>
+</header>
+
+<div class="timeline" id="tl" aria-label="Timeline">
+  <div class="tl-bar">
+    <span class="tl-band ok" id="bandOK"></span><span class="tl-band nk" id="bandNK"></span><span class="tl-band rb" id="bandRB"></span>
+    <span class="tl-mark" id="tlMark"></span>
+  </div>
+  <div class="tl-ticks" id="tlTicks"></div>
+  <div class="tl-key"><span><i style="background:var(--old)"></i>Old Kingdom</span><span><i style="background:var(--new)"></i>New Kingdom</span><span><i style="background:var(--rome)"></i>Romans in Britain</span></div>
+</div>
+
+<details class="info" id="info" open>
+  <summary id="infoTitle">Ancient Egypt</summary>
+  <div id="infoBody"></div>
+  <dl id="readouts"></dl>
+</details>
+
+<p class="say" id="say" aria-live="polite"></p>
+
+<div class="controls" id="controls">
+  <button type="button" data-for="pyramids" id="prevBtn" class="ghost">◀ Previous</button>
+  <button type="button" data-for="pyramids" id="nextBtn">Next ▶</button>
+  <button type="button" data-for="pyramids" id="allBtn" class="ghost">See them all</button>
+  <button type="button" data-for="build" id="pullBtn">Pull the sledge</button>
+  <button type="button" data-for="build" id="waterBtn" class="ghost" aria-pressed="true">Water on the sand</button>
+  <button type="button" data-for="build" id="leverBtn">Use the levers</button>
+  <button type="button" data-for="build" id="rampBtn" class="ghost">Another ramp idea</button>
+  <button type="button" data-for="nile" id="dipBtn">Lower the bucket</button>
+  <button type="button" data-for="nile" id="liftBtn">Lift and swing</button>
+  <button type="button" data-for="nile" id="seasonBtn" class="ghost">Next season</button>
+  <button type="button" data-for="tomb" id="openBtn">Open the next layer</button>
+  <button type="button" data-for="tomb" id="closeBtn" class="ghost">Close them all</button>
+  <button type="button" data-for="tomb" id="insideBtn" class="ghost">Go into the burial chamber</button>
+  <button type="button" data-for="heart" id="weighBtn">Weigh the heart</button>
+  <button type="button" data-for="heart" id="heavyBtn" class="ghost">What if it was heavy?</button>
+  <button type="button" data-for="temple" id="obBtn">See the obelisk</button>
+  <button type="button" data-for="temple" id="stepBtn">Next step</button>
+  <button type="button" data-for="temple" id="againBtn" class="ghost">Start again</button>
+  <button type="button" data-for="pyramids build nile tomb heart temple" id="labelsBtn" class="ghost" aria-pressed="true">Labels</button>
+</div>
+
+<footer><span class="tip">Drag to turn · pinch or scroll to zoom · </span>Wallscourt Farm Academy · Y5-17.11.26a</footer>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const $ = s => document.querySelector(s);
+const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+function seeded(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+// ---------------- Renderer, camera, labels ----------------
+const wrap = $('#scene');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
+catch (e) { document.body.insertAdjacentHTML('beforeend', '<div class="oops">Sorry, this device cannot show 3D models.</div>'); throw e; }
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+wrap.appendChild(renderer.domElement);
+const labelR = new CSS2DRenderer();
+labelR.domElement.className = 'labels';
+wrap.appendChild(labelR.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 900);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.enablePan = false;
+controls.minDistance = 2; controls.maxDistance = 260;
+controls.maxPolarAngle = Math.PI / 2 - 0.04;
+
+scene.add(new THREE.HemisphereLight(0xfff8ec, 0x9a7d55, 1.2));
+const sun = new THREE.DirectionalLight(0xfff0d6, 2.2);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
+scene.add(sun, sun.target);
+function setSun(range, center, dir = V(0.55, 1, 0.45)) {
+  sun.target.position.copy(center);
+  sun.position.copy(center).add(dir.clone().normalize().multiplyScalar(range * 2.2));
+  const c = sun.shadow.camera;
+  c.left = c.bottom = -range; c.right = c.top = range; c.near = 0.5; c.far = range * 5;
+  c.updateProjectionMatrix();
+}
+
+// ---------------- Textures drawn in code ----------------
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
+  return t;
+}
+function speckle(g, w, h, rnd, n, dark, light) {
+  for (let i = 0; i < n; i++) {
+    g.fillStyle = rnd() < 0.5 ? `rgba(${dark},${0.05 + rnd() * 0.14})` : `rgba(${light},${0.05 + rnd() * 0.12})`;
+    g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 2.5, 1 + rnd() * 2.5);
+  }
+}
+const linenTex = canvasTex(64, 256, (g, w, h) => {        // wrapped linen bandages
+  const rnd = seeded(23); g.fillStyle = '#efe6cf'; g.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 7) { g.strokeStyle = `rgba(120,95,60,${0.25 + rnd() * 0.2})`; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, y); g.lineTo(w, y + 9); g.stroke(); }
+  speckle(g, w, h, rnd, 900, '120,95,60', '255,250,240');
+});
+const sandTex = canvasTex(512, 512, (g, w, h) => {
+  const rnd = seeded(11);
+  g.fillStyle = '#dcc08a'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, rnd, 26000, '140,100,50', '255,240,200');
+  g.globalCompositeOperation = 'destination-in';
+  const r = g.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, w / 2);
+  r.addColorStop(0, 'rgba(0,0,0,1)'); r.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = r; g.fillRect(0, 0, w, h);
+});
+const plainSand = canvasTex(256, 256, (g, w, h) => {
+  const rnd = seeded(12); g.fillStyle = '#dcc08a'; g.fillRect(0, 0, w, h); speckle(g, w, h, rnd, 6000, '140,100,50', '255,240,200');
+});
+const courseTex = canvasTex(256, 256, (g, w, h) => {      // rows of limestone blocks; 1 tile = 4 x 4 blocks
+  const rnd = seeded(13);
+  g.fillStyle = '#9c8662'; g.fillRect(0, 0, w, h);
+  for (let r = 0; r < 4; r++) for (let c = -1; c < 5; c++) {
+    const l = 200 + rnd() * 34, x = c * 64 + (r % 2) * 32;
+    g.fillStyle = `rgb(${l},${l * 0.9},${l * 0.72})`; g.fillRect(x + 2, r * 64 + 2, 60, 60);
+  }
+  speckle(g, w, h, rnd, 9000, '90,70,40', '255,250,235');
+});
+const smoothTex = canvasTex(256, 256, (g, w, h) => {
+  const rnd = seeded(14); g.fillStyle = '#efe6d2'; g.fillRect(0, 0, w, h); speckle(g, w, h, rnd, 9000, '120,100,70', '255,255,245');
+  g.strokeStyle = 'rgba(120,100,70,.18)'; for (let y = 0; y < h; y += 32) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+});
+const rockTex = canvasTex(256, 256, (g, w, h) => {
+  const rnd = seeded(15); g.fillStyle = '#c9a777'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 26; i++) { g.fillStyle = `rgba(${rnd() < .5 ? '120,85,45' : '240,215,170'},${0.12 + rnd() * 0.18})`; g.fillRect(0, rnd() * h, w, 2 + rnd() * 8); }
+  speckle(g, w, h, rnd, 12000, '90,60,30', '250,230,190');
+});
+const mudTex = canvasTex(256, 128, (g, w, h) => {
+  const rnd = seeded(16); g.fillStyle = '#6e5133'; g.fillRect(0, 0, w, h);
+  for (let r = 0; r < 4; r++) for (let c = -1; c < 5; c++) {
+    const l = 120 + rnd() * 30, x = c * 64 + (r % 2) * 32;
+    g.fillStyle = `rgb(${l * 1.15},${l * 0.88},${l * 0.6})`; g.fillRect(x + 2, r * 32 + 2, 60, 28);
+  }
+  speckle(g, w, h, rnd, 4000, '60,40,20', '220,190,150');
+});
+const soilTex = canvasTex(256, 256, (g, w, h) => {
+  const rnd = seeded(17); g.fillStyle = '#3d2c1f'; g.fillRect(0, 0, w, h); speckle(g, w, h, rnd, 14000, '20,12,6', '120,95,70');
+});
+const waterTex = canvasTex(256, 64, (g, w, h) => {
+  const rnd = seeded(18); g.fillStyle = '#2f7fa8'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 46; i++) { g.fillStyle = `rgba(220,240,255,${0.12 + rnd() * 0.3})`; g.fillRect(rnd() * w, rnd() * h, 10 + rnd() * 40, 1.5 + rnd() * 2); }
+});
+const woodTex = canvasTex(128, 32, (g, w, h) => {
+  const rnd = seeded(19); g.fillStyle = '#9a6a3a'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 14; i++) { g.strokeStyle = `rgba(60,35,12,${0.2 + rnd() * 0.25})`; const y = rnd() * h; g.beginPath(); g.moveTo(0, y); g.lineTo(w, y + rnd() * 4 - 2); g.stroke(); }
+});
+// Simple hieroglyph-style signs: reed, water, bird, eye, ankh, loaf, sun
+function glyph(g, kind, x, y, s, col) {
+  g.strokeStyle = col; g.fillStyle = col; g.lineWidth = Math.max(1.5, s * 0.09); g.lineCap = 'round';
+  g.beginPath();
+  if (kind === 0) { g.moveTo(x + s * .5, y + s); g.lineTo(x + s * .5, y + s * .2); g.moveTo(x + s * .5, y + s * .25); g.quadraticCurveTo(x + s * .9, y, x + s * .7, y + s * .45); g.stroke(); }
+  else if (kind === 1) { g.moveTo(x, y + s * .5); for (let k = 0; k < 4; k++) g.lineTo(x + s * (k + .5) / 4, y + s * (k % 2 ? .5 : .3)), g.lineTo(x + s * (k + 1) / 4, y + s * .5); g.stroke(); }
+  else if (kind === 2) { g.ellipse(x + s * .5, y + s * .55, s * .32, s * .2, 0, 0, 7); g.fill(); g.beginPath(); g.arc(x + s * .78, y + s * .3, s * .12, 0, 7); g.fill(); g.beginPath(); g.moveTo(x + s * .4, y + s * .72); g.lineTo(x + s * .35, y + s); g.moveTo(x + s * .55, y + s * .72); g.lineTo(x + s * .55, y + s); g.stroke(); }
+  else if (kind === 3) { g.ellipse(x + s * .5, y + s * .45, s * .4, s * .18, 0, 0, 7); g.stroke(); g.beginPath(); g.arc(x + s * .5, y + s * .45, s * .1, 0, 7); g.fill(); g.beginPath(); g.moveTo(x + s * .45, y + s * .62); g.lineTo(x + s * .4, y + s * .9); g.stroke(); }
+  else if (kind === 4) { g.ellipse(x + s * .5, y + s * .25, s * .16, s * .2, 0, 0, 7); g.stroke(); g.beginPath(); g.moveTo(x + s * .2, y + s * .48); g.lineTo(x + s * .8, y + s * .48); g.moveTo(x + s * .5, y + s * .45); g.lineTo(x + s * .5, y + s); g.stroke(); }
+  else if (kind === 5) { g.arc(x + s * .5, y + s * .8, s * .38, Math.PI, 0); g.fill(); }
+  else { g.arc(x + s * .5, y + s * .5, s * .32, 0, 7); g.stroke(); g.beginPath(); g.arc(x + s * .5, y + s * .5, s * .07, 0, 7); g.fill(); }
+}
+const glyphTex = canvasTex(128, 1024, (g, w, h) => {       // one face of an obelisk: pink granite with a column of signs
+  const rnd = seeded(20); g.fillStyle = '#b77f72'; g.fillRect(0, 0, w, h); speckle(g, w, h, rnd, 9000, '60,30,30', '240,210,200');
+  g.strokeStyle = 'rgba(60,25,20,.5)'; g.lineWidth = 2; g.strokeRect(30, 30, 68, h - 60);
+  for (let y = 44; y < h - 80; y += 48) glyph(g, Math.floor(rnd() * 7), 40, y, 46, 'rgba(60,25,20,.75)');
+});
+const paintTex = canvasTex(1024, 512, (g, w, h) => {      // tomb wall painting (style only, not a copy of a real wall)
+  const rnd = seeded(21);
+  g.fillStyle = '#e8c766'; g.fillRect(0, 0, w, h); speckle(g, w, h, rnd, 9000, '150,110,40', '255,240,190');
+  g.fillStyle = '#3c6e8f'; g.fillRect(0, 0, w, 26); g.fillStyle = '#9b3a2a'; g.fillRect(0, 26, w, 8); g.fillRect(0, h - 30, w, 30);
+  // figures in profile, facing right
+  const figs = [[120, '#8a4a2a'], [300, '#5e3420'], [470, '#a0603a'], [690, '#704027'], [880, '#8a4a2a']];
+  for (const [x, skin] of figs) {
+    const y0 = 120;
+    g.fillStyle = skin; g.beginPath(); g.ellipse(x + 6, y0 + 20, 20, 24, 0, 0, 7); g.fill();         // head
+    g.fillStyle = '#1b1612'; g.beginPath(); g.ellipse(x, y0 + 14, 22, 24, 0, Math.PI * .6, Math.PI * 1.9); g.fill(); // hair
+    g.fillStyle = skin; g.fillRect(x - 22, y0 + 46, 44, 110);                                           // body
+    g.fillStyle = '#f4efe2'; g.beginPath(); g.moveTo(x - 26, y0 + 150); g.lineTo(x + 30, y0 + 150); g.lineTo(x + 22, y0 + 240); g.lineTo(x - 22, y0 + 240); g.fill(); // kilt
+    g.fillStyle = skin; g.fillRect(x - 16, y0 + 240, 12, 100); g.fillRect(x + 8, y0 + 240, 12, 100);   // legs
+    g.fillRect(x + 18, y0 + 60, 50, 12);                                                                // arm reaching forward
+    g.fillStyle = '#d6a634'; g.fillRect(x - 24, y0 + 46, 48, 12);                                       // collar
+  }
+  for (let k = 0; k < 18; k++) glyph(g, Math.floor(rnd() * 7), 40 + k * 54, 52, 40, '#1d1a17');
+});
+const nemesTex = canvasTex(64, 64, (g, w, h) => {          // gold and blue stripes (headdress)
+  for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#1f4f8f' : '#e3b23c'; g.fillRect(0, i * 8, w, 8); }
+});
+
+// ---------------- Helpers for shapes ----------------
+const matCache = new Map();
+function M(color, o = {}) {
+  const key = color + JSON.stringify(o);
+  if (!matCache.has(key)) matCache.set(key, new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true, ...o }));
+  return matCache.get(key);
+}
+function TM(map, color = '#ffffff', o = {}) { return new THREE.MeshStandardMaterial({ map, color, roughness: 0.9, ...o }); }
+function mesh(geo, mat, x = 0, y = 0, z = 0, parent) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+  if (parent) parent.add(m);
+  return m;
+}
+// Texture coordinates in world units, so blocks keep the same size on big and small faces
+function worldUV(geo, s) {
+  const p = geo.attributes.position, n = geo.attributes.normal, uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) {
+    const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+    let u, v;
+    if (ay >= ax && ay >= az) { u = p.getX(i); v = p.getZ(i); } else if (ax >= az) { u = p.getZ(i); v = p.getY(i); } else { u = p.getX(i); v = p.getY(i); }
+    uv[i * 2] = u * s; uv[i * 2 + 1] = v * s;
+  }
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return geo;
+}
+// Square or rectangular frustum (a pyramid with its top cut off). tx = tz = 0 makes a pointed pyramid.
+function frustum(bx, bz, tx, tz, h, y0 = 0, uvScale = 0.2) {
+  const B = [[-bx, -bz], [bx, -bz], [bx, bz], [-bx, bz]], T = [[-tx, -tz], [tx, -tz], [tx, tz], [-tx, tz]];
+  const pos = [];
+  const quad = (a, b, c, d) => pos.push(...a, ...b, ...c, ...a, ...c, ...d);
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    quad([B[i][0], y0, B[i][1]], [T[i][0], y0 + h, T[i][1]], [T[j][0], y0 + h, T[j][1]], [B[j][0], y0, B[j][1]]);
+  }
+  if (tx > 0.001) quad([T[0][0], y0 + h, T[0][1]], [T[3][0], y0 + h, T[3][1]], [T[2][0], y0 + h, T[2][1]], [T[1][0], y0 + h, T[1][1]]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return worldUV(g, uvScale);
+}
+function boxUV(w, h, d, s, x = 0, y = 0, z = 0) { const g = new THREE.BoxGeometry(w, h, d); g.translate(x, y, z); return worldUV(g, s); }
+function groundDisc(r, parent, x = 0, z = 0, y = 0) {
+  const m = new THREE.Mesh(new THREE.CircleGeometry(r, 72), new THREE.MeshStandardMaterial({ map: sandTex, transparent: true, roughness: 1, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); m.receiveShadow = true; m.renderOrder = -1;
+  parent.add(m); return m;
+}
+
+// ---------------- People (low-poly, respectful, varied skin tones) ----------------
+const SKINS = ['#8d5524', '#6b3e1e', '#a0673a', '#7a4a2a', '#5a3418', '#b07848', '#68401f', '#94592c'];
+function person(skin, o = {}) {
+  const g = new THREE.Group(), sk = M(skin), cloth = M(o.cloth || '#f1ead8'), hair = M('#1c1612');
+  const legGeo = new THREE.BoxGeometry(0.13, 0.8, 0.14), armGeo = new THREE.BoxGeometry(0.1, 0.62, 0.11);
+  const limb = (geo, mat, x, y, len) => { const pv = new THREE.Group(); pv.position.set(x, y, 0); mesh(geo, mat, 0, -len / 2, 0, pv); g.add(pv); return pv; };
+  const legL = limb(legGeo, sk, -0.09, 0.82, 0.8), legR = limb(legGeo, sk, 0.09, 0.82, 0.8);
+  if (o.robe) mesh(new THREE.CylinderGeometry(0.2, 0.3, 1.0, 8), cloth, 0, 0.55, 0, g);
+  else mesh(new THREE.CylinderGeometry(0.21, 0.27, 0.42, 8), cloth, 0, 0.8, 0, g);
+  mesh(new THREE.CylinderGeometry(0.19, 0.16, 0.56, 8), o.wrapped ? cloth : sk, 0, 1.18, 0, g);
+  if (o.collar) mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 10), M(o.collar), 0, 1.43, 0, g);
+  mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.1, 6), sk, 0, 1.49, 0, g);
+  const armL = limb(armGeo, sk, -0.26, 1.42, 0.62), armR = limb(armGeo, sk, 0.26, 1.42, 0.62);
+  const head = new THREE.Group(); head.position.set(0, 1.62, 0); g.add(head);
+  if (o.head === 'jackal') {
+    const blk = M('#1a1a1e');
+    mesh(new THREE.BoxGeometry(0.22, 0.22, 0.26), blk, 0, 0, 0, head);
+    const snout = mesh(new THREE.ConeGeometry(0.075, 0.3, 6), blk, 0, -0.03, 0.26, head); snout.rotation.x = Math.PI / 2;
+    for (const s of [-1, 1]) { const ear = mesh(new THREE.ConeGeometry(0.05, 0.3, 4), blk, s * 0.07, 0.24, -0.04, head); ear.rotation.z = -s * 0.1; }
+    mesh(new THREE.BoxGeometry(0.3, 0.22, 0.12), M('#1f4f8f'), 0, -0.04, -0.12, head);
+  } else if (o.head === 'ibis') {
+    const blk = M('#202024');
+    mesh(new THREE.SphereGeometry(0.12, 8, 6), blk, 0, 0, 0, head);
+    const curve = new THREE.CatmullRomCurve3([V(0, -0.02, 0.1), V(0, -0.06, 0.3), V(0, -0.16, 0.46), V(0, -0.3, 0.52)]);
+    mesh(new THREE.TubeGeometry(curve, 8, 0.025, 5), blk, 0, 0, 0, head);
+    mesh(new THREE.BoxGeometry(0.3, 0.22, 0.12), M('#1f4f8f'), 0, -0.06, -0.1, head);
+  } else {
+    mesh(new THREE.SphereGeometry(0.125, 10, 8), sk, 0, 0, 0, head);
+    const cap = mesh(new THREE.SphereGeometry(0.135, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.55), hair, 0, 0.02, -0.02, head);
+    cap.scale.set(1, 1, 1.05);
+  }
+  g.userData = { legL, legR, armL, armR, head };
+  return g;
+}
+function walkPose(p, t, amt = 0.5) {
+  const u = p.userData, s = Math.sin(t);
+  u.legL.rotation.x = s * amt; u.legR.rotation.x = -s * amt;
+}
+
+// ---------------- Labels ----------------
+const labels = [];
+function addLabel(parent, text, pos, show = () => true, cls = '', sub = '') {
+  const el = document.createElement('div');
+  el.className = 'lbl ' + cls; el.textContent = text;
+  if (sub) { const s = document.createElement('small'); s.textContent = sub; el.appendChild(s); }
+  const o = new CSS2DObject(el);
+  o.position.copy(pos); parent.add(o);
+  labels.push({ o, show });
+  return o;
+}
+function chainVisible(o) { for (let p = o.parent; p; p = p.parent) if (!p.visible) return false; return true; }
+
+// ---------------- Tiny tween helper ----------------
+const tweens = [];
+function tween(dur, fn, done) { const t = { t: 0, dur, fn, done }; tweens.push(t); return t; }
+function runTweens(dt) {
+  for (let k = tweens.length - 1; k >= 0; k--) {
+    const t = tweens[k]; t.t += dt; const f = clamp(t.t / t.dur, 0, 1); t.fn(f);
+    if (f >= 1) { tweens.splice(k, 1); if (t.done) t.done(); dirty = true; }
+  }
+}
+function clearTweens() { tweens.length = 0; }
+
+const ui = { tab: 'pyramids', king: 'old', labels: true };
+let dirty = true;
+
+// =====================================================================
+//  1. PYRAMIDS IN ORDER (1 unit = 10 m)
+// =====================================================================
+const pyr = new THREE.Group(); scene.add(pyr);
+groundDisc(105, pyr, 53, 0);
+const PYR = [
+  { key: 'mastaba', x: 0, name: 'Mastaba', year: -2800, date: 'about 3000 to 2650 BC', who: 'Kings and important officials', h: 'about 8 m', cmp: 'a quarter of Cabot Tower', size: 7, top: 0.9,
+    q: 'What came before the pyramids?',
+    p: ['Before pyramids, kings and important people were buried under a <b>mastaba</b>. It is a flat-topped tomb with sloping sides. <i>Mastaba</i> is the Arabic word for a bench.',
+        'The body was placed in a burial chamber dug deep under the ground. The mastaba on top held offerings for the dead person’s spirit.'] },
+  { key: 'step', x: 15, name: 'Step Pyramid of Djoser', year: -2650, date: 'about 2650 BC', who: 'King Djoser', h: 'about 62 m', cmp: 'about 2 Cabot Towers', size: 13, top: 6.4,
+    q: 'Who built the first pyramid?',
+    p: ['King <b>Djoser</b> built the first pyramid at Saqqara. His architect, <b>Imhotep</b>, piled six mastaba shapes on top of each other, each one smaller than the one below.',
+        'It was the first huge building made entirely of cut stone.',
+        { note: 'Dates from this long ago are not exact. Many historians start the Old Kingdom with Djoser’s family of kings, a little before the date on our timeline.' }] },
+  { key: 'bent', x: 36, name: 'Bent Pyramid', year: -2600, date: 'about 2600 BC', who: 'King Sneferu', h: 'about 105 m', cmp: 'more than 3 Cabot Towers', size: 20, top: 10.6,
+    q: 'Why is this pyramid bent?',
+    p: ['King <b>Sneferu</b> wanted a pyramid with smooth sides. The builders started very steep, but about halfway up they changed to a gentler slope.',
+        'Historians think the steep sides were cracking and becoming unsafe, so the builders changed their plan as they went.',
+        'Much of its smooth outer stone is still in place today.'] },
+  { key: 'red', x: 61, name: 'Red Pyramid', year: -2590, date: 'about 2590 BC', who: 'King Sneferu', h: 'about 105 m', cmp: 'more than 3 Cabot Towers', size: 22, top: 10.3,
+    q: 'What was the first true pyramid?',
+    p: ['Sneferu then built a second pyramid nearby. This time the builders used the gentle slope from the start.',
+        'It is the first successful <b>true pyramid</b>: smooth, straight sides all the way to the point. It is named after the reddish colour of its stone.'] },
+  { key: 'great', x: 87, name: 'Great Pyramid of Khufu', year: -2560, date: 'about 2560 BC', who: 'King Khufu, Sneferu’s son', h: 'about 146 m when new', cmp: 'about 4½ Cabot Towers', size: 24, top: 14.7,
+    q: 'How big is the Great Pyramid?',
+    p: ['<b>Khufu</b> built the biggest pyramid of all at Giza. It is made of about 2 million blocks of stone.',
+        'For about 3,800 years it was the tallest building in the world.',
+        'When it was new it was covered in smooth, white limestone that shone in the sun. Most of that outer layer was later taken away to build Cairo.'] },
+  { key: 'sphinx', x: 106, name: 'Great Sphinx', year: -2500, date: 'about 2500 BC', who: 'Probably King Khafra', h: 'about 20 m tall, 73 m long', cmp: 'about two-thirds of Cabot Tower', size: 9, top: 2.2,
+    q: 'Who is the Great Sphinx?',
+    p: ['The Great Sphinx was carved out of the rock at Giza. It has the body of a lion and the head of a king.',
+        'Most historians think the face is <b>Khafra</b>, Khufu’s son, whose pyramid stands behind it.',
+        'It wears the royal headcloth called the <b>nemes</b>. Its nose was lost hundreds of years ago.'] },
+];
+{
+  const lime = TM(courseTex, '#ffffff', { flatShading: true });
+  // mastaba
+  mesh(frustum(2.6, 1.5, 2.3, 1.2, 0.8, 0, 0.4), lime, PYR[0].x, 0, 0, pyr);
+  mesh(new THREE.BoxGeometry(0.5, 0.5, 0.08), M('#3b2a1a'), PYR[0].x, 0.25, 1.37, pyr);           // false door
+  // step pyramid: six steps, each a smaller mastaba
+  for (let i = 0; i < 6; i++) {
+    const bx = 6.05 - i * 0.82, bz = 5.45 - i * 0.82;
+    mesh(frustum(bx, bz, bx - 0.3, bz - 0.3, 1.04, i * 1.04, 0.5), lime, PYR[1].x, 0, 0, pyr);
+  }
+  // bent pyramid: steep lower part, gentler upper part
+  const casing = TM(smoothTex, '#f3ead6', { flatShading: true });
+  const b = 9.45, hLow = 4.7, mid = b - hLow / Math.tan(THREE.MathUtils.degToRad(54.5));
+  mesh(frustum(b, b, mid, mid, hLow, 0, 0.3), casing, PYR[2].x, 0, 0, pyr);
+  const hUp = mid * Math.tan(THREE.MathUtils.degToRad(43));
+  mesh(frustum(mid, mid, 0, 0, hUp, hLow, 0.3), TM(smoothTex, '#e6d8bc', { flatShading: true }), PYR[2].x, 0, 0, pyr);
+  PYR[2].bend = hLow;
+  // red pyramid
+  mesh(frustum(11, 11, 0, 0, 11 * Math.tan(THREE.MathUtils.degToRad(43)), 0, 0.3), TM(smoothTex, '#d6a183', { flatShading: true }), PYR[3].x, 0, 0, pyr);
+  // great pyramid (shown as it was when new, with its white casing)
+  mesh(frustum(11.52, 11.52, 0, 0, 14.65, 0, 0.3), TM(smoothTex, '#fbf6ea', { flatShading: true }), PYR[4].x, 0, 0, pyr);
+  // great sphinx
+  const sp = sphinx('#d4b07a'); sp.position.x = PYR[5].x; pyr.add(sp);
+  PYR.forEach((P, i) => addLabel(pyr, P.name, V(P.x, P.top + 0.6 + P.size * 0.04, 0), () => ui.labels && (pyrAll || pyrIdx === i), '', P.date));
+  addLabel(pyr, 'The slope changes here', V(PYR[2].x + mid + 0.3, PYR[2].bend, mid * 0.2), () => ui.labels && ui.tab === 'pyramids' && pyrIdx === 2, 'hot');
+}
+function sphinx(color, s = 1) {
+  const g = new THREE.Group(), st = M(color), dark = M('#a88454');
+  mesh(new THREE.BoxGeometry(5.0, 1.05, 1.5), st, 0.3, 0.52, 0, g);                       // body
+  mesh(new THREE.BoxGeometry(1.6, 0.85, 1.35), st, -1.6, 0.45, 0, g);                     // haunches
+  for (const z of [-0.45, 0.45]) mesh(new THREE.BoxGeometry(1.9, 0.32, 0.36), st, 3.5, 0.16, z, g);   // front paws
+  mesh(new THREE.BoxGeometry(0.7, 1.0, 1.0), st, 2.75, 1.35, 0, g);                        // chest and neck
+  const head = mesh(new THREE.BoxGeometry(0.62, 0.68, 0.6), st, 3.0, 2.0, 0, g);           // face
+  mesh(frustum(0.42, 0.52, 0.32, 0.32, 0.55, 0, 1), dark, 2.85, 1.65, 0, g).rotation.z = 0;     // nemes headcloth (back)
+  for (const z of [-0.42, 0.42]) mesh(new THREE.BoxGeometry(0.26, 0.85, 0.16), dark, 2.95, 1.6, z, g); // nemes lappets
+  mesh(new THREE.BoxGeometry(0.66, 0.16, 0.66), dark, 2.95, 2.38, 0, g);
+  const tail = mesh(new THREE.BoxGeometry(0.9, 0.12, 0.16), st, -2.4, 0.08, 0.72, g); tail.rotation.y = 0.4;
+  g.rotation.y = 0; g.scale.setScalar(s);
+  g.userData.head = head;
+  return g;
+}
+let pyrIdx = 0, pyrAll = false;
+
+// =====================================================================
+//  2. BUILDING A PYRAMID (1 unit = 1 m)
+// =====================================================================
+const bld = new THREE.Group(); scene.add(bld); bld.visible = false;
+groundDisc(70, bld, 14, 0);
+const COURSE = 1, NC = 9, HB = 14, SLOPE = 0.78;
+const RAMP_FOOT = 35, RAMP_TOP = 7, RAMP_H = NC * COURSE, RAMP_W = 5;
+const lime2 = TM(courseTex, '#ffffff', { flatShading: true });
+for (let i = 0; i < NC; i++) { const hw = HB - i * SLOPE; mesh(frustum(hw, hw, hw - 0.12, hw - 0.12, COURSE, i * COURSE, 0.25), lime2, 0, 0, 0, bld); }
+const topY = NC * COURSE, topHW = HB - NC * SLOPE;
+// some blocks of the next course, with a gap where the levered block goes
+const blockGeo = boxUV(1.3, 1, 1.3, 0.25, 0, 0.5, 0);
+{
+  const spots = [];
+  for (let k = -2; k <= 3; k++) spots.push([k * 1.35 - 0.6, topHW - 0.75]);
+  for (let k = -3; k <= -2; k++) spots.push([topHW - 0.75, k * 1.35]);
+  for (const [x, z] of spots) if (!(Math.abs(x - 0.75) < 0.1 && z > 0)) mesh(blockGeo, lime2, x, topY, z, bld);
+}
+const SLOT = V(0.75, topY, topHW - 0.75);
+const leverBlock = mesh(blockGeo, lime2, SLOT.x, topY, SLOT.z - 1.8, bld);
+const leverPivot = new THREE.Group(); bld.add(leverPivot);
+const levers = [];
+for (const dx of [-0.35, 0.35]) {
+  const pv = new THREE.Group(); pv.position.set(SLOT.x + dx, topY + 0.25, SLOT.z - 3.0); bld.add(pv);
+  mesh(new THREE.BoxGeometry(0.4, 0.5, 0.4), M('#7a5530'), 0, -0.05, 0, bld).position.copy(pv.position).add(V(0, -0.1, 0)); // fulcrum
+  const pole = mesh(new THREE.CylinderGeometry(0.05, 0.06, 3.2, 6), TM(woodTex), 0, 0, 0, pv); pole.rotation.x = Math.PI / 2 - 0.15; pole.position.z = 0.2;
+  levers.push(pv);
+}
+const leverMen = [];
+for (const [k, dx] of [[0, -0.5], [1, 0.5]]) {
+  const p = person(SKINS[k + 2]); p.position.set(SLOT.x + dx, topY, SLOT.z - 4.9); bld.add(p); leverMen.push(p);
+  p.userData.armL.rotation.x = -1.0; p.userData.armR.rotation.x = -1.0;
+}
+// workers standing on top
+for (let k = 0; k < 3; k++) { const p = person(SKINS[(k + 4) % 8]); p.position.set(-3 + k * 1.8, topY, -3.2 - k * 0.9); p.rotation.y = k; bld.add(p); }
+// straight ramp of mud brick and rubble
+function rampMesh() {
+  const sh = new THREE.Shape(); sh.moveTo(RAMP_TOP, 0); sh.lineTo(RAMP_FOOT, 0); sh.lineTo(RAMP_TOP, RAMP_H); sh.lineTo(RAMP_TOP, 0);
+  const g = new THREE.ExtrudeGeometry(sh, { depth: RAMP_W, bevelEnabled: false }); g.translate(0, 0, -RAMP_W / 2);
+  g.computeVertexNormals(); worldUV(g, 0.25);
+  return mesh(g, TM(mudTex, '#ffffff', { flatShading: true }), 0, 0, 0, bld);
+}
+const ramp = rampMesh();
+const rampSlope = Math.atan2(RAMP_H, RAMP_FOOT - RAMP_TOP);
+// wrap-around ramp (another idea): sloping slabs that climb round the pyramid
+const spiral = new THREE.Group(); spiral.visible = false; bld.add(spiral);
+{
+  const mudMat = TM(mudTex, '#ffffff', { flatShading: true });
+  const rise = RAMP_H / 8;
+  for (let f = 0; f < 8; f++) {
+    const y0 = f * rise, y1 = y0 + rise, ym = (y0 + y1) / 2, hw = HB - ym * SLOPE + 1.2;
+    const len = 2 * hw, ang = Math.atan2(rise, len);
+    const slab = mesh(boxUV(len / Math.cos(ang), 0.7, 2.2, 0.25), mudMat, 0, 0, 0, spiral);
+    const face = f * Math.PI / 2;
+    const pivot = new THREE.Group(); pivot.rotation.y = face; spiral.add(pivot); pivot.add(slab);
+    slab.position.set(0, ym - 0.4, hw); slab.rotation.z = ang;
+  }
+}
+// sledge with its block, the rope team and the water carrier
+const sledge = new THREE.Group(); bld.add(sledge);
+{
+  for (const z of [-0.45, 0.45]) { const r = mesh(boxUV(2.4, 0.18, 0.18, 1), TM(woodTex), 0, 0.09, z, sledge); r.rotation.z = 0; }
+  for (const x of [-0.8, 0, 0.8]) mesh(new THREE.BoxGeometry(0.16, 0.1, 1.2), TM(woodTex), x, 0.22, 0, sledge);
+  mesh(boxUV(1.4, 1.0, 1.2, 0.25, 0, 0.77, 0), lime2, 0, 0, 0, sledge);
+}
+const wet = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.6), new THREE.MeshStandardMaterial({ color: 0x5a4126, transparent: true, opacity: 0.55, roughness: 0.3, depthWrite: false }));
+wet.rotation.x = -Math.PI / 2; bld.add(wet);
+const ropes = [], team = [];
+for (let k = 0; k < 12; k++) {
+  const p = person(SKINS[k % 8]); bld.add(p); team.push(p);
+  p.userData.armL.rotation.x = -0.9; p.userData.armR.rotation.x = -0.9;
+}
+for (const z of [-0.45, 0.45]) { const r = mesh(new THREE.CylinderGeometry(0.03, 0.03, 1, 5), M('#c8a46a'), 0, 0, 0, bld); ropes.push({ m: r, z }); }
+const waterman = person('#7a4a2a'); bld.add(waterman);
+const jar = mesh(new THREE.SphereGeometry(0.2, 8, 6), M('#a5603a'), 0, 0, 0, waterman); jar.position.set(0.32, 1.25, 0.35); jar.scale.set(1, 1.25, 1);
+waterman.userData.armR.rotation.x = -1.2;
+const pour = mesh(new THREE.CylinderGeometry(0.03, 0.06, 1.1, 6), new THREE.MeshStandardMaterial({ color: 0x9fd0ea, transparent: true, opacity: 0.7 }), 0.34, 0.7, 0.6, waterman);
+// path along the ramp: u = metres travelled horizontally from the foot of the ramp
+function pathAt(u) {
+  if (u <= 0) return { x: RAMP_FOOT - u, y: 0, pitch: 0 };
+  if (u <= RAMP_FOOT - RAMP_TOP) return { x: RAMP_FOOT - u, y: u * Math.tan(rampSlope), pitch: rampSlope };
+  return { x: RAMP_TOP - (u - (RAMP_FOOT - RAMP_TOP)), y: RAMP_H, pitch: 0 };
+}
+const build = { u: 0, moving: false, water: true, lever: 0, levering: false, spiral: false, walk: 0 };
+const U_END = RAMP_FOOT - RAMP_TOP - 1.3;
+function placeBuild() {
+  const nTeam = build.water ? 6 : 12;
+  const s = pathAt(build.u);
+  sledge.position.set(s.x, s.y, 0); sledge.rotation.z = -s.pitch;
+  const front = pathAt(build.u + 1.3);
+  const wp = pathAt(build.u + 2.3);
+  wet.visible = build.water && !build.spiral && build.u < U_END - 0.5; wet.position.set(wp.x, wp.y + 0.05, 0);
+  wet.quaternion.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)).premultiply(new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), -wp.pitch));
+  waterman.visible = build.water && !build.spiral;
+  const wm = pathAt(build.u + 2.0); waterman.position.set(wm.x, wm.y, 1.2); waterman.rotation.y = -Math.PI / 2;
+  pour.visible = build.water;
+  let last = null;
+  team.forEach((p, k) => {
+    p.visible = k < nTeam && !build.spiral;
+    if (!p.visible) return;
+    const row = k % 2 ? 0.55 : -0.55, idx = Math.floor(k / 2);
+    const q = pathAt(build.u + 3.0 + idx * 1.25);
+    p.position.set(q.x, q.y, row); p.rotation.set(0.2, -Math.PI / 2, 0, 'YXZ');   // lean into the pull
+    walkPose(p, build.walk + idx, build.moving ? 0.5 : 0);
+    last = q;
+  });
+  // ropes from the front of the sledge to the back of the team
+  const endQ = pathAt(build.u + 3.0 + (Math.ceil(nTeam / 2) - 1) * 1.25);
+  for (const r of ropes) {
+    const a = V(front.x, front.y + 0.4, r.z), b = V(endQ.x, endQ.y + 1.05, r.z * 1.2);
+    r.m.position.copy(a).add(b).multiplyScalar(0.5);
+    r.m.scale.set(1, a.distanceTo(b), 1);
+    r.m.quaternion.setFromUnitVectors(V(0, 1, 0), b.clone().sub(a).normalize());
+    r.m.visible = !build.spiral;
+  }
+}
+function pullSledge() {
+  if (build.moving || build.spiral) return;
+  if (build.u >= U_END - 0.01) { build.u = 0; placeBuild(); }
+  build.moving = true; dirty = true;
+  const u0 = build.u, dur = build.water ? 9 : 14;
+  tween(dur, f => { build.u = lerp(u0, U_END, f); }, () => { build.moving = false; });
+}
+function useLevers() {
+  if (build.levering) return;
+  if (build.lever >= 3) { build.lever = 0; leverBlock.position.set(SLOT.x, topY, SLOT.z - 1.8); dirty = true; return; }
+  build.levering = true; dirty = true;
+  const nudge = () => {
+    const z0 = leverBlock.position.z;
+    tween(1.1, f => {
+      const lift = Math.sin(f * Math.PI);
+      leverBlock.position.y = topY + lift * 0.18; leverBlock.position.z = z0 + 0.6 * ease(f);
+      for (const l of levers) l.rotation.x = -lift * 0.22;
+      for (const p of leverMen) p.userData.armL.rotation.x = p.userData.armR.rotation.x = -1.0 + lift * 0.5;
+    }, () => { build.lever++; if (build.lever < 3) nudge(); else build.levering = false; });
+  };
+  nudge();
+}
+addLabel(bld, 'Ramp', V(22, 4.6, 2.8), () => ui.labels && !build.spiral, '', 'mud brick and rubble');
+addLabel(bld, 'Ramp winding round the pyramid', V(HB - 2, 6.5, HB * 0.4), () => ui.labels && build.spiral);
+addLabel(bld, 'Limestone blocks', V(-HB * 0.55, 3.2, HB * 0.55), () => ui.labels);
+const lblSledge = addLabel(sledge, 'Sledge', V(0, 1.9, 0), () => ui.labels && !build.spiral);
+const lblWet = addLabel(wet, 'Wet sand', V(0, -0.3, 0.6), () => ui.labels && wet.visible);
+const lblTeam = addLabel(bld, 'Rope team', V(0, 0, 0), () => ui.labels && !build.spiral);
+addLabel(bld, 'Levers', V(SLOT.x - 1.3, topY + 1.3, SLOT.z - 3.6), () => ui.labels);
+
+// =====================================================================
+//  3. THE NILE AND THE SHADUF (1 unit = 1 m)
+// =====================================================================
+const nile = new THREE.Group(); scene.add(nile); nile.visible = false;
+const BANK = 7, FIELD_Y = 0.6;
+const riverBed = mesh(new THREE.BoxGeometry(100, 1, 2 * BANK + 2), M('#5b4a33'), 0, -1.1, 0, nile);
+const river = new THREE.Mesh(new THREE.PlaneGeometry(100, 2 * BANK + 1.2), new THREE.MeshStandardMaterial({ map: waterTex, roughness: 0.25, metalness: 0.05 }));
+river.rotation.x = -Math.PI / 2; river.position.y = 0.1; river.receiveShadow = true; nile.add(river);
+waterTex.repeat.set(6, 2);
+for (const s of [1, -1]) {
+  // black land (fields) then red land (desert)
+  const f = mesh(boxUV(100, 1.6, 12, 0.12, 0, 0, 0), TM(soilTex, '#ffffff', { flatShading: true }), 0, FIELD_Y - 0.8, s * (BANK + 6), nile);
+  const d = mesh(boxUV(100, 2.2, 22, 0.08, 0, 0, 0), TM(plainSand, '#e6c48c', { flatShading: true }), 0, 0.3, s * (BANK + 12 + 11), nile);
+  // a low line of dunes
+  for (let k = -5; k <= 5; k++) { const dune = mesh(new THREE.SphereGeometry(3.2, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), M('#e2bd82'), k * 9 + s * 2, 1.4, s * (BANK + 22), nile); dune.scale.set(1.6, 0.5, 1); }
+}
+// crops in rows
+const CROPS = [];
+const cropGeo = new THREE.ConeGeometry(0.16, 0.42, 5); cropGeo.translate(0, 0.21, 0);
+const cropMat = new THREE.MeshStandardMaterial({ color: 0x5f9b3a, flatShading: true, roughness: 0.9 });
+{
+  const rnd = seeded(31), pts = [];
+  for (const s of [1, -1]) for (let x = -44; x <= 44; x += 1.1) for (let z = BANK + 1.6; z <= BANK + 11.5; z += 1.25) {
+    if (s === 1 && Math.abs(x - 3.6) < 1.0) continue;            // keep the channel clear
+    if (s === 1 && Math.abs(z - (BANK + 5.5)) < 0.7 && x > -12 && x < 20) continue;
+    if (rnd() < 0.15) continue;
+    pts.push([x + rnd() * 0.4, s * z]);
+  }
+  const im = new THREE.InstancedMesh(cropGeo, cropMat, pts.length); const m4 = new THREE.Matrix4();
+  pts.forEach(([x, z], i) => { m4.makeScale(1, 0.8 + rnd() * 0.5, 1).setPosition(x, FIELD_Y, z); im.setMatrixAt(i, m4); });
+  im.castShadow = true; nile.add(im); CROPS.push(im);
+}
+// irrigation channels: a dug groove with water that fills bucket by bucket
+const SHX = 0, SHZ = BANK + 1.1;
+const chanGroove = new THREE.MeshStandardMaterial({ color: 0x2a1d12, roughness: 1 });
+const chanWater = new THREE.MeshStandardMaterial({ map: waterTex, color: 0xbfe6ff, roughness: 0.2, transparent: true, opacity: 0.95 });
+const channels = [
+  { x0: 3.6, z0: SHZ, x1: 3.6, z1: BANK + 11.5 },      // main channel into the fields
+  { x0: -12, z0: BANK + 5.5, x1: 20, z1: BANK + 5.5 },        // side channel
+];
+const chanFill = [];
+for (const c of channels) {
+  const len = Math.hypot(c.x1 - c.x0, c.z1 - c.z0), ang = Math.atan2(c.x1 - c.x0, c.z1 - c.z0);
+  const phi = Math.atan2(-(c.x1 - c.x0), -(c.z1 - c.z0));   // lay flat, then turn to point along the channel
+  const gm = mesh(new THREE.PlaneGeometry(0.8, len), chanGroove, (c.x0 + c.x1) / 2, FIELD_Y + 0.005, (c.z0 + c.z1) / 2, nile);
+  gm.rotation.set(-Math.PI / 2, phi, 0, 'YXZ');
+  const wg = new THREE.PlaneGeometry(0.6, len); wg.translate(0, len / 2, 0);
+  const wm = new THREE.Mesh(wg, chanWater); wm.position.set(c.x0, FIELD_Y + 0.02, c.z0); wm.rotation.set(-Math.PI / 2, phi, 0, 'YXZ'); nile.add(wm);
+  wm.scale.y = 0.001; chanFill.push(wm);
+}
+const basin = mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.1, 12), chanGroove, 3.6, FIELD_Y - 0.03, SHZ, nile);
+// the shaduf
+const shaduf = new THREE.Group(); shaduf.position.set(SHX, FIELD_Y, SHZ); nile.add(shaduf);
+const SH = { pivotY: 2.3, long: 3.7, short: 1.7, rope: 1.05 };
+for (const x of [-0.55, 0.55]) mesh(boxUV(0.35, SH.pivotY + 0.15, 0.35, 0.5, 0, (SH.pivotY + 0.15) / 2, 0), TM(mudTex), x, 0, 0, shaduf);
+mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.5, 6), TM(woodTex), 0, SH.pivotY + 0.05, 0, shaduf).rotation.z = Math.PI / 2;
+const yaw = new THREE.Group(); yaw.position.y = SH.pivotY + 0.05; shaduf.add(yaw);
+const tilt = new THREE.Group(); yaw.add(tilt);
+{
+  const pole = mesh(new THREE.CylinderGeometry(0.05, 0.07, SH.long + SH.short, 6), TM(woodTex), 0, 0, (SH.short - SH.long) / 2, tilt);
+  pole.rotation.x = Math.PI / 2;
+  mesh(new THREE.SphereGeometry(0.42, 8, 6), M('#5b4128'), 0, -0.15, SH.short + 0.1, tilt);   // counterweight of mud
+}
+const bucketHang = new THREE.Group(); nile.add(bucketHang);
+const bucket = new THREE.Group(); bucketHang.add(bucket);
+const ropeShaduf = mesh(new THREE.CylinderGeometry(0.015, 0.015, SH.rope, 4), M('#c8a46a'), 0, -SH.rope / 2, 0, bucketHang);
+mesh(new THREE.CylinderGeometry(0.22, 0.16, 0.34, 10, 1, true), M('#6a4a2a', { side: THREE.DoubleSide }), 0, 0, 0, bucket);
+const bucketWater = mesh(new THREE.CircleGeometry(0.2, 10), new THREE.MeshStandardMaterial({ color: 0x4f9ccc }), 0, 0.12, 0, bucket);
+bucketWater.rotation.x = -Math.PI / 2;
+bucket.position.y = -SH.rope - 0.17;
+const stream = mesh(new THREE.CylinderGeometry(0.05, 0.09, 1, 6), new THREE.MeshStandardMaterial({ color: 0x9fd0ea, transparent: true, opacity: 0.75 }), 0, 0, 0, nile);
+stream.visible = false;
+const shadufMan = person('#6b3e1e'); shadufMan.position.set(SHX + 0.9, FIELD_Y, SHZ + 1.2); shadufMan.rotation.y = Math.PI; nile.add(shadufMan);
+shadufMan.userData.armL.rotation.x = shadufMan.userData.armR.rotation.x = -2.4;
+const shad = { tilt: -0.35, yaw: 0, state: 'up', full: false, fills: 0, busy: false, season: 1 };
+const nileTmp = V();
+function placeShaduf() {
+  tilt.rotation.x = -shad.tilt; yaw.rotation.y = shad.yaw;
+  // river end of the pole is at local (0,0,-long) after tilt
+  tilt.updateWorldMatrix(true, false);
+  nileTmp.set(0, 0, -SH.long).applyMatrix4(tilt.matrixWorld);
+  bucketHang.position.copy(nileTmp);
+  bucketWater.visible = shad.full;
+  const hold = shad.yaw < -0.3 ? 'handle' : 'pole';
+  shadufMan.userData.armL.rotation.x = shadufMan.userData.armR.rotation.x = hold === 'pole' ? -2.0 - shad.tilt * 0.6 : -1.6;
+}
+function lowerBucket() {
+  if (shad.busy || shad.state !== 'up') return;
+  shad.busy = true; dirty = true;
+  tween(1.4, f => { shad.tilt = lerp(-0.35, 0.6, ease(f)); }, () => { shad.full = true; shad.state = 'down'; shad.busy = false; });
+}
+function liftAndSwing() {
+  if (shad.busy || shad.state !== 'down') return;
+  shad.busy = true; dirty = true;
+  tween(1.3, f => { shad.tilt = lerp(0.6, -0.32, ease(f)); }, () =>
+    tween(1.3, f => { shad.yaw = lerp(0, -Math.PI / 2, ease(f)); }, () =>
+      tween(0.7, f => { shad.tilt = lerp(-0.32, 0.12, ease(f)); }, () => {
+        stream.visible = true;
+        stream.position.set(bucketHang.position.x, (bucketHang.position.y - SH.rope - 0.2 + FIELD_Y) / 2, bucketHang.position.z);
+        stream.scale.y = Math.max(0.2, bucketHang.position.y - SH.rope - 0.2 - FIELD_Y);
+        tween(1.0, f => { bucket.rotation.x = Math.sin(f * Math.PI) * 1.1; if (f > 0.5) shad.full = false; }, () => {
+          stream.visible = false; shad.fills = Math.min(5, shad.fills + 1); fillChannels(); bucket.rotation.x = 0;
+          tween(1.4, f => { shad.yaw = lerp(-Math.PI / 2, 0, ease(f)); shad.tilt = lerp(0.12, -0.35, ease(f)); }, () => { shad.state = 'up'; shad.busy = false; });
+        });
+      })));
+}
+function fillChannels() {
+  const k = shad.fills / 5;
+  tween(1.2, f => { chanFill[0].scale.y = Math.max(0.001, lerp(chanFill[0].scale.y, Math.min(1, k * 1.6), f)); chanFill[1].scale.y = Math.max(0.001, lerp(chanFill[1].scale.y, clamp((k - 0.4) / 0.6, 0, 1), f)); });
+}
+// season: 0 flood (Akhet), 1 growing (Peret), 2 harvest (Shemu)
+const SEASONS = [
+  { name: 'Akhet: the flood', months: 'about July to October', river: 0.85, crops: false, cropCol: 0x5f9b3a },
+  { name: 'Peret: growing', months: 'about November to February', river: 0.1, crops: true, cropCol: 0x5f9b3a },
+  { name: 'Shemu: harvest', months: 'about March to June', river: -0.25, crops: true, cropCol: 0xd8b23f },
+];
+const flood = new THREE.Mesh(new THREE.PlaneGeometry(100, 2 * (BANK + 12)), new THREE.MeshStandardMaterial({ color: 0x9c7a4e, roughness: 0.35, transparent: true, opacity: 0.9 }));
+flood.rotation.x = -Math.PI / 2; flood.position.y = 0.85; nile.add(flood); flood.visible = false;
+function setSeason(i, instant) {
+  shad.season = i; const S = SEASONS[i];
+  const y0 = river.position.y;
+  flood.visible = i === 0;
+  CROPS[0].visible = S.crops; cropMat.color.setHex(S.cropCol);
+  if (instant) river.position.y = S.river; else tween(1.5, f => { river.position.y = lerp(y0, S.river, ease(f)); });
+  dirty = true;
+}
+// papyrus, palms, a boat, houses
+{
+  const rnd = seeded(41);
+  const stemGeo = new THREE.CylinderGeometry(0.025, 0.035, 1, 4), headGeo = new THREE.ConeGeometry(0.22, 0.3, 6);
+  const N = 240, stems = new THREE.InstancedMesh(stemGeo, M('#5c8a2e'), N), heads = new THREE.InstancedMesh(headGeo, M('#7fae3c'), N);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  for (let i = 0; i < N; i++) {
+    const s = i % 2 ? 1 : -1, cx = -40 + Math.floor(i / 12) * 4 + (s > 0 ? 7 : 0), cz = s * (BANK - 0.3);
+    if (s > 0 && Math.abs(cx - SHX) < 3.5) { m4.makeScale(0, 0, 0); stems.setMatrixAt(i, m4); heads.setMatrixAt(i, m4); continue; }
+    const x = cx + (rnd() - 0.5) * 1.6, z = cz + (rnd() - 0.5) * 0.9, h = 1.4 + rnd() * 0.9;
+    e.set((rnd() - 0.5) * 0.25, 0, (rnd() - 0.5) * 0.25); q.setFromEuler(e);
+    m4.compose(V(x, h / 2 - 0.1, z), q, V(1, h, 1)); stems.setMatrixAt(i, m4);
+    e.set(Math.PI, 0, 0); q.setFromEuler(e); m4.compose(V(x, h - 0.05, z), q, V(1, 1, 1)); heads.setMatrixAt(i, m4);
+  }
+  nile.add(stems, heads);
+  for (const [x, z] of [[-14, BANK + 2], [-8, -(BANK + 3)], [12, BANK + 12], [22, -(BANK + 9)], [-26, BANK + 11]]) {
+    const palm = new THREE.Group(); palm.position.set(x, Math.abs(z) > BANK + 12 ? 1.4 : FIELD_Y, z); nile.add(palm);
+    const tr = mesh(new THREE.CylinderGeometry(0.14, 0.22, 5, 6), M('#7a5a36'), 0, 2.5, 0, palm); tr.rotation.z = 0.08;
+    for (let k = 0; k < 7; k++) {
+      const fr = mesh(new THREE.ConeGeometry(0.35, 2.4, 3), M('#4f8a33'), 0, 0, 0, palm);
+      fr.position.set(Math.cos(k) * 0.9 + 0.2, 4.7, Math.sin(k) * 0.9); fr.rotation.set(Math.sin(k) * 1.2, 0, -Math.cos(k) * 1.2); fr.scale.z = 0.25;
+    }
+  }
+  for (const [x, z] of [[-6, -(BANK + 14)], [-1, -(BANK + 15.5)], [9, -(BANK + 14.5)]]) {
+    const hs = new THREE.Group(); hs.position.set(x, 1.4, z); nile.add(hs);
+    mesh(boxUV(3, 2, 2.6, 0.5, 0, 1, 0), TM(mudTex, '#e8d2b0'), 0, 0, 0, hs);
+    mesh(new THREE.BoxGeometry(0.7, 1.2, 0.05), M('#3b2a1a'), 0, 0.6, 1.31, hs);
+  }
+}
+const boat = new THREE.Group(); nile.add(boat);
+{
+  const hull = new THREE.Shape(); hull.moveTo(-3, 0.6); hull.quadraticCurveTo(-2.2, -0.1, 0, -0.15); hull.quadraticCurveTo(2.2, -0.1, 3, 0.7); hull.lineTo(-3, 0.6);
+  const hg = new THREE.ExtrudeGeometry(hull, { depth: 1.1, bevelEnabled: false }); hg.translate(0, 0, -0.55);
+  mesh(hg, TM(woodTex, '#d0a070'), 0, 0, 0, boat);
+  mesh(new THREE.CylinderGeometry(0.05, 0.06, 4, 6), TM(woodTex), 0.3, 2.2, 0, boat);
+  const sail = mesh(new THREE.PlaneGeometry(2.2, 2.4), M('#efe4c8', { side: THREE.DoubleSide }), 0.3, 2.7, 0, boat); sail.rotation.y = Math.PI / 2;
+  for (let k = 0; k < 2; k++) { const r = person(SKINS[k + 5]); r.position.set(-1.6 + k * 2.6, 0.2, 0); r.scale.setScalar(0.85); r.rotation.y = Math.PI / 2; boat.add(r); }
+}
+boat.position.set(-30, 0.1, -3);
+addLabel(nile, 'River Nile', V(-6, 0.9, -2.5), () => ui.labels);
+addLabel(shaduf, 'Shaduf', V(-1.4, 3.0, 0.6), () => ui.labels);
+const lblCW = addLabel(scene, 'Counterweight', V(), () => ui.labels && ui.tab === 'nile');
+const lblBucket = addLabel(scene, 'Bucket', V(), () => ui.labels && ui.tab === 'nile');
+addLabel(nile, 'Irrigation channel', V(3.6, FIELD_Y + 0.5, BANK + 9), () => ui.labels);
+addLabel(nile, 'Black land', V(-20, FIELD_Y + 1.1, BANK + 6), () => ui.labels, '', 'rich, dark soil');
+addLabel(nile, 'Red land', V(-20, 2.6, BANK + 19), () => ui.labels, '', 'desert');
+addLabel(nile, 'Papyrus', V(-10, 2.5, -(BANK - 0.3)), () => ui.labels);
+addLabel(boat, 'Boat', V(0.3, 4.4, 0), () => ui.labels);
+
+// =====================================================================
+//  4. ROYAL TOMB IN THE VALLEY OF THE KINGS (1 unit = 1 m, simplified)
+// =====================================================================
+const tomb = new THREE.Group(); scene.add(tomb); tomb.visible = false;
+const DEP = 4;          // depth of the cutaway slab
+{
+  const surface = [[-3, 0], [2, 1.5], [8, 4], [14, 8], [20, 11], [30, 13]];
+  const cut = new THREE.Shape();
+  cut.moveTo(-24, -14); cut.lineTo(30, -14);
+  for (let k = surface.length - 1; k >= 0; k--) cut.lineTo(...surface[k]);
+  // ceiling of the cavity, going in
+  for (const p of [[-1.7, -2], [5, -3.5], [5, -2.8], [13, -2.8], [13, -2.5], [20, -2.5], [20, -4.2], [24, -4.2], [24, -6.5], [13, -6.5], [13, -5.5], [5, -5.5], [-1.7, -4]]) cut.lineTo(...p);
+  let x = -1.7, y = -4;
+  for (let i = 0; i < 8; i++) { x -= 0.6; cut.lineTo(x, y); y += 0.5; cut.lineTo(x, y); }
+  cut.lineTo(-24, 0); cut.lineTo(-24, -14);
+  const rock = TM(rockTex, '#ffffff', { flatShading: true });
+  const g = new THREE.ExtrudeGeometry(cut, { depth: DEP, bevelEnabled: false }); worldUV(g, 0.12);
+  mesh(g, rock, 0, 0, -DEP, tomb);
+  const back = new THREE.Shape(); back.moveTo(-24, -14); back.lineTo(30, -14);
+  for (let k = surface.length - 1; k >= 0; k--) back.lineTo(...surface[k]);
+  back.lineTo(-24, 0); back.lineTo(-24, -14);
+  const bg = new THREE.ExtrudeGeometry(back, { depth: 3, bevelEnabled: false }); worldUV(bg, 0.12);
+  mesh(bg, TM(rockTex, '#d9be95', { flatShading: true }), 0, 0, -DEP - 3, tomb);
+  const floor = mesh(new THREE.PlaneGeometry(21, 16), TM(plainSand, '#e9cf9c'), -13.5, 0.01, -1, tomb); floor.rotation.x = -Math.PI / 2;
+  // peak above the valley
+  mesh(new THREE.ConeGeometry(9, 9, 4), TM(rockTex, '#d8b480', { flatShading: true }), 22, 13 + 4.4, -10, tomb).rotation.y = Math.PI / 4;
+}
+// warm lamp light inside the rooms (the rock blocks the sun)
+for (const [x, y, z, i] of [[16.5, -3.3, -0.6, 30], [9, -3.6, -0.8, 16], [22, -4.8, -0.6, 8]]) { const l = new THREE.PointLight(0xffd9a0, i, 12, 1.6); l.position.set(x, y, z); tomb.add(l); }
+const paint = mesh(new THREE.PlaneGeometry(6.9, 3.9), new THREE.MeshStandardMaterial({ map: paintTex, roughness: 0.9 }), 16.5, -4.5, -DEP + 0.02, tomb);
+paint.castShadow = false;
+// grave goods in the antechamber
+{
+  const gold = M('#d9a93a', { metalness: 0.2, roughness: 0.4 }), wood = TM(woodTex);
+  mesh(new THREE.BoxGeometry(1.1, 0.7, 0.8), wood, 6.4, -5.15, -2.6, tomb);
+  mesh(new THREE.BoxGeometry(0.9, 0.6, 0.7), M('#e9e1cf'), 7.7, -5.2, -3.1, tomb);
+  // golden couch with lion legs
+  mesh(new THREE.BoxGeometry(2.4, 0.15, 0.9), gold, 10.2, -4.7, -3.0, tomb);
+  for (const dx of [-1.05, 1.05]) for (const dz of [-0.35, 0.35]) mesh(new THREE.BoxGeometry(0.14, 0.7, 0.14), gold, 10.2 + dx, -5.15, -3.0 + dz, tomb);
+  mesh(new THREE.BoxGeometry(0.25, 0.5, 0.5), gold, 11.5, -4.4, -3.0, tomb);
+  // chariot wheel leaning on the wall
+  const wh = mesh(new THREE.TorusGeometry(0.45, 0.05, 6, 16), gold, 12.3, -5.0, -3.6, tomb); wh.rotation.y = 0.2;
+  for (const [dx, dz] of [[8.8, -1.4], [9.3, -1.2], [12.2, -1.6]]) {
+    const pts = [V(0, 0), V(0.18, 0.02), V(0.24, 0.25), V(0.14, 0.5), V(0.1, 0.62), V(0, 0.62)].map(p => new THREE.Vector2(p.x, p.y));
+    mesh(new THREE.LatheGeometry(pts, 10), M('#c9b28d'), dx, -5.5, dz, tomb);
+  }
+  // treasury: canopic chest and a box of shabtis
+  mesh(new THREE.BoxGeometry(1.2, 1.1, 1.0), gold, 22.0, -5.95, -2.6, tomb);
+  mesh(frustum(0.65, 0.55, 0.45, 0.35, 0.25, 0, 1), gold, 22.0, -5.4, -2.6, tomb);
+  mesh(new THREE.BoxGeometry(1.0, 0.45, 0.6), M('#2c2a28'), 22.6, -6.27, -1.0, tomb);
+  for (let k = 0; k < 4; k++) mesh(new THREE.CapsuleGeometry(0.05, 0.16, 2, 6), M('#2f8f86'), 22.25 + k * 0.23, -5.9, -1.0, tomb);
+}
+// the burial: shrine, stone sarcophagus, three coffins, the mummy
+const burial = new THREE.Group(); burial.position.set(16.5, -6.5, -2); tomb.add(burial);
+function coffinHalves(L, W, colLid, colBase, metal = 0.2) {
+  const P = [[0, 0], [0.5, 0], [0.56, 0.08], [0.44, 0.34], [0.6, 0.62], [0.7, 0.72], [0.52, 0.82], [0.5, 0.92], [0.36, 1], [0, 1]]
+    .map(([r, y]) => new THREE.Vector2(r * W, y * L));
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.LatheGeometry(P, 14, 0, Math.PI), new THREE.MeshStandardMaterial({ color: colBase, metalness: metal, roughness: 0.45, side: THREE.DoubleSide, flatShading: true }));
+  const lid = new THREE.Mesh(new THREE.LatheGeometry(P, 14, Math.PI, Math.PI), new THREE.MeshStandardMaterial({ color: colLid, metalness: metal, roughness: 0.4, side: THREE.DoubleSide, flatShading: true }));
+  for (const m of [base, lid]) { m.rotation.z = -Math.PI / 2; m.castShadow = true; }
+  // the face end: striped headdress, a gold face looking up, dark eyes and a beard
+  const nem = new THREE.Mesh(new THREE.BoxGeometry(W * 0.34, W * 0.62, W * 1.08), new THREE.MeshStandardMaterial({ map: nemesTex, roughness: 0.45 }));
+  nem.position.set(L * 0.95, W * 0.3, 0);
+  const face = new THREE.Mesh(new THREE.SphereGeometry(W * 0.38, 12, 8), new THREE.MeshStandardMaterial({ color: '#efc35a', roughness: 0.35, flatShading: true }));
+  face.position.set(L * 0.86, W * 0.42, 0); face.scale.set(0.95, 0.6, 0.85);
+  const lidG = new THREE.Group(); lidG.add(lid, nem, face);
+  for (const s of [-1, 1]) { const eye = new THREE.Mesh(new THREE.BoxGeometry(W * 0.12, W * 0.04, W * 0.1), M('#1b1a1f')); eye.position.set(L * 0.88, W * 0.65, s * W * 0.15); lidG.add(eye); }
+  const beard = new THREE.Mesh(new THREE.CylinderGeometry(W * 0.06, W * 0.08, W * 0.5, 6), M('#1f4f8f')); beard.rotation.z = Math.PI / 2; beard.position.set(L * 0.74, W * 0.55, 0); lidG.add(beard);
+  // crossed arms across the chest
+  for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(W * 0.9, W * 0.12, W * 0.16), M('#c58e2a')); arm.position.set(L * 0.6, W * 0.66, 0); arm.rotation.y = s * 0.7; lidG.add(arm); }
+  g.add(base, lidG);
+  g.position.x = -L / 2;
+  return { g, lid: lidG };
+}
+const LAYERS = [];
+let sarcFront = null;
+{
+  // innermost: the mummy with its gold mask and amulets
+  const mum = new THREE.Group(); burial.add(mum);
+  const mP = [[0, 0], [0.12, 0], [0.13, 0.2], [0.17, 0.55], [0.2, 0.7], [0.15, 0.82], [0.13, 0.9], [0.09, 1], [0, 1]].map(([r, y]) => new THREE.Vector2(r, y * 1.75));
+  const mb = mesh(new THREE.LatheGeometry(mP, 16), TM(linenTex, '#f1e8d2'), -0.87, 0.55, 0, mum); mb.rotation.z = -Math.PI / 2; mb.scale.z = 0.85;
+  // gold mask: face looking up, striped headcloth, eyes and beard
+  mesh(new THREE.BoxGeometry(0.2, 0.2, 0.4), new THREE.MeshStandardMaterial({ map: nemesTex, roughness: 0.35 }), 0.83, 0.6, 0, mum);
+  const mface = mesh(new THREE.SphereGeometry(0.15, 12, 8), M('#f2c14e', { roughness: 0.3 }), 0.71, 0.64, 0, mum); mface.scale.set(1, 0.65, 0.9);
+  for (const s of [-1, 1]) mesh(new THREE.BoxGeometry(0.05, 0.02, 0.04), M('#1b1a1f'), 0.74, 0.735, s * 0.05, mum);
+  const mbeard = mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.14, 6), M('#1f4f8f'), 0.57, 0.7, 0, mum); mbeard.rotation.z = Math.PI / 2;
+  // amulets on the chest, on top of the bandages
+  for (let k = 0; k < 5; k++) { const a = mesh(new THREE.SphereGeometry(0.03, 8, 5), M(k % 2 ? '#2f8f86' : '#e3b23c'), 0.06 + k * 0.065, 0.735, (k - 2) * 0.035, mum); a.scale.set(1.3, 0.6, 1); }
+  LAYERS.push({ name: 'The mummy', obj: mum, lbl: V(-0.25, 1.05, 0.1) });
+  const c3 = coffinHalves(2.05, 0.3, '#f2c14e', '#e0ad37'); c3.g.position.y = 0.55; burial.add(c3.g);
+  const c2 = coffinHalves(2.25, 0.36, '#d9a93a', '#c9982f'); c2.g.position.y = 0.55; burial.add(c2.g);
+  const c1 = coffinHalves(2.45, 0.42, '#d4a73a', '#b88a2a'); c1.g.position.y = 0.55; burial.add(c1.g);
+  c3.g.position.x += 0; c2.g.position.x -= 0.1; c1.g.position.x -= 0.2;
+  // where each coffin lid stands once it is lifted off: upright against the painted wall, face towards us
+  const standAt = (c, L, x) => ({ p: V(x - c.g.position.x, 0.05 - c.g.position.y, -1.93), q: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(V(0, 1, 0), V(0, 0, 1), V(1, 0, 0))) });
+  LAYERS.push({ name: 'Inner coffin', obj: c3.lid, stand: standAt(c3, 2.05, 1.3), lbl: V(1.0, 0.75, 0) },
+              { name: 'Middle coffin', obj: c2.lid, stand: standAt(c2, 2.25, 0), lbl: V(1.1, 0.8, 0) },
+              { name: 'Outer coffin', obj: c1.lid, stand: standAt(c1, 2.45, -1.3), lbl: V(1.2, 0.85, 0) });
+  // stone sarcophagus: open box and lid
+  const sarc = new THREE.Group(); burial.add(sarc);
+  const qz = M('#d9bc84'), wallT = 0.12, SL = 2.95, SW = 1.2, SHh = 1.15;
+  mesh(new THREE.BoxGeometry(SL, 0.15, SW), qz, 0, 0.075, 0, sarc);
+  for (const s of [-1, 1]) { const w = mesh(new THREE.BoxGeometry(SL, SHh, wallT), qz, 0, SHh / 2, s * (SW - wallT) / 2, sarc); if (s > 0) sarcFront = w; mesh(new THREE.BoxGeometry(wallT, SHh, SW), qz, s * (SL - wallT) / 2, SHh / 2, 0, sarc); }
+  const sarcLid = mesh(new THREE.BoxGeometry(SL + 0.1, 0.22, SW + 0.1), M('#b98b7f'), 0, SHh + 0.11, 0, burial);
+  LAYERS.push({ name: 'Stone sarcophagus', obj: sarcLid, lbl: V(0, 0.45, 0) });
+  // gilded shrine over everything (Tutankhamun had four, one inside another; we show one)
+  const shrine = new THREE.Group(); burial.add(shrine);
+  const sg = new THREE.MeshStandardMaterial({ color: '#d8a73a', metalness: 0.2, roughness: 0.35, flatShading: true }), band = new THREE.MeshStandardMaterial({ color: '#1f4f8f' });
+  mesh(new THREE.BoxGeometry(4.6, 2.6, 2.0), sg, 0, 1.3, 0, shrine);
+  mesh(new THREE.BoxGeometry(4.7, 0.18, 2.1), band, 0, 2.5, 0, shrine);
+  mesh(frustum(2.4, 1.1, 2.1, 0.7, 0.35, 0, 1), sg, 0, 2.6, 0, shrine);
+  LAYERS.push({ name: 'Golden shrine', obj: shrine, lbl: V(0, 3.3, 0.5) });
+  LAYERS.reverse();      // outermost first
+  for (const L of LAYERS) L.home = { p: L.obj.position.clone(), q: L.obj.quaternion.clone() };
+}
+const tombSt = { opened: 0, inside: false, busy: false };
+function openLayer() {
+  if (tombSt.busy || tombSt.opened >= LAYERS.length - 1) return;
+  const L = LAYERS[tombSt.opened]; tombSt.busy = true; dirty = true;
+  const k = tombSt.opened, p0 = L.obj.position.clone(), q0 = L.obj.quaternion.clone();
+  let p1, q1 = q0.clone();
+  if (k === 0) p1 = p0.clone().add(V(0, 4.2, 0));                                        // shrine lifts away
+  else if (k === 1) { p1 = V(2.7, 0.11, 0); q1 = new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), Math.PI / 2); }   // stone lid set down beside it
+  else { p1 = L.stand.p; q1 = L.stand.q; }                                                 // coffin lids stand against the wall
+  const lift = Math.max(p0.y, p1.y) + (k === 1 ? 0.6 : 1.4);
+  tween(k === 0 ? 1.6 : 2.2, f => {
+    const e = ease(f);
+    L.obj.position.x = lerp(p0.x, p1.x, e); L.obj.position.z = lerp(p0.z, p1.z, e);
+    L.obj.position.y = k === 0 ? lerp(p0.y, p1.y, e) : (e < 0.5 ? lerp(p0.y, lift, ease(e * 2)) : lerp(lift, p1.y, ease(e * 2 - 1)));
+    L.obj.quaternion.slerpQuaternions(q0, q1, e);
+    if (k === 0) L.obj.traverse(o => { if (o.material) { o.material.transparent = true; o.material.opacity = 1 - e * 0.85; } });
+  }, () => {
+    if (k === 0) L.obj.visible = false;
+    if (k === 1) sarcFront.visible = false;            // cutaway: open the front of the stone box so we can see inside
+    tombSt.opened++; tombSt.busy = false;
+    if (tombSt.opened === LAYERS.length - 1 && !userMoved) flyTo(homeView());
+  });
+}
+function closeLayers() {
+  if (tombSt.busy) return;
+  for (const L of LAYERS) {
+    L.obj.position.copy(L.home.p); L.obj.quaternion.copy(L.home.q); L.obj.visible = true;
+    L.obj.traverse(o => { if (o.material) { o.material.opacity = 1; o.material.transparent = false; } });
+  }
+  sarcFront.visible = true;
+  tombSt.opened = 0; dirty = true;
+  if (tombSt.inside && !userMoved) flyTo(homeView());
+}
+addLabel(tomb, 'Valley floor', V(-15, 0.6, 1), () => ui.labels && !tombSt.inside);
+addLabel(tomb, 'Stairs', V(-5.2, -0.9, -0.5), () => ui.labels && !tombSt.inside);
+addLabel(tomb, 'Sloping corridor', V(2.2, -6.4, -0.5), () => ui.labels && !tombSt.inside);
+addLabel(tomb, 'Antechamber', V(9, -2.0, -1), () => ui.labels && !tombSt.inside, '', 'grave goods');
+addLabel(tomb, 'Burial chamber', V(16.5, -1.7, -1), () => ui.labels && !tombSt.inside);
+addLabel(tomb, 'Treasury', V(22, -7.6, -1), () => ui.labels && !tombSt.inside, '', 'canopic chest');
+addLabel(tomb, 'Wall paintings', V(14.4, -2.95, -3.2), () => ui.labels && tombSt.inside);
+addLabel(tomb, 'Canopic chest', V(22.0, -4.9, -2.4), () => ui.labels && tombSt.inside, '', 'for the organs');
+addLabel(tomb, 'Shabtis', V(22.6, -5.55, -0.9), () => ui.labels && tombSt.inside);
+LAYERS.forEach((L, i) => addLabel(L.obj, L.name, L.lbl, () => ui.labels && tombSt.inside && tombSt.opened === i && !tombSt.busy, 'hot'));
+addLabel(LAYERS[LAYERS.length - 1].obj, 'Amulets', V(0.2, 0.95, 0.42), () => ui.labels && tombSt.inside && tombSt.opened >= LAYERS.length - 1);
+addLabel(LAYERS[LAYERS.length - 1].obj, 'Gold mask', V(0.78, 0.95, -0.3), () => ui.labels && tombSt.inside && tombSt.opened >= LAYERS.length - 1);
+addLabel(tomb, 'Coffin lids', V(16.5, -3.4, -3.5), () => ui.labels && tombSt.inside && tombSt.opened >= 3 && tombSt.opened < LAYERS.length - 1 && !tombSt.busy);
+
+// =====================================================================
+//  5. THE WEIGHING OF THE HEART
+// =====================================================================
+const heart = new THREE.Group(); scene.add(heart); heart.visible = false;
+{
+  const fl = mesh(boxUV(16, 0.3, 9, 0.4, 0, -0.15, 0), TM(plainSand, '#cdb48a', { flatShading: true }), 0, 0, 0, heart);
+  const wall = mesh(new THREE.PlaneGeometry(16, 6), new THREE.MeshStandardMaterial({ map: paintTex, color: 0xf3e3b8, roughness: 0.95 }), 0, 3, -3.2, heart);
+  wall.castShadow = false;
+}
+const scale = new THREE.Group(); heart.add(scale);
+const bronze = M('#b8862e', { metalness: 0.2, roughness: 0.4 });
+mesh(new THREE.CylinderGeometry(0.35, 0.45, 0.2, 10), bronze, 0, 0.1, 0, scale);
+mesh(new THREE.CylinderGeometry(0.07, 0.08, 2.4, 8), bronze, 0, 1.3, 0, scale);
+mesh(new THREE.SphereGeometry(0.12, 8, 6), bronze, 0, 2.55, 0, scale);
+const beam = new THREE.Group(); beam.position.set(0, 2.45, 0); scale.add(beam);
+mesh(new THREE.BoxGeometry(2.8, 0.08, 0.08), bronze, 0, 0, 0, beam);
+function pan() {
+  const g = new THREE.Group();
+  mesh(new THREE.CylinderGeometry(0.45, 0.36, 0.06, 14), bronze, 0, -1.15, 0, g);
+  for (let k = 0; k < 3; k++) {
+    const a = k * 2.094, end = V(Math.cos(a) * 0.42, -1.12, Math.sin(a) * 0.42), len = end.length();
+    const s = mesh(new THREE.CylinderGeometry(0.008, 0.008, len, 4), M('#6b5320'), 0, 0, 0, g);
+    s.position.copy(end).multiplyScalar(0.5); s.quaternion.setFromUnitVectors(V(0, 1, 0), end.clone().normalize());
+  }
+  scale.add(g); return g;
+}
+const panL = pan(), panR = pan();
+const heartObj = new THREE.Group(); panL.add(heartObj); heartObj.position.y = -1.12;
+{
+  const pts = [[0, 0], [0.1, 0], [0.16, 0.08], [0.17, 0.2], [0.12, 0.3], [0.08, 0.33], [0.1, 0.38], [0, 0.38]].map(([r, y]) => new THREE.Vector2(r, y));
+  mesh(new THREE.LatheGeometry(pts, 10), M('#a3342b'), 0, 0, 0, heartObj);
+  for (const s of [-1, 1]) { const h = mesh(new THREE.TorusGeometry(0.05, 0.015, 4, 8), M('#a3342b'), s * 0.15, 0.25, 0, heartObj); h.rotation.y = Math.PI / 2; }
+}
+const feather = new THREE.Group(); panR.add(feather); feather.position.y = -1.12;
+{
+  const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.bezierCurveTo(0.16, 0.15, 0.2, 0.55, 0.05, 0.85); sh.bezierCurveTo(0.0, 0.8, -0.08, 0.5, 0, 0);
+  const f = mesh(new THREE.ShapeGeometry(sh, 10), M('#f7f3e8', { side: THREE.DoubleSide }), 0, 0, 0, feather);
+  mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.82, 4), M('#bfae8a'), 0.03, 0.41, 0.005, feather);
+  mesh(new THREE.BoxGeometry(0.14, 0.06, 0.14), M('#8a6a3a'), 0, 0.03, 0, feather);
+}
+const anubis = person('#7a4a2a', { head: 'jackal', collar: '#d9a93a' }); anubis.position.set(-1.9, 0, 0.3); anubis.rotation.y = Math.PI / 2 - 0.3; heart.add(anubis);
+anubis.userData.armR.rotation.x = -1.3;
+const thoth = person('#6b3e1e', { head: 'ibis', collar: '#d9a93a' }); thoth.position.set(2.0, 0, 0.5); thoth.rotation.y = -Math.PI / 2 + 0.3; heart.add(thoth);
+thoth.userData.armL.rotation.x = -1.0; thoth.userData.armR.rotation.x = -1.1;
+mesh(new THREE.BoxGeometry(0.06, 0.4, 0.1), M('#e8dfc7'), 0, -0.55, 0.05, thoth.userData.armR);
+const dead = person('#8d5524', { robe: true, cloth: '#f6f1e4' }); dead.position.set(-3.6, 0, 0.6); dead.rotation.y = Math.PI / 2; heart.add(dead);
+// Osiris seated on his throne
+const osiris = new THREE.Group(); osiris.position.set(4.6, 0, -0.6); osiris.rotation.y = -Math.PI / 2 + 0.35; heart.add(osiris);
+{
+  mesh(new THREE.BoxGeometry(0.9, 0.85, 0.9), M('#2f5d8a'), 0, 0.42, 0, osiris);
+  mesh(new THREE.BoxGeometry(0.9, 1.4, 0.15), M('#2f5d8a'), 0, 0.7, -0.45, osiris);
+  mesh(new THREE.CylinderGeometry(0.22, 0.26, 1.0, 8), M('#f2ede0'), 0, 1.3, 0, osiris);
+  mesh(new THREE.BoxGeometry(0.4, 0.2, 0.7), M('#f2ede0'), 0, 0.95, 0.3, osiris);
+  mesh(new THREE.BoxGeometry(0.3, 0.75, 0.2), M('#f2ede0'), 0, 0.5, 0.6, osiris);
+  mesh(new THREE.SphereGeometry(0.14, 10, 8), M('#4f8a5b'), 0, 1.95, 0.02, osiris);
+  mesh(new THREE.CylinderGeometry(0.05, 0.13, 0.45, 8), M('#f6f3ea'), 0, 2.3, 0, osiris);
+  for (const s of [-1, 1]) mesh(new THREE.BoxGeometry(0.04, 0.4, 0.08), M('#e8e2d2'), s * 0.13, 2.25, 0, osiris);
+  const crook = mesh(new THREE.TorusGeometry(0.07, 0.015, 4, 8, Math.PI), M('#2f5d8a'), -0.08, 1.75, 0.3, osiris);
+  mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5, 4), M('#d9a93a'), -0.08, 1.5, 0.3, osiris);
+  mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5, 4), M('#d9a93a'), 0.08, 1.5, 0.3, osiris);
+}
+const hw = { ang: 0, vel: 0, target: 0, state: 'start', heavy: false };
+function placeScale() {
+  beam.rotation.z = hw.ang;
+  const c = Math.cos(hw.ang), s = Math.sin(hw.ang);
+  panL.position.set(-1.38 * c, 2.45 - 1.38 * s, 0);
+  panR.position.set(1.38 * c, 2.45 + 1.38 * s, 0);
+}
+function weigh(heavy) {
+  hw.heavy = heavy; hw.state = 'weighing'; dirty = true;
+  hw.ang = heavy ? 0.05 : 0.32; hw.vel = 0; hw.target = heavy ? 0.36 : 0;
+  heartObj.scale.setScalar(heavy ? 1.25 : 1);
+  heartObj.children[0].material = M(heavy ? '#6e2420' : '#a3342b');
+  tween(3.2, () => {}, () => { hw.state = heavy ? 'heavy' : 'balanced'; });
+}
+addLabel(heart, 'Anubis', V(-2.0, 2.95, 0.3), () => ui.labels, '', 'god of mummification');
+addLabel(heart, 'Thoth', V(2.1, 2.3, 0.5), () => ui.labels, '', 'god of writing');
+addLabel(heart, 'Osiris', V(4.6, 3.1, -0.6), () => ui.labels, '', 'god of the afterlife');
+addLabel(heart, 'The dead person', V(-3.6, 2.0, 0.6), () => ui.labels && innerWidth >= 640);
+addLabel(heart, 'Dead person', V(-3.6, 2.0, 0.6), () => ui.labels && innerWidth < 640);
+addLabel(panL, 'Heart', V(0, -1.5, 0.3), () => ui.labels);
+addLabel(panR, 'Feather of Maat', V(0, -1.5, 0.3), () => ui.labels);
+
+// =====================================================================
+//  6. HATSHEPSUT'S TEMPLE AND RAISING AN OBELISK (temple: 1 unit = about 5 m; obelisk: 1 unit = 1 m)
+// =====================================================================
+const temple = new THREE.Group(); scene.add(temple); temple.visible = false;
+groundDisc(70, temple, 0, 5);
+{
+  const stone = TM(smoothTex, '#efe3c8', { flatShading: true });
+  // cliff of Deir el-Bahari: rock buttresses of different heights in a curve behind the temple
+  {
+    const rnd = seeded(51), rock = TM(rockTex, '#e2b884', { flatShading: true }), CZ = 6, R = 40;
+    for (let a = 0.17 * Math.PI; a <= 0.83 * Math.PI; a += 0.045) {
+      const h = 15 + rnd() * 8 + Math.sin(a) * 3, w = 5 + rnd() * 2, d = 6 + rnd() * 3;
+      const m = mesh(frustum(w / 2, d / 2, w / 2 - 0.6 - rnd(), d / 2 - 0.8 - rnd(), h, 0, 0.08), rock, Math.cos(a) * (R + d / 2), 0, CZ - Math.sin(a) * (R + d / 2), temple);
+      m.rotation.y = Math.PI / 2 - a;
+    }
+  }
+  // terraces, colonnades and ramps
+  const T1 = { w: 34, d: 22, h: 3, z: -14 }, T2 = { w: 24, d: 12, h: 3, z: -23 };
+  mesh(boxUV(T1.w, T1.h, T1.d, 0.15, 0, T1.h / 2, 0), stone, 0, 0, T1.z, temple);
+  mesh(boxUV(T2.w, T2.h, T2.d, 0.15, 0, T2.h / 2, 0), stone, 0, T1.h, T2.z, temple);
+  const pill = new THREE.BoxGeometry(0.7, 1, 0.7);
+  const colonnade = (w, y, z, h, gap) => {
+    for (let x = -w / 2 + 0.8; x <= w / 2 - 0.8; x += 1.6) {
+      if (Math.abs(x) < gap) continue;
+      const c = mesh(pill, stone, x, y + h / 2, z, temple); c.scale.y = h;
+    }
+    mesh(boxUV(w, 0.35, 2.4, 0.15, 0, 0, 0), stone, 0, y + h + 0.17, z - 0.9, temple);
+  };
+  colonnade(T1.w, 0, T1.z + T1.d / 2 + 0.5, T1.h - 0.35, 2.6);
+  colonnade(T2.w, T1.h, T2.z + T2.d / 2 + 0.5, T2.h - 0.35, 2.6);
+  // Osiris-shaped statues of Hatshepsut along the top terrace
+  for (let x = -T2.w / 2 + 1.5; x <= T2.w / 2 - 1.5; x += 2.2) {
+    if (Math.abs(x) < 2.6) continue;
+    mesh(new THREE.CapsuleGeometry(0.32, 1.6, 2, 8), M('#f2ead6'), x, T1.h + T2.h + 1.1, T2.z + T2.d / 2 - 0.7, temple);
+    mesh(new THREE.CylinderGeometry(0.06, 0.2, 0.5, 6), M('#f6f3ea'), x, T1.h + T2.h + 2.35, T2.z + T2.d / 2 - 0.7, temple);
+  }
+  // ramps up the middle
+  const rampTo = (zFrom, zTo, yFrom, yTo) => {
+    const len = Math.hypot(zTo - zFrom, yTo - yFrom), ang = Math.atan2(yTo - yFrom, zFrom - zTo);
+    const r = mesh(boxUV(4.2, 0.6, len, 0.15), stone, 0, (yFrom + yTo) / 2 - 0.25, (zFrom + zTo) / 2, temple); r.rotation.x = ang;
+  };
+  rampTo(T1.z + T1.d / 2 + 14, T1.z + T1.d / 2, 0, T1.h);
+  rampTo(T2.z + T2.d / 2 + 9, T2.z + T2.d / 2, T1.h, T1.h + T2.h);
+  // sanctuary door cut into the cliff
+  mesh(new THREE.BoxGeometry(2.4, 3.2, 0.3), M('#2a1d14'), 0, T1.h + T2.h + 1.6, -33.9, temple);
+  // avenue of sphinxes
+  for (let z = 10; z <= 34; z += 4) for (const x of [-5, 5]) { const sx = sphinx('#e0cfa8', 0.5); sx.position.set(x, 0, z); sx.rotation.y = x < 0 ? 0 : Math.PI; temple.add(sx); }
+  for (const x of [-11, -7, 7, 11]) mesh(new THREE.SphereGeometry(1.2, 8, 6), M('#5f8f3a'), x, 1.2, 4.5, temple);
+}
+addLabel(temple, 'Cliffs of Deir el-Bahari', V(-22, 21, -28), () => ui.labels && !ob.view);
+addLabel(temple, 'Lower terrace', V(-12, 1.0, 6), () => ui.labels && !ob.view);
+addLabel(temple, 'Middle terrace', V(-12, 3.7, -9), () => ui.labels && !ob.view);
+addLabel(temple, 'Upper terrace', V(8, 8.6, -19), () => ui.labels && !ob.view, '', 'statues of Hatshepsut as Osiris');
+addLabel(temple, 'Ramps', V(3.5, 3.4, 3.8), () => ui.labels && !ob.view);
+addLabel(temple, 'Avenue of sphinxes', V(9, 1.6, 14), () => ui.labels && !ob.view);
+addLabel(temple, 'Sanctuary', V(0, 11.4, -33), () => ui.labels && !ob.view, '', 'cut into the cliff');
+// obelisk site, well away from the temple
+const OBX = 140;
+const obSite = new THREE.Group(); obSite.position.x = OBX; temple.add(obSite);
+groundDisc(55, obSite, 0, 0);
+const OB_H = 28, OB_B = 1.25, OB_T = 0.9, RAMP_Y = 11, PIT = { x: 0, w: 12 }, BASE_X = -2.5;
+const obPivot = new THREE.Group(); obSite.add(obPivot);
+const obelisk = new THREE.Group(); obPivot.add(obelisk);
+{
+  const shaftMat = TM(glyphTex, '#ffffff');
+  const g = frustum(OB_B, OB_B, OB_T, OB_T, OB_H, 0, 1);
+  // map the glyph column along each face: u across the face, v up the shaft
+  const p = g.attributes.position, uv = g.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i), x = p.getX(i), z = p.getZ(i);
+    const n = g.attributes.normal; const ax = Math.abs(n.getX(i)), az = Math.abs(n.getZ(i));
+    const half = lerp(OB_B, OB_T, y / OB_H);
+    const across = ax > az ? z : x;
+    uv.setXY(i, across / (2 * half) + 0.5, y / OB_H);
+  }
+  mesh(g, shaftMat, 0, 0, 0, obelisk);
+  mesh(frustum(OB_T, OB_T, 0, 0, 1.6, OB_H, 1), M('#e8c35a', { metalness: 0.2, roughness: 0.3 }), 0, 0, 0, obelisk);
+}
+// ramp with a funnel-shaped pit filled with sand at its end; a stone base at the bottom of the pit
+const obRamp = new THREE.Group(); obSite.add(obRamp);
+{
+  const mud = TM(mudTex, '#ffffff', { flatShading: true });
+  const sh = new THREE.Shape(); sh.moveTo(PIT.w / 2, 0); sh.lineTo(PIT.w / 2 + 68, 0); sh.lineTo(PIT.w / 2 + 30, RAMP_Y); sh.lineTo(PIT.w / 2, RAMP_Y); sh.lineTo(PIT.w / 2, 0);
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 8, bevelEnabled: false }); g.translate(0, 0, -4); g.computeVertexNormals(); worldUV(g, 0.25);
+  mesh(g, mud, 0, 0, 0, obRamp);
+  // pit walls (front wall left out so we can see inside)
+  mesh(boxUV(1.2, RAMP_Y, 8, 0.25, 0, RAMP_Y / 2, 0), mud, -PIT.w / 2 - 0.6, 0, 0, obRamp);
+  mesh(boxUV(PIT.w + 2.4, RAMP_Y, 1.2, 0.25, 0, RAMP_Y / 2, 0), mud, 0, 0, -4.6, obRamp);
+}
+mesh(boxUV(3.4, 0.8, 3.4, 0.5, 0, 0.4, 0), M('#8f7a68'), BASE_X, 0, 0, obSite);       // stone base
+const sandFill = mesh(boxUV(PIT.w - 0.1, 1, 7.6, 0.3, 0, 0.5, 0), TM(plainSand, '#e8cc95', { flatShading: true }), 0, 0, 0, obSite);
+const obTeam = [];
+for (let k = 0; k < 8; k++) { const p = person(SKINS[k % 8]); p.position.set(-13 - (k % 4) * 1.4, 0, -1.2 + Math.floor(k / 4) * 2.4); p.rotation.y = -Math.PI / 2; p.userData.armL.rotation.x = p.userData.armR.rotation.x = -0.9; obSite.add(p); obTeam.push(p); }
+const obRope = mesh(new THREE.CylinderGeometry(0.04, 0.04, 1, 5), M('#c8a46a'), 0, 0, 0, obSite);
+// key positions: base point of the obelisk, tilt from upright (radians, towards +x), sand height
+const EDGE = V(PIT.w / 2 + 0.9, RAMP_Y + 0.9, 0);         // where the shaft rests on the edge of the pit
+const tiltOnEdge = b => Math.atan2(EDGE.x - b.x, EDGE.y - b.y);
+const OB_STEPS = [
+  { base: V(PIT.w / 2 + 0.6, RAMP_Y + OB_B, 0), tilt: Math.PI / 2, sand: RAMP_Y - 0.2, team: false,
+    say: 'Step 1: the obelisk is dragged up the ramp, base first. The pit at the end is full of sand.' },
+  { base: V(1.5, 7.5, 0), tilt: tiltOnEdge(V(1.5, 7.5, 0)), sand: 7.5, team: false,
+    say: 'Step 2: the base slides over the edge and rests on the sand in the pit.' },
+  { base: V(BASE_X, 0.8, 0), tilt: tiltOnEdge(V(BASE_X, 0.8, 0)), sand: 0.8, team: true,
+    say: 'Step 3: workers dig sand out from below. The obelisk slowly sinks until its base sits on the stone.' },
+  { base: V(BASE_X, 0.8, 0), tilt: 0, sand: 0.8, team: true,
+    say: 'Step 4: teams pull on ropes to stand it upright. Then the ramp is taken away.' },
+];
+const ob = { view: false, step: 0, busy: false, k: { base: OB_STEPS[0].base.clone(), tilt: OB_STEPS[0].tilt, sand: OB_STEPS[0].sand } };
+function placeObelisk() {
+  obPivot.position.copy(ob.k.base);
+  obPivot.rotation.z = -ob.k.tilt;
+  sandFill.scale.y = Math.max(0.01, ob.k.sand); sandFill.visible = ob.k.sand > 0.85;
+  obRamp.visible = !(ob.step === 3 && !ob.busy);
+  const showTeam = OB_STEPS[ob.step].team;
+  for (const p of obTeam) p.visible = showTeam;
+  obRope.visible = showTeam && ob.step >= 2;
+  if (obRope.visible) {
+    const top = V(0, OB_H * 0.8, 0).applyAxisAngle(V(0, 0, 1), -ob.k.tilt).add(ob.k.base);
+    const a = top, b = V(-12.3, 1.1, 0);
+    obRope.position.copy(a).add(b).multiplyScalar(0.5); obRope.scale.set(1, a.distanceTo(b), 1);
+    obRope.quaternion.setFromUnitVectors(V(0, 1, 0), b.clone().sub(a).normalize());
+  }
+}
+function obNext() {
+  if (ob.busy || ob.step >= OB_STEPS.length - 1) return;
+  const A = { base: ob.k.base.clone(), tilt: ob.k.tilt, sand: ob.k.sand }, B = OB_STEPS[ob.step + 1];
+  ob.busy = true; ob.step++; dirty = true;
+  tween(2.6, f => { const e = ease(f); ob.k.base.lerpVectors(A.base, B.base, e); ob.k.tilt = lerp(A.tilt, B.tilt, e); ob.k.sand = lerp(A.sand, B.sand, e); }, () => { ob.busy = false; });
+}
+function obReset() { if (ob.busy) return; ob.step = 0; const S = OB_STEPS[0]; ob.k = { base: S.base.clone(), tilt: S.tilt, sand: S.sand }; dirty = true; }
+addLabel(obelisk, 'Obelisk', V(0.6, 9, 0), () => ui.labels && ob.view, '', 'one piece of granite');
+addLabel(obelisk, 'Gold-covered tip', V(0, OB_H + 2.2, 0), () => ui.labels && ob.view && ob.k.tilt < 1.2);
+addLabel(obSite, 'Ramp', V(15, RAMP_Y - 3, 4.2), () => ui.labels && ob.view && obRamp.visible);
+addLabel(obSite, 'Pit of sand', V(-1, 4, 4.2), () => ui.labels && ob.view && obRamp.visible && ob.step < 2);
+addLabel(obSite, 'Stone base', V(BASE_X + 1.6, 1.4, 2.4), () => ui.labels && ob.view && ob.step >= 2);
+
+// =====================================================================
+//  WORDS
+// =====================================================================
+const OLD = '<span class="kchip old">Old Kingdom · about 2575 to 2150 BC</span>';
+const NEW = '<span class="kchip new">New Kingdom · about 1520 to 1075 BC</span>';
+const para = list => list.map(x => typeof x === 'string' ? `<p>${x}</p>` : x.think ? `<p class="think">${x.think}</p>` : `<p class="note">${x.note}</p>`).join('');
+function infoFor(tab) {
+  if (tab === 'pyramids') {
+    if (pyrAll) return { title: 'How did pyramids change?', body: OLD + para(['Egyptian kings tried out different shapes over about 150 years: first flat <b>mastabas</b>, then a pyramid of steps, then a bent pyramid, and at last smooth, straight-sided pyramids.',
+      'Press “Next” to visit each one in order. The models are to scale with each other.',
+      { note: 'A pyramid was a tomb for a pharaoh. Egyptians believed it helped the king’s spirit reach the afterlife.' }]),
+      rows: [['Pyramids', 'Old Kingdom only'], ['Where', 'Saqqara, Dahshur and Giza'], ['Scale', 'All to the same scale']], year: -2600, ydate: 'about 2650 to 2500 BC' };
+    const P = PYR[pyrIdx];
+    return { title: P.q, body: OLD + para(P.p), rows: [['Built', P.date], ['Built for', P.who], ['Height', P.h], ['Compared with', P.cmp]], year: P.year, ydate: P.date };
+  }
+  if (tab === 'build') return { title: 'How was a pyramid built?', body: OLD + para([
+      'Most blocks were limestone, cut from quarries close by with copper tools. Workers dragged them on wooden <b>sledges</b>.',
+      { think: 'Historians think the blocks were pulled up <b>ramps</b> of mud brick and rubble. They still argue about the shape: one long straight ramp, a ramp winding round the pyramid, or something else. Press “Another ramp idea”.' },
+      'A tomb painting shows a worker pouring water in front of a sledge. Scientists have tested it: wet sand can cut the pull needed by about half.',
+      'At the top, workers used <b>levers</b> to lift and nudge each block into place. A lever with a fulcrum makes a small push move a heavy load, just like in Science.',
+      { note: 'The builders were not slaves. They were paid workers who lived in a village nearby. Archaeologists have found their homes, bakeries and tombs. Many were farmers who came to work while the Nile flooded their fields.' },
+      { note: 'The oldest written papyrus ever found is a diary kept by an official called Merer. It tells how his team moved stone by boat for Khufu’s pyramid.' }]),
+    rows: [['Pulling', build.water ? 'Wet sand: about 6 people' : 'Dry sand: about 12 people'], ['Block', 'about 2.5 tonnes'], ['Ramp idea', build.spiral ? 'Winding round' : 'Straight'], ['Levered block', build.lever >= 3 ? 'In place' : `${build.lever} of 3 nudges`]],
+    year: -2560, ydate: 'about 2560 BC' };
+  if (tab === 'nile') { const S = SEASONS[shad.season]; return { title: 'Why was the Nile so important?', body: OLD + para([
+      'Egypt is mostly desert. The <b>Nile</b> gave people water, food, fish and a road for boats.',
+      'Every summer the river flooded. When the water went down, it left rich black mud. Egyptians called their country <b>Kemet</b>, the black land. The desert was <b>Deshret</b>, the red land.',
+      'A <b>shaduf</b> is a lever. The heavy counterweight on the short end balances the full bucket, so lifting water into the <b>irrigation</b> channels is easier. Try it!',
+      'Tall <b>papyrus</b> reeds grew by the river. Egyptians made them into paper, rope, baskets and even boats.',
+      { note: 'Farmers have used shadufs for thousands of years, and some still do. The oldest Egyptian pictures of one come from the New Kingdom; before that, water was carried in pots.' },
+      { note: 'Links with the River Journey model: rivers carry water and rich mud that help life grow.' }]),
+    rows: [['Season', S.name], ['When', S.months], ['Buckets lifted', `${shad.fills}`], ['Channels', shad.fills >= 5 ? 'Full' : shad.fills ? 'Filling' : 'Empty']], year: -2500, ydate: 'about 2500 BC' }; }
+  if (tab === 'tomb') { const L = LAYERS[tombSt.opened]; return { title: 'Why were kings buried in the Valley of the Kings?', body: NEW + para([
+      'Almost every pyramid had been robbed. A pyramid was like a giant sign saying “treasure here!”',
+      'So New Kingdom pharaohs were buried in tombs cut deep into the rock in the <b>Valley of the Kings</b>, near Thebes (now Luxor). The entrances were hidden and the valley was guarded.',
+      '<b>Tutankhamun</b>’s tomb was found by Howard Carter in 1922. Robbers had got in twice soon after the burial, but the tomb was sealed up again, so most treasure was still there.',
+      'His body was <b>mummified</b> and laid inside three coffins, a stone sarcophagus and four golden shrines. <b>Amulets</b> were wrapped in the bandages for protection. His organs were kept in <b>canopic</b> jars.',
+      'Small figures called <b>shabtis</b> were buried too, to do work for the king in the <b>afterlife</b>.',
+      { note: 'This cutaway is simplified. The real rooms do not sit in one straight line. The craftspeople who cut and painted royal tombs lived in the village of Deir el-Medina.' }]),
+    rows: [['Pharaoh', 'Tutankhamun'], ['Buried', 'about 1323 BC'], ['Found', '1922'], ['Showing', L.name], ['Layers opened', `${tombSt.opened} of ${LAYERS.length - 1}`]], year: -1323, ydate: 'about 1323 BC' }; }
+  if (tab === 'heart') return { title: 'What happened in the afterlife?', body: NEW + para([
+      'Egyptians were buried with a scroll called the <b>Book of the Dead</b>. It held spells and prayers to help them on their journey to the <b>afterlife</b>.',
+      'One famous scene shows the <b>Weighing of the Heart</b>. Egyptians believed the heart held a person’s thoughts and memories, so it was left in the body when it was mummified.',
+      '<b>Anubis</b>, the jackal-headed god, weighs the heart against the <b>feather of Maat</b>. Maat was the goddess of truth, fairness and order. <b>Thoth</b>, the ibis-headed god of writing, records the result.',
+      'If the heart was as light as the feather, the person could join <b>Osiris</b> in the afterlife, in a place called the Field of Reeds.',
+      { note: 'If a heart was heavy with wrongdoing, Egyptians believed a creature called Ammit would eat it, and the person could not go on. This is why they tried to live by Maat.' }]),
+    rows: [['Gods', 'Anubis, Thoth, Osiris'], ['Scroll', 'Book of the Dead'], ['Result', hw.state === 'balanced' ? 'Balanced: welcome to the afterlife' : hw.state === 'heavy' ? 'Too heavy' : hw.state === 'weighing' ? 'Weighing…' : 'Not weighed yet']],
+    year: -1300, ydate: 'about 1300 BC' };
+  if (ob.view) return { title: 'How was an obelisk raised?', body: NEW + para([
+      'An <b>obelisk</b> is a tall, four-sided pillar cut from one single piece of granite. It ends in a small pyramid shape, which was covered in gold or electrum so it shone in the sun.',
+      'Pharaohs put obelisks in pairs outside temples, carved with <b>hieroglyphics</b> praising the gods and the king. Hatshepsut had obelisks put up at the temple of Amun at Karnak; one still stands there.',
+      { think: 'Nobody wrote down exactly how obelisks were raised. Historians think one way was to slide them down into a pit of sand, then let the sand out slowly. Press “Next step”.' },
+      { note: 'One of <b>Thutmose III</b>’s obelisks now stands beside the River Thames in London. It is called Cleopatra’s Needle, even though it is about 1,400 years older than Cleopatra.' }]),
+    rows: [['Height', 'about 29 m'], ['Weight', 'about 300 tonnes'], ['Stone', 'Granite from Aswan'], ['Step', `${ob.step + 1} of ${OB_STEPS.length}`]], year: -1460, ydate: 'about 1460 BC' };
+  return { title: 'Who was Hatshepsut?', body: NEW + para([
+      '<b>Hatshepsut</b> was one of the few women to rule Egypt as pharaoh. Statues often show her wearing the royal false beard, like a king.',
+      'Her <b>mortuary temple</b> stands against the cliffs at Deir el-Bahari. Priests made offerings there so her spirit would live forever. Her tomb was hidden in the Valley of the Kings, on the other side of these cliffs.',
+      'It has three terraces joined by long ramps, with rows of columns. Statues of Hatshepsut dressed as the god Osiris line the top terrace.',
+      { note: 'Not far away was <b>Deir el-Medina</b>, the village of the workers who built the royal tombs. Their letters, stele and drawings tell us about ordinary families, including women and children.' }]),
+    rows: [['Pharaoh', 'Hatshepsut'], ['Ruled', 'about 1479 to 1458 BC'], ['Temple', 'Deir el-Bahari'], ['Gods', 'Amun, Hathor, Anubis']], year: -1470, ydate: 'about 1470 BC' };
+}
+function hint() {
+  const t = ui.tab;
+  if (t === 'pyramids') return pyrAll ? 'From the first mastaba to the Great Pyramid and the Sphinx. Press “Next” to visit each one.' : `${pyrIdx + 1} of ${PYR.length}: ${PYR[pyrIdx].name}, ${PYR[pyrIdx].date}.`;
+  if (t === 'build') {
+    if (build.spiral) return 'Another idea: a ramp that winds round the pyramid as it grows. Press again to go back.';
+    if (build.moving) return build.water ? 'Water makes the sand firm, so fewer people can pull the sledge.' : 'Dry sand piles up in front of the sledge. It takes more people to pull.';
+    if (build.levering) return 'Push down on the long end of the lever and the block lifts a little.';
+    if (build.u >= U_END - 0.01) return 'The block has reached the top. Now use the levers to fit a block into its gap.';
+    return 'Press “Pull the sledge”. Then turn the water off and see how many people you need.';
+  }
+  if (t === 'nile') {
+    if (shad.season === 0) return 'Akhet: the flood covers the fields. Nobody needs a shaduf now!';
+    if (shad.busy) return shad.state === 'down' ? 'The counterweight helps lift the full bucket.' : 'Swinging the water over to the channel…';
+    if (shad.state === 'down') return 'The bucket is full. Press “Lift and swing”.';
+    if (shad.fills >= 5) return 'The channels are full. Water runs between the crops.';
+    return 'Pull the pole down to dip the bucket into the Nile.';
+  }
+  if (t === 'tomb') {
+    if (tombSt.opened >= LAYERS.length - 1) return 'At last: Tutankhamun’s mummy, with its gold mask.';
+    return tombSt.inside ? `Next to open: ${LAYERS[tombSt.opened].name}.` : 'The tomb is cut deep into the rock. Press “Go into the burial chamber”.';
+  }
+  if (t === 'heart') {
+    if (hw.state === 'balanced') return 'The heart is as light as the feather. Osiris welcomes the person into the afterlife.';
+    if (hw.state === 'heavy') return 'The heart is too heavy. Egyptians believed this person could not go on to the afterlife.';
+    if (hw.state === 'weighing') return 'Anubis watches the scales. Thoth gets ready to write down the result.';
+    return 'Press “Weigh the heart” to see the scene from the Book of the Dead.';
+  }
+  if (ob.view) return OB_STEPS[ob.step].say;
+  return 'Hatshepsut’s mortuary temple at Deir el-Bahari. Drag to look round.';
+}
+
+// ---------------- Timeline ----------------
+const Y0 = -3100, Y1 = 2026, pct = y => ((y - Y0) / (Y1 - Y0)) * 100;
+function band(el, a, b) { el.style.left = pct(a) + '%'; el.style.width = (pct(b) - pct(a)) + '%'; }
+band($('#bandOK'), -2575, -2150); band($('#bandNK'), -1520, -1075); band($('#bandRB'), 43, 410);
+$('#tlTicks').innerHTML = [[-3000, '3000 BC'], [-2000, '2000 BC', 1], [-1000, '1000 BC', 1], [1, 'AD 1'], [1000, 'AD 1000', 1], [2026, 'Today']]
+  .map(([y, t, opt]) => `<span${opt ? ' class="opt"' : ''} style="left:${pct(y)}%">${t}</span>`).join('');
+
+// =====================================================================
+//  CAMERA
+// =====================================================================
+let fly = null, userMoved = false;
+function topSpace() { return $('#hdr').offsetHeight + (innerWidth < 900 ? $('#tl').offsetHeight + 10 : 0); }
+function sideShift() { const info = $('#info'); return innerWidth >= 700 && info.open ? (info.offsetWidth + 16) / 2 : 0; }
+function view(target, dir, needW, needH) {
+  const w = innerWidth, h = innerHeight, aspect = w / h;
+  const top = topSpace(), bottom = $('#controls').offsetHeight + 80;
+  const avail = Math.max(0.35, (h - top - bottom) / h), availW = Math.max(0.4, (w - 2 * sideShift()) / w);
+  const tanF = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const d = Math.max((needH / 2) / tanF / avail, (needW / 2) / (tanF * aspect * availW));
+  return { pos: target.clone().add(dir.clone().normalize().multiplyScalar(d)), target };
+}
+function homeView() {
+  const t = ui.tab;
+  if (t === 'pyramids') {
+    if (pyrAll) return view(V(54, 4, 0), V(0.1, 0.36, 1), 116, 20);
+    const P = PYR[pyrIdx]; return view(V(P.x, P.top * 0.42, 0), V(0.55, 0.42, 1), P.size * 1.5, P.top * 1.5 + 2);
+  }
+  if (t === 'build') return view(V(15, 4, 0), V(0.6, 0.5, 1), 50, 16);
+  if (t === 'nile') return view(V(1.5, 1.4, 6), V(0.3, 0.55, 1), 24, 11);
+  if (t === 'tomb' && tombSt.inside && tombSt.opened >= LAYERS.length - 1) return view(V(16.75, -5.75, -2), V(0.12, 0.6, 1), 3.9, 2.0);   // close-up of the mummy
+  if (t === 'tomb') return tombSt.inside ? view(V(16.7, -5.3, -1.9), V(0.08, 0.42, 1), 7.6, 3.9) : view(V(5, -3.4, -1), V(0.08, 0.16, 1), 52, 20);
+  if (t === 'heart') return view(V(0.5, 1.5, 0), V(0.1, 0.22, 1), innerWidth < 640 ? 14.5 : 10.5, 3.6);
+  if (ob.view) return view(V(OBX + 10, 13.5, 0), V(0.25, 0.5, 1), 54, 33);
+  return view(V(0, 6, -14), V(0.18, 0.55, 1), 72, 30);
+}
+function flyTo(v, instant = false) {
+  if (instant) { camera.position.copy(v.pos); controls.target.copy(v.target); fly = null; return; }
+  fly = { t: 0, p0: camera.position.clone(), t0: controls.target.clone(), p1: v.pos, t1: v.target };
+}
+controls.addEventListener('start', () => { fly = null; userMoved = true; });
+function updateFly(dt) {
+  if (!fly) return;
+  fly.t += dt / 1.4; const k = ease(fly.t);
+  camera.position.lerpVectors(fly.p0, fly.p1, k); controls.target.lerpVectors(fly.t0, fly.t1, k);
+  if (fly.t >= 1) fly = null;
+}
+function goHome() { userMoved = false; flyTo(homeView()); }
+function sunFor() {
+  const t = ui.tab;
+  if (t === 'pyramids') return pyrAll ? setSun(70, V(54, 0, 0)) : setSun(PYR[pyrIdx].size * 1.1 + 4, V(PYR[pyrIdx].x, 0, 0));
+  if (t === 'build') setSun(36, V(14, 0, 0));
+  else if (t === 'nile') setSun(28, V(0, 0, 5));
+  else if (t === 'tomb') setSun(30, V(4, -2, 0), V(-0.3, 1, 0.6));
+  else if (t === 'heart') setSun(8, V(0.5, 0, 0), V(0.3, 1, 0.8));
+  else setSun(ob.view ? 36 : 50, ob.view ? V(OBX + 10, 0, 0) : V(0, 0, -10));
+}
+
+// =====================================================================
+//  UI
+// =====================================================================
+let lastHint = '', lastYear = null;
+function refresh() {
+  dirty = false;
+  const I = infoFor(ui.tab);
+  $('#infoTitle').textContent = I.title;
+  $('#infoBody').innerHTML = I.body;
+  $('#readouts').innerHTML = I.rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+  const mk = $('#tlMark'), pc = pct(I.year); mk.style.left = pc + '%'; mk.style.setProperty('--a', pc + '%'); mk.style.transform = `translateX(-${pc}%)`; mk.textContent = I.ydate;
+  const h = hint(); if (h !== lastHint) { $('#say').textContent = h; lastHint = h; }
+  for (const b of document.querySelectorAll('#controls button')) b.hidden = !b.dataset.for.split(' ').includes(ui.tab);
+  for (const b of document.querySelectorAll('.tabs button')) { b.hidden = b.dataset.k !== ui.king; b.setAttribute('aria-selected', b.dataset.tab === ui.tab); }
+  for (const b of document.querySelectorAll('.king button')) b.setAttribute('aria-pressed', b.dataset.k === ui.king);
+  $('#prevBtn').disabled = !pyrAll && pyrIdx === 0;
+  $('#nextBtn').disabled = !pyrAll && pyrIdx === PYR.length - 1;
+  $('#allBtn').setAttribute('aria-pressed', pyrAll);
+  $('#pullBtn').disabled = build.moving || build.spiral;
+  $('#pullBtn').textContent = build.u >= U_END - 0.01 ? 'Pull another block' : 'Pull the sledge';
+  $('#waterBtn').disabled = build.moving || build.spiral;
+  $('#waterBtn').setAttribute('aria-pressed', build.water);
+  $('#waterBtn').textContent = build.water ? 'Water on the sand: on' : 'Water on the sand: off';
+  $('#leverBtn').disabled = build.levering;
+  $('#leverBtn').textContent = build.lever >= 3 ? 'Do it again' : 'Use the levers';
+  $('#rampBtn').disabled = build.moving;
+  $('#rampBtn').textContent = build.spiral ? 'Back to the straight ramp' : 'Another ramp idea';
+  $('#dipBtn').disabled = shad.busy || shad.state !== 'up' || shad.season === 0;
+  $('#liftBtn').disabled = shad.busy || shad.state !== 'down';
+  $('#seasonBtn').disabled = shad.busy;
+  $('#seasonBtn').textContent = `Next season (now ${SEASONS[shad.season].name.split(':')[0]})`;
+  $('#openBtn').disabled = tombSt.busy || tombSt.opened >= LAYERS.length - 1;
+  $('#closeBtn').disabled = tombSt.busy || tombSt.opened === 0;
+  $('#insideBtn').textContent = tombSt.inside ? 'See the whole tomb' : 'Go into the burial chamber';
+  $('#weighBtn').disabled = hw.state === 'weighing';
+  $('#heavyBtn').disabled = hw.state === 'weighing';
+  $('#obBtn').textContent = ob.view ? 'See the temple' : 'See the obelisk';
+  $('#stepBtn').hidden = $('#againBtn').hidden = !(ui.tab === 'temple' && ob.view);
+  $('#stepBtn').disabled = ob.busy || ob.step >= OB_STEPS.length - 1;
+  $('#againBtn').disabled = ob.busy || ob.step === 0;
+  $('#labelsBtn').setAttribute('aria-pressed', ui.labels);
+  layoutVars();
+}
+const GROUPS = { pyramids: pyr, build: bld, nile, tomb, heart, temple };
+function setTab(tab) {
+  ui.tab = tab;
+  for (const [k, g] of Object.entries(GROUPS)) g.visible = k === tab;
+  ui.king = ['tomb', 'heart', 'temple'].includes(tab) ? 'new' : 'old';
+  sunFor(); dirty = true; refresh(); resize(); goHome();
+}
+for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => setTab(b.dataset.tab));
+for (const b of document.querySelectorAll('.king button')) b.addEventListener('click', () => { if (b.dataset.k !== ui.king) setTab(b.dataset.k === 'old' ? 'pyramids' : 'tomb'); });
+$('#prevBtn').onclick = () => { if (pyrAll) { pyrAll = false; pyrIdx = PYR.length - 1; } else pyrIdx = Math.max(0, pyrIdx - 1); sunFor(); dirty = true; refresh(); goHome(); };
+$('#nextBtn').onclick = () => { if (pyrAll) { pyrAll = false; pyrIdx = 0; } else pyrIdx = Math.min(PYR.length - 1, pyrIdx + 1); sunFor(); dirty = true; refresh(); goHome(); };
+$('#allBtn').onclick = () => { pyrAll = true; sunFor(); dirty = true; refresh(); goHome(); };
+$('#pullBtn').onclick = pullSledge;
+$('#waterBtn').onclick = () => { build.water = !build.water; dirty = true; };
+$('#leverBtn').onclick = useLevers;
+$('#rampBtn').onclick = () => { build.spiral = !build.spiral; ramp.visible = !build.spiral; spiral.visible = build.spiral; sledge.visible = !build.spiral; for (const p of team) p.visible = !build.spiral; dirty = true; };
+$('#dipBtn').onclick = lowerBucket;
+$('#liftBtn').onclick = liftAndSwing;
+$('#seasonBtn').onclick = () => setSeason((shad.season + 1) % 3);
+$('#openBtn').onclick = () => { if (!tombSt.inside) { tombSt.inside = true; goHome(); } openLayer(); };
+$('#closeBtn').onclick = closeLayers;
+$('#insideBtn').onclick = () => { tombSt.inside = !tombSt.inside; dirty = true; goHome(); };
+$('#weighBtn').onclick = () => weigh(false);
+$('#heavyBtn').onclick = () => weigh(true);
+$('#obBtn').onclick = () => { ob.view = !ob.view; sunFor(); dirty = true; refresh(); goHome(); };
+$('#stepBtn').onclick = obNext;
+$('#againBtn').onclick = obReset;
+$('#labelsBtn').onclick = () => { ui.labels = !ui.labels; dirty = true; };
+
+// ---------------- Resize and loop ----------------
+function layoutVars() {
+  const r = document.documentElement.style;
+  r.setProperty('--hdr', $('#hdr').offsetHeight + 'px');
+  r.setProperty('--tl', $('#tl').offsetHeight + 'px');
+  r.setProperty('--ctl', $('#controls').offsetHeight + 'px');
+}
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h); labelR.setSize(w, h);
+  camera.aspect = w / h;
+  const top = topSpace(), bottom = $('#controls').offsetHeight + 80;
+  camera.setViewOffset(w, h, -sideShift(), -(top - bottom) / 2, w, h);
+  camera.updateProjectionMatrix();
+  layoutVars();
+  if (!userMoved && !fly) flyTo(homeView(), true);
+}
+addEventListener('resize', resize);
+$('#info').addEventListener('toggle', () => { resize(); if (!userMoved) flyTo(homeView()); });
+if (innerWidth < 700) $('#info').open = false;
+
+setSeason(1, true);
+setTab('pyramids');
+placeBuild(); placeShaduf(); placeScale(); placeObelisk();
+flyTo(homeView(), true);
+
+let last = performance.now(), clock = 0;
+function frame(dt, draw = true) {
+  clock += dt;
+  runTweens(dt);
+  if (bld.visible) {
+    if (build.moving) build.walk += dt * 6;
+    placeBuild();
+    const tp = pathAt(build.u + 3.0 + 1.25); lblTeam.position.set(tp.x, tp.y + 2.3, 0);
+    pour.scale.y = 0.8 + Math.sin(clock * 12) * 0.1;
+  }
+  if (nile.visible) {
+    placeShaduf();
+    tilt.updateWorldMatrix(true, false);
+    lblCW.position.set(0, 0.55, SH.short + 0.1).applyMatrix4(tilt.matrixWorld);
+    lblBucket.position.copy(bucketHang.position).add(V(0, -SH.rope - 0.6, 0));
+    boat.position.x += dt * 1.4; if (boat.position.x > 46) boat.position.x = -46;
+    waterTex.offset.x -= dt * 0.04;
+  }
+  if (heart.visible) {
+    if (hw.state !== 'start') { hw.vel += (hw.target - hw.ang) * 9 * dt; hw.vel *= Math.pow(0.18, dt); hw.ang += hw.vel * dt * 2.2; }
+    placeScale();
+  }
+  if (temple.visible) placeObelisk();
+  updateFly(dt);
+  for (const l of labels) l.o.visible = !!l.show() && chainVisible(l.o);
+  if (dirty) refresh();
+  controls.update();
+  if (!draw) return;
+  renderer.render(scene, camera);
+  labelR.render(scene, camera);
+}
+renderer.setAnimationLoop(now => { const dt = Math.min(0.05, (now - last) / 1000); last = now; frame(dt); });
+window.__egypt = { step: (n = 60) => { for (let k = 0; k < n; k++) frame(1 / 30, k === n - 1); } };   // test helper: run n frames at once
+</script>
+
+</html>

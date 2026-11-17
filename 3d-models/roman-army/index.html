@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<link rel="icon" type="image/png" href="../../favicon.png">
+<style>html{color-scheme:light}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Roman Army</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Layout: full-screen 3D scene; WFA-blue header with three tabs; info card top-left;
+     a hint line and the controls floating at the bottom. Light and dark palettes. */
+  :root {
+    --bg: #ecf2f6;
+    --panel: rgba(255, 255, 255, 0.95);
+    --edge: #c6d8e4;
+    --fg: #11212b;
+    --muted: #4d6372;
+    --blue: #1798d3;
+    --on-blue: #ffffff;
+    --btn: #1798d3;
+    --on-btn: #ffffff;
+    --press: #dff0fa;
+    --roman: #a3261f;
+    --ask-bg: #fff4dc;
+    --ask-edge: #e0b252;
+    --lbl-bg: rgba(255, 255, 255, 0.93);
+    --lbl-fg: #11212b;
+    --shadow: rgba(16, 50, 70, 0.16);
+    --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+    --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+    --hdr: 64px;
+    --ctl: 70px;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #0f1c24; --panel: rgba(22, 37, 48, 0.95); --edge: #2c4555; --fg: #e8f1f6; --muted: #9fb4c3;
+    --btn: #3aaee3; --on-btn: #04121a; --press: #17384a; --roman: #ff8a7a; --ask-bg: #2e2612; --ask-edge: #8a6a22;
+    --lbl-bg: rgba(15, 28, 36, 0.92); --lbl-fg: #e8f1f6; --shadow: rgba(0, 0, 0, 0.45); color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg: #0f1c24; --panel: rgba(22, 37, 48, 0.95); --edge: #2c4555; --fg: #e8f1f6; --muted: #9fb4c3;
+    --btn: #3aaee3; --on-btn: #04121a; --press: #17384a; --roman: #ff8a7a; --ask-bg: #2e2612; --ask-edge: #8a6a22;
+    --lbl-bg: rgba(15, 28, 36, 0.92); --lbl-fg: #e8f1f6; --shadow: rgba(0, 0, 0, 0.45); color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; overflow: hidden; }
+  #scene { position: fixed; inset: 0; touch-action: none; }
+  #scene canvas { display: block; }
+  .labels { position: absolute; inset: 0; pointer-events: none; }
+
+  header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 3;
+    background: var(--blue); color: var(--on-blue);
+    padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-bottom: 10px;
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+  }
+  .brand { display: flex; flex-direction: column; min-width: 0; }
+  h1 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.15; text-wrap: balance; }
+  .brand > span { font-size: 13px; font-weight: 700; opacity: .9; letter-spacing: .02em; }
+  .short { display: none; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .tabs button {
+    font: inherit; font-weight: 800; font-size: 15px; min-height: 44px; padding: 6px 14px;
+    border-radius: 999px; border: 2px solid rgba(255,255,255,.6); background: transparent; color: var(--on-blue); cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: #ffffff; color: #0f6d99; border-color: #ffffff; }
+
+  .info {
+    position: fixed; z-index: 2; left: var(--gutter-l); top: calc(var(--hdr) + 12px);
+    width: min(360px, calc(100% - 32px)); max-height: calc(100% - var(--hdr) - var(--ctl) - 110px); overflow: auto;
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 12px 16px;
+    box-shadow: 0 4px 14px var(--shadow);
+  }
+  .info summary { font-weight: 800; font-size: 17px; cursor: pointer; line-height: 1.3; text-wrap: balance; min-height: 28px; }
+  .info p { margin: 8px 0 0; line-height: 1.45; }
+  .info p.note { color: var(--muted); font-size: 13px; }
+  .info p.piece { border-left: 4px solid var(--roman); padding-left: 10px; }
+  .info p.ask { background: var(--ask-bg); border: 1px solid var(--ask-edge); border-radius: 10px; padding: 8px 10px; }
+  .info b { color: var(--blue); }
+  dl { margin: 12px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: baseline; }
+  dt { color: var(--muted); font-size: 13px; font-weight: 700; }
+  dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 0; }
+
+  .say {
+    position: fixed; z-index: 2; left: 50%; transform: translateX(-50%); margin: 0;
+    bottom: calc(var(--ctl) + 32px + env(safe-area-inset-bottom, 0px));
+    width: max-content; max-width: min(600px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 8px 16px;
+    font-weight: 800; font-size: 15px; line-height: 1.35; text-align: center; text-wrap: balance;
+    box-shadow: 0 4px 14px var(--shadow);
+  }
+  .say:empty { display: none; }
+
+  .controls {
+    position: fixed; z-index: 3; left: 50%; transform: translateX(-50%);
+    bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    width: min(820px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 16px; padding: 10px 12px;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 4px 18px var(--shadow);
+  }
+  .controls button {
+    font: inherit; font-weight: 800; font-size: 15px; min-height: 44px; padding: 8px 16px; border-radius: 12px; cursor: pointer;
+    border: 2px solid var(--btn); background: var(--btn); color: var(--on-btn);
+  }
+  .controls button.ghost { background: transparent; color: var(--fg); border-color: var(--edge); }
+  .controls button.ghost[aria-pressed="true"] { background: var(--press); border-color: var(--btn); }
+  .controls button:disabled { opacity: .4; cursor: default; }
+  button:focus-visible, summary:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+  /* Labels sit above the point they name, with a short stem */
+  .lw { display: flex; flex-direction: column; align-items: center; transform: translateY(-50%); }
+  .lbl {
+    font: 800 13px var(--font); background: var(--lbl-bg); color: var(--lbl-fg); border: 1px solid var(--edge);
+    padding: 3px 10px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 6px var(--shadow);
+  }
+  .lbl.hot { background: var(--roman); color: #ffffff; border-color: transparent; }
+  .stem { width: 2px; height: 10px; background: var(--lbl-fg); opacity: .55; }
+
+  footer {
+    position: fixed; z-index: 2; left: 0; right: 0; bottom: calc(3px + env(safe-area-inset-bottom, 0px));
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    text-align: center; font-size: 11px; color: var(--muted);
+  }
+  .oops { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; font-weight: 800; }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 18px; }
+    .tabs { margin-left: 0; }
+    .tabs button { font-size: 14px; padding: 5px 11px; }
+    .controls button { font-size: 14px; padding: 6px 12px; }
+    .controls { bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+    .say { font-size: 14px; }
+    .lbl { font-size: 12px; padding: 2px 8px; }
+    footer .tip { display: none; }
+    .long { display: none; }
+    .short { display: inline; }
+    .tabs { gap: 5px; }
+    .tabs button { padding: 5px 10px; }
+  }
+</style>
+
+<div id="scene"></div>
+
+<header id="hdr">
+  <div class="brand">
+    <h1>Roman Army</h1>
+    <span>Year 5 History · <span class="long">The Roman Empire and its Impact on Britain</span><span class="short">The Roman Empire</span></span>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Choose a model">
+    <button role="tab" data-tab="kit" aria-selected="true">Legionary kit</button>
+    <button role="tab" data-tab="testudo" aria-selected="false">Testudo</button>
+    <button role="tab" data-tab="battle" aria-selected="false"><span class="long">Boudicca's last battle</span><span class="short">Boudicca's battle</span></button>
+  </nav>
+</header>
+
+<details class="info" id="info" open>
+  <summary id="infoTitle">What did a legionary carry?</summary>
+  <div id="infoBody"></div>
+  <dl id="readouts"></dl>
+</details>
+
+<p class="say" id="say" aria-live="polite"></p>
+
+<div class="controls" id="controls">
+  <button type="button" data-for="kit" id="nextPieceBtn">Next piece ▶</button>
+  <button type="button" data-for="kit" id="equipBtn" class="ghost">Take the kit off</button>
+  <button type="button" data-for="kit" id="skinBtn" class="ghost">Another soldier</button>
+  <button type="button" data-for="kit" id="spinBtn" class="ghost" aria-pressed="true">Turn</button>
+  <button type="button" data-for="testudo" id="formBtn">Make a testudo</button>
+  <button type="button" data-for="testudo" id="fireBtn">Fire arrows</button>
+  <button type="button" data-for="testudo" id="marchBtn" class="ghost" aria-pressed="false">March forward</button>
+  <button type="button" data-for="testudo" id="tResetBtn" class="ghost">Start again</button>
+  <button type="button" data-for="battle" id="prevBtn" class="ghost">◀ Back</button>
+  <button type="button" data-for="battle" id="nextBtn">Next ▶</button>
+  <button type="button" data-for="battle" id="againBtn" class="ghost">Start again</button>
+  <button type="button" data-for="kit testudo battle" id="labelsBtn" class="ghost" aria-pressed="true">Labels</button>
+</div>
+
+<footer><span class="tip">Drag to turn · pinch or scroll to zoom · </span>Wallscourt Farm Academy · Y5-17.11.26a</footer>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const $ = s => document.querySelector(s);
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+function seeded(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+const UP = V(0, 1, 0);
+
+// ---------------- Renderer, camera, labels ----------------
+const wrap = $('#scene');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+} catch (e) {
+  document.body.insertAdjacentHTML('beforeend', '<div class="oops">Sorry, this device cannot show 3D models.</div>');
+  throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+wrap.appendChild(renderer.domElement);
+const labelR = new CSS2DRenderer();
+labelR.domElement.className = 'labels';
+wrap.appendChild(labelR.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 600);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.enablePan = false;
+controls.maxPolarAngle = Math.PI / 2 - 0.06;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7a5a, 1.15));
+const sun = new THREE.DirectionalLight(0xfff3df, 2.0);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+scene.add(sun, sun.target);
+function setSun(range, pos, target = V(0, 0, 0)) {
+  sun.position.copy(pos).add(target); sun.target.position.copy(target);
+  const c = sun.shadow.camera;
+  c.left = c.bottom = -range; c.right = c.top = range; c.near = 0.5; c.far = range * 6;
+  c.updateProjectionMatrix();
+}
+
+// ---------------- Canvas textures (no image files) ----------------
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
+  return t;
+}
+function speckle(g, w, h, rnd, n, dark, light) {
+  for (let i = 0; i < n; i++) {
+    g.fillStyle = rnd() < 0.5 ? `rgba(${dark},${0.05 + rnd() * 0.14})` : `rgba(${light},${0.05 + rnd() * 0.12})`;
+    g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 2.5, 1 + rnd() * 2.5);
+  }
+}
+// Grass with a soft edge, so the page colour shows beyond it
+function grassDisc(seed, earth) {
+  return canvasTex(512, 512, (g, w, h) => {
+    const rnd = seeded(seed);
+    g.fillStyle = '#86a95c'; g.fillRect(0, 0, w, h);
+    speckle(g, w, h, rnd, 30000, '40,70,20', '200,220,140');
+    if (earth) { g.fillStyle = 'rgba(176,150,105,0.5)'; g.fillRect(w * 0.42, 0, w * 0.16, h); }
+    g.globalCompositeOperation = 'destination-in';
+    const r = g.createRadialGradient(w / 2, h / 2, w * 0.32, w / 2, h / 2, w / 2);
+    r.addColorStop(0, 'rgba(0,0,0,1)'); r.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = r; g.fillRect(0, 0, w, h);
+  });
+}
+// Red shield with yellow border, wings and thunderbolts (a common legion design)
+const shieldTex = canvasTex(256, 384, (g, w, h) => {
+  g.fillStyle = '#a3201b'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#e8b93a'; g.lineWidth = 9; g.strokeRect(14, 14, w - 28, h - 28);
+  g.fillStyle = '#e8b93a'; g.strokeStyle = '#e8b93a'; g.lineWidth = 7; g.lineJoin = 'round';
+  const cx = w / 2, cy = h / 2;
+  for (const s of [-1, 1]) {
+    // wings
+    g.beginPath(); g.moveTo(cx + s * 34, cy - 10);
+    g.quadraticCurveTo(cx + s * 95, cy - 70, cx + s * 100, cy - 20);
+    g.quadraticCurveTo(cx + s * 70, cy - 30, cx + s * 34, cy + 6); g.fill();
+    // thunderbolts up and down
+    for (const v of [-1, 1]) {
+      g.beginPath(); g.moveTo(cx + s * 8, cy + v * 40);
+      g.lineTo(cx + s * 26, cy + v * 85); g.lineTo(cx + s * 10, cy + v * 95); g.lineTo(cx + s * 34, cy + v * 150);
+      g.stroke();
+    }
+  }
+  const rnd = seeded(4); speckle(g, w, h, rnd, 3000, '60,10,5', '255,200,180');
+});
+const loricaTex = canvasTex(64, 128, (g, w, h) => {
+  g.fillStyle = '#a5acb3'; g.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 16) { g.fillStyle = '#6f767d'; g.fillRect(0, y, w, 3); g.fillStyle = '#c9cfd4'; g.fillRect(0, y + 3, w, 2); }
+});
+const strapTex = canvasTex(64, 64, (g, w, h) => {
+  g.clearRect(0, 0, w, h); g.strokeStyle = '#6b4626'; g.lineWidth = 7;
+  for (let i = -2; i < 4; i++) { g.beginPath(); g.moveTo(i * 22, 0); g.lineTo(i * 22 + 40, h); g.stroke(); g.beginPath(); g.moveTo(i * 22 + 40, 0); g.lineTo(i * 22, h); g.stroke(); }
+});
+strapTex.repeat.set(2, 1);
+const woodTex = canvasTex(128, 32, (g, w, h) => {
+  const rnd = seeded(3); g.fillStyle = '#8d6236'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 14; i++) { g.fillStyle = `rgba(50,30,10,${0.15 + rnd() * 0.25})`; g.fillRect(0, rnd() * h, w, 1 + rnd() * 1.5); }
+});
+
+const M = (color, rough = 0.8, metal = 0, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, ...extra });
+const IRON = () => M(0x9ca3aa, 0.38, 0.55);
+const BRASS = () => M(0xc9a447, 0.35, 0.6);
+
+// ---------------- Labels ----------------
+const labels = [];
+function addLabel(parent, text, pos, show, hot = false) {
+  const outer = document.createElement('div');
+  const inner = document.createElement('div'); inner.className = 'lw';
+  const tag = document.createElement('span'); tag.className = 'lbl' + (hot ? ' hot' : ''); tag.textContent = text;
+  const stem = document.createElement('span'); stem.className = 'stem';
+  inner.append(tag, stem); outer.append(inner);
+  const o = new CSS2DObject(outer);
+  o.position.copy(pos); parent.add(o);
+  const L = { o, show, tag };
+  labels.push(L);
+  return L;
+}
+const shownUp = o => { for (let p = o.parent; p; p = p.parent) if (!p.visible) return false; return true; };
+
+function limb(a, b, r, mat, parent, r2 = r * 0.9, seg = 10) {
+  const len = a.distanceTo(b);
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r2, len, seg), mat);
+  m.position.copy(a).add(b).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(UP, b.clone().sub(a).normalize());
+  m.castShadow = true; parent.add(m); return m;
+}
+function add(parent, geo, mat, x = 0, y = 0, z = 0, shadow = true) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = shadow; parent.add(m); return m;
+}
+
+const SKINS = ['#c68a5e', '#f0c6a3', '#7f4e2f', '#e0ac83', '#a86d45', '#5b3720'];
+const HAIRS = ['#2b1d14', '#5a3b22', '#141010', '#3a2a1c', '#1c1410', '#0f0b09'];
+
+// =====================================================================
+//  TAB 1: LEGIONARY KIT
+// =====================================================================
+const kitG = new THREE.Group(); scene.add(kitG);
+{
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(5.5, 64), new THREE.MeshStandardMaterial({ map: grassDisc(5, false), transparent: true, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -0.07; ground.receiveShadow = true; kitG.add(ground);
+}
+const stage = new THREE.Group(); kitG.add(stage);
+{
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.95, 2.0, 0.07, 64), M(0xcdbf9f, 0.9));
+  disc.position.y = -0.035; disc.receiveShadow = true; stage.add(disc);
+}
+const skinMat = M(SKINS[0], 0.7), hairMat = M(HAIRS[0], 0.9), tunicMat = M(0xa3261f, 0.85), beltMat = M(0x5a3a1e, 0.8);
+// ---- the soldier's body (stays put) ----
+const body = new THREE.Group(); stage.add(body);
+{
+  for (const s of [-1, 1]) {
+    limb(V(s * 0.1, 0.03, 0), V(s * 0.1, 0.62, 0), 0.065, skinMat, body);
+    add(body, new THREE.BoxGeometry(0.1, 0.06, 0.22), skinMat, s * 0.1, 0.03, 0.04);
+  }
+  add(body, new THREE.CylinderGeometry(0.2, 0.25, 0.44, 18), tunicMat, 0, 0.78, 0);
+  add(body, new THREE.CylinderGeometry(0.2, 0.2, 0.5, 18), tunicMat, 0, 1.22, 0);
+  const sh = add(body, new THREE.SphereGeometry(0.2, 18, 10), tunicMat, 0, 1.45, 0); sh.scale.set(1.25, 0.5, 0.9);
+  limb(V(0, 1.45, 0), V(0, 1.57, 0), 0.055, skinMat, body);
+  add(body, new THREE.SphereGeometry(0.105, 20, 14), skinMat, 0, 1.64, 0);
+  add(body, new THREE.BoxGeometry(0.03, 0.05, 0.04), skinMat, 0, 1.63, 0.1);
+  for (const s of [-1, 1]) add(body, new THREE.SphereGeometry(0.012, 8, 6), M(0x1a1410), s * 0.035, 1.665, 0.094, false);
+  const hair = add(body, new THREE.SphereGeometry(0.11, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), hairMat, 0, 1.655, -0.012); hair.scale.set(1, 0.95, 1.02);
+  // arms: right (soldier's right is -x) holds the pilum; left holds the shield
+  const arm = (S, E, H) => { limb(S, E, 0.055, skinMat, body); limb(S, S.clone().lerp(E, 0.45), 0.066, tunicMat, body); limb(E, H, 0.05, skinMat, body); add(body, new THREE.SphereGeometry(0.05, 12, 8), skinMat, H.x, H.y, H.z); };
+  arm(V(-0.25, 1.42, 0), V(-0.31, 1.17, 0.04), V(-0.34, 1.0, 0.15));
+  arm(V(0.25, 1.42, 0), V(0.31, 1.2, 0.14), V(0.22, 1.06, 0.3));
+  // belt (cingulum) with a hanging apron of studded straps
+  const belt = add(body, new THREE.TorusGeometry(0.206, 0.024, 8, 32), beltMat, 0, 0.99, 0); belt.rotation.x = Math.PI / 2;
+  for (let i = 0; i < 4; i++) {
+    const x = -0.06 + i * 0.04, st = add(body, new THREE.BoxGeometry(0.022, 0.22, 0.01), beltMat, x, 0.88, 0.235);
+    st.rotation.x = -0.08;
+    for (let k = 0; k < 4; k++) add(body, new THREE.SphereGeometry(0.008, 6, 4), BRASS(), x, 0.95 - k * 0.05, 0.243, false);
+  }
+}
+
+// ---- the kit: each piece has a "worn" place and a "laid out" place ----
+const PIECES = {
+  galea: { name: 'Helmet', latin: 'galea', made: 'Iron, with brass trim',
+    job: 'Cheek guards protected the sides of the face. The wide guard at the back protected the neck from blows from above.' },
+  lorica: { name: 'Strip armour', latin: 'lorica segmentata', made: 'Strips of iron joined by leather straps',
+    job: 'The strips slid over each other, so the soldier could bend and twist. Many soldiers wore mail armour, made of tiny iron rings, instead.' },
+  scutum: { name: 'Shield', latin: 'scutum', made: 'Thin layers of wood glued together, covered in leather',
+    job: 'Over a metre tall and curved to wrap around the body. The metal boss in the middle could punch an enemy backwards.' },
+  gladius: { name: 'Short sword', latin: 'gladius', made: 'Iron blade, about 60 cm long',
+    job: 'Made for stabbing in close fighting, from behind the shield. Worn on the right so it did not catch on the shield when drawn.' },
+  pugio: { name: 'Dagger', latin: 'pugio', made: 'Iron, often decorated',
+    job: 'A back-up weapon that was also handy for everyday jobs. Worn on the left.' },
+  pilum: { name: 'Javelin', latin: 'pilum', made: 'Wooden shaft with a long, thin iron neck. About 2 m long',
+    job: 'Thrown just before the armies met. The soft iron neck often bent, so the enemy could not throw it back. One stuck in a shield made the shield heavy and hard to use.' },
+  caligae: { name: 'Boots', latin: 'caligae', made: 'Leather straps, with iron hobnails in the soles',
+    job: 'Open boots that let air in. The hobnails gripped the ground and stopped the soles wearing out on long marches.' },
+  furca: { name: 'Marching pole and pack', latin: 'furca', made: 'Wooden pole carrying a bag, pot and cloak',
+    job: 'Carried food, a cooking pot, a cloak and tools such as a spade for digging the camp each night. Soldiers were nicknamed “Marius’s mules”.' },
+};
+const ORDER = ['galea', 'lorica', 'scutum', 'gladius', 'pilum', 'pugio', 'caligae', 'furca'];
+const pieceG = {};
+const hiMats = {};   // materials per piece, for the highlight glow
+function makePiece(key, build, wornPos, wornEuler, laidY, laidEuler, radius = 1.32) {
+  const g = new THREE.Group(); g.userData.kit = key;
+  const mats = [];
+  build(g, mat => { const m = mat; mats.push(m); return m; });
+  g.position.copy(wornPos); g.rotation.copy(wornEuler);
+  const i = ORDER.indexOf(key), a = -Math.PI / 2 + Math.PI / 5 + i * (2 * Math.PI / ORDER.length);
+  const laidQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -a - Math.PI / 2, 0)).multiply(new THREE.Quaternion().setFromEuler(laidEuler));
+  g.userData.worn = { p: wornPos.clone(), q: new THREE.Quaternion().setFromEuler(wornEuler) };
+  g.userData.laid = { p: V(Math.cos(a) * radius, laidY, Math.sin(a) * radius), q: laidQ };
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  stage.add(g); pieceG[key] = g; hiMats[key] = mats;
+  return g;
+}
+const E = (x = 0, y = 0, z = 0) => new THREE.Euler(x, y, z);
+
+makePiece('galea', (g, k) => {
+  const iron = k(IRON()), brass = k(BRASS());
+  add(g, new THREE.SphereGeometry(0.128, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.53), iron, 0, 0.01, 0);
+  const brow = add(g, new THREE.TorusGeometry(0.129, 0.011, 6, 30), brass, 0, 0.0, 0); brow.rotation.x = Math.PI / 2;
+  add(g, new THREE.CylinderGeometry(0.135, 0.2, 0.05, 22, 1, true, Math.PI - 1.0, 2.0), iron, 0, -0.02, 0).material.side = THREE.DoubleSide;
+  for (const s of [-1, 1]) { const c = add(g, new THREE.BoxGeometry(0.016, 0.13, 0.09), iron, s * 0.122, -0.075, 0.035); c.rotation.z = s * 0.12; }
+  add(g, new THREE.CylinderGeometry(0.016, 0.02, 0.035, 10), brass, 0, 0.145, 0);
+  const ridge = add(g, new THREE.TorusGeometry(0.1, 0.006, 4, 20, Math.PI), brass, 0, 0.075, 0.0); ridge.rotation.y = Math.PI / 2;
+}, V(0, 1.64, 0), E(), 0.155, E());
+
+makePiece('lorica', (g, k) => {
+  const iron = k(IRON()); iron.side = THREE.DoubleSide; const brass = k(BRASS());
+  for (let i = 0; i < 6; i++) add(g, new THREE.CylinderGeometry(0.218 + i * 0.002, 0.222 + i * 0.002, 0.052, 22, 1, true), iron, 0, -0.2 + i * 0.062, 0);
+  add(g, new THREE.CylinderGeometry(0.19, 0.226, 0.08, 22, 1, true), iron, 0, 0.18, 0);
+  for (const s of [-1, 1]) for (let k2 = 0; k2 < 3; k2++) {
+    const lame = add(g, new THREE.CylinderGeometry(0.1, 0.1, 0.22, 14, 1, true, Math.PI / 2, Math.PI), iron, s * (0.2 + k2 * 0.045), 0.2 - k2 * 0.05, 0);
+    lame.rotation.set(Math.PI / 2, 0, -s * (0.35 + k2 * 0.25), 'ZXY');
+  }
+  for (const s of [-1, 1]) for (let r = 0; r < 3; r++) add(g, new THREE.SphereGeometry(0.012, 8, 6), brass, s * 0.05, 0.16 - r * 0.07, 0.222);
+}, V(0, 1.23, 0), E(), 0.205, E());
+
+makePiece('scutum', (g, k) => {
+  const front = k(new THREE.MeshStandardMaterial({ map: shieldTex, roughness: 0.75 }));
+  const back = k(M(0x6a4a2c, 0.9)); back.side = THREE.BackSide;
+  const geo = new THREE.CylinderGeometry(0.55, 0.55, 1.06, 28, 1, true, -0.6, 1.2);
+  add(g, geo, front, 0, 0, -0.55); add(g, geo, back, 0, 0, -0.55);
+  const brass = k(BRASS());
+  const boss = add(g, new THREE.SphereGeometry(0.085, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), brass, 0, 0, 0.0); boss.rotation.x = Math.PI / 2;
+  add(g, new THREE.BoxGeometry(0.2, 0.2, 0.012), brass, 0, 0, -0.004);
+  for (const y of [-0.53, 0.53]) add(g, new THREE.CylinderGeometry(0.556, 0.556, 0.022, 28, 1, true, -0.6, 1.2), brass, 0, y, -0.55).material.side = THREE.DoubleSide;
+}, V(0.12, 0.92, 0.44), E(0, 0.28, 0), 0.11, E(-Math.PI / 2, 0, 0));
+
+makePiece('gladius', (g, k) => {
+  const leather = k(M(0x3b2a1d, 0.7)), brass = k(BRASS()), bone = k(M(0xe8dcc0, 0.6));
+  add(g, new THREE.BoxGeometry(0.06, 0.46, 0.026), leather, 0, 0, 0);
+  add(g, new THREE.ConeGeometry(0.032, 0.06, 4), brass, 0, -0.26, 0).rotation.x = Math.PI;
+  for (const y of [0.2, 0.06, -0.1]) add(g, new THREE.BoxGeometry(0.066, 0.02, 0.032), brass, 0, y, 0);
+  add(g, new THREE.BoxGeometry(0.085, 0.026, 0.045), bone, 0, 0.245, 0);
+  add(g, new THREE.CylinderGeometry(0.016, 0.018, 0.09, 10), bone, 0, 0.3, 0);
+  add(g, new THREE.SphereGeometry(0.032, 12, 8), bone, 0, 0.365, 0);
+}, V(-0.25, 0.87, 0.07), E(0.12, 0, -0.1), 0.035, E(0, 0, Math.PI / 2));
+
+makePiece('pugio', (g, k) => {
+  const iron = k(IRON()), brass = k(BRASS());
+  add(g, new THREE.BoxGeometry(0.048, 0.2, 0.022), iron, 0, 0, 0);
+  for (const y of [0.05, -0.04]) add(g, new THREE.BoxGeometry(0.052, 0.015, 0.026), brass, 0, y, 0);
+  add(g, new THREE.BoxGeometry(0.055, 0.016, 0.028), brass, 0, 0.105, 0);
+  add(g, new THREE.CylinderGeometry(0.013, 0.013, 0.07, 8), iron, 0, 0.145, 0);
+  add(g, new THREE.CylinderGeometry(0.026, 0.026, 0.014, 12), brass, 0, 0.185, 0);
+}, V(0.215, 0.92, 0.1), E(0.1, 0, 0.12), 0.03, E(0, 0, Math.PI / 2));
+
+makePiece('pilum', (g, k) => {
+  const wood = k(new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.8 })), iron = k(IRON());
+  add(g, new THREE.CylinderGeometry(0.017, 0.019, 1.36, 10), wood, 0, -0.37, 0);
+  add(g, new THREE.BoxGeometry(0.042, 0.08, 0.042), wood, 0, 0.35, 0);
+  add(g, new THREE.CylinderGeometry(0.007, 0.008, 0.6, 8), iron, 0, 0.69, 0);
+  add(g, new THREE.ConeGeometry(0.017, 0.075, 4), iron, 0, 1.025, 0);
+  add(g, new THREE.ConeGeometry(0.02, 0.05, 6), iron, 0, -1.07, 0).rotation.x = Math.PI;
+}, V(-0.35, 1.06, 0.15), E(), 0.03, E(0, 0, Math.PI / 2), 1.5);
+
+makePiece('caligae', (g, k) => {
+  const sole = k(M(0x3b2a1d, 0.9)), strap = k(new THREE.MeshStandardMaterial({ map: strapTex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.8 }));
+  const nails = k(IRON());
+  for (const s of [-1, 1]) {
+    add(g, new THREE.BoxGeometry(0.115, 0.025, 0.26), sole, s * 0.1, -0.067, 0.01);
+    add(g, new THREE.CylinderGeometry(0.074, 0.078, 0.19, 12, 1, true), strap, s * 0.1, 0.035, -0.03);
+    add(g, new THREE.BoxGeometry(0.108, 0.07, 0.2), strap, s * 0.1, -0.03, 0.05);
+    for (let n = 0; n < 5; n++) add(g, new THREE.SphereGeometry(0.008, 6, 4), nails, s * 0.1 + (n % 2 ? 0.035 : -0.035), -0.08, -0.08 + n * 0.045, false);
+  }
+}, V(0, 0.08, 0.0), E(), 0.085, E());
+
+makePiece('furca', (g, k) => {
+  const wood = k(new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.8 })), leather = k(M(0x8b6a43, 0.85));
+  const bronze = k(M(0xb07a3c, 0.4, 0.5)), wool = k(M(0x6d5b4b, 0.95));
+  limb(V(0.06, -0.3, 0.42), V(-0.02, 0.3, -0.12), 0.018, wood, g);
+  limb(V(-0.26, 0.24, -0.1), V(0.28, 0.24, -0.1), 0.016, wood, g);
+  const bag = add(g, new THREE.SphereGeometry(0.13, 16, 10), leather, -0.14, 0.04, -0.12); bag.scale.set(1, 1.25, 0.8);
+  add(g, new THREE.CylinderGeometry(0.085, 0.07, 0.13, 16), bronze, 0.17, 0.07, -0.12);
+  const roll = add(g, new THREE.CylinderGeometry(0.066, 0.066, 0.44, 14), wool, 0.02, 0.3, -0.09); roll.rotation.z = Math.PI / 2;
+  add(g, new THREE.BoxGeometry(0.14, 0.17, 0.07), leather, 0.03, -0.06, -0.1);
+}, V(0.12, 1.72, -0.42), E(), 0.2, E(0, 0, Math.PI / 2), 1.42);
+
+// Labels: one per piece. Worn: only the chosen piece is named. Laid out: all are named.
+const kitLabels = {};
+for (const key of ORDER) {
+  kitLabels[key] = addLabel(pieceG[key], `${PIECES[key].name} · ${PIECES[key].latin}`, V(0, 0.05, 0),
+    () => ui.tab === 'kit' && ui.labels && ((kit.t > 0.98 && innerWidth >= 640) || kit.sel === key), false);
+}
+
+const kit = { sel: null, t: 0, dir: 0, spin: true, skin: 0 };
+function kitUpdate(dt) {
+  if (kit.dir) {
+    kit.t = clamp(kit.t + kit.dir * dt / 1.6, 0, 1);
+    if (kit.t === 0 || kit.t === 1) { kit.dir = 0; dirty = true; }
+  }
+  ORDER.forEach((key, i) => {
+    const g = pieceG[key], w = g.userData.worn, l = g.userData.laid;
+    const k = ease(clamp((kit.t - i * 0.05) / 0.6, 0, 1));
+    g.position.lerpVectors(w.p, l.p, k); g.position.y += Math.sin(Math.PI * k) * 0.35;
+    g.quaternion.slerpQuaternions(w.q, l.q, k);
+  });
+  if (kit.spin && !kit.dragging) stage.rotation.y += dt * 0.3;
+  const glow = 0.35 + 0.25 * Math.sin(clock * 5);
+  for (const key of ORDER) for (const m of hiMats[key]) {
+    if (key === kit.sel) m.emissive.setRGB(0.95 * glow, 0.7 * glow, 0.15 * glow); else m.emissive.setRGB(0, 0, 0);
+  }
+  for (const key of ORDER) kitLabels[key].tag.classList.toggle('hot', key === kit.sel);
+}
+function selectPiece(key) { kit.sel = key; dirty = true; }
+function setSkin(i) { kit.skin = i; skinMat.color.set(SKINS[i]); hairMat.color.set(HAIRS[i]); dirty = true; }
+
+// =====================================================================
+//  TAB 2: TESTUDO
+// =====================================================================
+const tesG = new THREE.Group(); scene.add(tesG); tesG.visible = false;
+{
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(22, 72), new THREE.MeshStandardMaterial({ map: grassDisc(8, false), transparent: true, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.set(0, 0, -4); ground.receiveShadow = true; tesG.add(ground);
+  const track = new THREE.Mesh(new THREE.PlaneGeometry(5, 19), M(0xb7a079, 1, 0, { transparent: true, opacity: 0.55 }));
+  track.rotation.x = -Math.PI / 2; track.position.set(0, 0.006, -1.4); track.receiveShadow = true; tesG.add(track);
+  // A British hillfort's earth rampart, ditch and wooden palisade
+  const sh = new THREE.Shape(); sh.moveTo(-2.2, 0); sh.lineTo(2.2, 0); sh.lineTo(0.8, 1.6); sh.lineTo(-0.8, 1.6); sh.closePath();
+  const bank = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 24, bevelEnabled: false }), M(0x8d7a52, 1));
+  bank.rotation.y = Math.PI / 2; bank.position.set(-12, 0, -14); bank.castShadow = bank.receiveShadow = true; tesG.add(bank);
+  const ditch = new THREE.Mesh(new THREE.PlaneGeometry(24, 1.2), M(0x4f4430, 1));
+  ditch.rotation.x = -Math.PI / 2; ditch.position.set(0, 0.012, -11.2); tesG.add(ditch);
+  const n = 92, postGeo = new THREE.CylinderGeometry(0.11, 0.12, 1.8, 6), tipGeo = new THREE.ConeGeometry(0.11, 0.25, 6);
+  const posts = new THREE.InstancedMesh(postGeo, M(0x7a5532, 0.9), n), tips = new THREE.InstancedMesh(tipGeo, M(0x6a472a, 0.9), n);
+  const m4 = new THREE.Matrix4(), rnd = seeded(12);
+  for (let i = 0; i < n; i++) {
+    const x = -11.8 + i * 0.26, h = 1.7 + rnd() * 0.3;
+    m4.makeScale(1, h / 1.8, 1).setPosition(x, 1.6 + h / 2, -14); posts.setMatrixAt(i, m4);
+    m4.makeTranslation(x, 1.6 + h + 0.12, -14); tips.setMatrixAt(i, m4);
+  }
+  posts.castShadow = tips.castShadow = true; tesG.add(posts, tips);
+}
+const TS = { leg: new THREE.CylinderGeometry(0.06, 0.055, 0.6, 8).translate(0, -0.3, 0), skirt: new THREE.CylinderGeometry(0.19, 0.24, 0.4, 12),
+  torso: new THREE.CylinderGeometry(0.2, 0.21, 0.5, 14), head: new THREE.SphereGeometry(0.1, 12, 10),
+  helm: new THREE.SphereGeometry(0.122, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.53), guard: new THREE.CylinderGeometry(0.13, 0.19, 0.05, 14, 1, true, Math.PI - 0.9, 1.8),
+  arm: new THREE.CylinderGeometry(0.05, 0.045, 0.52, 8).translate(0, -0.26, 0),
+  shield: new THREE.CylinderGeometry(0.55, 0.55, 1.06, 18, 1, true, -0.6, 1.2).translate(0, 0, -0.55),
+  boss: new THREE.SphereGeometry(0.08, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(Math.PI / 2) };
+const TM = { tunic: tunicMat, lorica: new THREE.MeshStandardMaterial({ map: loricaTex, roughness: 0.4, metalness: 0.5 }),
+  helm: IRON(), shieldF: new THREE.MeshStandardMaterial({ map: shieldTex, roughness: 0.75 }), shieldB: M(0x6a4a2c, 0.9, 0, { side: THREE.BackSide }), brass: BRASS() };
+TM.helm.side = THREE.DoubleSide;
+const skinMats = SKINS.map(c => M(c, 0.7));
+
+const COLS = 6, ROWS = 5, NT = COLS * ROWS;
+const formation = new THREE.Group(); tesG.add(formation);
+formation.rotation.y = Math.PI;   // soldiers face -z, towards the hillfort
+const tSoldiers = [];
+{
+  const rnd = seeded(77);
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const s = new THREE.Group(), skin = skinMats[Math.floor(rnd() * skinMats.length)];
+    const legs = [];
+    for (const side of [-1, 1]) { const l = add(s, TS.leg, skin, side * 0.1, 0.62, 0); legs.push(l); }
+    add(s, TS.skirt, TM.tunic, 0, 0.78, 0);
+    add(s, TS.torso, TM.lorica, 0, 1.22, 0);
+    add(s, TS.head, skin, 0, 1.62, 0, false);
+    add(s, TS.helm, TM.helm, 0, 1.63, 0, false);
+    add(s, TS.guard, TM.helm, 0, 1.6, 0, false);
+    for (const side of [-1, 1]) { const a = add(s, TS.arm, skin, side * 0.25, 1.42, 0.02, false); a.rotation.z = side * 0.12; }
+    const sh = new THREE.Group(); s.add(sh);
+    add(sh, TS.shield, TM.shieldF); add(sh, TS.shield, TM.shieldB, 0, 0, 0, false); add(sh, TS.boss, TM.brass, 0, 0, 0, false);
+    // role in the testudo
+    let role = 'roof';
+    if (r === 0) role = 'front'; else if (r === ROWS - 1) role = 'back'; else if (c === 0) role = 'left'; else if (c === COLS - 1) role = 'right';
+    const sp = 0.62, xT = (2.5 - c) * sp, zT = (2 - r) * sp;
+    const march = { p: V((2.5 - c) * 1.0, 0, (2 - r) * 1.25), sp: V(0.3, 0.88, 0.06), sq: new THREE.Quaternion().setFromEuler(E(0, Math.PI / 2, 0)) };
+    let tp, tq;
+    if (role === 'front') { tp = V(0, 0.72, 0.34); tq = E(-0.05, 0, 0); }
+    else if (role === 'back') { tp = V(0, 0.72, -0.34); tq = E(0.05, Math.PI, 0); }
+    else if (role === 'left') { tp = V(0.34, 0.72, 0); tq = E(0, Math.PI / 2, 0); }
+    else if (role === 'right') { tp = V(-0.34, 0.72, 0); tq = E(0, -Math.PI / 2, 0); }
+    else {
+      const spread = [0, 0.3, 0.1, -0.1, -0.3, 0][c], fwd = r === 1 ? 0.36 : r === ROWS - 2 ? -0.22 : 0.05;
+      tp = V(spread, 1.62 + (r === 1 ? -0.05 : 0), fwd); tq = new THREE.Euler(-Math.PI / 2 + 0.12, Math.PI / 2, 0, 'YXZ');
+    }
+    const test = { p: V(xT, -0.07, zT), sp: tp, sq: new THREE.Quaternion().setFromEuler(tq) };
+    s.userData = { legs, sh, march, test, role, phase: rnd() * 6 };
+    formation.add(s); tSoldiers.push(s);
+  }
+}
+// Arrows
+const arrowGeo = { shaft: new THREE.CylinderGeometry(0.012, 0.012, 0.72, 5), head: new THREE.ConeGeometry(0.022, 0.08, 4), fl: new THREE.BoxGeometry(0.004, 0.1, 0.05) };
+const arrowMat = { shaft: M(0x8a6a3c), head: IRON(), fl: M(0xeeeeee, 0.9) };
+const arrows = [];
+for (let i = 0; i < 40; i++) {
+  const a = new THREE.Group();
+  add(a, arrowGeo.shaft, arrowMat.shaft, 0, 0, 0, false); add(a, arrowGeo.head, arrowMat.head, 0, 0.39, 0, false);
+  for (const r of [0, Math.PI / 2]) { const f = add(a, arrowGeo.fl, arrowMat.fl, 0, -0.3, 0, false); f.rotation.y = r; }
+  a.visible = false; tesG.add(a);
+  arrows.push({ g: a, v: V(0, 0, 0), state: 'off', t: 0, delay: 0, spin: V(0, 0, 0) });
+}
+const tes = { form: 0, dir: 0, z: 2, marching: false, blocked: 0, through: 0, atWall: false };
+const Z_START = 2, Z_WALL = -8.6;
+function tesUpdate(dt) {
+  if (tes.dir) { tes.form = clamp(tes.form + tes.dir * dt / 1.8, 0, 1); if (tes.form === 0 || tes.form === 1) { tes.dir = 0; dirty = true; } }
+  const k = ease(tes.form);
+  const speed = lerp(1.25, 0.45, k);
+  if (tes.marching) {
+    tes.z -= speed * dt;
+    if (tes.z <= Z_WALL) { tes.z = Z_WALL; tes.marching = false; tes.atWall = true; dirty = true; }
+  }
+  formation.position.set(0, 0, tes.z);
+  const moving = tes.marching ? 1 : 0;
+  for (const s of tSoldiers) {
+    const u = s.userData;
+    s.position.lerpVectors(u.march.p, u.test.p, k);
+    u.sh.position.lerpVectors(u.march.sp, u.test.sp, k);
+    u.sh.quaternion.slerpQuaternions(u.march.sq, u.test.sq, k);
+    s.scale.y = lerp(1, 0.94, k);
+    const sw = moving * Math.sin(clock * lerp(6, 3.4, k) + u.phase) * lerp(0.45, 0.2, k);
+    u.legs[0].rotation.x = sw; u.legs[1].rotation.x = -sw;
+    s.position.y += moving * Math.abs(Math.sin(clock * lerp(6, 3.4, k) + u.phase)) * 0.03;
+  }
+  // arrows
+  const fz = tes.z, inTest = tes.form > 0.95;
+  const hx = inTest ? 1.95 : 3.1, hz = inTest ? 1.7 : 3.0, top = inTest ? 1.66 : 1.75;
+  for (const a of arrows) {
+    if (a.state === 'off') continue;
+    if (a.delay > 0) { a.delay -= dt; if (a.delay <= 0) a.g.visible = true; else continue; }
+    if (a.state === 'fly' || a.state === 'bounce') {
+      a.v.y -= 9.8 * dt;
+      a.g.position.addScaledVector(a.v, dt);
+      if (a.state === 'fly') a.g.quaternion.setFromUnitVectors(UP, a.v.clone().normalize());
+      else { a.g.rotation.x += a.spin.x * dt; a.g.rotation.z += a.spin.z * dt; }
+      const p = a.g.position, lx = p.x, lz = p.z - fz;
+      const inside = Math.abs(lx) < hx && Math.abs(lz) < hz;
+      if (a.state === 'fly' && inside && p.y < top) {
+        if (inTest) {
+          tes.blocked++; a.state = 'bounce'; p.y = top;
+          const out = V(lx, 0, lz).normalize();
+          a.v.set(out.x * 2.6 + (Math.random() - 0.5), 1.6 + Math.random() * 1.2, out.z * 2.6 + (Math.random() - 0.5));
+          a.spin.set((Math.random() - 0.5) * 18, 0, (Math.random() - 0.5) * 18);
+        } else { tes.through++; a.state = 'gap'; }
+        dirty = true;
+      }
+      if (p.y <= 0.05) { p.y = 0.05; a.state = 'down'; a.t = 0; }
+    } else if (a.state === 'gap') {
+      a.v.y -= 9.8 * dt; a.g.position.addScaledVector(a.v, dt);
+      if (a.g.position.y <= 0.28) { a.g.position.y = 0.28; a.state = 'down'; a.t = 0; }   // sticks in the ground between the soldiers
+    } else if (a.state === 'down') {
+      a.t += dt;
+      if (a.t > 4) { a.state = 'off'; a.g.visible = false; }
+    }
+  }
+}
+function fireArrows() {
+  let n = 0;
+  const inTest = tes.form > 0.95, hx = inTest ? 1.9 : 2.9, hz = inTest ? 1.6 : 2.8;
+  for (const a of arrows) {
+    if (a.state !== 'off' || n >= 26) continue;
+    const start = V((Math.random() - 0.5) * 12, 4.4 + Math.random(), -14.6);
+    const target = V((Math.random() * 2 - 1) * (hx + 0.4), 0, tes.z + (Math.random() * 2 - 1) * (hz + 0.4));
+    const T = 1.25 + Math.random() * 0.3;
+    a.v.set((target.x - start.x) / T, (target.y - start.y) / T + 0.5 * 9.8 * T, (target.z - start.z) / T);
+    a.g.position.copy(start); a.g.rotation.set(0, 0, 0); a.state = 'fly'; a.delay = n * 0.06 + Math.random() * 0.2; a.g.visible = false;
+    n++;
+  }
+}
+function resetTestudo() {
+  tes.z = Z_START; tes.marching = false; tes.atWall = false; tes.blocked = 0; tes.through = 0;
+  for (const a of arrows) { a.state = 'off'; a.g.visible = false; }
+  dirty = true;
+}
+// Testudo labels (on the formation, so they move with it)
+const lblRoof = addLabel(formation, 'Shields overhead', V(0.5, 2.4, -0.5), () => ui.tab === 'testudo' && ui.labels && tes.form > 0.95);
+const lblFront = addLabel(formation, 'Shields at the front', V(-1.5, 1.45, 1.9), () => ui.tab === 'testudo' && ui.labels && tes.form > 0.95);
+const lblSide = addLabel(formation, 'Shields at the sides', V(-2.15, 0.85, -1.0), () => ui.tab === 'testudo' && ui.labels && tes.form > 0.95);
+addLabel(formation, 'Marching block', V(0, 2.3, 0), () => ui.tab === 'testudo' && ui.labels && tes.form < 0.05);
+addLabel(tesG, 'Hillfort rampart', V(-6, 2.3, -12.6), () => ui.tab === 'testudo' && ui.labels);
+
+// =====================================================================
+//  TAB 3: BOUDICCA'S LAST BATTLE
+// =====================================================================
+const batG = new THREE.Group(); scene.add(batG); batG.visible = false;
+const woodEdge = z => 12.5 + Math.max(0, z + 18) * 0.9;     // the woods close in near the Roman line
+const hB = (x, z) => 0.11 * Math.max(0, -z - 6) + 0.3 * Math.sin(x * 0.13) * Math.cos(z * 0.11);
+const zWag = x => 31 - 0.0028 * x * x;
+{
+  const geo = new THREE.PlaneGeometry(230, 170, 92, 68); geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position, col = [];
+  const cA = new THREE.Color(0x8fb063), cB = new THREE.Color(0x7aa055), cR = new THREE.Color(0xc8b48a), c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i) - 5; pos.setZ(i, z); pos.setY(i, hB(x, z));
+    c.copy(cA).lerp(cB, 0.5 + 0.5 * Math.sin(x * 0.21 + z * 0.17));
+    if (Math.abs(z + 46) < 1.6) c.copy(cR);                                    // the Roman road behind the woods
+    col.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.computeVertexNormals();
+  const g = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+  g.receiveShadow = true; batG.add(g);
+  // woods: trees behind and beside the Roman army
+  const rnd = seeded(99), spots = [];
+  for (let k = 0; k < 2600 && spots.length < 620; k++) {
+    const x = (rnd() * 2 - 1) * 75, z = -43 + rnd() * 57;
+    const inWood = z < -24 || Math.abs(x) > woodEdge(z);
+    if (inWood && Math.abs(z + 46) > 2.2) spots.push([x, z, 0.8 + rnd() * 0.6]);
+  }
+  const foliage = new THREE.InstancedMesh(new THREE.ConeGeometry(1.2, 3.2, 7), M(0x3f6b34, 0.9), spots.length);
+  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.15, 0.2, 1, 6), M(0x5a3d22, 0.9), spots.length);
+  const m4 = new THREE.Matrix4(), cc = new THREE.Color();
+  spots.forEach(([x, z, s], i) => {
+    const y = hB(x, z);
+    m4.makeScale(s, s, s).setPosition(x, y + 0.5 * s + 1.6 * s, z); foliage.setMatrixAt(i, m4);
+    cc.setHSL(0.3 + rnd() * 0.05, 0.35, 0.28 + rnd() * 0.1); foliage.setColorAt(i, cc);
+    m4.makeScale(s, s, s).setPosition(x, y + 0.5 * s, z); trunk.setMatrixAt(i, m4);
+  });
+  batG.add(foliage, trunk);
+}
+// Unit parts as instanced meshes
+const P = {
+  bBody: new THREE.InstancedMesh(new THREE.ConeGeometry(0.32, 1.0, 6), M(0xffffff, 0.9), 1300),
+  head: new THREE.InstancedMesh(new THREE.SphereGeometry(0.17, 8, 6), M(0xffffff, 0.8), 1500),
+  rBody: new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.9, 0.32), M(0xffffff, 0.8), 200),
+  rShield: new THREE.InstancedMesh(new THREE.BoxGeometry(0.62, 0.82, 0.08), M(0xffffff, 0.7), 200),
+  helm: new THREE.InstancedMesh(new THREE.SphereGeometry(0.2, 8, 6), M(0x9ca3aa, 0.4, 0.5), 200),
+  horse: new THREE.InstancedMesh(new THREE.BoxGeometry(0.45, 0.75, 1.5), M(0xffffff, 0.9), 60),
+  cart: new THREE.InstancedMesh(new THREE.BoxGeometry(1.2, 0.5, 1.0), M(0xffffff, 0.9), 60),
+  wheel: new THREE.InstancedMesh(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 12).rotateZ(Math.PI / 2), M(0x4a3420, 0.9), 200),
+  pilum: new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.07, 2.8, 5), M(0xf1e2b8, 0.6), 80),
+};
+for (const k in P) { P[k].count = 0; P[k].frustumCulled = false; batG.add(P[k]); }
+const units = [];
+const BCOL = ['#3f5f8c', '#5c7a3a', '#7a5a2e', '#8c4a3a', '#6b5a8a', '#4a6b6b', '#9a7a3a', '#5a4a3a'];
+const BSKIN = ['#f0c6a3', '#e5b694', '#d9a47a', '#f3d2b5'];
+function unit(kind, color, skin) {
+  const u = { kind, cur: V(0, 0, 0), from: V(0, 0, 0), at: [], alpha: [], a: 1, aFrom: 1, rot: 0, yOff: 0, scale: 1, color: new THREE.Color(color), skin: new THREE.Color(skin) };
+  units.push(u); return u;
+}
+const STEPS = 6;
+{
+  const rnd = seeded(2024);
+  // Britons
+  for (let i = 0; i < 1050; i++) {
+    let x, z;
+    do { x = (rnd() * 2 - 1) * 38; z = 3 + rnd() * 20 + 2.5 * Math.sin(x * 0.15); } while (Math.abs(x) > woodEdge(z) - 1.5);
+    const u = unit('briton', BCOL[Math.floor(rnd() * BCOL.length)], BSKIN[Math.floor(rnd() * BSKIN.length)]);
+    u.rot = Math.PI;
+    const z1 = -13.4 + (z - 3) * 0.75 + rnd() * 0.5, x1 = clamp(x * clamp(0.3 + 0.035 * (z1 + 13.4), 0.3, 1), -(woodEdge(z1) - 1.6), woodEdge(z1) - 1.6);
+    const front = z1 < -9;
+    const z2 = front ? z1 + 2.5 + rnd() * 1.5 : z1 + 0.6;
+    const z3 = z2 + 7 + rnd(), x3 = clamp(x1 * 1.1, -(woodEdge(z3) - 1.6), woodEdge(z3) - 1.6);
+    let z4 = 13 + (z3 + 6) * 0.48 + rnd() * 0.5, x4 = x3 * 1.15;
+    x4 = clamp(x4, -(woodEdge(z4) - 2), woodEdge(z4) - 2); z4 = Math.min(z4, zWag(x4) - 1.6);
+    const f2 = front && rnd() < 0.15, f3 = f2 || (z3 < 0 && rnd() < 0.18), f4 = f3 || rnd() < 0.4;
+    u.at = [V(x, 0, z), V(x1, 0, z1), V(x1, 0, z2), V(x3, 0, z3), V(x4, 0, z4), V(x4, 0, z4)];
+    u.alpha = [1, 1, f2 ? 0 : 1, f3 ? 0 : 1, f4 ? 0 : 1, f4 ? 0 : 1];
+  }
+  // Chariots
+  for (let i = 0; i < 14; i++) {
+    const x = (rnd() * 2 - 1) * 22, z = 0.5 + rnd();
+    const u = unit('chariot', '#8a6238', BSKIN[Math.floor(rnd() * BSKIN.length)]); u.rot = Math.PI;
+    u.at = [V(x, 0, z), V(x * 0.4, 0, -11.2), V(x * 0.6, 0, -6 + rnd()), V(x * 0.7, 0, -1), V(x * 0.8, 0, 8), V(x * 0.8, 0, 8)];
+    const f = rnd() < 0.5;
+    u.alpha = [1, 1, f ? 0 : 1, rnd() < 0.5 ? 0 : (f ? 0 : 1), 0, 0];
+  }
+  // Wagons in an arc at the back, with families watching from them
+  for (let i = 0; i < 26; i++) {
+    const x = -37 + i * (74 / 25), z = zWag(x);
+    const u = unit('wagon', '#8a6238', '#000'); u.rot = Math.atan2(-0.0056 * x, 1) + Math.PI / 2;
+    u.at = Array(STEPS).fill(V(x, 0, z)); u.alpha = Array(STEPS).fill(1);
+    for (const off of [-0.35, 0.35]) {
+      const f = unit('briton', ['#a08a6a', '#8a7a9a', '#9a6a5a', '#6a8a7a'][Math.floor(rnd() * 4)], BSKIN[Math.floor(rnd() * BSKIN.length)]);
+      f.rot = Math.PI; f.scale = 0.72; f.yOff = 0.75; f.family = true;
+      const p = V(x + off * Math.cos(u.rot), 0, z - off * Math.sin(u.rot));
+      f.at = Array(STEPS).fill(p); f.alpha = Array(STEPS).fill(1);
+    }
+  }
+  // Wedge shapes: rows of 1, 3, 5 ... behind a tip
+  const wedge = (n, cx, tipZ, sp = 0.5) => { const out = []; let row = 0; while (out.length < n) { const w = 2 * row + 1; for (let j = 0; j < w && out.length < n; j++) out.push(V(cx + (j - row) * sp, 0, tipZ - row * sp * 1.1)); row++; } return out; };
+  // Legionaries
+  const legW = [-6, -2, 2, 6].flatMap(cx => wedge(30, cx, -11.5)), legW4 = [-6, -2, 2, 6].flatMap(cx => wedge(30, cx, 4.5));
+  for (let i = 0; i < 120; i++) {
+    const u = unit('legion', '#a3261f', '#c68a5e');
+    const r = Math.floor(i / 40), c = i % 40, p0 = V(-7.8 + c * 0.4, 0, -17.6 - r * 1.2);
+    u.at = [p0, p0, p0, legW[i], legW4[i], legW4[i]]; u.alpha = Array(STEPS).fill(1);
+  }
+  // Auxiliaries on the flanks
+  const auxW = [-9.6, 9.6].flatMap(cx => wedge(20, cx, -12.4)), auxW4 = [-10.5, 10.5].flatMap(cx => wedge(20, cx, 3));
+  for (let i = 0; i < 40; i++) {
+    const u = unit('aux', '#5d7a3e', '#7f4e2f');
+    const side = i < 20 ? -1 : 1, j = i % 20, p0 = V(side * (8.3 + (j % 5) * 0.42), 0, -17.6 - Math.floor(j / 5) * 0.55);
+    u.at = [p0, p0, p0, auxW[i], auxW4[i], auxW4[i]]; u.alpha = Array(STEPS).fill(1);
+  }
+  // Cavalry on the wings
+  for (let i = 0; i < 24; i++) {
+    const u = unit('cav', '#a3261f', '#a86d45');
+    const side = i < 12 ? -1 : 1, j = i % 12, p0 = V(side * (10.9 + (j % 2) * 0.75), 0, -17.4 - Math.floor(j / 2) * 1.7);
+    const p3 = V(p0.x, 0, p0.z + 5.5), p4 = V(side * (20 + (j % 3) * 1.3), 0, 6 + Math.floor(j / 3) * 1.8);
+    u.at = [p0, p0, p0, p3, p4, p4]; u.alpha = Array(STEPS).fill(1);
+  }
+  for (const u of units) { u.cur.copy(u.at[0]); u.a = u.alpha[0]; }
+}
+const bat = { step: 0, t: 1, pila: [] };
+const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), s4 = V(1, 1, 1), p4 = V(0, 0, 0), e4 = new THREE.Euler();
+const ROMAN_SH = new THREE.Color('#b8322a'), AUX_SH = new THREE.Color('#d9b45a'), HORSE = new THREE.Color('#6b4a2e');
+function put(mesh, x, y, z, rot, sc, color, sx = 1, sy = 1, sz = 1) {
+  if (sc <= 0.001) return;
+  q4.setFromEuler(e4.set(0, rot, 0)); s4.set(sc * sx, sc * sy, sc * sz); p4.set(x, y, z);
+  m4.compose(p4, q4, s4); const i = mesh.count++; mesh.setMatrixAt(i, m4); if (color) mesh.setColorAt(i, color);
+}
+const off = new THREE.Vector3();
+function placeUnits() {
+  for (const k in P) if (k !== 'pilum') P[k].count = 0;
+  for (const u of units) {
+    const { x, z } = u.cur, y = hB(x, z) + u.yOff, a = u.a, s = u.scale * a, r = u.rot;
+    const cs = Math.cos(r), sn = Math.sin(r);
+    const at = (lx, lz) => [x + lx * cs + lz * sn, z - lx * sn + lz * cs];
+    if (u.kind === 'briton') { put(P.bBody, x, y + 0.5 * s, z, r, s, u.color); put(P.head, x, y + 1.1 * s, z, r, s, u.skin); }
+    else if (u.kind === 'legion' || u.kind === 'aux') {
+      put(P.rBody, x, y + 0.55 * s, z, 0, s, u.color); put(P.helm, x, y + 1.17 * s, z, 0, s, null);
+      put(P.rShield, x, y + 0.6 * s, z + 0.27 * s, 0, s, u.kind === 'aux' ? AUX_SH : ROMAN_SH);
+    } else if (u.kind === 'cav') {
+      put(P.horse, x, y + 0.85 * s, z, 0, s, HORSE);
+      put(P.rBody, x, y + 1.55 * s, z - 0.1, 0, s * 0.85, u.color); put(P.helm, x, y + 2.08 * s, z - 0.1, 0, s * 0.85, null);
+    } else if (u.kind === 'chariot') {
+      put(P.cart, x, y + 0.6 * s, z, r, s, u.color);
+      for (const lx of [-0.62, 0.62]) { const [wx, wz] = at(lx, 0); put(P.wheel, wx, y + 0.42 * s, wz, r, s, null); }
+      for (const lx of [-0.35, 0.35]) { const [hx, hz] = at(lx, 1.5); put(P.horse, hx, y + 0.8 * s, hz, r, s * 0.9, HORSE); }
+      put(P.bBody, x, y + 1.3 * s, z, r, s * 0.8, new THREE.Color('#3f5f8c')); put(P.head, x, y + 1.82 * s, z, r, s * 0.8, u.skin);
+    } else if (u.kind === 'wagon') {
+      put(P.cart, x, y + 0.7, z, r, 1, u.color, 1.9, 1, 1.15);
+      for (const lx of [-0.8, 0.8]) for (const lz of [-0.45, 0.45]) { const [wx, wz] = at(lx, lz); put(P.wheel, wx, y + 0.42, wz, r + Math.PI / 2, 1, null); }
+    }
+  }
+  for (const k in P) { if (k === 'pilum') continue; P[k].instanceMatrix.needsUpdate = true; if (P[k].instanceColor) P[k].instanceColor.needsUpdate = true; }
+}
+function goStep(s) {
+  s = clamp(s, 0, STEPS - 1);
+  const forward = s === bat.step + 1;
+  bat.step = s; bat.t = 0;
+  for (const u of units) { u.from.copy(u.cur); u.aFrom = u.a; }
+  bat.pila = [];
+  if (s === 2 && forward) launchPila();
+  dirty = true;
+}
+function launchPila() {
+  const rnd = seeded(7 + Math.floor(clock * 10));
+  const legs = units.filter(u => u.kind === 'legion' && u.at[0].z > -18.5);
+  const foes = units.filter(u => u.kind === 'briton' && !u.family && u.at[1].z < -9.5);
+  for (let v = 0; v < 2; v++) for (let i = 0; i < 36; i++) {
+    const a = legs[Math.floor(rnd() * legs.length)].at[0], b = foes[Math.floor(rnd() * foes.length)].at[1];
+    bat.pila.push({ a: V(a.x, hB(a.x, a.z) + 1.4, a.z), b: V(b.x + (rnd() - 0.5), hB(b.x, b.z) + 0.3, b.z + (rnd() - 0.5)), t: -(v * 0.9 + rnd() * 0.25) });
+  }
+}
+function batUpdate(dt) {
+  const dur = bat.step === 1 ? 3.2 : 2.6;
+  const was = bat.t;
+  bat.t = Math.min(1, bat.t + dt / dur);
+  const k = ease(bat.t), ka = ease(clamp((bat.t - 0.3) / 0.7, 0, 1));
+  const delayed = bat.step === 2 ? ease(clamp((bat.t - 0.45) / 0.55, 0, 1)) : k;   // Britons fall back after the pila land
+  if (was < 1 || bat.pila.length) {
+    for (const u of units) {
+      const kk = u.kind === 'briton' || u.kind === 'chariot' ? delayed : k;
+      u.cur.lerpVectors(u.from, u.at[bat.step], kk);
+      u.a = lerp(u.aFrom, u.alpha[bat.step], u.kind === 'briton' || u.kind === 'chariot' ? (bat.step === 2 ? delayed : ka) : ka);
+    }
+  }
+  // pila in flight: an arc from the Roman line into the front of the British army
+  P.pilum.count = 0;
+  for (const p of bat.pila) {
+    p.t += dt / 1.1;
+    const t = clamp(p.t, 0, 1);
+    if (p.t < 0 || p.t > 2.2) continue;
+    const x = lerp(p.a.x, p.b.x, t), z = lerp(p.a.z, p.b.z, t), y = lerp(p.a.y, p.b.y, t) + Math.sin(Math.PI * t) * 4.5;
+    const dy = (p.b.y - p.a.y) + Math.PI * Math.cos(Math.PI * t) * 4.5, dx = p.b.x - p.a.x, dz = p.b.z - p.a.z;
+    const dir = V(dx, dy, dz).normalize();
+    q4.setFromUnitVectors(UP, dir); p4.set(x, y, z); s4.set(1, 1, 1);
+    m4.compose(p4, q4, s4); P.pilum.setMatrixAt(P.pilum.count++, m4);
+  }
+  P.pilum.instanceMatrix.needsUpdate = true;
+  if (was < 1 || bat.pila.length || bat.first !== true) { placeUnits(); bat.first = true; }
+}
+const centroid = (pred, step = null) => {
+  const c = V(0, 0, 0); let n = 0;
+  for (const u of units) if (pred(u) && (step === null ? u.a > 0.5 : u.alpha[step] > 0.5)) { c.add(step === null ? u.cur : u.at[step]); n++; }
+  if (n) c.multiplyScalar(1 / n); return c;
+};
+const BL = [];
+function battleLabel(text, fn, steps) {
+  const L = addLabel(batG, text, V(0, 0, 0), () => ui.tab === 'battle' && ui.labels && steps.includes(bat.step));
+  BL.push({ L, fn }); return L;
+}
+const ground = (x, z, up) => V(x, hB(x, z) + up, z);
+battleLabel('Legionaries', () => { const c = centroid(u => u.kind === 'legion'); return ground(c.x, c.z, 2.0); }, [0, 1, 4, 5]);
+battleLabel('Auxiliaries', () => { const c = centroid(u => u.kind === 'aux' && u.at[0].x < 0); return ground(c.x - 0.5, c.z, 2.0); }, [0]);
+battleLabel('Cavalry', () => { const c = centroid(u => u.kind === 'cav' && u.at[0].x > 0); return ground(c.x + 1.0, c.z, 2.6); }, [0, 4]);
+battleLabel('Woods', () => ground(-22, -20, 5.5), [0]);
+battleLabel('British army', () => { const c = centroid(u => u.kind === 'briton' && !u.family); return ground(c.x, c.z, 2.2); }, [0, 1, 3]);
+battleLabel('Chariots', () => ground(12, 0.8, 2.2), [0]);
+battleLabel('Wagons and families', () => ground(9, zWag(9) + 0.5, 2.6), [0, 1, 4, 5]);
+battleLabel('Narrow gap', () => ground(-14.5, -15, 3.5), [1]);
+battleLabel('Pila thrown', () => ground(3, -11, 4.2), [2]);
+battleLabel('Wedges (cuneus)', () => ground(-6, -11.5 + (bat.step >= 4 ? 16 : 0), 2.4), [3]);
+battleLabel('Trapped against the wagons', () => ground(-7, zWag(-7) - 4, 2.6), [4]);
+
+// =====================================================================
+//  WORDS
+// =====================================================================
+const STEP_TEXT = [
+  { name: 'The armies line up',
+    body: `<p>In AD 43 the emperor <b>Claudius</b> began the Roman <b>invasion</b> of Britain. The <b>Iceni</b>, a tribe from what is now Norfolk, at first lived alongside the Romans.</p>
+      <p>When the Iceni king died, the Romans took his lands and treated his wife, <b>Boudicca</b>, and their daughters cruelly. Boudicca led a revolt. Her army burned Camulodunum (Colchester), Londinium (London) and Verulamium (St Albans).</p>
+      <p>The Roman governor, Suetonius Paulinus, chose his battlefield carefully: a narrow gap with woods behind and beside his army, and open ground in front.</p>` },
+  { name: 'The Britons charge',
+    body: `<p>The British army was much bigger. Families came to watch from wagons lined up at the back of the plain.</p>
+      <p>The Britons charged uphill. As they pushed into the narrow gap, they were squeezed together and had little room to fight.</p>` },
+  { name: 'Pila volleys',
+    body: `<p>The legionaries waited. When the Britons came close, they threw their <b>pila</b> (javelins), two volleys one after the other.</p>
+      <p>The front of the British army was thrown into confusion and fell back.</p>` },
+  { name: 'Wedges (cuneus)',
+    body: `<p>Then the legionaries charged in wedge shapes called <b>cuneus</b> (say “KOO-nee-us”). The auxiliaries followed, and the cavalry rode forward.</p>
+      <p>The wedges pushed into the crowded British army and split it apart.</p>` },
+  { name: 'Trapped against the wagons',
+    body: `<p>The Britons tried to get away, but their own ring of wagons blocked the way. Many could not escape.</p>
+      <p>The battle ended in a terrible defeat for the Britons. Boudicca died soon afterwards. Tacitus says she took poison; Cassius Dio says she fell ill.</p>` },
+  { name: 'Whose story is this?',
+    body: `<p>Almost everything we know comes from two <b>Roman</b> writers. <b>Tacitus</b> wrote about 40 to 55 years later; his father-in-law was a young officer in Britain at the time. <b>Cassius Dio</b> wrote more than 100 years later.</p>
+      <p>The Britons left no written records, so we only hear the Roman side. Tacitus says the Romans had about 10,000 soldiers. Dio claims the Britons had 230,000. Tacitus reports that about 80,000 Britons and only about 400 Romans died.</p>
+      <p class="ask"><b>Do you trust these numbers?</b> Why might a Roman writer want the British army to seem huge and Roman losses to seem small? What might a Briton have said?</p>
+      <p class="note">After the revolt, the Romans ruled Britain more carefully. <b>Romanisation</b> (Roman towns, roads and ways of life) spread across the south.</p>` },
+];
+const TEXT = {
+  kit: { title: 'What did a legionary carry?',
+    body: () => {
+      const sel = kit.sel ? `<p class="piece"><b>${PIECES[kit.sel].name} (${PIECES[kit.sel].latin}).</b> ${PIECES[kit.sel].job}</p>` : '';
+      return `<p>A <b>legionary</b> was a soldier in a Roman legion. Legionaries had to be Roman citizens, and they signed up for 20 to 25 years.</p>${sel}
+        <p class="note">On the march, a legionary carried his armour, weapons and pack. Historians think this was about 30 kg or more: about the weight of a Year 5 child! Roman writers say soldiers trained to march about 30 km in five hours.</p>
+        <p class="note"><b>Auxiliaries</b> fought alongside the legions. They came from all over the empire. At Vindolanda, near Hadrian's Wall, soldiers came from what are now Belgium and the Netherlands. Archers from Syria and a unit from North Africa also served on the Wall. After about 25 years, auxiliaries became Roman citizens.</p>`;
+    } },
+  testudo: { title: 'How did the testudo work?',
+    body: () => `<p><b>Testudo</b> is Latin for tortoise. Soldiers packed tightly together and locked their shields. The front row held them in front, the outside rows held them at the sides, and everyone in the middle held theirs over their heads.</p>
+      <p>It was used to get close to a wall or a gate while the enemy threw arrows, stones and spears down from above.</p>
+      <p><b>Its weaknesses:</b> it was very slow, and soldiers could hardly fight from inside it. Once they reached the wall, they had to break formation.</p>
+      <p class="note">The testudo is carved on Trajan's Column in Rome, and Roman writers describe it being used to attack town walls and forts.</p>` },
+  battle: { title: "Boudicca's last battle",
+    body: () => STEP_TEXT[bat.step].body + (bat.step < 5 ? `<p class="note">The model is not to scale. The site is unknown: it was probably beside Watling Street, the Roman road from London to the north-west.</p>` : '') },
+};
+function readouts() {
+  if (ui.tab === 'kit') {
+    const p = kit.sel && PIECES[kit.sel];
+    return [['Kit', p ? `${p.name} (${p.latin})` : 'Tap a piece'], ['Made of', p ? p.made : '–']];
+  }
+  if (ui.tab === 'testudo') {
+    return [['Formation', tes.form > 0.95 ? 'Testudo' : tes.form < 0.05 ? 'Marching block' : 'Changing…'], ['Speed', tes.form > 0.5 ? 'Very slow' : 'Marching pace'],
+      ['Arrows stopped by shields', tes.blocked], ['Arrows that got through gaps', tes.through]];
+  }
+  return [['When', 'AD 60 or 61'], ['Where', 'Unknown, probably by Watling Street'], ['Romans', 'About 10,000 (Tacitus’s claim)'], ['Britons', 'Unknown: many more']];
+}
+function hint() {
+  if (ui.tab === 'kit') {
+    if (kit.dir) return '';
+    if (kit.t > 0.98) return kit.sel && innerWidth < 640 ? `${PIECES[kit.sel].name}: ${PIECES[kit.sel].latin}` : 'All the kit is laid out. Tap a piece to find out what it was for.';
+    return kit.sel ? `${PIECES[kit.sel].name}: ${PIECES[kit.sel].latin}` : 'Tap a piece of kit to find out what it was for.';
+  }
+  if (ui.tab === 'testudo') {
+    if (tes.atWall) return 'At the wall! Now they must break formation to attack.';
+    if (tes.form > 0.95) return 'Fire arrows at the testudo, or march it up to the wall.';
+    if (tes.form < 0.05) return tes.through ? 'Arrows got through the gaps! Try making a testudo.' : 'Fire arrows at the marching block, then try a testudo.';
+    return '';
+  }
+  return `Step ${bat.step + 1} of ${STEPS}: ${STEP_TEXT[bat.step].name}`;
+}
+
+// =====================================================================
+//  UI
+// =====================================================================
+const ui = { tab: 'kit', labels: true };
+let dirty = true, lastHint = null, lastBody = '';
+function refresh() {
+  dirty = false;
+  const t = TEXT[ui.tab];
+  $('#infoTitle').textContent = t.title;
+  const b = t.body(); if (b !== lastBody) { $('#infoBody').innerHTML = b; lastBody = b; }
+  $('#readouts').innerHTML = readouts().map(([a, v]) => `<dt>${a}</dt><dd>${v}</dd>`).join('');
+  const h = hint();
+  if (h !== lastHint) { $('#say').textContent = h; lastHint = h; }
+  for (const btn of document.querySelectorAll('#controls button')) btn.hidden = !btn.dataset.for.split(' ').includes(ui.tab);
+  $('#equipBtn').textContent = kit.t > 0.5 ? 'Put the kit on' : 'Take the kit off';
+  $('#equipBtn').disabled = !!kit.dir;
+  $('#spinBtn').setAttribute('aria-pressed', kit.spin);
+  $('#formBtn').textContent = tes.form > 0.5 ? 'Back to marching' : 'Make a testudo';
+  $('#formBtn').disabled = !!tes.dir;
+  $('#marchBtn').setAttribute('aria-pressed', tes.marching);
+  $('#marchBtn').textContent = tes.marching ? 'Stop' : 'March forward';
+  $('#marchBtn').disabled = tes.atWall;
+  $('#prevBtn').disabled = bat.step === 0;
+  $('#nextBtn').disabled = bat.step === STEPS - 1;
+  $('#labelsBtn').setAttribute('aria-pressed', ui.labels);
+  for (const btn of document.querySelectorAll('.tabs button')) btn.setAttribute('aria-selected', btn.dataset.tab === ui.tab);
+  layoutVars();
+}
+function setTab(tab) {
+  ui.tab = tab;
+  kitG.visible = tab === 'kit'; tesG.visible = tab === 'testudo'; batG.visible = tab === 'battle';
+  if (tab === 'kit') setSun(4, V(3, 7, 5));
+  else if (tab === 'testudo') setSun(16, V(9, 16, 10), V(0, 0, -4));
+  else setSun(1, V(30, 50, 25));
+  renderer.shadowMap.enabled = tab !== 'battle';
+  scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
+  sun.castShadow = tab !== 'battle';
+  controls.minDistance = tab === 'battle' ? 15 : tab === 'testudo' ? 4 : 2;
+  controls.maxDistance = tab === 'battle' ? 160 : tab === 'testudo' ? 50 : 14;
+  lastBody = '';
+  dirty = true; refresh();
+  userMoved = false;
+  flyTo(homeView(tab));
+}
+for (const btn of document.querySelectorAll('.tabs button')) btn.addEventListener('click', () => setTab(btn.dataset.tab));
+$('#nextPieceBtn').onclick = () => selectPiece(ORDER[(ORDER.indexOf(kit.sel) + 1) % ORDER.length]);
+$('#equipBtn').onclick = () => { kit.dir = kit.t > 0.5 ? -1 : 1; dirty = true; };
+$('#skinBtn').onclick = () => setSkin((kit.skin + 1) % SKINS.length);
+$('#spinBtn').onclick = () => { kit.spin = !kit.spin; dirty = true; };
+$('#formBtn').onclick = () => { tes.dir = tes.form > 0.5 ? -1 : 1; dirty = true; };
+$('#fireBtn').onclick = fireArrows;
+$('#marchBtn').onclick = () => { tes.marching = !tes.marching; dirty = true; };
+$('#tResetBtn').onclick = resetTestudo;
+$('#prevBtn').onclick = () => goStep(bat.step - 1);
+$('#nextBtn').onclick = () => goStep(bat.step + 1);
+$('#againBtn').onclick = () => { for (const u of units) { u.cur.copy(u.at[0]); u.a = u.alpha[0]; } bat.step = 0; bat.t = 1; bat.pila = []; bat.first = false; dirty = true; };
+$('#labelsBtn').onclick = () => { ui.labels = !ui.labels; dirty = true; };
+
+// Tap a piece of kit (a tap, not a drag)
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; kit.dragging = true; });
+addEventListener('pointerup', e => {
+  kit.dragging = false;
+  if (!downAt || ui.tab !== 'kit') { downAt = null; return; }
+  const moved = Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]); downAt = null;
+  if (moved > 6 || e.target !== renderer.domElement) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  for (const hit of ray.intersectObjects(stage.children, true)) {
+    let o = hit.object; while (o && !o.userData.kit) o = o.parent;
+    if (o) { selectPiece(o.userData.kit); return; }
+  }
+});
+
+// =====================================================================
+//  CAMERA
+// =====================================================================
+let fly = null, userMoved = false;
+function homeView(tab) {
+  const w = innerWidth, h = innerHeight, aspect = w / h;
+  const hdr = $('#hdr').offsetHeight, bottom = $('#controls').offsetHeight + 80;
+  const avail = Math.max(0.35, (h - hdr - bottom) / h);
+  const tanF = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  let target, dir, needW, needH;
+  if (tab === 'kit') { target = V(0, 1.0, 0); dir = V(-0.45, 0.3, 1); needW = aspect < 0.8 ? 3.9 : 4.2; needH = 2.5; }
+  else if (tab === 'testudo') { target = aspect < 0.8 ? V(-2.2, 1.2, -3) : V(0, 1.2, -4.5); dir = V(0.62, 0.5, 1); needW = aspect < 0.8 ? 7.5 : 15; needH = aspect < 0.8 ? 12 : 9.5; }
+  else { target = V(0, 1, -3); dir = V(0.2, 1.0, 0.95); needW = aspect < 0.8 ? 58 : 84; needH = 52; }
+  const availW = Math.max(0.4, (w - 2 * sideShift()) / w);
+  const d = Math.max((needH / 2) / tanF / avail, (needW / 2) / (tanF * aspect * availW));
+  return { pos: target.clone().add(dir.normalize().multiplyScalar(d)), target };
+}
+function sideShift() {
+  const info = $('#info');
+  return innerWidth >= 700 && info.open ? (info.offsetWidth + 16) / 2 : 0;
+}
+function flyTo(v, instant = false) {
+  if (instant) { camera.position.copy(v.pos); controls.target.copy(v.target); fly = null; return; }
+  fly = { t: 0, p0: camera.position.clone(), t0: controls.target.clone(), p1: v.pos, t1: v.target };
+}
+controls.addEventListener('start', () => { fly = null; userMoved = true; });
+function updateFly(dt) {
+  if (!fly) return;
+  fly.t += dt / 1.3;
+  const k = ease(fly.t);
+  camera.position.lerpVectors(fly.p0, fly.p1, k);
+  controls.target.lerpVectors(fly.t0, fly.t1, k);
+  if (fly.t >= 1) fly = null;
+}
+
+// ---------------- Resize and loop ----------------
+function layoutVars() {
+  document.documentElement.style.setProperty('--hdr', $('#hdr').offsetHeight + 'px');
+  document.documentElement.style.setProperty('--ctl', $('#controls').offsetHeight + 'px');
+}
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h); labelR.setSize(w, h);
+  camera.aspect = w / h;
+  const hdr = $('#hdr').offsetHeight, bottom = $('#controls').offsetHeight + 80;
+  camera.setViewOffset(w, h, -sideShift(), -(hdr - bottom) / 2, w, h);   // centre the model in the space between header and controls
+  camera.updateProjectionMatrix();
+  layoutVars();
+  if (!userMoved && !fly) flyTo(homeView(ui.tab), true);
+}
+addEventListener('resize', resize);
+$('#info').addEventListener('toggle', () => { resize(); if (!userMoved) flyTo(homeView(ui.tab)); });
+if (innerWidth < 700) $('#info').open = false;
+
+let clock = 0;
+setSkin(0);
+setTab('kit');
+resize();
+flyTo(homeView('kit'), true);
+placeUnits();
+
+function tick(dt) {
+  clock += dt;
+  kitUpdate(dt);
+  tesUpdate(dt);
+  if (batG.visible || !bat.first) batUpdate(dt);
+  updateFly(dt);
+  for (const L of BL) if (L.L.show()) L.L.o.position.copy(L.fn());
+  for (const l of labels) l.o.visible = !!l.show() && shownUp(l.o);
+  if (dirty || ui.tab === 'testudo' && (tes.dir || tes.marching)) refresh();
+  controls.update();
+  renderer.render(scene, camera);
+  labelR.render(scene, camera);
+}
+// TESTHOOK
+let last = performance.now();
+renderer.setAnimationLoop(now => { const dt = Math.min(0.05, (now - last) / 1000); last = now; tick(dt); });
+</script>
+
+</html>

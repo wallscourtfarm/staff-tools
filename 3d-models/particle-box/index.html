@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<link rel="icon" type="image/png" href="../../favicon.png">
+<style>html{color-scheme:light}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Particle Box</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Layout: full-screen 3D glass box of particles; WFA-blue header with three tabs; info card top-left;
+     controls floating at the bottom; a short "event" banner (Melting! Boiling!) under the header. */
+  :root {
+    --bg: #eef6fb;
+    --panel: rgba(255, 255, 255, 0.95);
+    --edge: #c9dce8;
+    --fg: #0a0101;
+    --muted: #4c6272;
+    --brand: #1798d3;
+    --on-brand: #ffffff;
+    --tint: #e1f1fa;
+    --say-bg: #0a2a3c;
+    --say-fg: #ffffff;
+    --glass: #5f8299;
+    --plate: #98a6b0;
+    --water: #2f86d6;
+    --sugar: #e0457b;
+    --salt: #e8960c;
+    --sand: #a8743a;
+    --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+    --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #0f1c24; --panel: rgba(26, 44, 55, 0.95); --edge: #2d4656; --fg: #e8f1f6; --muted: #a6bccb;
+    --tint: #18394b; --say-bg: #e8f1f6; --say-fg: #0a1a24; --glass: #a3c3d6; --plate: #5b6870; color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg: #0f1c24; --panel: rgba(26, 44, 55, 0.95); --edge: #2d4656; --fg: #e8f1f6; --muted: #a6bccb;
+    --tint: #18394b; --say-bg: #e8f1f6; --say-fg: #0a1a24; --glass: #a3c3d6; --plate: #5b6870; color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; overflow: hidden; }
+  #scene { position: fixed; inset: 0; touch-action: none; }
+  #scene canvas { display: block; }
+
+  header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 3;
+    background: var(--brand); color: var(--on-brand);
+    padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-bottom: 10px;
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+  }
+  .brand { display: flex; flex-direction: column; min-width: 0; }
+  h1 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.15; text-wrap: balance; }
+  .brand span { font-size: 13px; font-weight: 700; opacity: .9; letter-spacing: .02em; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .tabs button {
+    font: inherit; font-weight: 800; font-size: 15px; min-height: 44px; padding: 6px 14px;
+    border-radius: 999px; border: 2px solid rgba(255,255,255,.6); background: transparent; color: var(--on-brand); cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: var(--on-brand); color: #0b6f9e; border-color: var(--on-brand); }
+
+  .info {
+    position: fixed; z-index: 2; left: var(--gutter-l); top: calc(var(--hdr, 64px) + 12px);
+    width: min(340px, calc(100% - 32px)); max-height: calc(100% - var(--hdr, 64px) - var(--ctl, 90px) - 40px); overflow: auto;
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 12px 16px;
+    box-shadow: 0 4px 16px rgba(10, 40, 60, .12);
+  }
+  .info summary { font-weight: 800; font-size: 17px; cursor: pointer; line-height: 1.3; text-wrap: balance; }
+  .info p { margin: 8px 0 0; line-height: 1.45; }
+  .info p.note { color: var(--muted); font-size: 13px; }
+  .info .card { margin-top: 10px; padding: 8px 10px; border-radius: 10px; background: var(--tint); font-size: 14px; line-height: 1.4; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  dl { margin: 12px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: baseline; }
+  dt { color: var(--muted); font-size: 13px; font-weight: 700; }
+  dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 0; }
+  .meter { display: inline-block; width: 100%; max-width: 160px; height: 10px; border-radius: 99px; background: var(--tint); overflow: hidden; vertical-align: middle; }
+  .meter b { display: block; height: 100%; width: 0; background: var(--brand); border-radius: 99px; transition: width .3s; }
+
+  #say {
+    position: fixed; z-index: 4; left: 50%; transform: translateX(-50%); bottom: calc(var(--ctl, 90px) + 12px);
+    background: var(--say-bg); color: var(--say-fg); font-weight: 800; font-size: 18px;
+    padding: 8px 18px; border-radius: 999px; pointer-events: none; opacity: 0; transition: opacity .35s;
+    max-width: calc(100% - 32px); text-align: center;
+  }
+  #say.show { opacity: 1; }
+
+  .controls {
+    position: fixed; z-index: 3; left: 50%; transform: translateX(-50%);
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    width: min(780px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 16px; padding: 10px 14px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; justify-content: center;
+    box-shadow: 0 4px 18px rgba(10, 40, 60, .14);
+  }
+  .group { display: contents; }
+  .group[hidden] { display: none; }
+  .controls button {
+    font: inherit; font-weight: 800; font-size: 15px; min-height: 44px; padding: 8px 14px; border-radius: 12px; cursor: pointer;
+    border: 2px solid var(--brand); background: var(--brand); color: var(--on-brand);
+  }
+  .controls button.ghost { background: transparent; color: var(--fg); border-color: var(--edge); }
+  .controls button[aria-pressed="true"] { background: var(--tint); color: var(--fg); border-color: var(--brand); }
+  .controls button:disabled { opacity: .45; cursor: default; }
+  .seg { display: inline-flex; border: 2px solid var(--edge); border-radius: 12px; overflow: hidden; }
+  .seg button { border: 0 !important; border-radius: 0 !important; background: transparent !important; color: var(--fg) !important; min-height: 40px !important; }
+  .seg button[aria-pressed="true"] { background: var(--brand) !important; color: var(--on-brand) !important; }
+  .slider { flex: 1 1 240px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .slider span { font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .slider input { width: 100%; height: 30px; accent-color: var(--brand); }
+  button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+  footer {
+    position: fixed; z-index: 2; left: 0; right: 0; bottom: calc(3px + env(safe-area-inset-bottom, 0px));
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    text-align: center; font-size: 11px; color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 18px; }
+    .tabs { margin-left: 0; }
+    .tabs button { font-size: 14px; padding: 5px 11px; }
+    .controls { padding: 8px 10px; gap: 6px 8px; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); }
+    .controls button { font-size: 14px; padding: 6px 11px; }
+    #say { font-size: 16px; }
+  }
+</style>
+
+<div id="scene"></div>
+
+<header id="hdr">
+  <div class="brand">
+    <h1>Particle Box</h1>
+    <span>Year 5 Science · Atoms, Properties, Solutions and Changes</span>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Choose a model">
+    <button role="tab" data-mode="states" aria-selected="true">States of matter</button>
+    <button role="tab" data-mode="dissolving" aria-selected="false">Dissolving</button>
+    <button role="tab" data-mode="getting-it-back" aria-selected="false">Getting it back</button>
+  </nav>
+</header>
+
+<details class="info" id="info" open>
+  <summary id="infoTitle">What happens to particles when water changes state?</summary>
+  <div id="infoBody"></div>
+  <dl id="readouts"></dl>
+</details>
+
+<div id="say" role="status" aria-live="polite"></div>
+
+<div class="controls" id="controls">
+  <div class="group" data-for="states">
+    <label class="slider" for="temp"><span id="tempLabel">Temperature: −10 °C</span>
+      <input id="temp" type="range" min="-20" max="120" step="1" value="-10" aria-label="Temperature in degrees Celsius"></label>
+    <button type="button" class="ghost" data-t="-10">Freezer</button>
+    <button type="button" class="ghost" data-t="20">Room</button>
+    <button type="button" class="ghost" data-t="110">Boiling</button>
+  </div>
+  <div class="group" data-for="dissolving" hidden>
+    <div class="seg" role="group" aria-label="Choose what to add">
+      <button type="button" data-mat="sugar" aria-pressed="true">Sugar</button>
+      <button type="button" data-mat="sand" aria-pressed="false">Sand</button>
+    </div>
+    <button type="button" id="addBtn">Add a spoonful</button>
+    <button type="button" id="stirBtn" class="ghost" aria-pressed="false">Stir</button>
+    <button type="button" id="warmBtn" class="ghost" aria-pressed="false">Warm water</button>
+    <button type="button" id="resetD" class="ghost">Start again</button>
+  </div>
+  <div class="group" data-for="getting-it-back" hidden>
+    <button type="button" id="heatBtn" aria-pressed="false">Heat</button>
+    <button type="button" id="resetR" class="ghost">Start again</button>
+  </div>
+  <button type="button" id="eyesBtn" class="ghost" aria-pressed="false">What our eyes see</button>
+</div>
+
+<footer>A model: real particles are far too small to see, and there are billions of them. · Wallscourt Farm Academy · Y5-17.11.26a</footer>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ================= Sizes (scene units) =================
+const BX = 2.2, BZ = 1.4, BH = 4.4;       // inside of the glass box: x ±BX, z ±BZ, y 0..BH
+const CR = 0.21, SAND_CR = 0.29;          // collision radius of a particle and a sand grain
+const S = 0.44;                           // spacing in a solid
+const MAXP = 520;
+const DEG = Math.PI / 180;
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 2;   // roughly normal, variance 1
+
+const KIND = { WATER: 0, SUGAR: 1, SALT: 2, SAND: 3 };
+const PH = { SOLID: 0, LIQ: 1, GAS: 2, ESC: 3, GONE: 4 };
+const COLORS = [0x2f86d6, 0xe0457b, 0xe8960c, 0xa8743a];
+
+// ================= Particle store =================
+const x = new Float32Array(MAXP), y = new Float32Array(MAXP), z = new Float32Array(MAXP);
+const vx = new Float32Array(MAXP), vy = new Float32Array(MAXP), vz = new Float32Array(MAXP);
+const ax = new Float32Array(MAXP), ay = new Float32Array(MAXP), az = new Float32Array(MAXP);
+const hx = new Float32Array(MAXP), hy = new Float32Array(MAXP), hz = new Float32Array(MAXP);
+const sk = new Float32Array(MAXP);
+const tx = new Float32Array(MAXP), ty = new Float32Array(MAXP), tz = new Float32Array(MAXP), tt = new Float32Array(MAXP);   // where a dissolved particle is drifting to        // how strongly a solid particle is held in place (0..1)
+const cr = new Float32Array(MAXP), im = new Float32Array(MAXP);
+const kind = new Uint8Array(MAXP), ph = new Uint8Array(MAXP);
+const grp = new Int16Array(MAXP);
+const grainOff = new Float32Array(MAXP * 12);   // four little spheres per sand grain
+let n = 0;
+
+function addParticle(k, px, py, pz, phase = PH.LIQ) {
+  const i = n++;
+  x[i] = px; y[i] = py; z[i] = pz; vx[i] = vy[i] = vz[i] = 0;
+  kind[i] = k; ph[i] = phase; grp[i] = -1; sk[i] = 0;
+  cr[i] = k === KIND.SAND ? SAND_CR : CR;
+  im[i] = k === KIND.SAND ? 1 / 3 : 1;
+  if (k === KIND.SAND) {
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6));
+    const tet = [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]];
+    tet.forEach((t, m) => {
+      const v = new THREE.Vector3(...t).multiplyScalar(0.085 * (0.85 + Math.random() * 0.3)).applyQuaternion(q);
+      grainOff[i * 12 + m * 3] = v.x; grainOff[i * 12 + m * 3 + 1] = v.y; grainOff[i * 12 + m * 3 + 2] = v.z;
+    });
+  }
+  return i;
+}
+const randIn = (lo, hi) => lo + Math.random() * (hi - lo);
+
+// ================= Simulation =================
+const sim = { temp: -10, lid: true, stir: false, stirAngle: 0, mode: 'states' };
+const tSolid = T => 0.06 + 0.22 * clamp((T + 40) / 40, 0, 1);
+const tLiq = T => 0.2 + 0.5 * clamp(T / 100, 0, 1.2);
+const tGas = T => 6 + 3 * clamp((T - 100) / 40, 0, 1);
+const KREP = 700, KSPR = 170, G = 9;
+
+function step(dt) {
+  const T = sim.temp;
+  ax.fill(0, 0, n); ay.fill(0, 0, n); az.fill(0, 0, n);
+  // particles push each other apart when they overlap
+  for (let i = 0; i < n; i++) {
+    const pi = ph[i]; if (pi >= PH.ESC) continue;
+    const xi = x[i], yi = y[i], zi = z[i], ri = cr[i], gi = grp[i];
+    for (let j = i + 1; j < n; j++) {
+      const pj = ph[j]; if (pj >= PH.ESC) continue;
+      const dx = x[j] - xi; if (dx > 0.6 || dx < -0.6) continue;
+      const dy = y[j] - yi; if (dy > 0.6 || dy < -0.6) continue;
+      const dz = z[j] - zi; if (dz > 0.6 || dz < -0.6) continue;
+      if (pi === PH.SOLID && pj === PH.SOLID && gi === grp[j] && sk[i] > 0.6 && sk[j] > 0.6) continue;
+      const md = ri + cr[j], d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 >= md * md || d2 < 1e-8) continue;
+      const d = Math.sqrt(d2), f = KREP * (md - d) / d;
+      ax[i] -= f * dx * im[i]; ay[i] -= f * dy * im[i]; az[i] -= f * dz * im[i];
+      ax[j] += f * dx * im[j]; ay[j] += f * dy * im[j]; az[j] += f * dz * im[j];
+    }
+  }
+  const rodX = 0.85 * Math.cos(sim.stirAngle), rodZ = 0.85 * Math.sin(sim.stirAngle);
+  const lvl = sim.lid ? 0 : liquidLevel();
+  for (let i = 0; i < n; i++) {
+    const p = ph[i];
+    if (p === PH.GONE) continue;
+    if (p === PH.ESC) {                         // a water particle leaving the open beaker as a gas
+      vy[i] += (2.4 - vy[i]) * 2 * dt; vx[i] += gauss() * 3 * dt; vz[i] += gauss() * 3 * dt;
+      x[i] += vx[i] * dt; y[i] += vy[i] * dt; z[i] += vz[i] * dt;
+      if (y[i] < BH) { x[i] = clamp(x[i], -BX + CR, BX - CR); z[i] = clamp(z[i], -BZ + CR, BZ - CR); }
+      if (y[i] > BH + 2.6) ph[i] = PH.GONE;
+      continue;
+    }
+    let gamma, te;
+    if (p === PH.SOLID) {
+      ax[i] += KSPR * sk[i] * (hx[i] - x[i]); ay[i] += KSPR * sk[i] * (hy[i] - y[i]) - G * (1 - sk[i]); az[i] += KSPR * sk[i] * (hz[i] - z[i]);
+      gamma = 6; te = kind[i] === KIND.WATER ? tSolid(T) : 0.05;
+    } else if (p === PH.LIQ) {
+      const sand = kind[i] === KIND.SAND;
+      ay[i] -= sand ? G * 1.8 : G;
+      gamma = sand ? 5 : 3.5; te = sand ? 0.01 : tLiq(T);
+      if (kind[i] === KIND.SUGAR || kind[i] === KIND.SALT) {
+        // a dissolved particle wanders through the water (this stands in for diffusion, which is slow in a model this small)
+        tt[i] -= dt;
+        if (tt[i] <= 0 || (tx[i] - x[i]) ** 2 + (ty[i] - y[i]) ** 2 + (tz[i] - z[i]) ** 2 < 0.05) {
+          tx[i] = randIn(-BX + 0.3, BX - 0.3); tz[i] = randIn(-BZ + 0.3, BZ - 0.3);
+          ty[i] = randIn(CR, Math.max(CR, lvl - 0.35)); tt[i] = randIn(2, 4);
+        }
+        const w = (sim.stir ? 7 : 4) * (sim.temp > 40 ? 1.4 : 1);
+        ax[i] += clamp((tx[i] - x[i]) * w, -6, 6); ay[i] += clamp((ty[i] - y[i]) * w, -6, 6); az[i] += clamp((tz[i] - z[i]) * w, -6, 6);
+      }
+      if (sim.stir && y[i] < 3.4) {
+        const r = Math.hypot(x[i], z[i]) || 1e-3, s = 4.2 * Math.min(r, 1.2) / 1.2;
+        ax[i] += -z[i] / r * s; az[i] += x[i] / r * s;
+        const dxr = x[i] - rodX, dzr = z[i] - rodZ, dr = Math.hypot(dxr, dzr), md = 0.13 + cr[i];
+        if (dr < md && y[i] > 0.18) { const f = 500 * (md - dr) / (dr || 1e-3); ax[i] += f * dxr; az[i] += f * dzr; }
+        if (sand && y[i] < 0.7) ay[i] += 14 * Math.random();
+      }
+    } else {                                    // gas
+      ay[i] -= 0.4; gamma = 0.25; te = tGas(Math.max(T, 100));
+    }
+    const kick = Math.sqrt(2 * gamma * te * dt * im[i]);
+    vx[i] += (ax[i] - gamma * vx[i]) * dt + kick * gauss();
+    vy[i] += (ay[i] - gamma * vy[i]) * dt + kick * gauss();
+    vz[i] += (az[i] - gamma * vz[i]) * dt + kick * gauss();
+    const sp = vx[i] * vx[i] + vy[i] * vy[i] + vz[i] * vz[i];
+    if (sp > 144) { const k = 12 / Math.sqrt(sp); vx[i] *= k; vy[i] *= k; vz[i] *= k; }
+    x[i] += vx[i] * dt; y[i] += vy[i] * dt; z[i] += vz[i] * dt;
+    const r = cr[i], rest = p === PH.GAS ? 1 : 0.4;
+    if (x[i] > BX - r) { x[i] = BX - r; if (vx[i] > 0) vx[i] *= -rest; }
+    if (x[i] < -BX + r) { x[i] = -BX + r; if (vx[i] < 0) vx[i] *= -rest; }
+    if (z[i] > BZ - r) { z[i] = BZ - r; if (vz[i] > 0) vz[i] *= -rest; }
+    if (z[i] < -BZ + r) { z[i] = -BZ + r; if (vz[i] < 0) vz[i] *= -rest; }
+    if (y[i] < r) { y[i] = r; if (vy[i] < 0) vy[i] *= -rest; }
+    if (sim.lid && y[i] > BH - r) { y[i] = BH - r; if (vy[i] > 0) vy[i] *= -rest; }
+  }
+}
+
+function count(fn) { let c = 0; for (let i = 0; i < n; i++) if (fn(i)) c++; return c; }
+function pick(fn, tries = 10, better = null) {
+  // a random particle that passes fn; with "better", the best of a few random tries
+  let best = -1;
+  for (let t = 0; t < tries * 6 && tries > 0; t++) {
+    const i = (Math.random() * n) | 0;
+    if (!fn(i)) continue;
+    if (best < 0 || (better && better(i, best))) best = i;
+    tries--;
+  }
+  return best;
+}
+
+// ================= Mode: states of matter =================
+const LAT = [];   // ice lattice: 8 across, 6 high, 5 deep
+for (let ix = 0; ix < 8; ix++) for (let iy = 0; iy < 6; iy++) for (let iz = 0; iz < 5; iz++)
+  LAT.push([(ix - 3.5) * S, CR + 0.01 + iy * S, (iz - 2) * S]);
+const st = { frozen: false, meltQueue: [], meltAcc: 0, prevT: -10 };
+
+function setupStates() {
+  n = 0;
+  sim.lid = true; sim.stir = false;
+  for (let k = 0; k < 240; k++) addParticle(KIND.WATER, randIn(-2, 2), randIn(0.3, 2), randIn(-1.2, 1.2));
+  st.frozen = false; st.meltQueue = [];
+  if (sim.temp < 0) { freeze(); for (let i = 0; i < n; i++) { sk[i] = 1; x[i] = hx[i]; y[i] = hy[i]; z[i] = hz[i]; } }
+  else settle(200);
+}
+function freeze() {
+  const idx = [...Array(n).keys()].sort((a, b) => y[a] - y[b]);
+  for (let L = 0; L < 6; L++) {
+    const block = idx.slice(L * 40, L * 40 + 40).sort((a, b) => x[a] - x[b]);
+    for (let r = 0; r < 8; r++) {
+      const g = block.slice(r * 5, r * 5 + 5).sort((a, b) => z[a] - z[b]);
+      g.forEach((i, c) => { const h = LAT[r * 30 + L * 5 + c]; hx[i] = h[0]; hy[i] = h[1]; hz[i] = h[2]; ph[i] = PH.SOLID; grp[i] = 0; sk[i] = 0; });
+    }
+  }
+  st.frozen = true; st.meltQueue = [];
+}
+function updateStates(dt) {
+  const T = sim.temp;
+  if (T < 0) {
+    if (!st.frozen) freeze();
+    for (let i = 0; i < n; i++) sk[i] = Math.min(1, sk[i] + dt / 1.6);
+    return;
+  }
+  if (st.frozen) {             // start melting from the outside in
+    st.frozen = false;
+    st.meltQueue = [...Array(n).keys()].sort((a, b) =>
+      Math.max(Math.abs(hx[b]) / 1.6, Math.abs(hz[b]) / 0.9, (hy[b] - 1.1) / 1.2) - Math.max(Math.abs(hx[a]) / 1.6, Math.abs(hz[a]) / 0.9, (hy[a] - 1.1) / 1.2));
+    st.meltAcc = 0;
+  }
+  if (st.meltQueue.length) {
+    st.meltAcc += dt * (90 + T * 6);
+    while (st.meltAcc >= 1 && st.meltQueue.length) { st.meltAcc--; const i = st.meltQueue.shift(); ph[i] = PH.LIQ; grp[i] = -1; }
+  }
+  const gas = count(i => ph[i] === PH.GAS);
+  const target = T >= 100 ? n : Math.round(n * (0.015 + 0.09 * (T / 100) ** 2));
+  if (gas < target) {
+    if (T >= 100) {
+      let k = Math.min(target - gas, Math.ceil(90 * dt));
+      while (k-- > 0) { const i = pick(i => ph[i] === PH.LIQ, 1); if (i < 0) break; ph[i] = PH.GAS; vy[i] += 3; }
+    } else if (Math.random() < 4 * dt) {
+      const i = pick(i => ph[i] === PH.LIQ, 8, (a, b) => y[a] > y[b]);
+      if (i >= 0) { ph[i] = PH.GAS; vy[i] += 3.5; }
+    }
+  } else if (gas > target) {
+    let k = Math.ceil((gas - target) * 1.4 * dt);
+    while (k-- > 0) { const i = pick(i => ph[i] === PH.GAS, 1); if (i < 0) break; ph[i] = PH.LIQ; }
+  }
+}
+
+// ================= Mode: dissolving =================
+const SLOTS = [[-1.3, -0.6], [0, 0.55], [1.3, -0.6], [-1.3, 0.6], [0, -0.55], [1.3, 0.6]];
+const LS = 0.42;                    // spacing in a sugar lump
+const ds = { mat: 'sugar', warm: false, lumps: [], spoons: 0, total: 0 };
+const capacity = () => ds.warm ? 120 : 60;
+
+function setupDissolving() {
+  n = 0; sim.lid = false; ds.lumps = []; ds.spoons = 0; ds.total = 0;
+  for (let k = 0; k < 200; k++) addParticle(KIND.WATER, randIn(-2, 2), randIn(0.3, 2.2), randIn(-1.2, 1.2));
+  settle(220);
+  addSpoonful();
+}
+function addSpoonful() {
+  if (ds.mat === 'sugar') {
+    if (ds.lumps.length >= 6) return;
+    const [sx, sz] = SLOTS[ds.lumps.length];
+    const lump = { ox: sx, oy: BH + 0.4, oz: sz, vy: 0, cells: new Int16Array(27).fill(-1) };
+    for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) for (let c = 0; c < 3; c++) {
+      const i = addParticle(KIND.SUGAR, sx + (a - 1) * LS, lump.oy + b * LS, sz + (c - 1) * LS, PH.SOLID);
+      grp[i] = 10 + ds.lumps.length; sk[i] = 1; lump.cells[a * 9 + b * 3 + c] = i;
+    }
+    ds.lumps.push(lump); ds.total += 27;
+  } else {
+    if (ds.spoons >= 6) return;
+    for (let k = 0; k < 14; k++) addParticle(KIND.SAND, randIn(-0.9, 0.9), BH + randIn(0.2, 0.9), randIn(-0.5, 0.5));
+  }
+  ds.spoons++;
+  updateButtons();
+}
+function updateDissolving(dt) {
+  sim.temp = ds.warm ? 60 : 20;
+  const level = liquidLevel();
+  let dissolved = count(i => kind[i] === KIND.SUGAR && ph[i] === PH.LIQ);
+  const rate = 0.1 * (sim.stir ? 3 : 1) * (ds.warm ? 2.5 : 1);
+  for (const L of ds.lumps) {
+    L.vy = Math.max(L.vy - G * dt, L.oy < level ? -1.6 : -12);
+    L.oy = Math.max(CR + 0.005, L.oy + L.vy * dt);
+    if (L.oy <= CR + 0.005) L.vy = 0;
+    for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) for (let c = 0; c < 3; c++) {
+      const i = L.cells[a * 9 + b * 3 + c]; if (i < 0) continue;
+      hx[i] = L.ox + (a - 1) * LS; hy[i] = L.oy + b * LS; hz[i] = L.oz + (c - 1) * LS;
+      if (L.vy < -0.01 && L.oy > level) { x[i] = hx[i]; y[i] = hy[i]; z[i] = hz[i]; vx[i] = vy[i] = vz[i] = 0; }
+      if (dissolved >= capacity() || hy[i] > level) continue;
+      const nb = [[a - 1, b, c], [a + 1, b, c], [a, b - 1, c], [a, b + 1, c], [a, b, c - 1], [a, b, c + 1]]
+        .filter(([p, q, r]) => p >= 0 && p < 3 && q >= 0 && q < 3 && r >= 0 && r < 3 && L.cells[p * 9 + q * 3 + r] >= 0).length;
+      const exposed = nb < 6 - (b === 0 ? 1 : 0);   // the bottom face sits on the glass
+      if (exposed && Math.random() < rate * dt) {
+        ph[i] = PH.LIQ; grp[i] = -1; L.cells[a * 9 + b * 3 + c] = -1; dissolved++;
+        vx[i] = gauss() * 0.6; vy[i] = Math.abs(gauss()) * 0.6; vz[i] = gauss() * 0.6;
+      }
+    }
+  }
+}
+
+// ================= Mode: getting it back (evaporating salt water) =================
+const rc = { heat: false, acc: 0, sites: [], next: 0, done: false };
+function makeSites() {
+  const seeds = [[-0.85, 0.3], [0.9, -0.35]], lists = [[], []];
+  seeds.forEach(([sx, sz], s) => {
+    const cells = [];
+    for (let i = -2; i <= 2; i++) for (let j = 0; j <= 2; j++) for (let k = -2; k <= 2; k++)
+      cells.push({ i, j, k, o: Math.max(Math.abs(i), Math.abs(k), j) * 10 + j + Math.random() });
+    cells.sort((a, b) => a.o - b.o);
+    lists[s] = cells.map(c => ({ x: sx + c.i * 0.42, y: CR + 0.005 + c.j * 0.42, z: sz + c.k * 0.42, g: 20 + s }));
+  });
+  const out = []; for (let t = 0; t < lists[0].length; t++) out.push(lists[0][t], lists[1][t]);
+  return out;
+}
+function setupRecover() {
+  n = 0; sim.lid = false; sim.stir = false; sim.temp = 20;
+  rc.heat = false; rc.acc = 0; rc.sites = makeSites(); rc.next = 0; rc.done = false;
+  for (let k = 0; k < 200; k++) addParticle(KIND.WATER, randIn(-2, 2), randIn(0.3, 2.4), randIn(-1.2, 1.2));
+  for (let k = 0; k < 60; k++) addParticle(KIND.SALT, randIn(-2, 2), randIn(0.3, 2.0), randIn(-1.2, 1.2));
+  settle(220);
+}
+function updateRecover(dt) {
+  const target = rc.heat ? 100 : 20;
+  sim.temp += clamp(target - sim.temp, -8 * dt, 26 * dt);
+  const T = sim.temp;
+  const rate = T >= 99.5 ? 9 : 0.08 + 9 * clamp((T - 20) / 80, 0, 1) ** 3;
+  rc.acc += rate * dt;
+  while (rc.acc >= 1) {
+    rc.acc--;
+    const i = pick(i => kind[i] === KIND.WATER && ph[i] === PH.LIQ, 12, (a, b) => y[a] > y[b]);
+    if (i < 0) break;
+    ph[i] = PH.ESC; vy[i] = 1.5;
+  }
+  const water = count(i => kind[i] === KIND.WATER && ph[i] === PH.LIQ);
+  const saltFree = count(i => kind[i] === KIND.SALT && ph[i] === PH.LIQ);
+  let excess = saltFree - (water === 0 ? 0 : Math.floor(water * 0.5));
+  while (excess-- > 0 && rc.next < rc.sites.length) {
+    const s = rc.sites[rc.next++];
+    const i = pick(i => kind[i] === KIND.SALT && ph[i] === PH.LIQ, 20,
+      (a, b) => (x[a] - s.x) ** 2 + (y[a] - s.y) ** 2 + (z[a] - s.z) ** 2 < (x[b] - s.x) ** 2 + (y[b] - s.y) ** 2 + (z[b] - s.z) ** 2);
+    if (i < 0) break;
+    ph[i] = PH.SOLID; hx[i] = s.x; hy[i] = s.y; hz[i] = s.z; grp[i] = s.g; sk[i] = 0.03;
+  }
+  for (let i = 0; i < n; i++) if (ph[i] === PH.SOLID) sk[i] = Math.min(1, sk[i] + dt * 0.7);
+  if (!rc.done && water === 0) { rc.done = true; say('The salt is back! Dissolving is reversible.', 4000); }
+}
+
+// ================= Helpers =================
+function settle(steps) { for (let s = 0; s < steps; s++) step(1 / 120); for (let i = 0; i < n; i++) { vx[i] *= 0.3; vy[i] *= 0.3; vz[i] *= 0.3; } }
+const AREA = 4 * BX * BZ, VPP = 0.068;
+function liquidLevel() {
+  const c = count(i => ph[i] === PH.LIQ && kind[i] !== KIND.SAND);
+  const sand = count(i => ph[i] === PH.LIQ && kind[i] === KIND.SAND);
+  return c === 0 ? 0 : (c * VPP + sand * 0.12) / AREA + 0.05;
+}
+
+// ================= Three.js scene =================
+const wrap = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+wrap.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2.1, 0);
+controls.enableDamping = true; controls.enablePan = false;
+controls.minDistance = 5; controls.maxDistance = 30;
+controls.maxPolarAngle = Math.PI / 2 + 0.15;
+camera.position.set(3.2, 5.2, 10.5);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8fa4b4, 1.35));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5); sun.position.set(4, 9, 6); scene.add(sun);
+
+// glass box
+const glassMat = new THREE.MeshStandardMaterial({ color: 0xbfe3f5, transparent: true, opacity: 0.1, roughness: 0.1, depthWrite: false, side: THREE.DoubleSide });
+const edgeMat = new THREE.LineBasicMaterial({ color: 0x5f8299 });
+const box = new THREE.Group(); scene.add(box);
+const W = 2 * BX + 0.06, D = 2 * BZ + 0.06;
+function pane(w, h, pos, rotY = 0, rotX = 0) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glassMat);
+  m.position.set(...pos); m.rotation.set(rotX, rotY, 0); m.renderOrder = 2; box.add(m); return m;
+}
+pane(W, BH, [0, BH / 2, D / 2]); pane(W, BH, [0, BH / 2, -D / 2]);
+pane(D, BH, [W / 2, BH / 2, 0], Math.PI / 2); pane(D, BH, [-W / 2, BH / 2, 0], Math.PI / 2);
+pane(W, D, [0, 0.001, 0], 0, -Math.PI / 2);
+const lid = pane(W, D, [0, BH, 0], 0, -Math.PI / 2);
+const boxEdges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W, BH, D)), edgeMat);
+boxEdges.position.y = BH / 2; box.add(boxEdges);
+const openEdges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W, BH, D)), edgeMat);
+openEdges.position.y = BH / 2; box.add(openEdges);
+// measuring marks on the front
+const ticks = [];
+for (let k = 1; k <= 7; k++) { const yy = k * 0.55, len = k % 2 ? 0.25 : 0.45; ticks.push(-W / 2 + 0.05, yy, D / 2 + 0.01, -W / 2 + 0.05 + len, yy, D / 2 + 0.01); }
+const tickGeo = new THREE.BufferGeometry(); tickGeo.setAttribute('position', new THREE.Float32BufferAttribute(ticks, 3));
+box.add(new THREE.LineSegments(tickGeo, edgeMat));
+
+// hot plate
+const plateMat = new THREE.MeshStandardMaterial({ color: 0x98a6b0, roughness: 0.6, emissive: 0x000000 });
+const plate = new THREE.Mesh(new THREE.BoxGeometry(W + 0.8, 0.26, D + 0.6), plateMat);
+plate.position.y = -0.14; scene.add(plate);
+const ringMat = new THREE.MeshBasicMaterial({ color: 0x55606a });
+const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.15, 48), ringMat);
+ring.rotation.x = -Math.PI / 2; ring.position.y = -0.005; scene.add(ring);
+
+// stirring rod
+const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 4.2, 16), new THREE.MeshStandardMaterial({ color: 0xdfe8ee, roughness: 0.2, transparent: true, opacity: 0.85 }));
+rod.visible = false; scene.add(rod);
+
+// particles
+const sphere = new THREE.SphereGeometry(0.2, 18, 12);
+const pMesh = new THREE.InstancedMesh(sphere, new THREE.MeshStandardMaterial({ roughness: 0.45 }), MAXP);
+pMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); pMesh.frustumCulled = false; scene.add(pMesh);
+const grain = new THREE.SphereGeometry(0.15, 10, 8);
+const sMesh = new THREE.InstancedMesh(grain, new THREE.MeshStandardMaterial({ color: 0xa8743a, roughness: 0.9 }), MAXP * 4);
+sMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); sMesh.frustumCulled = false; scene.add(sMesh);
+const tmpC = new THREE.Color();
+for (let i = 0; i < MAXP; i++) pMesh.setColorAt(i, tmpC.set(COLORS[0]));
+
+// "what our eyes see" view
+const liquidMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1),
+  new THREE.MeshStandardMaterial({ color: 0x7cc3ea, transparent: true, opacity: 0.32, roughness: 0.1, depthWrite: false }));
+liquidMesh.renderOrder = 1; scene.add(liquidMesh);
+const lumpMats = {
+  ice: new THREE.MeshStandardMaterial({ color: 0xa9dcf7, transparent: true, opacity: 0.8, roughness: 0.15 }),
+  sugar: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }),
+  salt: new THREE.MeshStandardMaterial({ color: 0xf6f3ea, roughness: 0.35 }),
+};
+const blocks = [];
+for (let k = 0; k < 10; k++) { const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), lumpMats.sugar); m.visible = false; scene.add(m); blocks.push(m); }
+
+const view = { eyes: false };
+const m4 = new THREE.Matrix4();
+function render3D() {
+  let s = 0;
+  for (let i = 0; i < n; i++) {
+    let sc = 1;
+    if (ph[i] === PH.GONE) sc = 0;
+    else if (ph[i] === PH.ESC && y[i] > BH) sc = Math.max(0, 1 - (y[i] - BH) / 2.6);
+    if (kind[i] === KIND.SAND) {
+      for (let m = 0; m < 4; m++) {
+        m4.makeScale(sc, sc, sc).setPosition(x[i] + grainOff[i * 12 + m * 3], y[i] + grainOff[i * 12 + m * 3 + 1], z[i] + grainOff[i * 12 + m * 3 + 2]);
+        sMesh.setMatrixAt(s++, m4);
+      }
+      m4.makeScale(0, 0, 0); pMesh.setMatrixAt(i, m4);
+      continue;
+    }
+    if (view.eyes) sc = 0;
+    m4.makeScale(sc, sc, sc).setPosition(x[i], y[i], z[i]);
+    pMesh.setMatrixAt(i, m4);
+  }
+  pMesh.count = n; sMesh.count = s;
+  pMesh.instanceMatrix.needsUpdate = true; sMesh.instanceMatrix.needsUpdate = true;
+
+  // eyes view: water as a block of liquid, solids as blocks
+  blocks.forEach(b => b.visible = false);
+  liquidMesh.visible = false;
+  if (!view.eyes) return;
+  const lvl = liquidLevel();
+  if (lvl > 0.06) {
+    liquidMesh.visible = true;
+    liquidMesh.scale.set(2 * BX - 0.02, lvl, 2 * BZ - 0.02); liquidMesh.position.set(0, lvl / 2, 0);
+  }
+  let b = 0;
+  const groups = new Map();
+  for (let i = 0; i < n; i++) {
+    if (ph[i] !== PH.SOLID) continue;
+    if (kind[i] === KIND.SALT && (x[i] - hx[i]) ** 2 + (y[i] - hy[i]) ** 2 + (z[i] - hz[i]) ** 2 > 0.02) continue;
+    let g = groups.get(grp[i]);
+    if (!g) { g = { k: kind[i], x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9, z0: 1e9, z1: -1e9 }; groups.set(grp[i], g); }
+    g.x0 = Math.min(g.x0, x[i]); g.x1 = Math.max(g.x1, x[i]); g.y0 = Math.min(g.y0, y[i]); g.y1 = Math.max(g.y1, y[i]);
+    g.z0 = Math.min(g.z0, z[i]); g.z1 = Math.max(g.z1, z[i]);
+  }
+  for (const g of groups.values()) {
+    if (b >= blocks.length) break;
+    const m = blocks[b++], pad = CR * 0.9;
+    m.material = g.k === KIND.WATER ? lumpMats.ice : g.k === KIND.SUGAR ? lumpMats.sugar : lumpMats.salt;
+    m.scale.set(g.x1 - g.x0 + 2 * pad, g.y1 - g.y0 + 2 * pad, g.z1 - g.z0 + 2 * pad);
+    m.position.set((g.x0 + g.x1) / 2, (g.y0 + g.y1) / 2, (g.z0 + g.z1) / 2);
+    m.visible = true;
+  }
+}
+function recolour() {
+  for (let i = 0; i < n; i++) pMesh.setColorAt(i, tmpC.set(COLORS[kind[i]]));
+  pMesh.instanceColor.needsUpdate = true;
+}
+
+// theme colours for the glass edges and hot plate
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  edgeMat.color.set(cs.getPropertyValue('--glass').trim() || '#5f8299');
+  plateBase.set(cs.getPropertyValue('--plate').trim() || '#98a6b0');
+}
+const plateBase = new THREE.Color(0x98a6b0), hotC = new THREE.Color(0xff5a1f), coldC = new THREE.Color(0x9fd6f5);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readTheme);
+new MutationObserver(readTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// ================= Words =================
+const legend = items => `<div class="legend">${items.map(([c, t]) => `<span><i style="background:var(--${c})"></i>${t}</span>`).join('')}</div>`;
+const TEXT = {
+  states: {
+    title: 'What happens to particles when water changes state?',
+    body: `<p>Everything is made of tiny particles called atoms. Water is made of water particles. They are far too small to see, so this is a model.</p>
+      <p>Move the temperature slider. Watch how the particles are arranged and how fast they move.</p>
+      <p class="note">Water melts at 0 °C and boils at 100 °C. Some water evaporates below 100 °C too: the fastest particles escape from the surface. The lid stops them leaving.</p>
+      ${legend([['water', 'water particle']])}`,
+  },
+  dissolving: {
+    title: 'Where does the sugar go when it dissolves?',
+    body: `<p>The sugar is the <b>solute</b>. The water is the <b>solvent</b>. Mixed together, they make a <b>solution</b>.</p>
+      <p>Water particles knock sugar particles off the lump. They spread out between the water particles, so the solution looks clear. The sugar is still there.</p>
+      <div class="card"><b>Melting is not dissolving.</b> Melting needs heat and only one material. Dissolving needs a solvent.</div>
+      ${legend([['water', 'water particle'], ['sugar', 'sugar particle'], ['sand', 'sand grain']])}`,
+    sand: `<p><b>Sand is insoluble.</b> It does not dissolve. Each grain is far bigger than a particle and stays in one piece. The grains sink, however much you stir.</p>
+      <p>We could separate sand from water by <b>filtering</b>.</p>
+      ${legend([['water', 'water particle'], ['sand', 'sand grain']])}`,
+  },
+  'getting-it-back': {
+    title: 'Can we get the salt back out of salt water?',
+    body: `<p>This salt water is a solution. Heat it and the water <b>evaporates</b>: water particles escape as a gas. The salt particles stay behind.</p>
+      <p>As the water goes, the solution gets more concentrated. When it is <b>saturated</b>, salt particles join up into <b>crystals</b>.</p>
+      <p>We get the salt back, so dissolving is a <b>reversible change</b>.</p>
+      <div class="card">Some changes cannot go back. Burning a candle, frying an egg and a nail rusting all make new materials. These are <b>irreversible changes</b>.</div>
+      ${legend([['water', 'water particle'], ['salt', 'salt particle']])}`,
+  },
+};
+
+// ================= UI =================
+const $ = id => document.getElementById(id);
+const info = $('info'), readouts = $('readouts');
+const tempIn = $('temp'), tempLabel = $('tempLabel');
+const fmtT = t => `${t < 0 ? '−' : ''}${Math.abs(Math.round(t))} °C`;
+let sayTimer = 0;
+function say(text, ms = 2200) {
+  const el = $('say'); el.textContent = text; el.classList.add('show');
+  clearTimeout(sayTimer); sayTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+function setMode(mode, fromHash = false) {
+  if (!TEXT[mode]) mode = 'states';
+  sim.mode = mode;
+  clearTimeout(sayTimer); $('say').classList.remove('show');
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
+  document.querySelectorAll('.group').forEach(g => g.hidden = g.dataset.for !== mode);
+  sim.stir = false; $('stirBtn').setAttribute('aria-pressed', 'false');
+  if (mode === 'states') { sim.temp = +tempIn.value; st.prevT = sim.temp; setupStates(); }
+  else if (mode === 'dissolving') setupDissolving();
+  else setupRecover();
+  recolour(); refreshText(); updateButtons();
+  if (!fromHash && location.hash !== '#' + mode) history.replaceState(null, '', '#' + mode);
+  requestAnimationFrame(layout);
+}
+function refreshText() {
+  const t = TEXT[sim.mode];
+  $('infoTitle').textContent = t.title;
+  $('infoBody').innerHTML = sim.mode === 'dissolving' && ds.mat === 'sand' ? t.sand : t.body;
+  if (sim.mode === 'dissolving' && ds.mat === 'sand') $('infoTitle').textContent = 'Does sand dissolve in water?';
+}
+function updateButtons() {
+  $('addBtn').disabled = ds.spoons >= 6;
+  $('heatBtn').textContent = rc.heat ? 'Stop heating' : 'Heat';
+  $('heatBtn').setAttribute('aria-pressed', String(rc.heat));
+}
+
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+window.addEventListener('hashchange', () => setMode(location.hash.slice(1), true));
+
+function setTemp(t) {
+  const prev = st.prevT;
+  sim.temp = t; tempIn.value = t; tempLabel.textContent = `Temperature: ${fmtT(t)}`;
+  if (prev < 0 && t >= 0) say('Melting: solid → liquid');
+  else if (prev >= 0 && t < 0) say('Freezing: liquid → solid');
+  if (prev < 100 && t >= 100) say(prev < 0 ? 'Melting, then boiling: solid → liquid → gas' : 'Boiling: liquid → gas');
+  else if (prev >= 100 && t < 100) say(t < 0 ? 'Condensing, then freezing: gas → liquid → solid' : 'Condensing: gas → liquid');
+  st.prevT = t;
+}
+tempIn.addEventListener('input', () => setTemp(+tempIn.value));
+document.querySelectorAll('[data-t]').forEach(b => b.addEventListener('click', () => setTemp(+b.dataset.t)));
+
+document.querySelectorAll('[data-mat]').forEach(b => b.addEventListener('click', () => {
+  if (ds.mat === b.dataset.mat) return;
+  ds.mat = b.dataset.mat;
+  document.querySelectorAll('[data-mat]').forEach(c => c.setAttribute('aria-pressed', String(c === b)));
+  setupDissolving(); recolour(); refreshText();
+}));
+$('addBtn').addEventListener('click', () => { addSpoonful(); recolour(); });
+$('stirBtn').addEventListener('click', e => { sim.stir = !sim.stir; e.currentTarget.setAttribute('aria-pressed', String(sim.stir)); e.currentTarget.textContent = sim.stir ? 'Stop stirring' : 'Stir'; });
+$('warmBtn').addEventListener('click', e => { ds.warm = !ds.warm; e.currentTarget.setAttribute('aria-pressed', String(ds.warm)); });
+$('resetD').addEventListener('click', () => { setupDissolving(); recolour(); });
+$('heatBtn').addEventListener('click', () => { rc.heat = !rc.heat; updateButtons(); if (rc.heat) say('Heating the salt water'); });
+$('resetR').addEventListener('click', () => { setupRecover(); recolour(); updateButtons(); });
+$('eyesBtn').addEventListener('click', e => {
+  view.eyes = !view.eyes; e.currentTarget.setAttribute('aria-pressed', String(view.eyes));
+  e.currentTarget.textContent = view.eyes ? 'Show the particles' : 'What our eyes see';
+});
+
+// ---------- readouts ----------
+const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+function meanSpeed(fn) {
+  let s = 0, c = 0;
+  for (let i = 0; i < n; i++) if (fn(i)) { s += Math.hypot(vx[i], vy[i], vz[i]); c++; }
+  return c ? s / c : 0;
+}
+function updateReadouts() {
+  let html = '';
+  if (sim.mode === 'states') {
+    const T = sim.temp, gas = count(i => ph[i] === PH.GAS), solid = count(i => ph[i] === PH.SOLID), liq = n - gas - solid;
+    let state, what;
+    if (solid > n * 0.5) { state = 'Solid (ice)'; what = 'In a fixed pattern. They vibrate on the spot.'; }
+    else if (gas > n * 0.5) { state = 'Gas (water vapour)'; what = 'Far apart. They move fast in every direction and fill the box. Real steam takes up about 1,700 times more space than the water it came from, so in real life they would be much further apart than this!'; }
+    else { state = gas > 0 ? 'Liquid (a little is evaporating)' : 'Liquid (water)'; what = 'Close together. They slide past each other.'; }
+    if (solid > 0 && liq > 0 && T >= 0) state = 'Melting';
+    const sp = meanSpeed(i => ph[i] !== PH.GONE);
+    html = row('Temperature', fmtT(T)) + row('State', state) + row('Particles', what) +
+      row('Speed', `<span class="meter" aria-label="Particle speed"><b style="width:${clamp(sp / 5.2 * 100, 3, 100)}%"></b></span>`);
+    if (view.eyes && gas > n * 0.5) html += row('We see', 'Nothing! Water vapour is invisible.');
+  } else if (sim.mode === 'dissolving') {
+    if (ds.mat === 'sugar') {
+      const d = count(i => kind[i] === KIND.SUGAR && ph[i] === PH.LIQ);
+      const sat = d >= capacity() && d < ds.total;
+      const conc = d === 0 ? 'Just water' : d < 30 ? 'Weak' : d < 70 ? 'Medium' : 'Strong';
+      html = row('Water', ds.warm ? 'Warm (60 °C)' : 'Cold (20 °C)') +
+        row('Sugar dissolved', `${d} of ${ds.total} particles`) +
+        row('Concentration', conc) +
+        row('Saturated?', sat ? 'Yes: no more can dissolve' : 'No') +
+        row('Sugar lost', '0. It is all still there.');
+    } else {
+      const g = count(i => kind[i] === KIND.SAND);
+      html = row('Sand grains', g) + row('Dissolved', '0. Sand is insoluble.') + row('Stirring', sim.stir ? 'Grains swirl, then sink' : 'Off');
+    }
+  } else {
+    const water = count(i => kind[i] === KIND.WATER && ph[i] === PH.LIQ);
+    const cry = count(i => kind[i] === KIND.SALT && ph[i] === PH.SOLID);
+    html = row('Temperature', fmtT(sim.temp)) +
+      row('Water left', `${water} of 200 particles`) +
+      row('Salt', `60 particles: all still here`) +
+      row('In crystals', `${cry} salt particles`) +
+      row('Now', water === 0 ? 'Only salt crystals are left' : rc.heat ? (sim.temp > 99 ? 'Water is evaporating fast' : 'Warming up') : 'Evaporating very slowly');
+  }
+  readouts.innerHTML = html;
+}
+
+// ---------- layout: keep the box in the free space between the panels ----------
+const hdr = $('hdr'), ctl = $('controls');
+const dir = new THREE.Vector3();
+function layout() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h);
+  const top = hdr.getBoundingClientRect().bottom, bot = h - ctl.getBoundingClientRect().top;
+  document.documentElement.style.setProperty('--hdr', `${top}px`);
+  document.documentElement.style.setProperty('--ctl', `${bot}px`);
+  let left = 0;
+  if (w >= 900) left = info.getBoundingClientRect().right;
+  const freeW = Math.max(200, w - left), freeH = Math.max(160, h - top - bot - 10);
+  camera.aspect = w / h;
+  const cx = left + freeW / 2, cy = top + freeH / 2;
+  camera.setViewOffset(w, h, w / 2 - cx, h / 2 - cy, w, h);
+  const half = Math.tan(camera.fov * DEG / 2);
+  const dH = (6.4 / 2) / half * (h / freeH);
+  const dW = (6.6 / 2) / (half * w / h) * (w / freeW);
+  const dist = clamp(Math.max(dH, dW), 6, 28);
+  dir.copy(camera.position).sub(controls.target).normalize();
+  camera.position.copy(controls.target).addScaledVector(dir, dist);
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', layout);
+info.addEventListener('toggle', layout);
+if (window.innerWidth < 640) info.open = false;
+
+// ---------- main loop ----------
+const clock = new THREE.Clock();
+let textT = 0;
+readTheme();
+setMode(location.hash.slice(1) || 'states', true);
+layout();
+function frame(dt) {
+  if (sim.mode === 'states') updateStates(dt);
+  else if (sim.mode === 'dissolving') updateDissolving(dt);
+  else updateRecover(dt);
+  if (sim.stir) sim.stirAngle += dt * 2.4;
+  const sub = 3; for (let s = 0; s < sub; s++) step(dt / sub);
+
+  // scene furniture
+  lid.visible = sim.lid; boxEdges.visible = sim.lid; openEdges.visible = !sim.lid;
+  rod.visible = sim.mode === 'dissolving' && sim.stir;
+  rod.position.set(0.85 * Math.cos(sim.stirAngle), 2.1 + 0.18, 0.85 * Math.sin(sim.stirAngle));
+  rod.rotation.z = -0.12 * Math.cos(sim.stirAngle); rod.rotation.x = 0.12 * Math.sin(sim.stirAngle);
+  const heat = clamp((sim.temp - 25) / 75, 0, 1), cold = clamp(-sim.temp / 20, 0, 1);
+  plateMat.color.copy(plateBase).lerp(hotC, heat * 0.8).lerp(coldC, cold * 0.6);
+  plateMat.emissive.copy(hotC).multiplyScalar(heat * 0.35);
+  ringMat.color.copy(plateBase).multiplyScalar(0.7).lerp(hotC, heat);
+
+  render3D();
+  textT += dt; if (textT > 0.25) { textT = 0; updateReadouts(); }
+  controls.update();
+  renderer.render(scene, camera);
+}
+renderer.setAnimationLoop(() => frame(Math.min(clock.getDelta(), 1 / 30)));
+// for testing: run the model forward without waiting for the screen
+window.particleBox = { run(seconds) { for (let t = 0; t < seconds; t += 1 / 30) frame(1 / 30); }, info: () => ({ n, meanY: [0,1,2].map(k => { let t = 0, c = 0; for (let i = 0; i < n; i++) if (kind[i] === k && ph[i] === PH.LIQ) { t += y[i]; c++; } return c ? +(t / c).toFixed(2) : null; }), level: liquidLevel(), top: (() => { const ys = []; for (let i = 0; i < n; i++) if (ph[i] === PH.LIQ) ys.push(y[i]); ys.sort((a, b) => a - b); return ys[Math.floor(ys.length * 0.95)]; })() }) };
+</script>
+
+</html>

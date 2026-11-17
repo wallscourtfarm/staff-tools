@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<link rel="icon" type="image/png" href="../../favicon.png">
+<style>html{color-scheme:light}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cam Machine</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Layout: full-screen 3D workbench; WFA-blue header with three tabs (plate, drum, linear cam);
+     info card top-left; movement graph bottom-right; controls floating at the bottom. */
+  :root {
+    --bg: #eef4f7;
+    --surface: #ffffff;
+    --edge: #cfdfe8;
+    --fg: #0a0101;
+    --muted: #4f6170;
+    --blue: #1798d3;
+    --on-blue: #ffffff;
+    --lift: #1c8f4f;
+    --fall: #d23b37;
+    --dwell: #6f7f8c;
+    --grid: #d9e6ee;
+    --shadow: rgba(10, 40, 60, .14);
+    --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+    --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+    --hdr: 64px;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #0f1c24; --surface: #1a2c37; --edge: #2c4555; --fg: #e8f1f6; --muted: #9fb3c2;
+    --blue: #3aaee3; --on-blue: #04121a; --lift: #4cc47f; --fall: #f06a64; --dwell: #9aa9b5;
+    --grid: #2a3f4c; --shadow: rgba(0, 0, 0, .4); color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg: #0f1c24; --surface: #1a2c37; --edge: #2c4555; --fg: #e8f1f6; --muted: #9fb3c2;
+    --blue: #3aaee3; --on-blue: #04121a; --lift: #4cc47f; --fall: #f06a64; --dwell: #9aa9b5;
+    --grid: #2a3f4c; --shadow: rgba(0, 0, 0, .4); color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; overflow: hidden; }
+  #scene { position: fixed; inset: 0; touch-action: none; }
+  #scene canvas { display: block; }
+
+  header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 3;
+    background: var(--blue); color: var(--on-blue);
+    padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-bottom: 10px;
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+  }
+  .brand { display: flex; flex-direction: column; min-width: 0; }
+  h1 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.15; text-wrap: balance; }
+  .brand span { font-size: 13px; font-weight: 700; opacity: .9; letter-spacing: .02em; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .tabs button {
+    font: inherit; font-weight: 800; font-size: 15px; min-height: 40px; padding: 6px 14px;
+    border-radius: 999px; border: 2px solid rgba(255,255,255,.6); background: transparent; color: var(--on-blue); cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: var(--on-blue); color: var(--blue); border-color: var(--on-blue); }
+
+  .info {
+    position: fixed; z-index: 2; left: var(--gutter-l); top: calc(var(--hdr) + 12px);
+    width: min(330px, calc(100% - 32px)); max-height: calc(100% - var(--hdr) - 190px); overflow: auto;
+    background: var(--surface); border: 1px solid var(--edge); border-radius: 14px; padding: 12px 16px;
+    box-shadow: 0 4px 14px var(--shadow);
+  }
+  .info summary { font-weight: 800; font-size: 17px; cursor: pointer; line-height: 1.3; text-wrap: balance; }
+  .info p { margin: 8px 0 0; line-height: 1.45; }
+  .info p.shape { border-left: 4px solid var(--blue); padding-left: 10px; }
+  dl { margin: 10px 0 4px; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: baseline; }
+  dt { color: var(--muted); font-size: 13px; font-weight: 700; }
+  dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 0; }
+  .chip { display: inline-block; padding: 1px 10px; border-radius: 999px; font-size: 14px; color: #fff; }
+  .chip.lift { background: var(--lift); } .chip.fall { background: var(--fall); } .chip.dwell { background: var(--dwell); }
+  :root[data-theme="dark"] .chip { color: #06131a; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .chip { color: #06131a; } }
+
+  .graph {
+    position: fixed; z-index: 2; margin: 0; right: var(--gutter-r);
+    bottom: calc(var(--ctl, 120px) + 34px + env(safe-area-inset-bottom, 0px));
+    width: clamp(220px, 28vw, 320px); max-width: calc(100% - 32px);
+    background: var(--surface); border: 1px solid var(--edge); border-radius: 14px; padding: 8px 10px 6px;
+    box-shadow: 0 4px 14px var(--shadow);
+  }
+  .graph figcaption { font-size: 13px; font-weight: 800; color: var(--muted); }
+  .graph canvas { display: block; width: 100%; height: 130px; }
+  .legend { display: flex; gap: 10px; font-size: 12px; font-weight: 800; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+
+  .controls {
+    position: fixed; z-index: 3; left: 50%; transform: translateX(-50%);
+    bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    width: min(760px, calc(100% - 32px));
+    background: var(--surface); border: 1px solid var(--edge); border-radius: 16px; padding: 10px 14px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; box-shadow: 0 4px 18px var(--shadow);
+  }
+  .controls button {
+    font: inherit; font-weight: 800; font-size: 15px; min-height: 44px; padding: 8px 16px; border-radius: 12px; cursor: pointer;
+    border: 2px solid var(--blue); background: var(--blue); color: var(--on-blue);
+  }
+  .controls button.ghost { background: transparent; color: var(--fg); border-color: var(--edge); }
+  .controls button.ghost[aria-pressed="true"] { border-color: var(--blue); color: var(--blue); }
+  .shapes { display: flex; gap: 6px; flex-wrap: wrap; width: 100%; align-items: center; }
+  .shapes > span { font-size: 13px; font-weight: 800; color: var(--muted); margin-right: 2px; }
+  .shapes button { min-height: 40px; padding: 6px 12px; font-size: 14px; }
+  .slider { flex: 1 1 200px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .slider span { font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .slider input { width: 100%; height: 30px; accent-color: var(--blue); }
+  button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+  .say {
+    position: fixed; z-index: 4; left: 50%; transform: translateX(-50%); top: calc(var(--hdr) + 14px);
+    width: min(420px, calc(100% - 32px)); background: var(--fall); color: #fff; font-weight: 800;
+    border-radius: 14px; padding: 10px 14px; text-align: center; line-height: 1.35; box-shadow: 0 4px 14px var(--shadow);
+  }
+
+  .lbl {
+    font: 800 13px var(--font); color: var(--fg); background: var(--surface); border: 2px solid var(--blue);
+    border-radius: 999px; padding: 2px 10px; white-space: nowrap; pointer-events: none; box-shadow: 0 2px 6px var(--shadow);
+  }
+
+  footer {
+    position: fixed; z-index: 2; left: 0; right: 0; bottom: calc(3px + env(safe-area-inset-bottom, 0px));
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    text-align: center; font-size: 11px; color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 18px; }
+    .tabs { margin-left: 0; }
+    .tabs button { font-size: 14px; padding: 5px 11px; }
+    .info { max-height: 40vh; }
+    .graph { width: 170px; padding: 6px 8px 4px; }
+    .graph canvas { height: 88px; }
+    .legend { font-size: 11px; gap: 6px; }
+    .lbl { font-size: 11px; padding: 1px 7px; }
+    footer .hint { display: none; }
+  }
+</style>
+
+<div id="scene"></div>
+
+<header id="hdr">
+  <div class="brand">
+    <h1>Cam Machine</h1>
+    <span>Year 5 DT · Mechanisms: Cams</span>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Choose a type of cam">
+    <button role="tab" data-mode="plate" aria-selected="true">Plate cam</button>
+    <button role="tab" data-mode="drum" aria-selected="false">Drum cam</button>
+    <button role="tab" data-mode="linear" aria-selected="false">Linear cam</button>
+  </nav>
+</header>
+
+<details class="info" id="info" open>
+  <summary id="infoTitle">How does a cam make something move?</summary>
+  <dl id="readouts"></dl>
+  <div id="infoBody"></div>
+</details>
+
+<figure class="graph" id="graph">
+  <figcaption id="graphTitle">How the follower moves in one turn</figcaption>
+  <canvas id="graphCv" aria-label="Graph of the follower's movement"></canvas>
+  <div class="legend" id="legend"></div>
+</figure>
+
+<div class="say" id="say" role="status" hidden></div>
+
+<div class="controls" id="controls">
+  <div class="shapes" id="shapes">
+    <span>Cam shape:</span>
+    <button type="button" class="ghost" data-shape="snail" aria-pressed="true">Snail</button>
+    <button type="button" class="ghost" data-shape="pear" aria-pressed="false">Pear</button>
+    <button type="button" class="ghost" data-shape="off" aria-pressed="false">Off-centre circle</button>
+    <button type="button" class="ghost" data-shape="centre" aria-pressed="false">Centred circle</button>
+  </div>
+  <button id="play" type="button">Turn</button>
+  <label class="slider" for="slider"><span id="sliderLabel">Turn the crank</span><input id="slider" type="range" min="0" max="359" step="1" value="0"></label>
+  <button id="dirBtn" type="button" class="ghost" aria-pressed="false">Turn the other way</button>
+  <button id="lblBtn" type="button" class="ghost" aria-pressed="true">Labels</button>
+</div>
+
+<footer><span class="hint">Drag to look around. Pinch or scroll to zoom. · </span>Wallscourt Farm Academy · Y5-17.11.26a</footer>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const TAU = Math.PI * 2, DEG = Math.PI / 180;
+const Y0 = 1.45;                  // axle height
+const TOP = 3.1;                  // underside of the top board
+const MM = 20;                    // 1 scene unit = 20 mm, for the height readout
+const SPEED = TAU / 4;            // one turn every 4 seconds
+const smooth = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+const wrap = a => ((a % TAU) + TAU) % TAU;
+
+// ---------------- Cam shapes: radius from the axle at angle psi (in the cam's own frame) ----------------
+// The follower sits on top, so at crank angle a it touches the cam at psi = 90° - a.
+const SNAIL = { r0: 0.55, h: 0.65, step: Math.PI / 2 };       // step lines up with crank angle 0°
+const PEAR = { r0: 0.70, h: 0.55, nose: -Math.PI / 2, w: Math.PI / 2 };
+const OFF = { R: 0.90, e: 0.35, dir: -Math.PI / 2 };
+const CAMS = {
+  snail:  { name: 'Snail cam', colour: '#f07d2c',
+            r: p => SNAIL.r0 + SNAIL.h * (wrap(SNAIL.step - p) / TAU),
+            text: 'A slow, steady lift all the way round, then a sudden fall when the follower drops off the step. A snail cam only works one way round. Try turning it the other way!' },
+  pear:   { name: 'Pear cam', colour: '#2fae66',
+            r: p => { let d = Math.abs(wrap(p - PEAR.nose + Math.PI) - Math.PI);
+                      return d < PEAR.w ? PEAR.r0 + PEAR.h * (1 + Math.cos(Math.PI * d / PEAR.w)) / 2 : PEAR.r0; },
+            text: 'For half of each turn the follower stays still (dwell). Then the point of the pear gives a smooth lift and a smooth fall.' },
+  off:    { name: 'Off-centre circle cam', colour: '#8a5cd6',
+            r: p => { const q = p - OFF.dir; return OFF.e * Math.cos(q) + Math.sqrt(OFF.R * OFF.R - (OFF.e * Math.sin(q)) ** 2); },
+            text: 'A round cam with the axle hole away from the middle. The follower lifts smoothly, then falls smoothly, again and again, with almost no rest.' },
+  centre: { name: 'Centred circle (not really a cam)', colour: '#1798d3',
+            r: () => 0.9,
+            text: 'The hole is in the middle, so the edge is always the same distance from the axle. The follower never moves. It is dwell all the time. This is why a cam needs an unusual shape!' },
+};
+
+// Drum cam: follower position along the axle at crank angle a (dwell, move right, dwell, move left)
+const DRUM_R = 0.6, DRUM_A = 0.55;
+function drumX(a) {
+  const d = wrap(a) / DEG;
+  if (d < 60) return -DRUM_A;
+  if (d < 180) return -DRUM_A + 2 * DRUM_A * smooth((d - 60) / 120);
+  if (d < 240) return DRUM_A;
+  return DRUM_A - 2 * DRUM_A * smooth((d - 240) / 120);
+}
+// Linear cam: height of the slide's top surface at a point u along it (u = 0 is the middle)
+const SLIDE_LEN = 3.0, SLIDE_BASE = 0.35, S_MAX = 1.4;
+function slideTop(u) {
+  let p = 0;
+  if (u > -0.9 && u <= -0.1) p = 0.5 * smooth((u + 0.9) / 0.8);
+  else if (u > -0.1 && u <= 0.3) p = 0.5;
+  else if (u > 0.3 && u <= 0.38) p = 0.5 * (1 - (u - 0.3) / 0.08);
+  else if (u > 0.8 && u <= 1.3) p = 0.3 * Math.sin(Math.PI * (u - 0.8) / 0.5);
+  return SLIDE_BASE + p;
+}
+
+// ---------------- State ----------------
+const state = { mode: 'plate', shape: 'snail', a: 0, s: -S_MAX, phase: 0, playing: false, dir: 1, labels: true,
+                turns: 0, lastA: 0, stuck: false, lastMoveDir: 1 };
+
+// ---------------- Renderer, scene, camera ----------------
+const wrapEl = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+wrapEl.appendChild(renderer.domElement);
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.domElement.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
+wrapEl.appendChild(labelRenderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+camera.position.set(5.2, 4.6, 7.4);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2.3, 0);
+controls.enableDamping = true;
+controls.enablePan = false;
+controls.minDistance = 4;
+controls.maxDistance = 18;
+controls.maxPolarAngle = Math.PI / 2 - 0.04;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0xa7b8c4, 1.25));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(4, 9, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 6, bottom: -2, near: 1, far: 25 });
+sun.shadow.bias = -0.0008;
+scene.add(sun);
+
+const ground = new THREE.Mesh(new THREE.CircleGeometry(9, 48), new THREE.ShadowMaterial({ opacity: 0.16 }));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+let grid = null;
+function makeGrid() {
+  if (grid) scene.remove(grid);
+  const cs = getComputedStyle(document.documentElement);
+  const c = new THREE.Color(cs.getPropertyValue('--grid').trim() || '#d9e6ee');
+  grid = new THREE.GridHelper(14, 14, c, c);
+  grid.position.y = 0.001;
+  scene.add(grid);
+}
+makeGrid();
+
+// ---------------- Materials ----------------
+function woodTexture(base, line) {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = base; g.fillRect(0, 0, 256, 256);
+  let s = 7; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  g.strokeStyle = line; g.lineWidth = 1.2;
+  for (let i = 0; i < 26; i++) {
+    const y = rnd() * 256, amp = 2 + rnd() * 5, f = 0.01 + rnd() * 0.03;
+    g.globalAlpha = 0.18 + rnd() * 0.25; g.beginPath();
+    for (let x = 0; x <= 256; x += 8) g.lineTo(x, y + Math.sin(x * f + i) * amp);
+    g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
+  return t;
+}
+const wood = new THREE.MeshStandardMaterial({ map: woodTexture('#dfbd8a', '#9c7442'), roughness: 0.75 });
+const darkWood = new THREE.MeshStandardMaterial({ map: woodTexture('#b98a55', '#6e4a22'), roughness: 0.75 });
+const metal = new THREE.MeshStandardMaterial({ color: 0x9aa6af, metalness: 0.7, roughness: 0.35 });
+const red = new THREE.MeshStandardMaterial({ color: 0xe5484d, roughness: 0.5 });
+const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+
+function box(w, h, d, mat, x, y, z) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; return m;
+}
+function addLabel(parent, text, x, y, z) {
+  const div = document.createElement('div'); div.className = 'lbl'; div.textContent = text;
+  const o = new CSS2DObject(div); o.position.set(x, y, z); parent.add(o); labels.push(o); return o;
+}
+const labels = [];
+
+// ---------------- Frame (the box the mechanism sits in) ----------------
+const frame = new THREE.Group(); scene.add(frame);
+frame.add(box(3.3, 0.12, 2.9, darkWood, 0, 0.06, 0));                         // base
+const sides = new THREE.Group(); frame.add(sides);
+sides.add(box(0.1, TOP - 0.12, 2.9, wood, -1.5, 0.12 + (TOP - 0.12) / 2, 0));
+sides.add(box(0.1, TOP - 0.12, 2.9, wood, 1.5, 0.12 + (TOP - 0.12) / 2, 0));
+const posts = new THREE.Group(); frame.add(posts);                              // used instead of sides for the linear cam
+for (const x of [-1.5, 1.5]) for (const z of [-1.35, 1.35]) posts.add(box(0.14, TOP - 0.12, 0.14, wood, x, 0.12 + (TOP - 0.12) / 2, z));
+
+function topBoard(slot) {
+  const sh = new THREE.Shape();
+  sh.moveTo(-1.6, -1.45); sh.lineTo(1.6, -1.45); sh.lineTo(1.6, 1.45); sh.lineTo(-1.6, 1.45); sh.lineTo(-1.6, -1.45);
+  const hole = new THREE.Path();
+  if (slot) { hole.moveTo(-0.72, -0.09); hole.lineTo(0.72, -0.09); hole.lineTo(0.72, 0.09); hole.lineTo(-0.72, 0.09); hole.lineTo(-0.72, -0.09); }
+  else hole.absarc(0, 0, 0.1, 0, TAU, true);
+  sh.holes.push(hole);
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.1, bevelEnabled: false });
+  g.rotateX(-Math.PI / 2);
+  const m = new THREE.Mesh(g, wood); m.position.y = TOP; m.castShadow = m.receiveShadow = true;
+  frame.add(m); return m;
+}
+const topHole = topBoard(false), topSlot = topBoard(true);
+
+// ---------------- Axle and crank (plate and drum cams) ----------------
+const axleGroup = new THREE.Group(); scene.add(axleGroup);
+const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.4, 20), metal);
+axle.rotation.z = Math.PI / 2; axle.position.set(0.1, Y0, 0); axle.castShadow = true; axleGroup.add(axle);
+const crank = new THREE.Group(); crank.position.set(1.66, Y0, 0); axleGroup.add(crank);
+crank.add(box(0.1, 0.7, 0.16, red, 0, 0.3, 0));
+const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.45, 16), darkWood);
+handle.rotation.z = Math.PI / 2; handle.position.set(0.25, 0.6, 0); handle.castShadow = true; crank.add(handle);
+const knob = new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 12), red); knob.position.set(0.48, 0.6, 0); crank.add(knob);
+addLabel(axleGroup, 'Crank', 1.95, Y0 + 0.95, 0);
+const axleLbl = addLabel(axleGroup, 'Axle', -1.1, Y0 - 0.3, 0.2);
+
+// ---------------- Plate cams ----------------
+const plateGroup = new THREE.Group(); plateGroup.position.y = Y0; scene.add(plateGroup);
+const camMeshes = {};
+const DEPTH = 0.22;
+for (const [key, cam] of Object.entries(CAMS)) {
+  const sh = new THREE.Shape(), N = 240;
+  for (let i = 0; i <= N; i++) {
+    let p, r;
+    if (key === 'snail') { const t = i / N; p = SNAIL.step - TAU * t; r = SNAIL.r0 + SNAIL.h * t; }   // exact step edge
+    else { p = TAU * i / N; r = cam.r(p); }
+    const x = r * Math.cos(p), y = r * Math.sin(p);
+    i === 0 ? sh.moveTo(x, y) : sh.lineTo(x, y);
+  }
+  const hole = new THREE.Path(); hole.absarc(0, 0, 0.085, 0, TAU, true); sh.holes.push(hole);
+  const g = new THREE.ExtrudeGeometry(sh, { depth: DEPTH, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02, bevelSegments: 2, curveSegments: 24 });
+  g.rotateY(Math.PI / 2);                 // shape x -> world -z, shape y -> world y, thickness along the axle
+  g.translate(-DEPTH / 2, 0, 0);
+  const grp = new THREE.Group();
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: cam.colour, roughness: 0.55 }));
+  m.castShadow = m.receiveShadow = true; grp.add(m);
+  // a white dot so you can see it turning, even for the round cams
+  const dotR = key === 'off' ? 0.35 : 0.42;
+  const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.02, 16), white);
+  dot.rotation.z = Math.PI / 2; dot.position.set(DEPTH / 2 + 0.025, dotR * Math.sin(OFF.dir), -dotR * Math.cos(OFF.dir));
+  if (key !== 'off') dot.position.set(DEPTH / 2 + 0.025, 0.42, 0);
+  grp.add(dot);
+  grp.visible = false; plateGroup.add(grp); camMeshes[key] = grp;
+}
+const camLbl = addLabel(scene, 'Cam', 0, Y0 - 0.15, 1.55);
+
+// Follower for the plate and linear cams: a rod with a little bird on top
+function makeBird() {
+  const b = new THREE.Group();
+  const yellow = new THREE.MeshStandardMaterial({ color: 0xf2b416, roughness: 0.5 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.26, 20, 16), yellow); body.scale.set(1.2, 0.95, 1); body.position.y = 0.26; b.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 18, 14), yellow); head.position.set(0, 0.56, 0.12); b.add(head);
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.14, 12), new THREE.MeshStandardMaterial({ color: 0xf07d2c }));
+  beak.rotation.x = Math.PI / 2; beak.position.set(0, 0.55, 0.3); b.add(beak);
+  for (const s of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), new THREE.MeshStandardMaterial({ color: 0x0a0101 }));
+    eye.position.set(0.08 * s, 0.6, 0.25); b.add(eye);
+    const wing = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 10), yellow);
+    wing.scale.set(0.35, 0.7, 1.1); wing.position.set(0.3 * s, 0.3, -0.02); b.add(wing); b.userData['wing' + s] = wing;
+  }
+  b.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return b;
+}
+const follower = new THREE.Group(); scene.add(follower);
+const FOLLOW_LEN = 2.0;
+const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 1, 16), red); rod.castShadow = true; follower.add(rod);
+const tip = new THREE.Mesh(new THREE.SphereGeometry(0.055, 14, 10), red); follower.add(tip);
+const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 24), darkWood); plate.castShadow = true; follower.add(plate);
+const bird = makeBird(); follower.add(bird);
+const followerLbl = addLabel(follower, 'Follower', 0.55, 0.9, 0.3);
+const guideLbl = addLabel(scene, 'Guide', -1.0, TOP + 0.25, 0.7);
+function setFollowerLength(len) {
+  rod.scale.y = len; rod.position.y = len / 2; tip.position.y = 0.055;
+  plate.position.y = len + 0.03; bird.position.y = len + 0.06;
+  followerLbl.position.y = Math.min(len - 0.4, TOP - 0.2 - 1.0);
+}
+
+// ---------------- Drum cam ----------------
+const drumGroup = new THREE.Group(); drumGroup.position.y = Y0; scene.add(drumGroup);
+{
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(DRUM_R, DRUM_R, 1.6, 48), new THREE.MeshStandardMaterial({ color: 0x2fae66, roughness: 0.55 }));
+  drum.rotation.z = Math.PI / 2; drum.castShadow = drum.receiveShadow = true; drumGroup.add(drum);
+  // the groove: two raised rails following the path
+  for (const off of [-0.1, 0.1]) {
+    const pts = [];
+    for (let i = 0; i < 240; i++) {
+      const p = TAU * i / 240, a = Math.PI / 2 - p;        // crank angle that brings this point to the top
+      pts.push(new THREE.Vector3(drumX(a) + off, (DRUM_R + 0.025) * Math.sin(p), -(DRUM_R + 0.025) * Math.cos(p)));
+    }
+    const curve = new THREE.CatmullRomCurve3(pts, true);
+    const rail = new THREE.Mesh(new THREE.TubeGeometry(curve, 360, 0.035, 8, true), new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.5 }));
+    rail.castShadow = true; drumGroup.add(rail);
+  }
+  const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.02, 16), white);
+  dot.rotation.z = Math.PI / 2; dot.position.set(0.81, 0.35, 0); drumGroup.add(dot);
+}
+const drumLbl = addLabel(scene, 'Drum cam', -0.4, Y0 - 0.85, 0.75);
+const grooveLbl = addLabel(drumGroup.parent, 'Groove', 0.45, Y0 + DRUM_R - 0.05, 0.75);
+grooveLbl.userData.drumOnly = true;
+const peg = new THREE.Group(); scene.add(peg);
+{
+  const len = TOP + 0.8 - (Y0 + DRUM_R - 0.03);
+  const r = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, len, 16), red);
+  r.position.y = len / 2; r.castShadow = true; peg.add(r);
+  const p = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 24), darkWood); p.position.y = len + 0.03; peg.add(p);
+  const b2 = makeBird(); b2.position.y = len + 0.06; b2.rotation.y = Math.PI / 2; peg.add(b2); peg.userData.bird = b2;
+  peg.position.y = Y0 + DRUM_R - 0.03;
+  addLabel(peg, 'Follower', 0.4, 0.75, 0.3);
+}
+
+// ---------------- Linear cam ----------------
+const linGroup = new THREE.Group(); scene.add(linGroup);
+const slide = new THREE.Group(); linGroup.add(slide);
+{
+  const sh = new THREE.Shape(), N = 300;
+  sh.moveTo(-SLIDE_LEN / 2, 0); sh.lineTo(SLIDE_LEN / 2, 0);
+  for (let i = N; i >= 0; i--) { const u = -SLIDE_LEN / 2 + SLIDE_LEN * i / N; sh.lineTo(u, slideTop(u)); }
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.6, bevelEnabled: false });
+  g.translate(0, 0, -0.3);
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x8a5cd6, roughness: 0.55 }));
+  m.castShadow = m.receiveShadow = true; slide.add(m);
+  const knobL = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), red); knobL.position.set(-SLIDE_LEN / 2 - 0.1, 0.2, 0); slide.add(knobL);
+  slide.position.y = 0.12;
+  for (const z of [-0.38, 0.38]) linGroup.add(box(3.3, 0.1, 0.08, darkWood, 0, 0.17, z));   // track the slide runs in
+}
+const linLbl = addLabel(slide, 'Linear cam', -1.0, 0.85, 0.35);
+
+// ---------------- Words ----------------
+const INFO = {
+  plate: {
+    title: 'How does a plate cam make something move up and down?',
+    body: ['Turn the <b>crank</b>. It turns the <b>axle</b>, and the axle turns the <b>cam</b>. Going round and round is called <b>rotary motion</b>.',
+           'The <b>follower</b> rests on the edge of the cam. As the cam turns, the follower is pushed up (<b>lift</b>), drops down (<b>fall</b>) or stays still (<b>dwell</b>). Moving in a straight line is called <b>linear motion</b>.',
+           'So a cam changes rotary motion into linear motion. The shape of the cam decides how the follower moves.'],
+    graph: 'How the follower moves in one turn',
+  },
+  drum: {
+    title: 'How does a drum cam work?',
+    body: ['A <b>drum cam</b> (or cylindrical cam) is a cylinder with a <b>groove</b> curving round it.',
+           'A peg on the <b>follower</b> sits in the groove. As the drum turns, the groove pushes the peg from side to side, along the line of the axle.',
+           'Rotary motion goes in. Linear motion, side to side, comes out. When the groove runs straight round the drum, the follower has a <b>dwell</b>.'],
+    graph: 'Where the follower is in one turn',
+  },
+  linear: {
+    title: 'How does a linear cam work?',
+    body: ['A <b>linear cam</b> does not turn round. It slides backwards and forwards in a straight line.',
+           'The bumps and slopes on top push the <b>follower</b> up (<b>lift</b>) and let it down (<b>fall</b>). On the flat parts it stays still (<b>dwell</b>).',
+           'A gentle slope gives a slow lift. A steep edge gives a sudden fall. Linear motion goes in, and linear motion comes out, but it changes direction: from side to side into up and down.'],
+    graph: 'How the follower moves as the cam slides',
+  },
+};
+const infoTitle = document.getElementById('infoTitle'), infoBody = document.getElementById('infoBody'), readouts = document.getElementById('readouts');
+const graphTitle = document.getElementById('graphTitle'), legend = document.getElementById('legend');
+const playBtn = document.getElementById('play'), slider = document.getElementById('slider'), sliderLabel = document.getElementById('sliderLabel');
+const dirBtn = document.getElementById('dirBtn'), lblBtn = document.getElementById('lblBtn'), shapesEl = document.getElementById('shapes');
+const say = document.getElementById('say');
+
+function renderInfo() {
+  const I = INFO[state.mode];
+  infoTitle.textContent = I.title;
+  let html = I.body.map(t => `<p>${t}</p>`).join('');
+  if (state.mode === 'plate') html += `<p class="shape"><b>${CAMS[state.shape].name}:</b> ${CAMS[state.shape].text}</p>`;
+  html += '<p>Toy makers use cams to make models bob, peck, nod and jump. What could your cam make move?</p>';
+  infoBody.innerHTML = html;
+  graphTitle.textContent = I.graph;
+  const side = state.mode === 'drum';
+  legend.innerHTML = side
+    ? '<span><i style="background:var(--lift)"></i>Moves right</span><span><i style="background:var(--fall)"></i>Moves left</span><span><i style="background:var(--dwell)"></i>Dwell</span>'
+    : '<span><i style="background:var(--lift)"></i>Lift</span><span><i style="background:var(--fall)"></i>Fall</span><span><i style="background:var(--dwell)"></i>Dwell</span>';
+}
+
+// ---------------- Output of the mechanism for a given input ----------------
+// plate: input = crank angle, output = follower height above the axle
+// drum: input = crank angle, output = follower position along the axle
+// linear: input = slide position, output = follower height
+function output(mode, x) {
+  if (mode === 'plate') return CAMS[state.shape].r(Math.PI / 2 - x);
+  if (mode === 'drum') return drumX(x);
+  return slideTop(-x);
+}
+function kindAt(mode, x, dir) {          // 1 lift / right, -1 fall / left, 0 dwell (for the direction of travel)
+  const e = mode === 'linear' ? 0.01 : 1.5 * DEG;
+  let d = (output(mode, x + e * dir) - output(mode, x)) / e;
+  if (mode === 'plate' && state.shape === 'snail' && Math.abs(d) > 5) d = dir > 0 ? -1 : 1;
+  return Math.abs(d) < 0.02 ? 0 : (d > 0 ? 1 : -1);
+}
+
+// ---------------- Graph ----------------
+const gcv = document.getElementById('graphCv'), gctx = gcv.getContext('2d');
+let gw = 0, gh = 0;
+function sizeGraph() {
+  const r = gcv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio, 2);
+  gw = r.width; gh = r.height; gcv.width = Math.round(gw * dpr); gcv.height = Math.round(gh * dpr);
+  gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function drawGraph() {
+  if (!gw) return;
+  const cs = getComputedStyle(document.documentElement);
+  const col = { lift: cs.getPropertyValue('--lift').trim(), fall: cs.getPropertyValue('--fall').trim(), dwell: cs.getPropertyValue('--dwell').trim(),
+                fg: cs.getPropertyValue('--fg').trim(), muted: cs.getPropertyValue('--muted').trim(), grid: cs.getPropertyValue('--grid').trim() };
+  const g = gctx; g.clearRect(0, 0, gw, gh);
+  const L = 22, R = 6, T = 6, B = 18, W = gw - L - R, H = gh - T - B;
+  const mode = state.mode, N = 360;
+  const xs = [], ys = [];
+  for (let i = 0; i <= N; i++) {
+    const x = mode === 'linear' ? -S_MAX + 2 * S_MAX * i / N : TAU * i / N;
+    xs.push(x); ys.push(output(mode, mode === 'plate' && i === N ? x - 1e-6 : x));
+  }
+  let lo = Math.min(...ys), hi = Math.max(...ys);
+  if (hi - lo < 0.2) { const m = (hi + lo) / 2; lo = m - 0.4; hi = m + 0.4; }
+  const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
+  const px = i => L + W * i / N, py = v => T + H * (1 - (v - lo) / (hi - lo));
+  // grid
+  g.strokeStyle = col.grid; g.lineWidth = 1; g.font = '700 10px Nunito, sans-serif'; g.fillStyle = col.muted; g.textAlign = 'center';
+  const ticks = mode === 'linear' ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
+  for (const t of ticks) {
+    const x = L + W * t; g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + H); g.stroke();
+    g.fillText(mode === 'linear' ? ['start', 'middle', 'end'][t * 2] : `${Math.round(t * 360)}°`, Math.min(Math.max(x, L + 8), L + W - 8), gh - 4);
+  }
+  g.beginPath(); g.moveTo(L, T + H); g.lineTo(L + W, T + H); g.stroke();
+  g.save(); g.translate(10, T + H / 2); g.rotate(-Math.PI / 2);
+  g.fillText(mode === 'drum' ? 'left · right' : 'height', 0, 0); g.restore();
+  // curve, coloured by what the follower is doing
+  g.lineWidth = 3; g.lineCap = 'round';
+  for (let i = 0; i < N; i++) {
+    const k = kindAt(mode, xs[i] + (xs[i + 1] - xs[i]) / 2, 1);
+    g.strokeStyle = k > 0 ? col.lift : k < 0 ? col.fall : col.dwell;
+    g.beginPath(); g.moveTo(px(i), py(ys[i])); g.lineTo(px(i + 1), py(ys[i + 1])); g.stroke();
+  }
+  if (mode === 'plate' && state.shape === 'snail') {            // the sudden drop at the step
+    g.strokeStyle = col.fall; g.setLineDash([4, 3]); g.lineWidth = 2;
+    g.beginPath(); g.moveTo(px(N), py(ys[N])); g.lineTo(px(N), py(ys[0])); g.stroke(); g.setLineDash([]);
+  }
+  // marker
+  const xin = mode === 'linear' ? state.s : wrap(state.a);
+  const fi = mode === 'linear' ? (xin + S_MAX) / (2 * S_MAX) : xin / TAU;
+  const mx = L + W * fi, my = py(shown.out);
+  g.strokeStyle = col.fg; g.globalAlpha = 0.35; g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(mx, T); g.lineTo(mx, T + H); g.stroke(); g.globalAlpha = 1;
+  g.fillStyle = col.fg; g.beginPath(); g.arc(mx, my, 5, 0, TAU); g.fill();
+}
+
+// ---------------- Moving the mechanism ----------------
+const shown = { out: output('plate', 0), v: 0, kind: 0, hold: 0 };   // what the follower is actually doing (it falls under gravity)
+const SNAIL_STEP_A = 0;          // crank angle (mod 360°) where the snail's step is
+
+function turnBy(da) {
+  if (da === 0) return;
+  if (state.mode === 'plate' && state.shape === 'snail' && da < 0) {
+    // turning backwards: the follower hits the step and the cam jams
+    const k = Math.ceil((state.a - SNAIL_STEP_A) / TAU - 1e-9) - 1;     // last step at or below the current angle
+    const stepA = SNAIL_STEP_A + k * TAU;
+    if (state.a + da <= stepA + 0.004) {
+      state.a = stepA + 0.004;
+      if (!state.stuck) jam();
+      return;
+    }
+  }
+  state.stuck = false;
+  state.a += da;
+}
+function jam() {
+  state.stuck = true; state.playing = false; updatePlay();
+  say.textContent = 'Stuck! The follower has hit the step on the snail cam. A snail cam can only turn one way.';
+  say.hidden = false; clearTimeout(jam.t); jam.t = setTimeout(() => (say.hidden = true), 4500);
+}
+
+let sliderPrev = 0;
+slider.addEventListener('input', () => {
+  const v = +slider.value;
+  if (state.mode === 'linear') { state.s = v / 100; state.playing = false; updatePlay(); return; }
+  let d = (v - sliderPrev) * DEG; sliderPrev = v;
+  state.playing = false; updatePlay();
+  turnBy(d);
+  state.lastMoveDir = Math.sign(d) || state.lastMoveDir;
+});
+function syncSlider() {
+  if (state.mode === 'linear') { slider.value = Math.round(state.s * 100); sliderLabel.textContent = 'Push the slide'; return; }
+  const deg = Math.round(wrap(state.a) / DEG) % 360;
+  slider.value = deg; sliderPrev = deg;
+  sliderLabel.textContent = `Turn the crank: ${deg}°`;
+}
+
+function updatePlay() { playBtn.textContent = state.playing ? 'Stop' : (state.mode === 'linear' ? 'Slide' : 'Turn'); }
+playBtn.addEventListener('click', () => {
+  state.playing = !state.playing;
+  if (state.playing && state.stuck && state.dir < 0) { state.dir = 1; dirBtn.setAttribute('aria-pressed', 'false'); }
+  if (state.playing && state.mode === 'linear') state.phase = Math.acos(Math.max(-1, Math.min(1, -state.s / S_MAX)));
+  updatePlay();
+});
+dirBtn.addEventListener('click', () => {
+  state.dir *= -1; dirBtn.setAttribute('aria-pressed', String(state.dir < 0));
+  if (state.dir < 0) { state.playing = true; updatePlay(); }
+});
+lblBtn.addEventListener('click', () => {
+  state.labels = !state.labels; lblBtn.setAttribute('aria-pressed', String(state.labels));
+  applyVisibility();
+});
+shapesEl.addEventListener('click', e => {
+  const b = e.target.closest('button[data-shape]'); if (!b) return;
+  state.shape = b.dataset.shape; state.stuck = false; say.hidden = true;
+  for (const x of shapesEl.querySelectorAll('button')) x.setAttribute('aria-pressed', String(x === b));
+  shown.out = output('plate', state.a); shown.v = 0;
+  applyVisibility(); renderInfo(); drawGraph();
+});
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+
+function setMode(mode) {
+  state.mode = mode; state.playing = false; state.stuck = false; say.hidden = true;
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
+  if (mode === 'linear') state.s = -S_MAX;
+  shown.out = output(mode, mode === 'linear' ? state.s : state.a); shown.v = 0;
+  updatePlay(); applyVisibility(); renderInfo(); syncSlider(); sizeGraph(); drawGraph();
+}
+
+function applyVisibility() {
+  const m = state.mode;
+  for (const [k, g] of Object.entries(camMeshes)) g.visible = m === 'plate' && k === state.shape;
+  plateGroup.visible = m === 'plate';
+  drumGroup.visible = peg.visible = m === 'drum';
+  linGroup.visible = m === 'linear';
+  axleGroup.visible = m !== 'linear';
+  follower.visible = m !== 'drum';
+  sides.visible = m !== 'linear'; posts.visible = m === 'linear';
+  topHole.visible = m !== 'drum'; topSlot.visible = m === 'drum';
+  shapesEl.hidden = m !== 'plate';
+  dirBtn.hidden = m === 'linear';
+  slider.min = m === 'linear' ? -Math.round(S_MAX * 100) : 0;
+  slider.max = m === 'linear' ? Math.round(S_MAX * 100) : 359;
+  // the linear cam is low down, so its frame is shorter
+  const top = m === 'linear' ? 1.9 : TOP;
+  topHole.position.y = top; guideLbl.position.y = top + 0.25;
+  posts.scale.y = (top - 0.12) / (TOP - 0.12);
+  setFollowerLength(m === 'linear' ? 2.4 : FOLLOW_LEN);
+  // CSS2D labels ignore their parents' visibility, so check up the tree
+  const shownUp = o => { for (let p = o.parent; p; p = p.parent) if (!p.visible) return false; return true; };
+  for (const l of labels) {
+    let vis = state.labels && shownUp(l);
+    if (l === camLbl) vis = vis && m === 'plate';
+    if (l === drumLbl || l.userData.drumOnly) vis = vis && m === 'drum';
+    l.visible = vis;
+  }
+  requestAnimationFrame(layout);
+}
+
+// ---------------- Readouts ----------------
+function readout() {
+  const m = state.mode, k = shown.kind;
+  const what = m === 'drum'
+    ? (k > 0 ? '<span class="chip lift">Moving right</span>' : k < 0 ? '<span class="chip fall">Moving left</span>' : '<span class="chip dwell">Dwell (still)</span>')
+    : (k > 0 ? '<span class="chip lift">Lift</span>' : k < 0 ? '<span class="chip fall">Fall</span>' : '<span class="chip dwell">Dwell (still)</span>');
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < 180; i++) { const x = m === 'linear' ? -S_MAX + 2 * S_MAX * i / 179 : TAU * i / 180; const o = output(m, x); lo = Math.min(lo, o); hi = Math.max(hi, o); }
+  const pos = Math.round((shown.out - lo) * MM);
+  const rows = [
+    ['Motion in', m === 'linear' ? 'Linear (sliding)' : 'Rotary (turning)'],
+    ['Motion out', m === 'drum' ? 'Linear (side to side)' : 'Linear (up and down)'],
+    ['Follower', what],
+    [m === 'drum' ? 'Distance from left' : 'Height above lowest', `${pos} mm of ${Math.round((hi - lo) * MM)} mm`],
+  ];
+  if (m !== 'linear') rows.push(['Turns of the crank', String(Math.floor(Math.abs(state.a) / TAU))]);
+  readouts.innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+}
+
+// ---------------- Layout: keep the model clear of the info card, graph and controls ----------------
+const hdr = document.getElementById('hdr'), ctl = document.getElementById('controls');
+function layout() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h); labelRenderer.setSize(w, h);
+  document.documentElement.style.setProperty('--hdr', hdr.offsetHeight + 'px');
+  document.documentElement.style.setProperty('--ctl', ctl.offsetHeight + 'px');
+  camera.aspect = w / h;
+  // step back far enough that the whole machine fits, even on a narrow phone screen
+  const fit = Math.max(9.3, 2.7 / (Math.tan(20 * DEG) * camera.aspect));
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  camera.position.copy(controls.target).addScaledVector(dir, Math.min(fit, controls.maxDistance));
+  const info = document.getElementById('info');
+  const top = w < 640 ? info.getBoundingClientRect().bottom : hdr.offsetHeight, bottom = ctl.offsetHeight + 30;
+  const dx = w > 900 ? Math.min(150, w * 0.1) : 0;
+  const dy = (bottom - top) / 2;
+  camera.setViewOffset(w, h, -dx, dy, w, h);
+  camera.updateProjectionMatrix();
+  sizeGraph(); drawGraph();
+}
+window.addEventListener('resize', layout);
+const mq = window.matchMedia('(prefers-color-scheme: dark)');
+mq.addEventListener?.('change', () => { makeGrid(); drawGraph(); });
+if (window.innerWidth < 640) document.getElementById('info').open = false;
+document.getElementById('info').addEventListener('toggle', () => { if (window.innerWidth < 640) layout(); });
+
+// ---------------- Animation ----------------
+const clock = new THREE.Clock();
+let readoutT = 0;
+function frameUpdate(dt) {
+  const m = state.mode;
+  if (state.playing) {
+    if (m === 'linear') { state.phase += dt * TAU / 6; state.s = -S_MAX * Math.cos(state.phase); }
+    else { turnBy(state.dir * SPEED * dt); state.lastMoveDir = state.dir; }
+    syncSlider();
+  } else if (m !== 'linear') syncSlider();
+
+  const input = m === 'linear' ? state.s : state.a;
+  const target = output(m, input);
+  // the follower is pushed up by the cam, but falls under its own weight
+  if (m !== 'drum' && target < shown.out - 1e-4) {
+    shown.v += 14 * dt; shown.out = Math.max(target, shown.out - shown.v * dt);
+  } else { shown.out = target; shown.v = 0; }
+
+  // what is the follower doing right now?
+  let dirNow = m === 'linear' ? Math.sign(Math.sin(state.phase)) || 1 : state.lastMoveDir;
+  let k = kindAt(m, input, dirNow);
+  if (shown.v > 0.5) { k = -1; shown.hold = 0.5; }
+  else if (shown.hold > 0) { shown.hold -= dt; k = -1; }
+  shown.kind = k;
+
+  // place everything
+  if (m === 'plate') {
+    camMeshes[state.shape].rotation.x = state.a;
+    follower.position.set(0, Y0 + shown.out + 0.02, 0);    // + the cam's rounded edge
+  } else if (m === 'drum') {
+    drumGroup.rotation.x = state.a;
+    peg.position.x = shown.out;
+  } else {
+    slide.position.x = state.s;
+    follower.position.set(0, 0.12 + shown.out, 0);
+  }
+  crank.rotation.x = state.a;
+  // the bird flaps a little when it is lifted
+  const flap = k > 0 && (state.playing || m === 'linear') ? Math.sin(performance.now() / 70) * 0.5 : 0;
+  for (const b of [bird, peg.userData.bird]) { b.userData['wing-1'].rotation.z = flap; b.userData.wing1.rotation.z = -flap; }
+
+  readoutT -= dt;
+  if (readoutT <= 0) { readout(); readoutT = 0.1; }
+}
+
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  frameUpdate(dt);
+  drawGraph();
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+});
+
+try { await document.fonts.load('800 13px Nunito'); } catch (e) {}
+setMode('plate');
+layout();
+</script>
+
+</html>

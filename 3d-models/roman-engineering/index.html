@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<link rel="icon" type="image/png" href="../../favicon.png">
+<style>html{color-scheme:light}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Roman Engineering</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Layout: full-screen 3D scene; WFA-blue header with three tabs; info card top-left;
+     a hint line and the controls floating at the bottom. Light and dark palettes. */
+  :root {
+    --bg: #e8f2f8;
+    --panel: rgba(255, 255, 255, 0.95);
+    --edge: #c6d8e4;
+    --fg: #11212b;
+    --muted: #4d6372;
+    --blue: #1798d3;
+    --on-blue: #ffffff;
+    --btn: #1798d3;
+    --on-btn: #ffffff;
+    --press: #dff0fa;
+    --force: #d9480f;
+    --on-force: #ffffff;
+    --lbl-bg: rgba(255, 255, 255, 0.93);
+    --lbl-fg: #11212b;
+    --shadow: rgba(16, 50, 70, 0.16);
+    --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+    --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+    --hdr: 64px;
+    --ctl: 70px;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #0f1c24; --panel: rgba(22, 37, 48, 0.95); --edge: #2c4555; --fg: #e8f1f6; --muted: #9fb4c3;
+    --btn: #3aaee3; --on-btn: #04121a; --press: #17384a; --force: #ff8a4c; --on-force: #1a0a00;
+    --lbl-bg: rgba(15, 28, 36, 0.92); --lbl-fg: #e8f1f6; --shadow: rgba(0, 0, 0, 0.45); color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg: #0f1c24; --panel: rgba(22, 37, 48, 0.95); --edge: #2c4555; --fg: #e8f1f6; --muted: #9fb4c3;
+    --btn: #3aaee3; --on-btn: #04121a; --press: #17384a; --force: #ff8a4c; --on-force: #1a0a00;
+    --lbl-bg: rgba(15, 28, 36, 0.92); --lbl-fg: #e8f1f6; --shadow: rgba(0, 0, 0, 0.45); color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; overflow: hidden; }
+  #scene { position: fixed; inset: 0; touch-action: none; }
+  #scene canvas { display: block; }
+  .labels { position: absolute; inset: 0; pointer-events: none; }
+
+  header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 3;
+    background: var(--blue); color: var(--on-blue);
+    padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-bottom: 10px;
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+  }
+  .brand { display: flex; flex-direction: column; min-width: 0; }
+  h1 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.15; text-wrap: balance; }
+  .brand span { font-size: 13px; font-weight: 700; opacity: .9; letter-spacing: .02em; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .tabs button {
+    font: inherit; font-weight: 800; font-size: 15px; min-height: 44px; padding: 6px 14px;
+    border-radius: 999px; border: 2px solid rgba(255,255,255,.6); background: transparent; color: var(--on-blue); cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: #ffffff; color: #0f6d99; border-color: #ffffff; }
+
+  .info {
+    position: fixed; z-index: 2; left: var(--gutter-l); top: calc(var(--hdr) + 12px);
+    width: min(340px, calc(100% - 32px)); max-height: calc(100% - var(--hdr) - var(--ctl) - 110px); overflow: auto;
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 12px 16px;
+    box-shadow: 0 4px 14px var(--shadow);
+  }
+  .info summary { font-weight: 800; font-size: 17px; cursor: pointer; line-height: 1.3; text-wrap: balance; min-height: 28px; }
+  .info p { margin: 8px 0 0; line-height: 1.45; }
+  .info p.note { color: var(--muted); font-size: 13px; }
+  .info p.forces { border-left: 4px solid var(--force); padding-left: 10px; }
+  .info b { color: var(--blue); }
+  dl { margin: 12px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: baseline; }
+  dt { color: var(--muted); font-size: 13px; font-weight: 700; }
+  dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 0; }
+
+  .say {
+    position: fixed; z-index: 2; left: 50%; transform: translateX(-50%); margin: 0;
+    bottom: calc(var(--ctl) + 32px + env(safe-area-inset-bottom, 0px));
+    width: max-content; max-width: min(600px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 8px 16px;
+    font-weight: 800; font-size: 15px; line-height: 1.35; text-align: center; text-wrap: balance;
+    box-shadow: 0 4px 14px var(--shadow);
+  }
+  .say:empty { display: none; }
+
+  .controls {
+    position: fixed; z-index: 3; left: 50%; transform: translateX(-50%);
+    bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    width: min(820px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 16px; padding: 10px 12px;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 4px 18px var(--shadow);
+  }
+  .controls button {
+    font: inherit; font-weight: 800; font-size: 15px; min-height: 44px; padding: 8px 16px; border-radius: 12px; cursor: pointer;
+    border: 2px solid var(--btn); background: var(--btn); color: var(--on-btn);
+  }
+  .controls button.ghost { background: transparent; color: var(--fg); border-color: var(--edge); }
+  .controls button.ghost[aria-pressed="true"] { background: var(--press); border-color: var(--btn); }
+  .controls button:disabled { opacity: .4; cursor: default; }
+  button:focus-visible, summary:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+  .lbl {
+    font: 800 13px var(--font); background: var(--lbl-bg); color: var(--lbl-fg); border: 1px solid var(--edge);
+    padding: 3px 10px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 6px var(--shadow);
+  }
+  .lbl.force { background: var(--force); color: var(--on-force); border-color: transparent; }
+
+  footer {
+    position: fixed; z-index: 2; left: 0; right: 0; bottom: calc(3px + env(safe-area-inset-bottom, 0px));
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    text-align: center; font-size: 11px; color: var(--muted);
+  }
+  [hidden] { display: none !important; }
+  .stepper { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 4px; font-weight: 800; font-size: 14px; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .stepper input { width: 130px; accent-color: var(--btn); }
+  .oops { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; font-weight: 800; }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 18px; }
+    .tabs { margin-left: 0; }
+    .tabs button { font-size: 14px; padding: 5px 11px; }
+    .controls button { font-size: 14px; padding: 6px 12px; }
+    .controls { bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+    .say { font-size: 14px; }
+    .lbl { font-size: 12px; padding: 2px 8px; }
+    footer .tip { display: none; }
+  }
+</style>
+
+<div id="scene"></div>
+
+<header id="hdr">
+  <div class="brand">
+    <h1>Roman Engineering</h1>
+    <span>Year 5 History · Arches, aqueducts and roads of the Roman Empire</span>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Choose a model">
+    <button role="tab" data-tab="build" aria-selected="true">Build an arch</button>
+    <button role="tab" data-tab="pull" aria-selected="false">Pull the keystone</button>
+    <button role="tab" data-tab="aqueduct" aria-selected="false">Aqueduct</button>
+    <button role="tab" data-tab="road" aria-selected="false">Roman road</button>
+  </nav>
+</header>
+
+<details class="info" id="info" open>
+  <summary id="infoTitle">How did the Romans build an arch?</summary>
+  <div id="infoBody"></div>
+  <dl id="readouts"></dl>
+</details>
+
+<p class="say" id="say" aria-live="polite"></p>
+
+<div class="controls" id="controls">
+  <button type="button" data-for="build" id="addBtn">Add a stone</button>
+  <button type="button" data-for="build" id="allBtn" class="ghost">Add them all</button>
+  <button type="button" data-for="build" id="frameBtn">Take away the frame</button>
+  <button type="button" data-for="pull" id="pullBtn">Pull out the keystone</button>
+  <button type="button" data-for="pull" id="noKeyBtn" class="ghost">Try with no keystone</button>
+  <button type="button" data-for="aqueduct" id="viewBtn">Walk along the top</button>
+  <button type="button" data-for="aqueduct" id="slopeBtn" class="ghost" aria-pressed="false">Show the slope</button>
+  <button type="button" data-for="road" id="roadBack" class="ghost">◀ Back</button>
+  <button type="button" data-for="road" id="roadNext">Next layer ▶</button>
+  <label class="stepper" data-for="road"><span id="roadNum">1 of 8</span><input type="range" id="roadRange" min="0" max="7" step="1" value="0" aria-label="Choose a step"></label>
+  <button type="button" data-for="road" id="roadGravel" class="ghost" aria-pressed="false">Gravel top (Britain)</button>
+  <button type="button" data-for="road" id="roadRain" class="ghost" aria-pressed="false">Rain</button>
+  <button type="button" data-for="build pull" id="forcesBtn" class="ghost" aria-pressed="false">Show the forces</button>
+  <button type="button" data-for="build pull aqueduct road" id="labelsBtn" class="ghost" aria-pressed="true">Labels</button>
+  <button type="button" data-for="build" id="resetBtn" class="ghost">Start again</button>
+  <button type="button" data-for="pull" id="rebuildBtn" class="ghost">Rebuild</button>
+</div>
+
+<footer><span class="tip">Drag to turn · pinch or scroll to zoom · </span>Wallscourt Farm Academy · Y5-17.11.26a</footer>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const $ = s => document.querySelector(s);
+const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+function seeded(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+// ---------------- Renderer, camera, labels ----------------
+const wrap = $('#scene');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+} catch (e) {
+  document.body.insertAdjacentHTML('beforeend', '<div class="oops">Sorry, this device cannot show 3D models.</div>');
+  throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+wrap.appendChild(renderer.domElement);
+const labelR = new CSS2DRenderer();
+labelR.domElement.className = 'labels';
+wrap.appendChild(labelR.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 400);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.enablePan = false;
+controls.minDistance = 5;
+controls.maxDistance = 80;
+controls.maxPolarAngle = Math.PI / 2 - 0.06;   // keep the camera above the ground
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7a5a, 1.15));
+const sun = new THREE.DirectionalLight(0xfff3df, 2.1);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+scene.add(sun, sun.target);
+function setSun(range, pos) {
+  sun.position.copy(pos);
+  const c = sun.shadow.camera;
+  c.left = c.bottom = -range; c.right = c.top = range; c.near = 1; c.far = range * 5;
+  c.updateProjectionMatrix();
+}
+
+// ---------------- Canvas textures (no image files) ----------------
+function canvasTex(w, h, draw, repeat = 1) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
+  t.repeat.set(repeat, repeat);
+  return t;
+}
+function speckle(g, w, h, rnd, n, dark, light) {
+  for (let i = 0; i < n; i++) {
+    g.fillStyle = rnd() < 0.5 ? `rgba(${dark},${0.05 + rnd() * 0.14})` : `rgba(${light},${0.05 + rnd() * 0.12})`;
+    g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 2.5, 1 + rnd() * 2.5);
+  }
+}
+// Pale limestone, tinted per stone by the material colour
+const stoneTex = canvasTex(256, 256, (g, w, h) => {
+  const rnd = seeded(7);
+  g.fillStyle = '#f2ede3'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, rnd, 9000, '90,70,40', '255,252,240');
+  for (let i = 0; i < 30; i++) { g.fillStyle = `rgba(110,90,60,${0.15 + rnd() * 0.2})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, 1 + rnd() * 2.5, 0, 7); g.fill(); }
+}, 0.6);
+// Squared blocks for the aqueduct walls (texture units are world units)
+const blockTex = canvasTex(512, 256, (g, w, h) => {
+  const rnd = seeded(21);
+  g.fillStyle = '#7d6a4c'; g.fillRect(0, 0, w, h);
+  for (let row = 0; row < 2; row++) for (let col = -1; col < 5; col++) {
+    const x = col * 128 + (row % 2) * 64, y = row * 128;
+    const l = 196 + rnd() * 30;
+    g.fillStyle = `rgb(${l},${l * 0.88},${l * 0.66})`;
+    g.fillRect(x + 3, y + 3, 122, 122);
+  }
+  speckle(g, w, h, rnd, 14000, '90,70,40', '255,250,235');
+});
+blockTex.repeat.set(1 / 3.2, 1 / 1.6);
+const woodTex = canvasTex(256, 64, (g, w, h) => {
+  const rnd = seeded(3);
+  g.fillStyle = '#a8743f'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 26; i++) {
+    g.strokeStyle = `rgba(70,40,15,${0.15 + rnd() * 0.25})`; g.lineWidth = 1 + rnd() * 1.5;
+    const y = rnd() * h; g.beginPath(); g.moveTo(0, y);
+    for (let x = 0; x <= w; x += 16) g.lineTo(x, y + Math.sin(x * 0.03 + i) * 3);
+    g.stroke();
+  }
+});
+const grassTex = canvasTex(512, 512, (g, w, h) => {
+  const rnd = seeded(5);
+  g.fillStyle = '#86a95c'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, rnd, 30000, '40,70,20', '200,220,140');
+  g.fillStyle = 'rgba(176,150,105,0.55)';                 // trodden earth around the building site
+  g.beginPath(); g.ellipse(w / 2, h / 2, w * 0.3, h * 0.2, 0, 0, 7); g.fill();
+  g.globalCompositeOperation = 'destination-in';           // soft edge, so the page colour shows beyond
+  const r = g.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, w / 2);
+  r.addColorStop(0, 'rgba(0,0,0,1)'); r.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = r; g.fillRect(0, 0, w, h);
+});
+const waterTex = canvasTex(256, 64, (g, w, h) => {
+  const rnd = seeded(9);
+  g.fillStyle = '#3f8fc4'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 40; i++) {
+    g.fillStyle = `rgba(220,240,255,${0.15 + rnd() * 0.35})`;
+    g.fillRect(rnd() * w, rnd() * h, 10 + rnd() * 40, 1.5 + rnd() * 2);
+  }
+});
+
+const mats = {
+  wood: new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.85, transparent: true }),
+  block: new THREE.MeshStandardMaterial({ map: blockTex, roughness: 0.9 }),
+  force: new THREE.MeshBasicMaterial({ color: 0xe8590c }),
+};
+
+// ---------------- Labels ----------------
+const labels = [];
+function addLabel(parent, text, pos, show, cls = '') {
+  const el = document.createElement('div');
+  el.className = 'lbl ' + cls; el.textContent = text;
+  const o = new CSS2DObject(el);
+  o.position.copy(pos); parent.add(o);
+  labels.push({ o, show });
+  return o;
+}
+
+// =====================================================================
+//  ARCH (tabs 1 and 2)
+// =====================================================================
+const RI = 2, RO = 2.9, D = 1.2, N = 11, KEY = 5, H = 2.6;
+const PIER_OUT = RO + 0.6, PIER_D = D + 0.2;
+const RM = (RI + RO) / 2, STEP = Math.PI / N, GAP = 0.018;
+const ORDER = [0, 10, 1, 9, 2, 8, 3, 7, 4, 6, 5];    // both sides at once, keystone last
+
+const arch = new THREE.Group();
+scene.add(arch);
+
+const ground = new THREE.Mesh(new THREE.CircleGeometry(16, 72), new THREE.MeshStandardMaterial({ map: grassTex, transparent: true, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.position.x = 1.6; ground.receiveShadow = true;
+arch.add(ground);
+
+// Piers: courses of squared blocks, with a projecting top course (the impost)
+{
+  const rnd = seeded(31);
+  for (const side of [1, -1]) {
+    const courses = 5, ch = H / courses;
+    for (let c = 0; c < courses; c++) {
+      const widths = c === courses - 1 ? [PIER_OUT - RI] : (c % 2 ? [0.55, 0.95] : [0.95, 0.55]);
+      let x = RI;
+      const top = c === courses - 1;
+      for (const bw of widths) {
+        const tint = 0.92 + rnd() * 0.1;
+        const m = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.9, color: new THREE.Color(0.86 * tint, 0.78 * tint, 0.6 * tint) });
+        const ext = top ? 0.08 : 0;
+        const b = new THREE.Mesh(new THREE.BoxGeometry(bw - 0.03 + ext * 2, ch - 0.03, PIER_D - 0.02 + ext * 2), m);
+        b.position.set(side * (x + bw / 2 + (top ? 0 : 0)), c * ch + ch / 2, 0);
+        b.castShadow = b.receiveShadow = true;
+        arch.add(b);
+        x += bw;
+      }
+    }
+  }
+}
+
+// Voussoirs: wedge-shaped stones, each built round its own centre so it can fly and fall
+const stones = [];
+{
+  const rnd = seeded(47);
+  for (let i = 0; i < N; i++) {
+    const a0 = i * STEP + GAP, a1 = (i + 1) * STEP - GAP, m = (i + 0.5) * STEP;
+    const ro = i === KEY ? RO + 0.2 : RO;
+    const cx = RM * Math.cos(m), cy = RM * Math.sin(m);
+    const shape = new THREE.Shape();
+    const seg = 6, pts = [];
+    for (let k = 0; k <= seg; k++) { const a = a0 + (a1 - a0) * k / seg; pts.push([RI * Math.cos(a) - cx, RI * Math.sin(a) - cy]); }
+    for (let k = seg; k >= 0; k--) { const a = a0 + (a1 - a0) * k / seg; pts.push([ro * Math.cos(a) - cx, ro * Math.sin(a) - cy]); }
+    shape.moveTo(...pts[0]); for (const p of pts.slice(1)) shape.lineTo(...p);
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: D, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.025, bevelSegments: 1, curveSegments: 4 });
+    geo.translate(0, 0, -D / 2);
+    const tint = 0.93 + rnd() * 0.09;
+    const col = i === KEY ? new THREE.Color(0.98, 0.84, 0.55) : new THREE.Color(0.9 * tint, 0.8 * tint, 0.6 * tint);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: stoneTex, color: col, roughness: 0.85 }));
+    mesh.castShadow = mesh.receiveShadow = true;
+    arch.add(mesh);
+    // Corner points used to stop falling stones going through the ground
+    const corners = [];
+    for (const z of [-D / 2, D / 2]) for (const [a, r] of [[a0, RI], [a1, RI], [a0, ro], [a1, ro], [m, ro], [m, RI]])
+      corners.push(new THREE.Vector3(r * Math.cos(a) - cx, r * Math.sin(a) - cy, z));
+    stones.push({ i, m, mesh, corners, home: new THREE.Vector3(cx, H + cy, 0),
+      pilePos: new THREE.Vector3(), pileQ: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, -m)),
+      state: 'pile', v: new THREE.Vector3(), w: new THREE.Vector3(), delay: 0, still: 0, t: 0, dur: 1 });
+  }
+  // The pile beside the arch: the keystone at the front, the others in two rows
+  ORDER.forEach((idx, k) => {
+    const s = stones[idx];
+    // lift each stone so its lowest corner just touches the ground
+    let low = Infinity;
+    for (const c of s.corners) low = Math.min(low, c.clone().applyQuaternion(s.pileQ).y);
+    const y = -low + 0.03;
+    if (idx === KEY) s.pilePos.set(4.4, y, 3.2);
+    else s.pilePos.set(5.2 + (k % 2) * 1.45, y, 2.1 - Math.floor(k / 2) * 1.05);
+  });
+}
+
+// The wooden frame (centring) that holds the stones while the arch is built
+const frame = new THREE.Group();
+arch.add(frame);
+{
+  const add = (geo, x, y, z, rz = 0) => { const m = new THREE.Mesh(geo, mats.wood); m.position.set(x, y, z); m.rotation.z = rz; m.castShadow = m.receiveShadow = true; frame.add(m); return m; };
+  const boards = 16, bw = (Math.PI * (RI - 0.05)) / boards - 0.025;
+  for (let k = 0; k < boards; k++) {
+    const a = (k + 0.5) * Math.PI / boards, r = RI - 0.05;
+    add(new THREE.BoxGeometry(bw, 0.08, D + 0.16), r * Math.cos(a), H + r * Math.sin(a), 0, a - Math.PI / 2);
+  }
+  const rib = new THREE.Shape();
+  rib.absarc(0, 0, RI - 0.09, 0, Math.PI, false);
+  rib.absarc(0, 0, RI - 0.42, Math.PI, 0, true);
+  const ribGeo = new THREE.ExtrudeGeometry(rib, { depth: 0.14, bevelEnabled: false, curveSegments: 24 });
+  ribGeo.translate(0, 0, -0.07);
+  const zs = [D / 2 - 0.12, -D / 2 + 0.12];
+  for (const z of zs) {
+    add(ribGeo, 0, H, z);
+    add(new THREE.BoxGeometry(0.14, RI - 0.42, 0.14), 0, H + (RI - 0.42) / 2, z);       // king post
+    for (const s of [1, -1]) {                                                             // struts
+      const a = Math.PI / 2 - s * Math.PI / 4, r = RI - 0.42;
+      const px = r * Math.cos(a), py = r * Math.sin(a), len = Math.hypot(px, py);
+      add(new THREE.BoxGeometry(0.12, len, 0.12), px / 2, H + py / 2, z, -Math.atan2(px, py));
+    }
+    for (const x of [-1.35, 0, 1.35]) add(new THREE.BoxGeometry(0.16, H - 0.18, 0.16), x, (H - 0.18) / 2, z);  // posts
+  }
+  add(new THREE.BoxGeometry(2 * RI - 0.06, 0.18, D + 0.2), 0, H - 0.09, 0);              // tie beam
+}
+
+// Force arrows: little cones that travel round the arch
+const CHEV = 40;
+const chev = new THREE.InstancedMesh(new THREE.ConeGeometry(0.12, 0.32, 12), mats.force, CHEV);
+chev.frustumCulled = false;
+arch.add(chev);
+function bigArrow(len) {
+  const g = new THREE.Group();
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, len - 0.35, 10), mats.force);
+  shaft.position.y = (len - 0.35) / 2 + 0.35;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.35, 14), mats.force);
+  head.rotation.x = Math.PI; head.position.y = 0.175;
+  g.add(shaft, head);
+  return g;                                           // points down (-y) from its tip at the origin
+}
+const weightArrow = bigArrow(1.2);
+weightArrow.position.set(0, H + RO + 0.75, D / 2 + 0.1);
+const pushR = bigArrow(0.9); pushR.rotation.z = Math.PI / 2; pushR.position.set(PIER_OUT + 1.05, H - 0.35, 0);
+const pushL = bigArrow(0.9); pushL.rotation.z = -Math.PI / 2; pushL.position.set(-PIER_OUT - 1.05, H - 0.35, 0);
+arch.add(weightArrow, pushR, pushL);
+
+// =====================================================================
+//  AQUEDUCT (tab 3) — modelled on the Pont du Gard, not to exact scale
+// =====================================================================
+const aq = new THREE.Group();
+aq.visible = false;
+scene.add(aq);
+const valleyH = (x, z) => 10 * ease((Math.abs(x) - 3.5) / 14) - 0.7 * Math.exp(-((x / 1.3) ** 2)) + 0.18 * Math.sin(x * 0.7 + z * 0.5) * Math.sin(z * 0.9);
+{
+  // Valley terrain with soft edges
+  const tg = new THREE.PlaneGeometry(66, 36, 132, 72);
+  tg.rotateX(-Math.PI / 2);
+  const pos = tg.attributes.position, cols = [];
+  const c1 = new THREE.Color('#7fa457'), c2 = new THREE.Color('#a9a26a'), c3 = new THREE.Color('#c9b98a');
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i), y = valleyH(x, z);
+    pos.setY(i, y);
+    const c = new THREE.Color().lerpColors(c1, c2, clamp(y / 10, 0, 1));
+    if (Math.abs(x) < 2.1) c.lerp(c3, 0.6);                       // pebbly river banks
+    cols.push(c.r, c.g, c.b);
+  }
+  tg.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  tg.computeVertexNormals();
+  const alpha = canvasTex(256, 256, (g, w, h) => {
+    const r = g.createRadialGradient(w / 2, h / 2, w * 0.32, w / 2, h / 2, w / 2);
+    r.addColorStop(0, '#fff'); r.addColorStop(1, '#000');
+    g.fillStyle = r; g.fillRect(0, 0, w, h);
+  });
+  alpha.colorSpace = THREE.NoColorSpace; alpha.repeat.set(1, 1);
+  const terrain = new THREE.Mesh(tg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, transparent: true, alphaMap: alpha }));
+  terrain.receiveShadow = true;
+  aq.add(terrain);
+
+  // Three rows of arches, each row narrower than the one below
+  function archWall(x0, x1, y0, y1, n, pier, band, depth) {
+    const s = (x1 - x0 - (n + 1) * pier) / n, r = s / 2, ys = y1 - band - r;
+    const sh = new THREE.Shape();
+    sh.moveTo(x0, y0);
+    for (let k = 0; k < n; k++) {
+      const cx = x0 + pier + r + k * (s + pier);
+      sh.lineTo(cx - r, y0); sh.lineTo(cx - r, ys); sh.absarc(cx, ys, r, Math.PI, 0, true); sh.lineTo(cx + r, y0);
+    }
+    sh.lineTo(x1, y0); sh.lineTo(x1, y1); sh.lineTo(x0, y1); sh.closePath();
+    const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false, curveSegments: 14 });
+    g.translate(0, 0, -depth / 2);
+    const m = new THREE.Mesh(g, mats.block);
+    m.castShadow = m.receiveShadow = true;
+    aq.add(m);
+  }
+  const span = 3.62;
+  archWall(-9.5, 9.5, -0.6, 4.6, 5, 0.9, 0.45, 2.4);
+  archWall(-9.5 - span, 9.5 + span, 4.6, 8.6, 7, 0.9, 0.4, 2.0);
+  archWall(-17.65, 17.65, 8.6, 9.8, 29, 0.3, 0.18, 1.5);
+
+  // The water channel on top, carrying on into the hills at both ends
+  const wallGeo = new THREE.BoxGeometry(48, 0.6, 0.25);
+  for (const z of [0.45, -0.45]) { const w = new THREE.Mesh(wallGeo, mats.block); w.position.set(0, 10.1, z); w.castShadow = w.receiveShadow = true; aq.add(w); }
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(48, 0.12, 0.7), mats.block); floor.position.set(0, 9.86, 0); aq.add(floor);
+  const chanTex = waterTex.clone(); chanTex.needsUpdate = true; chanTex.repeat.set(24, 1);
+  const chan = new THREE.Mesh(new THREE.PlaneGeometry(48, 0.66), new THREE.MeshStandardMaterial({ map: chanTex, roughness: 0.2, metalness: 0.1 }));
+  chan.rotation.x = -Math.PI / 2; chan.position.y = 10.2; aq.add(chan);
+  aq.userData.chanTex = chanTex;
+
+  // The River Gardon in the valley floor
+  const rivTex = waterTex.clone(); rivTex.needsUpdate = true; rivTex.repeat.set(1, 10);
+  rivTex.rotation = Math.PI / 2; rivTex.center.set(0.5, 0.5);
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 34), new THREE.MeshStandardMaterial({ map: rivTex, roughness: 0.25, transparent: true, opacity: 0.92 }));
+  river.rotation.x = -Math.PI / 2; river.position.set(0, -0.35, 0); aq.add(river);
+  aq.userData.rivTex = rivTex;
+
+  // A few trees, and one person shown at the right size
+  const rnd = seeded(77);
+  const leaf = new THREE.MeshStandardMaterial({ color: 0x3d6b3f, roughness: 1 }), bark = new THREE.MeshStandardMaterial({ color: 0x6b4a2b });
+  for (let k = 0; k < 26; k++) {
+    const side = rnd() < 0.5 ? -1 : 1;
+    const x = side * (4 + rnd() * 20), z = (rnd() - 0.5) * 26;
+    if (Math.abs(z) < 2.6) continue;
+    const y = valleyH(x, z), hgt = 1.2 + rnd() * 1.4;
+    const t = new THREE.Mesh(new THREE.ConeGeometry(0.35 + rnd() * 0.2, hgt, 8), leaf);
+    t.position.set(x, y + hgt / 2 + 0.2, z); t.castShadow = true;
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.4, 6), bark);
+    tr.position.set(x, y + 0.2, z);
+    aq.add(t, tr);
+  }
+  const person = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.3, 10), new THREE.MeshStandardMaterial({ color: 0xc0392b }));
+  body.position.y = 0.15;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), new THREE.MeshStandardMaterial({ color: 0x8d5a3b }));
+  head.position.y = 0.36;
+  person.add(body, head);
+  person.position.set(2.4, valleyH(2.4, 3.2) + 0.02, 3.2);
+  aq.add(person);
+  aq.userData.person = person;
+
+  // The slope, shown 100 times steeper than it really is
+  const slope = new THREE.Group();
+  const len = 46, drop = 1.2;
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(len, 0.12, 0.12), mats.force);
+  bar.rotation.z = -Math.atan2(drop, len);
+  bar.position.set(0, 11.6, 0);
+  slope.add(bar);
+  const level = new THREE.Mesh(new THREE.BoxGeometry(len, 0.04, 0.04), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 }));
+  level.position.set(0, 11.6 + drop / 2, 0);
+  slope.add(level);
+  slope.visible = false;
+  aq.add(slope);
+  aq.userData.slope = slope;
+}
+
+
+// =====================================================================
+//  ROMAN ROAD (tab 4) — a cutaway built one step at a time. Layers are drawn thicker than real.
+// =====================================================================
+const road = new THREE.Group();
+road.visible = false;
+scene.add(road);
+const RW = 3, LEN = 12, ZF = LEN / 2, DX = 5.3;              // road half-width, length, front (cut) face, ditch centre
+const T_BOT = -1.2, S_TOP = -0.6, R_TOP = -0.1, N_BASE = 0.4, SURF = 0.3, CAMB = 0.24, SW = RW - 0.25;
+const rs = { step: 0, cam: 0, gravel: false, rain: false, fill: 0, puddle: 0, anims: [] };
+const nTop = x => N_BASE + rs.cam * CAMB * Math.max(0, 1 - (x / RW) ** 2);   // top of the nucleus (curved once cambered)
+
+function prism(pts, z0, z1) {
+  const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y))), { depth: z1 - z0, bevelEnabled: false });
+  g.translate(0, 0, z0);
+  return g;
+}
+const noiseTex = canvasTex(256, 256, (g, w, h) => { const rnd = seeded(13); g.fillStyle = '#ececec'; g.fillRect(0, 0, w, h); speckle(g, w, h, rnd, 9000, '60,50,40', '255,255,255'); }, 0.3);
+const statTex = canvasTex(256, 256, (g, w, h) => {
+  const rnd = seeded(11);
+  g.fillStyle = '#6a5b47'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, rnd, 4000, '30,20,10', '160,140,110');
+  for (let i = 0; i < 46; i++) {
+    const x = rnd() * w, y = rnd() * h, r = 15 + rnd() * 15, l = 125 + rnd() * 70;
+    g.fillStyle = `rgb(${l},${l * 0.94},${l * 0.82})`; g.strokeStyle = 'rgba(35,25,15,.55)'; g.lineWidth = 2.5;
+    g.beginPath(); g.ellipse(x, y, r, r * (0.65 + rnd() * 0.3), rnd() * 3, 0, 7); g.fill(); g.stroke();
+  }
+}, 0.4);
+const rudusTex = canvasTex(256, 256, (g, w, h) => {
+  const rnd = seeded(12);
+  g.fillStyle = '#ddd8cb'; g.fillRect(0, 0, w, h);                       // lime
+  for (let i = 0; i < 380; i++) {
+    const x = rnd() * w, y = rnd() * h, r = 3 + rnd() * 6, l = 90 + rnd() * 70;
+    g.fillStyle = `rgb(${l},${l * 0.93},${l * 0.85})`; g.beginPath();
+    for (let k = 0; k < 5; k++) { const a = k * 1.256 + rnd() * 0.6, rr = r * (0.6 + rnd() * 0.5); g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+    g.fill();
+  }
+}, 0.4);
+const nucTex = canvasTex(256, 256, (g, w, h) => {
+  const rnd = seeded(14);
+  g.fillStyle = '#c9a46f'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, rnd, 9000, '90,60,30', '250,230,190');
+  for (let i = 0; i < 220; i++) { const l = 110 + rnd() * 80; g.fillStyle = `rgb(${l},${l * 0.9},${l * 0.75})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, 1.5 + rnd() * 2, 0, 7); g.fill(); }
+}, 0.4);
+const paveTex = canvasTex(256, 256, (g, w, h) => {
+  const rnd = seeded(15);
+  g.fillStyle = '#4e463c'; g.fillRect(0, 0, w, h);                       // joints between the slabs
+  const n = 4, c = w / n;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const cx = (i + 0.5) * c, cy = (j + 0.5) * c, l = 140 + rnd() * 50;
+    g.fillStyle = `rgb(${l},${l * 0.97},${l * 0.9})`; g.beginPath();
+    for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3 + rnd() * 0.5, rr = c * (0.4 + rnd() * 0.12); g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+    g.fill();
+  }
+  speckle(g, w, h, rnd, 5000, '50,45,40', '230,225,215');
+}, 0.3);
+const gravTex = canvasTex(256, 256, (g, w, h) => {
+  const rnd = seeded(16);
+  g.fillStyle = '#a79a82'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, rnd, 12000, '60,50,40', '235,225,205');
+  for (let i = 0; i < 500; i++) { const l = 100 + rnd() * 100; g.fillStyle = `rgb(${l},${l * 0.95},${l * 0.85})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, 1 + rnd() * 2.2, 0, 7); g.fill(); }
+}, 0.4);
+const mileTex = canvasTex(256, 256, (g, w, h) => {
+  const rnd = seeded(17);
+  g.fillStyle = '#cfc5b0'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, rnd, 7000, '90,80,60', '255,250,235');
+  g.fillStyle = '#5b4f3f'; g.font = 'bold 30px serif'; g.textAlign = 'center';
+  ['IMP', 'CAES', 'M · P', 'XII'].forEach((t, k) => g.fillText(t, w * 0.5, 70 + k * 44));
+});
+mileTex.repeat.set(1, 1);
+const poleTex = canvasTex(16, 128, (g, w, h) => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#f4f1ea' : '#c0392b'; g.fillRect(0, i * 16, w, 16); } });
+poleTex.repeat.set(1, 1);
+
+const rmat = {
+  ground: new THREE.MeshStandardMaterial({ map: noiseTex, vertexColors: true, roughness: 1 }),
+  stat: new THREE.MeshStandardMaterial({ map: statTex, roughness: 0.95 }),
+  rudus: new THREE.MeshStandardMaterial({ map: rudusTex, roughness: 0.95 }),
+  nuc: new THREE.MeshStandardMaterial({ map: nucTex, roughness: 1 }),
+  pave: new THREE.MeshStandardMaterial({ map: paveTex, roughness: 0.85 }),
+  grav: new THREE.MeshStandardMaterial({ map: gravTex, roughness: 1 }),
+  kerb: new THREE.MeshStandardMaterial({ map: stoneTex, color: 0xc9bfa8, roughness: 0.85 }),
+  earth: new THREE.MeshStandardMaterial({ map: noiseTex, color: 0x8f6e47, roughness: 1 }),
+  wood: new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.85 }),
+  metal: new THREE.MeshStandardMaterial({ color: 0x4f4840, roughness: 0.5, metalness: 0.4 }),
+  water: new THREE.MeshStandardMaterial({ color: 0x3f8fc4, roughness: 0.15, transparent: true, opacity: 0.85 }),
+};
+const shade = m => { m.castShadow = m.receiveShadow = true; return m; };
+
+// The ground, cut open at the front. The trench and the ditches appear when they are dug.
+function groundGeo(trench, ditch) {
+  const top = [[-9, 0]];
+  if (ditch) top.push([-DX - 0.5, 0], [-DX - 0.2, -0.6], [-DX + 0.2, -0.6], [-DX + 0.5, 0]);
+  if (trench) top.push([-RW, 0], [-RW, T_BOT], [RW, T_BOT], [RW, 0]);
+  if (ditch) top.push([DX - 0.5, 0], [DX - 0.2, -0.6], [DX + 0.2, -0.6], [DX + 0.5, 0]);
+  top.push([9, 0], [9, -2], [-9, -2]);
+  const g = prism(top, -ZF, ZF);
+  const p = g.attributes.position, n = g.attributes.normal, cols = [];
+  const grass = new THREE.Color('#7ea255'), soil = new THREE.Color('#8a6742');
+  for (let i = 0; i < p.count; i++) {
+    const c = n.getY(i) > 0.6 && p.getY(i) > -0.05 ? grass : soil;
+    cols.push(c.r, c.g, c.b);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  return g;
+}
+const rGround = shade(new THREE.Mesh(groundGeo(false, false), rmat.ground));
+rGround.userData.key = '00';
+road.add(rGround);
+
+// The layers. Each one stops a little further back, so you can see them all at the cut.
+const ZS = [ZF, ZF - 0.8, ZF - 1.6, ZF - 2.4];
+const rStat = shade(new THREE.Mesh(prism([[-RW, T_BOT], [RW, T_BOT], [RW, S_TOP], [-RW, S_TOP]], -ZF, ZS[0]), rmat.stat));
+const rRud = shade(new THREE.Mesh(prism([[-RW, S_TOP], [RW, S_TOP], [RW, R_TOP], [-RW, R_TOP]], -ZF, ZS[1]), rmat.rudus));
+const rNuc = shade(new THREE.Mesh(new THREE.BufferGeometry(), rmat.nuc));
+const rSurf = shade(new THREE.Mesh(new THREE.BufferGeometry(), rmat.pave));
+const rKerbs = new THREE.Group();
+for (const sd of [1, -1]) for (let z = -ZF + 0.45; z < ZS[3]; z += 0.9) {
+  const k = shade(new THREE.Mesh(new THREE.BoxGeometry(0.25, SURF + 0.1, 0.86), rmat.kerb));
+  k.position.set(sd * (SW + 0.125), 0, z); rKerbs.add(k);
+}
+function buildTop() {
+  const xs = []; for (let k = 0; k <= 24; k++) xs.push(-RW + (2 * RW * k) / 24);
+  rNuc.geometry.dispose();
+  rNuc.geometry = prism([[-RW, R_TOP], [RW, R_TOP], ...xs.slice().reverse().map(x => [x, nTop(x)])], -ZF, ZS[2]);
+  const ss = []; for (let k = 0; k <= 22; k++) ss.push(-SW + (2 * SW * k) / 22);
+  rSurf.geometry.dispose();
+  rSurf.geometry = prism([...ss.map(x => [x, nTop(x)]), ...ss.slice().reverse().map(x => [x, nTop(x) + SURF])], -ZF, ZS[3]);
+  for (const k of rKerbs.children) k.position.y = nTop(SW + 0.125) + (SURF + 0.1) / 2;
+}
+buildTop();
+// The agger: banks of earth either side, so the road stands up above the fields
+const rAgger = new THREE.Group();
+for (const sd of [1, -1]) rAgger.add(shade(new THREE.Mesh(prism([[sd * RW, 0], [sd * 4.4, 0], [sd * (RW + 0.15), N_BASE + 0.05], [sd * RW, N_BASE]], -ZF, ZS[2]), rmat.earth)));
+// A milestone beside the road
+const rMile = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 1.5, 20), new THREE.MeshStandardMaterial({ map: mileTex, roughness: 0.9 })));
+rMile.position.set(-4.62, 0.75, -2.2); rMile.rotation.y = Math.PI + 0.4;   // inscription faces the viewer
+road.add(rStat, rRud, rNuc, rSurf, rKerbs, rAgger, rMile);
+
+// Step 1: surveying. Poles in a straight line, lined up with a groma.
+const rSurvey = new THREE.Group();
+road.add(rSurvey);
+{
+  for (const z of [-5, -2.5, 0, 2.5]) { const p = shade(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.6, 8), new THREE.MeshStandardMaterial({ map: poleTex }))); p.position.set(0, 0.8, z); rSurvey.add(p); }
+  const GZ = 4.6, add = (geo, m, x, y, z, ry = 0, rx = 0) => { const o = shade(new THREE.Mesh(geo, m)); o.position.set(x, y, z); o.rotation.set(rx, ry, 0); rSurvey.add(o); return o; };
+  add(new THREE.CylinderGeometry(0.035, 0.04, 1.95, 8), rmat.wood, 0.45, 0.975, GZ);                // the staff
+  add(new THREE.BoxGeometry(0.45, 0.045, 0.045), rmat.wood, 0.225, 1.9, GZ);                         // the arm
+  add(new THREE.BoxGeometry(1.0, 0.035, 0.035), rmat.wood, 0, 1.93, GZ);                             // the cross
+  add(new THREE.BoxGeometry(1.0, 0.035, 0.035), rmat.wood, 0, 1.93, GZ, Math.PI / 2);
+  for (const [dx, dz] of [[0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]]) {
+    add(new THREE.CylinderGeometry(0.006, 0.006, 0.6, 4), rmat.metal, dx, 1.63, GZ + dz);           // plumb line
+    add(new THREE.ConeGeometry(0.05, 0.13, 10), rmat.metal, dx, 1.29, GZ + dz, 0, Math.PI);         // plumb weight
+  }
+  const body = add(new THREE.CylinderGeometry(0.14, 0.18, 1.25, 12), new THREE.MeshStandardMaterial({ color: 0xb03a2e }), 1.0, 0.625, GZ + 0.55);
+  add(new THREE.SphereGeometry(0.13, 14, 10), new THREE.MeshStandardMaterial({ color: 0x8d5a3b }), 1.0, 1.42, GZ + 0.55);
+  body.userData.person = true;
+}
+
+// Rain, water running off the camber, the ditches filling, and a puddle on a flat road
+const RAIN_N = 260, RUN_N = 90;
+const rainMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.012, 0.012, 0.3, 4), new THREE.MeshBasicMaterial({ color: 0x8fc3e6, transparent: true, opacity: 0.75 }), RAIN_N);
+const runMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshStandardMaterial({ color: 0x5ab4ec, roughness: 0.2, emissive: 0x1a5f8f }), RUN_N);
+rainMesh.frustumCulled = runMesh.frustumCulled = false;
+const rainP = [], runs = [];
+{
+  const rr = seeded(55);
+  for (let i = 0; i < RAIN_N; i++) rainP.push(new THREE.Vector3((rr() - 0.5) * 16, rr() * 9, (rr() - 0.5) * 12));
+  for (let i = 0; i < RUN_N; i++) runs.push({ x0: 0, z: 0, t: rr(), sd: 1, fresh: true });
+}
+const ditchWater = [1, -1].map(sd => { const m = new THREE.Mesh(new THREE.BoxGeometry(1, 0.02, LEN), rmat.water); m.userData.sd = sd; road.add(m); return m; });
+const puddle = new THREE.Mesh(new THREE.PlaneGeometry(2 * SW - 0.3, ZS[3] + ZF - 0.3), new THREE.MeshStandardMaterial({ color: 0x3f8fc4, roughness: 0.1, transparent: true, opacity: 0 }));
+puddle.rotation.x = -Math.PI / 2; puddle.position.set(0, N_BASE + SURF + 0.015, (ZS[3] - ZF) / 2);
+road.add(rainMesh, runMesh, puddle);
+
+// ---------------- Labels for each part ----------------
+const ui = { tab: 'build', labels: true, forces: false, slope: false, view: 'whole' };
+const LBL = (fn) => () => ui.labels && fn();
+addLabel(arch, 'Keystone', new THREE.Vector3(0, H + RO + 0.55, 0), LBL(() => isArchTab() && stones[KEY].state === 'placed' && !ui.forces));
+addLabel(arch, 'Keystone', new THREE.Vector3(4.4, 1.1, 3.2), LBL(() => ui.tab === 'build' && stones[KEY].state === 'pile'));
+addLabel(arch, 'Voussoir (wedge stone)', new THREE.Vector3((RO + 0.6) * Math.cos(2.5 * STEP) + 0.6, H + (RO + 0.6) * Math.sin(2.5 * STEP), 0),
+  LBL(() => isArchTab() && stones[2].state === 'placed'));
+addLabel(arch, 'Pier', new THREE.Vector3(-(RI + PIER_OUT) / 2, 1.2, PIER_D / 2 + 0.05), LBL(() => isArchTab()));
+addLabel(arch, 'Wooden frame (centring)', new THREE.Vector3(0, H + 0.75, D / 2 + 0.3), LBL(() => isArchTab() && frame.visible && frameState !== 'removing'));
+addLabel(arch, 'Weight', new THREE.Vector3(0.95, H + RO + 1.45, D / 2 + 0.1), () => isArchTab() && ui.forces && archState === 'standing', 'force');
+addLabel(arch, 'Pushes outwards', new THREE.Vector3(PIER_OUT + 1.2, H + 0.15, 0), () => isArchTab() && ui.forces && archState === 'standing', 'force');
+addLabel(arch, 'Down into the pier', new THREE.Vector3(RM, 0.5, D / 2 + 0.3), () => isArchTab() && ui.forces && archState === 'standing', 'force');
+addLabel(arch, 'The frame holds them up', new THREE.Vector3(0, H - 0.6, D / 2 + 0.3), () => isArchTab() && ui.forces && archState === 'building' && placedCount() > 0, 'force');
+addLabel(aq, 'Water channel', new THREE.Vector3(-6, 11.0, 0), LBL(() => ui.tab === 'aqueduct' && !ui.slope));
+addLabel(aq, 'From the spring near Uzès', new THREE.Vector3(-21, 11.3, 0), LBL(() => ui.tab === 'aqueduct'));
+addLabel(aq, 'To the city of Nîmes', new THREE.Vector3(21, 11.3, 0), LBL(() => ui.tab === 'aqueduct'));
+addLabel(aq, 'River Gardon', new THREE.Vector3(0, 0.6, 9), LBL(() => ui.tab === 'aqueduct' && ui.view === 'whole'));
+addLabel(aq, 'Three rows of arches', new THREE.Vector3(11.5, 6.3, 1.2), LBL(() => ui.tab === 'aqueduct' && ui.view === 'whole'));
+addLabel(aq, 'A person, to scale', new THREE.Vector3(2.4, valleyH(2.4, 3.2) + 0.9, 3.2), LBL(() => ui.tab === 'aqueduct' && ui.view === 'whole'));
+addLabel(aq, 'Higher', new THREE.Vector3(-23, 12.7, 0), () => ui.tab === 'aqueduct' && ui.slope, 'force');
+addLabel(aq, 'Lower', new THREE.Vector3(23, 11.5, 0), () => ui.tab === 'aqueduct' && ui.slope, 'force');
+addLabel(aq, 'Slope made 100 times steeper so you can see it', new THREE.Vector3(0, 12.5, 0), () => ui.tab === 'aqueduct' && ui.slope, 'force');
+
+const RL = (fn) => LBL(() => ui.tab === 'road' && fn());
+const shortLbl = [];   // [label, long text, short text] for narrow screens
+function rlbl(long, short, pos, show) { const o = addLabel(road, long, pos, show); shortLbl.push([o, long, short]); return o; }
+addLabel(road, 'Groma', new THREE.Vector3(0, 2.25, 4.6), RL(() => rs.step === 0));
+addLabel(road, 'Poles in a straight line', new THREE.Vector3(0, 1.95, -2.5), RL(() => rs.step === 0));
+addLabel(road, 'Trench down to firm ground', new THREE.Vector3(0, -0.55, ZF), RL(() => rs.step === 1));
+rlbl('Statumen: big stones', 'Statumen', new THREE.Vector3(-2.2, (T_BOT + S_TOP) / 2, ZS[0] + 0.02), RL(() => rs.step >= 2));
+rlbl('Rudus: broken stones and lime', 'Rudus', new THREE.Vector3(1.9, (S_TOP + R_TOP) / 2, ZS[1] + 0.02), RL(() => rs.step >= 3));
+rlbl('Nucleus: gravel and sand', 'Nucleus', new THREE.Vector3(-2.7, (R_TOP + N_BASE) / 2, ZS[2] + 0.02), RL(() => rs.step >= 4));
+const surfLbl = addLabel(road, 'Paving slabs (summa crusta)', new THREE.Vector3(2.0, N_BASE + SURF / 2, ZS[3] + 0.02), RL(() => rs.step >= 5));
+const camLbl = rlbl('Camber: a curved top', 'Camber', new THREE.Vector3(0, N_BASE + SURF + CAMB + 0.35, -1.5), RL(() => rs.step === 6 && rs.cam > 0.5));
+addLabel(road, 'Ditch', new THREE.Vector3(DX, 0.35, -3), RL(() => rs.step >= 6));
+addLabel(road, 'Kerb stones', new THREE.Vector3(SW + 0.12, N_BASE + SURF + 0.45, -3.5), RL(() => rs.step === 6));
+addLabel(road, 'Milestone', new THREE.Vector3(-4.62, 1.85, -2.2), RL(() => rs.step >= 6));
+rlbl('Agger: a raised bank', 'Agger', new THREE.Vector3(-3.8, 0.7, 2.2), RL(() => rs.step >= 7));
+
+// =====================================================================
+//  ARCH STATE
+// =====================================================================
+let archState = 'building';        // building | standing | falling | fallen | empty
+let frameState = 'in';             // in | removing | out
+let frameT = 0, keyPull = null, fallT = 0, fallReason = '', committed = 0, flying = null;
+const queue = [], timers = [];
+const isArchTab = () => ui.tab === 'build' || ui.tab === 'pull';
+const placedCount = () => stones.filter(s => s.state === 'placed').length;
+function later(sec, fn) { timers.push({ t: sec, fn }); }
+
+function resetArch(full) {
+  timers.length = 0; queue.length = 0; flying = null; keyPull = null; fallReason = '';
+  for (const s of stones) {
+    s.state = full ? 'placed' : 'pile';
+    s.mesh.position.copy(full ? s.home : s.pilePos);
+    s.mesh.quaternion.copy(full ? new THREE.Quaternion() : s.pileQ);
+    s.v.set(0, 0, 0); s.w.set(0, 0, 0);
+  }
+  committed = full ? N : 0;
+  frameState = full ? 'out' : 'in'; frameT = 0;
+  frame.visible = !full; frame.position.set(0, 0, 0); mats.wood.opacity = 1;
+  archState = full ? 'standing' : 'building';
+  dirty = true;
+}
+function addStone(fast = false) {
+  if (frameState !== 'in' || committed >= N) return;
+  const s = stones[ORDER[committed++]];
+  s.dur = fast ? 0.55 : 1.0;
+  queue.push(s);
+  dirty = true;
+}
+function removeFrame() {
+  if (frameState !== 'in' || flying || queue.length) return;
+  frameState = 'removing'; frameT = 0; dirty = true;
+}
+function collapse(reason) {
+  const rnd = seeded(Math.floor(performance.now()));
+  let n = 0;
+  for (const s of stones) {
+    if (s.state !== 'placed' || s.i === 0 || s.i === N - 1 || s.i === KEY) continue;
+    const side = Math.sign(Math.cos(s.m)), hi = Math.sin(s.m);
+    s.state = 'falling'; s.still = 0;
+    s.delay = (1 - hi) * 0.35 + rnd() * 0.05;
+    s.v.set(-side * (0.7 + hi * 0.9), 0, (rnd() - 0.5) * 0.5);
+    s.w.set((rnd() - 0.5) * 0.6, (rnd() - 0.5) * 0.6, side * (1.4 + rnd() * 1.2));
+    n++;
+  }
+  if (n === 0 && !keyPull) { archState = 'empty'; dirty = true; return; }
+  archState = 'falling'; fallT = 0; fallReason = reason; dirty = true;
+}
+function pullKeystone() {
+  if (archState !== 'standing') return;
+  keyPull = { t: 0, done: false };
+  archState = 'falling'; fallT = 0; fallReason = 'pulled'; dirty = true;
+}
+function tryNoKey() {
+  resetArch(false);
+  for (const s of stones) if (s.i !== KEY) { s.state = 'placed'; s.mesh.position.copy(s.home); s.mesh.quaternion.identity(); }
+  committed = N - 1;
+  later(0.9, removeFrame);
+  dirty = true;
+}
+
+// ---------------- Per-frame updates ----------------
+const _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _ax = new THREE.Vector3(), IDQ = new THREE.Quaternion();
+function updateFlights(dt) {
+  if (!flying && queue.length) { flying = queue.shift(); flying.state = 'flying'; flying.t = 0; }
+  if (!flying) return;
+  const s = flying;
+  s.t += dt / s.dur;
+  const k = ease(s.t);
+  s.mesh.position.lerpVectors(s.pilePos, s.home, k);
+  s.mesh.position.y += Math.sin(Math.PI * Math.min(1, s.t)) * 2.2;
+  s.mesh.quaternion.slerpQuaternions(s.pileQ, IDQ, k);
+  if (s.t >= 1) {
+    s.mesh.position.copy(s.home); s.mesh.quaternion.identity();
+    s.state = 'placed'; flying = null; dirty = true;
+  }
+}
+function updateFrame(dt) {
+  if (frameState !== 'removing') return;
+  const before = frameT;
+  frameT += dt;
+  frame.position.y = -0.35 * ease(frameT / 0.5);              // knock out the wedges: the frame drops a little
+  frame.position.z = -5 * ease((frameT - 0.5) / 1.1);           // then slide it out under the arch
+  mats.wood.opacity = 1 - ease((frameT - 1.1) / 0.5);
+  if (before < 0.22 && frameT >= 0.22) {
+    if (stones[KEY].state === 'placed') { archState = 'standing'; dirty = true; }
+    else collapse('noKey');
+  }
+  if (frameT >= 1.6) { frameState = 'out'; frame.visible = false; dirty = true; }
+}
+function floorAt(p) {
+  const inPier = Math.abs(p.x) >= RI - 0.02 && Math.abs(p.x) <= PIER_OUT && Math.abs(p.z) <= PIER_D / 2;
+  return inPier ? (p.y > H - 0.5 ? { y: H } : { side: true }) : { y: 0 };
+}
+function stepStone(s, dt) {
+  if (s.delay > 0) { s.delay -= dt; return; }
+  s.v.y -= 9.8 * dt;
+  s.mesh.position.addScaledVector(s.v, dt);
+  const wl = s.w.length();
+  if (wl > 1e-4) { _q.setFromAxisAngle(_ax.copy(s.w).divideScalar(wl), wl * dt); s.mesh.quaternion.premultiply(_q); }
+  s.mesh.updateMatrix();
+  let pen = 0, side = 0, cp = null;
+  for (const c of s.corners) {
+    _p.copy(c).applyMatrix4(s.mesh.matrix);
+    const f = floorAt(_p);
+    if (f.side) side = Math.max(side, Math.abs(_p.x) - (RI - 0.02));
+    else if (f.y - _p.y > pen) { pen = f.y - _p.y; cp = _p.clone(); }
+  }
+  if (side > 0) { s.mesh.position.x -= Math.sign(s.mesh.position.x) * side; s.v.x = -Math.sign(s.mesh.position.x) * Math.abs(s.v.x) * 0.2; }
+  if (pen > 0) {
+    s.mesh.position.y += pen;
+    if (s.v.y < 0) s.v.y *= -0.22;
+    s.v.x *= 0.8; s.v.z *= 0.8; s.w.multiplyScalar(0.8);
+    // let gravity tip the stone over its contact point so it settles flat
+    s.w.z += (cp.x - s.mesh.position.x) * 7 * dt;
+    s.w.x -= (cp.z - s.mesh.position.z) * 7 * dt;
+    if (s.v.lengthSq() < 0.15 && s.w.lengthSq() < 0.3) { s.still += dt; if (s.still > 0.3) s.state = 'rest'; }
+  }
+}
+function updateFalling(dt) {
+  if (keyPull && !keyPull.done) {
+    const k = stones[KEY];
+    keyPull.t += dt;
+    k.mesh.position.set(k.home.x, k.home.y, ease(keyPull.t / 0.8) * 1.9);
+    if (keyPull.t >= 0.45 && !keyPull.collapsed) { keyPull.collapsed = true; collapse('pulled'); archState = 'falling'; }
+    if (keyPull.t >= 0.8) { keyPull.done = true; k.state = 'falling'; k.delay = 0; k.still = 0; k.v.set(0, 0, 0.7); k.w.set(1.6, 0, 0.3); }
+  }
+  let moving = 0;
+  for (const s of stones) if (s.state === 'falling') { stepStone(s, dt / 2); stepStone(s, dt / 2); if (s.state === 'falling') moving++; }
+  if (archState === 'falling') {
+    fallT += dt;
+    if ((moving === 0 && (!keyPull || keyPull.done)) || fallT > 4.5) {
+      for (const s of stones) if (s.state === 'falling') s.state = 'rest';
+      archState = 'fallen'; dirty = true;
+    }
+  }
+}
+const _m = new THREE.Matrix4(), _s = new THREE.Vector3(), _t = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), ZERO = new THREE.Vector3(0, 0, 0);
+let clock = 0;
+function flowPoint(side, s) {
+  const La = RM * Math.PI / 2;
+  if (s < La) { const a = Math.PI / 2 - s / RM; _p.set(side * RM * Math.cos(a), H + RM * Math.sin(a), D / 2 + 0.16); _t.set(side * Math.sin(a), -Math.cos(a), 0); }
+  else { _p.set(side * RM, H - (s - La), D / 2 + 0.16); _t.set(0, -1, 0); }
+}
+function updateForces() {
+  let n = 0;
+  const show = isArchTab() && ui.forces;
+  if (show && archState === 'standing') {
+    const La = RM * Math.PI / 2, L = La + H - 0.25, per = 14;
+    for (const side of [1, -1]) for (let k = 0; k < per; k++) {
+      const s = ((k / per) * L + clock * 0.9) % L;
+      flowPoint(side, s);
+      _q.setFromUnitVectors(UP, _t);
+      _m.compose(_p, _q, _s.set(1, 1, 1));
+      chev.setMatrixAt(n++, _m);
+    }
+  } else if (show && archState === 'building') {
+    for (const st of stones) {
+      if (st.state !== 'placed') continue;
+      const f = ((clock * 0.8 + st.i * 0.37) % 1);
+      const r = RM + 0.15 - f * (RM - RI + 0.3);
+      _p.set(r * Math.cos(st.m), H + r * Math.sin(st.m), D / 2 + 0.16);
+      _t.set(-Math.cos(st.m), -Math.sin(st.m), 0);
+      _q.setFromUnitVectors(UP, _t);
+      _m.compose(_p, _q, _s.set(1, 1, 1));
+      chev.setMatrixAt(n++, _m);
+    }
+  }
+  _m.compose(ZERO, IDQ, _s.set(0, 0, 0));
+  for (let k = n; k < CHEV; k++) chev.setMatrixAt(k, _m);
+  chev.instanceMatrix.needsUpdate = true;
+  const big = show && archState === 'standing';
+  weightArrow.visible = pushL.visible = pushR.visible = big;
+}
+
+
+// =====================================================================
+//  ROAD STATE
+// =====================================================================
+const R_STEPS = [
+  { name: 'Survey the line', made: 'A groma and poles', why: 'Surveyors used a groma to line up poles, so the road could run straight.' },
+  { name: 'Dig the trench', made: 'Picks, spades and baskets', why: 'Workers dug down to firm ground, so the road would not sink.' },
+  { name: 'Statumen', made: 'Big stones', why: 'A bed of big stones spreads out the weight of carts and marching soldiers.' },
+  { name: 'Rudus', made: 'Broken stones and lime', why: 'Smaller broken stones, mixed with lime and packed down hard.' },
+  { name: 'Nucleus', made: 'Gravel and sand', why: 'Gravel and sand, rammed down to make a firm, smooth bed for the top.' },
+  { name: 'Top surface', made: 'Paving slabs', why: 'The top layer takes the wear from feet, hooves and wheels.' },
+  { name: 'Camber, ditches and kerbs', made: 'Stone and earth', why: 'The curved top sheds rain into the ditches. Kerbs hold the edges. Milestones count the miles.' },
+  { name: 'Agger', made: 'Earth and stone', why: 'The finished road sits on a raised bank, called the agger, so it stays dry above the fields.' },
+];
+const R_PARTS = [[rStat, 2], [rRud, 3], [rNuc, 4], [rSurf, 5], [rKerbs, 6], [rMile, 6], [rAgger, 7]];
+function setRoadStep(k, animate = true) {
+  k = clamp(k, 0, R_STEPS.length - 1);
+  const prev = rs.step;
+  rs.step = k;
+  const key = `${k >= 1 ? 1 : 0}${k >= 6 ? 1 : 0}`;
+  if (rGround.userData.key !== key) { rGround.geometry.dispose(); rGround.geometry = groundGeo(k >= 1, k >= 6); rGround.userData.key = key; }
+  rSurvey.visible = k === 0;
+  for (const [o, idx] of R_PARTS) {
+    o.visible = k >= idx;
+    o.position.y = o === rMile ? 0.75 : 0;
+    if (animate && k === prev + 1 && idx === k) rs.anims.push({ o, t: 0, base: o.position.y });
+  }
+  if (k < 6) rs.fill = 0;
+  $('#roadRange').value = k;
+  dirty = true;
+}
+const _a = new THREE.Vector3(), _b = new THREE.Vector3();
+function runPoint(r, out) {
+  const sd = r.sd, kerbTop = nTop(SW + 0.125) + SURF + 0.1;
+  const pts = [[r.x0, nTop(r.x0) + SURF + 0.04], [sd * SW, nTop(SW) + SURF + 0.04], [sd * (RW + 0.02), kerbTop + 0.03],
+    rs.step >= 7 ? [sd * 4.4, 0.05] : [sd * (RW + 0.08), 0.05], [sd * (DX - 0.5), 0.05], [sd * DX, -0.6 + 0.35 * rs.fill + 0.05]];
+  let L = 0; const seg = [];
+  for (let k = 1; k < pts.length; k++) { const l = Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]); seg.push(l); L += l; }
+  let d = r.t * L, k = 0;
+  while (k < seg.length - 1 && d > seg[k]) { d -= seg[k]; k++; }
+  const f = seg[k] ? Math.min(1, d / seg[k]) : 0;
+  out.set(pts[k][0] + (pts[k + 1][0] - pts[k][0]) * f, pts[k][1] + (pts[k + 1][1] - pts[k][1]) * f, r.z);
+}
+const rrnd = seeded(91);
+function updateRoad(dt) {
+  if (!road.visible) return;
+  // layers dropping into place
+  for (let i = rs.anims.length - 1; i >= 0; i--) {
+    const a = rs.anims[i]; a.t += dt / 0.7;
+    a.o.position.y = a.base + 1.6 * (1 - ease(a.t));
+    if (a.t >= 1) { a.o.position.y = a.base; rs.anims.splice(i, 1); }
+  }
+  // the camber appears at step 7
+  const camT = rs.step >= 6 ? 1 : 0;
+  if (rs.cam !== camT) {
+    rs.cam = camT > rs.cam ? Math.min(1, rs.cam + dt / 1.1) : Math.max(0, rs.cam - dt / 0.6);
+    buildTop(); surfLbl.position.y = N_BASE + SURF / 2 + rs.cam * CAMB * 0.8; dirty = true;
+  }
+  const shed = rs.rain && rs.step >= 6 && rs.cam > 0.6;
+  // rain
+  rainMesh.visible = rs.rain;
+  if (rs.rain) {
+    for (let i = 0; i < RAIN_N; i++) {
+      const p = rainP[i]; p.y -= 11 * dt; if (p.y < 0) p.y += 9;
+      _m.compose(p, IDQ, _s.set(1, 1, 1)); rainMesh.setMatrixAt(i, _m);
+    }
+    rainMesh.instanceMatrix.needsUpdate = true;
+  }
+  // water running off the camber
+  runMesh.visible = shed;
+  if (shed) {
+    for (let i = 0; i < RUN_N; i++) {
+      const r = runs[i];
+      r.t += dt / 2.4;
+      if (r.t >= 1 || r.fresh) {
+        r.x0 = (rrnd() - 0.5) * 2 * (SW - 0.2); if (Math.abs(r.x0) < 0.15) r.x0 = 0.15 * (rrnd() < 0.5 ? -1 : 1);
+        r.sd = Math.sign(r.x0); r.z = -ZF + 0.4 + rrnd() * (ZS[3] + ZF - 0.8);
+        if (r.fresh) r.fresh = false; else r.t = 0;
+      }
+      runPoint(r, _a);
+      _m.compose(_a, IDQ, _s.set(1, 1, 1)); runMesh.setMatrixAt(i, _m);
+    }
+    runMesh.instanceMatrix.needsUpdate = true;
+  }
+  rs.fill = clamp(rs.fill + (shed ? dt * 0.12 : -dt * 0.04), 0, 1);
+  for (const w of ditchWater) {
+    w.visible = rs.step >= 6 && rs.fill > 0.02;
+    const y = -0.6 + 0.35 * rs.fill;
+    w.position.set(w.userData.sd * DX, y, 0);
+    w.scale.x = 0.4 + 0.6 * (y + 0.6) / 0.6;
+  }
+  const pud = rs.rain && rs.step === 5;
+  rs.puddle = clamp(rs.puddle + (pud ? dt * 0.35 : -dt * 0.8), 0, 1);
+  puddle.visible = rs.puddle > 0.01;
+  puddle.material.opacity = 0.55 * rs.puddle;
+}
+// =====================================================================
+//  CAMERA
+// =====================================================================
+let fly = null, userMoved = false;
+function homeView(tab) {
+  const w = innerWidth, h = innerHeight, aspect = w / h;
+  const hdr = $('#hdr').offsetHeight, bottom = $('#controls').offsetHeight + 80;
+  const avail = Math.max(0.35, (h - hdr - bottom) / h);
+  const tanF = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  let target, dir, needW, needH;
+  if (tab === 'aqueduct') { target = new THREE.Vector3(0, 5.2, 0); dir = new THREE.Vector3(0.2, 0.3, 1); needW = 52; needH = 16; }
+  else if (tab === 'road') { target = new THREE.Vector3(0, -0.5, 2.2); dir = new THREE.Vector3(0.55, 0.5, 1); needW = 18; needH = 9; }
+  else { target = new THREE.Vector3(1.2, 2.8, 0); dir = new THREE.Vector3(0.22, 0.3, 1); needW = 13.5; needH = 7.2; }
+  const availW = Math.max(0.4, (w - 2 * sideShift()) / w);
+  const d = Math.max((needH / 2) / tanF / avail, (needW / 2) / (tanF * aspect * availW));
+  return { pos: target.clone().add(dir.normalize().multiplyScalar(d)), target };
+}
+// On wide screens, centre the model in the space to the right of the open info card
+function sideShift() {
+  const info = $('#info');
+  return innerWidth >= 700 && info.open ? (info.offsetWidth + 16) / 2 : 0;
+}
+function topView() { return { pos: new THREE.Vector3(-27, 12.6, 2.6), target: new THREE.Vector3(0, 10.3, 0) }; }
+function flyTo(v, instant = false) {
+  if (instant) { camera.position.copy(v.pos); controls.target.copy(v.target); fly = null; return; }
+  fly = { t: 0, p0: camera.position.clone(), t0: controls.target.clone(), p1: v.pos, t1: v.target };
+}
+controls.addEventListener('start', () => { fly = null; userMoved = true; });
+function updateFly(dt) {
+  if (!fly) return;
+  fly.t += dt / 1.3;
+  const k = ease(fly.t);
+  camera.position.lerpVectors(fly.p0, fly.p1, k);
+  controls.target.lerpVectors(fly.t0, fly.t1, k);
+  if (fly.t >= 1) fly = null;
+}
+
+// =====================================================================
+//  WORDS
+// =====================================================================
+const TEXT = {
+  build: {
+    title: 'How did the Romans build an arch?',
+    body: `<p>An arch is made of wedge-shaped stones called <b>voussoirs</b> (say “voo-swahs”). The stone at the very top is the <b>keystone</b>.</p>
+      <p>First, builders made a wooden frame called <b>centring</b>. The stones sat on the frame while the arch went up from both sides at once.</p>
+      <p>When the keystone was in, the frame could be taken away. Now the stones push against each other and hold themselves up.</p>
+      <p class="note">The Romans did not invent the arch, but they used it everywhere: in bridges, aqueducts and amphitheatres like the Colosseum.</p>`,
+  },
+  pull: {
+    title: 'What does the keystone do?',
+    body: `<p>The keystone locks the arch together. It is squeezed tight between the stones on each side.</p>
+      <p>Pull it out and the two sides have nothing to push against. They tip inwards and fall.</p>
+      <p>Now try taking the frame away before the keystone is in. What do you think will happen?</p>`,
+  },
+  aqueduct: {
+    title: 'How did the Romans carry water to their towns?',
+    body: `<p>An <b>aqueduct</b> carries water from a spring to a town. Most of it ran in channels underground or along hillsides. Where it had to cross a valley, the Romans built a bridge of arches.</p>
+      <p>There were no pumps. The water simply flowed downhill, so the channel had to slope gently all the way.</p>
+      <p>The <b>Pont du Gard</b> in France was built about 2,000 years ago, in the 1st century AD. It carried water across the River Gardon to the city of Nîmes.</p>
+      <p class="note">Roman Britain had no giant arched aqueducts like this. Towns such as Dorchester got their water along channels dug into the hillside.</p>`,
+  },
+  road: {
+    title: 'How did the Romans build a road?',
+    body: `<p>Roman roads let soldiers, traders and messengers travel quickly across the Empire. In Britain the Romans built thousands of kilometres of road, and many were built by soldiers.</p>
+      <p>A good road was built in layers. Press <b>Next layer</b> to build one, step by step.</p>
+      <p class="note"><b>In Britain</b>, most roads had a top of packed gravel, not paving slabs. Paved roads were mostly in towns. Not every road had every layer: builders used whatever stone they could find nearby.</p>
+      <p><b>Did you know?</b> Roman roads are famous for running straight. Fosse Way, Watling Street and Ermine Street still have long, straight stretches, and many modern roads follow them. Fosse Way ran through Aquae Sulis (Bath), and another road ran from Bath to a Roman port at Sea Mills, in Bristol.</p>
+      <p class="note">The layers are drawn thicker than real, so you can see them.</p>`,
+  },
+};
+const FORCES_P = `<p class="forces">The weight of the stones is pushed down and outwards round the curve, into the thick piers. That is why piers must be strong and heavy.</p>`;
+
+function roadHint() {
+  if (rs.rain) {
+    if (rs.step < 5) return 'Rain! Finish the road, then see where the water goes.';
+    if (rs.step === 5) return 'On a flat road, rain sits in puddles and soaks in. The road soon breaks up.';
+    return 'The camber sends the rain off the road and into the ditches.';
+  }
+  return R_STEPS[rs.step].why;
+}
+function hint() {
+  if (ui.tab === 'road') return roadHint();
+  const n = placedCount();
+  if (ui.tab === 'aqueduct') return ui.view === 'top'
+    ? 'This is the view along the channel. It slopes, but far too gently to see!'
+    : 'Water flows along the top, all the way from the spring to the city.';
+  if (archState === 'falling') return fallReason === 'pulled' ? 'Out comes the keystone…' : 'The frame is going…';
+  if (archState === 'fallen') return fallReason === 'pulled'
+    ? 'Crash! Without the keystone, nothing locks the two sides together.'
+    : 'Crash! With no keystone, the two sides lean in and fall.';
+  if (archState === 'empty') return 'The frame has gone, but there is no arch yet. Press “Start again”.';
+  if (archState === 'standing') return ui.tab === 'pull'
+    ? 'The arch is standing. What will happen if you pull out the keystone?'
+    : (frameState === 'out' ? 'It stands by itself! The stones push against each other and hold the arch up.' : 'It holds…');
+  if (ui.tab === 'pull' && archState === 'building') return 'No keystone this time. Watch what happens when the frame is taken away…';
+  if (flying || queue.length) return 'Lifting a stone into place…';
+  if (n === 0) return 'Press “Add a stone”. Roman builders worked from both sides at once.';
+  if (n === N - 1) return 'One gap left at the top. Add the keystone!';
+  if (n === N) return 'The keystone is in. Now take away the wooden frame.';
+  return `${n} of ${N} stones are in. The wooden frame is holding them up.`;
+}
+function readouts() {
+  if (ui.tab === 'road') {
+    const st = R_STEPS[rs.step];
+    const made = rs.step === 5 && rs.gravel ? 'Packed gravel' : st.made;
+    const r = [['Step', `${rs.step + 1} of ${R_STEPS.length}`], ['Stage', st.name], ['Made of', made]];
+    if (rs.step >= 5) r.push(['Top', rs.gravel ? 'Gravel (most roads in Britain)' : 'Paving slabs (mostly in towns)']);
+    if (rs.step >= 6) r.push(['Roman mile', 'about 1,480 m']);
+    return r;
+  }
+  if (ui.tab === 'aqueduct') return [
+    ['Real height', 'about 49 m'], ['Whole aqueduct', 'about 50 km long'],
+    ['Total drop', 'about 12 m'], ['Slope', 'about 2.5 cm every 100 m'],
+  ];
+  const archWord = { building: 'Being built', standing: 'Standing', falling: 'Falling!', fallen: 'Fallen down', empty: 'No arch yet' }[archState];
+  const k = stones[KEY].state;
+  const keyWord = k === 'placed' ? 'In place' : k === 'pile' ? 'Not yet' : 'Pulled out';
+  if (ui.tab === 'pull') return [['Arch', archWord], ['Keystone', keyPull ? 'Pulled out' : keyWord]];
+  return [
+    ['Stones placed', `${placedCount()} of ${N}`], ['Keystone', keyWord],
+    ['Wooden frame', frameState === 'in' ? 'Holding the stones' : 'Taken away'], ['Arch', archWord],
+  ];
+}
+let dirty = true, lastHint = '';
+function refresh() {
+  dirty = false;
+  const t = TEXT[ui.tab];
+  $('#infoTitle').textContent = t.title;
+  $('#infoBody').innerHTML = t.body + (isArchTab() && ui.forces ? FORCES_P : '');
+  $('#readouts').innerHTML = readouts().map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+  const h = hint();
+  if (h !== lastHint) { $('#say').textContent = h; lastHint = h; }
+  for (const b of document.querySelectorAll('#controls [data-for]')) b.hidden = !b.dataset.for.split(' ').includes(ui.tab);
+  $('#roadBack').disabled = rs.step === 0;
+  $('#roadNext').disabled = rs.step === R_STEPS.length - 1;
+  $('#roadNum').textContent = `${rs.step + 1} of ${R_STEPS.length}`;
+  $('#roadGravel').setAttribute('aria-pressed', rs.gravel);
+  $('#roadRain').setAttribute('aria-pressed', rs.rain);
+  const narrow = innerWidth < 640;
+  for (const [o, long, short] of shortLbl) o.element.textContent = narrow ? short : long;
+  surfLbl.element.textContent = rs.gravel ? (narrow ? 'Gravel' : 'Packed gravel (most roads in Britain)') : (narrow ? 'Paving slabs' : 'Paving slabs (summa crusta)');
+  rSurf.material = rs.gravel ? rmat.grav : rmat.pave;
+  const busy = !!flying || queue.length > 0;
+  $('#addBtn').disabled = frameState !== 'in' || committed >= N;
+  $('#allBtn').disabled = frameState !== 'in' || committed >= N;
+  $('#frameBtn').disabled = frameState !== 'in' || busy;
+  $('#pullBtn').disabled = archState !== 'standing';
+  $('#noKeyBtn').disabled = archState === 'falling' || frameState === 'removing';
+  $('#rebuildBtn').disabled = archState === 'falling';
+  $('#forcesBtn').setAttribute('aria-pressed', ui.forces);
+  $('#labelsBtn').setAttribute('aria-pressed', ui.labels);
+  $('#slopeBtn').setAttribute('aria-pressed', ui.slope);
+  $('#viewBtn').textContent = ui.view === 'top' ? 'See the whole bridge' : 'Walk along the top';
+  for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', b.dataset.tab === ui.tab);
+  layoutVars();
+}
+
+// ---------------- Buttons ----------------
+function setTab(tab) {
+  ui.tab = tab;
+  const aqTab = tab === 'aqueduct';
+  arch.visible = isArchTab(); aq.visible = aqTab; road.visible = tab === 'road';
+  if (aqTab) { setSun(30, new THREE.Vector3(18, 30, 22)); ui.view = 'whole'; }
+  else if (tab === 'road') setSun(11, new THREE.Vector3(9, 15, 11));
+  else setSun(9, new THREE.Vector3(7, 13, 9));
+  if (tab === 'pull' && archState !== 'standing') resetArch(true);
+  dirty = true; refresh();
+  userMoved = false;
+  flyTo(homeView(tab));
+}
+for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => setTab(b.dataset.tab));
+$('#addBtn').onclick = () => addStone();
+$('#allBtn').onclick = () => { while (committed < N) addStone(true); };
+$('#frameBtn').onclick = removeFrame;
+$('#resetBtn').onclick = () => resetArch(false);
+$('#pullBtn').onclick = pullKeystone;
+$('#noKeyBtn').onclick = tryNoKey;
+$('#rebuildBtn').onclick = () => resetArch(true);
+$('#forcesBtn').onclick = () => { ui.forces = !ui.forces; dirty = true; };
+$('#labelsBtn').onclick = () => { ui.labels = !ui.labels; dirty = true; };
+$('#slopeBtn').onclick = () => { ui.slope = !ui.slope; aq.userData.slope.visible = ui.slope; dirty = true; };
+$('#roadNext').onclick = () => setRoadStep(rs.step + 1);
+$('#roadBack').onclick = () => setRoadStep(rs.step - 1, false);
+$('#roadRange').oninput = e => setRoadStep(+e.target.value, false);
+$('#roadGravel').onclick = () => { rs.gravel = !rs.gravel; dirty = true; };
+$('#roadRain').onclick = () => { rs.rain = !rs.rain; dirty = true; };
+$('#viewBtn').onclick = () => { ui.view = ui.view === 'top' ? 'whole' : 'top'; flyTo(ui.view === 'top' ? topView() : homeView('aqueduct')); dirty = true; };
+
+// ---------------- Resize and loop ----------------
+function layoutVars() {
+  document.documentElement.style.setProperty('--hdr', $('#hdr').offsetHeight + 'px');
+  document.documentElement.style.setProperty('--ctl', $('#controls').offsetHeight + 'px');
+}
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h); labelR.setSize(w, h);
+  camera.aspect = w / h;
+  const hdr = $('#hdr').offsetHeight, bottom = $('#controls').offsetHeight + 80;
+  camera.setViewOffset(w, h, -sideShift(), -(hdr - bottom) / 2, w, h);   // centre the model in the space between header and controls
+  camera.updateProjectionMatrix();
+  layoutVars();
+  if (!userMoved && !fly) flyTo(ui.tab === 'aqueduct' && ui.view === 'top' ? topView() : homeView(ui.tab), true);
+}
+addEventListener('resize', resize);
+$('#info').addEventListener('toggle', resize);
+if (innerWidth < 700) $('#info').open = false;
+
+resetArch(false);
+setRoadStep(0, false);
+setSun(9, new THREE.Vector3(7, 13, 9));
+refresh();
+resize();
+flyTo(homeView('build'), true);
+
+let last = performance.now();
+renderer.setAnimationLoop(now => {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; clock += dt;
+  for (let k = timers.length - 1; k >= 0; k--) { timers[k].t -= dt; if (timers[k].t <= 0) { const f = timers[k].fn; timers.splice(k, 1); f(); } }
+  const wasBusy = !!flying || queue.length > 0;
+  updateFlights(dt);
+  if (wasBusy !== (!!flying || queue.length > 0)) dirty = true;
+  updateFrame(dt);
+  updateFalling(dt);
+  updateForces();
+  if (aq.visible) { aq.userData.chanTex.offset.x -= dt * 0.6; aq.userData.rivTex.offset.y += dt * 0.25; }
+  updateRoad(dt);
+  updateFly(dt);
+  for (const l of labels) l.o.visible = !!l.show();
+  if (dirty) refresh();
+  controls.update();
+  renderer.render(scene, camera);
+  labelR.render(scene, camera);
+});
+</script>
+
+</html>
