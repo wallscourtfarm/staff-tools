@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" type="image/png" href="../../favicon.png">
+<style>html{color-scheme:light}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Mummification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Layout: full-screen 3D scene; WFA-blue header; a day strip with the eight steps under the header;
+     info card top-left; hint line and controls floating at the bottom. */
+  :root {
+    --bg: #f1ebe0;
+    --panel: rgba(255, 255, 255, 0.95);
+    --edge: #d9cdb8;
+    --fg: #1f1a12;
+    --muted: #6a5d48;
+    --blue: #1798d3;
+    --on-blue: #ffffff;
+    --btn: #1798d3;
+    --on-btn: #ffffff;
+    --press: #dff0fa;
+    --gold: #b7791f;
+    --day: #d08a2e;
+    --lbl-bg: rgba(255, 255, 255, 0.93);
+    --lbl-fg: #1f1a12;
+    --shadow: rgba(60, 40, 10, 0.18);
+    --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+    --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+    --hdr: 64px;
+    --strip: 0px;
+    --ctl: 70px;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #1b1610; --panel: rgba(34, 28, 20, 0.95); --edge: #4a3f2e; --fg: #f3ece0; --muted: #bfae92;
+    --btn: #3aaee3; --on-btn: #04121a; --press: #17384a; --gold: #e0a84a; --day: #e8a04a;
+    --lbl-bg: rgba(27, 22, 16, 0.92); --lbl-fg: #f3ece0; --shadow: rgba(0, 0, 0, 0.5); color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg: #1b1610; --panel: rgba(34, 28, 20, 0.95); --edge: #4a3f2e; --fg: #f3ece0; --muted: #bfae92;
+    --btn: #3aaee3; --on-btn: #04121a; --press: #17384a; --gold: #e0a84a; --day: #e8a04a;
+    --lbl-bg: rgba(27, 22, 16, 0.92); --lbl-fg: #f3ece0; --shadow: rgba(0, 0, 0, 0.5); color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; overflow: hidden; }
+  #scene { position: fixed; inset: 0; touch-action: none; }
+  #scene canvas { display: block; }
+  .labels { position: absolute; inset: 0; pointer-events: none; }
+
+  header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 3;
+    background: var(--blue); color: var(--on-blue);
+    padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-bottom: 10px;
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  }
+  .brand { display: flex; flex-direction: column; min-width: 0; }
+  h1 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.15; text-wrap: balance; }
+  .brand span { font-size: 13px; font-weight: 700; opacity: .9; letter-spacing: .02em; }
+
+  /* Day strip with the eight steps */
+  .strip {
+    position: fixed; z-index: 2; top: calc(var(--hdr) + 10px); right: var(--gutter-r);
+    width: min(520px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 8px 12px 8px;
+    box-shadow: 0 4px 14px var(--shadow);
+  }
+  .day-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-weight: 800; }
+  .day-top b { font-size: 16px; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .day-top span { font-size: 12px; color: var(--muted); }
+  .day-bar { position: relative; height: 10px; margin-top: 4px; border-radius: 6px; background: var(--edge); overflow: hidden; }
+  .day-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--day); border-radius: 6px; }
+  .chips { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 7px; }
+  .chips button {
+    font: inherit; font-weight: 800; font-size: 12px; min-height: 34px; padding: 2px 2px; border-radius: 10px; cursor: pointer;
+    border: 1.5px solid var(--edge); background: transparent; color: var(--fg); line-height: 1.1;
+  }
+  .chips button i { display: block; font-style: normal; font-size: 10px; color: var(--muted); }
+  .chips button[aria-current="step"] { background: var(--btn); border-color: var(--btn); color: var(--on-btn); }
+  .chips button[aria-current="step"] i { color: var(--on-btn); opacity: .85; }
+  .chips button.done { border-color: var(--day); }
+
+  .info {
+    position: fixed; z-index: 2; left: var(--gutter-l); top: calc(var(--hdr) + 12px);
+    width: min(350px, calc(100% - 32px)); max-height: calc(100% - var(--hdr) - var(--ctl) - 110px); overflow: auto;
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 12px 16px;
+    box-shadow: 0 4px 14px var(--shadow);
+  }
+  .info summary { font-weight: 800; font-size: 17px; cursor: pointer; line-height: 1.3; text-wrap: balance; min-height: 28px; }
+  .info p { margin: 8px 0 0; line-height: 1.45; }
+  .info p.note { color: var(--muted); font-size: 13px; }
+  .info p.think { border-left: 4px solid var(--gold); padding-left: 10px; }
+  .info ul { margin: 6px 0 0; padding-left: 20px; line-height: 1.45; }
+  .info b { color: var(--blue); }
+  .kchip { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--day); color: #1f1a12; margin-bottom: 2px; }
+  dl { margin: 12px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: baseline; }
+  dt { color: var(--muted); font-size: 13px; font-weight: 700; }
+  dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 0; }
+
+  .say {
+    position: fixed; z-index: 2; left: 50%; transform: translateX(-50%); margin: 0;
+    bottom: calc(var(--ctl) + 32px + env(safe-area-inset-bottom, 0px));
+    width: max-content; max-width: min(600px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 8px 16px;
+    font-weight: 800; font-size: 15px; line-height: 1.35; text-align: center; text-wrap: balance;
+    box-shadow: 0 4px 14px var(--shadow);
+  }
+  .say:empty { display: none; }
+
+  .controls {
+    position: fixed; z-index: 3; left: 50%; transform: translateX(-50%);
+    bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    width: min(720px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 16px; padding: 10px 12px;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 4px 18px var(--shadow);
+  }
+  .controls button {
+    font: inherit; font-weight: 800; font-size: 15px; min-height: 44px; padding: 8px 16px; border-radius: 12px; cursor: pointer;
+    border: 2px solid var(--btn); background: var(--btn); color: var(--on-btn);
+  }
+  .controls button.ghost { background: transparent; color: var(--fg); border-color: var(--edge); }
+  .controls button.ghost[aria-pressed="true"] { background: var(--press); border-color: var(--btn); }
+  .controls button:disabled { opacity: .4; cursor: default; }
+  button:focus-visible, summary:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+  .lbl {
+    font: 800 13px var(--font); background: var(--lbl-bg); color: var(--lbl-fg); border: 1px solid var(--edge);
+    padding: 3px 10px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 6px var(--shadow);
+  }
+  .lbl small { display: block; font-weight: 700; font-size: 11px; color: var(--muted); text-align: center; }
+  .lbl.hot { background: var(--gold); color: #fff; border-color: transparent; }
+  .lbl.hot small { color: #fff; opacity: .9; }
+
+  footer {
+    position: fixed; z-index: 2; left: 0; right: 0; bottom: calc(3px + env(safe-area-inset-bottom, 0px));
+    padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+    text-align: center; font-size: 11px; color: var(--muted);
+  }
+  .oops { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; font-weight: 800; }
+
+  @media (max-width: 899px) {
+    .strip { left: var(--gutter-l); right: var(--gutter-r); width: auto; }
+    .info { top: calc(var(--hdr) + var(--strip) + 18px); max-height: calc(100% - var(--hdr) - var(--strip) - var(--ctl) - 116px); }
+  }
+  @media (max-width: 640px) {
+    h1 { font-size: 18px; }
+    .controls button { font-size: 14px; padding: 6px 12px; }
+    .controls { bottom: calc(20px + env(safe-area-inset-bottom, 0px)); padding: 8px; gap: 6px; }
+    .say { font-size: 14px; }
+    .lbl { font-size: 12px; padding: 2px 8px; }
+    .lbl small { display: none; }
+    .strip { padding: 6px 8px; }
+    .chips { gap: 3px; }
+    .chips button { font-size: 12px; min-height: 30px; }
+    .chips button i { display: none; }
+    footer .tip { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="scene"></div>
+
+<header id="hdr">
+  <div class="brand">
+    <h1>Mummification</h1>
+    <span>Year 5 History · Ancient Egypt</span>
+  </div>
+</header>
+
+<div class="strip" id="strip" aria-label="Steps and days">
+  <div class="day-top"><b id="dayText">Day 1</b><span>Making a mummy took about 70 days</span></div>
+  <div class="day-bar"><span class="day-fill" id="dayFill"></span></div>
+  <div class="chips" id="chips"></div>
+</div>
+
+<details class="info" id="info" open>
+  <summary id="infoTitle">Mummification</summary>
+  <div id="infoBody"></div>
+  <dl id="readouts"></dl>
+</details>
+
+<p class="say" id="say" aria-live="polite"></p>
+
+<div class="controls" id="controls">
+  <button type="button" id="backBtn" class="ghost">◀ Back</button>
+  <button type="button" id="nextBtn">Next step ▶</button>
+  <button type="button" id="againBtn" class="ghost">↺ Again</button>
+  <button type="button" id="playBtn" class="ghost" aria-pressed="false">Play all</button>
+  <button type="button" id="labelsBtn" class="ghost" aria-pressed="true">Labels</button>
+</div>
+
+<footer><span class="tip">Drag to turn · pinch or scroll to zoom · </span>Wallscourt Farm Academy · Y5-18.11.26a</footer>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const $ = s => document.querySelector(s);
+const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (p, a, b) => clamp((p - a) / (b - a), 0, 1);          // how far p is through [a, b], 0 to 1
+const sstep = (a, b, x) => ease(seg(x, a, b));
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+function seeded(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+// ---------------- Renderer, camera, labels ----------------
+const wrap = $('#scene');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
+catch (e) { document.body.insertAdjacentHTML('beforeend', '<div class="oops">Sorry, this device cannot show 3D models.</div>'); throw e; }
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.localClippingEnabled = true;                       // used to wrap the bandages on from the feet up
+wrap.appendChild(renderer.domElement);
+const labelR = new CSS2DRenderer();
+labelR.domElement.className = 'labels';
+wrap.appendChild(labelR.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 300);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.enablePan = false;
+controls.minDistance = 1.2; controls.maxDistance = 40;
+controls.maxPolarAngle = Math.PI / 2 - 0.04;
+
+scene.add(new THREE.HemisphereLight(0xfff8ec, 0x9a7d55, 1.25));
+const sun = new THREE.DirectionalLight(0xfff0d6, 2.1);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
+scene.add(sun, sun.target);
+(function setSun(range, center, dir) {
+  sun.target.position.copy(center);
+  sun.position.copy(center).add(dir.normalize().multiplyScalar(range * 2.2));
+  const c = sun.shadow.camera;
+  c.left = c.bottom = -range; c.right = c.top = range; c.near = 0.5; c.far = range * 5;
+  c.updateProjectionMatrix();
+})(9, V(2.5, 0, 0), V(0.5, 1, 0.55));
+
+// ---------------- Textures drawn in code ----------------
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
+  return t;
+}
+function speckle(g, w, h, rnd, n, dark, light) {
+  for (let i = 0; i < n; i++) {
+    g.fillStyle = rnd() < 0.5 ? `rgba(${dark},${0.05 + rnd() * 0.14})` : `rgba(${light},${0.05 + rnd() * 0.12})`;
+    g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 2.5, 1 + rnd() * 2.5);
+  }
+}
+const sandTex = canvasTex(512, 512, (g, w, h) => {
+  const rnd = seeded(11);
+  g.fillStyle = '#dcc08a'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, rnd, 26000, '140,100,50', '255,240,200');
+  g.globalCompositeOperation = 'destination-in';
+  const r = g.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, w / 2);
+  r.addColorStop(0, 'rgba(0,0,0,1)'); r.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = r; g.fillRect(0, 0, w, h);
+});
+const sheetTex = canvasTex(128, 128, (g, w, h) => {          // plain linen sheet
+  const rnd = seeded(22); g.fillStyle = '#f4eedf'; g.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 3) { g.fillStyle = `rgba(150,130,95,${0.05 + rnd() * 0.06})`; g.fillRect(0, y, w, 1); }
+  for (let x = 0; x < w; x += 3) { g.fillStyle = `rgba(150,130,95,${0.03 + rnd() * 0.05})`; g.fillRect(x, 0, 1, h); }
+});
+const bandTex = canvasTex(128, 128, (g, w, h) => {           // inner bandages: strips wound in one direction
+  const rnd = seeded(23); g.fillStyle = '#ecdfc0'; g.fillRect(0, 0, w, h);
+  g.lineWidth = 1.6;
+  for (let k = -h; k < w + h; k += 11) { g.strokeStyle = `rgba(120,95,60,${0.3 + rnd() * 0.2})`; g.beginPath(); g.moveTo(k, 0); g.lineTo(k + h * 0.5, h); g.stroke(); }
+  speckle(g, w, h, rnd, 700, '120,95,60', '255,250,240');
+});
+bandTex.repeat.set(3, 9);
+const band2Tex = canvasTex(128, 128, (g, w, h) => {          // outer bandages: criss-cross pattern
+  const rnd = seeded(24); g.fillStyle = '#e3cfa6'; g.fillRect(0, 0, w, h);
+  g.lineWidth = 2;
+  for (let k = -h; k < w + h; k += 16) {
+    g.strokeStyle = `rgba(110,80,45,${0.32 + rnd() * 0.15})`; g.beginPath(); g.moveTo(k, 0); g.lineTo(k + h, h); g.stroke();
+    g.beginPath(); g.moveTo(k + h, 0); g.lineTo(k, h); g.stroke();
+  }
+  speckle(g, w, h, rnd, 700, '110,80,45', '255,245,225');
+});
+band2Tex.repeat.set(3, 7);
+const natronTex = canvasTex(256, 256, (g, w, h) => {         // white salt crystals
+  const rnd = seeded(25); g.fillStyle = '#efece4'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, rnd, 9000, '170,165,150', '255,255,255');
+  for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(255,255,255,${0.4 + rnd() * 0.5})`; g.fillRect(rnd() * w, rnd() * h, 2, 2); }
+});
+natronTex.repeat.set(3, 2);
+const stoneTex = canvasTex(256, 256, (g, w, h) => {
+  const rnd = seeded(26); g.fillStyle = '#d8ccb3'; g.fillRect(0, 0, w, h); speckle(g, w, h, rnd, 12000, '120,105,80', '255,250,235');
+});
+const woodTex = canvasTex(128, 32, (g, w, h) => {
+  const rnd = seeded(19); g.fillStyle = '#9a6a3a'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 14; i++) { g.strokeStyle = `rgba(60,35,12,${0.2 + rnd() * 0.25})`; const y = rnd() * h; g.beginPath(); g.moveTo(0, y); g.lineTo(w, y + rnd() * 4 - 2); g.stroke(); }
+});
+const matTex = canvasTex(128, 128, (g, w, h) => {            // woven reed mat
+  g.fillStyle = '#c8a764'; g.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 16) for (let x = 0; x < w; x += 16) {
+    g.fillStyle = ((x + y) / 16) % 2 ? 'rgba(120,85,35,.28)' : 'rgba(255,240,200,.18)';
+    if (((x + y) / 16) % 2) g.fillRect(x, y + 2, 16, 12); else g.fillRect(x + 2, y, 12, 16);
+  }
+});
+matTex.repeat.set(5, 4);
+const basketTex = canvasTex(64, 64, (g, w, h) => {
+  g.fillStyle = '#b08848'; g.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 6) { g.fillStyle = 'rgba(90,60,20,.35)'; g.fillRect(0, y, w, 2); }
+  for (let x = 0; x < w; x += 8) { g.fillStyle = 'rgba(255,230,180,.18)'; g.fillRect(x, 0, 3, h); }
+});
+basketTex.repeat.set(4, 1);
+const rockTex = canvasTex(256, 256, (g, w, h) => {
+  const rnd = seeded(15); g.fillStyle = '#c9a777'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 26; i++) { g.fillStyle = `rgba(${rnd() < .5 ? '120,85,45' : '240,215,170'},${0.12 + rnd() * 0.18})`; g.fillRect(0, rnd() * h, w, 2 + rnd() * 8); }
+  speckle(g, w, h, rnd, 12000, '90,60,30', '250,230,190');
+});
+rockTex.repeat.set(2, 2);
+const waterTex = canvasTex(256, 64, (g, w, h) => {
+  const rnd = seeded(18); g.fillStyle = '#2f7fa8'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 46; i++) { g.fillStyle = `rgba(220,240,255,${0.12 + rnd() * 0.3})`; g.fillRect(rnd() * w, rnd() * h, 10 + rnd() * 40, 1.5 + rnd() * 2); }
+});
+waterTex.repeat.set(6, 1);
+const nemesTex = canvasTex(64, 64, (g, w, h) => {            // gold and blue stripes (headcloth)
+  for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#1f4f8f' : '#e3b23c'; g.fillRect(0, i * 8, w, 8); }
+});
+// Coffin painting. u goes round the coffin (lid = 0.5 to 1, middle of lid = 0.75); v goes from feet (0) to head (1).
+const coffinTex = canvasTex(256, 512, (g, w, h) => {
+  const yOf = v => (1 - v) * h;
+  g.fillStyle = '#6e3420'; g.fillRect(0, 0, w / 2, h);                                     // base: dark red
+  g.fillStyle = '#d7a738'; for (let y = 20; y < h; y += 60) g.fillRect(0, y, w / 2, 6);
+  g.fillStyle = '#d7a738'; g.fillRect(w / 2, 0, w / 2, h);                                 // lid: gold
+  const cols = ['#1f4f8f', '#2f8f83', '#a33a2a'];
+  for (let y = yOf(0.62), k = 0; y < yOf(0.1); y += 13, k++) {                           // feathered wings
+    g.strokeStyle = cols[k % 3]; g.lineWidth = 5; g.beginPath();
+    g.moveTo(w / 2, y); g.lineTo(w * 0.75, y + 18); g.lineTo(w, y); g.stroke();
+  }
+  for (let k = 0; k < 6; k++) { g.fillStyle = ['#1f4f8f', '#d7a738', '#a33a2a', '#2f8f83', '#d7a738', '#1f4f8f'][k]; g.fillRect(w / 2, yOf(0.7) + k * 7, w / 2, 7); } // collar
+  for (let y = yOf(0.98), k = 0; y < yOf(0.7); y += 9, k++) {                            // headcloth stripes at the sides
+    g.fillStyle = k % 2 ? '#1f4f8f' : '#e8bb46'; g.fillRect(w / 2, y, 34, 9); g.fillRect(w - 34, y, 34, 9);
+  }
+  g.fillStyle = '#e9bf55'; g.beginPath(); g.ellipse(w * 0.75, yOf(0.84), 27, 40, 0, 0, 7); g.fill();  // face
+  g.fillStyle = '#1b1612';
+  for (const s of [-1, 1]) { g.beginPath(); g.ellipse(w * 0.75 + s * 11, yOf(0.87), 6, 3, 0, 0, 7); g.fill(); g.fillRect(w * 0.75 + s * 11 - 8, yOf(0.9), 16, 2.5); }
+  g.fillStyle = '#a33a2a'; g.fillRect(w * 0.75 - 7, yOf(0.8), 14, 3);                      // mouth
+  g.fillStyle = '#1f4f8f'; g.fillRect(w * 0.75 - 5, yOf(0.78), 10, 22);                     // beard
+});
+
+// ---------------- Helpers for shapes ----------------
+const matCache = new Map();
+function M(color, o = {}) {
+  const key = color + JSON.stringify(o);
+  if (!matCache.has(key)) matCache.set(key, new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true, ...o }));
+  return matCache.get(key);
+}
+function TM(map, color = '#ffffff', o = {}) { return new THREE.MeshStandardMaterial({ map, color, roughness: 0.9, ...o }); }
+function mesh(geo, mat, x = 0, y = 0, z = 0, parent) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+  if (parent) parent.add(m);
+  return m;
+}
+const alongX = g => { g.rotateZ(Math.PI / 2); return g; };   // turn an upright shape so it lies along x
+function lathe(points, segs = 24, phi0 = 0, phiLen = Math.PI * 2) {
+  return new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), segs, phi0, phiLen);
+}
+
+// ---------------- People (low-poly, respectful, varied skin tones) ----------------
+const SKINS = ['#8d5524', '#6b3e1e', '#a0673a', '#7a4a2a', '#5a3418', '#b07848', '#68401f', '#94592c'];
+function person(skin, o = {}) {
+  const g = new THREE.Group(), sk = M(skin), cloth = M(o.cloth || '#f1ead8'), hair = M('#1c1612');
+  const legGeo = new THREE.BoxGeometry(0.13, 0.8, 0.14), armGeo = new THREE.BoxGeometry(0.1, 0.62, 0.11);
+  const limb = (geo, mat, x, y, len) => { const pv = new THREE.Group(); pv.position.set(x, y, 0); mesh(geo, mat, 0, -len / 2, 0, pv); g.add(pv); return pv; };
+  limb(legGeo, sk, -0.09, 0.82, 0.8); limb(legGeo, sk, 0.09, 0.82, 0.8);
+  if (o.robe) mesh(new THREE.CylinderGeometry(0.2, 0.3, 1.0, 8), cloth, 0, 0.55, 0, g);
+  else mesh(new THREE.CylinderGeometry(0.21, 0.27, 0.42, 8), cloth, 0, 0.8, 0, g);
+  mesh(new THREE.CylinderGeometry(0.19, 0.16, 0.56, 8), o.top ? M(o.top) : sk, 0, 1.18, 0, g);
+  if (o.collar) mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 10), M(o.collar), 0, 1.43, 0, g);
+  mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.1, 6), sk, 0, 1.49, 0, g);
+  const armL = limb(armGeo, sk, -0.26, 1.42, 0.62), armR = limb(armGeo, sk, 0.26, 1.42, 0.62);
+  const head = new THREE.Group(); head.position.set(0, 1.62, 0); g.add(head);
+  if (o.head === 'jackal') {                 // a priest wearing an Anubis mask
+    const blk = M('#1a1a1e');
+    mesh(new THREE.BoxGeometry(0.24, 0.24, 0.28), blk, 0, 0, 0, head);
+    const snout = mesh(new THREE.ConeGeometry(0.08, 0.32, 6), blk, 0, -0.03, 0.27, head); snout.rotation.x = Math.PI / 2;
+    for (const s of [-1, 1]) { const ear = mesh(new THREE.ConeGeometry(0.055, 0.32, 4), blk, s * 0.075, 0.26, -0.04, head); ear.rotation.z = -s * 0.1; }
+    mesh(new THREE.BoxGeometry(0.32, 0.24, 0.12), M('#1f4f8f'), 0, -0.05, -0.12, head);
+    for (const s of [-1, 1]) mesh(new THREE.BoxGeometry(0.03, 0.02, 0.03), M('#e3b23c'), s * 0.07, 0.05, 0.14, head);
+  } else {
+    mesh(new THREE.SphereGeometry(0.125, 10, 8), sk, 0, 0, 0, head);
+    if (!o.bald) { const cap = mesh(new THREE.SphereGeometry(0.135, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.55), hair, 0, 0.02, -0.02, head); cap.scale.set(1, 1, 1.05); }
+  }
+  g.userData = { armL, armR, head };
+  return g;
+}
+function face(g, dx, dz) { g.rotation.y = Math.atan2(dx, dz); }   // turn a person to face a direction
+
+// ---------------- Labels ----------------
+const labels = [];
+function addLabel(parent, text, pos, show = () => true, cls = '', sub = '') {
+  const el = document.createElement('div');
+  el.className = 'lbl ' + cls; el.textContent = text;
+  if (sub) { const s = document.createElement('small'); s.textContent = sub; el.appendChild(s); }
+  const o = new CSS2DObject(el);
+  o.position.copy(pos); parent.add(o);
+  labels.push({ o, show });
+  return o;
+}
+function chainVisible(o) { for (let p = o.parent; p; p = p.parent) if (!p.visible) return false; return true; }
+
+// =====================================================================
+//  STATE
+// =====================================================================
+const ui = { step: 1, p: 0, animating: true, playing: false, wait: 0, labels: true, jar: -1 };
+const L = (...steps) => () => ui.labels && steps.includes(ui.step);   // label shown on these steps
+let dirty = true;
+
+// =====================================================================
+//  THE WORKSHOP (1 unit = 1 metre)
+// =====================================================================
+const world = new THREE.Group(); scene.add(world);
+{
+  const g = new THREE.Mesh(new THREE.CircleGeometry(30, 72), new THREE.MeshStandardMaterial({ map: sandTex, transparent: true, roughness: 1, depthWrite: false }));
+  g.rotation.x = -Math.PI / 2; g.receiveShadow = true; g.renderOrder = -1; world.add(g);
+  g.material.map.repeat.set(1, 1);
+}
+// The Nile and palm trees behind the tent
+{
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(60, 6), TM(waterTex, '#ffffff', { roughness: 0.3 }));
+  river.rotation.x = -Math.PI / 2; river.position.set(0, 0.02, -11); world.add(river);
+  const rnd = seeded(31);
+  for (const [x, z] of [[-6, -7], [-3.5, -8], [5, -7.5], [8.5, -8.2], [-9, -8.5]]) {
+    const palm = new THREE.Group(); palm.position.set(x, 0, z); world.add(palm);
+    const hgt = 3.6 + rnd() * 1.2;
+    const trunk = mesh(new THREE.CylinderGeometry(0.1, 0.16, hgt, 6), M('#8a6a45'), 0, hgt / 2, 0, palm); trunk.rotation.z = (rnd() - 0.5) * 0.15;
+    for (let k = 0; k < 7; k++) {
+      const leaf = mesh(new THREE.ConeGeometry(0.22, 1.6, 4), M('#4f7d33'), 0, hgt, 0, palm);
+      leaf.geometry = leaf.geometry.clone(); leaf.geometry.translate(0, 0.8, 0); leaf.scale.set(1, 1, 0.25);
+      leaf.rotation.set(1.1, k / 7 * Math.PI * 2, 0, 'YXZ');
+    }
+  }
+}
+// Tent of purification: a linen roof and back wall, open at the front
+const tent = new THREE.Group(); world.add(tent);
+{
+  const linen = TM(sheetTex, '#f6efdc', { side: THREE.DoubleSide });
+  const roofGeo = new THREE.PlaneGeometry(7.6, 2.8, 20, 6);
+  const rp = roofGeo.attributes.position;
+  for (let i = 0; i < rp.count; i++) rp.setZ(i, -0.12 * Math.sin((rp.getX(i) / 7.6 + 0.5) * Math.PI * 4) ** 2);
+  roofGeo.computeVertexNormals();
+  const roof = mesh(roofGeo, linen, 0, 0, 0, tent);
+  roof.rotation.x = -Math.PI / 2 + 0.2; roof.position.set(0, 2.95, -1.75); roof.castShadow = true;
+  const back = mesh(new THREE.PlaneGeometry(7.6, 3.2), linen, 0, 1.6, -3.1, tent);
+  back.material = TM(sheetTex, '#efe4c8', { side: THREE.DoubleSide });
+  for (const x of [-3.7, 3.7]) for (const z of [-0.35, -3.1]) {
+    const h = z > -1 ? 2.7 : 3.25;
+    mesh(new THREE.CylinderGeometry(0.06, 0.07, h, 6), M('#7b5530'), x, h / 2, z, tent);
+  }
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 5.4), TM(matTex, '#ffffff', { roughness: 1 }));
+  floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0.01, -0.5); floor.receiveShadow = true; tent.add(floor);
+}
+addLabel(tent, 'Tent of purification', V(-2.2, 2.85, -1.2), L(1), '', 'the Ibu, near the Nile');
+
+// Stone embalming table. The body lies along x, head towards +x; the table top is at y = 0.95.
+const TOP = 0.95;
+{
+  const stone = TM(stoneTex, '#ffffff');
+  mesh(new THREE.BoxGeometry(2.3, 0.14, 0.84), stone, 0, TOP - 0.07, 0, world);
+  for (const x of [-0.82, 0.82]) mesh(new THREE.BoxGeometry(0.34, TOP - 0.14, 0.7), stone, x, (TOP - 0.14) / 2, 0, world);
+}
+addLabel(world, 'Embalming table', V(-0.75, 0.6, 0.48), L(1), '', 'made of stone');
+
+// Side table with tools (front right)
+const TT = V(1.95, 0.8, 1.05);
+{
+  const wood = TM(woodTex, '#ffffff');
+  mesh(new THREE.BoxGeometry(1.05, 0.06, 0.58), wood, TT.x, TT.y - 0.03, TT.z, world);
+  for (const [dx, dz] of [[-0.45, -0.22], [0.45, -0.22], [-0.45, 0.22], [0.45, 0.22]]) mesh(new THREE.BoxGeometry(0.06, TT.y - 0.06, 0.06), wood, TT.x + dx, (TT.y - 0.06) / 2, TT.z + dz, world);
+}
+// Long bronze hook
+const hook = new THREE.Group(); hook.position.set(TT.x - 0.2, TT.y + 0.02, TT.z - 0.12); world.add(hook);
+{
+  const pts = [V(-0.24, 0, 0), V(0.14, 0, 0), V(0.19, 0, 0.01), V(0.22, 0, 0.04), V(0.21, 0, 0.07), V(0.18, 0, 0.075)];
+  mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.008, 6), M('#b07a3c', { metalness: 0.6, roughness: 0.4, flatShading: false }), 0, 0, 0, hook);
+  mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.1, 8), M('#5a3a1e'), -0.24, 0, 0, hook).rotation.z = Math.PI / 2;
+}
+const lblHook = addLabel(hook, 'Long bronze hook', V(0, 0.16, 0), L(2), 'hot', 'for taking out the brain');
+// Flint knife
+const knife = new THREE.Group(); knife.position.set(TT.x + 0.25, TT.y + 0.015, TT.z + 0.1); world.add(knife);
+mesh(new THREE.BoxGeometry(0.17, 0.012, 0.04), M('#3c3b3f', { roughness: 0.5 }), 0.06, 0, 0, knife);
+mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.1, 6), M('#6e4a28'), -0.07, 0, 0, knife).rotation.z = Math.PI / 2;
+addLabel(knife, 'Stone knife', V(0, 0.14, 0), L(3), '', 'flint or obsidian');
+// Small oil jars on the side table
+const potGeo = lathe([[0, 0], [0.05, 0], [0.07, 0.05], [0.065, 0.11], [0.035, 0.15], [0.04, 0.17], [0, 0.17]], 14);
+mesh(potGeo, M('#e6d8b8', { flatShading: false }), TT.x + 0.38, TT.y, TT.z - 0.15, world);
+mesh(potGeo, M('#b0643a', { flatShading: false }), TT.x + 0.2, TT.y, TT.z - 0.18, world);
+// Linen rolls for stuffing (they move into the body on step 6)
+const stuff = [];
+for (let k = 0; k < 3; k++) {
+  const r = mesh(alongX(new THREE.CylinderGeometry(0.035, 0.035, 0.13, 10)), M('#f0e6cf', { flatShading: false }), 0, 0, 0, world);
+  r.userData.home = V(TT.x - 0.32 + k * 0.1, TT.y + 0.04, TT.z + 0.17);
+  stuff.push(r);
+}
+const lblStuff = addLabel(world, 'Linen for stuffing', V(TT.x - 0.22, TT.y + 0.25, TT.z + 0.22), () => ui.labels && ui.step === 6 && ui.p < 0.62);
+
+// Linen store (back left)
+{
+  const lin = M('#f0e6cf', { flatShading: false });
+  for (let k = 0; k < 6; k++) mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.5, 12), lin, -2.85 + (k % 3) * 0.22, 0.1 + Math.floor(k / 3) * 0.19, 0.2, world).rotation.x = Math.PI / 2;
+  mesh(new THREE.BoxGeometry(0.6, 0.12, 0.45), M('#e9dcbf'), -2.65, 0.06, 0.85, world);
+  mesh(new THREE.BoxGeometry(0.55, 0.1, 0.42), M('#f3ead6'), -2.65, 0.17, 0.85, world);
+}
+
+// Natron baskets (back left)
+const domes = [];
+{
+  for (const [x, z] of [[-2.35, -1.75], [-2.95, -1.2]]) {
+    mesh(new THREE.CylinderGeometry(0.34, 0.28, 0.36, 16, 1, true), TM(basketTex, '#ffffff', { side: THREE.DoubleSide }), x, 0.18, z, world);
+    mesh(new THREE.CircleGeometry(0.28, 16), M('#8a6a35'), x, 0.01, z, world).rotation.x = -Math.PI / 2;
+    const d = mesh(new THREE.SphereGeometry(0.32, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), TM(natronTex, '#ffffff'), x, 0.33, z, world);
+    domes.push(d);
+  }
+}
+addLabel(world, 'Natron', V(-2.6, 0.95, -1.5), L(5), '', 'salt from dried lake beds');
+
+// Canopic chest and the four jars (back right)
+const CH = V(2.05, 0.5, -1.55);
+mesh(new THREE.BoxGeometry(1.75, CH.y, 0.5), TM(woodTex, '#c08a52'), CH.x, CH.y / 2, CH.z, world);
+mesh(new THREE.BoxGeometry(1.8, 0.04, 0.55), M('#d6a634'), CH.x, CH.y - 0.02, CH.z, world);
+addLabel(world, 'Canopic chest', V(CH.x, 0.2, CH.z + 0.32), L(4), '', 'for the jars');
+const JARS = [
+  { name: 'Imsety', head: 'human', organ: 'liver', who: 'human-headed' },
+  { name: 'Hapy', head: 'baboon', organ: 'lungs', who: 'baboon-headed' },
+  { name: 'Duamutef', head: 'jackal', organ: 'stomach', who: 'jackal-headed' },
+  { name: 'Qebehsenuef', head: 'falcon', organ: 'intestines', who: 'falcon-headed' },
+];
+const jarGeo = lathe([[0, 0], [0.09, 0], [0.12, 0.07], [0.135, 0.2], [0.12, 0.33], [0.085, 0.4], [0.07, 0.42], [0, 0.42]], 20);
+const alabaster = M('#efe3c8', { flatShading: false, roughness: 0.6 });
+const jarHits = [];
+JARS.forEach((J, i) => {
+  const g = new THREE.Group(); g.position.set(CH.x - 0.63 + i * 0.42, CH.y, CH.z); world.add(g);
+  const body = mesh(jarGeo, alabaster, 0, 0, 0, g); body.userData.jar = i; jarHits.push(body);
+  const lid = new THREE.Group(); lid.position.y = 0.42; g.add(lid);
+  mesh(new THREE.CylinderGeometry(0.085, 0.095, 0.04, 16), alabaster, 0, 0.02, 0, lid).userData.jar = i;
+  const h = new THREE.Group(); h.position.y = 0.13; lid.add(h);
+  if (J.head === 'human') {
+    mesh(new THREE.SphereGeometry(0.075, 12, 10), M('#a0673a', { flatShading: false }), 0, 0.01, 0.01, h);
+    const wig = mesh(new THREE.SphereGeometry(0.085, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.6), TM(nemesTex, '#ffffff'), 0, 0.01, -0.012, h);
+    wig.scale.set(1.05, 1.1, 1);
+    mesh(new THREE.BoxGeometry(0.17, 0.11, 0.06), TM(nemesTex, '#ffffff'), 0, -0.05, -0.03, h);
+  } else if (J.head === 'baboon') {
+    mesh(new THREE.SphereGeometry(0.08, 12, 10), M('#8a7a62', { flatShading: false }), 0, 0, 0, h);
+    mesh(new THREE.BoxGeometry(0.07, 0.06, 0.07), M('#6d5c47'), 0, -0.02, 0.07, h);
+    for (const s of [-1, 1]) mesh(new THREE.SphereGeometry(0.025, 8, 6), M('#6d5c47'), s * 0.075, 0.02, 0, h);
+    mesh(new THREE.BoxGeometry(0.2, 0.08, 0.06), M('#9c8a6e'), 0, -0.05, -0.03, h);
+  } else if (J.head === 'jackal') {
+    const blk = M('#1e1d22');
+    mesh(new THREE.BoxGeometry(0.11, 0.1, 0.12), blk, 0, 0, 0, h);
+    const sn = mesh(new THREE.ConeGeometry(0.04, 0.13, 6), blk, 0, -0.015, 0.11, h); sn.rotation.x = Math.PI / 2;
+    for (const s of [-1, 1]) mesh(new THREE.ConeGeometry(0.025, 0.12, 4), blk, s * 0.035, 0.1, -0.01, h);
+    mesh(new THREE.BoxGeometry(0.17, 0.1, 0.06), TM(nemesTex, '#ffffff'), 0, -0.05, -0.04, h);
+  } else {
+    mesh(new THREE.SphereGeometry(0.075, 12, 10), M('#7a5a3a', { flatShading: false }), 0, 0, 0, h);
+    const beak = mesh(new THREE.ConeGeometry(0.025, 0.08, 6), M('#e2b13c'), 0, -0.02, 0.085, h); beak.rotation.x = Math.PI / 2 + 0.5;
+    for (const s of [-1, 1]) mesh(new THREE.BoxGeometry(0.012, 0.05, 0.012), M('#1e1d22'), s * 0.05, -0.03, 0.05, h);
+    mesh(new THREE.BoxGeometry(0.17, 0.1, 0.06), TM(nemesTex, '#ffffff'), 0, -0.05, -0.04, h);
+  }
+  J.g = g; J.lid = lid;
+  J.lbl = addLabel(g, J.name, V(0, i % 2 ? 1.08 : 0.8, 0), () => ui.labels && (ui.step === 4 || ui.jar === i), '', J.organ);
+});
+
+// Tomb entrance (far right) where the Opening of the Mouth took place
+{
+  const rock = mesh(new THREE.BoxGeometry(3, 4.6, 7.5), TM(rockTex, '#ffffff'), 9.3, 2.3, -0.6, world);
+  rock.castShadow = true;
+  mesh(new THREE.DodecahedronGeometry(2.4, 0), TM(rockTex, '#e2c79a'), 9.6, 4.2, -3.2, world).scale.set(1, 0.8, 1.4);
+  const door = mesh(new THREE.PlaneGeometry(1.15, 2.05), M('#1d140c'), 7.79, 1.025, -1.25, world);
+  door.rotation.y = -Math.PI / 2;
+  for (const dz of [-0.66, 0.66]) mesh(new THREE.BoxGeometry(0.12, 2.25, 0.14), M('#b99b6c'), 7.76, 1.12, -1.25 + dz, world);
+  mesh(new THREE.BoxGeometry(0.16, 0.18, 1.5), M('#b99b6c'), 7.76, 2.2, -1.25, world);
+}
+addLabel(world, 'Tomb', V(7.75, 1.9, -2.3), () => ui.labels && ui.step === 8 && ui.p > 0.6, '', 'the mummy’s new home');
+
+// ---------------- People ----------------
+const chief = person(SKINS[1], { collar: '#2f6f9f' }); chief.position.set(0.15, 0, -0.85); world.add(chief);
+const chiefMask = person(SKINS[1], { collar: '#2f6f9f', head: 'jackal' }); chiefMask.position.copy(chief.position); world.add(chiefMask);
+const helper = person(SKINS[5]); helper.position.set(-0.85, 0, -0.85); world.add(helper);
+for (const p of [chief, chiefMask, helper]) { p.userData.armL.rotation.x = -0.75; p.userData.armR.rotation.x = -0.75; }
+addLabel(helper, 'Embalmers', V(0, 2.05, 0), L(1), '', 'priests who made mummies');
+addLabel(chiefMask, 'Anubis mask', V(0, 2.12, 0), L(7), '', 'worn by the chief embalmer?');
+// Priest reading spells (step 7), with a papyrus scroll
+const reader = person(SKINS[3], { collar: '#c9a14a', bald: true }); reader.position.set(1.6, 0, -0.75); face(reader, -0.75, 0.65); world.add(reader);
+reader.userData.armL.rotation.x = -1.15; reader.userData.armR.rotation.x = -1.15;
+{
+  const scroll = new THREE.Group(); scroll.position.set(0, 1.18, 0.5); reader.add(scroll);
+  mesh(new THREE.BoxGeometry(0.42, 0.005, 0.24), M('#efe0b8'), 0, 0, 0, scroll).rotation.x = -0.5;
+  for (const s of [-1, 1]) mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.26, 8), M('#e2cc98'), s * 0.21, 0, 0, scroll).rotation.x = Math.PI / 2 - 0.5;
+}
+addLabel(world, 'Priest reading spells', V(1.3, 1.55, -0.6), L(7), '', 'from a papyrus scroll');
+// Priest at the tomb for the Opening of the Mouth (step 8)
+const sem = person(SKINS[6], { collar: '#2f8f83', bald: true }); sem.position.set(7.25, 0, 0.25); face(sem, -0.55, -0.6); world.add(sem);
+{
+  const adze = new THREE.Group(); adze.position.set(0, -0.6, 0.02); sem.userData.armR.add(adze);
+  mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.42, 6), M('#6e4a28'), 0, 0.0, 0.12, adze).rotation.x = Math.PI / 2;
+  mesh(new THREE.BoxGeometry(0.04, 0.1, 0.03), M('#b07a3c', { metalness: 0.5 }), 0, -0.04, 0.33, adze);
+}
+addLabel(sem, 'Opening of the Mouth', V(0.1, 0.95, 0.35), () => ui.labels && ui.step === 8 && ui.p > 0.8, 'hot', 'a priest touches the mouth');
+
+// ---------------- The body ----------------
+// Everything that travels with the body lives in bodyG, which sits on the table top.
+const bodyG = new THREE.Group(); bodyG.position.set(0, TOP, 0); world.add(bodyG);
+const bodyClip = new THREE.Plane(V(1, 0, 0), 2);     // keeps the part of the body not yet wrapped (x > wrap line)
+const wrapClip = new THREE.Plane(V(-1, 0, 0), -2);   // first bandage layer (x < wrap line)
+const wrap2Clip = new THREE.Plane(V(-1, 0, 0), -2);  // outer bandage layer
+const FRESH = new THREE.Color('#8a5a34'), DRY = new THREE.Color('#5a3a22');
+const skin = new THREE.MeshStandardMaterial({ color: FRESH.clone(), roughness: 0.8, clippingPlanes: [bodyClip] });
+const bodyHair = new THREE.MeshStandardMaterial({ color: '#1c1612', roughness: 0.9, clippingPlanes: [bodyClip] });
+const bodyCloth = new THREE.MeshStandardMaterial({ color: '#efe6cf', roughness: 0.9, clippingPlanes: [bodyClip] });
+const bodyFig = new THREE.Group(); bodyG.add(bodyFig);       // a simple figure lying on its back, facing up
+{
+  const cap = (r, l) => alongX(new THREE.CapsuleGeometry(r, l, 4, 10));
+  const torso = mesh(cap(0.14, 0.46), skin, 0.3, 0.13, 0, bodyFig); torso.scale.set(1, 0.75, 1.45);
+  mesh(new THREE.BoxGeometry(0.28, 0.17, 0.38), bodyCloth, -0.03, 0.11, 0, bodyFig);           // cloth round the hips
+  mesh(alongX(new THREE.CylinderGeometry(0.05, 0.055, 0.12, 8)), skin, 0.68, 0.12, 0, bodyFig);  // neck
+  mesh(new THREE.SphereGeometry(0.115, 14, 12), skin, 0.8, 0.14, 0, bodyFig);                   // head
+  mesh(new THREE.SphereGeometry(0.121, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), bodyHair, 0.8, 0.14, 0, bodyFig).rotation.z = -Math.PI / 2 - 0.55;
+  for (const s of [-1, 1]) {
+    mesh(cap(0.065, 0.7), skin, -0.48, 0.08, s * 0.085, bodyFig);                               // legs
+    mesh(new THREE.BoxGeometry(0.06, 0.12, 0.07), skin, -0.9, 0.12, s * 0.085, bodyFig);        // feet
+    mesh(cap(0.045, 0.5), skin, 0.24, 0.09, s * 0.27, bodyFig);                                 // arms by the sides
+  }
+}
+// Linen sheet draped over the body (steps 1-4)
+function drapeGeo() {
+  const x0 = -1.06, x1 = 0.64, g = new THREE.PlaneGeometry(x1 - x0, 1.2, 60, 30);
+  g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, 0, 0);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), z = p.getZ(i), az = Math.abs(z);
+    let top = x > 0.05 ? 0.26 : x > -0.12 ? lerp(0.2, 0.26, (x + 0.12) / 0.17) : lerp(0.16, 0.2, clamp((x + 0.95) / 0.83, 0, 1));
+    top += 0.07 * Math.exp(-(((x + 0.9) / 0.06) ** 2));                 // toes
+    top *= 1 - 0.55 * sstep(0.5, 0.64, x);                                // falls away at the shoulders
+    const wd = lerp(0.28, 0.37, sstep(-0.4, -0.08, x));
+    let y = 0.02 + top * Math.exp(-((az / wd) ** 4));
+    if (az > 0.41) y = Math.min(y, 0.02 - (az - 0.41) * 2.4);
+    p.setY(i, Math.max(y, -0.45));
+  }
+  g.computeVertexNormals(); return g;
+}
+const sheet = mesh(drapeGeo(), TM(sheetTex, '#f6f0e2', { side: THREE.DoubleSide }), 0, 0, 0, bodyG);
+addLabel(bodyG, 'Heart stays inside', V(0.42, 0.45, -0.05), L(3), 'hot', 'needed in the afterlife');
+
+// Bandaged mummy: the same outline turned around its length. Two layers, so amulets can sit between them.
+const OUTLINE = [[0, -0.96], [0.06, -0.95], [0.085, -0.9], [0.075, -0.75], [0.1, -0.5], [0.12, -0.3], [0.17, -0.05], [0.165, 0.12], [0.19, 0.35],
+  [0.22, 0.53], [0.17, 0.62], [0.085, 0.67], [0.1, 0.71], [0.13, 0.8], [0.115, 0.9], [0, 0.95]];
+function mummyGeo(grow = 1, depth = 1, width = 1, phi0 = 0, phiLen = Math.PI * 2, rAdd = 0, lenScale = 1) {
+  const g = lathe(OUTLINE.map(([r, y]) => [r * grow + rAdd, y * lenScale]), 32, phi0, phiLen);
+  const uv = g.attributes.uv;                       // u measured all the way round, so the two coffin halves share one painting
+  for (let i = 0; i < uv.count; i++) uv.setX(i, (phi0 + uv.getX(i) * phiLen) / (Math.PI * 2));
+  g.rotateZ(-Math.PI / 2);                         // length along x (feet at -x, head at +x); the lathe's u runs round the body
+  g.scale(1, 0.75 * depth, 1.4 * width);
+  return g;
+}
+const WRAP_Y = 0.165;
+const wrap1 = mesh(mummyGeo(), TM(bandTex, '#ffffff', { clippingPlanes: [wrapClip] }), 0, WRAP_Y, 0, bodyG); wrap1.castShadow = false;
+const wrap2 = mesh(mummyGeo(1, 1.1, 1.08), TM(band2Tex, '#ffffff', { clippingPlanes: [wrap2Clip] }), 0, WRAP_Y, 0, bodyG); wrap2.castShadow = false;
+addLabel(bodyG, 'Linen bandages', V(-0.85, 0.36, 0.25), () => ui.labels && ui.step === 7 && ui.p > 0.2 && innerWidth >= 640);
+// Amulets placed between the layers
+const scarab = new THREE.Group(); scarab.position.set(0.36, 0.305, 0); bodyG.add(scarab);
+{
+  const fai = M('#2f8f83', { flatShading: false, roughness: 0.4 });
+  const sb = mesh(new THREE.SphereGeometry(0.05, 12, 8), fai, 0, 0, 0, scarab); sb.scale.set(1.25, 0.4, 0.95);
+  mesh(new THREE.SphereGeometry(0.022, 8, 6), fai, 0.065, 0, 0, scarab).scale.set(1, 0.5, 1.1);
+}
+const eye = new THREE.Group(); eye.position.set(0.04, 0.29, 0.085); bodyG.add(eye);
+{
+  mesh(new THREE.BoxGeometry(0.075, 0.012, 0.05), M('#2a6fb0', { roughness: 0.4 }), 0, 0, 0, eye);
+  mesh(new THREE.BoxGeometry(0.03, 0.016, 0.018), M('#f2ead8'), 0, 0, 0.004, eye);
+  mesh(new THREE.BoxGeometry(0.012, 0.02, 0.012), M('#14181f'), 0, 0, 0.004, eye);
+}
+addLabel(scarab, 'Scarab amulet', V(0.12, 0.24, -0.12), L(7), 'hot', 'placed over the heart');
+addLabel(eye, 'Eye of Horus', V(-0.18, 0.16, 0.2), L(7), 'hot', 'amulet for protection');
+// Mask (step 8)
+const mask = new THREE.Group(); bodyG.add(mask);
+{
+  const gold = M('#d9a93b', { metalness: 0.55, roughness: 0.35, flatShading: false });
+  const cloth = mesh(new THREE.SphereGeometry(0.16, 18, 12), TM(nemesTex, '#ffffff', { metalness: 0.3, roughness: 0.4 }), 0.81, 0.18, 0, mask);
+  cloth.scale.set(0.9, 0.55, 1.25);
+  const f = mesh(new THREE.SphereGeometry(0.135, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), gold, 0.83, 0.2, 0, mask); f.scale.set(0.95, 0.62, 0.85);
+  for (const s of [-1, 1]) {
+    mesh(new THREE.BoxGeometry(0.035, 0.012, 0.022), M('#14181f'), 0.86, 0.284, s * 0.04, mask);
+    mesh(new THREE.BoxGeometry(0.12, 0.05, 0.08), TM(nemesTex, '#ffffff', { metalness: 0.3 }), 0.66, 0.18, s * 0.17, mask);
+  }
+  mesh(alongX(new THREE.CylinderGeometry(0.018, 0.022, 0.1, 8)), M('#1f4f8f'), 0.7, 0.27, 0, mask);
+  mesh(new THREE.TorusGeometry(0.13, 0.025, 6, 20, Math.PI), M('#2f8f83'), 0.62, 0.2, 0, mask).rotation.set(Math.PI / 2, 0, Math.PI / 2);
+}
+addLabel(mask, 'Gold mask', V(0.95, 0.42, 0), () => ui.labels && ui.step === 8 && ui.p > 0.05 && ui.p < 0.6, 'hot', 'so the spirit knows its face');
+
+// Organs (simple soft shapes; they lift out on step 3 and go into the jars on step 4)
+const soft = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 });
+const ORGANS = [
+  { name: 'Liver', make: g => { mesh(new THREE.SphereGeometry(0.1, 16, 12), soft('#7c4434'), 0, 0, 0, g).scale.set(1.5, 0.6, 1.0); } },
+  { name: 'Lungs', make: g => { for (const s of [-1, 1]) mesh(new THREE.SphereGeometry(0.075, 14, 10), soft('#c99590'), s * 0.065, 0, 0, g).scale.set(0.8, 1.3, 0.7); } },
+  { name: 'Stomach', make: g => { const m = mesh(new THREE.SphereGeometry(0.08, 14, 10), soft('#c9a27c'), 0, 0, 0, g); m.scale.set(1.4, 0.8, 0.9); m.rotation.z = 0.5; } },
+  { name: 'Intestines', make: g => { mesh(new THREE.TorusKnotGeometry(0.06, 0.022, 48, 6, 2, 3), soft('#d6ab9c'), 0, 0, 0, g); } },
+];
+ORGANS.forEach((O, i) => {
+  O.g = new THREE.Group(); world.add(O.g); O.make(O.g);
+  O.inside = V(0.3, TOP + 0.12, 0.12);
+  O.hover = V(-0.2 + i * 0.36, TOP + 0.75, 0.34);
+  O.above = V(JARS[i].g.position.x, CH.y + 0.95, CH.z);
+  O.into = V(JARS[i].g.position.x, CH.y + 0.3, CH.z);
+  O.lbl = addLabel(O.g, O.name, V(0, i % 2 ? 0.3 : 0.15, 0), () => ui.labels && (ui.step === 3 || (ui.step === 4 && ui.p < 0.12 + i * 0.22)));
+});
+
+// Water jug (step 1) and oil jar (step 6), each with a pouring stream
+function pourer(color, streamColor) {
+  const g = new THREE.Group(); world.add(g);
+  const tilt = new THREE.Group(); g.add(tilt);
+  mesh(lathe([[0, 0], [0.07, 0], [0.11, 0.09], [0.1, 0.2], [0.05, 0.27], [0.06, 0.3], [0, 0.3]], 14), M(color, { flatShading: false }), 0, -0.15, 0, tilt);
+  const stream = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, 1, 8), new THREE.MeshStandardMaterial({ color: streamColor, transparent: true, opacity: 0.75, roughness: 0.2 }));
+  g.add(stream);
+  return { g, tilt, stream };
+}
+const jug = pourer('#b0643a', '#9fd0e8'); jug.g.position.set(0.25, TOP + 0.75, -0.35);
+addLabel(jug.g, 'Palm wine and Nile water', V(0, -0.3, 0.25), () => ui.labels && ui.step === 1 && ui.p > 0.15, '', 'for washing');
+const oil = pourer('#e6d8b8', '#d79a2c'); oil.g.position.set(-0.25, TOP + 0.62, -0.3);
+addLabel(oil.g, 'Oils and resin', V(0, 0.26, 0), () => ui.labels && ui.step === 6 && ui.p > 0.15, '', 'to keep the skin soft');
+function setPour(P, show, tilt, flow, landY) {
+  P.g.visible = show; if (!show) return;
+  P.tilt.rotation.x = tilt;
+  P.stream.visible = flow;
+  const top = P.g.position.y - 0.05, len = top - landY;
+  P.stream.scale.y = len; P.stream.position.set(0, -0.05 - len / 2, 0.16);
+}
+
+// Natron heap over the body (step 5)
+const heap = mesh(new THREE.SphereGeometry(1, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2), TM(natronTex, '#ffffff'), 0, TOP, 0, world);
+heap.userData.base = V(1.18, 0.42, 0.5);
+addLabel(heap, 'Natron', V(0, 1.15, 0), L(5), 'hot', 'dries the body out');
+
+// Coffin: two halves of the same outline, a little bigger than the mummy. The lid has a painted face and wings.
+const coffinOuter = new THREE.Group(); world.add(coffinOuter);
+const coffinInner = new THREE.Group(); coffinOuter.add(coffinInner);
+const C_REST = V(4.35, 0.36, 0.1), C_UP = V(6.55, 1.12, -0.45);
+const coffinBase = mesh(mummyGeo(1.4, 1, 1, 0, Math.PI, 0.035, 1.08), TM(coffinTex, '#ffffff', { side: THREE.DoubleSide }), 0, 0, 0, coffinInner);
+const coffinLid = mesh(mummyGeo(1.4, 1, 1, Math.PI, Math.PI, 0.035, 1.08), TM(coffinTex, '#ffffff', { side: THREE.DoubleSide, metalness: 0.2, roughness: 0.6 }), 0, 0, 0, coffinInner);
+mesh(new THREE.BoxGeometry(2.3, 0.1, 0.5), TM(woodTex, '#a77748'), C_REST.x, 0.05, C_REST.z, world);
+addLabel(coffinInner, 'Coffin', V(0, 0.5, 0), () => ui.labels && ui.step === 8 && ui.p > 0.3 && ui.p < 0.82, '', 'shaped like a person');
+
+// =====================================================================
+//  THE EIGHT STEPS
+// =====================================================================
+const STEPS = [
+  { chip: 'Wash', dur: 4, q: 'What happened first?', day: () => 1,
+    p: ['When an important Egyptian died, their body was taken to the <b>embalmers</b>. Embalmers were priests who made mummies. They worked in a tent near the Nile called the <b>Ibu</b>, or “tent of purification”.',
+        'First, the body was washed with palm wine and water from the River Nile, to make it clean and pure.',
+        { note: 'Egyptians believed a person needed their body in the <b>afterlife</b>. Making a mummy stopped the body from rotting, so the person’s spirit could find it again.' }],
+    rows: [['Where', 'The Ibu (tent of purification)'], ['Who', 'Embalmers (priests)']],
+    say: () => 'The body is washed with palm wine and Nile water.' },
+  { chip: 'Brain', dur: 3.5, q: 'What happened to the brain?', day: () => 1,
+    p: ['Next, the embalmers took out the brain. The Greek writer <b>Herodotus</b> described them using a long bronze hook pushed up through the nose.',
+        'Egyptians thought people did their thinking with the heart, not the brain. They believed the brain was not important, so they threw it away.',
+        { note: 'Herodotus visited Egypt about 2,500 years ago, long after the pyramids were built. Historians use his writing, but they check it against real mummies.' }],
+    rows: [['Tool', 'A long bronze hook'], ['The brain', 'Thrown away']],
+    say: () => 'A long hook was used to take out the brain. It was thrown away.' },
+  { chip: 'Organs', dur: 5, q: 'Which organs were taken out?', day: () => 2,
+    p: ['An embalmer made a cut on the <b>left side</b> of the body with a sharp stone knife. Through it, the embalmers took out the liver, lungs, stomach and intestines. These would rot first, so they had to be removed.',
+        { think: 'The <b>heart</b> was left inside. Egyptians believed it held a person’s thoughts and memories. In the afterlife it would be weighed against the feather of Maat (see “The heart” in the Ancient Egypt model).' }],
+    rows: [['Taken out', 'Liver, lungs, stomach, intestines'], ['Left inside', 'The heart']],
+    say: () => 'Four organs are taken out. The heart stays inside.' },
+  { chip: 'Jars', dur: 6.5, q: 'Where did the organs go?', day: p => Math.round(lerp(3, 15, p)),
+    p: ['The organs were dried with natron salt, wrapped in linen and stored in four <b>canopic jars</b>.',
+        'In the New Kingdom, each jar lid was often shaped like the head of one of the four sons of the god Horus. Each son protected one organ:',
+        { list: ['<b>Imsety</b> (human head): the liver', '<b>Hapy</b> (baboon): the lungs', '<b>Duamutef</b> (jackal): the stomach', '<b>Qebehsenuef</b> (falcon): the intestines'] },
+        { note: 'Tap a jar to see who guards it.' }],
+    rows: [['Jars', '4, kept in a canopic chest'], ['Made of', 'Often alabaster (a pale stone)']],
+    say: () => 'Each organ goes into its own canopic jar. Tap a jar.' },
+  { chip: 'Natron', dur: 5.5, q: 'How was the body dried out?', day: p => Math.round(lerp(15, 55, ease(seg(p, 0.35, 1)))),
+    p: ['The body was covered in a heap of <b>natron</b>, a salt collected from dried-up lake beds. Natron soaks up water.',
+        'It was left for about 40 days. Without water, the tiny living things that make a body rot cannot grow.',
+        { note: 'By the end the body was dry, dark and much lighter.' }],
+    rows: [['Salt', 'Natron'], ['How long', 'About 40 days']],
+    say: () => 'Natron salt covers the body for about 40 days.' },
+  { chip: 'Oils', dur: 5, q: 'How did they keep its shape?', day: () => 55,
+    p: ['The natron was brushed away and the body was washed again. It was rubbed with oils, spices and <b>resin</b> (sticky tree sap) to keep the skin soft and to make it smell sweet.',
+        'The body was stuffed with linen, and sometimes sawdust, so that it kept a life-like shape.'],
+    rows: [['Rubbed with', 'Oils, spices and resin'], ['Stuffed with', 'Linen and sawdust']],
+    say: () => 'The body is rubbed with oils and stuffed with linen.' },
+  { chip: 'Wrap', dur: 10, q: 'How was a mummy wrapped?', day: p => Math.round(lerp(55, 69, ease(seg(p, 0.02, 1)))),
+    p: ['The embalmers wound long strips of linen round and round the body, layer after layer. This took about 15 days and used hundreds of metres of linen.',
+        '<b>Amulets</b> (lucky charms) were tucked between the layers to protect the person. A <b>scarab</b> beetle was placed over the heart, and the <b>Eye of Horus</b> kept them safe and well.',
+        'A priest read spells while they worked. Many spells like these are in the <b>Book of the Dead</b>.',
+        { note: 'The chief embalmer may have worn a mask of <b>Anubis</b>, the jackal-headed god of mummification. One real mask survives, but historians are not sure how often masks were worn.' }],
+    rows: [['Linen', 'Hundreds of metres'], ['Amulets', 'Scarab, Eye of Horus']],
+    say: p => p < 0.42 ? 'Linen bandages are wound round, from the feet up.' : p < 0.6 ? 'Amulets are placed between the layers.' : 'More layers of linen cover the amulets.' },
+  { chip: 'Mask', dur: 10, q: 'What happened at the end?', day: () => 70,
+    p: ['A mask was placed over the mummy’s head so the spirit could recognise it. A king’s mask was gold, like Tutankhamun’s. Other people had masks of linen and plaster, painted to look like gold.',
+        'The mummy was laid in its coffin. At the tomb, a priest touched the mouth of the coffin with a special tool. This was the <b>Opening of the Mouth</b> ceremony, so the person could eat, breathe and speak in the <b>afterlife</b>.',
+        { note: 'The whole process took about 70 days. It was expensive: Herodotus says poorer families paid for a simpler, quicker way.' }],
+    rows: [['Mask', 'Gold, for a king'], ['Ceremony', 'Opening of the Mouth']],
+    say: p => p < 0.2 ? 'A mask is placed over the head.' : p < 0.6 ? 'The mummy is laid in its coffin.' : p < 0.82 ? 'The coffin is taken to the tomb.' : 'The Opening of the Mouth ceremony.' },
+];
+$('#chips').innerHTML = STEPS.map((S, i) => `<button type="button" data-s="${i + 1}" aria-label="Step ${i + 1}: ${S.chip}">${i + 1}<i>${S.chip}</i></button>`).join('');
+
+// Put every object where it should be for step s at progress p (0 to 1). Pure, so jumping to any step works.
+const tmp = new THREE.Vector3();
+let clock = 0;
+function apply(s, p) {
+  // sheet, natron, drying
+  sheet.visible = s < 5 || (s === 5 && p < 0.3);
+  const heapS = s < 5 ? 0 : s === 5 ? ease(seg(p, 0.08, 0.45)) : s === 6 ? 1 - ease(seg(p, 0, 0.25)) : 0;
+  heap.visible = heapS > 0.01;
+  const hb = heap.userData.base; heap.scale.set(hb.x * (0.75 + 0.25 * heapS), hb.y * Math.max(heapS, 0.01), hb.z * (0.75 + 0.25 * heapS));
+  domes.forEach(d => { d.scale.y = s < 5 ? 1 : s === 5 ? 1 - 0.75 * ease(seg(p, 0.05, 0.45)) : 0.25; });
+  skin.color.copy(s >= 6 || (s === 5 && p > 0.5) ? DRY : FRESH);
+  bodyFig.scale.set(1, s >= 6 ? 0.88 : 1, s >= 6 ? 0.92 : 1);
+
+  // hook (step 2): lifts and turns slowly so everyone can see it
+  const hk = s === 2 ? ease(seg(p, 0, 0.3)) : 0;
+  hook.position.y = TT.y + 0.02 + hk * 0.3;
+  hook.rotation.y = s === 2 ? clock * 0.6 : 0;
+
+  // organs
+  ORGANS.forEach((O, i) => {
+    let vis = false, sc = 1;
+    if (s === 3) {
+      const t = ease(seg(p, 0.08 + i * 0.17, 0.38 + i * 0.17));
+      O.g.position.lerpVectors(O.inside, O.hover, t); sc = lerp(0.4, 1, t); vis = t > 0.01;
+      O.g.position.y += 0.03 * Math.sin(clock * 2 + i) * t;
+    } else if (s === 4) {
+      const t = seg(p, 0.05 + i * 0.22, 0.3 + i * 0.22);
+      if (t < 0.65) { const u = ease(t / 0.65); O.g.position.lerpVectors(O.hover, O.above, u); O.g.position.y += Math.sin(Math.PI * u) * 0.25; }
+      else { const u = ease((t - 0.65) / 0.35); O.g.position.lerpVectors(O.above, O.into, u); sc = lerp(1, 0.35, u); }
+      vis = t < 0.995;
+    }
+    O.g.visible = vis; O.g.scale.setScalar(sc);
+    JARS[i].lid.position.y = 0.42 + (s === 4 ? 0.24 * Math.sin(Math.PI * seg(seg(p, 0.05 + i * 0.22, 0.3 + i * 0.22), 0.45, 1)) : 0);
+  });
+
+  // pouring
+  setPour(jug, s === 1, -1.1 * ease(seg(p, 0.05, 0.25)), s === 1 && p > 0.25 && p < 0.88, TOP + 0.24);
+  setPour(oil, s === 6, -1.1 * ease(seg(p, 0.25, 0.4)), s === 6 && p > 0.4 && p < 0.7, TOP + 0.22);
+  if (s === 1) jug.g.position.x = lerp(0.55, -0.45, ease(seg(p, 0.25, 0.88)));
+  if (s === 6) oil.g.position.x = -0.25 + 0.5 * seg(p, 0.4, 0.7);
+
+  // linen stuffing (step 6)
+  stuff.forEach((r, k) => {
+    const t = s < 6 ? 0 : s > 6 ? 1 : ease(seg(p, 0.66 + k * 0.09, 0.86 + k * 0.09));
+    tmp.set(0.3 + k * 0.08, TOP + 0.2, 0.15);
+    r.position.lerpVectors(r.userData.home, tmp, t); r.position.y += Math.sin(Math.PI * t) * 0.35;
+    r.scale.setScalar(1 - 0.85 * t); r.visible = t < 0.98;
+  });
+
+  // wrapping (step 7): the first layer from feet to head, amulets, then the outer layer
+  const toX = v => v;                                  // the body sits at world x = 0 while it is wrapped
+  const w1 = s < 7 ? -2 : s > 7 ? 50 : toX(lerp(-1.0, 1.0, ease(seg(p, 0.02, 0.42))));
+  const w2 = s < 7 ? -2 : s > 7 ? 50 : toX(lerp(-1.02, 1.0, ease(seg(p, 0.62, 0.98))));
+  bodyClip.constant = -w1; wrapClip.constant = w1; wrap2Clip.constant = w2;
+  wrap1.visible = wrap2.visible = s >= 7;
+  bodyFig.visible = s < 8;
+  const am = s < 7 ? 0 : s > 7 ? 1 : ease(seg(p, 0.44, 0.54));
+  scarab.visible = eye.visible = am > 0.01; scarab.scale.setScalar(Math.max(am, 0.01)); eye.scale.setScalar(Math.max(am, 0.01));
+  chief.visible = s !== 7; chiefMask.visible = s === 7;
+  reader.visible = s === 7;
+
+  // mask, coffin and tomb (step 8)
+  const m8 = s === 8 ? p : 0;
+  mask.visible = s === 8;
+  mask.position.y = lerp(0.8, 0, ease(seg(m8, 0.02, 0.18)));
+  const tr = s === 8 ? ease(seg(m8, 0.22, 0.42)) : 0;
+  bodyG.position.set(lerp(0, C_REST.x, tr), lerp(TOP, C_REST.y - WRAP_Y, tr) + Math.sin(Math.PI * tr) * 0.7, lerp(0, C_REST.z, tr));
+  bodyG.rotation.y = 0;
+  bodyG.visible = !(s === 8 && m8 > 0.6);
+  coffinLid.position.y = s < 8 ? 0.9 : lerp(0.9, 0, ease(seg(m8, 0.44, 0.58)));
+  coffinLid.visible = s === 8;
+  const up = s === 8 ? ease(seg(m8, 0.62, 0.82)) : 0;
+  coffinOuter.position.lerpVectors(C_REST, C_UP, up); coffinOuter.position.y += Math.sin(Math.PI * up) * 0.25;
+  coffinOuter.rotation.y = up * Math.PI / 2; coffinInner.rotation.z = up * Math.PI / 2;
+  sem.visible = s === 8;
+  sem.userData.armR.rotation.x = -2.0 * ease(seg(m8, 0.84, 0.94));
+  helper.visible = true;
+}
+
+// =====================================================================
+//  CAMERA
+// =====================================================================
+let fly = null, userMoved = false;
+function topSpace() { return $('#hdr').offsetHeight + (innerWidth < 900 ? $('#strip').offsetHeight + 10 : 0); }
+function sideShift() { const info = $('#info'); return innerWidth >= 700 && info.open ? (info.offsetWidth + 16) / 2 : 0; }
+function view(target, dir, needW, needH) {
+  const w = innerWidth, h = innerHeight, aspect = w / h;
+  const top = topSpace(), bottom = $('#controls').offsetHeight + 80;
+  const avail = Math.max(0.35, (h - top - bottom) / h), availW = Math.max(0.4, (w - 2 * sideShift()) / w);
+  const tanF = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const d = Math.max((needH / 2) / tanF / avail, (needW / 2) / (tanF * aspect * availW));
+  return { pos: target.clone().add(dir.clone().normalize().multiplyScalar(d)), target };
+}
+const VIEWS = [
+  () => view(V(0.2, 1.25, -0.4), V(0.25, 0.5, 1), 6.6, 3.4),
+  () => view(V(1.35, 1.05, 0.45), V(0.15, 0.65, 1), 2.4, 1.3),
+  () => view(V(0.35, 1.35, 0.1), V(0.12, 0.5, 1), 2.7, 1.5),
+  () => view(V(1.2, 1.2, -0.6), V(0.2, 0.5, 1), 4.2, 2.3),
+  () => view(V(-0.6, 1.0, -0.5), V(0.15, 0.7, 1), 4.0, 1.8),
+  () => view(V(0.45, 1.3, 0.2), V(0.2, 0.55, 1), 3.4, 2.0),
+  () => view(V(-0.2, 1.3, -0.3), V(0.12, 0.45, 1), 4.6, 2.5),
+];
+function homeView() {
+  if (ui.step === 8) return ui.p < 0.6 ? view(V(2.2, 1.0, 0.05), V(0.12, 0.55, 1), 6.4, 2.3) : view(V(6.85, 1.1, -0.3), V(-0.4, 0.2, 1), 3.4, 2.6);
+  return VIEWS[ui.step - 1]();
+}
+function flyTo(v, instant = false) {
+  if (instant) { camera.position.copy(v.pos); controls.target.copy(v.target); fly = null; return; }
+  fly = { t: 0, p0: camera.position.clone(), t0: controls.target.clone(), p1: v.pos, t1: v.target };
+}
+controls.addEventListener('start', () => { fly = null; userMoved = true; });
+function updateFly(dt) {
+  if (!fly) return;
+  fly.t += dt / 1.4; const k = ease(fly.t);
+  camera.position.lerpVectors(fly.p0, fly.p1, k); controls.target.lerpVectors(fly.t0, fly.t1, k);
+  if (fly.t >= 1) fly = null;
+}
+function goHome() { userMoved = false; flyTo(homeView()); }
+
+// =====================================================================
+//  UI
+// =====================================================================
+function infoHTML(S) {
+  return S.p.map(x => typeof x === 'string' ? `<p>${x}</p>`
+    : x.note ? `<p class="note">${x.note}</p>`
+    : x.think ? `<p class="think">${x.think}</p>`
+    : `<ul>${x.list.map(li => `<li>${li}</li>`).join('')}</ul>`).join('');
+}
+let lastInfo = -1, lastSay = '';
+function refresh() {
+  dirty = false;
+  const S = STEPS[ui.step - 1], day = S.day(ui.p);
+  if (lastInfo !== ui.step) {
+    lastInfo = ui.step;
+    $('#infoTitle').textContent = S.q;
+    $('#infoBody').innerHTML = `<span class="kchip">Step ${ui.step} of 8</span>` + infoHTML(S);
+  }
+  $('#readouts').innerHTML = [['Day', day === 70 ? 'about 70' : (day === 1 ? '1' : 'about ' + day)], ...S.rows].map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+  $('#dayText').textContent = day === 70 ? 'Day 70' : 'Day ' + day;
+  $('#dayFill').style.width = (day / 70 * 100) + '%';
+  let say = S.say(ui.p);
+  if (ui.jar >= 0) { const J = JARS[ui.jar]; say = `${J.name}, the ${J.who} son of Horus, guarded the ${J.organ}.`; }
+  if (say !== lastSay) { $('#say').textContent = say; lastSay = say; }
+  for (const b of document.querySelectorAll('#chips button')) {
+    const n = +b.dataset.s;
+    if (n === ui.step) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+    b.classList.toggle('done', n < ui.step);
+  }
+  JARS.forEach((J, i) => J.lbl.element.classList.toggle('hot', ui.jar === i));
+  $('#backBtn').disabled = ui.step === 1;
+  $('#nextBtn').disabled = ui.step === 8;
+  $('#playBtn').textContent = ui.playing ? 'Stop' : 'Play all';
+  $('#playBtn').setAttribute('aria-pressed', ui.playing);
+  $('#labelsBtn').setAttribute('aria-pressed', ui.labels);
+  layoutVars();
+}
+function goStep(n, keepPlaying = false) {
+  ui.step = clamp(n, 1, 8); ui.p = 0; ui.animating = true; ui.wait = 0; ui.jar = -1;
+  if (!keepPlaying) ui.playing = false;
+  dirty = true; refresh(); goHome();
+}
+$('#chips').addEventListener('click', e => { const b = e.target.closest('button'); if (b) goStep(+b.dataset.s); });
+$('#backBtn').onclick = () => goStep(ui.step - 1);
+$('#nextBtn').onclick = () => goStep(ui.step + 1);
+$('#againBtn').onclick = () => goStep(ui.step);
+$('#playBtn').onclick = () => {
+  if (ui.playing) { ui.playing = false; dirty = true; return; }
+  ui.playing = true; goStep(ui.step === 8 && !ui.animating ? 1 : ui.step, true);
+};
+$('#labelsBtn').onclick = () => { ui.labels = !ui.labels; dirty = true; };
+
+// Tap a jar to see which son of Horus guards it
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(JARS.map(J => J.g), true)[0];
+  if (hit) {
+    let o = hit.object; while (o && o.userData.jar === undefined && o.parent) o = o.parent;
+    const i = JARS.findIndex(J => { let q = hit.object; while (q) { if (q === J.g) return true; q = q.parent; } return false; });
+    ui.jar = ui.jar === i ? -1 : i; dirty = true;
+  }
+});
+
+// ---------------- Resize and loop ----------------
+function layoutVars() {
+  const r = document.documentElement.style;
+  r.setProperty('--hdr', $('#hdr').offsetHeight + 'px');
+  r.setProperty('--strip', $('#strip').offsetHeight + 'px');
+  r.setProperty('--ctl', $('#controls').offsetHeight + 'px');
+}
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h); labelR.setSize(w, h);
+  camera.aspect = w / h;
+  const top = topSpace(), bottom = $('#controls').offsetHeight + 80;
+  camera.setViewOffset(w, h, -sideShift(), -(top - bottom) / 2, w, h);
+  camera.updateProjectionMatrix();
+  layoutVars();
+  if (!userMoved && !fly) flyTo(homeView(), true);
+}
+addEventListener('resize', resize);
+$('#info').addEventListener('toggle', () => { resize(); if (!userMoved) flyTo(homeView()); });
+if (innerWidth < 700) $('#info').open = false;
+
+refresh(); resize(); apply(1, 0); flyTo(homeView(), true);
+
+let last = performance.now(), lastPhase = 0;
+function frame(dt, draw = true) {
+  clock += dt;
+  if (ui.animating) {
+    ui.p = Math.min(1, ui.p + dt / STEPS[ui.step - 1].dur);
+    if (ui.p >= 1) { ui.animating = false; ui.wait = 0; }
+    dirty = true;
+  } else if (ui.playing) {
+    ui.wait += dt;
+    if (ui.wait > 4) { if (ui.step < 8) goStep(ui.step + 1, true); else { ui.playing = false; dirty = true; } }
+  }
+  const phase = ui.step === 8 && ui.p >= 0.6 ? 1 : 0;           // step 8: follow the coffin to the tomb
+  if (phase !== lastPhase) { lastPhase = phase; if (!userMoved) flyTo(homeView()); }
+  apply(ui.step, ui.p);
+  updateFly(dt);
+  for (const l of labels) l.o.visible = !!l.show() && chainVisible(l.o);
+  if (dirty) refresh();
+  controls.update();
+  if (!draw) return;
+  renderer.render(scene, camera);
+  labelR.render(scene, camera);
+}
+renderer.setAnimationLoop(now => { const dt = Math.min(0.05, (now - last) / 1000); last = now; frame(dt); });
+// Test helper: jump to a step and progress, then draw one frame
+window.__mummy = { go: (s, p = 1) => { goStep(s); ui.p = p; ui.animating = p < 1; dirty = true; lastPhase = s === 8 && p >= 0.6 ? 1 : 0; frame(0, false); flyTo(homeView(), true); frame(0); } };
+</script>
+</body>
+</html>
