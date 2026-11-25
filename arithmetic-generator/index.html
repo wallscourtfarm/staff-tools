@@ -352,12 +352,12 @@ input[type=text]:focus,input[type=number]:focus,select:focus{border-color:#1798d
   </div>
   </div><!-- /paperMode -->
 
-  <div class="version">11.11.26b</div>
+  <div class="version">25.11.26a</div>
 </div>
 
 <script>
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
-const API_URL = 'https://app.wallscourt-farm-academy.co.uk/api/claude';
+const API_URL = '/_api/ai/claude'; // same-site AI proxy (wfa-ai-proxy Worker), 25.11.26
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -1614,8 +1614,8 @@ Return ONLY a valid JSON array — no markdown, no explanation. Each element:
 
   const resp = await fetch(API_URL, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({model:'claude-opus-4-8',max_tokens:4000,messages:[{role:'user',content:prompt}]})
+    headers: {'Content-Type': 'application/json', 'X-WFA-Proxy': '1'},
+    body: JSON.stringify({max_tokens:16000,messages:[{role:'user',content:prompt}]})
   });
   const data = await resp.json();
   if (!data.ok) throw new Error(data.error || 'API error');
