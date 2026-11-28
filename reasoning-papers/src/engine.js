@@ -146,15 +146,18 @@ RP.answerKit = function (show) {
     },
     // Draw lines to match: left items, right items, pairs [[li, ri], ...]
     match(left, right, pairs) {
-      const W = 150, rowH = 13, n = Math.max(left.length, right.length), H = n * rowH + 4;
-      const yl = i => 6 + i * rowH + (n - left.length) * rowH / 2;
-      const yr = i => 6 + i * rowH + (n - right.length) * rowH / 2;
-      let s = `<div class="match"><div class="mcol">` + left.map(t => `<div class="mi">${v(t)}</div>`).join('') + `</div>`;
-      s += `<svg viewBox="0 0 60 ${H}" style="width:40mm;height:${H * 0.75}mm" preserveAspectRatio="none">`;
-      left.forEach((_, i) => s += `<circle cx="4" cy="${yl(i) + 2}" r="1.6"/>`);
-      right.forEach((_, i) => s += `<circle cx="56" cy="${yr(i) + 2}" r="1.6"/>`);
-      if (show) pairs.forEach(([a, b]) => s += `<line x1="4" y1="${yl(a) + 2}" x2="56" y2="${yr(b) + 2}" class="ansl"/>`);
-      s += `</svg><div class="mcol">` + right.map(t => `<div class="mi">${v(t)}</div>`).join('') + `</div></div>`;
+      // Every row is RH mm tall in both columns and the dot sits at the row's centre, so dots, boxes and lines line up
+      // whatever is inside the boxes (fractions make boxes taller).
+      const RH = 13, n = Math.max(left.length, right.length), H = n * RH;
+      const off = len => (n - len) * RH / 2;
+      const yl = i => off(left.length) + i * RH + RH / 2, yr = i => off(right.length) + i * RH + RH / 2;
+      const col = items => `<div class="mcol" style="padding-top:${off(items.length)}mm">` + items.map(t => `<div class="mr"><div class="mi">${v(t)}</div></div>`).join('') + `</div>`;
+      let s = `<div class="match">` + col(left);
+      s += `<svg viewBox="0 0 40 ${H}" style="width:40mm;height:${H}mm">`;
+      left.forEach((_, i) => s += `<circle cx="3" cy="${yl(i)}" r="1.1"/>`);
+      right.forEach((_, i) => s += `<circle cx="37" cy="${yr(i)}" r="1.1"/>`);
+      if (show) pairs.forEach(([a, b]) => s += `<line x1="3" y1="${yl(a)}" x2="37" y2="${yr(b)}" class="ansl"/>`);
+      s += `</svg>` + col(right) + `</div>`;
       return s;
     },
     // Two-part question label
