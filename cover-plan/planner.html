@@ -494,7 +494,7 @@ body.edit-locked .notify-btn   { display:none; }
 <header>
   <img src="logo.png" alt="Wallscourt Farm Academy">
   <div>
-    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(27.10.26c)</span></div>
+    <div class="header-title">Release Schedule <span style="color:#64748b;font-weight:normal;font-size:12px">(28.11.26a)</span></div>
     <div class="header-sub">Wallscourt Farm Academy</div>
   </div>
   <div class="view-tabs">
@@ -624,7 +624,7 @@ body.edit-locked .notify-btn   { display:none; }
   <button onclick="closeDeleteMenu()" style="display:block;width:100%;text-align:left;background:none;border:none;color:#64748b;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:12px">Cancel</button>
 </div>
 
-<footer>Wallscourt Farm Academy · Release Schedule · 27.10.26c</footer>
+<footer>Wallscourt Farm Academy · Release Schedule · 28.11.26a</footer>
 
 <script>
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -1712,7 +1712,9 @@ function renderGrid() {
       const noteKey = `${state.weekIdx}-${dayIdx}-${session}`;
       const cellNote = state.cellNotes[noteKey];
       if (cellNote) {
-        html += `<div class="cell-note">
+        // Clear any vertical event strips (absolute, 24px each) on AM/Lunch/PM
+        const noteIndent = (hasEvents && !isShortRow) ? ` style="margin-left:${allEvents.length * 24}px"` : '';
+        html += `<div class="cell-note"${noteIndent}>
           <span style="flex:1">${cellNote}</span>
           <button class="note-del" onclick="removeCellNote('${noteKey}')">×</button>
         </div>`;
@@ -1724,7 +1726,7 @@ function renderGrid() {
         // Short rows with banners: let slots flow below the banners (and grow
         // the row) instead of being absolutely positioned over them
         const slotsStyle = hasVerticalEvent ? `left:${1 + allEvents.length * 24}px`
-          : (hasEvents && isShortRow) ? 'position:static' : '';
+          : ((hasEvents || cellNote) && isShortRow) ? 'position:static' : '';
         html += `<div class="slots-row" ${slotsStyle ? `style="${slotsStyle}"` : ''}>`;
         cellSlots.forEach(s => {
           const t = teacher(s.tid);
@@ -1800,6 +1802,7 @@ function renderGrid() {
   // boundaries via getBoundingClientRect, which would be stale if row
   // heights hadn't already settled.
   requestAnimationFrame(() => {
+    offsetSlotsBelowNotes();
     adjustSessionRowHeights();
     positionSpanStrips(spans);
   });
@@ -1812,6 +1815,25 @@ function renderGrid() {
 // the full content height even when it currently overflows a
 // smaller/stretched container) and grows the row's actual rendered height
 // to fit, via inline style (which overrides the CSS default/minimum).
+// 28.11.26: a cell note (e.g. "ARV", "Panto Showings") sits in normal flow
+// at the top of its cell, but .slots-row is absolutely positioned at top:5px,
+// so in any cell that also had slots the cards were drawn over the note and
+// hid it. Start the slots just below the note instead (dataset.noteShift is
+// the extra drop, used by adjustSessionRowHeights and positionSpanStrips).
+function offsetSlotsBelowNotes() {
+  document.querySelectorAll('.week-grid td.grid-cell').forEach(cell => {
+    const sr = cell.querySelector(':scope > .slots-row');
+    if (!sr || sr.style.position === 'static') return;
+    const notes = cell.querySelectorAll(':scope > .cell-note');
+    if (!notes.length) return;
+    const last = notes[notes.length - 1];
+    const top = last.offsetTop + last.offsetHeight + 4;
+    if (top <= 5) return;
+    sr.style.top = top + 'px';
+    sr.dataset.noteShift = String(top - 5);
+  });
+}
+
 function adjustSessionRowHeights() {
   ['srow-am', 'srow-pm'].forEach(cls => {
     document.querySelectorAll('.week-grid tbody tr.' + cls).forEach(row => {
@@ -1819,7 +1841,7 @@ function adjustSessionRowHeights() {
       row.querySelectorAll('.slots-row').forEach(sr => {
         // +10 restores the 5px top + 5px bottom inset .slots-row carves out
         // of the cell it fills, which scrollHeight alone doesn't include.
-        const needed = sr.scrollHeight + 10;
+        const needed = sr.scrollHeight + 10 + (parseInt(sr.dataset.noteShift) || 0);
         if (needed > maxNeeded) maxNeeded = needed;
       });
       row.style.height = maxNeeded + 'px';
@@ -1901,7 +1923,8 @@ function positionSpanStrips(spans) {
     // Horizontal stacking: slots stack vertically, so offset downward by index
     const left = baseSlotItemRect.left - containerRect.left;
     const spanRowTop = rowTops[startIdx];
-    const top = spanRowTop + maxSlotIndex * (CARD_H + gap);
+    const noteShift = parseInt(firstCell.querySelector('.slots-row')?.dataset.noteShift) || 0;
+    const top = spanRowTop + noteShift + maxSlotIndex * (CARD_H + gap);
     const bottom = rowBottoms[endIdx];
     const height = bottom - top;
 
