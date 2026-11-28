@@ -676,10 +676,34 @@ RP.D = (function () {
       o.rows.map((rw, i) => `<tr><th>${rw}</th>${cell(o.cells[i][0])}${cell(o.cells[i][1])}</tr>`).join('') + `</table>`;
   }
 
+  /* Weighing scales with a round dial (a 300° gauge, min at bottom left, max at bottom right).
+   * o = {max, min=0, major, minor, value, unit, fmt, ans:true (pointer only on the scheme: "draw the pointer"), r} */
+  function dial(o, A) {
+    const r = o.r || 25, min = o.min || 0, cx = r + 9, cy = r + 17, fmt = o.fmt || (v => F.n(v));
+    const ang = v => (-150 + 300 * (v - min) / (o.max - min)) * Math.PI / 180;
+    const at = (v, rr) => [cx + rr * Math.sin(ang(v)), cy - rr * Math.cos(ang(v))];
+    let s = `<rect x="${r2(cx - r - 7)}" y="9" width="${r2(2 * r + 14)}" height="${r2(2 * r + 15)}" rx="5" class="sbody"/>`;
+    s += `<rect x="${r2(cx - r - 3)}" y="2" width="${r2(2 * r + 6)}" height="4" rx="1.5" class="sbody"/>` + line(cx, 6, cx, 9, 'thin');
+    s += `<circle cx="${cx}" cy="${cy}" r="${r}" class="face"/>`;
+    const n = Math.round((o.max - min) / o.minor), per = Math.round(o.major / o.minor);
+    for (let i = 0; i <= n; i++) {
+      const v = min + i * o.minor, big = i % per === 0, a = at(v, r - 0.6), b = at(v, r - (big ? 4 : 2.4));
+      s += line(a[0], a[1], b[0], b[1], big ? 'tk2' : 'tk1');
+      if (big) { const t = at(v, r - 7.6); s += txt(t[0], t[1] + 1.1, fmt(+v.toFixed(6)), { size: 3 }); }
+    }
+    if (o.unit) s += txt(cx, cy + r * 0.55, o.unit, { size: 3.6, bold: true });
+    if (!o.ans || (A && A.show)) {
+      const p = at(o.value, r - 3.2), cls = o.ans ? 'ansl' : 'hand';
+      s += line(cx, cy, p[0], p[1], cls);
+    }
+    s += `<circle cx="${cx}" cy="${cy}" r="1.3" class="fillk"/>`;
+    return svg(2 * cx, cy + r + 8, s);
+  }
+
   function row(items, gap = 8) {
     return `<div class="figrow" style="gap:${gap}mm">` + items.map(it => typeof it === 'string' ? `<div class="fi">${it}</div>` : `<div class="fi">${it.fig}<div class="cap">${it.cap || ''}</div></div>`).join('') + `</div>`;
   }
 
-  return { svg, txt, line, poly, pline, box, numberLine, scale, grid, clock, barChart, lineGraph, pictogram, pie, fractionBar, fractionCircle, rectParts, shape, regular, angle, array, groups, partWhole, barModel, coins, ruler, solid, row, r2, convGraph, sym, cubes, protractor, priceList, receipt, digital, calendar, venn, carroll, MONTHS, DAYS, daysIn, dow };
+  return { svg, txt, line, poly, pline, box, numberLine, scale, grid, clock, barChart, lineGraph, pictogram, pie, fractionBar, fractionCircle, rectParts, shape, regular, angle, array, groups, partWhole, barModel, coins, ruler, solid, row, r2, convGraph, sym, cubes, protractor, priceList, receipt, digital, calendar, venn, carroll, dial, MONTHS, DAYS, daysIn, dow };
 })();
 if (typeof module !== 'undefined') module.exports = RP;
