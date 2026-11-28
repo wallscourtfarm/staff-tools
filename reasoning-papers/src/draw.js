@@ -476,10 +476,127 @@ RP.D = (function () {
   }
 
   // place several figures side by side with captions
+  /* Conversion graph: a straight line through 0 (y = x * k).
+   * o = {xmax, ymax, xstep, ystep, xminor, yminor, k, xlab, ylab, width, height,
+   *      reads:[{x}|{y}] } — each read is drawn (on the scheme only) as red dashed guide lines
+   *      from the given axis value to the line and across to the other axis. */
+  function convGraph(o, A) {
+    const W = o.width || 120, Hc = o.height || 70, left = 16, top = 5, bottom = 15, right = 6;
+    const Wc = W - left - right;
+    const X = v => left + v / o.xmax * Wc, Y = v => top + Hc - v / o.ymax * Hc;
+    let s = '';
+    const xm = o.xminor || o.xstep, ym = o.yminor || o.ystep;
+    for (let v = 0; v <= o.ymax + 1e-9; v += ym) {
+      const maj = Math.abs(v / o.ystep - Math.round(v / o.ystep)) < 1e-9;
+      s += line(left, Y(v), left + Wc, Y(v), maj ? 'gl' : 'gl2');
+      if (maj) s += txt(left - 1.8, Y(v) + 1.2, F.n(+v.toFixed(6)), { size: 3.2, anchor: 'end' });
+    }
+    for (let v = 0; v <= o.xmax + 1e-9; v += xm) {
+      const maj = Math.abs(v / o.xstep - Math.round(v / o.xstep)) < 1e-9;
+      s += line(X(v), top, X(v), top + Hc, maj ? 'gl' : 'gl2');
+      if (maj) s += txt(X(v), top + Hc + 4.5, F.n(+v.toFixed(6)), { size: 3.2 });
+    }
+    s += line(left, top, left, top + Hc, 'axis') + line(left, top + Hc, left + Wc, top + Hc, 'axis');
+    const xe = Math.min(o.xmax, o.ymax / o.k);
+    s += line(X(0), Y(0), X(xe), Y(xe * o.k), 'graph');
+    if (A && A.show) for (const r of (o.reads || [])) {
+      const x = r.x !== undefined ? r.x : r.y / o.k, y = x * o.k;
+      s += line(X(x), Y(0), X(x), Y(y), 'ansl dash') + line(X(x), Y(y), X(0), Y(y), 'ansl dash');
+    }
+    if (o.ylab) s += txt(4, top + Hc / 2, o.ylab, { size: 3.4, rot: -90 });
+    if (o.xlab) s += txt(left + Wc / 2, top + Hc + 11, o.xlab, { size: 3.4 });
+    return svg(W, top + Hc + bottom, s);
+  }
+
+  /* Symbol for shape-value puzzles, as inline SVG the size of a digit.
+   * kind: 'circle' | 'square' | 'triangle' | 'star' | 'heart' | 'diamond' */
+  function sym(kind, size = 5) {
+    const c = 5, shapes = {
+      circle: `<circle cx="5" cy="5" r="4.2" class="symf"/>`,
+      square: `<rect x="1" y="1" width="8" height="8" class="symf"/>`,
+      triangle: `<polygon points="5,0.7 9.5,9.2 0.5,9.2" class="symf"/>`,
+      diamond: `<polygon points="5,0.4 9.6,5 5,9.6 0.4,5" class="symf"/>`,
+      star: `<polygon points="${[...Array(10)].map((_, i) => { const r = i % 2 ? 2 : 4.8, a = -Math.PI / 2 + i * Math.PI / 5; return r2(c + r * Math.cos(a)) + ',' + r2(c + 0.3 + r * Math.sin(a)); }).join(' ')}" class="symf"/>`,
+      heart: `<path d="M5,9.2 C1,6.2 0.3,4.4 0.8,2.9 C1.5,0.6 4.2,0.5 5,2.6 C5.8,0.5 8.5,0.6 9.2,2.9 C9.7,4.4 9,6.2 5,9.2 Z" class="symf"/>`,
+    };
+    return `<svg class="symi" viewBox="0 0 10 10" style="width:${size}mm;height:${size}mm">${shapes[kind]}</svg>`;
+  }
+
+  /* Model made of unit cubes, drawn on isometric dotty paper.
+   * o = {cubes:[[x, y, z], ...] (whole numbers, z up), s (mm per cube edge), dots (true: iso dot paper),
+   *      ans:[[x,y,z]] cubes drawn only on the scheme, in red outline} */
+  function cubes(o, A) {
+    const s = o.s || 7, c = Math.cos(Math.PI / 6) * s, h = s / 2;
+    const all = o.cubes.map(p => ({ p, ans: false })).concat(A && A.show ? (o.ans || []).map(p => ({ p, ans: true })) : []);
+    const P = (x, y, z) => [(x - y) * c, (x + y) * h - z * s];
+    let pts = [];
+    for (const { p: [x, y, z] } of all) for (const d of [[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,0,1],[1,0,1],[0,1,1],[1,1,1]]) pts.push(P(x + d[0], y + d[1], z + d[2]));
+    const pad = 4, minx = Math.min(...pts.map(q => q[0])) - pad, miny = Math.min(...pts.map(q => q[1])) - pad;
+    const maxx = Math.max(...pts.map(q => q[0])) + pad, maxy = Math.max(...pts.map(q => q[1])) + pad;
+    const Q = (x, y, z) => { const q = P(x, y, z); return [q[0] - minx, q[1] - miny]; };
+    let out = '';
+    if (o.dots !== false) {
+      // isometric dot paper: every cube corner is a lattice point (i*c, j*h) with i + j even
+      const i0 = Math.floor(minx / c), i1 = Math.ceil(maxx / c), j0 = Math.floor(miny / h), j1 = Math.ceil(maxy / h);
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        if ((i + j) % 2) continue;
+        const x = i * c - minx, y = j * h - miny;
+        if (x >= -0.01 && x <= maxx - minx + 0.01 && y >= -0.01 && y <= maxy - miny + 0.01) out += `<circle cx="${r2(x)}" cy="${r2(y)}" r="0.35" class="dot"/>`;
+      }
+    }
+    const order = all.slice().sort((a, b) => (a.p[0] + a.p[1] + a.p[2]) - (b.p[0] + b.p[1] + b.p[2]) || a.p[2] - b.p[2]);
+    for (const { p: [x, y, z], ans } of order) {
+      const k = ans ? ' ansc' : '';
+      out += poly([Q(x, y, z + 1), Q(x + 1, y, z + 1), Q(x + 1, y + 1, z + 1), Q(x, y + 1, z + 1)], 'ctop' + k);
+      out += poly([Q(x + 1, y, z), Q(x + 1, y + 1, z), Q(x + 1, y + 1, z + 1), Q(x + 1, y, z + 1)], 'cright' + k);
+      out += poly([Q(x, y + 1, z), Q(x + 1, y + 1, z), Q(x + 1, y + 1, z + 1), Q(x, y + 1, z + 1)], 'cleft' + k);
+    }
+    return svg(maxx - minx, maxy - miny, out);
+  }
+
+  /* Protractor laid over an angle, centre on the vertex. o = {deg, side:'right'|'left', r}
+   * side 'right': one arm along the right-hand baseline (read the inner scale, 0 on the right);
+   * side 'left': one arm along the left-hand baseline (read the outer scale, 0 on the left). */
+  function protractor(o) {
+    const R = o.r || 44, cx = R + 12, cy = R + 9, arm = R + 10;
+    let s = `<path d="M${cx - R},${cy} A${R},${R} 0 0 1 ${cx + R},${cy} Z" class="prot"/>`;
+    s += `<path d="M${cx - R + 9},${cy} A${R - 9},${R - 9} 0 0 1 ${cx + R - 9},${cy}" class="thin"/>`;
+    for (let a = 0; a <= 180; a++) {
+      const t = a * Math.PI / 180, L = a % 10 === 0 ? 4 : a % 5 === 0 ? 2.8 : 1.6;
+      const co = Math.cos(t), si = Math.sin(t);
+      s += line(cx - R * co, cy - R * si, cx - (R - L) * co, cy - (R - L) * si, 'tk1');
+      if (a % 10 === 0) {
+        s += txt(cx - (R - 6.3) * co, cy - (R - 6.3) * si + 0.9, a, { size: 2.4, rot: a - 90 });          // outer scale, 0 at the left
+        s += txt(cx - (R - 11.5) * co, cy - (R - 11.5) * si + 0.9, 180 - a, { size: 2.2, rot: a - 90 });  // inner scale, 0 at the right
+      }
+    }
+    s += line(cx - R, cy, cx + R, cy, 'thin') + `<circle cx="${cx}" cy="${cy}" r="0.8" class="fillk"/>` + line(cx, cy - 3, cx, cy, 'thin');
+    // the angle: base arm and turned arm
+    const base = o.side === 'left' ? Math.PI : 0, turn = o.side === 'left' ? Math.PI - o.deg * Math.PI / 180 : o.deg * Math.PI / 180;
+    s += line(cx, cy, cx + arm * Math.cos(base), cy - arm * Math.sin(base), 'arm2');
+    s += line(cx, cy, cx + arm * Math.cos(turn), cy - arm * Math.sin(turn), 'arm2');
+    return svg(2 * cx, cy + 4, s);
+  }
+
+  /* Price list / menu card (HTML). o = {title, items:[[name, pence]], note} */
+  function priceList(o) {
+    return `<div class="menu"><div class="mt">${o.title}</div>` + o.items.map(([n, p]) => `<div class="mrw"><span>${n}</span><span class="ld"></span><span>${F.money(p, p < 100 && o.pence !== false)}</span></div>`).join('') + (o.note ? `<div class="mnote">${o.note}</div>` : '') + `</div>`;
+  }
+
+  /* Shop receipt (HTML). o = {shop, rows:[[name, qty, pence|{a}]], total: pence|{a}, paid, change: pence|{a}}; {a: pence} = answer box */
+  function receipt(o, A) {
+    const val = v => v && typeof v === 'object' ? A.blank(F.money(v.a), 18) : F.money(v);
+    let s = `<div class="rcpt"><div class="rh">${o.shop}</div>`;
+    for (const [n, q, p] of o.rows) s += `<div class="rr"><span>${q > 1 ? q + ' ' + F.times + ' ' : ''}${n}</span><span>${val(p)}</span></div>`;
+    s += `<div class="rr rt"><span>Total</span><span>${val(o.total)}</span></div>`;
+    if (o.paid !== undefined) s += `<div class="rr"><span>Paid</span><span>${F.money(o.paid)}</span></div><div class="rr"><span>Change</span><span>${val(o.change)}</span></div>`;
+    return s + `</div>`;
+  }
+
   function row(items, gap = 8) {
     return `<div class="figrow" style="gap:${gap}mm">` + items.map(it => typeof it === 'string' ? `<div class="fi">${it}</div>` : `<div class="fi">${it.fig}<div class="cap">${it.cap || ''}</div></div>`).join('') + `</div>`;
   }
 
-  return { svg, txt, line, poly, pline, box, numberLine, scale, grid, clock, barChart, lineGraph, pictogram, pie, fractionBar, fractionCircle, rectParts, shape, regular, angle, array, groups, partWhole, barModel, coins, ruler, solid, row, r2 };
+  return { svg, txt, line, poly, pline, box, numberLine, scale, grid, clock, barChart, lineGraph, pictogram, pie, fractionBar, fractionCircle, rectParts, shape, regular, angle, array, groups, partWhole, barModel, coins, ruler, solid, row, r2, convGraph, sym, cubes, protractor, priceList, receipt };
 })();
 if (typeof module !== 'undefined') module.exports = RP;
