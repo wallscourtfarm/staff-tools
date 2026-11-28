@@ -593,10 +593,93 @@ RP.D = (function () {
     return s + `</div>`;
   }
 
+  /* Digital clock (seven-segment). o = {h, m, mode:'24'|'12', ampm:true (12-hour: show am/pm), ans:true (digits only on the scheme), size}
+   * mode '24': 07:05 · mode '12': 7:05 with optional am/pm. */
+  function digital(o, A) {
+    const SEG = { 0: 'abcdef', 1: 'bc', 2: 'abged', 3: 'abgcd', 4: 'fgbc', 5: 'afgcd', 6: 'afgedc', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg' };
+    const k = (o.size || 1), w = 7 * k, hh = 12 * k, t = 1.25 * k, gap = 2.4 * k;
+    const show = !o.ans || (A && A.show), cls = o.ans ? 'segA' : 'seg';
+    const h = o.mode === '12' ? ((o.h % 12) || 12) : o.h;
+    const hs = o.mode === '12' ? String(h).padStart(2, ' ') : String(h).padStart(2, '0'), ms = String(o.m).padStart(2, '0');
+    const digit = (x, y, ch) => {
+      if (ch === ' ' || !show) return '';
+      const on = SEG[ch], r = [];
+      const H = (yy) => `<rect x="${r2(x + t * 0.7)}" y="${r2(yy)}" width="${r2(w - 1.4 * t)}" height="${r2(t)}" rx="${r2(t / 2)}" class="${cls}"/>`;
+      const V = (xx, yy) => `<rect x="${r2(xx)}" y="${r2(yy)}" width="${r2(t)}" height="${r2(hh / 2 - t * 0.9)}" rx="${r2(t / 2)}" class="${cls}"/>`;
+      if (on.includes('a')) r.push(H(y));
+      if (on.includes('g')) r.push(H(y + hh / 2 - t / 2));
+      if (on.includes('d')) r.push(H(y + hh - t));
+      if (on.includes('f')) r.push(V(x, y + t * 0.55));
+      if (on.includes('b')) r.push(V(x + w - t, y + t * 0.55));
+      if (on.includes('e')) r.push(V(x, y + hh / 2 + t * 0.35));
+      if (on.includes('c')) r.push(V(x + w - t, y + hh / 2 + t * 0.35));
+      return r.join('');
+    };
+    const px = 6 * k, py = 5 * k, colon = 3.6 * k, extra = o.mode === '12' && o.ampm ? 9 * k : 0;
+    const W = 2 * px + 4 * w + 2 * gap + colon + gap + extra, Hh = 2 * py + hh;
+    let s = `<rect x="0.5" y="0.5" width="${r2(W - 1)}" height="${r2(Hh - 1)}" rx="${r2(2.5 * k)}" class="dclk"/>`;
+    s += `<rect x="${r2(px * 0.55)}" y="${r2(py * 0.55)}" width="${r2(W - px * 1.1)}" height="${r2(Hh - py * 1.1)}" rx="${r2(1.2 * k)}" class="dscr"/>`;
+    let x = px;
+    s += digit(x, py, hs[0]); x += w + gap; s += digit(x, py, hs[1]); x += w + gap * 0.6;
+    if (show) s += `<circle cx="${r2(x + colon / 2)}" cy="${r2(py + hh * 0.3)}" r="${r2(t * 0.6)}" class="${cls}"/><circle cx="${r2(x + colon / 2)}" cy="${r2(py + hh * 0.7)}" r="${r2(t * 0.6)}" class="${cls}"/>`;
+    x += colon + gap * 0.6;
+    s += digit(x, py, ms[0]); x += w + gap; s += digit(x, py, ms[1]); x += w + gap;
+    if (extra && show) s += txt(x + 2.5 * k, py + hh - 0.5, o.h < 12 ? 'am' : 'pm', { size: 3.6 * k, bold: true, cls: o.ans ? 'ans' : '' });
+    return svg(W, Hh, s);
+  }
+
+  /* Calendar page (HTML), weeks start on Monday. o = {year, month (0-11), ring:[days circled], cross:[days crossed]} */
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const daysIn = (y, m) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const dow = (y, m, d) => (new Date(Date.UTC(y, m, d)).getUTCDay() + 6) % 7;   // 0 = Monday
+  function calendar(o) {
+    const n = daysIn(o.year, o.month), first = dow(o.year, o.month, 1);
+    let s = `<table class="cal"><caption>${MONTHS[o.month]} ${o.year}</caption><tr>${DAYS.map(d => `<th>${d.slice(0, 3)}</th>`).join('')}</tr><tr>`;
+    for (let i = 0; i < first; i++) s += '<td></td>';
+    for (let d = 1; d <= n; d++) {
+      const c = (first + d - 1) % 7;
+      if (c === 0 && d > 1) s += '</tr><tr>';
+      const cl = (o.ring || []).includes(d) ? ' class="ring"' : (o.cross || []).includes(d) ? ' class="xd"' : '';
+      s += `<td${cl}><span>${d}</span></td>`;
+    }
+    const last = (first + n - 1) % 7;
+    for (let i = last + 1; i < 7; i++) s += '<td></td>';
+    return s + '</tr></table>';
+  }
+
+  /* Venn diagram with two circles inside a box. o = {labels:[a, b], a:[], both:[], b:[], none:[], ans:true (all items are answers)}
+   * Items listed per region; when o.ans, the items show only on the scheme, in red. */
+  function venn(o, A) {
+    const W = 140, H = 70, r = 27, c1 = [50, 38], c2 = [90, 38];
+    const show = !o.ans || (A && A.show), cls = o.ans ? 'ans' : '';
+    let s = `<rect x="1" y="1" width="${W - 2}" height="${H - 2}" class="vbox"/>`;
+    s += `<circle cx="${c1[0]}" cy="${c1[1]}" r="${r}" class="vc"/><circle cx="${c2[0]}" cy="${c2[1]}" r="${r}" class="vc"/>`;
+    s += txt(c1[0] - 8, 7.5, o.labels[0], { size: 3.5, bold: true }) + txt(c2[0] + 8, 7.5, o.labels[1], { size: 3.5, bold: true });
+    const col = (x, items) => {
+      const k = items.length, sp = Math.min(7, 40 / Math.max(k, 1));
+      return items.map((v, i) => txt(x, 38 + (i - (k - 1) / 2) * sp + 1.4, v, { size: 4.2, cls })).join('');
+    };
+    if (show) {
+      s += col(c1[0] - 13, o.a || []) + col(70, o.both || []) + col(c2[0] + 13, o.b || []);
+      const corners = [[10, 60], [130, 60], [10, 14], [130, 14], [70, 66.5]];
+      (o.none || []).forEach((v, i) => s += txt(corners[i][0], corners[i][1], v, { size: 4.2, cls }));
+    }
+    return svg(W, H, s);
+  }
+
+  /* Carroll diagram (HTML). o = {cols:[c1, c2], rows:[r1, r2], cells:[[[..],[..]],[[..],[..]]], ans:true} */
+  function carroll(o, A) {
+    const show = !o.ans || (A && A.show);
+    const cell = items => `<td>${show ? items.map(v => o.ans ? `<span class="av">${v}</span>` : v).join(', ') : ''}</td>`;
+    return `<table class="qt carroll"><tr><th></th><th>${o.cols[0]}</th><th>${o.cols[1]}</th></tr>` +
+      o.rows.map((rw, i) => `<tr><th>${rw}</th>${cell(o.cells[i][0])}${cell(o.cells[i][1])}</tr>`).join('') + `</table>`;
+  }
+
   function row(items, gap = 8) {
     return `<div class="figrow" style="gap:${gap}mm">` + items.map(it => typeof it === 'string' ? `<div class="fi">${it}</div>` : `<div class="fi">${it.fig}<div class="cap">${it.cap || ''}</div></div>`).join('') + `</div>`;
   }
 
-  return { svg, txt, line, poly, pline, box, numberLine, scale, grid, clock, barChart, lineGraph, pictogram, pie, fractionBar, fractionCircle, rectParts, shape, regular, angle, array, groups, partWhole, barModel, coins, ruler, solid, row, r2, convGraph, sym, cubes, protractor, priceList, receipt };
+  return { svg, txt, line, poly, pline, box, numberLine, scale, grid, clock, barChart, lineGraph, pictogram, pie, fractionBar, fractionCircle, rectParts, shape, regular, angle, array, groups, partWhole, barModel, coins, ruler, solid, row, r2, convGraph, sym, cubes, protractor, priceList, receipt, digital, calendar, venn, carroll, MONTHS, DAYS, daysIn, dow };
 })();
 if (typeof module !== 'undefined') module.exports = RP;
